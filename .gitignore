@@ -29,6 +29,11 @@ Homestead.yaml
 Thumbs.db
 
 /dist/
+
+# Apps mobile (repositorios Git separados)
+/apps/forca-vendas/
+/apps/vendas-internas/
+
 /installer/assets/laragon-wamp.exe
 /installer/assets/php-8.4-win.zip
 /installer/assets/7z-extra.7z
