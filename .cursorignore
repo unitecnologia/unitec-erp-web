@@ -1,0 +1,30 @@
+﻿# Dependências (milhares de arquivos — não indexar)
+vendor/
+node_modules/
+
+# Pacote cliente / staging (cópia duplicada do ERP + vendor)
+dist/
+
+# Gerados pelo Laravel
+storage/
+bootstrap/cache/
+public/build/
+public/hot/
+public/storage/
+
+# Cache e logs
+.phpunit.cache/
+.phpunit.result.cache/
+*.log
+
+# Binários do instalador (grandes)
+installer/assets/*.exe
+installer/assets/*.zip
+installer/assets/*.7z
+installer/assets/*.sfx
+
+# Ferramentas locais
+.idea/
+.zed/
+.phpactor.json
+_ide_helper.php

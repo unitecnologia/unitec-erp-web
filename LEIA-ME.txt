@@ -1,0 +1,32 @@
+UNITEC ERP — INSTALACAO
+
+
+
+1. Duplo clique em: Instalar Unitec ERP.exe
+
+2. Clique Avancar > Avancar > Instalar
+
+3. Aguarde a barra de progresso (ate 20 minutos)
+
+4. O sistema abre sozinho no navegador
+
+
+
+DEPOIS DE INSTALAR
+
+- Use o atalho "Unitec ERP" na Area de Trabalho
+
+- Leia "COMO USAR - Unitec ERP.txt" na Area de Trabalho
+
+
+
+Login:
+
+  E-mail: usuario@unitecnologia.local
+
+  Senha:  01
+
+
+
+Suporte: https://unitecnologiasc.com.br/
+

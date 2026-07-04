@@ -1,0 +1,433 @@
+/* ERP — Configurações de Terminais (viewport/janela = erp-produtos-form.css + master-detail) */
+
+/* Viewport modal */
+.fi-body:has(.erp-terminais-form-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.48) !important;
+}
+
+.fi-body:has(.erp-terminais-form-page) .erp-menu-bar,
+.fi-body:has(.erp-terminais-form-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-terminais-form-page) .erp-title-bar {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-terminais-form-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-terminais-form-page) .fi-layout,
+.fi-body:has(.erp-terminais-form-page) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-terminais-form-page) .fi-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.75rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-terminais-form-page) .fi-main > * {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: min(1180px, 98vw);
+    min-height: 0;
+    height: calc(100dvh - 3.25rem);
+    max-height: calc(100dvh - 3.25rem);
+    overflow: hidden;
+}
+
+.fi-page.erp-form-page.erp-terminais-form-page,
+.fi-page.erp-terminais-form-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    min-height: 0 !important;
+    height: calc(100dvh - 3.25rem);
+    max-height: calc(100dvh - 3.25rem);
+    overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-terminais-form-page .fi-page-header-main-ctn,
+.erp-terminais-form-page .fi-page-main,
+.erp-terminais-form-page .fi-page-content,
+.erp-terminais-form-page .fi-sc {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0 !important;
+    gap: 0 !important;
+    background: transparent;
+}
+
+.erp-terminais-form-page .fi-sc > div:has(> .erp-terminais-window) {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-terminais-window {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.erp-terminais-window__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-terminais-window__body > .erp-terminais-master {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-terminais-window__body > .erp-terminais-pcad__footer {
+    flex-shrink: 0;
+}
+
+.erp-terminais-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.erp-terminais-window__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-terminais-form-page .fi-header,
+.erp-terminais-form-page .fi-form-actions {
+    display: none !important;
+}
+
+@supports not (height: 100dvh) {
+    .fi-body:has(.erp-terminais-form-page) {
+        height: 100vh;
+    }
+
+    .fi-body:has(.erp-terminais-form-page) .fi-main > *,
+    .fi-page.erp-form-page.erp-terminais-form-page,
+    .fi-page.erp-terminais-form-page {
+        height: calc(100vh - 3.25rem);
+        max-height: calc(100vh - 3.25rem);
+    }
+}
+
+@media (max-width: 1180px) {
+    .erp-terminais-window {
+        min-width: 0;
+    }
+}
+/* Master-detail — coluna NOME estilo DBGrid Delphi */
+.erp-terminais-master {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    align-items: stretch;
+}
+
+.erp-terminais-master > * {
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.erp-terminais-master__sidebar {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    flex: 0 0 10.5rem;
+    width: 10.5rem;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid #8ea8c3;
+    background: #fff;
+}
+
+.erp-terminais-master__sidebar-head {
+    padding: 0.22rem 0.35rem;
+    border-bottom: 1px solid #8ea8c3;
+    background: #d9e6f2;
+    text-align: center;
+}
+
+.erp-terminais-master__sidebar-title {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-terminais-master__nome-input {
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.2rem 0.35rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+}
+
+.erp-terminais-master__list {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-left: 1px solid #8ea8c3;
+    border-right: 1px solid #8ea8c3;
+    border-bottom: 1px solid #8ea8c3;
+    background: #fff;
+}
+
+.erp-terminais-master__list > li {
+    margin: 0;
+    padding: 0;
+}
+
+.erp-terminais-master__item {
+    display: block;
+    width: 100%;
+    min-height: 1.65rem;
+    padding: 0.18rem 0.35rem;
+    border: 0;
+    border-bottom: 1px solid #c5d4e4;
+    border-radius: 0;
+    background: #fff;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #000;
+    cursor: pointer;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.erp-terminais-master__item:hover {
+    background: #e8f2fb;
+}
+
+.erp-terminais-master__item--selected {
+    background: #316ac5 !important;
+    color: #fff !important;
+    box-shadow: none;
+}
+
+.erp-terminais-master__item-label {
+    display: block;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-terminais-master__item--selected .erp-terminais-master__item-label {
+    color: #fff;
+}
+
+.erp-terminais-master__empty {
+    display: flex;
+    align-items: center;
+    min-height: 2.35rem;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 1px solid var(--erp-border-light, #d8e2ef);
+}
+
+/* Shell pcad — tipografia igual Produtos */
+.erp-terminais-pcad {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #000;
+    background: #eef4fb !important;
+    padding: 0.25rem 0.35rem 0 !important;
+}
+
+.erp-terminais-pcad .erp-pcad-form__input,
+.erp-terminais-pcad .erp-pcad-form__select,
+.erp-terminais-pcad .erp-pcad-form__textarea {
+    font-size: 0.82rem;
+    font-weight: 600;
+    min-height: 1.45rem;
+}
+
+.erp-terminais-pcad .erp-pcad__group-title,
+.erp-terminais-pcad .erp-pcad__check,
+.erp-terminais-pcad .erp-pcad-form__label {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.erp-terminais-pcad .erp-pcad-actions__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-terminais-pcad__tabs {
+    flex-shrink: 0;
+}
+
+.erp-terminais-form-page .erp-pcad__workspace,
+.erp-terminais-pcad__workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 !important;
+    border: 1px solid #8ea8c3 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+}
+
+.erp-terminais-form-page .erp-pcad__tabs,
+.erp-terminais-pcad__tabs {
+    margin-bottom: 0 !important;
+    padding-left: 0.15rem;
+}
+
+.erp-terminais-form-page .erp-pcad__tab {
+    padding: 0.28rem 0.75rem !important;
+    font-size: 0.76rem !important;
+    border-radius: 0 !important;
+}
+
+.erp-terminais-form-page .erp-pcad__content,
+.erp-terminais-pcad__workspace .erp-pcad__content {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    padding: 0.45rem 0.55rem 0.35rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Rodapé Delphi — F4 / F10 / ESC fixo na janela */
+.erp-terminais-pcad__footer {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    padding: 0.35rem 0.45rem !important;
+}
+
+.erp-terminais-pcad__actions {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: auto;
+    gap: 0.55rem !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
+    border-color: #fca5a5 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%) !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: #86efac !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"]:hover {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%) !important;
+}
+
+@media (max-width: 768px) {
+    .erp-terminais-master {
+        flex-direction: column;
+    }
+
+    .erp-terminais-master__sidebar {
+        flex: 0 0 auto;
+        width: 100%;
+        max-height: 9rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    }
+
+    .erp-terminais-pcad__actions {
+        flex-wrap: wrap;
+    }
+}

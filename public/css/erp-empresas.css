@@ -1,0 +1,35 @@
+/* ERP — Empresas (larguras de colunas; UI em erp-list-ui.css) */
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(1),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 6%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(2),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 22%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(3),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 24%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(4),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 18%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(5),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 16%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(6),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 14%;
+}
+
+.erp-empresas-actions__label {
+    font-weight: 700;
+}

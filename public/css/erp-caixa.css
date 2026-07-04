@@ -1,0 +1,706 @@
+/* ERP — Caixa (grade compacta + filtros + resumo Delphi) */
+
+.erp-caixa-page .erp-caixa {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    flex-shrink: 0;
+}
+
+.erp-caixa-page .erp-caixa__filter-block {
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0.35rem !important;
+    padding: 0.4rem 0.55rem !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-right: 4px solid var(--erp-brand-primary) !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.35rem 0.45rem !important;
+}
+
+.erp-caixa-page .erp-caixa__account-label {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-caixa-page .erp-caixa__account-select {
+    min-width: 9rem;
+    max-width: 11rem;
+    text-transform: none;
+    font-weight: 600;
+}
+
+.erp-caixa-page .erp-caixa__period {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 0.3rem 0.35rem;
+    min-width: 0;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-caixa-page .erp-caixa__period-label {
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.erp-caixa-page .erp-caixa__period-input,
+.erp-caixa-page .erp-caixa__period-input.erp-date-input,
+.erp-caixa-page .erp-caixa__period .erp-date-field {
+    width: calc(10.5ch + 2.1rem);
+    min-width: calc(10.5ch + 2.1rem);
+    max-width: calc(10.5ch + 2.1rem);
+}
+
+.erp-caixa-page .erp-caixa__period-input,
+.erp-caixa-page .erp-caixa__period-input.erp-date-input {
+    height: 1.75rem;
+    min-height: 1.75rem;
+    box-sizing: border-box;
+    padding: 0.18rem 2.1rem 0.18rem 0.35rem !important;
+    font-size: 0.75rem;
+}
+
+.erp-caixa-page .erp-caixa__btn {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.6875rem;
+}
+
+.erp-caixa-page .erp-caixa__locate-group {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-caixa-page .erp-caixa__locate-field {
+    width: auto;
+    min-width: 5.75rem;
+    max-width: 6.75rem;
+    flex-shrink: 0;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+}
+
+.erp-caixa-page .erp-caixa__locate-input {
+    flex: 1 1 auto;
+    min-width: 6rem;
+    max-width: none;
+    width: auto;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+}
+
+.erp-caixa-page .erp-caixa__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-caixa-page .erp-caixa__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-caixa-page .erp-caixa__page-size-select {
+    width: auto;
+    min-width: 3.75rem;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+}
+
+.erp-caixa-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-caixa-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ── Grade compacta ─────────────────────────────────────────────── */
+
+.erp-caixa-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn {
+    --erp-caixa-scrollbar-size: 17px;
+    padding-right: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 40%) #164a85;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn::-webkit-scrollbar {
+    width: var(--erp-caixa-scrollbar-size) !important;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%) !important;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 38%);
+    border-radius: 4px;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-content-ctn > .fi-ta-table {
+    width: calc(100% + var(--erp-caixa-scrollbar-size));
+    margin-right: calc(-1 * var(--erp-caixa-scrollbar-size));
+}
+
+.erp-list-page.erp-caixa-page .fi-ta-table,
+.erp-caixa-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100% !important;
+    table-layout: fixed;
+}
+
+.erp-caixa-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-caixa-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+    box-shadow: var(--erp-caixa-scrollbar-size, 17px) 0 0 0 #164a85;
+}
+
+.erp-caixa-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-caixa-page .fi-ta-cell:last-child {
+    border-right: none !important;
+    position: relative;
+}
+
+.erp-caixa-page .fi-ta-row .fi-ta-cell:last-child::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: calc(-1 * var(--erp-caixa-scrollbar-size, 17px));
+    width: var(--erp-caixa-scrollbar-size, 17px);
+    height: 100%;
+    background: inherit;
+    pointer-events: none;
+}
+
+.erp-caixa-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-caixa-page .fi-ta-header-cell-sort-btn svg,
+.erp-caixa-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-caixa-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-caixa-page button.fi-ta-col,
+.erp-caixa-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-caixa-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-caixa-page .fi-ta-text-item,
+.erp-caixa-page .fi-ta-col,
+.erp-caixa-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-caixa-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-caixa-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-caixa-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-caixa-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-caixa-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-caixa-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-caixa-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-caixa-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-caixa-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-caixa-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* ── Larguras das colunas ───────────────────────────────────────── */
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(1),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.5rem;
+    max-width: 5rem;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(2),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 5.75rem;
+    max-width: 6.25rem;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(3),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 5.5rem;
+    max-width: 6.5rem;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(4),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: auto !important;
+    min-width: 12rem;
+    max-width: none !important;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(5),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: calc(10rem + 2cm);
+    min-width: calc(10rem + 2cm);
+    max-width: calc(12rem + 2cm);
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(6),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: calc(8rem + 1cm);
+    min-width: calc(8rem + 1cm);
+    max-width: calc(10rem + 1cm);
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(7),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 6.5rem;
+    max-width: 7.5rem;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(8),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-caixa-page .fi-ta-header-cell-saida,
+.erp-caixa-page .fi-ta-cell-saida {
+    width: 6.5rem;
+    max-width: 7.5rem;
+}
+
+.erp-caixa-page .fi-ta-header-cell:nth-child(9),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-caixa-page .fi-ta-header-cell-ver-itens,
+.erp-caixa-page .fi-ta-cell-ver-itens {
+    width: 1.35rem !important;
+    min-width: 1.35rem !important;
+    max-width: 1.35rem !important;
+    padding-inline: 0 !important;
+    overflow: hidden;
+}
+
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
+.erp-caixa-page .fi-ta-cell-ver-itens .fi-ta-col {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    justify-content: center !important;
+}
+
+.erp-caixa-page .erp-caixa__eye-btn {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 4px;
+    background: var(--erp-bg-panel, #fff);
+    color: var(--erp-brand-primary, #1e5a9e);
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--erp-transition), border-color var(--erp-transition), transform var(--erp-transition);
+}
+
+.erp-caixa-page .erp-caixa__eye-icon {
+    width: calc(0.9rem + 1mm);
+    height: calc(0.9rem + 1mm);
+    display: block;
+}
+
+.erp-caixa-page .erp-caixa__eye-btn:hover {
+    background: var(--erp-row-hover, #e8f2ff);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    transform: scale(1.05);
+}
+
+.erp-caixa-page .erp-caixa__eye-btn:focus-visible {
+    outline: 2px solid var(--erp-brand-primary, #1e5a9e);
+    outline-offset: 1px;
+}
+
+.erp-caixa-page .fi-ta-row.erp-row-selected .erp-caixa__eye-btn {
+    background: #fff;
+    border-color: #1e3a8a;
+    color: #1e3a8a;
+}
+
+.erp-caixa-page .fi-ta-col:has(.erp-caixa__eye-btn) {
+    justify-content: center !important;
+    overflow: visible !important;
+}
+
+.erp-caixa-page .fi-ta-header-cell-ver-itens,
+.erp-caixa-page .fi-ta-header-cell:nth-child(9) {
+    padding: 0 !important;
+}
+
+/* ── Conta / resumo ─────────────────────────────────────────────── */
+
+.erp-caixa-page .erp-caixa__summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    flex-shrink: 0;
+    margin: 0 0.65rem;
+    padding: 0.35rem 0.75rem;
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-right: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    font-family: var(--erp-font);
+    box-shadow: var(--erp-shadow-md);
+}
+
+.erp-caixa-page .erp-caixa__summary-label {
+    font-size: var(--erp-font-size-sm);
+    font-weight: 800;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.erp-caixa-page .erp-caixa__summary-label--saldo {
+    margin-left: auto;
+}
+
+.erp-caixa-page .erp-caixa__summary-value {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-caixa-page .erp-caixa__summary-value--entrada {
+    color: #15803d;
+}
+
+.erp-caixa-page .erp-caixa__summary-value--saida {
+    color: #b91c1c;
+}
+
+.erp-caixa-page .erp-caixa__summary-value--saldo {
+    color: var(--erp-brand-primary-dark);
+}
+
+/* ── Action bar ─────────────────────────────────────────────────── */
+
+.erp-caixa-page .erp-caixa-actions {
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-caixa-page .erp-caixa-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-caixa-page .erp-caixa-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-caixa-page .erp-caixa-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-caixa-page .erp-caixa-actions__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.erp-caixa-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-caixa-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__window {
+    width: min(42rem, calc(100vw - 1rem));
+    max-height: calc(100vh - 1.5rem);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+}
+
+.erp-caixa-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-caixa-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0.65rem 0.75rem 0.55rem;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 0.85rem;
+    margin-bottom: 0.65rem;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__field--wide {
+    grid-column: 1 / -1;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary, #1e5a9e);
+    text-transform: uppercase;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__value {
+    min-height: 1.35rem;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+    word-break: break-word;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__value--entrada {
+    color: #15803d;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__value--saida {
+    color: #b91c1c;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__actions {
+    display: flex !important;
+    width: 100%;
+    justify-content: flex-end !important;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.45rem 0.55rem !important;
+    background: linear-gradient(180deg, #1a3a5c 0%, #0f2847 100%) !important;
+    border-top: 2px solid #1e5a9e;
+    border-radius: 0 0 var(--erp-radius-md, 8px) var(--erp-radius-md, 8px);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__btn {
+    min-width: 5.85rem;
+    height: 3rem;
+    border: 1px solid #fca5a5;
+    border-radius: var(--erp-radius-md, 8px);
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+    color: #fff;
+    cursor: pointer;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__btn:hover {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+}
+
+.erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__label,
+.erp-caixa-page .erp-caixa-view-modal__actions .erp-pcad-actions__label kbd {
+    color: #fff;
+}
+
+@media (max-width: 900px) {
+    .erp-caixa-page .erp-caixa__filter-block {
+        flex-wrap: wrap !important;
+    }
+
+    .erp-caixa-page .erp-caixa__summary-label--saldo {
+        margin-left: 0;
+    }
+
+    .erp-caixa-page .erp-caixa__period,
+    .erp-caixa-page .erp-caixa__locate-group,
+    .erp-caixa-page .erp-caixa__page-size-group {
+        flex-basis: 100%;
+        padding-left: 0;
+        border-left: none;
+        margin-left: 0;
+    }
+
+    .erp-caixa-page .erp-caixa-view-modal__grid {
+        grid-template-columns: 1fr;
+    }
+}

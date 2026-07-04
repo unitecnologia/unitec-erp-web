@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Http\Controllers\Api\VendasInternas;
+
+use App\Models\User;
+use App\Models\VendasInternasDevice;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class AuthController
+{
+    public function login(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'empresa_id' => ['nullable', 'integer'],
+            'user_id' => ['nullable', 'integer'],
+            'login' => ['nullable', 'string', 'max:120'],
+            'senha' => ['required', 'string', 'max:60'],
+            'device_uuid' => ['required', 'string', 'max:100'],
+            'device_name' => ['nullable', 'string', 'max:120'],
+            'platform' => ['nullable', 'string', 'max:40'],
+            'app_version' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $query = User::query()->where('ativo', true);
+
+        if (! empty($data['user_id'])) {
+            $query->whereKey($data['user_id']);
+        } elseif (! empty($data['login'])) {
+            $login = trim($data['login']);
+            $query->where(function ($q) use ($login): void {
+                $q->where('email', mb_strtolower($login))
+                    ->orWhere('name', mb_strtoupper($login, 'UTF-8'));
+            });
+        } else {
+            throw ValidationException::withMessages([
+                'login' => 'Informe o usuário.',
+            ]);
+        }
+
+        if (! empty($data['empresa_id'])) {
+            $query->where('empresa_id', $data['empresa_id']);
+        }
+
+        $user = $query->first();
+
+        if (! $user instanceof User || blank($user->senha_app_forca_vendas)) {
+            throw ValidationException::withMessages([
+                'senha' => 'Usuário ou senha do app inválidos.',
+            ]);
+        }
+
+        if (! hash_equals((string) $user->senha_app_forca_vendas, (string) $data['senha'])) {
+            throw ValidationException::withMessages([
+                'senha' => 'Usuário ou senha do app inválidos.',
+            ]);
+        }
+
+        $tokenName = 'vi:'.$data['device_uuid'];
+
+        DB::transaction(function () use ($user, $tokenName): void {
+            $user->tokens()->where('name', $tokenName)->delete();
+        });
+
+        $token = $user->createToken($tokenName, ['vendas-internas']);
+
+        VendasInternasDevice::query()->updateOrCreate(
+            ['device_uuid' => $data['device_uuid']],
+            [
+                'user_id' => $user->id,
+                'empresa_id' => $user->empresa_id,
+                'device_name' => $data['device_name'] ?? null,
+                'platform' => $data['platform'] ?? null,
+                'app_version' => $data['app_version'] ?? null,
+                'current_token_id' => $token->accessToken->getKey(),
+                'last_seen_at' => now(),
+                'revoked_at' => null,
+            ]
+        );
+
+        return response()->json([
+            'token' => $token->plainTextToken,
+            'user' => $this->userPayload($user),
+        ]);
+    }
+
+    public function me(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return response()->json([
+            'user' => $this->userPayload($user),
+        ]);
+    }
+
+    public function logout(Request $request): JsonResponse
+    {
+        $token = $request->user()?->currentAccessToken();
+
+        if ($token !== null) {
+            VendasInternasDevice::query()
+                ->where('current_token_id', $token->getKey())
+                ->update(['revoked_at' => now()]);
+
+            $token->delete();
+        }
+
+        return response()->json(['message' => 'Sessão encerrada.']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'empresa_id' => $user->empresa_id,
+            'vendedor_id' => $user->vendedor_id,
+            'vendedor_nome' => $user->vendedor?->nome,
+            'is_admin' => (bool) $user->is_admin,
+            'permissions' => $user->effectivePermissionKeys(),
+        ];
+    }
+}

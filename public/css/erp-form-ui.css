@@ -1,0 +1,884 @@
+/* ERP — UI compartilhada dos cadastros (visual v2; operação inalterada) */
+
+/* ── Overlay / viewport ────────────────────────────────────────── */
+
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)) {
+    background: rgba(15, 52, 96, 0.58) !important;
+}
+
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)) .erp-title-bar {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+/* Viewport modal — layout compartilhado (todos os cadastros) */
+.fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)),
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed)),
+.fi-body:has(.erp-empresas-form-page),
+.fi-body:has(.erp-terminais-form-page),
+.fi-body:has(.erp-orcamentos-form-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+.fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)) .erp-menu-bar,
+.fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)) .erp-shortcut-bar,
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed)) .erp-menu-bar,
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed)) .erp-shortcut-bar,
+.fi-body:has(.erp-empresas-form-page) .erp-menu-bar,
+.fi-body:has(.erp-empresas-form-page) .erp-shortcut-bar,
+.fi-body:has(.erp-terminais-form-page) .erp-menu-bar,
+.fi-body:has(.erp-terminais-form-page) .erp-shortcut-bar,
+.fi-body:has(.erp-orcamentos-form-page) .erp-menu-bar,
+.fi-body:has(.erp-orcamentos-form-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)) .fi-layout,
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)):not(:has(.erp-terminais-form-page)):not(:has(.erp-orcamentos-form-page)):not(:has(.erp-produtos-form-page:not(.erp-pdv-embed))) .fi-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.75rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-form-page:not(.erp-pdv-embed)):not(:has(.erp-terminais-form-page)):not(:has(.erp-orcamentos-form-page)):not(:has(.erp-produtos-form-page:not(.erp-pdv-embed))) .fi-main > * {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: min(1280px, 98vw);
+    min-height: 0;
+    max-height: calc(100dvh - 5.5rem);
+    overflow: hidden;
+}
+
+.fi-page.erp-form-page:not(.erp-pdv-embed):not(.erp-terminais-form-page):not(.erp-orcamentos-form-page):not(.erp-produtos-form-page) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 5.5rem);
+    overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-form-page:not(.erp-pdv-embed):not(.erp-terminais-form-page) .fi-page-header-main-ctn,
+.erp-form-page:not(.erp-pdv-embed):not(.erp-terminais-form-page) .fi-page-main,
+.erp-form-page:not(.erp-pdv-embed):not(.erp-terminais-form-page) .fi-page-content,
+.erp-form-page:not(.erp-pdv-embed):not(.erp-terminais-form-page) .fi-sc {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0 !important;
+    gap: 0 !important;
+    background: transparent;
+}
+
+.erp-form-page .fi-header,
+.erp-form-page .fi-form-actions {
+    display: none !important;
+}
+
+.erp-form-page .erp-pcad__filament-hidden {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+/* ── Janela modal ──────────────────────────────────────────────── */
+
+.erp-pessoas-window,
+.erp-produtos-window,
+.erp-empresas-window,
+.erp-terminais-window,
+.erp-orcamentos-window {
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
+    border-radius: var(--erp-radius-lg, 10px) !important;
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35)) !important;
+    background: var(--erp-bg-app, #eef4fb) !important;
+    overflow: hidden;
+}
+
+.erp-pessoas-window__titlebar,
+.erp-produtos-window__titlebar,
+.erp-empresas-window__titlebar,
+.erp-terminais-window__titlebar,
+.erp-orcamentos-window__titlebar {
+    padding: 0.5rem 0.75rem !important;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    border-bottom: none !important;
+}
+
+.erp-pessoas-window__title,
+.erp-produtos-window__title,
+.erp-empresas-window__title,
+.erp-terminais-window__title,
+.erp-orcamentos-window__title {
+    font-size: 0.9375rem !important;
+    font-weight: 700 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    letter-spacing: 0.02em;
+}
+
+.erp-pessoas-window__close,
+.erp-produtos-window__close,
+.erp-empresas-window__close,
+.erp-terminais-window__close,
+.erp-orcamentos-window__close {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    font-size: 1.1rem !important;
+    transition: background var(--erp-transition, 0.15s ease), border-color var(--erp-transition, 0.15s ease);
+}
+
+.erp-pessoas-window__close:hover,
+.erp-produtos-window__close:hover,
+.erp-empresas-window__close:hover,
+.erp-terminais-window__close:hover,
+.erp-orcamentos-window__close:hover {
+    background: var(--erp-action-danger, #dc2626) !important;
+    border-color: #fca5a5 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions,
+.erp-pessoas-form-page:not(.erp-pdv-embed) .erp-pessoas-window__body > .erp-pcad-actions,
+.erp-produtos-form-page:not(.erp-pdv-embed) .erp-produtos-pcad__footer,
+.erp-empresas-form-page .erp-produtos-pcad__footer,
+.erp-terminais-form-page .erp-terminais-pcad__footer,
+.erp-config-fiscais-page .erp-config-fiscais-pcad__footer {
+    background: var(--erp-action-bg, linear-gradient(180deg, #1a3a5c 0%, #0f2847 100%)) !important;
+    border-top: 2px solid var(--erp-brand-primary, #1e5a9e) !important;
+    padding: 0.55rem 0.65rem !important;
+}
+
+/* ── Shell pcad (abas + workspace) ─────────────────────────────── */
+
+.erp-pcad,
+.erp-produtos-pcad,
+.erp-empresas-pcad,
+.erp-terminais-pcad {
+    background: var(--erp-bg-app, #eef4fb) !important;
+    padding: 0.5rem 0.55rem 0 !important;
+    font-family: var(--erp-font, 'Segoe UI', system-ui, sans-serif) !important;
+    color: var(--erp-text, #0f172a) !important;
+}
+
+.erp-pcad__tabs {
+    gap: 0.25rem !important;
+}
+
+.erp-pcad__tab {
+    padding: 0.38rem 0.95rem !important;
+    font-size: var(--erp-font-size-xs, 0.8125rem) !important;
+    font-weight: 600 !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-bottom: none !important;
+    border-radius: var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) 0 0 !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+    color: var(--erp-text-muted, #64748b) !important;
+    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+}
+
+.erp-pcad__tab:hover {
+    background: var(--erp-bg-panel, #fff) !important;
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+.erp-pcad__tab--active,
+.erp-empresas-form-page .erp-pcad__tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: var(--erp-brand-accent, #15803d) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    font-weight: 700 !important;
+    margin-bottom: 0 !important;
+}
+
+.erp-pcad__workspace {
+    background: var(--erp-bg-panel, #fff) !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: 0 var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1)) !important;
+    padding: 0.65rem 0.75rem !important;
+}
+
+/* ── Campos do formulário ──────────────────────────────────────── */
+
+.erp-pcad-form__label {
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+    font-weight: 700 !important;
+}
+
+.erp-pcad-form__input,
+.erp-pcad-form__select,
+.erp-pcad-form__textarea {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-panel, #fff) !important;
+    color: var(--erp-text, #0f172a) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.08));
+    transition: border-color var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+.erp-pcad-form__input:focus,
+.erp-pcad-form__select:focus,
+.erp-pcad-form__textarea:focus {
+    outline: none;
+    border-color: var(--erp-focus-ring, #2563eb) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
+}
+
+.erp-pcad-form__btn {
+    border: 1px solid var(--erp-border, #94a3b8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-panel, #fff) !important;
+    font-weight: 600 !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+    transition: background var(--erp-transition, 0.15s ease), border-color var(--erp-transition, 0.15s ease);
+}
+
+.erp-pcad-form__btn:hover {
+    background: var(--erp-hover, #dbeafe) !important;
+    border-color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+.erp-pcad__group {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.08));
+}
+
+.erp-pcad__group-title {
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+    font-weight: 700 !important;
+}
+
+.erp-pcad__check {
+    color: var(--erp-text, #0f172a) !important;
+}
+
+/* ── Grids internos (contatos, lookup) ───────────────────────── */
+
+.erp-pessoas-contatos__grid-wrap,
+.erp-lookup-modal__grid-wrap {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    overflow: hidden;
+}
+
+.erp-pessoas-contatos__grid th,
+.erp-lookup-modal__grid th {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.erp-pessoas-contatos__row--selected,
+.erp-lookup-modal__row--selected {
+    background: var(--erp-row-selected, #bfdbfe) !important;
+    color: var(--erp-text, #0f172a) !important;
+    box-shadow: inset 3px 0 0 var(--erp-row-selected-border, #1d4ed8);
+}
+
+.erp-pessoas-contatos__mini-btn {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-pessoas-foto__preview {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-pessoas-foto__modal-panel {
+    border-radius: var(--erp-radius-md, 8px) !important;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e) !important;
+    background: var(--erp-bg-panel, #fff) !important;
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+}
+
+/* ── Lookup modal ──────────────────────────────────────────────── */
+
+.erp-lookup-modal__window {
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
+    border-radius: var(--erp-radius-lg, 10px) !important;
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35)) !important;
+    overflow: hidden;
+}
+
+.erp-lookup-modal__titlebar {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    border-bottom: none !important;
+}
+
+.erp-lookup-modal__close {
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-lookup-modal__search-box,
+.erp-lookup-modal__form-box {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+}
+
+.erp-lookup-modal__search-legend,
+.erp-lookup-modal__form-legend {
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+    font-weight: 700 !important;
+}
+
+/* ── Produtos — cabeçalho empresa ──────────────────────────────── */
+
+.erp-produtos-pcad__empresa-box {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+}
+
+.erp-produtos-pcad__fieldset-legend,
+.erp-produtos-pcad__cadastro-label {
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+/* ── Action bar F5 / ESC ─────────────────────────────────────── */
+
+.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.erp-pcad-actions__btn {
+    min-width: 5.85rem !important;
+    height: 4rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: var(--erp-radius-md, 8px) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: var(--erp-text, #0f172a) !important;
+    box-shadow: var(--erp-shadow-md, 0 4px 14px rgba(30, 90, 158, 0.14)) !important;
+    transition: background var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+.erp-pcad-actions__btn:hover {
+    background: #ffffff !important;
+    border-color: var(--erp-brand-primary, #1e5a9e) !important;
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18)) !important;
+    transform: translateY(-2px);
+}
+
+.erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: #86efac !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-pcad-actions__btn[data-erp-key="F5"]:hover {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%) !important;
+}
+
+.erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
+    border-color: #fca5a5 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%) !important;
+}
+
+.erp-pcad-actions__icon--save {
+    background: rgba(255, 255, 255, 0.25) !important;
+}
+
+.erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.25) !important;
+}
+
+.erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+.erp-pcad-actions__btn:not([data-erp-key="F5"]):not([data-erp-key="Escape"]) .erp-pcad-actions__label kbd {
+    background: var(--erp-bg-muted, #e2eaf4);
+    border-color: var(--erp-border-light, #c7d5e8);
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-produtos-pcad__hints {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.erp-produtos-pcad__hints p {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ── Modal duplicar produto ────────────────────────────────────── */
+
+.erp-duplicate-modal__window {
+    border-radius: var(--erp-radius-lg, 10px) !important;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35)) !important;
+    overflow: hidden;
+}
+
+.erp-duplicate-modal__titlebar {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+/* ── Filament fields dentro do pcad (fallback) ─────────────────── */
+
+.erp-form-page .fi-input-wrp,
+.erp-form-page .fi-select-input,
+.erp-form-page .fi-input {
+    border-radius: var(--erp-radius-sm, 6px) !important;
+}
+
+.erp-form-page .fi-input-wrp:focus-within {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* ── Produtos — abas inferiores + áreas internas ───────────────── */
+
+.erp-produtos-pcad__top,
+.erp-produtos-pcad__workspace,
+.erp-produtos-pcad__fields,
+.erp-produtos-pcad__main,
+.erp-produtos-pcad__tabs-col,
+.erp-produtos-pcad__foto-col,
+.erp-produtos-pcad__aside,
+.erp-produtos-pcad__tabs-area,
+.erp-produtos-pcad__bottom-panel {
+    background: transparent !important;
+}
+
+.erp-produtos-pcad__main,
+.erp-produtos-pcad__tabs-col,
+.erp-produtos-pcad__bottom-panel {
+    background: var(--erp-bg-panel, #fff) !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1)) !important;
+}
+
+.erp-produtos-pcad__bottom-tabs {
+    gap: 0.25rem !important;
+    border-top: none !important;
+}
+
+.erp-produtos-pcad__bottom-tab {
+    padding: 0.38rem 0.85rem !important;
+    font-size: var(--erp-font-size-xs, 0.8125rem) !important;
+    font-weight: 600 !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-bottom: none !important;
+    border-radius: var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) 0 0 !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+    color: var(--erp-text-muted, #64748b) !important;
+    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+}
+
+.erp-produtos-pcad__bottom-tab:hover {
+    background: var(--erp-bg-panel, #fff) !important;
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+.erp-produtos-pcad__bottom-tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: var(--erp-brand-accent, #15803d) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    font-weight: 700 !important;
+}
+
+.erp-produtos-pcad__foto {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+}
+
+.erp-produtos-pcad__brand {
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+.erp-produtos-pcad__brand-title {
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+    font-weight: 700 !important;
+}
+
+.erp-produtos-pcad__required,
+.erp-produtos-form-page .erp-pcad-form__input--required,
+.erp-produtos-form-page .erp-pcad-form__label--required {
+    background: #fef9c3 !important;
+}
+
+.erp-produtos-pcad__footer {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    flex-shrink: 0 !important;
+}
+
+/* ── Empresas — sub-abas parâmetros + logo ─────────────────────── */
+
+.erp-empresas-parametros__tabs,
+.erp-empresas-parametros__nav {
+    gap: 0.25rem !important;
+}
+
+.erp-empresas-parametros__tab,
+.erp-empresas-parametros__nav-btn {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+    color: var(--erp-text-muted, #64748b) !important;
+    font-weight: 600 !important;
+    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+}
+
+.erp-empresas-parametros__tab--active,
+.erp-empresas-parametros__nav-btn--active {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    border-color: var(--erp-brand-primary-dark, #0f3460) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-empresas-logo__preview,
+.erp-empresas-logo__dropzone {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+    background: var(--erp-bg-panel, #fff) !important;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.08)) !important;
+}
+
+.erp-empresas-form-page .erp-pcad__tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: var(--erp-brand-accent, #15803d) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+/* ── Contatos / grids internos ─────────────────────────────────── */
+
+.erp-pessoas-contatos__toolbar,
+.erp-pessoas-contatos__form {
+    background: var(--erp-bg-muted, #e2eaf4) !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: var(--erp-radius-sm, 6px) !important;
+}
+
+.erp-pessoas-contatos__mini-btn--cancel {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
+    border-color: #fca5a5 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-pessoas-contatos__mini-btn--save {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: #86efac !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+/* ── Reset visual Delphi (cinzas antigos) ──────────────────────── */
+
+.erp-form-page [class*="__window"],
+.erp-form-page .erp-pcad,
+.erp-form-page .erp-produtos-pcad,
+.erp-form-page .erp-empresas-pcad,
+.erp-form-page .erp-terminais-pcad {
+    border-color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-form-page .erp-pcad-actions__btn {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.erp-form-page .erp-pcad-actions__icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.45rem !important;
+    height: 1.45rem !important;
+    border-radius: 50% !important;
+    font-size: 0.85rem !important;
+    line-height: 1 !important;
+    margin-bottom: 0.15rem !important;
+    font-weight: 700 !important;
+}
+
+.erp-form-page .erp-pcad-actions__label {
+    font-size: 0.68rem !important;
+    text-align: center !important;
+    line-height: 1.1 !important;
+}
+
+.erp-pcad-form__input.erp-mask-doc--invalid,
+.erp-pdv-finalizar__input.erp-mask-doc--invalid {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.25);
+}
+
+.erp-pcad-form__error {
+    display: block;
+    width: 100%;
+    margin-top: 0.2rem;
+    color: #b91c1c;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* ── Aviso modal central (padrão ERP — confirmações e alertas) ── */
+
+.erp-aviso-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.erp-aviso-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 52, 96, 0.45);
+}
+
+.erp-aviso-modal__box {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 28rem);
+    background: #fff;
+    border-radius: 16px;
+    border-width: 3px;
+    border-style: solid;
+    padding: 1.65rem 1.75rem 1.35rem;
+    text-align: center;
+    box-shadow: 0 22px 60px rgba(15, 52, 96, 0.28);
+    animation: erp-aviso-modal-in 0.22s ease-out;
+}
+
+@keyframes erp-aviso-modal-in {
+    from {
+        opacity: 0;
+        transform: scale(0.94) translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.erp-aviso-modal__icon {
+    width: 3.1rem;
+    height: 3.1rem;
+    margin: 0 auto 0.55rem;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 1.85rem;
+    font-weight: 800;
+    line-height: 3.1rem;
+}
+
+.erp-aviso-modal__title {
+    margin: 0 0 0.65rem;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+}
+
+.erp-aviso-modal__body {
+    margin-bottom: 0.35rem;
+}
+
+.erp-aviso-modal__text {
+    margin: 0 0 0.45rem;
+    color: #0f172a;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.erp-aviso-modal__text:last-child {
+    margin-bottom: 0;
+}
+
+.erp-aviso-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.55rem;
+    margin-top: 1rem;
+}
+
+.erp-aviso-modal__btn {
+    min-width: 7.5rem;
+    padding: 0.58rem 1.15rem;
+    border-radius: 9px;
+    font-size: 0.92rem;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.erp-aviso-modal__btn--primary {
+    border: none;
+    color: #fff;
+}
+
+.erp-aviso-modal__btn--secondary {
+    background: #fff;
+    border-width: 2px;
+    border-style: solid;
+}
+
+.erp-aviso-modal__hint {
+    margin: 0.85rem 0 0;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__box {
+    border-color: #d97706;
+    box-shadow: 0 22px 60px rgba(217, 119, 6, 0.28);
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__icon {
+    background: #d97706;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__title {
+    color: #b45309;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__btn--primary {
+    background: #d97706;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__btn--primary:hover {
+    background: #b45309;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__btn--secondary {
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.erp-aviso-modal--warning .erp-aviso-modal__btn--secondary:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__box {
+    border-color: #dc2626;
+    box-shadow: 0 22px 60px rgba(220, 38, 38, 0.35);
+    animation: erp-aviso-modal-danger-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes erp-aviso-modal-danger-pulse {
+    from {
+        transform: scale(1);
+        box-shadow: 0 22px 60px rgba(220, 38, 38, 0.35);
+    }
+
+    to {
+        transform: scale(1.02);
+        box-shadow: 0 26px 72px rgba(220, 38, 38, 0.48);
+    }
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__icon {
+    background: #dc2626;
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__title {
+    color: #b91c1c;
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__btn--primary {
+    background: #dc2626;
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__btn--primary:hover {
+    background: #b91c1c;
+}
+
+.erp-aviso-modal--danger .erp-aviso-modal__btn--secondary {
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__box {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 22px 60px rgba(30, 90, 158, 0.25);
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__icon {
+    background: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__title {
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__btn--primary {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+}
+
+.erp-aviso-modal--info .erp-aviso-modal__btn--secondary {
+    border-color: #c7d5e8;
+    color: #475569;
+}

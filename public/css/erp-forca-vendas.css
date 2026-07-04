@@ -1,0 +1,58 @@
+/* ERP — Força de Venda (larguras de colunas; UI em erp-list-ui.css) */
+
+/* Pedidos recebidos */
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(1),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 14%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(2),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 18%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(4),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 11%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(5),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 12%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(6),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 10%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(7),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 11%;
+}
+
+/* Aparelhos */
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(2),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 20%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(3),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 12%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(4),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 10%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(5),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 16%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(6),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 10%;
+}

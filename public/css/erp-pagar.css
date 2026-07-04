@@ -1,0 +1,641 @@
+/* ERP â€” Contas a Pagar (padrÃ£o Delphi / erp-list-ui + grade compacta) */
+
+.erp-pagar-page {
+    --erp-pagar-gutter: 0.65rem;
+    --erp-pagar-grid-gutter: calc(var(--erp-pagar-gutter) - 2mm);
+}
+
+.erp-pagar-page .erp-pagar {
+    padding: 0.5rem var(--erp-pagar-gutter) 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    flex-shrink: 0;
+}
+
+/* â”€â”€ F12 | Filtro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-pagar-page .erp-pagar__filter-block {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.35rem 0.45rem !important;
+    margin: 0 0 0.35rem !important;
+    padding: 0.35rem 0.75rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-right: 4px solid var(--erp-brand-primary) !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+}
+
+.erp-pagar-page .erp-pagar__filter-title {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__supplier-label {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-pagar-page .erp-pagar__supplier-select {
+    min-width: 9rem;
+    max-width: 11rem;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+    text-transform: none;
+    font-weight: 600;
+}
+
+.erp-pagar-page .erp-pagar__period {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 0.3rem 0.35rem;
+    min-width: 0;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-pagar-page .erp-pagar__period-label {
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__period-input,
+.erp-pagar-page .erp-pagar__period-input.erp-date-input,
+.erp-pagar-page .erp-pagar__period .erp-date-field {
+    width: calc(10.5ch + 2.1rem);
+    min-width: calc(10.5ch + 2.1rem);
+    max-width: calc(10.5ch + 2.1rem);
+}
+
+.erp-pagar-page .erp-pagar__period-input,
+.erp-pagar-page .erp-pagar__period-input.erp-date-input {
+    height: 1.75rem;
+    min-height: 1.75rem;
+    box-sizing: border-box;
+    padding: 0.18rem 2.1rem 0.18rem 0.35rem !important;
+    font-size: 0.75rem;
+}
+
+.erp-pagar-page .erp-pagar__btn {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.6875rem;
+}
+
+/* â”€â”€ Localizar (2Âª faixa â€” padrÃ£o Pagar/Delphi) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-pagar-page .erp-pagar__locate-group {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-pagar-page .erp-pagar__locate-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    max-width: 8rem;
+    flex-shrink: 0;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.erp-pagar-page .erp-pagar__search-text {
+    flex: 1 1 auto;
+    min-width: 8rem;
+    max-width: none;
+    width: auto;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+}
+
+.erp-pagar-page .erp-pagar__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.55rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-pagar-page .erp-pagar__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__page-size-select {
+    width: auto;
+    min-width: 3.75rem;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-block: 0.18rem;
+    font-size: 0.75rem;
+}
+
+.erp-pagar-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+/* â”€â”€ Abas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-pagar-page .erp-pagar__view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 var(--erp-pagar-gutter) 0.35rem;
+}
+
+.erp-pagar-page .erp-pagar__view-tab {
+    padding: 0.35rem 0.85rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm) var(--erp-radius-sm) 0 0;
+    background: var(--erp-bg-muted);
+    color: var(--erp-text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--erp-transition), color var(--erp-transition), border-color var(--erp-transition);
+}
+
+.erp-pagar-page .erp-pagar__view-tab:hover {
+    background: var(--erp-bg-panel);
+    color: var(--erp-brand-primary);
+    border-color: var(--erp-brand-primary);
+}
+
+.erp-pagar-page .erp-pagar__view-tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
+    border-color: var(--erp-brand-accent);
+    font-weight: 700;
+    color: var(--erp-text-inverse);
+    box-shadow: var(--erp-shadow-sm);
+}
+
+.erp-pagar-page .erp-pagar__hint {
+    margin: 0 var(--erp-pagar-gutter) 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    font-family: var(--erp-font);
+}
+
+.erp-pagar-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-pagar-page .fi-sc > div:has(.fi-ta) {
+    padding-inline: var(--erp-pagar-grid-gutter);
+    box-sizing: border-box;
+}
+
+/* ── Grade compacta ─────────────────────────────────────────────── */
+
+.erp-pagar-page .fi-ta-ctn {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-right: 4px solid var(--erp-brand-primary) !important;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn {
+    --erp-pagar-scrollbar-size: 17px;
+    padding-right: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 40%) #164a85;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn::-webkit-scrollbar {
+    width: var(--erp-pagar-scrollbar-size) !important;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%) !important;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 38%);
+    border-radius: 4px;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-content-ctn > .fi-ta-table {
+    width: calc(100% + var(--erp-pagar-scrollbar-size));
+    margin-right: calc(-1 * var(--erp-pagar-scrollbar-size));
+}
+
+.erp-list-page.erp-pagar-page .fi-ta-table,
+.erp-pagar-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100% !important;
+    table-layout: fixed;
+}
+
+.erp-pagar-page .fi-ta-header-cell {
+    padding: 0.28rem 0.18rem !important;
+    line-height: 1.1 !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-pagar-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+    box-shadow: var(--erp-pagar-scrollbar-size, 17px) 0 0 0 #164a85;
+}
+
+.erp-pagar-page .fi-ta-cell {
+    padding: 0.05rem 0.18rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: 0.75rem !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .fi-ta-cell:last-child {
+    border-right: none !important;
+    position: relative;
+}
+
+.erp-pagar-page .fi-ta-row .fi-ta-cell:last-child::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: calc(-1 * var(--erp-pagar-scrollbar-size, 17px));
+    width: var(--erp-pagar-scrollbar-size, 17px);
+    height: 100%;
+    background: inherit;
+    pointer-events: none;
+}
+
+.erp-pagar-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-pagar-page .fi-ta-header-cell-sort-btn svg,
+.erp-pagar-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-pagar-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-pagar-page button.fi-ta-col,
+.erp-pagar-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-pagar-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-pagar-page .fi-ta-text-item,
+.erp-pagar-page .fi-ta-col,
+.erp-pagar-page .fi-ta-col .fi-ta-text {
+    font-size: 0.75rem !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-pagar-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-pagar-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-pagar-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-pagar-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-pagar-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-pagar-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-pagar-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-pagar-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-pagar-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-pagar-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(1),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.75rem;
+    max-width: 5rem;
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(2),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-pagar-page .fi-ta-header-cell:nth-child(6),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-pagar-page .fi-ta-header-cell:nth-child(11),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(11) {
+    width: 5.5rem;
+    max-width: 6rem;
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(3),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: auto !important;
+    min-width: 7rem;
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(4),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 4.5rem;
+    max-width: 5rem;
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(5),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: calc(7rem + 1cm);
+    min-width: 6.5rem;
+    max-width: calc(9rem + 1cm);
+}
+
+.erp-pagar-page .fi-ta-header-cell:nth-child(7),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-pagar-page .fi-ta-header-cell:nth-child(8),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-pagar-page .fi-ta-header-cell:nth-child(9),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-pagar-page .fi-ta-header-cell:nth-child(10),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-pagar-page .fi-ta-header-cell:nth-child(12),
+.erp-pagar-page .fi-ta-row .fi-ta-cell:nth-child(12) {
+    width: 5.25rem;
+    max-width: 5.75rem;
+}
+
+/* â”€â”€ RodapÃ© / totais â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-pagar-page .erp-pagar__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    clear: both;
+    margin: 0.35rem var(--erp-pagar-gutter) 0;
+    padding: 0.45rem 0.75rem;
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-right: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    font-family: var(--erp-font);
+    box-shadow: var(--erp-shadow-md);
+}
+
+.erp-pagar-page .erp-pagar__totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.erp-pagar-page .erp-pagar__total-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.erp-pagar-page .erp-pagar__total-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 800;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__total-value {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar__total-value--paid {
+    color: #b91c1c;
+}
+
+.erp-pagar-page .erp-pagar__footer-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.erp-pagar-page .erp-pagar__filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.erp-pagar-page .erp-pagar__filter-link {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border: none;
+    background: transparent;
+    color: var(--erp-brand-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.erp-pagar-page .erp-pagar__filter-link:hover {
+    color: var(--erp-brand-primary-dark);
+}
+
+.erp-pagar-page .erp-pagar__filter-link--active {
+    font-weight: 800;
+    text-decoration: none;
+    background: var(--erp-brand-accent-soft);
+    border-radius: var(--erp-radius-sm);
+    padding: 0.25rem 0.6rem;
+}
+
+.erp-pagar-page .erp-pagar-actions {
+    clear: both;
+    flex-shrink: 0;
+    width: 100%;
+    margin: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-pagar-page .erp-pagar-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-pagar-page .erp-pagar-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-pagar-page .erp-pagar-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-pagar-page .erp-pagar-actions__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.erp-pagar-page .erp-pagar-actions__btn--baixar {
+    border-color: #86efac;
+    background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
+    color: #166534;
+}
+
+.erp-pagar-page .erp-pagar-actions__btn--baixar:hover {
+    border-color: #22c55e;
+    background: linear-gradient(180deg, #bbf7d0 0%, #86efac 100%);
+}
+
+.erp-pagar-page .erp-pagar-actions__btn--baixar .erp-pagar-actions__label,
+.erp-pagar-page .erp-pagar-actions__btn--baixar .erp-pagar-actions__label kbd {
+    color: #166534;
+}
+
+.erp-pagar-page .erp-pagar-actions__icon--baixar {
+    background: #16a34a;
+    color: #fff;
+    border-radius: 50%;
+    font-weight: 800;
+}
+
+@media (max-width: 900px) {
+    .erp-pagar-page .erp-pagar__filter-block {
+        flex-wrap: wrap !important;
+    }
+
+    .erp-pagar-page .erp-pagar__supplier-label,
+    .erp-pagar-page .erp-pagar__period,
+    .erp-pagar-page .erp-pagar__locate-group,
+    .erp-pagar-page .erp-pagar__page-size-group {
+        flex-basis: 100%;
+        padding-left: 0;
+        border-left: none;
+        margin-left: 0;
+    }
+
+    .erp-pagar-page .erp-pagar__period {
+        justify-content: flex-start;
+    }
+
+    .erp-pagar-page .erp-pagar__footer-filters {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+

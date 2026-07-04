@@ -1,0 +1,649 @@
+/* ERP — Contadores (layout listagem + grade compacta; botões em erp-list-ui.css) */
+
+.erp-contadores-page .erp-contadores {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-contadores-page .erp-contadores__filters {
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem !important;
+    margin: 0 0 0.35rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-top: none !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    font-family: var(--erp-font);
+    display: block !important;
+}
+
+.erp-contadores-page .erp-contadores__filters-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .erp-contadores-page .erp-contadores__filters-row {
+        flex-wrap: wrap;
+    }
+}
+
+.erp-contadores-page .erp-contadores__search-group {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-contadores-page .erp-contadores__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    flex-shrink: 0;
+}
+
+.erp-contadores-page .erp-contadores__search-text {
+    flex: 0 0 auto;
+    width: 11cm;
+    max-width: 11cm;
+    min-width: 6rem;
+}
+
+.erp-contadores-page .erp-contadores__search-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-contadores-page .erp-contadores__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-contadores-page .erp-contadores__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-contadores-page .erp-contadores__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-contadores-page .erp-contadores__btn--secondary {
+    background: var(--erp-bg-muted);
+    color: var(--erp-text);
+}
+
+.erp-contadores-page .erp-contadores__hint {
+    margin: 0 0.65rem 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    line-height: 1.2;
+}
+
+.erp-contadores-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    .erp-contadores-page .erp-contadores__search-actions,
+    .erp-contadores-page .erp-contadores__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}
+
+.erp-contadores-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ── Grade compacta ─────────────────────────────────────────────── */
+
+.erp-contadores-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-contadores-page .fi-ta-table {
+    border-collapse: collapse;
+    width: auto;
+    min-width: 100%;
+}
+
+.erp-contadores-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-contadores-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-contadores-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-contadores-page .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-contadores-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-contadores-page .fi-ta-header-cell-sort-btn svg,
+.erp-contadores-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-contadores-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-contadores-page .fi-ta-cell:first-of-type {
+    padding-inline-start: 0.18rem !important;
+}
+
+.erp-contadores-page .fi-ta-cell:last-of-type {
+    padding-inline-end: 0.18rem !important;
+}
+
+.erp-contadores-page button.fi-ta-col,
+.erp-contadores-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-contadores-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-contadores-page .fi-ta-text-item,
+.erp-contadores-page .fi-ta-col,
+.erp-contadores-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-contadores-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-contadores-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-contadores-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-contadores-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-contadores-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-contadores-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-contadores-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-contadores-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-contadores-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-contadores-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* ── Action bar compacta ───────────────────────────────────────── */
+
+.erp-contadores-page .erp-contadores-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-contadores-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-contadores-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-contadores-page .erp-contadores-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-contadores-page .erp-contadores-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-contadores-page .erp-contadores-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-contadores-page .erp-contadores-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}
+
+/* ── Larguras de colunas ──────────────────────────────────────── */
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(1),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem;
+    max-width: 4.75rem;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(2),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: auto;
+    min-width: 12rem;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(3),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 10rem;
+    max-width: 11rem;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(4),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: auto;
+    min-width: 9rem;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(5),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 3rem;
+    max-width: 3.5rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(6),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: auto;
+    min-width: 10rem;
+}
+
+.erp-contadores-page .fi-ta-header-cell:nth-child(7),
+.erp-contadores-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 8rem;
+    max-width: 9rem;
+}
+
+/* ── Modal cadastro (F2 / F3) ─────────────────────────────────── */
+
+.erp-contadores-page .erp-contador-form-modal {
+    --erp-contador-modal-bump: 0cm;
+}
+
+.erp-contadores-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-contadores-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-contadores-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__window {
+    width: min(calc(34rem + var(--erp-contador-modal-bump) + 1cm), calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-contadores-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem 0.35rem 0.7rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-contadores-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__body {
+    padding: 0.6rem 0.7rem 0.4rem;
+    overflow: auto;
+    overflow-x: hidden;
+    background: #fff;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form.erp-pcad-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 1.85rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__label {
+    width: 5.8rem;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 0.75rem;
+    color: #000;
+    padding-right: 0.15rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__label--inline {
+    width: auto;
+    min-width: 4.2rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input,
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__select {
+    font-family: inherit;
+    font-size: 0.75rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    color: #000;
+    padding: 0.15rem 0.3rem;
+    min-height: 1.55rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--xs {
+    width: calc(3.2rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--md {
+    width: calc(9.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--cep {
+    width: calc(5.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--doc {
+    width: calc(11.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--phone {
+    width: calc(7.25rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--city {
+    width: calc(14rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--grow {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__select--uf {
+    width: 3.2rem;
+    flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__error {
+    font-size: 0.68rem;
+    color: #b91c1c;
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    background: var(--erp-bg-app, #e3ecf7);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 4rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+    font-weight: 700;
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__label {
+    font-size: 0.68rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__icon--save,
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff);
+}
+
+/* ── Modal confirmar exclusão ───────────────────────────────────── */
+
+.erp-contadores-page .erp-contador-delete-modal__window {
+    width: min(22rem, calc(100vw - 2rem));
+}
+
+.erp-contadores-page .erp-contador-delete-modal__body {
+    padding: 1rem 0.85rem 0.75rem;
+    background: #fff;
+    text-align: center;
+}
+
+.erp-contadores-page .erp-contador-delete-modal__message {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-contadores-page .erp-contador-delete-modal__detail {
+    margin: 0.45rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions {
+    justify-content: center;
+    padding: 0.45rem 0.65rem 0.65rem;
+    background: var(--erp-bg-app, #e3ecf7);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 4rem;
+    cursor: pointer;
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions .erp-pcad-actions__label {
+    font-size: 0.68rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.erp-contadores-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-contadores-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label {
+    color: var(--erp-text-inverse, #fff);
+}

@@ -1,0 +1,830 @@
+/* ERP — Monitor de Vendas (App Força de Vendas)
+   Replica a estrutura da tela legada "Monitor de Recebimento de Vendas":
+   cabeçalho com contador, painel "Campos para Consulta", grade mestre,
+   dois grids de detalhe (itens / pagamentos) e barra de ações.
+   Usa os tokens visuais do ERP (erp-nfe.css / erp-grid.css). */
+
+/* ---- Cabeçalho com contador de próxima atualização ---- */
+.erp-fv-monitor-page .fi-header,
+.erp-fv-monitor-page .fi-page-header {
+    display: none !important;
+}
+
+.erp-fv-monitor-page,
+.erp-fv-monitor-page .fi-page-content,
+.erp-fv-monitor-page .fi-page__content,
+.erp-fv-monitor-page .fi-sc,
+.erp-fv-monitor-page .fi-sc > div:first-child {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    row-gap: 0 !important;
+}
+
+.erp-fv-monitor-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-fv-mon-root {
+    margin-top: 0;
+}
+
+/* Cartão único no padrão dos toolbars do ERP (ver tela de Orçamento):
+   acento azul de 4px à esquerda, borda clara, cantos arredondados e sombra.
+   A barra azul de título e o painel de consulta ficam dentro do mesmo cartão. */
+.erp-fv-monitor-page .erp-fv-mon {
+    width: calc(100% - 4mm);
+    margin-left: 2mm;
+    margin-bottom: 2mm;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md, 8px);
+    box-shadow: var(--erp-shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-fv-mon__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: calc(0.3rem - 1mm) 0.75rem;
+    line-height: 1.1;
+    border-top-left-radius: var(--erp-radius-md, 8px);
+    border-top-right-radius: var(--erp-radius-md, 8px);
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: var(--erp-text-on-brand, #fff);
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.erp-fv-mon__topbar-count {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.erp-fv-mon__topbar-count strong {
+    color: #4ade80;
+    font-variant-numeric: tabular-nums;
+    margin-left: 0.25rem;
+}
+
+/* ---- Campos para Consulta ---- */
+.erp-fv-mon__consulta {
+    margin: 0;
+    border: 0;
+    border-radius: 0 0 var(--erp-radius-md, 8px) var(--erp-radius-md, 8px);
+    padding: calc(0.35rem - 2mm) 0.75rem calc(0.45rem - 1mm);
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-fv-mon__consulta > legend {
+    padding: 0 0.4rem;
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-fv-mon__consulta-row {
+    display: flex;
+    flex-direction: column;
+    gap: calc(0.4rem - 1mm);
+    margin-top: 0;
+}
+
+.erp-fv-mon__inputs {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 0.15rem 0.55rem;
+}
+
+.erp-fv-mon__toggles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.erp-fv-mon__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    color: var(--erp-text-muted, #475569);
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.erp-fv-mon__field--tipo {
+    flex: 0 0 10.5rem;
+}
+
+.erp-fv-mon__field--plataforma {
+    flex: 0 0 11rem;
+}
+
+.erp-fv-mon__field--periodo {
+    flex: 0 0 auto;
+}
+
+.erp-fv-mon__field--sm {
+    flex: 0 0 7rem;
+}
+
+.erp-fv-mon__field--grow {
+    flex: 1 1 0;
+    min-width: 7rem;
+}
+
+.erp-fv-mon__field .erp-nfe__select,
+.erp-fv-mon__field .erp-nfe__input {
+    width: 100%;
+}
+
+.erp-fv-mon__periodo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Aparência explícita dos campos (a base só existe sob .erp-nfe-page) */
+.erp-fv-monitor-page .erp-fv-mon__field .erp-nfe__select,
+.erp-fv-monitor-page .erp-fv-mon__field .erp-nfe__input,
+.erp-fv-monitor-page .erp-fv-mon__periodo .erp-nfe__period-input {
+    height: calc(1.95rem - 2mm);
+    min-height: calc(1.95rem - 2mm);
+    box-sizing: border-box;
+    padding: 0.2rem 0.5rem;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--erp-text, #0f172a);
+    background: #fff;
+    border: 1px solid var(--erp-border, #94a3b8);
+    border-radius: var(--erp-radius-sm, 6px);
+    box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.04);
+}
+
+.erp-fv-monitor-page .erp-fv-mon__periodo .erp-nfe__period-input {
+    width: 8.5rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon__field .erp-nfe__select:focus,
+.erp-fv-monitor-page .erp-fv-mon__field .erp-nfe__input:focus,
+.erp-fv-monitor-page .erp-fv-mon__periodo .erp-nfe__period-input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+}
+
+.erp-fv-mon__periodo-sep {
+    font-weight: 600;
+    color: var(--erp-text-muted, #475569);
+}
+
+/* ---- Filtro unificado (campo + valor) ---- */
+.erp-fv-mon__field--filtro {
+    flex: 0 0 auto;
+}
+
+.erp-fv-mon__filtro {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.erp-fv-mon__filtro-campo {
+    flex: 0 0 5cm;
+    width: 5cm;
+}
+
+.erp-fv-mon__filtro-valor {
+    flex: 0 0 10cm;
+    width: 10cm;
+    min-width: 0;
+}
+
+.erp-fv-monitor-page [x-cloak] {
+    display: none !important;
+}
+
+.erp-fv-mon__consulta-row .erp-nfe__select,
+.erp-fv-mon__consulta-row .erp-nfe__input,
+.erp-fv-mon__consulta-row .erp-nfe__period-input,
+.erp-fv-mon__consulta-row .erp-fv-mon__combo-input {
+    height: 1.55rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+}
+
+.erp-fv-mon__field > span {
+    line-height: 1.05;
+}
+
+.erp-fv-mon__combo {
+    position: relative;
+    flex: 0 0 10cm;
+    width: 10cm;
+    min-width: 0;
+}
+
+.erp-fv-mon__combo-input {
+    width: 100%;
+}
+
+.erp-fv-mon__combo-panel {
+    position: absolute;
+    top: calc(100% + 0.2rem);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 14rem;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 4px);
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.25));
+}
+
+.erp-fv-mon__combo-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.2rem 0.5rem;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--erp-text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-mon__combo-item:hover {
+    background: var(--erp-row-hover, #e8f2ff);
+}
+
+.erp-fv-mon__combo-item.is-active {
+    background: var(--erp-primary, #1d4ed8);
+    color: #fff;
+}
+
+.erp-fv-mon__combo-empty {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #64748b);
+}
+
+/* ---- Itens da direita na mesma linha (mobile / legenda / consultar) ---- */
+.erp-fv-mon__mobile-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-fv-mon__legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.6rem;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+}
+
+.erp-fv-mon__legend-title {
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-fv-mon__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-fv-mon__dot {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 3px;
+    border: 1px solid rgba(15, 23, 42, 0.2);
+}
+
+.erp-fv-mon__dot--pendente { background: #f59e0b; }
+.erp-fv-mon__dot--confirmado { background: #2563eb; }
+.erp-fv-mon__dot--faturado { background: #16a34a; }
+.erp-fv-mon__dot--cancelado { background: #dc2626; }
+
+/* ---- Canais de venda (Vendas Mobile + marketplaces) ---- */
+.erp-fv-mon__plataformas {
+    align-self: flex-end;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.1rem 0.6rem 0.25rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 4px);
+    width: max-content;
+}
+
+.erp-fv-mon__plataformas-legend {
+    padding: 0 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-fv-mon__plataformas .erp-fv-mon__canais {
+    margin-left: 0;
+    align-self: auto;
+}
+
+.erp-fv-mon__plataformas .erp-fv-mon__legend {
+    margin-left: 0;
+    align-self: auto;
+    height: auto;
+}
+
+.erp-fv-mon__canais {
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    gap: 0.1rem 1rem;
+    width: max-content;
+    line-height: 1.05;
+}
+
+.erp-fv-mon__canais .erp-fv-mon__mobile-check {
+    margin-left: 0;
+    height: auto;
+}
+
+.erp-fv-mon__canal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+    cursor: pointer;
+}
+
+.erp-fv-mon__canal input[type="checkbox"] {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.erp-fv-mon__canal--meli input[type="checkbox"] { accent-color: #ffe600; }
+.erp-fv-mon__canal--shopee input[type="checkbox"] { accent-color: #ee4d2d; }
+.erp-fv-mon__canal--magalu input[type="checkbox"] { accent-color: #0086ff; }
+.erp-fv-mon__canal--amazon input[type="checkbox"] { accent-color: #ff9900; }
+.erp-fv-mon__canal--ali input[type="checkbox"] { accent-color: #e62e04; }
+.erp-fv-mon__canal--casasbahia input[type="checkbox"] { accent-color: #e4002b; }
+.erp-fv-mon__canal--ecommerce input[type="checkbox"] { accent-color: #7b2ff7; }
+.erp-fv-mon__mobile-check input[type="checkbox"] { accent-color: #4b5563; }
+
+@media (max-width: 1300px) {
+    .erp-fv-mon__mobile-check {
+        margin-left: 0;
+    }
+}
+
+/* ---- Realce da linha por situação (grade mestre) ---- */
+.fi-ta-row.erp-fv-mon--pendente .fi-ta-cell { box-shadow: inset 4px 0 0 #f59e0b; }
+.fi-ta-row.erp-fv-mon--confirmado .fi-ta-cell { box-shadow: inset 4px 0 0 #2563eb; }
+.fi-ta-row.erp-fv-mon--faturado .fi-ta-cell { box-shadow: inset 4px 0 0 #16a34a; }
+.fi-ta-row.erp-fv-mon--cancelado .fi-ta-cell {
+    box-shadow: inset 4px 0 0 #dc2626;
+    color: var(--erp-text-muted, #64748b);
+}
+
+/* ---- Linha selecionada (azul forte, igual às outras telas) ---- */
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+/* ---- Linha marcada para faturar (checkbox): verde escuro ---- */
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-cell {
+    background: #166534 !important;
+    color: #f0fdf4 !important;
+    box-shadow: none !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked {
+    box-shadow: inset 5px 0 0 #064e3b;
+    outline: none;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked:hover .fi-ta-cell {
+    background: #15803d !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-text-item,
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #f0fdf4 !important;
+}
+
+/* ---- Detalhe: itens + pagamentos ---- */
+.erp-fv-mon__detail {
+    margin: 0.5rem 0.65rem 0;
+}
+
+.erp-fv-mon__detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr);
+    gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+    .erp-fv-mon__detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.erp-fv-mon__panel {
+    background: var(--erp-bg-panel, #fff);
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md, 8px);
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-fv-mon__table-wrap {
+    overflow: auto;
+    max-height: calc(220px + 1mm);
+    min-height: calc(120px + 1mm);
+}
+
+.erp-fv-mon__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+}
+
+.erp-fv-mon__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: var(--erp-text-on-brand, #fff);
+    font-weight: 700;
+    text-align: left;
+    padding: 0 0.55rem;
+    line-height: 1.05;
+    border-right: 1px solid rgb(255 255 255 / 25%);
+    border-bottom: 1px solid var(--erp-border, #94a3b8);
+    white-space: nowrap;
+}
+
+.erp-fv-mon__table thead th:last-child {
+    border-right: none;
+}
+
+.erp-fv-mon__table tbody td {
+    padding: 0.02rem 0.55rem;
+    line-height: 1.1;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    color: var(--erp-text, #0f172a);
+    white-space: nowrap;
+}
+
+.erp-fv-mon__table tbody tr:nth-child(even) td {
+    background: var(--erp-row-zebra, #f4f8fc);
+}
+
+.erp-fv-mon__th--num,
+.erp-fv-mon__td--num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-fv-mon__th--code,
+.erp-fv-mon__td--code {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-mon__empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--erp-text-muted, #64748b);
+    font-style: italic;
+    white-space: normal;
+}
+
+/* ---- Rodapé dos grids (contador + total) ---- */
+.erp-fv-mon__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.02rem 0.55rem;
+    line-height: 1.15;
+    border-top: 1px solid var(--erp-border, #94a3b8);
+    background: var(--erp-bg-muted, #eef3fa);
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+}
+
+.erp-fv-mon__foot-count {
+    min-width: 2.5rem;
+    padding: 0 0.4rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 4px;
+    background: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-mon__foot-total {
+    font-weight: 800;
+    color: var(--erp-text, #0f172a);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Grade mestre: mesma densidade/linhas de grade do Orçamento.
+   Linhas compactas (1.375rem) para caber muitos pedidos visíveis.
+   Como há muitas colunas, liberamos rolagem horizontal. ---- */
+.erp-list-page.erp-fv-monitor-page .fi-ta-content-ctn {
+    overflow-x: auto !important;
+}
+
+.erp-list-page.erp-fv-monitor-page .fi-ta-table {
+    border-collapse: collapse;
+    table-layout: auto !important;
+    min-width: 92rem;
+}
+
+.erp-fv-monitor-page .fi-ta-header-cell {
+    padding: 0.5mm 0.45rem !important;
+    line-height: 0.9 !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--erp-text-on-brand, #fff) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+}
+
+.erp-fv-monitor-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row {
+    height: calc(1.375rem - 1mm);
+}
+
+.erp-fv-monitor-page .fi-ta-row .fi-ta-cell {
+    padding: 0.05rem 0.45rem !important;
+    height: calc(1.375rem - 1mm) !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    white-space: nowrap;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+/* Mantém badges/estados compactos dentro da célula baixa */
+.erp-fv-monitor-page .fi-ta-row .fi-ta-cell .fi-badge {
+    padding: 0.02rem 0.35rem !important;
+    font-size: 0.6875rem !important;
+}
+
+/* Zera o wrapper interno da coluna (igual produtos/orçamento) — é o que
+   realmente compacta a linha; sem isto a célula fica alta. */
+.erp-fv-monitor-page button.fi-ta-col,
+.erp-fv-monitor-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-fv-monitor-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-fv-monitor-page .fi-ta-text-item,
+.erp-fv-monitor-page .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-fv-monitor-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    box-shadow: none;
+}
+
+.erp-fv-monitor-page .fi-ta-header-cell-sort-btn svg,
+.erp-fv-monitor-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+/* Oculta o seletor "por página" (igual NF-e) */
+.erp-fv-monitor-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+/* Checkbox de seleção 2mm menor (não esticar a coluna) */
+.erp-fv-monitor-page .fi-ta-table input[type="checkbox"],
+.erp-fv-monitor-page .fi-ta-table .fi-checkbox-input {
+    width: calc(1.25rem - 1.5mm) !important;
+    height: calc(1.25rem - 1.5mm) !important;
+}
+
+.erp-fv-monitor-page .fi-ta-selection-cell,
+.erp-fv-monitor-page .fi-ta-selection-header-cell {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Barra "X registros selecionados" mais baixa */
+.erp-fv-monitor-page .fi-ta-selection-indicator {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: 0 !important;
+    font-size: 0.75rem !important;
+    line-height: 1.1 !important;
+}
+
+.erp-fv-monitor-page .fi-ta-selection-indicator .fi-btn,
+.erp-fv-monitor-page .fi-ta-selection-indicator .fi-link {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: 0 !important;
+}
+
+/* Rodapé de paginação 1mm mais baixo */
+.erp-list-page.erp-fv-monitor-page .fi-pagination {
+    padding: calc(0.35rem - 0.5mm) 0.5rem !important;
+}
+
+/* ---- Barra de ações (mesmo padrão compacto do Orçamento/NF-e) ---- */
+.erp-fv-mon-actions {
+    margin-top: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.erp-fv-monitor-page .erp-nfe-actions {
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    justify-content: flex-start;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Ícones 3D (glossy) — mantém o mesmo tamanho de botão */
+.erp-fv-monitor-page .erp-nfe-actions__icon svg {
+    width: 1.02rem;
+    height: 1.02rem;
+    display: block;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55));
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__icon--cancel svg,
+.erp-fv-monitor-page .erp-nfe-actions__icon--new svg {
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.12rem;
+    border-radius: 7px;
+    border: 1px solid rgba(15, 52, 96, 0.28);
+    background: linear-gradient(180deg, #ffffff 0%, #eaf2fc 52%, #d3e2f6 100%);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -2px 3px rgba(15, 52, 96, 0.18),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__btn:hover .erp-nfe-actions__icon {
+    background: linear-gradient(180deg, #ffffff 0%, #f3f8ff 52%, #e1ecfb 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 1),
+        inset 0 -2px 3px rgba(15, 52, 96, 0.16),
+        0 3px 5px rgba(15, 40, 71, 0.32);
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__btn:active .erp-nfe-actions__icon {
+    box-shadow:
+        inset 0 2px 4px rgba(15, 52, 96, 0.35),
+        0 1px 1px rgba(15, 40, 71, 0.2);
+}
+
+/* Faturar (verde 3D) */
+.erp-fv-monitor-page .erp-nfe-actions__icon--new {
+    border-color: rgba(6, 78, 59, 0.45);
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 52%, #15803d 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(6, 78, 59, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(6, 78, 59, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+/* Estornar (vermelho 3D) */
+.erp-fv-monitor-page .erp-nfe-actions__icon--cancel {
+    font-size: 0.8rem;
+    border-radius: 50%;
+    border-color: rgba(127, 29, 29, 0.5);
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 52%, #b91c1c 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(127, 29, 29, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(127, 29, 29, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+/* Sair (cinza/escuro 3D) */
+.erp-fv-monitor-page .erp-nfe-actions__icon--close {
+    border-color: rgba(15, 23, 42, 0.45);
+    background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 52%, #94a3b8 100%);
+    color: #0f172a;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 -2px 3px rgba(15, 23, 42, 0.22),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-fv-monitor-page .erp-nfe-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}

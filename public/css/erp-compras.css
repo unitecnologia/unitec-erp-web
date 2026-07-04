@@ -1,0 +1,1136 @@
+/* ERP — Compras (layout Delphi + grade compacta; UI base em erp-list-ui.css) */
+
+.erp-compras-page .erp-compras {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-compras-page .erp-compras__filters {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0.28rem 0.75rem !important;
+    margin: 0 0 0.35rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-right: 4px solid var(--erp-brand-primary) !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    font-family: var(--erp-font);
+}
+
+.erp-compras-page .erp-compras__filters-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    width: 100%;
+    min-width: 0;
+    min-height: 1.85rem;
+}
+
+.erp-compras-page .erp-compras__empresa-group {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 0.45rem;
+    flex: 0 0 auto;
+    min-width: calc(18rem + 2cm);
+    max-width: calc(18rem + 2cm);
+    padding-right: 0.65rem;
+    border-right: 1px solid var(--erp-border-light);
+}
+
+.erp-compras-page .erp-compras__empresa-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.erp-compras-page .erp-compras__empresa-value {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras__locate {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 !important;
+    padding-left: 0.65rem !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-left: 1px solid var(--erp-border-light) !important;
+    box-shadow: none !important;
+}
+
+.erp-compras-page .erp-compras__locate-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.erp-compras-page .erp-compras__locate-label kbd {
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: var(--erp-bg-muted);
+    border: 1px solid var(--erp-border-light);
+    color: var(--erp-brand-primary);
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-compras__locate-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras__search-field {
+    width: auto;
+    min-width: 5.75rem;
+    max-width: 7.5rem;
+    flex-shrink: 0;
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-compras__search-field option {
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-compras__search-text {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 6rem;
+    max-width: 9cm;
+}
+
+.erp-compras-page .erp-compras__search-date-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras__search-date-range .erp-compras__period-input {
+    width: calc(10.5ch + 2.35rem);
+    min-width: calc(10.5ch + 2.35rem);
+    max-width: calc(10.5ch + 2.35rem);
+    box-sizing: border-box;
+    padding-inline: 0.35rem 2.25rem !important;
+}
+
+.erp-compras-page .erp-compras__period-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-compras-page .erp-compras__select,
+.erp-compras-page .erp-compras__input,
+.erp-compras-page .erp-compras__period-input,
+.erp-compras-page .erp-compras__page-size-select {
+    height: 1.85rem;
+    min-height: 1.85rem;
+    box-sizing: border-box;
+    line-height: 1.2;
+    padding-block: 0.2rem;
+}
+
+.erp-compras-page .erp-compras__search-date-range .erp-compras__period-input,
+.erp-compras-page .erp-compras__search-date-range .erp-compras__period-input.erp-date-input {
+    height: 1.85rem;
+    min-height: 1.85rem;
+}
+
+.erp-compras-page .erp-compras__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-compras-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-compras-page .erp-compras__tabs-wrap {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.erp-compras-page .erp-compras__tabs {
+    margin: 0 0 0.35rem;
+    gap: 0.25rem;
+}
+
+.erp-compras-page .erp-compras__tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem !important;
+    line-height: 1.1;
+    min-height: 0;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+}
+
+.erp-compras-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ── Grade compacta ─────────────────────────────────────────────── */
+
+.erp-compras-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn {
+    --erp-compras-scrollbar-size: 17px;
+    padding-right: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 40%) #164a85;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn::-webkit-scrollbar {
+    width: var(--erp-compras-scrollbar-size) !important;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%) !important;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 38%);
+    border-radius: 4px;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+}
+
+.erp-list-page.erp-compras-page .fi-ta-content-ctn > .fi-ta-table {
+    width: calc(100% + var(--erp-compras-scrollbar-size));
+    margin-right: calc(-1 * var(--erp-compras-scrollbar-size));
+}
+
+.erp-list-page.erp-compras-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100% !important;
+    table-layout: fixed;
+}
+
+.erp-compras-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.erp-compras-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-compras-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-compras-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-compras-page .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-compras-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-compras-page .fi-ta-header-cell-sort-btn svg,
+.erp-compras-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-compras-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-compras-page button.fi-ta-col,
+.erp-compras-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-compras-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-compras-page .fi-ta-text-item,
+.erp-compras-page .fi-ta-col,
+.erp-compras-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-compras-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-compras-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-compras-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-compras-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-compras-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-compras-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* ── Rodapé total ───────────────────────────────────────────────── */
+
+.erp-compras-page .erp-compras__total {
+    margin: 0 0.65rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--erp-radius-md) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-right: 4px solid var(--erp-brand-primary) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+}
+
+.erp-compras-page .erp-compras__total-label::after {
+    content: ' |';
+}
+
+/* ── Action bar (F2–F9) ─────────────────────────────────────────── */
+
+.erp-compras-page .erp-compras-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-compras-page .erp-compras-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-compras-page .erp-compras-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-compras-page .erp-compras-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-compras-page .erp-compras-actions__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.erp-compras-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-compras-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Larguras de colunas (Delphi) ───────────────────────────────── */
+
+.erp-compras-page .fi-ta-header-cell:nth-child(1),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.5rem;
+    max-width: 5rem;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(2),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-compras-page .fi-ta-header-cell:nth-child(3),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 5.75rem;
+    max-width: 6.25rem;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(4),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 5.5rem;
+    max-width: 6.5rem;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(5),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-compras-page .fi-ta-header-cell-fornecedor\.nome-razao,
+.erp-compras-page .fi-ta-cell-fornecedor\.nome-razao {
+    width: auto !important;
+    min-width: calc(10rem + 4cm);
+    max-width: none !important;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(6),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-compras-page .fi-ta-header-cell-chave-nfe,
+.erp-compras-page .fi-ta-cell-chave-nfe {
+    width: 46ch !important;
+    min-width: 46ch !important;
+    max-width: none !important;
+}
+
+.erp-compras-page .fi-ta-header-cell-chave-nfe,
+.erp-compras-page .fi-ta-cell-chave-nfe,
+.erp-compras-page .fi-ta-cell-chave-nfe .fi-ta-col,
+.erp-compras-page .fi-ta-cell-chave-nfe .fi-ta-col .fi-ta-text,
+.erp-compras-page .fi-ta-cell-chave-nfe .fi-ta-text-item {
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+.erp-compras-page .fi-ta-cell-chave-nfe .fi-ta-text-item {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(7),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-compras-page .fi-ta-header-cell-total,
+.erp-compras-page .fi-ta-cell-total {
+    width: 6.5rem;
+    max-width: 7.5rem;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(8),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-compras-page .fi-ta-header-cell-ver-itens,
+.erp-compras-page .fi-ta-cell-ver-itens {
+    width: 1.35rem !important;
+    min-width: 1.35rem !important;
+    max-width: 1.35rem !important;
+    padding-inline: 0 !important;
+    overflow: hidden;
+}
+
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-compras-page .fi-ta-cell-ver-itens .fi-ta-col {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    justify-content: center !important;
+}
+
+.erp-compras-page .erp-compras__eye-btn {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 4px;
+    background: var(--erp-bg-panel, #fff);
+    color: var(--erp-brand-primary, #1e5a9e);
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--erp-transition), border-color var(--erp-transition), transform var(--erp-transition);
+}
+
+.erp-compras-page .erp-compras__eye-icon {
+    width: calc(0.9rem + 1mm);
+    height: calc(0.9rem + 1mm);
+    display: block;
+}
+
+.erp-compras-page .erp-compras__eye-btn:hover {
+    background: var(--erp-row-hover, #e8f2ff);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    transform: scale(1.05);
+}
+
+.erp-compras-page .erp-compras__eye-btn:focus-visible {
+    outline: 2px solid var(--erp-brand-primary, #1e5a9e);
+    outline-offset: 1px;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected .erp-compras__eye-btn {
+    background: #fff;
+    border-color: #1e3a8a;
+    color: #1e3a8a;
+}
+
+.erp-compras-page .fi-ta-col:has(.erp-compras__eye-btn) {
+    justify-content: center !important;
+    overflow: visible !important;
+}
+
+.erp-compras-page .fi-ta-header-cell-ver-itens,
+.erp-compras-page .fi-ta-header-cell:nth-child(8) {
+    padding: 0 !important;
+    box-shadow: var(--erp-compras-scrollbar-size, 17px) 0 0 0 #164a85;
+}
+
+.erp-compras-page .fi-ta-cell-ver-itens,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    position: relative;
+}
+
+.erp-compras-page .fi-ta-cell-ver-itens::after,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: calc(-1 * var(--erp-compras-scrollbar-size, 17px));
+    width: var(--erp-compras-scrollbar-size, 17px);
+    height: 100%;
+    background: inherit;
+    pointer-events: none;
+}
+
+.erp-compras-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-compras-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(92rem, calc(100vw - 1rem));
+    height: min(44rem, calc(100vh - 1.5rem));
+    max-height: calc(100vh - 1.5rem);
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__titlebar {
+    flex-shrink: 0;
+}
+
+.erp-compras-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.45rem 0.55rem 0.55rem;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__toolbar {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.4rem;
+    height: 3.85rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #757575 0%, #5f5f5f 100%);
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%);
+    text-decoration: none;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #828282 0%, #686868 100%);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-btn--exit {
+    background: linear-gradient(180deg, #8b3a3a 0%, #6d2d2d 100%);
+    border-color: #5a2424;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-icon {
+    font-size: 1rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__tool-label kbd {
+    font: inherit;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__status-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    min-width: 8.5rem;
+    min-height: 3.2rem;
+    padding: 0.35rem 1rem;
+    border: 1px solid #9aa8b8;
+    border-radius: 4px;
+    background: #fff;
+    color: #000;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__header {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.45rem 0.65rem;
+    min-height: 1.65rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-group--grow {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-label {
+    flex-shrink: 0;
+    font-size: calc(0.72rem + 1mm);
+    font-weight: 700;
+    line-height: 1.35rem;
+    color: #000;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.35rem;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 2px;
+    background: #fff;
+    color: #000;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--xs {
+    width: 3rem;
+    flex: 0 0 auto;
+    justify-content: center;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--sm {
+    width: 5.5rem;
+    flex: 0 0 auto;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--date {
+    width: 6.2rem;
+    flex: 0 0 auto;
+    justify-content: center;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--doc {
+    width: 9.8rem;
+    flex: 0 0 auto;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--uf {
+    width: 2.4rem;
+    flex: 0 0 auto;
+    justify-content: center;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--empresa {
+    width: 12rem;
+    flex: 0 0 auto;
+    max-width: 12rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--fornecedor {
+    flex: 1 1 auto;
+    min-width: 10rem;
+    max-width: 100%;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--chave {
+    flex: 1 1 auto;
+    min-width: 12rem;
+    max-width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__form-input--margem {
+    width: 4.5rem;
+    min-height: 1.35rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid-hint {
+    margin: 0;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: #000;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 8rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    overflow: auto;
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.28rem 0.35rem;
+    text-align: left;
+    font-weight: 700;
+    color: var(--erp-text-inverse, #fff);
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    border-right: 1px solid rgb(255 255 255 / 25%);
+    border-bottom: 1px solid rgb(255 255 255 / 20%);
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid td {
+    padding: 0.18rem 0.35rem;
+    border-right: 1px solid #b8c8d8;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef);
+    vertical-align: middle;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid tbody tr:nth-child(even):not(.erp-lookup-modal__row--selected) td {
+    background: var(--erp-row-zebra, #f8fafc);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-lookup-modal__row--selected) td {
+    background: var(--erp-row-hover, #e8f2ff);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__grid .erp-lookup-modal__row--selected td {
+    background: var(--erp-row-selected, #bfdbfe) !important;
+    color: var(--erp-text, #0f172a);
+    box-shadow: inset 3px 0 0 var(--erp-row-selected-border, #1d4ed8);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__center {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__footer-top {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__footer-bottom {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.45rem 0.65rem;
+    align-items: start;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__fieldset {
+    margin: 0;
+    padding: 0.35rem 0.5rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__legend {
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__fieldset--aplicar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 8.5rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__radio,
+.erp-compras-page .erp-compras-lancamento-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.72rem;
+    color: #000;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__fieldset--parametros {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 11rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__check--disabled {
+    opacity: 0.65;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__margem-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__percent {
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__apply-btn {
+    min-height: 1.45rem;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 3px;
+    background: #f3f4f6;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__formula {
+    margin: 0;
+    font-size: calc(0.72rem + 1mm);
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__fieldset--totais {
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__totais-grid {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.28rem 0.35rem;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__total-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__total-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary, #1e5a9e);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__total-value {
+    min-height: 1.25rem;
+    padding: 0.08rem 0.3rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 2px;
+    background: #fff;
+    text-align: right;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #000;
+}
+
+.erp-compras-page .erp-compras-lancamento-modal__total-value--strong {
+    font-weight: 800;
+}
+
+@media (max-width: 1200px) {
+    .erp-compras-page .erp-compras-lancamento-modal__window {
+        width: calc(100vw - 0.75rem);
+        height: calc(100vh - 0.75rem);
+    }
+
+    .erp-compras-page .erp-compras-lancamento-modal__footer-top {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-compras-page .erp-compras-lancamento-modal__footer-bottom {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-compras-page .erp-compras-lancamento-modal__totais-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .erp-compras-page .erp-compras__filters-row {
+        flex-wrap: wrap;
+    }
+
+    .erp-compras-page .erp-compras__empresa-group,
+    .erp-compras-page .erp-compras__page-size-group {
+        border-right: none;
+        padding-right: 0;
+    }
+
+    .erp-compras-page .erp-compras__locate {
+        padding-left: 0;
+        border-left: none;
+    }
+
+    .erp-compras-page .erp-compras__page-size-group {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+    }
+
+    .erp-compras-page .erp-compras__search-text {
+        max-width: none;
+    }
+}

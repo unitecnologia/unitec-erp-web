@@ -1,0 +1,647 @@
+/* ERP — Produtos (larguras de colunas; UI em erp-list-ui.css) */
+
+/* ── Layout listagem (mesma lógica Orçamentos) ───────────────────── */
+
+.erp-produtos-page .erp-produtos {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-produtos-page .erp-produtos__filters {
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem !important;
+    margin: 0 0 0.35rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-top: none !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    font-family: var(--erp-font);
+    display: block !important;
+}
+
+.erp-produtos-page .erp-produtos__filters-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .erp-produtos-page .erp-produtos__filters-row {
+        flex-wrap: wrap;
+    }
+}
+
+.erp-produtos-page .erp-produtos__search-group {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-produtos-page .erp-produtos__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    flex-shrink: 0;
+}
+
+.erp-produtos-page .erp-produtos__search-desc-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.erp-produtos-page .erp-produtos__search-text {
+    flex: 0 0 auto;
+    width: 11cm;
+    max-width: 11cm;
+    min-width: 6rem;
+}
+
+.erp-produtos-page .erp-produtos__search-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-produtos-page .erp-produtos__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-produtos-page .erp-produtos__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-produtos-page .erp-produtos__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-produtos-page .erp-produtos__btn--secondary {
+    background: var(--erp-bg-muted);
+    color: var(--erp-text);
+}
+
+.erp-produtos-page .erp-produtos__hint {
+    margin: 0 0.65rem 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    line-height: 1.2;
+}
+
+.erp-produtos-page .erp-produtos__status-wrap {
+    flex-shrink: 0;
+    margin: 0 0.65rem 0.35rem;
+}
+
+.erp-produtos-page .erp-produtos__status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.erp-produtos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    .erp-produtos-page .erp-produtos__search-actions,
+    .erp-produtos-page .erp-produtos__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}
+
+.erp-produtos-page .erp-produtos__tabs-wrap {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.erp-produtos-page .erp-produtos__tabs {
+    margin: 0 0 0.35rem;
+    gap: 0.25rem;
+}
+
+.erp-produtos-page .erp-produtos__tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem !important;
+    line-height: 1.1;
+    min-height: 0;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+}
+
+.erp-produtos-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ── Grade compacta (igual Orçamentos) ─────────────────────────── */
+
+.erp-produtos-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-produtos-page .fi-ta-table {
+    border-collapse: collapse;
+    width: auto;
+    min-width: 100%;
+}
+
+.erp-produtos-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-produtos-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-produtos-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-produtos-page .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-produtos-page .fi-ta-header-cell-sort-btn svg,
+.erp-produtos-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-produtos-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-produtos-page .fi-ta-cell:first-of-type {
+    padding-inline-start: 0.18rem !important;
+}
+
+.erp-produtos-page .fi-ta-cell:last-of-type {
+    padding-inline-end: 0.18rem !important;
+}
+
+.erp-produtos-page button.fi-ta-col,
+.erp-produtos-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-produtos-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-produtos-page .fi-ta-text-item,
+.erp-produtos-page .fi-ta-col,
+.erp-produtos-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-produtos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-produtos-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-produtos-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-produtos-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-produtos-page .fi-ta-col-validade .fi-color-danger,
+.erp-produtos-page .fi-ta-col-validade .fi-ta-text-item-label.fi-color-danger,
+.erp-produtos-page .fi-ta-cell:nth-child(12) .fi-color-danger {
+    color: #c00000 !important;
+    font-weight: 800 !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-col-validade .fi-color-danger,
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-cell:nth-child(12) .fi-color-danger {
+    color: #991b1b !important;
+}
+
+.erp-produtos-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* ── Action bar compacta ───────────────────────────────────────── */
+
+.erp-produtos-page .erp-produtos-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-produtos-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-produtos-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-produtos-page .erp-produtos-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-produtos-page .erp-produtos-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-produtos-page .erp-produtos-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-produtos-page .erp-produtos-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}
+
+/* ── Larguras de colunas (ordem Delphi + marcador) ──────────────── */
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(1),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 1.35rem;
+    max-width: 1.35rem;
+    padding-inline: 0.08rem !important;
+    text-align: center !important;
+}
+
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    font-weight: 800 !important;
+    color: #1e3a8a !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected .fi-ta-cell:nth-child(1) {
+    color: #0f172a !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(2),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 4.25rem;
+    max-width: 4.25rem;
+}
+
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    padding-inline: 0.12rem !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(3),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 5.5rem;
+    max-width: 6rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(4),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 8.5rem;
+    max-width: 9.5rem;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(5),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: auto;
+    min-width: 10rem;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(6),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 6.5rem;
+    max-width: 8rem;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(7),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 5.5rem;
+    max-width: 6rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(8),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-produtos-page .fi-ta-header-cell:nth-child(9),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-produtos-page .fi-ta-header-cell:nth-child(10),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(10) {
+    width: 4.5rem;
+    max-width: 5rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(11),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(11) {
+    width: 5.5rem;
+    max-width: 6.5rem;
+}
+
+.erp-produtos-page .fi-ta-header-cell:nth-child(12),
+.erp-produtos-page .fi-ta-row .fi-ta-cell:nth-child(12) {
+    width: 5.5rem;
+    max-width: 6.5rem;
+}
+
+@media (max-width: 1024px) {
+    .erp-produtos__tabs {
+        flex-wrap: wrap;
+    }
+}
+
+.erp-cardex-modal__window {
+    width: min(1180px, 98vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-produtos-cardex-page .erp-produtos-cardex-window {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+}
+
+.erp-produtos-cardex-page .erp-produtos-cardex__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.75rem 1rem 0.5rem;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--entradas,
+.erp-produtos-cardex-page .erp-cardex-modal__panel--saidas {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--entradas .erp-cardex-modal__fieldset {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--entradas .erp-lookup-modal__grid-wrap.erp-cardex-modal__grid-wrap--tall {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    height: auto;
+    overflow-y: auto;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--saidas .erp-cardex-modal__fieldset:last-child {
+    margin-bottom: 0;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--saidas .erp-lookup-modal__grid-wrap:not(.erp-cardex-modal__grid-wrap--fiscal) {
+    max-height: 8.5rem;
+}
+
+.erp-lookup-modal__grid-wrap.erp-cardex-modal__grid-wrap--fiscal {
+    height: 3cm;
+    max-height: 3cm;
+    overflow-y: auto;
+}
+
+.erp-cardex-modal__body {
+    overflow: auto;
+    padding: 0.75rem 1rem 0.5rem;
+}
+
+.erp-cardex-modal__product {
+    margin: 0 0 0.75rem;
+    padding: 0.45rem 0.65rem;
+    font-size: var(--erp-font-size-sm);
+    font-weight: 700;
+    text-align: center;
+    background: var(--erp-bg-panel);
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+}
+
+.erp-cardex-modal__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+.erp-cardex-modal__section-title {
+    margin: 0 0 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--erp-brand-primary);
+}
+
+.erp-cardex-modal__fieldset {
+    margin: 0 0 0.55rem;
+    padding: 0.45rem 0.55rem 0.55rem;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-bg-panel);
+}
+
+.erp-cardex-modal__legend {
+    padding: 0 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-text-muted);
+}
+
+.erp-cardex-modal__grid-wrap--tall {
+    max-height: 420px;
+}
+
+.erp-cardex-modal__panel--saidas .erp-lookup-modal__grid-wrap:not(.erp-cardex-modal__grid-wrap--fiscal) {
+    max-height: 120px;
+}
+
+.erp-cardex-modal__grid {
+    font-size: 11px;
+}
+
+.erp-cardex-modal__grid th,
+.erp-cardex-modal__grid td {
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-cardex-modal__grid .erp-cardex-modal__num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-cardex-modal__totals {
+    margin: 0.65rem 0 0;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-bg-muted);
+}
+
+.erp-cardex-modal__totals-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    font-size: var(--erp-font-size-xs);
+}
+
+.erp-cardex-modal__totals-highlight {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+}
+
+.erp-cardex-modal__actions {
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+@media (max-width: 960px) {
+    .erp-cardex-modal__layout {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-cardex-modal__grid-wrap--tall {
+        max-height: 220px;
+    }
+
+    .erp-cardex-modal__totals-highlight {
+        margin-left: 0;
+        width: 100%;
+    }
+}

@@ -1,0 +1,1239 @@
+/* ERP — UI compartilhada das telas de listagem (filtros, abas, action bar, total) */
+
+/* ── Área superior da tela ─────────────────────────────────────── */
+
+.erp-orcamentos,
+.erp-vendas,
+.erp-caixa,
+.erp-compras,
+.erp-receber,
+.erp-ajustes-estoque,
+.erp-pagar,
+.erp-pessoas,
+.erp-vendedores,
+.erp-grupos,
+.erp-marcas,
+.erp-unidades,
+.erp-ajusta-precos,
+.erp-impressao-etiquetas,
+.erp-ajusta-estoque-grupo,
+.erp-entregadores,
+.erp-contadores,
+.erp-terminais,
+.erp-aniversariantes,
+.erp-produtos,
+.erp-usuarios,
+.erp-empresas {
+    font-family: var(--erp-font);
+    background: var(--erp-bg-app);
+    padding: 0.5rem 0.65rem 0;
+    flex-shrink: 0;
+}
+
+.erp-orcamentos__filter-block,
+.erp-vendas__filter-block,
+.erp-caixa__filter-block,
+.erp-compras__filter-block,
+.erp-compras__filters,
+.erp-receber__filter-block,
+.erp-ajustes-estoque__filter-block,
+.erp-pagar__filter-block,
+.erp-orcamentos__locate,
+.erp-vendas__locate,
+.erp-caixa__locate,
+.erp-compras__locate,
+.erp-receber__locate,
+.erp-ajustes-estoque__locate,
+.erp-pagar__locate,
+.erp-pessoas__locate,
+.erp-vendedores__locate,
+.erp-grupos__locate,
+.erp-marcas__locate,
+.erp-unidades__locate,
+.erp-ajusta-precos__locate,
+.erp-impressao-etiquetas__locate,
+.erp-ajusta-estoque-grupo__locate,
+.erp-entregadores__locate,
+.erp-contadores__locate,
+.erp-terminais__locate,
+.erp-aniversariantes__locate,
+.erp-produtos__locate,
+.erp-empresas__locate {
+    padding: 0.55rem 0.75rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+    margin-bottom: 0.45rem;
+}
+
+.erp-orcamentos__filter-block,
+.erp-vendas__filter-block,
+.erp-caixa__filter-block,
+.erp-compras__filter-block,
+.erp-receber__filter-block,
+.erp-pagar__filter-block {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.erp-orcamentos__locate,
+.erp-vendas__locate,
+.erp-caixa__locate,
+.erp-compras__locate,
+.erp-receber__locate,
+.erp-pagar__locate,
+.erp-pessoas__locate,
+.erp-vendedores__locate,
+.erp-produtos__locate,
+.erp-empresas__locate {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.erp-orcamentos__filter-title,
+.erp-vendas__filter-title,
+.erp-caixa__filter-title,
+.erp-compras__filter-title,
+.erp-receber__filter-title,
+.erp-ajustes-estoque__filter-title,
+.erp-pagar__filter-title,
+.erp-compras__period-title,
+.erp-orcamentos__locate-label,
+.erp-vendas__locate-label,
+.erp-caixa__locate-label,
+.erp-compras__locate-label,
+.erp-receber__locate-label,
+.erp-ajustes-estoque__locate-label,
+.erp-pagar__locate-label,
+.erp-pessoas__locate-label,
+.erp-vendedores__locate-label,
+.erp-grupos__locate-label,
+.erp-marcas__locate-label,
+.erp-unidades__locate-label,
+.erp-ajusta-precos__locate-label,
+.erp-impressao-etiquetas__locate-label,
+.erp-ajusta-estoque-grupo__locate-label,
+.erp-entregadores__locate-label,
+.erp-contadores__locate-label,
+.erp-terminais__locate-label,
+.erp-aniversariantes__locate-label,
+.erp-produtos__locate-label,
+.erp-usuarios__locate-label,
+.erp-empresas__locate-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-orcamentos__filter-title,
+.erp-vendas__filter-title,
+.erp-receber__filter-title,
+.erp-pagar__filter-title {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.erp-orcamentos__period,
+.erp-vendas__period,
+.erp-caixa__period,
+.erp-compras__period,
+.erp-receber__period,
+.erp-ajustes-estoque__period,
+.erp-pagar__period {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.erp-orcamentos__period-label,
+.erp-vendas__period-label,
+.erp-caixa__period-label,
+.erp-compras__period-label,
+.erp-receber__period-label,
+.erp-ajustes-estoque__period-label,
+.erp-pagar__period-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text);
+}
+
+.erp-orcamentos__locate-controls,
+.erp-vendas__locate-controls,
+.erp-caixa__locate-controls,
+.erp-compras__locate-controls,
+.erp-receber__locate-controls,
+.erp-ajustes-estoque__locate-controls,
+.erp-pagar__locate-controls,
+.erp-pessoas__locate-controls,
+.erp-vendedores__locate-controls,
+.erp-grupos__locate-controls,
+.erp-marcas__locate-controls,
+.erp-unidades__locate-controls,
+.erp-ajusta-precos__locate-controls,
+.erp-impressao-etiquetas__locate-controls,
+.erp-ajusta-estoque-grupo__locate-controls,
+.erp-entregadores__locate-controls,
+.erp-contadores__locate-controls,
+.erp-terminais__locate-controls,
+.erp-aniversariantes__locate-controls,
+.erp-produtos__locate-controls,
+.erp-empresas__locate-controls {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+/* ── Campos e botões ───────────────────────────────────────────── */
+
+.erp-orcamentos__period-input,
+.erp-vendas__period-input,
+.erp-caixa__period-input,
+.erp-compras__period-input,
+.erp-receber__period-input,
+.erp-ajustes-estoque__period-input,
+.erp-pagar__period-input,
+.erp-orcamentos__input,
+.erp-vendas__input,
+.erp-caixa__input,
+.erp-compras__input,
+.erp-receber__input,
+.erp-ajustes-estoque__input,
+.erp-pagar__input,
+.erp-orcamentos__select,
+.erp-vendas__select,
+.erp-caixa__select,
+.erp-compras__select,
+.erp-receber__select,
+.erp-ajustes-estoque__select,
+.erp-pagar__select,
+.erp-pessoas__select,
+.erp-vendedores__select,
+.erp-grupos__select,
+.erp-marcas__select,
+.erp-unidades__select,
+.erp-ajusta-precos__select,
+.erp-impressao-etiquetas__select,
+.erp-ajusta-estoque-grupo__select,
+.erp-entregadores__select,
+.erp-contadores__select,
+.erp-terminais__select,
+.erp-aniversariantes__select,
+.erp-pessoas__input,
+.erp-vendedores__input,
+.erp-grupos__input,
+.erp-marcas__input,
+.erp-unidades__input,
+.erp-ajusta-precos__input,
+.erp-impressao-etiquetas__input,
+.erp-ajusta-estoque-grupo__input,
+.erp-entregadores__input,
+.erp-contadores__input,
+.erp-terminais__input,
+.erp-aniversariantes__input,
+.erp-produtos__select,
+.erp-produtos__input,
+.erp-usuarios__select,
+.erp-usuarios__input,
+.erp-empresas__input {
+    font-family: inherit;
+    font-size: var(--erp-font-size-sm);
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    padding: 0.35rem 0.55rem;
+    background: var(--erp-bg-panel);
+    color: var(--erp-text);
+    transition: border-color var(--erp-transition), box-shadow var(--erp-transition);
+}
+
+.erp-orcamentos__period-input:focus,
+.erp-vendas__period-input:focus,
+.erp-caixa__period-input:focus,
+.erp-compras__period-input:focus,
+.erp-receber__period-input:focus,
+.erp-ajustes-estoque__period-input:focus,
+.erp-pagar__period-input:focus,
+.erp-compras__input:focus,
+.erp-receber__input:focus,
+.erp-ajustes-estoque__input:focus,
+.erp-pagar__input:focus,
+.erp-compras__select:focus,
+.erp-receber__select:focus,
+.erp-ajustes-estoque__select:focus,
+.erp-pagar__select:focus,
+.erp-orcamentos__input:focus,
+.erp-vendas__input:focus,
+.erp-caixa__input:focus,
+.erp-orcamentos__select:focus,
+.erp-vendas__select:focus,
+.erp-caixa__select:focus,
+.erp-pessoas__select:focus,
+.erp-vendedores__select:focus,
+.erp-grupos__select:focus,
+.erp-marcas__select:focus,
+.erp-unidades__select:focus,
+.erp-ajusta-precos__select:focus,
+.erp-impressao-etiquetas__select:focus,
+.erp-ajusta-estoque-grupo__select:focus,
+.erp-entregadores__select:focus,
+.erp-contadores__select:focus,
+.erp-aniversariantes__select:focus,
+.erp-pessoas__input:focus,
+.erp-vendedores__input:focus,
+.erp-grupos__input:focus,
+.erp-marcas__input:focus,
+.erp-unidades__input:focus,
+.erp-ajusta-precos__input:focus,
+.erp-impressao-etiquetas__input:focus,
+.erp-ajusta-estoque-grupo__input:focus,
+.erp-entregadores__input:focus,
+.erp-contadores__input:focus,
+.erp-aniversariantes__input:focus,
+.erp-produtos__select:focus,
+.erp-produtos__input:focus,
+.erp-usuarios__input:focus,
+.erp-usuarios__select:focus,
+.erp-empresas__input:focus {
+    outline: none;
+    border-color: var(--erp-focus-ring);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.erp-orcamentos__select,
+.erp-vendas__select,
+.erp-caixa__select,
+.erp-compras__select,
+.erp-receber__select,
+.erp-pagar__select,
+.erp-pessoas__select,
+.erp-vendedores__select,
+.erp-produtos__select,
+.erp-ajusta-precos__select,
+.erp-impressao-etiquetas__select,
+.erp-ajusta-estoque-grupo__select {
+    min-width: 9rem;
+}
+
+.erp-orcamentos__input,
+.erp-vendas__input,
+.erp-caixa__input,
+.erp-compras__input,
+.erp-receber__input,
+.erp-pagar__input,
+.erp-pessoas__input,
+.erp-vendedores__input,
+.erp-produtos__input,
+.erp-empresas__input {
+    flex: 1;
+    min-width: 0;
+}
+
+.erp-orcamentos__btn,
+.erp-vendas__btn,
+.erp-caixa__btn,
+.erp-compras__btn,
+.erp-receber__btn,
+.erp-ajustes-estoque__btn,
+.erp-pagar__btn,
+.erp-pessoas__btn,
+.erp-vendedores__btn,
+.erp-grupos__btn,
+.erp-marcas__btn,
+.erp-unidades__btn,
+.erp-ajusta-precos__btn,
+.erp-impressao-etiquetas__btn,
+.erp-ajusta-estoque-grupo__btn,
+.erp-entregadores__btn,
+.erp-contadores__btn,
+.erp-aniversariantes__btn,
+.erp-produtos__btn,
+.erp-usuarios__btn,
+.erp-empresas__btn {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--erp-action-primary-dark);
+    border-radius: var(--erp-radius-sm);
+    background: linear-gradient(180deg, var(--erp-action-primary) 0%, var(--erp-action-primary-dark) 100%);
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--erp-text-inverse);
+    box-shadow: var(--erp-shadow-sm);
+    transition: background var(--erp-transition), transform var(--erp-transition), box-shadow var(--erp-transition);
+}
+
+.erp-orcamentos__btn:hover,
+.erp-vendas__btn:hover,
+.erp-caixa__btn:hover,
+.erp-compras__btn:hover,
+.erp-receber__btn:hover,
+.erp-ajustes-estoque__btn:hover,
+.erp-pagar__btn:hover,
+.erp-pessoas__btn:hover,
+.erp-vendedores__btn:hover,
+.erp-grupos__btn:hover,
+.erp-marcas__btn:hover,
+.erp-unidades__btn:hover,
+.erp-ajusta-precos__btn:hover,
+.erp-impressao-etiquetas__btn:hover,
+.erp-ajusta-estoque-grupo__btn:hover,
+.erp-entregadores__btn:hover,
+.erp-contadores__btn:hover,
+.erp-aniversariantes__btn:hover,
+.erp-produtos__btn:hover,
+.erp-usuarios__btn:hover,
+.erp-empresas__btn:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, var(--erp-action-primary) 100%);
+    box-shadow: var(--erp-shadow-md);
+    transform: translateY(-1px);
+}
+
+.erp-orcamentos__btn:focus-visible,
+.erp-vendas__btn:focus-visible,
+.erp-caixa__btn:focus-visible,
+.erp-compras__btn:focus-visible,
+.erp-receber__btn:focus-visible,
+.erp-ajustes-estoque__btn:focus-visible,
+.erp-pagar__btn:focus-visible,
+.erp-pessoas__btn:focus-visible,
+.erp-vendedores__btn:focus-visible,
+.erp-grupos__btn:focus-visible,
+.erp-marcas__btn:focus-visible,
+.erp-unidades__btn:focus-visible,
+.erp-ajusta-precos__btn:focus-visible,
+.erp-impressao-etiquetas__btn:focus-visible,
+.erp-ajusta-estoque-grupo__btn:focus-visible,
+.erp-entregadores__btn:focus-visible,
+.erp-contadores__btn:focus-visible,
+.erp-aniversariantes__btn:focus-visible,
+.erp-produtos__btn:focus-visible,
+.erp-empresas__btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+/* ── Abas de status ────────────────────────────────────────────── */
+
+.erp-orcamentos__tabs,
+.erp-vendas__tabs,
+.erp-compras__tabs,
+.erp-pessoas__tabs,
+.erp-vendedores__tabs,
+.erp-grupos__tabs,
+.erp-marcas__tabs,
+.erp-unidades__tabs,
+.erp-ajustes-estoque__tabs,
+.erp-ajusta-precos__tabs,
+.erp-impressao-etiquetas__tabs,
+.erp-ajusta-estoque-grupo__tabs,
+.erp-entregadores__tabs,
+.erp-contadores__tabs,
+.erp-aniversariantes__tabs,
+.erp-produtos__tabs,
+.erp-nfe__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.35rem;
+}
+
+.erp-orcamentos__tab,
+.erp-vendas__tab,
+.erp-compras__tab,
+a.erp-pessoas__tab,
+a.erp-pessoas__filter,
+a.erp-produtos__tab {
+    text-decoration: none;
+    display: inline-block;
+    color: inherit;
+}
+
+.erp-orcamentos__tab,
+.erp-vendas__tab,
+.erp-compras__tab,
+.erp-pessoas__tab,
+.erp-vendedores__tab,
+.erp-grupos__tab,
+.erp-marcas__tab,
+.erp-unidades__tab,
+.erp-ajustes-estoque__tab,
+.erp-ajusta-precos__tab,
+.erp-impressao-etiquetas__tab,
+.erp-ajusta-estoque-grupo__tab,
+.erp-entregadores__tab,
+.erp-contadores__tab,
+.erp-aniversariantes__tab,
+.erp-produtos__tab,
+.erp-nfe__tab {
+    padding: 0.4rem 1rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm) var(--erp-radius-sm) 0 0;
+    background: var(--erp-bg-muted);
+    color: var(--erp-text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--erp-transition), color var(--erp-transition), border-color var(--erp-transition), box-shadow var(--erp-transition);
+}
+
+.erp-orcamentos__tab:hover,
+.erp-vendas__tab:hover,
+.erp-compras__tab:hover,
+.erp-pessoas__tab:hover,
+.erp-vendedores__tab:hover,
+.erp-grupos__tab:hover,
+.erp-marcas__tab:hover,
+.erp-unidades__tab:hover,
+.erp-ajustes-estoque__tab:hover,
+.erp-ajusta-precos__tab:hover,
+.erp-impressao-etiquetas__tab:hover,
+.erp-ajusta-estoque-grupo__tab:hover,
+.erp-entregadores__tab:hover,
+.erp-contadores__tab:hover,
+.erp-aniversariantes__tab:hover,
+.erp-produtos__tab:hover,
+.erp-nfe__tab:hover {
+    background: var(--erp-bg-panel);
+    color: var(--erp-brand-primary);
+    border-color: var(--erp-brand-primary);
+}
+
+.erp-orcamentos__tab--active,
+.erp-vendas__tab--active,
+.erp-compras__tab--active,
+.erp-pessoas__tab--active,
+.erp-vendedores__tab--active,
+.erp-grupos__tab--active,
+.erp-marcas__tab--active,
+.erp-unidades__tab--active,
+.erp-ajustes-estoque__tab--active,
+.erp-ajusta-precos__tab--active,
+.erp-impressao-etiquetas__tab--active,
+.erp-ajusta-estoque-grupo__tab--active,
+.erp-entregadores__tab--active,
+.erp-contadores__tab--active,
+.erp-aniversariantes__tab--active,
+.erp-produtos__tab--active,
+.erp-nfe__tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
+    border-color: var(--erp-brand-accent);
+    font-weight: 700;
+    color: var(--erp-text-inverse);
+    box-shadow: var(--erp-shadow-sm);
+}
+
+.erp-produtos__tab--disabled,
+.erp-ajusta-precos__tab--disabled,
+.erp-impressao-etiquetas__tab--disabled,
+.erp-ajusta-estoque-grupo__tab--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Filtros secundários (pessoas / produtos) ──────────────────── */
+
+.erp-pessoas__hint,
+.erp-vendedores__hint,
+.erp-grupos__hint,
+.erp-marcas__hint,
+.erp-unidades__hint,
+.erp-ajustes-estoque__hint,
+.erp-ajusta-precos__hint,
+.erp-impressao-etiquetas__hint,
+.erp-ajusta-estoque-grupo__hint,
+.erp-entregadores__hint,
+.erp-contadores__hint,
+.erp-aniversariantes__hint,
+.erp-pessoas__hint--top,
+.erp-vendedores__hint--top,
+.erp-grupos__hint--top,
+.erp-marcas__hint--top,
+.erp-unidades__hint--top,
+.erp-ajustes-estoque__hint--top,
+.erp-ajusta-precos__hint--top,
+.erp-impressao-etiquetas__hint--top,
+.erp-ajusta-estoque-grupo__hint--top,
+.erp-entregadores__hint--top,
+.erp-contadores__hint--top,
+.erp-aniversariantes__hint--top,
+.erp-produtos__hint {
+    margin: 0 0.65rem 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+}
+
+.erp-pessoas__filters,
+.erp-vendedores__filters,
+.erp-grupos__filters,
+.erp-marcas__filters,
+.erp-unidades__filters,
+.erp-ajustes-estoque__filters,
+.erp-ajusta-precos__filters,
+.erp-impressao-etiquetas__filters,
+.erp-ajusta-estoque-grupo__filters,
+.erp-entregadores__filters,
+.erp-contadores__filters,
+.erp-aniversariantes__filters {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    background: var(--erp-bg-app);
+    border-top: 1px solid var(--erp-border-light);
+}
+
+.erp-pessoas__filter,
+.erp-vendedores__filter,
+.erp-grupos__filter,
+.erp-marcas__filter,
+.erp-unidades__filter,
+.erp-ajustes-estoque__filter,
+.erp-ajusta-precos__filter,
+.erp-impressao-etiquetas__filter,
+.erp-ajusta-estoque-grupo__filter,
+.erp-entregadores__filter,
+.erp-contadores__filter,
+.erp-aniversariantes__filter {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-bg-panel);
+    cursor: pointer;
+    color: var(--erp-text);
+    transition: background var(--erp-transition), border-color var(--erp-transition);
+}
+
+.erp-pessoas__filter:hover,
+.erp-vendedores__filter:hover,
+.erp-grupos__filter:hover,
+.erp-marcas__filter:hover,
+.erp-unidades__filter:hover,
+.erp-ajustes-estoque__filter:hover,
+.erp-ajusta-precos__filter:hover,
+.erp-impressao-etiquetas__filter:hover,
+.erp-ajusta-estoque-grupo__filter:hover,
+.erp-entregadores__filter:hover,
+.erp-contadores__filter:hover,
+.erp-aniversariantes__filter:hover {
+    background: var(--erp-hover);
+}
+
+.erp-pessoas__filter--active,
+.erp-vendedores__filter--active,
+.erp-grupos__filter--active,
+.erp-marcas__filter--active,
+.erp-unidades__filter--active,
+.erp-ajustes-estoque__filter--active,
+.erp-ajusta-precos__filter--active,
+.erp-impressao-etiquetas__filter--active,
+.erp-ajusta-estoque-grupo__filter--active,
+.erp-entregadores__filter--active,
+.erp-contadores__filter--active,
+.erp-aniversariantes__filter--active {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
+    border-color: var(--erp-brand-accent);
+    font-weight: 700;
+    color: var(--erp-text-inverse);
+    box-shadow: var(--erp-shadow-sm);
+}
+
+/* ── Rodapé total (orçamentos) ─────────────────────────────────── */
+
+.erp-orcamentos__total,
+.erp-vendas__total,
+.erp-compras__total,
+.erp-nfe__total {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-shrink: 0;
+    padding: 0.5rem 0.85rem;
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%);
+    border-top: 2px solid var(--erp-brand-primary);
+    font-family: var(--erp-font);
+    box-shadow: var(--erp-shadow-sm);
+}
+
+.erp-orcamentos__total-label,
+.erp-vendas__total-label,
+.erp-compras__total-label,
+.erp-nfe__total-label {
+    font-size: var(--erp-font-size-sm);
+    font-weight: 800;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.erp-orcamentos__total-value,
+.erp-vendas__total-value,
+.erp-compras__total-value,
+.erp-nfe__total-value {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark);
+}
+
+/* ── Action bar (F2–F10) ───────────────────────────────────────── */
+
+.erp-orcamentos-actions,
+.erp-vendas-actions,
+.erp-caixa-actions,
+.erp-compras-actions,
+.erp-nfe-actions,
+.erp-receber-actions,
+.erp-ajustes-estoque-actions,
+.erp-pagar-actions,
+.erp-pessoas-actions,
+.erp-vendedores-actions,
+.erp-grupos-actions,
+.erp-marcas-actions,
+.erp-unidades-actions,
+.erp-ajusta-precos-actions,
+.erp-impressao-etiquetas-actions,
+.erp-ajusta-estoque-grupo-actions,
+.erp-entregadores-actions,
+.erp-contadores-actions,
+.erp-terminais-actions,
+.erp-aniversariantes-actions,
+.erp-produtos-actions,
+.erp-usuarios-actions,
+.erp-empresas-actions {
+    display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    gap: 0.45rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--erp-action-bg);
+    border-top: 2px solid var(--erp-brand-primary);
+    box-shadow: 0 -4px 12px rgba(15, 40, 71, 0.15);
+}
+
+.erp-orcamentos-actions__btn,
+.erp-vendas-actions__btn,
+.erp-caixa-actions__btn,
+.erp-compras-actions__btn,
+.erp-nfe-actions__btn,
+.erp-receber-actions__btn,
+.erp-ajustes-estoque-actions__btn,
+.erp-pagar-actions__btn,
+.erp-pessoas-actions__btn,
+.erp-vendedores-actions__btn,
+.erp-grupos-actions__btn,
+.erp-marcas-actions__btn,
+.erp-unidades-actions__btn,
+.erp-ajusta-precos-actions__btn,
+.erp-impressao-etiquetas-actions__btn,
+.erp-ajusta-estoque-grupo-actions__btn,
+.erp-entregadores-actions__btn,
+.erp-contadores-actions__btn,
+.erp-terminais-actions__btn,
+.erp-aniversariantes-actions__btn,
+.erp-produtos-actions__btn,
+.erp-usuarios-actions__btn,
+.erp-empresas-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 4.1rem;
+    padding: 0.3rem 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--erp-radius-md);
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--erp-text);
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: var(--erp-shadow-md);
+    transition: background var(--erp-transition), border-color var(--erp-transition), transform var(--erp-transition), box-shadow var(--erp-transition);
+}
+
+.erp-orcamentos-actions__btn:hover,
+.erp-vendas-actions__btn:hover,
+.erp-caixa-actions__btn:hover,
+.erp-compras-actions__btn:hover,
+.erp-nfe-actions__btn:hover,
+.erp-receber-actions__btn:hover,
+.erp-ajustes-estoque-actions__btn:hover,
+.erp-pagar-actions__btn:hover,
+.erp-pessoas-actions__btn:hover,
+.erp-vendedores-actions__btn:hover,
+.erp-grupos-actions__btn:hover,
+.erp-marcas-actions__btn:hover,
+.erp-unidades-actions__btn:hover,
+.erp-ajusta-precos-actions__btn:hover,
+.erp-impressao-etiquetas-actions__btn:hover,
+.erp-ajusta-estoque-grupo-actions__btn:hover,
+.erp-entregadores-actions__btn:hover,
+.erp-contadores-actions__btn:hover,
+.erp-terminais-actions__btn:hover,
+.erp-aniversariantes-actions__btn:hover,
+.erp-produtos-actions__btn:hover,
+.erp-usuarios-actions__btn:hover,
+.erp-empresas-actions__btn:hover {
+    background: #ffffff;
+    border-color: var(--erp-action-primary);
+    box-shadow: var(--erp-shadow-lg);
+    transform: translateY(-2px);
+}
+
+[class$="-actions__btn"][data-erp-key="F2"] {
+    background: linear-gradient(180deg, var(--erp-action-primary) 0%, var(--erp-action-primary-dark) 100%);
+    border-color: #93c5fd;
+    color: var(--erp-text-inverse);
+}
+
+[class$="-actions__btn"][data-erp-key="F2"]:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, var(--erp-action-primary) 100%);
+    border-color: #bfdbfe;
+}
+
+[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__label"],
+[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__label"] kbd {
+    color: var(--erp-text-inverse);
+}
+
+[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__label"] kbd {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.erp-orcamentos-actions__btn[data-erp-key="F4"],
+.erp-vendas-actions__btn[data-erp-key="F4"],
+.erp-compras-actions__btn[data-erp-key="F4"],
+.erp-nfe-actions__btn[data-erp-key="F4"],
+.erp-receber-actions__btn[data-erp-key="F4"],
+.erp-ajustes-estoque-actions__btn[data-erp-key="F4"],
+.erp-pagar-actions__btn[data-erp-key="F4"],
+.erp-caixa-actions__btn[data-erp-key="Delete"] {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.erp-orcamentos-actions__btn[data-erp-key="F4"]:hover,
+.erp-vendas-actions__btn[data-erp-key="F4"]:hover,
+.erp-compras-actions__btn[data-erp-key="F4"]:hover,
+.erp-nfe-actions__btn[data-erp-key="F4"]:hover,
+.erp-receber-actions__btn[data-erp-key="F4"]:hover,
+.erp-ajustes-estoque-actions__btn[data-erp-key="F4"]:hover,
+.erp-pagar-actions__btn[data-erp-key="F4"]:hover,
+.erp-caixa-actions__btn[data-erp-key="Delete"]:hover {
+    border-color: var(--erp-action-danger);
+    background: #fee2e2;
+}
+
+.erp-orcamentos-actions__btn:active,
+.erp-vendas-actions__btn:active,
+.erp-caixa-actions__btn:active,
+.erp-compras-actions__btn:active,
+.erp-nfe-actions__btn:active,
+.erp-receber-actions__btn:active,
+.erp-ajustes-estoque-actions__btn:active,
+.erp-pagar-actions__btn:active,
+.erp-pessoas-actions__btn:active,
+.erp-vendedores-actions__btn:active,
+.erp-grupos-actions__btn:active,
+.erp-marcas-actions__btn:active,
+.erp-unidades-actions__btn:active,
+.erp-ajusta-precos-actions__btn:active,
+.erp-impressao-etiquetas-actions__btn:active,
+.erp-ajusta-estoque-grupo-actions__btn:active,
+.erp-entregadores-actions__btn:active,
+.erp-contadores-actions__btn:active,
+.erp-terminais-actions__btn:active,
+.erp-aniversariantes-actions__btn:active,
+.erp-produtos-actions__btn:active,
+.erp-usuarios-actions__btn:active,
+.erp-empresas-actions__btn:active {
+    transform: translateY(1px);
+}
+
+.erp-orcamentos-actions__btn:focus-visible,
+.erp-vendas-actions__btn:focus-visible,
+.erp-caixa-actions__btn:focus-visible,
+.erp-compras-actions__btn:focus-visible,
+.erp-nfe-actions__btn:focus-visible,
+.erp-receber-actions__btn:focus-visible,
+.erp-ajustes-estoque-actions__btn:focus-visible,
+.erp-pagar-actions__btn:focus-visible,
+.erp-pessoas-actions__btn:focus-visible,
+.erp-vendedores-actions__btn:focus-visible,
+.erp-grupos-actions__btn:focus-visible,
+.erp-marcas-actions__btn:focus-visible,
+.erp-unidades-actions__btn:focus-visible,
+.erp-ajusta-precos-actions__btn:focus-visible,
+.erp-impressao-etiquetas-actions__btn:focus-visible,
+.erp-ajusta-estoque-grupo-actions__btn:focus-visible,
+.erp-entregadores-actions__btn:focus-visible,
+.erp-contadores-actions__btn:focus-visible,
+.erp-terminais-actions__btn:focus-visible,
+.erp-aniversariantes-actions__btn:focus-visible,
+.erp-produtos-actions__btn:focus-visible,
+.erp-usuarios-actions__btn:focus-visible,
+.erp-empresas-actions__btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.erp-orcamentos-actions__btn--close,
+.erp-vendas-actions__btn--close,
+.erp-caixa-actions__btn--close,
+.erp-compras-actions__btn--close,
+.erp-nfe-actions__btn--close,
+.erp-receber-actions__btn--close,
+.erp-ajustes-estoque-actions__btn--close,
+.erp-pagar-actions__btn--close,
+.erp-pessoas-actions__btn--close,
+.erp-vendedores-actions__btn--close,
+.erp-grupos-actions__btn--close,
+.erp-marcas-actions__btn--close,
+.erp-unidades-actions__btn--close,
+.erp-ajusta-precos-actions__btn--close,
+.erp-impressao-etiquetas-actions__btn--close,
+.erp-ajusta-estoque-grupo-actions__btn--close,
+.erp-entregadores-actions__btn--close,
+.erp-contadores-actions__btn--close,
+.erp-terminais-actions__btn--close,
+.erp-aniversariantes-actions__btn--close,
+.erp-produtos-actions__btn--close,
+.erp-usuarios-actions__btn--close,
+.erp-empresas-actions__btn--close {
+    margin-left: auto;
+    border-color: #f87171;
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark) 100%);
+    color: var(--erp-text-inverse);
+}
+
+.erp-orcamentos-actions__btn--close:hover,
+.erp-vendas-actions__btn--close:hover,
+.erp-caixa-actions__btn--close:hover,
+.erp-pessoas-actions__btn--close:hover,
+.erp-vendedores-actions__btn--close:hover,
+.erp-grupos-actions__btn--close:hover,
+.erp-marcas-actions__btn--close:hover,
+.erp-unidades-actions__btn--close:hover,
+.erp-ajustes-estoque-actions__btn--close:hover,
+.erp-ajusta-precos-actions__btn--close:hover,
+.erp-impressao-etiquetas-actions__btn--close:hover,
+.erp-ajusta-estoque-grupo-actions__btn--close:hover,
+.erp-entregadores-actions__btn--close:hover,
+.erp-contadores-actions__btn--close:hover,
+.erp-terminais-actions__btn--close:hover,
+.erp-aniversariantes-actions__btn--close:hover,
+.erp-produtos-actions__btn--close:hover,
+.erp-usuarios-actions__btn--close:hover,
+.erp-empresas-actions__btn--close:hover {
+    border-color: #fca5a5;
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger) 100%);
+    color: var(--erp-text-inverse);
+}
+
+.erp-orcamentos-actions__btn--close [class$="-actions__label"],
+.erp-vendas-actions__btn--close [class$="-actions__label"],
+.erp-caixa-actions__btn--close [class$="-actions__label"],
+.erp-pessoas-actions__btn--close [class$="-actions__label"],
+.erp-vendedores-actions__btn--close [class$="-actions__label"],
+.erp-grupos-actions__btn--close [class$="-actions__label"],
+.erp-marcas-actions__btn--close [class$="-actions__label"],
+.erp-unidades-actions__btn--close [class$="-actions__label"],
+.erp-ajustes-estoque-actions__btn--close [class$="-actions__label"],
+.erp-ajusta-precos-actions__btn--close [class$="-actions__label"],
+.erp-impressao-etiquetas-actions__btn--close [class$="-actions__label"],
+.erp-ajusta-estoque-grupo-actions__btn--close [class$="-actions__label"],
+.erp-entregadores-actions__btn--close [class$="-actions__label"],
+.erp-contadores-actions__btn--close [class$="-actions__label"],
+.erp-aniversariantes-actions__btn--close [class$="-actions__label"],
+.erp-produtos-actions__btn--close [class$="-actions__label"],
+.erp-usuarios-actions__btn--close [class$="-actions__label"],
+.erp-empresas-actions__btn--close [class$="-actions__label"] {
+    color: var(--erp-text-inverse);
+}
+
+.erp-orcamentos-actions__icon,
+.erp-vendas-actions__icon,
+.erp-caixa-actions__icon,
+.erp-compras-actions__icon,
+.erp-nfe-actions__icon,
+.erp-receber-actions__icon,
+.erp-ajustes-estoque-actions__icon,
+.erp-pagar-actions__icon,
+.erp-pessoas-actions__icon,
+.erp-vendedores-actions__icon,
+.erp-grupos-actions__icon,
+.erp-marcas-actions__icon,
+.erp-unidades-actions__icon,
+.erp-ajusta-precos-actions__icon,
+.erp-impressao-etiquetas-actions__icon,
+.erp-ajusta-estoque-grupo-actions__icon,
+.erp-entregadores-actions__icon,
+.erp-contadores-actions__icon,
+.erp-terminais-actions__icon,
+.erp-aniversariantes-actions__icon,
+.erp-produtos-actions__icon,
+.erp-usuarios-actions__icon,
+.erp-empresas-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    font-size: 1rem;
+    line-height: 1;
+    margin-bottom: 0.2rem;
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-bg-muted);
+    color: var(--erp-brand-primary);
+    font-weight: 700;
+}
+
+.erp-orcamentos-actions__icon--new,
+.erp-vendas-actions__icon--new,
+.erp-caixa-actions__icon--new,
+.erp-compras-actions__icon--new,
+.erp-nfe-actions__icon--new,
+.erp-receber-actions__icon--new,
+.erp-ajustes-estoque-actions__icon--new,
+.erp-pagar-actions__icon--new,
+[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__icon"] {
+    background: rgba(255, 255, 255, 0.25);
+    color: var(--erp-text-inverse);
+    font-weight: 800;
+}
+
+.erp-orcamentos-actions__icon--cancel,
+.erp-vendas-actions__icon--cancel,
+.erp-caixa-actions__icon--cancel,
+.erp-compras-actions__icon--cancel,
+.erp-nfe-actions__icon--cancel,
+.erp-receber-actions__icon--cancel,
+.erp-ajustes-estoque-actions__icon--cancel,
+.erp-pagar-actions__icon--cancel,
+.erp-contadores-actions__icon--cancel,
+.erp-usuarios-actions__icon--cancel,
+.erp-vendedores-actions__icon--cancel {
+    background: var(--erp-action-danger);
+    color: var(--erp-text-inverse);
+    border-radius: 50%;
+    font-size: 0.85rem;
+}
+
+.erp-orcamentos-actions__icon--close,
+.erp-vendas-actions__icon--close,
+.erp-caixa-actions__icon--close,
+.erp-compras-actions__icon--close,
+.erp-nfe-actions__icon--close,
+.erp-receber-actions__icon--close,
+.erp-ajustes-estoque-actions__icon--close,
+.erp-pagar-actions__icon--close,
+.erp-pessoas-actions__icon--close,
+.erp-vendedores-actions__icon--close,
+.erp-grupos-actions__icon--close,
+.erp-marcas-actions__icon--close,
+.erp-unidades-actions__icon--close,
+.erp-ajusta-precos-actions__icon--close,
+.erp-impressao-etiquetas-actions__icon--close,
+.erp-ajusta-estoque-grupo-actions__icon--close,
+.erp-entregadores-actions__icon--close,
+.erp-contadores-actions__icon--close,
+.erp-aniversariantes-actions__icon--close,
+.erp-produtos-actions__icon--close,
+.erp-usuarios-actions__icon--close,
+.erp-empresas-actions__icon--close {
+    background: rgba(255, 255, 255, 0.25);
+    color: var(--erp-text-inverse);
+}
+
+.erp-orcamentos-actions__label,
+.erp-vendas-actions__label,
+.erp-caixa-actions__label,
+.erp-compras-actions__label,
+.erp-nfe-actions__label,
+.erp-receber-actions__label,
+.erp-ajustes-estoque-actions__label,
+.erp-pagar-actions__label,
+.erp-pessoas-actions__label,
+.erp-vendedores-actions__label,
+.erp-grupos-actions__label,
+.erp-marcas-actions__label,
+.erp-unidades-actions__label,
+.erp-ajusta-precos-actions__label,
+.erp-impressao-etiquetas-actions__label,
+.erp-ajusta-estoque-grupo-actions__label,
+.erp-entregadores-actions__label,
+.erp-contadores-actions__label,
+.erp-terminais-actions__label,
+.erp-aniversariantes-actions__label,
+.erp-produtos-actions__label,
+.erp-usuarios-actions__label,
+.erp-empresas-actions__label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.15;
+    color: var(--erp-text);
+}
+
+.erp-orcamentos-actions__label kbd,
+.erp-vendas-actions__label kbd,
+.erp-caixa-actions__label kbd,
+.erp-compras-actions__label kbd,
+.erp-nfe-actions__label kbd,
+.erp-receber-actions__label kbd,
+.erp-ajustes-estoque-actions__label kbd,
+.erp-pagar-actions__label kbd,
+.erp-pessoas-actions__label kbd,
+.erp-vendedores-actions__label kbd,
+.erp-grupos-actions__label kbd,
+.erp-marcas-actions__label kbd,
+.erp-unidades-actions__label kbd,
+.erp-ajusta-precos-actions__label kbd,
+.erp-impressao-etiquetas-actions__label kbd,
+.erp-ajusta-estoque-grupo-actions__label kbd,
+.erp-entregadores-actions__label kbd,
+.erp-contadores-actions__label kbd,
+.erp-aniversariantes-actions__label kbd,
+.erp-produtos-actions__label kbd,
+.erp-usuarios-actions__label kbd,
+.erp-empresas-actions__label kbd {
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: var(--erp-bg-muted);
+    border: 1px solid var(--erp-border-light);
+    color: var(--erp-brand-primary);
+    font-weight: 700;
+}
+
+/* ── Loading sutil na grade ────────────────────────────────────── */
+
+.erp-list-page[wire\:loading] .fi-ta-ctn,
+.erp-list-page[wire\:loading\.delay] .fi-ta-ctn {
+    opacity: 0.72;
+    pointer-events: none;
+    transition: opacity var(--erp-transition);
+}
+
+.erp-list-page[wire\:loading] .fi-ta-ctn::after,
+.erp-list-page[wire\:loading\.delay] .fi-ta-ctn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+}
+
+.erp-list-page .fi-ta-ctn {
+    position: relative;
+}
+
+/* ── Responsivo ────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+    .erp-orcamentos__filter-block,
+    .erp-vendas__filter-block,
+    .erp-caixa__filter-block {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .erp-orcamentos__period,
+    .erp-vendas__period,
+    .erp-caixa__period,
+.erp-compras__period,
+.erp-receber__period,
+.erp-pagar__period {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .erp-orcamentos__locate,
+    .erp-vendas__locate,
+    .erp-caixa__locate,
+.erp-compras__locate,
+    .erp-pessoas__locate,
+    .erp-vendedores__locate,
+    .erp-grupos__locate,
+    .erp-marcas__locate,
+    .erp-unidades__locate,
+    .erp-ajustes-estoque__locate,
+    .erp-ajusta-precos__locate,
+    .erp-impressao-etiquetas__locate,
+    .erp-ajusta-estoque-grupo__locate,
+    .erp-entregadores__locate,
+    .erp-contadores__locate,
+.erp-terminais__locate,
+    .erp-aniversariantes__locate,
+    .erp-produtos__locate,
+    .erp-empresas__locate {
+        flex-wrap: wrap;
+    }
+
+    .erp-pessoas__locate-controls,
+    .erp-vendedores__locate-controls,
+    .erp-grupos__locate-controls,
+    .erp-marcas__locate-controls,
+    .erp-unidades__locate-controls,
+    .erp-ajustes-estoque__locate-controls,
+    .erp-ajusta-precos__locate-controls,
+    .erp-impressao-etiquetas__locate-controls,
+    .erp-ajusta-estoque-grupo__locate-controls,
+    .erp-entregadores__locate-controls,
+    .erp-contadores__locate-controls,
+.erp-terminais__locate-controls,
+    .erp-aniversariantes__locate-controls,
+    .erp-produtos__locate-controls,
+    .erp-ajusta-precos__locate-controls,
+    .erp-impressao-etiquetas__locate-controls,
+    .erp-ajusta-estoque-grupo__locate-controls {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .erp-orcamentos-actions__btn--close,
+    .erp-vendas-actions__btn--close,
+    .erp-caixa-actions__btn--close,
+.erp-compras-actions__btn--close,
+.erp-nfe-actions__btn--close,
+.erp-receber-actions__btn--close,
+.erp-pagar-actions__btn--close,
+    .erp-pessoas-actions__btn--close,
+    .erp-vendedores-actions__btn--close,
+    .erp-grupos-actions__btn--close,
+    .erp-marcas-actions__btn--close,
+    .erp-unidades-actions__btn--close,
+    .erp-ajustes-estoque-actions__btn--close,
+    .erp-ajusta-precos-actions__btn--close,
+    .erp-impressao-etiquetas-actions__btn--close,
+    .erp-ajusta-estoque-grupo-actions__btn--close,
+    .erp-entregadores-actions__btn--close,
+    .erp-contadores-actions__btn--close,
+.erp-terminais-actions__btn--close,
+    .erp-aniversariantes-actions__btn--close,
+    .erp-produtos-actions__btn--close,
+    .erp-usuarios-actions__btn--close,
+.erp-empresas-actions__btn--close {
+        margin-left: 0;
+    }
+}

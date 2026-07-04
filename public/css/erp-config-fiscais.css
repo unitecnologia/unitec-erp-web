@@ -1,0 +1,723 @@
+.fi-body:has(.erp-config-fiscais-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.48) !important;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .erp-menu-bar,
+.fi-body:has(.erp-config-fiscais-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .erp-title-bar {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .fi-layout,
+.fi-body:has(.erp-config-fiscais-page) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .fi-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.75rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-config-fiscais-page) .fi-main > * {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: min(1180px, 98vw);
+    min-height: 0;
+    height: calc(100dvh - 3.25rem);
+    max-height: calc(100dvh - 3.25rem);
+    overflow: hidden;
+}
+
+.fi-page.erp-form-page.erp-config-fiscais-page,
+.fi-page.erp-config-fiscais-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    min-height: 0 !important;
+    height: calc(100dvh - 3.25rem);
+    max-height: calc(100dvh - 3.25rem);
+    overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-config-fiscais-page .fi-page-header-main-ctn,
+.erp-config-fiscais-page .fi-page-main,
+.erp-config-fiscais-page .fi-page-content,
+.erp-config-fiscais-page .fi-sc {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0 !important;
+    gap: 0 !important;
+    background: transparent;
+}
+
+.erp-config-fiscais-page .fi-sc > div:has(> .erp-config-fiscais-window) {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-config-fiscais-page .fi-header,
+.erp-config-fiscais-page .fi-form-actions {
+    display: none !important;
+}
+
+.erp-config-fiscais-window {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-panel, #fff);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+}
+
+.erp-config-fiscais-window__titlebar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+    padding: 0.7rem 1rem;
+    border-bottom: none;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+}
+
+.erp-config-fiscais-window__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--erp-text-inverse, #fff);
+    letter-spacing: 0.01em;
+}
+
+.erp-config-fiscais-window__empresa {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-left: auto;
+    font-size: 0.8125rem;
+}
+
+.erp-config-fiscais-window__empresa label {
+    color: rgba(255, 255, 255, 0.88);
+    font-weight: 600;
+}
+
+.erp-config-fiscais-window__empresa span {
+    min-width: 14rem;
+    padding: 0.38rem 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+.erp-config-fiscais-window__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.erp-config-fiscais-window__close:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.erp-config-fiscais-window__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0;
+    background: var(--erp-bg-app, #eef4fb);
+}
+
+.erp-config-fiscais-pcad {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.65rem 0.75rem 0 !important;
+    background: var(--erp-bg-app, #eef4fb) !important;
+}
+
+.erp-config-fiscais-pcad .erp-pcad__tabs {
+    flex-shrink: 0;
+    margin-bottom: 0.15rem;
+}
+
+.erp-config-fiscais-pcad .erp-pcad__workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.1rem !important;
+}
+
+.erp-config-fiscais-pcad .erp-pcad__content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.15rem 0.1rem 0.5rem;
+}
+
+.erp-config-fiscais-page .erp-pcad-form__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+}
+
+.erp-config-fiscais-page .erp-pcad-form__label {
+    min-width: 8.5rem;
+    flex: 0 0 auto;
+    line-height: 1.35;
+}
+
+.erp-config-fiscais-page .erp-pcad__group {
+    margin: 0 0 1rem;
+    padding: 0.85rem 1rem 1rem !important;
+    background: var(--erp-bg-panel, #fff) !important;
+    border-color: var(--erp-border-light, #c7d5e8) !important;
+}
+
+.erp-config-fiscais-page .erp-pcad__group-title {
+    padding: 0 0.35rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.875rem;
+}
+
+.erp-config-fiscais-pcad__footer {
+    flex-shrink: 0;
+    margin-top: 0;
+}
+
+.erp-config-fiscais-page .erp-pcad-actions__btn[data-erp-key="F2"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: #86efac !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-config-fiscais-page .erp-pcad-actions__btn[data-erp-key="F2"]:hover {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%) !important;
+}
+
+.erp-config-fiscais-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label,
+.erp-config-fiscais-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label kbd,
+.erp-config-fiscais-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__icon--save {
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-config-fiscais-form__columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.erp-config-fiscais-form__col {
+    min-width: 0;
+}
+
+.erp-config-fiscais-form__field-row .erp-pcad-form__select,
+.erp-config-fiscais-form__field-row .erp-pcad-form__input {
+    flex: 1;
+    min-width: 0;
+}
+
+.erp-config-fiscais-form__path-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
+.erp-config-fiscais-form__path-group .erp-config-fiscais-form__path-row {
+    width: 100%;
+}
+
+.erp-config-fiscais-form__browse-btn {
+    border: 1px solid var(--erp-border-light, #94a3b8);
+    background: var(--erp-bg-panel, #fff);
+    border-radius: var(--erp-radius-sm, 6px);
+    width: 1.85rem;
+    height: 1.85rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.erp-config-fiscais-form__file-input {
+    display: none;
+}
+
+.erp-config-fiscais-form__verify-wrap {
+    margin-top: 0.5rem;
+}
+
+.erp-config-fiscais-form__verify-btn {
+    width: auto;
+    min-height: 2.5rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-bg-panel, #fff);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.erp-config-fiscais-form__verify-btn:hover {
+    background: #eef4fb;
+    border-color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-config-fiscais-form__hint {
+    margin: 0 0 0.85rem;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: #475569;
+}
+
+.erp-config-fiscais-form__hint--muted {
+    color: #64748b;
+    font-style: italic;
+    margin-top: 0.75rem;
+}
+
+.erp-config-fiscais-form--certificado .erp-config-fiscais-form__verify-wrap {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--erp-border-light, #dbe4ef);
+}
+
+.erp-config-fiscais-form--certificado .erp-config-fiscais-form__verify-btn {
+    width: auto;
+    min-width: 14rem;
+    min-height: 2.5rem;
+    padding: 0.6rem 1rem;
+}
+
+.erp-config-fiscais-form__import-group {
+    margin-bottom: 0;
+}
+
+.erp-config-fiscais-form__import-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 0.15rem;
+    margin-bottom: 0.35rem;
+}
+
+.erp-config-fiscais-form__import-row .erp-pcad-form__btn {
+    min-height: 2.35rem;
+    padding: 0.45rem 0.85rem;
+}
+
+.erp-config-fiscais-form__import-btn {
+    font-weight: 700;
+    border-color: var(--erp-brand-primary, #1e5a9e) !important;
+    background: linear-gradient(180deg, #e8f2fc 0%, #d4e6f8 100%) !important;
+    color: var(--erp-brand-primary-dark, #0f3460) !important;
+}
+
+.erp-config-fiscais-form__import-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #f3f8fd 0%, #e0eef9 100%) !important;
+}
+
+.erp-config-fiscais-form__cert-info {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #c5dcef;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #f8fbff;
+}
+
+.erp-config-fiscais-form__cert-info-title {
+    margin: 0 0 0.55rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    word-break: break-word;
+}
+
+.erp-config-fiscais-form__cert-info-meta {
+    margin: 0.35rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #475569;
+    word-break: break-word;
+}
+
+.erp-config-fiscais-form__storage-group {
+    margin-top: 0.25rem;
+}
+
+.erp-config-fiscais-form__paths {
+    margin: 0.5rem 0 0;
+    padding: 0;
+}
+
+.erp-config-fiscais-form__paths-row {
+    display: grid;
+    grid-template-columns: minmax(9rem, 11rem) 1fr;
+    gap: 0.5rem 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #e8eef3;
+}
+
+.erp-config-fiscais-form__paths-row:last-child {
+    border-bottom: none;
+}
+
+.erp-config-fiscais-form__paths-row dt {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.erp-config-fiscais-form__paths-row dd {
+    margin: 0;
+    font-size: 0.76rem;
+    color: #475569;
+    word-break: break-all;
+}
+
+.erp-config-fiscais-form__paths-row dd code {
+    font-size: 0.74rem;
+}
+
+.erp-config-fiscais-form--certificado .erp-config-fiscais-form__senha-row {
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.erp-config-fiscais-form--certificado .erp-config-fiscais-form__senha-row .erp-pcad-form__label {
+    flex: 0 0 auto;
+}
+
+.erp-config-fiscais-form__password-wrap {
+    position: relative;
+    flex: 0 0 auto;
+    width: min(100%, 16rem);
+    max-width: 16rem;
+}
+
+.erp-config-fiscais-form__password-input {
+    width: 100%;
+    min-height: 2.35rem;
+    padding-right: 2.6rem;
+}
+
+.erp-config-fiscais-form__password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: transparent;
+    color: var(--erp-brand-primary, #1e5a9e);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: background 0.15s ease;
+}
+
+.erp-config-fiscais-form__password-toggle:hover {
+    background: rgba(30, 90, 158, 0.08);
+}
+
+.erp-config-fiscais-form__password-toggle-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    display: block;
+}
+
+.erp-config-fiscais-form__password-toggle-icon--hide {
+    display: none;
+}
+
+.erp-config-fiscais-form__password-toggle.is-visible .erp-config-fiscais-form__password-toggle-icon--show {
+    display: none;
+}
+
+.erp-config-fiscais-form__password-toggle.is-visible .erp-config-fiscais-form__password-toggle-icon--hide {
+    display: block;
+}
+
+.erp-config-fiscais-page .erp-pcad__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-right: 1rem;
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 900px) {
+    .erp-config-fiscais-form__columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.erp-config-fiscais-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.erp-config-fiscais-picker__dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(640px, 96vw);
+    max-height: min(90dvh, 720px);
+    border: 1px solid var(--erp-border-dark, #7a8ea8);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-panel, #fff);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+.erp-config-fiscais-picker__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(180deg, #f8fbff 0%, #e8eef8 100%);
+}
+
+.erp-config-fiscais-picker__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #1a365d;
+}
+
+.erp-config-fiscais-picker__close {
+    border: none;
+    background: transparent;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+}
+
+.erp-config-fiscais-picker__body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.85rem;
+}
+
+.erp-config-fiscais-picker__hint {
+    margin: 0 0 0.75rem;
+    font-size: 0.8125rem;
+    color: #555;
+}
+
+.erp-config-fiscais-picker__hint code {
+    font-size: 0.75rem;
+}
+
+.erp-config-fiscais-picker__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+}
+
+.erp-config-fiscais-picker__status {
+    font-size: 0.75rem;
+    color: #444;
+}
+
+.erp-config-fiscais-picker__warn {
+    margin: 0 0 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #f6ad55;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fffaf0;
+    font-size: 0.8125rem;
+    color: #744210;
+}
+
+.erp-config-fiscais-picker__pfx-group {
+    margin-top: 0.85rem;
+}
+
+.erp-config-fiscais-picker__file-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.erp-config-fiscais-picker__file-name {
+    font-size: 0.8125rem;
+    color: #333;
+}
+
+.erp-config-fiscais-picker__list-title {
+    margin: 0 0 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #1a365d;
+}
+
+.erp-config-fiscais-picker__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 8rem;
+    padding: 0.35rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+}
+
+.erp-config-fiscais-picker__list--loading {
+    opacity: 0.65;
+}
+
+.erp-config-fiscais-picker__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid transparent;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-config-fiscais-picker__item:hover {
+    background: #eef3fa;
+}
+
+.erp-config-fiscais-picker__item--selected {
+    border-color: #6b46c1;
+    background: #f3e8ff;
+}
+
+.erp-config-fiscais-picker__item-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.erp-config-fiscais-picker__item-meta {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.erp-config-fiscais-picker__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 7rem;
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: #666;
+}
+
+.erp-config-fiscais-picker__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #eef3fa;
+}
+
+.erp-config-fiscais-picker__btn-ok {
+    min-width: 5rem;
+    font-weight: 700;
+}
+
+@supports not (height: 100dvh) {
+    .fi-body:has(.erp-config-fiscais-page) {
+        height: 100vh;
+    }
+
+    .fi-body:has(.erp-config-fiscais-page) .fi-main > *,
+    .fi-page.erp-form-page.erp-config-fiscais-page,
+    .fi-page.erp-config-fiscais-page {
+        height: calc(100vh - 3.25rem);
+        max-height: calc(100vh - 3.25rem);
+    }
+}

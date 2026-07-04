@@ -1,0 +1,7 @@
+﻿    public bool $printModalOpen = false;
+
+    public bool $previewOverlayOpen = false;
+
+    public ?string $previewOverlayUrl = null;
+
+    public function mount(): void

@@ -1,0 +1,1039 @@
+/* ERP â€” OrÃ§amentos (listagem compacta + visual moderno ERP) */
+
+/* â”€â”€ Filtros compactos (mantÃ©m visual compartilhado de erp-list-ui.css) â”€ */
+
+.erp-orcamentos-page .erp-orcamentos {
+    padding: 0.5rem 0.65rem 0;
+    margin: 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-orcamentos-page .erp-orcamentos__filters {
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem;
+    margin: 0 0 0.35rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+    font-family: var(--erp-font);
+}
+
+.erp-orcamentos-page .erp-orcamentos__filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos__search-group {
+    display: inline-flex;
+    flex: 1 1 32rem;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-orcamentos-page .erp-orcamentos__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    flex-shrink: 0;
+}
+
+.erp-orcamentos-page .erp-orcamentos__search-desc-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.erp-orcamentos-page .erp-orcamentos__search-text {
+    flex: 1 1 auto;
+    min-width: 14rem;
+    max-width: none;
+    width: auto;
+}
+
+.erp-orcamentos-page .erp-orcamentos__period-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.55rem;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-orcamentos-page .erp-orcamentos__period-group .erp-orcamentos__filter-title {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.erp-orcamentos-page .erp-orcamentos__period-group .erp-orcamentos__period-label {
+    white-space: nowrap;
+}
+
+.erp-orcamentos-page .erp-orcamentos__period-input,
+.erp-orcamentos-page .erp-orcamentos__period-group .erp-date-field {
+    min-width: 7.5rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-orcamentos-page .erp-orcamentos__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-orcamentos-page .erp-orcamentos__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-orcamentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    .erp-orcamentos-page .erp-orcamentos__period-group,
+    .erp-orcamentos-page .erp-orcamentos__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}
+
+/* â”€â”€ Abas acima da grade (layout compacto, estilo moderno) â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-orcamentos-page .erp-orcamentos__tabs-wrap {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tabs {
+    margin: 0 0 0.35rem;
+    gap: 0.25rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem;
+    line-height: 1.1;
+    min-height: 0;
+}
+
+/* â”€â”€ Grade: visual moderno (erp-grid.css) + linhas compactas â”€â”€â”€â”€â”€ */
+
+.erp-orcamentos-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+    min-height: 12rem;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta {
+    min-height: 12rem;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-content-ctn {
+    min-height: 10rem;
+    padding-right: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 40%) #164a85;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-content-ctn::-webkit-scrollbar {
+    width: 12px !important;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-content-ctn::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%) !important;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-content-ctn::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 38%);
+    border-radius: 4px;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-content-ctn::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+}
+
+.erp-list-page.erp-orcamentos-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100% !important;
+    table-layout: fixed;
+}
+
+.erp-orcamentos-page .fi-ta-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-orcamentos-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-orcamentos-page .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:first-child {
+    padding-left: 0.45rem !important;
+    padding-right: 0.18rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell-sort-btn svg,
+.erp-orcamentos-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-orcamentos-page .fi-ta-row {
+    height: 1.375rem;
+}
+
+.erp-orcamentos-page .fi-ta-cell:first-of-type {
+    padding-inline-start: 0.18rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-cell:last-of-type {
+    padding-inline-end: 0.18rem !important;
+}
+
+.erp-orcamentos-page button.fi-ta-col,
+.erp-orcamentos-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-orcamentos-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-orcamentos-page .fi-ta-text-item,
+.erp-orcamentos-page .fi-ta-col,
+.erp-orcamentos-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-orcamentos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-orcamentos-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-orcamentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-orcamentos-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-orcamentos-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* â”€â”€ RodapÃ© total (compacto, cores de erp-list-ui.css) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.erp-orcamentos-page .erp-orcamentos__total {
+    margin: 0 0.65rem;
+    padding: 0.35rem 0.65rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos__total-label {
+    font-size: 0.75rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos__total-value {
+    font-size: 0.875rem;
+}
+
+/* â”€â”€ Larguras das colunas (fixas nas estreitas, flex no cliente) â”€ */
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(1),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.25rem;
+    max-width: 4.25rem;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    padding-inline: 0.12rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(2),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 5.85rem;
+    max-width: 5.85rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(3),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-orcamentos-page .fi-ta-header-cell-cliente\.nome-razao,
+.erp-orcamentos-page .fi-ta-cell-cliente\.nome-razao {
+    width: auto !important;
+    min-width: 9rem;
+    max-width: 16rem;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(4),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 12.5rem;
+    max-width: 14rem;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(5),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 8.5rem;
+    max-width: 10rem;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(6),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 1.85rem;
+    max-width: 1.85rem;
+    padding-inline: 0.08rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(7),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-orcamentos-page .fi-ta-header-cell-total,
+.erp-orcamentos-page .fi-ta-cell-total {
+    width: 4.5rem;
+    max-width: 4.5rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(8),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-orcamentos-page .fi-ta-header-cell-ver-itens,
+.erp-orcamentos-page .fi-ta-cell-ver-itens {
+    width: 1.35rem !important;
+    min-width: 1.35rem !important;
+    max-width: 1.35rem !important;
+    padding-inline: 0 !important;
+    overflow: hidden;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-orcamentos-page .fi-ta-cell-ver-itens .fi-ta-col {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    justify-content: center !important;
+}
+
+.erp-orcamentos-page .erp-orcamentos__eye-btn {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 4px;
+    background: var(--erp-bg-panel, #fff);
+    color: var(--erp-brand-primary, #1e5a9e);
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--erp-transition), border-color var(--erp-transition), transform var(--erp-transition);
+}
+
+.erp-orcamentos-page .erp-orcamentos__eye-icon {
+    width: calc(0.9rem + 1mm);
+    height: calc(0.9rem + 1mm);
+    display: block;
+}
+
+.erp-orcamentos-page .erp-orcamentos__eye-btn:hover {
+    background: var(--erp-row-hover, #e8f2ff);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    transform: scale(1.05);
+}
+
+.erp-orcamentos-page .erp-orcamentos__eye-btn:focus-visible {
+    outline: 2px solid var(--erp-brand-primary, #1e5a9e);
+    outline-offset: 1px;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .erp-orcamentos__eye-btn {
+    background: #fff;
+    border-color: #1e3a8a;
+    color: #1e3a8a;
+}
+
+.erp-orcamentos-page .fi-ta-col:has(.erp-orcamentos__eye-btn) {
+    justify-content: center !important;
+    overflow: visible !important;
+}
+
+/* ── Action bar compacta ─────────────────────────────────────────── */
+
+.erp-orcamentos-page .erp-orcamentos-actions {
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-orcamentos-page .erp-orcamentos-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-orcamentos-page .erp-orcamentos-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos-actions__icon--cancel {
+    font-size: 0.75rem;
+}
+
+.erp-orcamentos-page .erp-orcamentos-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}
+
+/* â”€â”€ Modal impressÃ£o (F6) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.erp-orcamentos-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-orcamentos-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-orcamentos-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+}
+
+.erp-orcamentos-page .erp-orc-print-modal .erp-lookup-modal__window {
+    width: min(22rem, calc(100vw - 2rem));
+}
+
+.erp-orcamentos-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-orcamentos-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-orcamentos-page .erp-lookup-modal__body {
+    min-height: 0;
+    overflow: auto;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__window {
+    width: min(92rem, calc(100vw - 1rem));
+    height: min(44rem, calc(100vh - 1.5rem));
+    max-height: calc(100vh - 1.5rem);
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orcamentos-window {
+    height: 100%;
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    border-radius: 0;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__itens {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens__grid-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__totals .erp-orc-totals__value {
+    pointer-events: none;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__obs {
+    min-height: 8rem;
+    white-space: pre-wrap;
+    overflow: auto;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__actions {
+    display: flex !important;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-end !important;
+    align-items: center;
+    flex-shrink: 0;
+    margin: 0;
+    background: linear-gradient(180deg, #1a3a5c 0%, #0f2847 100%) !important;
+    border-top: 2px solid #1e5a9e;
+    padding: 0.45rem 0.55rem !important;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__actions .erp-pcad-actions__btn {
+    margin-left: auto;
+}
+
+.erp-orc-print-modal__body {
+    display: flex;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding: 0.85rem;
+}
+
+.erp-orc-print-modal__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 5.5rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #f8fafc 0%, #dbeafe 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.erp-orc-print-modal__icon-printer {
+    font-size: 2.75rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(15, 40, 71, 0.2));
+}
+
+.erp-orc-print-modal__options {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.erp-orc-print-modal__option {
+    flex: 1;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+    transition: background var(--erp-transition, 0.15s ease), border-color var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease);
+}
+
+.erp-orc-print-modal__option:hover {
+    background: #ffffff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    transform: translateY(-1px);
+}
+
+.erp-orc-print-modal__option:active {
+    transform: translateY(0);
+}
+
+.erp-orc-print-modal__option--exit {
+    background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #fca5a5;
+}
+
+.erp-orc-print-modal__option--exit:hover {
+    border-color: var(--erp-action-danger, #dc2626);
+    background: #fff5f5;
+}
+
+/* â”€â”€ Overlay visualizaÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.erp-orcamentos-page .erp-orc-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.erp-orcamentos-page .erp-orc-preview-overlay .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.erp-orcamentos-page .erp-orc-preview-overlay .erp-form-overlay__panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(1280px, 98vw);
+    height: calc(100dvh - 5.5rem);
+    max-height: calc(100dvh - 5.5rem);
+    min-height: 0;
+    overflow: hidden;
+    border-radius: var(--erp-radius-lg, 10px);
+}
+
+.erp-orcamentos-page .erp-orc-preview-overlay .erp-form-overlay__iframe {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    background: #c7d5e8;
+}
+
+@supports not (height: 100dvh) {
+    .erp-orcamentos-page .erp-orc-preview-overlay .erp-form-overlay__panel {
+        height: calc(100vh - 5.5rem);
+        max-height: calc(100vh - 5.5rem);
+    }
+}
+
+/* â”€â”€ Modal e-mail (F9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.erp-orcamentos-page .erp-orc-email-modal .erp-lookup-modal__window {
+    width: min(34rem, calc(100vw - 2rem));
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.75rem 0.85rem;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__field {
+    display: grid;
+    grid-template-columns: 5.25rem minmax(0, 1fr);
+    gap: 0.45rem 0.55rem;
+    align-items: center;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__field:has(.erp-orc-email-modal__attachments) {
+    align-items: start;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.82rem;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgb(30 90 158 / 18%);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__error {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: var(--erp-action-danger, #dc2626);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-height: 5.5rem;
+    max-height: 8rem;
+    padding: 0.25rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    overflow: auto;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachment {
+    width: 100%;
+    padding: 0.2rem 0.35rem;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.78rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachment:hover {
+    background: rgb(30 90 158 / 8%);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachment.is-selected {
+    background: rgb(30 90 158 / 16%);
+    outline: 1px solid var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachments-empty {
+    padding: 0.35rem;
+    color: var(--erp-text-muted, #64748b);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__attachment-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__mini-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__mini-btn:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    background: #fff;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__mini-btn--danger:hover {
+    border-color: var(--erp-action-danger, #dc2626);
+    background: #fff5f5;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__mini-btn span[aria-hidden="true"] {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__hint {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    background: transparent;
+    padding: 0;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 4rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--erp-radius-md, 8px);
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--erp-text, #0f172a);
+    box-shadow: var(--erp-shadow-md, 0 4px 14px rgba(30, 90, 158, 0.14));
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn:hover {
+    background: #ffffff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18));
+    transform: translateY(-2px);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%);
+    border-color: #86efac;
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"]:hover {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%);
+    border-color: #fca5a5;
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__icon--save,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+/* ── Modal WhatsApp (F10) ─────────────────────────────────────────────── */
+.erp-orcamentos-page .erp-orc-whatsapp-modal .erp-lookup-modal__window {
+    width: min(42rem, calc(100vw - 2rem));
+}
+
+.erp-orcamentos-page .erp-orc-whatsapp-modal .erp-orc-email-modal__field:has(.erp-orc-whatsapp-modal__textarea) {
+    align-items: start;
+}
+
+.erp-orcamentos-page .erp-orc-whatsapp-modal__textarea {
+    min-height: 14rem;
+    resize: vertical;
+    line-height: 1.45;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+}
+
+.erp-orcamentos-page .erp-orc-whatsapp-modal__hint {
+    grid-column: 2;
+    margin: 0;
+    font-size: 0.74rem;
+    color: var(--erp-text-muted, #64748b);
+}
+

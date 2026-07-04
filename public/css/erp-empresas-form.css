@@ -1,0 +1,914 @@
+/* ERP — Cadastro de Empresa (janela modal Delphi; pcad base em erp-pessoas-form.css) */
+
+.fi-body:has(.erp-empresas-form-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.48) !important;
+}
+
+.fi-body:has(.erp-empresas-form-page) .erp-menu-bar,
+.fi-body:has(.erp-empresas-form-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-empresas-form-page) .erp-title-bar {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-empresas-form-page) .fi-layout,
+.fi-body:has(.erp-empresas-form-page) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-empresas-form-page) .fi-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.75rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-empresas-form-page) .fi-main > * {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: min(1280px, 98vw);
+    min-height: 0;
+    max-height: calc(100dvh - 5.5rem);
+    overflow: hidden;
+}
+
+.fi-page.erp-empresas-form-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 5.5rem);
+    overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-empresas-form-page .fi-page-header-main-ctn,
+.erp-empresas-form-page .fi-page-main,
+.erp-empresas-form-page .fi-page-content,
+.erp-empresas-form-page .fi-sc {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0 !important;
+    gap: 0 !important;
+    background: transparent;
+}
+
+.erp-empresas-form-page .fi-sc > div:has(> .erp-empresas-window) {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-empresas-window {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.erp-empresas-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* Barra de título ~3mm mais baixa (menos padding vertical). */
+.erp-empresas-form-page .erp-empresas-window__titlebar {
+    padding-top: 0.16rem !important;
+    padding-bottom: 0.16rem !important;
+}
+
+.erp-empresas-window__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+}
+
+.erp-empresas-window__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-empresas-window__body > .erp-empresas-pcad,
+.erp-empresas-window__body > .erp-pcad {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-empresas-form-page .fi-header,
+.erp-empresas-form-page .fi-form-actions {
+    display: none !important;
+}
+
+.erp-empresas-form-page .erp-produtos-pcad__footer {
+    flex-shrink: 0;
+    background: var(--erp-bg-app, #eef4fb);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+/* Botões e barra azul do rodapé ~4mm menores. */
+.fi-page.erp-empresas-form-page .erp-produtos-pcad__footer {
+    padding-top: 0.32rem !important;
+    padding-bottom: 0.32rem !important;
+}
+
+.erp-empresas-form-page .erp-pcad-actions__btn {
+    height: 3.05rem !important;
+}
+
+.erp-empresas-pcad {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.erp-empresas-form-page .erp-pcad__workspace--parametros {
+    display: flex;
+    flex-direction: column;
+    padding-top: 0.2rem !important;
+}
+
+/* Topo (numéricos) + abas ficam FIXOS; só a área de campos da subaba rola.
+   O max-height por viewport é rede de segurança caso a cadeia de flex dos
+   contêineres pais não limite a altura — garante a rolagem e o rodapé visível. */
+.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-pcad__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    max-height: calc(100dvh - 13rem);
+    overflow: hidden;
+}
+
+.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros {
+    flex: 1;
+    min-height: 0;
+}
+
+.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros__subpanel {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.erp-empresas-form-page .erp-pcad__tab--active {
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+}
+
+.erp-empresas-form-page .erp-pcad__tabs {
+    flex-shrink: 0;
+}
+
+/* Abas do topo ~2mm mais baixas (menos padding vertical). */
+.erp-empresas-form-page .erp-pcad__tab {
+    padding-top: 0.16rem !important;
+    padding-bottom: 0.16rem !important;
+}
+
+.erp-empresas-form-page .erp-pcad__workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-empresas-form-page .erp-pcad__content {
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* Dados Básico — layout Delphi (grid) */
+.erp-empresas-dados-form {
+    --emp-label: 5.8rem;
+    --emp-gap: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 0;
+    overflow-x: hidden;
+}
+
+.erp-empresas-dados-form__row.erp-pcad-form__row {
+    display: grid;
+    gap: 0;
+    column-gap: var(--emp-gap);
+    row-gap: 0.2rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.erp-empresas-dados-form__row .erp-pcad-form__label {
+    justify-self: end;
+}
+
+.erp-empresas-dados-form__row .erp-pcad-form__label--inline {
+    width: auto;
+    min-width: 0;
+    justify-self: end;
+}
+
+.erp-empresas-dados-form__row .erp-pcad-form__input,
+.erp-empresas-dados-form__row .erp-pcad-form__select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: none;
+}
+
+.erp-empresas-dados-form__row--line1 {
+    grid-template-columns:
+        var(--emp-label) 2.5rem
+        4.5rem 5.25rem
+        5.5rem minmax(7rem, 7.75rem)
+        7.25rem
+        3.25rem 5.25rem
+        2rem 2.5rem
+        3rem 5.5rem
+        4.75rem minmax(5.5rem, 6.5rem);
+}
+
+.erp-empresas-dados-form__btn-search {
+    justify-self: stretch;
+    width: 100%;
+    white-space: nowrap;
+    padding: 0.12rem 0.2rem;
+    font-size: 0.68rem;
+}
+
+.erp-empresas-dados-form__row--names {
+    grid-template-columns: var(--emp-label) minmax(8rem, 1fr) 8.25rem minmax(8rem, 1fr);
+}
+
+.erp-empresas-dados-form__split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 11.5rem;
+    gap: 0.55rem;
+    align-items: start;
+    min-width: 0;
+}
+
+.erp-empresas-dados-form__main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 0;
+    overflow-x: hidden;
+}
+
+.erp-empresas-dados-form__logo {
+    min-width: 0;
+}
+
+.erp-empresas-dados-form__row--cep {
+    grid-template-columns:
+        var(--emp-label) 5.5rem 1.65rem
+        4.35rem minmax(5rem, 1fr)
+        3.45rem 3.2rem
+        5.35rem 8.75rem;
+}
+
+.erp-empresas-dados-form__btn-icon-only {
+    justify-self: start;
+    padding: 0.12rem 0.35rem;
+}
+
+.erp-empresas-dados-form__row--local {
+    grid-template-columns:
+        var(--emp-label) minmax(5.5rem, 6.5rem)
+        3.5rem 4.5rem
+        3.5rem minmax(4.5rem, 1fr)
+        2.15rem 2.85rem
+        3.5rem 4.5rem
+        2.5rem minmax(4.5rem, 6.5rem);
+}
+
+.erp-empresas-dados-form__row--email {
+    grid-template-columns: var(--emp-label) minmax(0, 1fr);
+}
+
+.erp-empresas-dados-form__row--site {
+    grid-template-columns: var(--emp-label) minmax(0, 1fr) 4.85rem 7.25rem;
+}
+
+.erp-empresas-dados-form__row--resp {
+    grid-template-columns: var(--emp-label) minmax(0, 1fr) 7.25rem 11.5rem;
+}
+
+.erp-empresas-dados-form__logo .erp-empresas-logo__preview-wrap {
+    min-height: 7.25rem;
+}
+
+@media (max-width: 1180px) {
+    .erp-empresas-window {
+        min-width: 0;
+    }
+
+    .erp-empresas-dados-form__row--line1,
+    .erp-empresas-dados-form__row--cep,
+    .erp-empresas-dados-form__row--local {
+        grid-template-columns: var(--emp-label) minmax(0, 1fr);
+    }
+
+    .erp-empresas-dados-form__row--line1 .erp-pcad-form__label--inline,
+    .erp-empresas-dados-form__row--cep .erp-pcad-form__label--inline,
+    .erp-empresas-dados-form__row--local .erp-pcad-form__label--inline {
+        grid-column: 1;
+        justify-self: start;
+        text-align: left;
+    }
+
+    .erp-empresas-dados-form__split {
+        grid-template-columns: 1fr;
+    }
+}
+
+.erp-empresas-pcad__atividade {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-muted, #e2eaf4);
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-empresas-pcad__atividade-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #000;
+    padding: 0 0.25rem;
+}
+
+.erp-empresas-pcad__atividade-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.2rem 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.erp-empresas-pcad__atividade-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #000;
+    cursor: pointer;
+}
+
+.erp-empresas-pcad__atividade-item span {
+    color: #000;
+}
+
+.erp-empresas-form-page .erp-empresas-pcad__ativo,
+.erp-empresas-form-page .erp-empresas-pcad__ativo span {
+    color: #000;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.erp-empresas-pcad__ativo {
+    margin-top: 0.35rem;
+}
+
+.erp-empresas-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+}
+
+.erp-empresas-logo__title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.erp-empresas-logo__preview-wrap {
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    min-height: 7.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+}
+
+.erp-empresas-logo__preview {
+    max-width: 100%;
+    max-height: 7rem;
+    object-fit: contain;
+}
+
+.erp-empresas-logo__preview--empty {
+    width: 100%;
+    min-height: 7rem;
+    background: #fff;
+}
+
+.erp-empresas-logo__upload {
+    display: flex;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.erp-empresas-logo__file {
+    display: none;
+}
+
+.erp-empresas-logo__clear {
+    width: 100%;
+    justify-content: center;
+}
+
+.erp-empresas-pcad__obs {
+    min-height: 12rem;
+}
+
+.erp-empresas-pcad__textarea {
+    width: 100%;
+    min-height: 12rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    padding: 0.35rem;
+    font-family: inherit;
+    font-size: 0.82rem;
+    resize: none;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.erp-empresas-pcad__obs-hint {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.erp-empresas-parametros {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    min-width: 0;
+    padding: 0 0.1rem 0.25rem;
+    overflow-x: hidden;
+}
+
+.erp-empresas-parametros__top {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.2rem 0.55rem;
+    padding-bottom: 0.3rem;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-empresas-parametros__col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+    min-width: 0;
+}
+
+.erp-empresas-parametros__field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.65rem;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    min-height: 1.35rem;
+}
+
+.erp-empresas-parametros__field .erp-pcad-form__label {
+    width: auto;
+    margin: 0;
+    padding-right: 0.1rem;
+    text-align: right;
+    justify-self: stretch;
+    font-size: 0.72rem;
+    line-height: 1.1;
+}
+
+.erp-empresas-parametros__field .erp-pcad-form__input,
+.erp-empresas-parametros__field .erp-pcad-form__input--xs,
+.erp-empresas-parametros__field .erp-pcad-form__input--sm {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: none;
+    text-align: right;
+    padding: 0.1rem 0.2rem;
+}
+
+.erp-empresas-parametros__subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    padding-bottom: 0;
+}
+
+.erp-empresas-parametros__subtab {
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-muted, #e2eaf4);
+    color: #000;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.22rem 0.8rem;
+    cursor: pointer;
+    border-radius: var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) 0 0;
+    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+}
+
+.erp-empresas-parametros__subtab:hover {
+    background: var(--erp-bg-panel, #fff);
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-empresas-parametros__subtab--active,
+.erp-empresas-parametros__subtab--active:hover {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%);
+    border-color: var(--erp-brand-accent, #15803d);
+    color: var(--erp-text-inverse, #fff);
+    font-weight: 700;
+}
+
+.erp-empresas-parametros__subpanel {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.3rem 0.35rem 0.25rem;
+    background: var(--erp-bg-app, #eef4fb);
+}
+
+.erp-empresas-parametros__perm-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.erp-empresas-parametros__perm-group.erp-pcad__group {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0.28rem 0.35rem 0.38rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-muted, #e2eaf4);
+    min-width: 0;
+    min-height: 100%;
+    box-sizing: border-box;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__perm-group .erp-pcad__group-title {
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0 0.2rem;
+    margin-bottom: 0.05rem;
+}
+
+.erp-empresas-parametros__checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-top: 0.1rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.erp-empresas-parametros__checks--inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin-bottom: 0.35rem;
+}
+
+.erp-empresas-parametros__checks .erp-pcad__check,
+.erp-empresas-parametros__tri {
+    display: grid;
+    grid-template-columns: 0.85rem minmax(0, 1fr);
+    align-items: start;
+    column-gap: 0.35rem;
+    row-gap: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__checks .erp-pcad__check,
+.erp-empresas-form-page .erp-empresas-parametros__checks .erp-pcad__check span,
+.erp-empresas-form-page .erp-empresas-parametros__tri span {
+    color: #000;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.12;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__checks .erp-pcad__check span,
+.erp-empresas-form-page .erp-empresas-parametros__tri span {
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__checks .erp-pcad__check input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin: 0.08rem 0 0;
+    padding: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__checks .erp-pcad__check input:checked {
+    background-color: #316ac5;
+    border-color: #2a5ba8;
+    box-shadow: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M4.5 8.2 2.2 5.9l-.9.9 3.2 3.2 6.4-6.4-.9-.9z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 0.65rem;
+}
+
+.erp-empresas-parametros__tri {
+    cursor: default;
+}
+
+.erp-empresas-parametros__tri-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-top: 0.08rem;
+    flex-shrink: 0;
+    padding: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    cursor: pointer;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-empresas-parametros__tri-box--yes {
+    background-color: #316ac5;
+    border-color: #2a5ba8;
+    box-shadow: none;
+}
+
+.erp-empresas-parametros__tri-box--yes::after {
+    content: '✓';
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.erp-empresas-parametros__tri-box--null,
+.erp-empresas-parametros__tri-box--no {
+    background: #fff;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-empresas-parametros__tri-box--null::after,
+.erp-empresas-parametros__tri-box--no::after {
+    content: none;
+}
+
+.erp-empresas-parametros__form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.75rem;
+}
+
+.erp-empresas-parametros__form-grid .erp-empresas-parametros__field {
+    grid-template-columns: minmax(0, 1fr) minmax(6rem, 8rem);
+}
+
+.erp-empresas-parametros__form-grid--wide {
+    grid-template-columns: 1fr;
+    gap: 0.45rem 0;
+    max-width: 36rem;
+}
+
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field {
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    min-height: 1.85rem;
+}
+
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field--compact {
+    grid-template-columns: 10.5rem 5.5rem;
+}
+
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field .erp-pcad-form__label {
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding-right: 0.35rem;
+}
+
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field .erp-pcad-form__input,
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field .erp-pcad-form__input--xs,
+.erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field .erp-pcad-form__input--grow {
+    text-align: left;
+    padding: 0.28rem 0.5rem;
+    font-size: 0.82rem;
+    min-height: 1.75rem;
+}
+
+.erp-empresas-parametros__obs-block {
+    margin-top: 0.5rem;
+}
+
+.erp-empresas-parametros__obs {
+    min-height: 6rem;
+}
+
+.erp-empresas-parametros__hint {
+    margin: 0.35rem 0 0.75rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-empresas-parametros__section-title {
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--erp-accent, #1d4ed8);
+}
+
+.erp-empresas-parametros__actions {
+    margin-top: 0.75rem;
+}
+
+.erp-whatsapp-panel {
+    margin: 0.75rem 0 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--erp-border, #cbd5e1);
+    border-radius: 8px;
+    background: var(--erp-surface-muted, #f8fafc);
+}
+
+.erp-whatsapp-panel__status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.erp-whatsapp-panel__status-label {
+    font-weight: 600;
+    margin-right: 0.35rem;
+}
+
+.erp-whatsapp-panel__status-value--connected {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.erp-whatsapp-panel__status-value--waiting {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.erp-whatsapp-panel__status-value--error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.erp-whatsapp-panel__qr-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+.erp-whatsapp-panel__qr {
+    width: 220px;
+    height: 220px;
+    border-radius: 8px;
+    border: 1px solid var(--erp-border, #cbd5e1);
+    background: #fff;
+}
+
+.erp-whatsapp-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.erp-whatsapp-panel__btn-danger {
+    color: #b91c1c;
+}
+
+/* API Boleto: muitos campos -> grade compacta de 3 colunas (rótulo em cima). */
+.erp-empresas-parametros__form-grid--boleto {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.1rem 0.85rem;
+}
+
+.erp-empresas-parametros__form-grid--boleto .erp-empresas-parametros__field {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 0.05rem;
+    min-height: 0;
+}
+
+.erp-empresas-parametros__form-grid--boleto .erp-empresas-parametros__field .erp-pcad-form__label {
+    text-align: left;
+    white-space: normal;
+    padding-right: 0;
+    font-size: 0.68rem;
+    line-height: 1.05;
+}
+
+.erp-empresas-parametros__form-grid--boleto .erp-empresas-parametros__field .erp-pcad-form__input,
+.erp-empresas-parametros__form-grid--boleto .erp-empresas-parametros__field .erp-pcad-form__select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    text-align: left;
+    padding: 0.12rem 0.3rem;
+}
+
+@media (max-width: 900px) {
+    .erp-empresas-parametros__top,
+    .erp-empresas-parametros__perm-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .erp-empresas-parametros__top,
+    .erp-empresas-parametros__perm-grid,
+    .erp-empresas-parametros__form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-empresas-parametros__field,
+    .erp-empresas-parametros__form-grid .erp-empresas-parametros__field {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-empresas-parametros__form-grid--wide {
+        max-width: none;
+    }
+
+    .erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field,
+    .erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field--compact {
+        grid-template-columns: 1fr;
+    }
+}

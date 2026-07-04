@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Support\Erp\Import;
+
+final class BrDecimalImport
+{
+    public static function parse(mixed $value, int $decimals = 2): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return round((float) $value, $decimals);
+        }
+
+        $normalized = trim((string) $value);
+
+        if ($normalized === '') {
+            return 0.0;
+        }
+
+        if (is_numeric($normalized) && ! str_contains($normalized, ',')) {
+            return round((float) $normalized, $decimals);
+        }
+
+        $normalized = str_replace('.', '', $normalized);
+        $normalized = str_replace(',', '.', $normalized);
+
+        if (! is_numeric($normalized)) {
+            return 0.0;
+        }
+
+        return round((float) $normalized, $decimals);
+    }
+}
