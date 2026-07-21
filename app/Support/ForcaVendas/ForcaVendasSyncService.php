@@ -139,11 +139,9 @@ class ForcaVendasSyncService
                 'marca' => $p->marca,
                 'grupo' => $p->grupo,
                 'preco_venda' => (float) $p->preco_venda,
-                'preco_venda_prazo' => (float) $p->preco_venda_prazo,
                 'preco_atacado' => (float) $p->preco_atacado,
+                'preco_especial' => (float) ($p->preco_especial ?? 0),
                 'qtd_atacado' => (float) $p->qtd_atacado,
-                'comissao_pct' => (float) $p->comissao_pct,
-                'desconto_pct' => (float) $p->desconto_pct,
                 'estoque' => $fisico,
                 'estoque_reservado' => $reservado,
                 'estoque_disponivel' => $disponivel,
@@ -234,6 +232,7 @@ class ForcaVendasSyncService
                 'nome_razao' => $c->nome_razao,
                 'apelido_fantasia' => $c->apelido_fantasia,
                 'cpf_cnpj' => $c->cpf_cnpj,
+                'rg_ie' => $c->rg_ie,
                 'endereco' => $c->endereco,
                 'numero' => $c->numero,
                 'bairro' => $c->bairro,
@@ -556,13 +555,15 @@ class ForcaVendasSyncService
                 $subtotal = 0.0;
                 $descontoValor = (float) ($order['desconto_valor'] ?? 0);
                 $clientCreatedAt = isset($order['created_at']) ? Carbon::parse($order['created_at']) : null;
-                $dataPedido = $clientCreatedAt
-                    ? ErpTimezone::toLocal($clientCreatedAt)->toDateString()
-                    : ErpTimezone::toLocal()->toDateString();
+                $momentoLocal = $clientCreatedAt
+                    ? ErpTimezone::toLocal($clientCreatedAt)
+                    : ErpTimezone::toLocal();
+                $dataPedido = $momentoLocal->toDateString();
 
                 $orcamento = Orcamento::query()->create([
                     'numero' => Orcamento::nextNumero(),
                     'data' => $dataPedido,
+                    'hora' => $momentoLocal->format('H:i:s'),
                     'cliente_id' => $clienteId,
                     'vendedor_id' => $user->vendedor_id,
                     'subtotal' => 0,
@@ -573,6 +574,7 @@ class ForcaVendasSyncService
                     'observacoes' => $order['observacoes'] ?? null,
                     'total' => 0,
                     'status' => Orcamento::STATUS_ABERTO,
+                    'plataforma' => Orcamento::PLATAFORMA_FV,
                 ]);
 
                 $linha = 1;
@@ -792,6 +794,7 @@ class ForcaVendasSyncService
             'nome_razao' => mb_strtoupper(trim((string) ($customer['nome_razao'] ?? '')), 'UTF-8'),
             'apelido_fantasia' => mb_strtoupper(trim((string) ($customer['apelido_fantasia'] ?? '')) ?: '') ?: null,
             'cpf_cnpj' => $cpfCnpj !== '' ? $cpfCnpj : null,
+            'rg_ie' => ($ie = trim((string) ($customer['rg_ie'] ?? ''))) !== '' ? mb_strtoupper($ie, 'UTF-8') : null,
             'endereco' => trim((string) ($customer['endereco'] ?? '')) ?: null,
             'numero' => trim((string) ($customer['numero'] ?? '')) ?: null,
             'bairro' => trim((string) ($customer['bairro'] ?? '')) ?: null,
@@ -803,7 +806,15 @@ class ForcaVendasSyncService
             'celular1' => trim((string) ($customer['celular1'] ?? '')) ?: null,
             'whatsapp' => trim((string) ($customer['whatsapp'] ?? '')) ?: null,
             'limite_credito' => (float) ($customer['limite_credito'] ?? 0),
-            'dia_pgto' => isset($customer['dia_pgto']) ? (int) $customer['dia_pgto'] : null,
+            'dia_pgto' => isset($customer['dia_pgto']) && $customer['dia_pgto'] !== null && $customer['dia_pgto'] !== ''
+                ? (int) $customer['dia_pgto']
+                : null,
+            'forma_pagamento_id' => isset($customer['forma_pagamento_id']) && $customer['forma_pagamento_id'] !== null && $customer['forma_pagamento_id'] !== ''
+                ? (int) $customer['forma_pagamento_id']
+                : null,
+            'tabela_prazo_id' => isset($customer['tabela_prazo_id']) && $customer['tabela_prazo_id'] !== null && $customer['tabela_prazo_id'] !== ''
+                ? (int) $customer['tabela_prazo_id']
+                : null,
             'vendedor_fv_id' => $user->vendedor_id,
             'regime_tributario' => 'simples',
             'tipo_contribuinte' => 'nao_contribuinte',

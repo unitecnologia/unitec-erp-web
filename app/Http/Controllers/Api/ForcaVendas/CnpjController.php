@@ -29,6 +29,7 @@ class CnpjController
             'email',
             'fone1',
             'fone2',
+            'rg_ie',
         ];
 
         $out = [];

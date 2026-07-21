@@ -2,7 +2,6 @@
 
 namespace App\Support\Erp;
 
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -61,10 +60,10 @@ class CnpjLookupService
     protected function fetchOpenCnpj(string $cnpj): array
     {
         try {
-            $response = Http::timeout(20)
+            $response = Http::timeout(8)->connectTimeout(5)
                 ->acceptJson()
                 ->get("https://api.opencnpj.org/{$cnpj}");
-        } catch (RequestException) {
+        } catch (\Throwable) {
             return [];
         }
 
@@ -84,10 +83,10 @@ class CnpjLookupService
     protected function fetchBrasilApi(string $cnpj): array
     {
         try {
-            $response = Http::timeout(20)
+            $response = Http::timeout(8)->connectTimeout(5)
                 ->acceptJson()
                 ->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
-        } catch (RequestException) {
+        } catch (\Throwable) {
             return [];
         }
 
@@ -107,10 +106,10 @@ class CnpjLookupService
     protected function fetchCnpjWs(string $cnpj): array
     {
         try {
-            $response = Http::timeout(20)
+            $response = Http::timeout(8)->connectTimeout(5)
                 ->acceptJson()
                 ->get("https://publica.cnpj.ws/cnpj/{$cnpj}");
-        } catch (RequestException) {
+        } catch (\Throwable) {
             return [];
         }
 
