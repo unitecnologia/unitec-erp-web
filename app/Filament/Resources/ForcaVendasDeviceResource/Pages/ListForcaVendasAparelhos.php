@@ -161,6 +161,7 @@ class ListForcaVendasAparelhos extends ListRecords
         }
 
         $device->forceFill([
+            'status' => ForcaVendasDevice::STATUS_REVOGADO,
             'current_token_id' => null,
             'revoked_at' => now(),
         ])->save();
@@ -169,7 +170,7 @@ class ListForcaVendasAparelhos extends ListRecords
         $this->resetTable();
 
         Notification::make()
-            ->title('Aparelho revogado. O vendedor precisará entrar novamente.')
+            ->title('Aparelho revogado. O vendedor precisará autorizar de novo.')
             ->success()
             ->send();
     }

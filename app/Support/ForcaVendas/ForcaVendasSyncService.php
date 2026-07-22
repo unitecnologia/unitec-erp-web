@@ -290,6 +290,7 @@ class ForcaVendasSyncService
                 'forma_pagamento_id' => $c->forma_pagamento_id,
                 'tabela_prazo_id' => $c->tabela_prazo_id,
                 'tabela_prazo_dias' => $c->tabelaPrazo?->dias,
+                'price_table_id' => $c->price_table_id,
                 'vendedor_fv_id' => $c->vendedor_fv_id,
                 'vendedor_loja_id' => $c->vendedor_loja_id,
                 'ativo' => (bool) $c->ativo,
@@ -337,6 +338,7 @@ class ForcaVendasSyncService
     private function vendedores(): array
     {
         return Vendedor::query()
+            ->with('tabelaVenda:id,codigo,descricao')
             ->orderBy('nome')
             ->get()
             ->map(fn (Vendedor $v): array => [
@@ -344,6 +346,9 @@ class ForcaVendasSyncService
                 'codigo' => $v->codigo,
                 'nome' => $v->nome,
                 'ativo' => (bool) $v->ativo,
+                'tabela_venda_id' => $v->tabela_venda_id,
+                'tabela_venda_codigo' => $v->tabelaVenda?->codigo,
+                'tabela_venda_descricao' => $v->tabelaVenda?->descricao,
             ])
             ->all();
     }
@@ -517,7 +522,19 @@ class ForcaVendasSyncService
     private function historicoOrcamentos(?Carbon $since, ?int $vendedorId = null): array
     {
         $query = Orcamento::query()
-            ->where('data', '>=', now()->subDays(self::ORCAMENTO_HISTORICO_DIAS)->toDateString());
+            ->with([
+                'itens.product:id,descricao',
+                'forcaVendasOrder:id,uuid,orcamento_id,tipo',
+            ])
+            ->where('data', '>=', now()->subDays(self::ORCAMENTO_HISTORICO_DIAS)->toDateString())
+            // Pedidos do app já entram em pedidos_fv; aqui só orçamentos (ERP ou FV).
+            ->where(function ($q): void {
+                $q->whereDoesntHave('forcaVendasOrder')
+                    ->orWhereHas(
+                        'forcaVendasOrder',
+                        fn ($fv) => $fv->where('tipo', ForcaVendasOrder::TIPO_ORCAMENTO),
+                    );
+            });
 
         if ($vendedorId !== null) {
             $query->where('vendedor_id', $vendedorId);
@@ -527,16 +544,38 @@ class ForcaVendasSyncService
             ->orderByDesc('data')
             ->limit(1000)
             ->get()
-            ->map(fn (Orcamento $o): array => [
-                'id' => $o->id,
-                'numero' => $o->numero,
-                'data' => optional($o->data)->toDateString(),
-                'cliente_id' => $o->cliente_id,
-                'vendedor_id' => $o->vendedor_id,
-                'total' => (float) $o->total,
-                'status' => $o->status,
-                'updated_at' => optional($o->updated_at)->toIso8601String(),
-            ])
+            ->map(function (Orcamento $o): array {
+                $fv = $o->forcaVendasOrder;
+                $itens = $o->itens
+                    ->map(fn ($item): array => [
+                        'product_id' => $item->product_id,
+                        'descricao' => $item->descricao ?: $item->product?->descricao,
+                        'quantidade' => (float) $item->quantidade,
+                        'preco_unitario' => (float) $item->preco_unitario,
+                        'desconto' => (float) ($item->desconto ?? 0),
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => $o->id,
+                    'uuid' => $fv?->uuid ?: ('erp-orc-'.$o->id),
+                    'numero' => $o->numero,
+                    'data' => optional($o->data)->toDateString(),
+                    'cliente_id' => $o->cliente_id,
+                    'vendedor_id' => $o->vendedor_id,
+                    'total' => (float) $o->total,
+                    'status' => $o->status,
+                    'tipo' => 'orcamento',
+                    'situacao' => $o->status,
+                    'observacoes' => $o->observacoes,
+                    'desconto_valor' => (float) ($o->desconto_valor ?? 0),
+                    'percentual_desconto' => (float) ($o->percentual_desconto ?? 0),
+                    'forma_pagamento' => $o->forma_pagamento,
+                    'itens' => $itens,
+                    'updated_at' => optional($o->updated_at)->toIso8601String(),
+                ];
+            })
             ->all();
     }
 

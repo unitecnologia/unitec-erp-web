@@ -32,8 +32,12 @@ class DeviceController
             $device->status = ForcaVendasDevice::STATUS_PENDENTE;
             $device->pairing_code = $this->generateCode();
             $device->registered_at = now();
+        } elseif ($device->revoked_at !== null && $device->status === ForcaVendasDevice::STATUS_APROVADO) {
+            // Legado: logout antigo marcava revoked_at sem o admin ter revogado.
+            // Restaura autorização sem pedir F2 de novo.
+            $device->revoked_at = null;
         } elseif ($device->revoked_at !== null) {
-            // Aparelho revogado que tenta se reconectar volta para a fila de aprovacao.
+            // Admin revogou (status revogado/pendente): volta para a fila.
             $device->status = ForcaVendasDevice::STATUS_PENDENTE;
             $device->revoked_at = null;
             $device->pairing_code = $this->generateCode();

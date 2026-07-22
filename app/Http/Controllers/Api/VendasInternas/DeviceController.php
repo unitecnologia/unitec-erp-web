@@ -27,6 +27,8 @@ class DeviceController
             $device->status = VendasInternasDevice::STATUS_PENDENTE;
             $device->pairing_code = $this->generateCode();
             $device->registered_at = now();
+        } elseif ($device->revoked_at !== null && $device->status === VendasInternasDevice::STATUS_APROVADO) {
+            $device->revoked_at = null;
         } elseif ($device->revoked_at !== null) {
             $device->status = VendasInternasDevice::STATUS_PENDENTE;
             $device->revoked_at = null;

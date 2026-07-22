@@ -31,8 +31,7 @@ class AuthController
         } elseif (! empty($data['login'])) {
             $login = trim($data['login']);
             $query->where(function ($q) use ($login): void {
-                $q->where('email', mb_strtolower($login))
-                    ->orWhere('name', mb_strtoupper($login, 'UTF-8'));
+                $q->where('name', mb_strtoupper($login, 'UTF-8'));
             });
         } else {
             throw ValidationException::withMessages([
@@ -101,9 +100,10 @@ class AuthController
         $token = $request->user()?->currentAccessToken();
 
         if ($token !== null) {
+            // Encerra só a sessão (token). O aparelho continua autorizado.
             VendasInternasDevice::query()
                 ->where('current_token_id', $token->getKey())
-                ->update(['revoked_at' => now()]);
+                ->update(['current_token_id' => null]);
 
             $token->delete();
         }
@@ -119,7 +119,6 @@ class AuthController
         return [
             'id' => $user->id,
             'name' => $user->name,
-            'email' => $user->email,
             'empresa_id' => $user->empresa_id,
             'vendedor_id' => $user->vendedor_id,
             'vendedor_nome' => $user->vendedor?->nome,

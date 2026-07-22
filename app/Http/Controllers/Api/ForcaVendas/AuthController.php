@@ -100,9 +100,11 @@ class AuthController
         $token = $request->user()?->currentAccessToken();
 
         if ($token !== null) {
+            // Encerra só a sessão (token). O aparelho continua autorizado —
+            // revogação é ação do admin em Força de Vendas → Aparelhos.
             ForcaVendasDevice::query()
                 ->where('current_token_id', $token->getKey())
-                ->update(['revoked_at' => now()]);
+                ->update(['current_token_id' => null]);
 
             $token->delete();
         }
@@ -115,11 +117,12 @@ class AuthController
      */
     private function userPayload(User $user): array
     {
-        $user->loadMissing(['vendedor.estoqueCadastro', 'vendedor.empresas']);
+        $user->loadMissing(['vendedor.estoqueCadastro', 'vendedor.empresas', 'vendedor.tabelaVenda']);
 
         $vendedor = $user->vendedor;
         $caixa = $vendedor?->caixaContaDaEmpresa($user->empresa_id ? (int) $user->empresa_id : null);
         $estoque = $vendedor?->estoqueCadastro;
+        $tabela = $vendedor?->tabelaVenda;
 
         return [
             'id' => $user->id,
@@ -132,6 +135,9 @@ class AuthController
             'estoque_id' => $estoque?->id ?? $vendedor?->estoque_id,
             'estoque_nome' => $estoque?->nome
                 ?? (filled($vendedor?->estoque) ? (string) $vendedor->estoque : null),
+            'tabela_venda_id' => $tabela?->id ?? $vendedor?->tabela_venda_id,
+            'tabela_venda_codigo' => $tabela?->codigo,
+            'tabela_venda_descricao' => $tabela?->descricao,
             'is_admin' => (bool) $user->is_admin,
             'is_supervisor' => (bool) $user->is_supervisor,
             'permissions' => $user->effectivePermissionKeys(),

@@ -2,9 +2,13 @@
 
 use App\Http\Controllers\Api\ForcaVendas\AuthController as FvAuthController;
 use App\Http\Controllers\Api\ForcaVendas\CnpjController;
+use App\Http\Controllers\Api\ForcaVendas\ComissaoController;
+use App\Http\Controllers\Api\ForcaVendas\DashboardController;
 use App\Http\Controllers\Api\ForcaVendas\DeviceController as FvDeviceController;
 use App\Http\Controllers\Api\ForcaVendas\InfoController as FvInfoController;
+use App\Http\Controllers\Api\ForcaVendas\OrcamentoController;
 use App\Http\Controllers\Api\ForcaVendas\PixController;
+use App\Http\Controllers\Api\ForcaVendas\ProductEstoqueFiliaisController;
 use App\Http\Controllers\Api\ForcaVendas\ProductPhotoController;
 use App\Http\Controllers\Api\ForcaVendas\SyncController as FvSyncController;
 use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
@@ -49,10 +53,14 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::get('auth/me', [FvAuthController::class, 'me']);
             Route::post('auth/logout', [FvAuthController::class, 'logout']);
+            Route::get('dashboard', DashboardController::class);
+            Route::get('comissao', ComissaoController::class);
+            Route::get('orcamentos/{orcamento}', [OrcamentoController::class, 'show']);
             Route::get('sync/pull', [FvSyncController::class, 'pull']);
             Route::post('sync/push', [FvSyncController::class, 'push']);
             Route::get('cnpj/{cnpj}', [CnpjController::class, 'show'])
                 ->where('cnpj', '\d{14}');
+            Route::get('produtos/{product}/estoque-filiais', ProductEstoqueFiliaisController::class);
 
             // Cobranças Pix (Mercado Pago). Confirmação por polling no status.
             Route::post('pix', [PixController::class, 'store']);
