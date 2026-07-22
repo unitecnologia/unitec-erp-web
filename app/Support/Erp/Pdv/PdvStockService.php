@@ -6,16 +6,21 @@ use App\Models\Product;
 use App\Models\ProductComposition;
 use App\Models\ProductGrade;
 use App\Models\ProductSerial;
-use Illuminate\Support\Facades\DB;
+use App\Support\Erp\ProductEstoqueSaldoService;
 
 final class PdvStockService
 {
+    public function __construct(
+        private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
+    ) {}
+
     public function baixaItemVenda(
         Product $product,
         float $quantidade,
         ?int $productGradeId = null,
         ?int $productSerialId = null,
         ?string $docSaida = null,
+        ?int $estoqueId = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -26,12 +31,12 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->baixaComposicao($product, $quantidade, $docSaida);
+            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId);
 
             return;
         }
 
-        $this->decrementarEstoqueProduto($product, $quantidade);
+        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId);
 
         if ($productGradeId && $product->contr_est_grade) {
             ProductGrade::query()
@@ -45,7 +50,7 @@ final class PdvStockService
         }
     }
 
-    public function validaEstoqueComposicao(Product $product, float $quantidade): ?string
+    public function validaEstoqueComposicao(Product $product, float $quantidade, ?int $estoqueId = null): ?string
     {
         if (! $product->is_composicao) {
             return null;
@@ -66,7 +71,7 @@ final class PdvStockService
             $qtdNecessaria = $quantidade * (float) $componente->quantidade;
 
             if ($comp->is_composicao) {
-                $erro = $this->validaEstoqueComposicao($comp, $qtdNecessaria);
+                $erro = $this->validaEstoqueComposicao($comp, $qtdNecessaria, $estoqueId);
 
                 if ($erro) {
                     return $erro;
@@ -75,7 +80,7 @@ final class PdvStockService
                 continue;
             }
 
-            if ((float) $comp->estoque < $qtdNecessaria) {
+            if ($this->saldos->fisico((int) $comp->id, $estoqueId) < $qtdNecessaria) {
                 return 'Estoque insuficiente do componente: ' . $comp->descricao;
             }
         }
@@ -105,7 +110,7 @@ final class PdvStockService
         return null;
     }
 
-    private function baixaComposicao(Product $product, float $quantidade, ?string $docSaida): void
+    private function baixaComposicao(Product $product, float $quantidade, ?string $docSaida, ?int $estoqueId = null): void
     {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -120,15 +125,13 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida);
+            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId);
         }
     }
 
-    private function decrementarEstoqueProduto(Product $product, float $quantidade): void
+    private function decrementarEstoqueProduto(Product $product, float $quantidade, ?int $estoqueId = null): void
     {
-        Product::query()
-            ->whereKey($product->id)
-            ->decrement('estoque', $quantidade);
+        $this->saldos->decrementar((int) $product->id, $quantidade, $estoqueId);
     }
 
     private function baixaSerial(int $productSerialId, ?string $docSaida): void
@@ -148,6 +151,7 @@ final class PdvStockService
         float $quantidade,
         ?int $productGradeId = null,
         ?int $productSerialId = null,
+        ?int $estoqueId = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -158,14 +162,12 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->estornoComposicao($product, $quantidade);
+            $this->estornoComposicao($product, $quantidade, $estoqueId);
 
             return;
         }
 
-        Product::query()
-            ->whereKey($product->id)
-            ->increment('estoque', $quantidade);
+        $this->saldos->incrementar((int) $product->id, $quantidade, $estoqueId);
 
         if ($productGradeId && $product->contr_est_grade) {
             ProductGrade::query()
@@ -179,7 +181,7 @@ final class PdvStockService
         }
     }
 
-    private function estornoComposicao(Product $product, float $quantidade): void
+    private function estornoComposicao(Product $product, float $quantidade, ?int $estoqueId = null): void
     {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -194,7 +196,7 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->estornoItemVenda($comp, $qtd);
+            $this->estornoItemVenda($comp, $qtd, null, null, $estoqueId);
         }
     }
 

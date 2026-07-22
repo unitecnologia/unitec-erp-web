@@ -8,17 +8,21 @@ use App\Models\ForcaVendasClienteImport;
 use App\Models\ForcaVendasOrder;
 use App\Models\ForcaVendasVisitaSemVenda;
 use App\Models\FormaPagamento;
+use App\Models\Grupo;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Models\Person;
+use App\Models\PersonVisitaDia;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductPriceTableItem;
+use App\Models\Transportadora;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\ProductEstoqueSaldoService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -26,12 +30,12 @@ use Illuminate\Support\Facades\Schema;
 class ForcaVendasSyncService
 {
     /**
-     * Quantidade de dias de histórico de vendas trazidos no pull.
+     * Quantidade de dias de histÃ³rico de vendas trazidos no pull.
      */
     private const HISTORICO_DIAS = 120;
 
     /**
-     * Orçamentos do ERP enviados ao app (sobrevivem a reinstalação).
+     * OrÃ§amentos do ERP enviados ao app (sobrevivem a reinstalaÃ§Ã£o).
      */
     private const ORCAMENTO_HISTORICO_DIAS = 30;
 
@@ -45,12 +49,15 @@ class ForcaVendasSyncService
         return [
             'server_time' => now()->toIso8601String(),
             'since' => $since?->toIso8601String(),
-            'products' => $this->products($since),
+            'products' => $this->products($since, $vendedorId),
             'price_tables' => $this->priceTables($since),
             'price_table_items' => $this->priceTableItems($since),
             'customers' => $this->customers($since, $vendedorId),
+            'visita_dias' => $this->visitaDias($vendedorId),
             'vendedores' => $this->vendedores(),
             'formas_pagamento' => $this->formasPagamento(),
+            'transportadoras' => $this->transportadoras(),
+            'grupos' => $this->grupos(),
             'financeiro' => $this->financeiro($since, $vendedorId),
             'historico_vendas' => $this->historicoVendas($since, $vendedorId),
             'historico_orcamentos' => $this->historicoOrcamentos($since, $vendedorId),
@@ -63,8 +70,8 @@ class ForcaVendasSyncService
      */
     public function pullSignature(?int $vendedorId = null): string
     {
-        // O histórico de vendas é por vendedor, então o ETag também precisa
-        // variar por vendedor (senão um vendedor recebe o cache do outro).
+        // O histÃ³rico de vendas Ã© por vendedor, entÃ£o o ETag tambÃ©m precisa
+        // variar por vendedor (senÃ£o um vendedor recebe o cache do outro).
         $parts = ['vendedor:'.($vendedorId ?? 0)];
 
         foreach ([
@@ -72,13 +79,29 @@ class ForcaVendasSyncService
             'price_tables' => PriceTable::query(),
             'price_table_items' => ProductPriceTableItem::query(),
             'people' => $this->peopleSignatureQuery($vendedorId),
+            'person_visita_dias' => $this->visitaDiasSignatureQuery($vendedorId),
             'vendedores' => Vendedor::query(),
             'formas_pagamento' => FormaPagamento::query()->where('disponivel_mobile', true),
+            'transportadoras' => Schema::hasTable('transportadoras')
+                ? Transportadora::query()->where('ativo', true)
+                : null,
+            'grupos' => Schema::hasTable('grupos')
+                ? Grupo::query()
+                    ->where('ativo', true)
+                    ->when(
+                        Schema::hasColumn('grupos', 'mostrar_no_app'),
+                        fn ($query) => $query->where('mostrar_no_app', true),
+                    )
+                : null,
             'contas_receber' => $this->financeiroSignatureQuery($vendedorId),
             'vendas' => Venda::query(),
             'orcamentos' => Orcamento::query(),
             'forca_vendas_orders' => ForcaVendasOrder::query(),
         ] as $label => $query) {
+            if ($query === null) {
+                $parts[] = "{$label}:0:";
+                continue;
+            }
             $table = $query->getModel()->getTable();
             $count = (clone $query)->count();
             $max = Schema::hasColumn($table, 'updated_at')
@@ -91,15 +114,33 @@ class ForcaVendasSyncService
         $reservaMax = (string) EstoqueReserva::query()->max('updated_at');
         $parts[] = "estoque_reservas:{$reservaCount}:{$reservaMax}";
 
+        if (Schema::hasTable('product_estoque_saldos')) {
+            $saldoCount = (int) DB::table('product_estoque_saldos')->count();
+            $saldoMax = (string) DB::table('product_estoque_saldos')->max('updated_at');
+            $parts[] = "product_estoque_saldos:{$saldoCount}:{$saldoMax}";
+        }
+
+        $estoqueVendedor = $vendedorId
+            ? (int) (Vendedor::query()->whereKey($vendedorId)->value('estoque_id') ?? 0)
+            : 0;
+        $parts[] = "vendedor_estoque:{$estoqueVendedor}";
+
         return sha1(implode('|', $parts));
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function products(?Carbon $since): array
+    private function products(?Carbon $since, ?int $vendedorId = null): array
     {
-        $reservados = (new EstoqueReservaService())->totaisReservadosAtivos();
+        $estoqueId = null;
+        if ($vendedorId) {
+            $raw = Vendedor::query()->whereKey($vendedorId)->value('estoque_id');
+            $estoqueId = $raw ? (int) $raw : null;
+        }
+
+        $saldos = new ProductEstoqueSaldoService();
+        $reservados = (new EstoqueReservaService())->totaisReservadosAtivos($estoqueId);
 
         $query = Product::query();
 
@@ -125,42 +166,43 @@ class ForcaVendasSyncService
         return $query
             ->orderBy('id')
             ->get()
-            ->map(function (Product $p) use ($reservados): array {
-                $fisico = (float) $p->estoque;
+            ->map(function (Product $p) use ($reservados, $saldos, $estoqueId): array {
+                $fisico = $saldos->fisico((int) $p->id, $estoqueId);
                 $reservado = (float) ($reservados[$p->id] ?? 0);
                 $disponivel = $fisico - $reservado;
 
                 return [
-                'id' => $p->id,
-                'codigo' => $p->codigo,
-                'codigo_barras' => $p->codigo_barras,
-                'descricao' => $p->descricao,
-                'unidade' => $p->unidade,
-                'marca' => $p->marca,
-                'grupo' => $p->grupo,
-                'preco_venda' => (float) $p->preco_venda,
-                'preco_atacado' => (float) $p->preco_atacado,
-                'preco_especial' => (float) ($p->preco_especial ?? 0),
-                'qtd_atacado' => (float) $p->qtd_atacado,
-                'estoque' => $fisico,
-                'estoque_reservado' => $reservado,
-                'estoque_disponivel' => $disponivel,
-                'usa_tab_preco' => (bool) $p->usa_tab_preco,
-                'mostrar_no_app' => (bool) $p->mostrar_no_app,
-                'promo_preco_venda' => (float) $p->promo_preco_venda,
-                'promo_data_inicio' => optional($p->promo_data_inicio)->toDateString(),
-                'promo_data_fim' => optional($p->promo_data_fim)->toDateString(),
-                'foto_url' => $this->fotoApp($p),
-                'ativo' => (bool) $p->ativo,
-                'updated_at' => optional($p->updated_at)->toIso8601String(),
+                    'id' => $p->id,
+                    'codigo' => $p->codigo,
+                    'codigo_barras' => $p->codigo_barras,
+                    'descricao' => $p->descricao,
+                    'unidade' => $p->unidade,
+                    'marca' => $p->marca,
+                    'grupo' => $p->grupo,
+                    'preco_venda' => (float) $p->preco_venda,
+                    'preco_atacado' => (float) $p->preco_atacado,
+                    'preco_especial' => (float) ($p->preco_especial ?? 0),
+                    'qtd_atacado' => (float) $p->qtd_atacado,
+                    'estoque' => $fisico,
+                    'estoque_reservado' => $reservado,
+                    'estoque_disponivel' => $disponivel,
+                    'estoque_id' => $estoqueId,
+                    'usa_tab_preco' => (bool) $p->usa_tab_preco,
+                    'mostrar_no_app' => (bool) $p->mostrar_no_app,
+                    'promo_preco_venda' => (float) $p->promo_preco_venda,
+                    'promo_data_inicio' => optional($p->promo_data_inicio)->toDateString(),
+                    'promo_data_fim' => optional($p->promo_data_fim)->toDateString(),
+                    'foto_url' => $this->fotoApp($p),
+                    'ativo' => (bool) $p->ativo,
+                    'updated_at' => optional($p->updated_at)->toIso8601String(),
                 ];
             })
             ->all();
     }
 
     /**
-     * URL pública (relativa) da foto do produto para o app. Retorna null quando
-     * o produto não tem foto. O app prefixa com o endereço do servidor.
+     * URL pÃºblica (relativa) da foto do produto para o app. Retorna null quando
+     * o produto nÃ£o tem foto. O app prefixa com o endereÃ§o do servidor.
      */
     private function fotoApp(Product $p): ?string
     {
@@ -257,6 +299,39 @@ class ForcaVendasSyncService
     }
 
     /**
+     * Dias de visita (rotas) dos clientes da carteira do vendedor.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function visitaDias(?int $vendedorId = null): array
+    {
+        if (! Schema::hasTable('person_visita_dias')) {
+            return [];
+        }
+
+        $query = PersonVisitaDia::query()
+            ->whereHas('person', function ($q) use ($vendedorId): void {
+                $q->where('is_cliente', true)
+                    ->where('ativo', true);
+
+                if ($vendedorId !== null) {
+                    $q->where('vendedor_fv_id', $vendedorId);
+                }
+            })
+            ->orderBy('dia_semana')
+            ->orderBy('ordem');
+
+        return $query
+            ->get(['person_id', 'dia_semana', 'ordem'])
+            ->map(fn (PersonVisitaDia $v): array => [
+                'person_id' => (int) $v->person_id,
+                'dia_semana' => (int) $v->dia_semana,
+                'ordem' => (int) $v->ordem,
+            ])
+            ->all();
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function vendedores(): array
@@ -274,8 +349,8 @@ class ForcaVendasSyncService
     }
 
     /**
-     * Formas de pagamento liberadas para o app (flag "Disponível Mobile"),
-     * já com as tabelas de prazo (parcelamentos) vinculadas.
+     * Formas de pagamento liberadas para o app (flag "DisponÃ­vel Mobile"),
+     * jÃ¡ com as tabelas de prazo (parcelamentos) vinculadas.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -302,6 +377,66 @@ class ForcaVendasSyncService
                     ])
                     ->values()
                     ->all(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Grupos de produto ativos (fonte oficial do filtro no app).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function grupos(): array
+    {
+        if (! Schema::hasTable('grupos')) {
+            return [];
+        }
+
+        return Grupo::query()
+            ->where('ativo', true)
+            ->when(
+                Schema::hasColumn('grupos', 'mostrar_no_app'),
+                fn ($query) => $query->where('mostrar_no_app', true),
+            )
+            ->orderBy('nome')
+            ->get()
+            ->map(fn (Grupo $g): array => [
+                'id' => $g->id,
+                'nome' => $g->nome,
+                'ativo' => (bool) $g->ativo,
+                'mostrar_no_app' => (bool) ($g->mostrar_no_app ?? false),
+                'updated_at' => optional($g->updated_at)->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Transportadoras ativas para frete no app.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function transportadoras(): array
+    {
+        if (! Schema::hasTable('transportadoras')) {
+            return [];
+        }
+
+        return Transportadora::query()
+            ->where('ativo', true)
+            ->orderByRaw('CAST(codigo AS UNSIGNED)')
+            ->orderBy('proprietario')
+            ->get()
+            ->map(fn (Transportadora $t): array => [
+                'id' => $t->id,
+                'codigo' => $t->codigo,
+                'nome' => filled($t->apelido) ? (string) $t->apelido : (string) $t->proprietario,
+                'proprietario' => $t->proprietario,
+                'apelido' => $t->apelido,
+                'cnpj_cpf' => $t->cnpj_cpf,
+                'cidade' => $t->cidade,
+                'uf' => $t->uf,
+                'ativo' => (bool) $t->ativo,
+                'updated_at' => optional($t->updated_at)->toIso8601String(),
             ])
             ->all();
     }
@@ -349,7 +484,7 @@ class ForcaVendasSyncService
             ->with(['forcaVendasOrder.orcamento'])
             ->where('data', '>=', now()->subDays(self::HISTORICO_DIAS)->toDateString());
 
-        // Cada vendedor enxerga apenas o próprio histórico de vendas.
+        // Cada vendedor enxerga apenas o prÃ³prio histÃ³rico de vendas.
         if ($vendedorId !== null) {
             $query->where('vendedor_id', $vendedorId);
         }
@@ -374,8 +509,8 @@ class ForcaVendasSyncService
     }
 
     /**
-     * Orçamentos do ERP (últimos 30 dias) do vendedor logado — exibidos no app
-     * após reinstalação, junto com os orçamentos locais da outbox.
+     * OrÃ§amentos do ERP (Ãºltimos 30 dias) do vendedor logado â€” exibidos no app
+     * apÃ³s reinstalaÃ§Ã£o, junto com os orÃ§amentos locais da outbox.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -406,7 +541,7 @@ class ForcaVendasSyncService
     }
 
     /**
-     * Pedidos/orçamentos enviados pelo app — atualiza números e situação no aparelho.
+     * Pedidos/orÃ§amentos enviados pelo app â€” atualiza nÃºmeros e situaÃ§Ã£o no aparelho.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -543,7 +678,7 @@ class ForcaVendasSyncService
                 $clienteId = (int) ($order['cliente_id'] ?? 0);
 
                 if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
-                    throw new \RuntimeException('Cliente inválido ou não encontrado.');
+                    throw new \RuntimeException('Cliente invÃ¡lido ou nÃ£o encontrado.');
                 }
 
                 $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
@@ -583,7 +718,7 @@ class ForcaVendasSyncService
                     $productId = (int) ($item['product_id'] ?? 0);
 
                     if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
-                        throw new \RuntimeException('Produto inválido no item '.$linha.'.');
+                        throw new \RuntimeException('Produto invÃ¡lido no item '.$linha.'.');
                     }
 
                     $quantidade = (float) ($item['quantidade'] ?? 0);
@@ -614,8 +749,8 @@ class ForcaVendasSyncService
                     'total' => $total,
                 ]);
 
-                // O pedido chega como "pendente" (situação padrão). O faturamento
-                // (venda + baixa de estoque + contas a receber) é feito manualmente,
+                // O pedido chega como "pendente" (situaÃ§Ã£o padrÃ£o). O faturamento
+                // (venda + baixa de estoque + contas a receber) Ã© feito manualmente,
                 // em lote, pela tela "Monitor de Vendas". Pedidos reservam estoque.
                 $tipo = (string) ($order['tipo'] ?? ForcaVendasOrder::TIPO_ORCAMENTO);
 
@@ -716,11 +851,13 @@ class ForcaVendasSyncService
                     $nome = trim((string) ($customer['nome_razao'] ?? ''));
 
                     if ($nome === '') {
-                        throw new \RuntimeException('Informe o nome ou razão social do cliente.');
+                        throw new \RuntimeException('Informe o nome ou razÃ£o social do cliente.');
                     }
 
                     $person = $this->findExistingCustomerByDocument($customer)
                         ?? $this->createCustomerFromApp($customer, $user);
+
+                    $this->syncVisitaDiasFromApp($person, $customer);
 
                     if ($user->vendedor_id && $person->vendedor_fv_id === null) {
                         $person->update(['vendedor_fv_id' => $user->vendedor_id]);
@@ -824,6 +961,46 @@ class ForcaVendasSyncService
     }
 
     /**
+     * @param  array<string, mixed>  $customer
+     */
+    private function syncVisitaDiasFromApp(Person $person, array $customer): void
+    {
+        if (! Schema::hasTable('person_visita_dias') || ! array_key_exists('visita_dias', $customer)) {
+            return;
+        }
+
+        $raw = $customer['visita_dias'];
+        $dias = collect(is_array($raw) ? $raw : [])
+            ->map(fn ($d) => (int) $d)
+            ->filter(fn (int $d): bool => array_key_exists($d, PersonVisitaDia::diasLabels()))
+            ->unique()
+            ->values()
+            ->all();
+
+        $existentes = $person->visitaDias()->get()->keyBy('dia_semana');
+
+        foreach ($dias as $dia) {
+            if ($existentes->has($dia)) {
+                continue;
+            }
+
+            $person->visitaDias()->create([
+                'dia_semana' => $dia,
+                'ordem' => PersonVisitaDia::nextOrdem(
+                    $dia,
+                    $person->vendedor_fv_id ? (int) $person->vendedor_fv_id : null
+                ),
+            ]);
+        }
+
+        foreach ($existentes as $dia => $visita) {
+            if (! in_array((int) $dia, $dias, true)) {
+                $visita->delete();
+            }
+        }
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Builder<Person>
      */
     private function peopleSignatureQuery(?int $vendedorId)
@@ -835,6 +1012,25 @@ class ForcaVendasSyncService
         }
 
         return $query;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\PersonVisitaDia>|null
+     */
+    private function visitaDiasSignatureQuery(?int $vendedorId)
+    {
+        if (! Schema::hasTable('person_visita_dias')) {
+            return null;
+        }
+
+        return PersonVisitaDia::query()
+            ->whereHas('person', function ($q) use ($vendedorId): void {
+                $q->where('is_cliente', true);
+
+                if ($vendedorId !== null) {
+                    $q->where('vendedor_fv_id', $vendedorId);
+                }
+            });
     }
 
     /**
@@ -900,7 +1096,7 @@ class ForcaVendasSyncService
                 $clienteId = (int) ($visita['cliente_id'] ?? 0);
 
                 if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
-                    throw new \RuntimeException('Cliente inválido ou não encontrado.');
+                    throw new \RuntimeException('Cliente invÃ¡lido ou nÃ£o encontrado.');
                 }
 
                 $motivo = trim((string) ($visita['motivo'] ?? ''));

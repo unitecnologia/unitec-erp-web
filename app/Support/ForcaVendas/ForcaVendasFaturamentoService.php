@@ -3,6 +3,7 @@
 namespace App\Support\ForcaVendas;
 
 use App\Models\ContaReceber;
+use App\Models\Entrega;
 use App\Models\ForcaVendasOrder;
 use App\Models\Orcamento;
 use App\Models\PixCobranca;
@@ -13,6 +14,8 @@ use App\Models\Vendedor;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Pdv\PdvStockService;
+use App\Support\VendasInternas\VendasInternasMonitorHookService;
+use App\Support\Logistica\LogisticaVendaHookService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +45,7 @@ class ForcaVendasFaturamentoService
         $vendedor = $order->vendedor_id
             ? Vendedor::query()->find($order->vendedor_id)
             : null;
+        $estoqueId = $vendedor?->estoque_id ? (int) $vendedor->estoque_id : null;
 
         // Cobrança Pix paga deste pedido (verdade do servidor, casada pelo uuid).
         $pixPago = PixCobranca::query()
@@ -94,6 +98,7 @@ class ForcaVendasFaturamentoService
                     $item->product_grade_id,
                     null,
                     $docSaida,
+                    $estoqueId,
                 );
             }
         }
@@ -107,6 +112,14 @@ class ForcaVendasFaturamentoService
             'situacao' => ForcaVendasOrder::SITUACAO_FATURADO,
             'faturado_at' => now(),
         ])->save();
+
+        (new VendasInternasMonitorHookService())->onForcaVendasOrderFaturado($order);
+
+        $origemExpedicao = (($order->payload['origem'] ?? '') === 'vendas_internas')
+            ? Entrega::ORIGEM_VI
+            : Entrega::ORIGEM_MONITOR;
+
+        (new LogisticaVendaHookService())->onVendaFechada($venda, $origemExpedicao);
 
         return $venda;
     }
@@ -140,6 +153,10 @@ class ForcaVendasFaturamentoService
         DB::transaction(function () use ($order, $venda): void {
             $venda->loadMissing('itens');
             $stock = new PdvStockService();
+            $vendedor = $order->vendedor_id
+                ? Vendedor::query()->find($order->vendedor_id)
+                : null;
+            $estoqueId = $vendedor?->estoque_id ? (int) $vendedor->estoque_id : null;
 
             foreach ($venda->itens as $item) {
                 if (! $item->product_id) {
@@ -149,13 +166,21 @@ class ForcaVendasFaturamentoService
                 $product = Product::query()->find($item->product_id);
 
                 if ($product) {
-                    $stock->estornoItemVenda($product, (float) $item->quantidade);
+                    $stock->estornoItemVenda(
+                        $product,
+                        (float) $item->quantidade,
+                        null,
+                        null,
+                        $estoqueId,
+                    );
                 }
             }
 
             $this->contasDoPedido($order)->delete();
 
             $venda->update(['status' => Venda::STATUS_CANCELADO]);
+
+            (new LogisticaVendaHookService())->onVendaCancelada($venda, 'Estorno no Monitor de Vendas.');
 
             $order->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
@@ -188,6 +213,8 @@ class ForcaVendasFaturamentoService
                 'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
                 'canceled_at' => now(),
             ])->save();
+
+            (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($order);
         });
     }
 

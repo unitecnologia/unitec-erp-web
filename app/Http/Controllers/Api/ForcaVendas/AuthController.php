@@ -31,8 +31,7 @@ class AuthController
         } elseif (! empty($data['login'])) {
             $login = trim($data['login']);
             $query->where(function ($q) use ($login): void {
-                $q->where('email', mb_strtolower($login))
-                    ->orWhere('name', mb_strtoupper($login, 'UTF-8'));
+                $q->where('name', mb_strtoupper($login, 'UTF-8'));
             });
         } else {
             throw ValidationException::withMessages([
@@ -116,13 +115,23 @@ class AuthController
      */
     private function userPayload(User $user): array
     {
+        $user->loadMissing(['vendedor.estoqueCadastro', 'vendedor.empresas']);
+
+        $vendedor = $user->vendedor;
+        $caixa = $vendedor?->caixaContaDaEmpresa($user->empresa_id ? (int) $user->empresa_id : null);
+        $estoque = $vendedor?->estoqueCadastro;
+
         return [
             'id' => $user->id,
             'name' => $user->name,
-            'email' => $user->email,
             'empresa_id' => $user->empresa_id,
             'vendedor_id' => $user->vendedor_id,
-            'vendedor_nome' => $user->vendedor?->nome,
+            'vendedor_nome' => $vendedor?->nome,
+            'caixa_id' => $caixa?->id,
+            'caixa_nome' => $caixa?->nome,
+            'estoque_id' => $estoque?->id ?? $vendedor?->estoque_id,
+            'estoque_nome' => $estoque?->nome
+                ?? (filled($vendedor?->estoque) ? (string) $vendedor->estoque : null),
             'is_admin' => (bool) $user->is_admin,
             'is_supervisor' => (bool) $user->is_supervisor,
             'permissions' => $user->effectivePermissionKeys(),
