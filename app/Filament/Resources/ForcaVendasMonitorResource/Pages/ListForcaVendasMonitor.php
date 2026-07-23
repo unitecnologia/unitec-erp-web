@@ -64,6 +64,10 @@ class ListForcaVendasMonitor extends ListRecords
      */
     public array $selecionados = [];
 
+    public bool $financeiroModalOpen = false;
+
+    public ?int $financeiroOrderId = null;
+
     public function mount(): void
     {
         parent::mount();
@@ -143,7 +147,15 @@ class ListForcaVendasMonitor extends ListRecords
             ->with(['user', 'orcamento', 'cliente']);
 
         if (array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
-            $query->where('situacao', $this->situacaoFilter);
+            if ($this->situacaoFilter === ForcaVendasOrder::SITUACAO_PENDENTE) {
+                // Inclui pedidos aguardando liberação financeira na visão padrão.
+                $query->whereIn('situacao', [
+                    ForcaVendasOrder::SITUACAO_PENDENTE,
+                    ForcaVendasOrder::SITUACAO_FINANCEIRO,
+                ]);
+            } else {
+                $query->where('situacao', $this->situacaoFilter);
+            }
         }
 
         // Período usa a data da venda no app (client_created_at), não a sincronização.
@@ -184,10 +196,28 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        // Hoje só há vendas mobile; marketplaces ainda não geram pedidos.
-        if ($plataforma !== 'mobile') {
-            $query->whereRaw('0 = 1');
+        if ($plataforma === 'mobile') {
+            return;
         }
+
+        if ($plataforma === 'vi') {
+            $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) = 'vendas_internas'");
+
+            return;
+        }
+
+        if ($plataforma === 'fv') {
+            $query->where(function (Builder $q): void {
+                $q->whereNull('payload')
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) IS NULL")
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) != 'vendas_internas'");
+            });
+
+            return;
+        }
+
+        // Marketplaces ainda não geram pedidos no monitor.
+        $query->whereRaw('0 = 1');
     }
 
     /**
@@ -448,7 +478,73 @@ class ListForcaVendasMonitor extends ListRecords
                 EmbeddedTable::make()->columnSpanFull(),
                 View::make('filament.components.erp.forca-vendas.monitor-detail'),
                 View::make('filament.components.erp.forca-vendas.monitor-action-bar'),
+                View::make('filament.components.erp.forca-vendas.monitor-financeiro-modal'),
             ]);
+    }
+
+    #[Computed]
+    public function financeiroPedido(): ?ForcaVendasOrder
+    {
+        if (! $this->financeiroOrderId) {
+            return null;
+        }
+
+        return ForcaVendasOrder::query()
+            ->with(['orcamento', 'cliente'])
+            ->find($this->financeiroOrderId);
+    }
+
+    public function abrirLiberacaoFinanceira(int $orderId): void
+    {
+        $order = ForcaVendasOrder::query()->find($orderId);
+        if (! $order || $order->situacao !== ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+            $this->avisa('Pedido não está aguardando liberação financeira.', 'warning');
+
+            return;
+        }
+
+        $this->financeiroOrderId = $orderId;
+        $this->financeiroModalOpen = true;
+    }
+
+    public function fecharLiberacaoFinanceira(): void
+    {
+        $this->financeiroModalOpen = false;
+        $this->financeiroOrderId = null;
+    }
+
+    public function aprovarLiberacaoFinanceira(): void
+    {
+        $order = $this->financeiroPedido;
+        if (! $order) {
+            return;
+        }
+
+        try {
+            (new ForcaVendasFaturamentoService())->liberarFinanceiro($order, auth()->user());
+            $this->fecharLiberacaoFinanceira();
+            $this->avisa('Pedido liberado. Status: Pendente (Enviado no app).', 'success');
+            $this->resetTable();
+        } catch (\Throwable $e) {
+            $this->avisa($e->getMessage(), 'warning');
+        }
+    }
+
+    public function negarLiberacaoFinanceira(): void
+    {
+        $order = $this->financeiroPedido;
+        if (! $order) {
+            return;
+        }
+
+        try {
+            (new ForcaVendasFaturamentoService())->cancelarPendente($order);
+            $this->fecharLiberacaoFinanceira();
+            $this->avisa('Pedido negado e cancelado.', 'success');
+            $this->resetTable();
+        } catch (\Throwable $e) {
+            $this->avisa($e->getMessage(), 'warning');
+        }
     }
 
     public function consultar(): void
@@ -596,7 +692,9 @@ class ListForcaVendasMonitor extends ListRecords
     public function plataformaOptions(): array
     {
         return [
-            'mobile' => 'Vendas Mobile',
+            'mobile' => 'Vendas Mobile (todos)',
+            'vi' => 'Vendas Internas',
+            'fv' => 'Força de Vendas',
             'meli' => 'Mercado Livre',
             'shopee' => 'Shopee',
             'magalu' => 'Magalu',
@@ -681,6 +779,12 @@ class ListForcaVendasMonitor extends ListRecords
 
         foreach ($orders as $order) {
             if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO || $order->venda_id) {
+                $ignorados++;
+
+                continue;
+            }
+
+            if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
                 $ignorados++;
 
                 continue;

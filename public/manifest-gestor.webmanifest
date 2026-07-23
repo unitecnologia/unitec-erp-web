@@ -1,0 +1,31 @@
+{
+  "id": "/gestor/",
+  "name": "Unitec Executivo",
+  "short_name": "Executivo",
+  "description": "Painel executivo mobile do Unitec ERP — pulso da empresa em 30 segundos",
+  "start_url": "/gestor/",
+  "scope": "/gestor/",
+  "display": "browser",
+  "orientation": "portrait-primary",
+  "background_color": "#0d2f57",
+  "theme_color": "#0d2f57",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "icons": [
+    {
+      "src": "/pwa-gestor/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-gestor/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

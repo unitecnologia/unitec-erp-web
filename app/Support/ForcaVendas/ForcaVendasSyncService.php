@@ -648,6 +648,7 @@ class ForcaVendasSyncService
         return [
             'uuid' => $order->uuid,
             'status' => $order->status,
+            'situacao' => $order->situacao,
             'orcamento_id' => $order->orcamento_id,
             'numero' => $order->orcamento?->numero,
             'numero_pedido' => $order->venda?->numero,
@@ -788,10 +789,11 @@ class ForcaVendasSyncService
                     'total' => $total,
                 ]);
 
-                // O pedido chega como "pendente" (situaÃ§Ã£o padrÃ£o). O faturamento
-                // (venda + baixa de estoque + contas a receber) Ã© feito manualmente,
-                // em lote, pela tela "Monitor de Vendas". Pedidos reservam estoque.
+                // Pedido com restrição financeira fica em "financeiro" até liberação
+                // no Monitor de Vendas. Demais chegam como "pendente".
                 $tipo = (string) ($order['tipo'] ?? ForcaVendasOrder::TIPO_ORCAMENTO);
+                $restricaoFinanceira = $tipo === ForcaVendasOrder::TIPO_PEDIDO
+                    && ! empty($order['restricao_financeira']);
 
                 $fvOrder = ForcaVendasOrder::query()->create([
                     'uuid' => $uuid,
@@ -807,6 +809,9 @@ class ForcaVendasSyncService
                     'latitude' => $order['latitude'] ?? null,
                     'longitude' => $order['longitude'] ?? null,
                     'status' => ForcaVendasOrder::STATUS_IMPORTADO,
+                    'situacao' => $restricaoFinanceira
+                        ? ForcaVendasOrder::SITUACAO_FINANCEIRO
+                        : ForcaVendasOrder::SITUACAO_PENDENTE,
                     'payload' => $order,
                     'client_created_at' => $clientCreatedAt,
                     'received_at' => now(),
@@ -814,6 +819,12 @@ class ForcaVendasSyncService
 
                 if ($tipo === ForcaVendasOrder::TIPO_PEDIDO) {
                     (new EstoqueReservaService())->reservarPedido($fvOrder, $orcamento, $user);
+
+                    try {
+                        app(\App\Support\Gestor\GestorPushService::class)->notifyPedidoPendente($fvOrder);
+                    } catch (\Throwable) {
+                        // Push não deve quebrar o sync do pedido.
+                    }
                 }
 
                 return array_merge(

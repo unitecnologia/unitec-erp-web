@@ -159,7 +159,70 @@ trait ErpPersonFormPage
     {
         $merged = array_merge($data, $this->data ?? []);
 
+        unset($merged['visita_dias'], $merged['vendedor_rota_id'], $merged['visita_ordem']);
+
+        // Selects HTML enviam "" quando "— Selecione —"; MySQL rejeita '' em colunas inteiras.
+        foreach ([
+            'vendedor_fv_id',
+            'vendedor_loja_id',
+            'forma_pagamento_id',
+            'tabela_prazo_id',
+            'price_table_id',
+            'dia_pgto',
+        ] as $field) {
+            if (! array_key_exists($field, $merged)) {
+                continue;
+            }
+
+            $value = $merged[$field];
+            if ($value === '' || $value === null) {
+                $merged[$field] = null;
+            } else {
+                $merged[$field] = (int) $value;
+            }
+        }
+
         return ErpUppercase::normalizeFormData($merged);
+    }
+
+    protected function syncPersonVisitaDias(Person $person): void
+    {
+        $dias = collect($this->data['visita_dias'] ?? [])
+            ->map(fn ($d) => (int) $d)
+            ->filter(fn (int $d): bool => array_key_exists($d, \App\Models\PersonVisitaDia::diasLabels()))
+            ->unique()
+            ->values()
+            ->all();
+
+        $existentes = $person->visitaDias()->get()->keyBy('dia_semana');
+
+        foreach ($dias as $dia) {
+            if ($existentes->has($dia)) {
+                continue;
+            }
+
+            $person->visitaDias()->create([
+                'dia_semana' => $dia,
+                'ordem' => \App\Models\PersonVisitaDia::nextOrdem($dia, $person->vendedor_fv_id ? (int) $person->vendedor_fv_id : null),
+            ]);
+        }
+
+        foreach ($existentes as $dia => $visita) {
+            if (! in_array((int) $dia, $dias, true)) {
+                $visita->delete();
+            }
+        }
+    }
+
+    protected function loadPersonVisitaDias(?Person $person = null): void
+    {
+        $person ??= $this->record;
+
+        $dias = $person
+            ? $person->visitaDias()->pluck('dia_semana')->map(fn ($d) => (int) $d)->values()->all()
+            : [];
+
+        $this->data['visita_dias'] = $dias;
     }
 
     public function cancelForm(): void

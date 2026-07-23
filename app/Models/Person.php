@@ -39,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'dia_pgto',
     'forma_pagamento_id',
     'tabela_prazo_id',
+    'price_table_id',
     'vendedor_fv_id',
     'vendedor_loja_id',
     'estado_civil',
@@ -185,6 +186,11 @@ class Person extends Model
         return $this->belongsTo(TabelaPrazo::class, 'tabela_prazo_id');
     }
 
+    public function priceTable(): BelongsTo
+    {
+        return $this->belongsTo(PriceTable::class, 'price_table_id');
+    }
+
     public function vendedorFv(): BelongsTo
     {
         return $this->belongsTo(Vendedor::class, 'vendedor_fv_id');
@@ -193,6 +199,31 @@ class Person extends Model
     public function vendedorLoja(): BelongsTo
     {
         return $this->belongsTo(Vendedor::class, 'vendedor_loja_id');
+    }
+
+    public function visitaDias(): HasMany
+    {
+        return $this->hasMany(PersonVisitaDia::class)->orderBy('dia_semana')->orderBy('ordem');
+    }
+
+    public function isPessoaFisica(): bool
+    {
+        if ($this->pessoa_tipo === self::PESSOA_FISICA) {
+            return true;
+        }
+
+        $digits = preg_replace('/\D/', '', (string) ($this->cpf_cnpj ?? '')) ?? '';
+
+        return strlen($digits) === 11;
+    }
+
+    public function isConsumidorFinalPadrao(): bool
+    {
+        if ($this->isPessoaFisica()) {
+            return true;
+        }
+
+        return strtolower((string) ($this->tipo_contribuinte ?? 'nao_contribuinte')) === 'nao_contribuinte';
     }
 
     public function getEnderecoListaAttribute(): string
@@ -242,6 +273,9 @@ class Person extends Model
             'dia_pgto' => 'integer',
             'forma_pagamento_id' => 'integer',
             'tabela_prazo_id' => 'integer',
+            'price_table_id' => 'integer',
+            'vendedor_fv_id' => 'integer',
+            'vendedor_loja_id' => 'integer',
             'ativo' => 'boolean',
         ];
     }

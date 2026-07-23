@@ -28,12 +28,13 @@
             <div class="erp-fv-mon__inputs">
             <label class="erp-fv-mon__field erp-fv-mon__field--tipo">
                 <span>Tipo de Pedido</span>
-                <select wire:model.live="situacaoFilter" class="erp-nfe__select">
-                    <option value="todos">&lt;todos&gt;</option>
-                    @foreach ($situacaoOptions as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
+                @include('filament.components.erp.shared.search-field-dropdown', [
+                    'fields' => ['todos' => '<todos>'] + $situacaoOptions,
+                    'searchColumn' => $this->situacaoFilter,
+                    'wireProperty' => 'situacaoFilter',
+                    'ariaLabel' => 'Tipo de Pedido',
+                    'btnClass' => 'erp-fv-mon__dd-btn',
+                ])
             </label>
 
             <div class="erp-fv-mon__field erp-fv-mon__field--periodo">
@@ -60,11 +61,13 @@
             <div class="erp-fv-mon__field erp-fv-mon__field--grow erp-fv-mon__field--filtro">
                 <span>Filtrar por</span>
                 <div class="erp-fv-mon__filtro">
-                    <select wire:model.live="filtroCampo" class="erp-nfe__select erp-fv-mon__filtro-campo">
-                        @foreach ($this->filtroCamposOptions() as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
-                        @endforeach
-                    </select>
+                    @include('filament.components.erp.shared.search-field-dropdown', [
+                        'fields' => $this->filtroCamposOptions(),
+                        'searchColumn' => $this->filtroCampo,
+                        'wireProperty' => 'filtroCampo',
+                        'ariaLabel' => 'Filtrar por',
+                        'btnClass' => 'erp-fv-mon__dd-btn erp-fv-mon__dd-btn--filtro',
+                    ])
 
                     @php($tipoFiltro = $this->filtroCampoTipo())
 
@@ -164,6 +167,7 @@
                 <legend class="erp-fv-mon__plataformas-legend">Status</legend>
                 <div class="erp-fv-mon__legend">
                     <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--pendente"></i> Pendente</span>
+                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--financeiro"></i> Financeiro</span>
                     <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--confirmado"></i> Confirmado</span>
                     <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--faturado"></i> Faturado</span>
                     <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--cancelado"></i> Cancelado</span>

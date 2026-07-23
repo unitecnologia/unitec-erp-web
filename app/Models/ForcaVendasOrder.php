@@ -42,6 +42,8 @@ class ForcaVendasOrder extends Model
 
     public const SITUACAO_PENDENTE = 'pendente';
 
+    public const SITUACAO_FINANCEIRO = 'financeiro';
+
     public const SITUACAO_CONFIRMADO = 'confirmado';
 
     public const SITUACAO_FATURADO = 'faturado';
@@ -72,6 +74,7 @@ class ForcaVendasOrder extends Model
     {
         return [
             self::SITUACAO_PENDENTE => 'Pendente',
+            self::SITUACAO_FINANCEIRO => 'Financeiro',
             self::SITUACAO_CONFIRMADO => 'Confirmado',
             self::SITUACAO_FATURADO => 'Faturado',
             self::SITUACAO_CANCELADO => 'Cancelado',
@@ -89,11 +92,138 @@ class ForcaVendasOrder extends Model
     public function situacaoColor(): string
     {
         return match ($this->situacao) {
+            self::SITUACAO_PENDENTE => 'gray',
+            self::SITUACAO_FINANCEIRO => 'warning',
             self::SITUACAO_CONFIRMADO => 'info',
             self::SITUACAO_FATURADO => 'success',
             self::SITUACAO_CANCELADO => 'danger',
-            default => 'warning',
+            default => 'gray',
         };
+    }
+
+    public function temRestricaoFinanceira(): bool
+    {
+        if ($this->situacao === self::SITUACAO_FINANCEIRO) {
+            return true;
+        }
+
+        $payload = is_array($this->payload) ? $this->payload : [];
+
+        return ! empty($payload['restricao_financeira']);
+    }
+
+    /**
+     * Resumo estruturado para o modal de liberação (motivos + situação).
+     *
+     * @return array{motivos: list<string>, situacao: list<array{label: string, valor: string}>}
+     */
+    public function financeiroResumo(): array
+    {
+        $payload = is_array($this->payload) ? $this->payload : [];
+        $money = static fn (float $v): string => 'R$ '.number_format($v, 2, ',', '.');
+
+        $hasSnapshot = array_key_exists('credito_total_aberto', $payload)
+            || array_key_exists('credito_limite', $payload)
+            || ! empty($payload['credito_titulos_vencidos'])
+            || ! empty($payload['credito_limite_excedido'])
+            || ! empty($payload['credito_boleto_atrasado']);
+
+        if (! $hasSnapshot) {
+            $texto = trim((string) ($payload['credito_motivo'] ?? ''));
+
+            return [
+                'motivos' => [$texto !== '' ? $texto : 'Pendência financeira informada pelo aplicativo.'],
+                'situacao' => [],
+            ];
+        }
+
+        $motivos = [];
+        if (! empty($payload['credito_titulos_vencidos'])) {
+            $motivos[] = 'Títulos vencidos: '.$money((float) ($payload['credito_titulos_vencidos_saldo'] ?? 0));
+        }
+        if (! empty($payload['credito_boleto_atrasado'])) {
+            $motivos[] = 'Boletos vencidos: '.$money((float) ($payload['credito_boleto_saldo'] ?? 0));
+        }
+        if (! empty($payload['credito_limite_excedido'])) {
+            $motivos[] = 'Limite insuficiente / excedido';
+        }
+        if (! empty($payload['credito_cliente_em_debito']) && empty($payload['credito_titulos_vencidos'])) {
+            $motivos[] = 'Cliente com débitos em aberto';
+        }
+
+        $limiteVal = (float) ($payload['credito_limite'] ?? 0);
+        $situacao = [
+            ['label' => 'Em aberto', 'valor' => $money((float) ($payload['credito_total_aberto'] ?? 0))],
+        ];
+        if (! empty($payload['credito_titulos_vencidos'])) {
+            $situacao[] = [
+                'label' => 'Vencidos',
+                'valor' => $money((float) ($payload['credito_titulos_vencidos_saldo'] ?? 0)),
+            ];
+        }
+        $situacao[] = [
+            'label' => 'Limite',
+            'valor' => $limiteVal > 0 ? $money($limiteVal) : 'não cadastrado',
+        ];
+        if ($limiteVal > 0) {
+            $situacao[] = [
+                'label' => 'Disponível',
+                'valor' => $money((float) ($payload['credito_disponivel'] ?? 0)),
+            ];
+        }
+        $situacao[] = [
+            'label' => 'Pedido',
+            'valor' => $money((float) ($payload['credito_total_pedido'] ?? $this->total)),
+        ];
+        $situacao[] = [
+            'label' => 'Aberto após pedido',
+            'valor' => $money((float) ($payload['credito_aberto_apos_pedido'] ?? 0)),
+        ];
+        if ($limiteVal > 0) {
+            $situacao[] = [
+                'label' => 'Disponível após',
+                'valor' => $money((float) ($payload['credito_disponivel_apos_pedido'] ?? 0)),
+            ];
+        }
+
+        return [
+            'motivos' => $motivos,
+            'situacao' => $situacao,
+        ];
+    }
+
+    /**
+     * Texto resumido da restrição financeira (vindo do app).
+     */
+    public function motivoFinanceiro(): string
+    {
+        $payload = is_array($this->payload) ? $this->payload : [];
+        $motivo = trim((string) ($payload['credito_motivo'] ?? ''));
+        if ($motivo !== '') {
+            return $motivo;
+        }
+
+        $resumo = $this->financeiroResumo();
+        $linhas = [];
+        if ($resumo['motivos'] !== []) {
+            $linhas[] = 'MOTIVOS:';
+            foreach ($resumo['motivos'] as $m) {
+                $linhas[] = '• '.$m;
+            }
+        }
+        if ($resumo['situacao'] !== []) {
+            if ($linhas !== []) {
+                $linhas[] = '';
+            }
+            $linhas[] = 'SITUAÇÃO:';
+            foreach ($resumo['situacao'] as $row) {
+                $linhas[] = $row['label'].': '.$row['valor'];
+            }
+        }
+
+        return $linhas !== []
+            ? implode("\n", $linhas)
+            : 'Pendência financeira informada pelo aplicativo.';
     }
 
     public function clienteNome(): string

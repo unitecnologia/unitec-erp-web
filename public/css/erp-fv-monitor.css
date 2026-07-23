@@ -321,7 +321,8 @@
     border: 1px solid rgba(15, 23, 42, 0.2);
 }
 
-.erp-fv-mon__dot--pendente { background: #f59e0b; }
+.erp-fv-mon__dot--pendente { background: #0f172a; }
+.erp-fv-mon__dot--financeiro { background: #eab308; }
 .erp-fv-mon__dot--confirmado { background: #2563eb; }
 .erp-fv-mon__dot--faturado { background: #16a34a; }
 .erp-fv-mon__dot--cancelado { background: #dc2626; }
@@ -402,12 +403,218 @@
 }
 
 /* ---- Realce da linha por situação (grade mestre) ---- */
-.fi-ta-row.erp-fv-mon--pendente .fi-ta-cell { box-shadow: inset 4px 0 0 #f59e0b; }
+.fi-ta-row.erp-fv-mon--pendente .fi-ta-cell { box-shadow: inset 4px 0 0 #0f172a; }
+
+/* Badge Status = Pendente em preto */
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon--pendente .fi-badge {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+    --c-400: #0f172a;
+    --c-600: #0f172a;
+}
+.fi-ta-row.erp-fv-mon--financeiro .fi-ta-cell { box-shadow: inset 4px 0 0 #eab308; }
 .fi-ta-row.erp-fv-mon--confirmado .fi-ta-cell { box-shadow: inset 4px 0 0 #2563eb; }
 .fi-ta-row.erp-fv-mon--faturado .fi-ta-cell { box-shadow: inset 4px 0 0 #16a34a; }
 .fi-ta-row.erp-fv-mon--cancelado .fi-ta-cell {
     box-shadow: inset 4px 0 0 #dc2626;
     color: var(--erp-text-muted, #64748b);
+}
+
+/* Célula Financeiro clicável (badge nativo Filament) */
+.erp-fv-monitor-page .erp-fv-mon__fin-cell {
+    cursor: pointer !important;
+}
+.erp-fv-monitor-page .erp-fv-mon__fin-cell .fi-badge {
+    background-color: #fef08a !important;
+    color: #854d0e !important;
+    border: 1px solid #ca8a04;
+    cursor: pointer !important;
+}
+.erp-fv-monitor-page .erp-fv-mon__fin-cell:hover .fi-badge {
+    background-color: #fde047 !important;
+}
+
+/* ---- Alerta Liberação financeira (amarelo / conteúdo compacto) ---- */
+.erp-fv-fin-alert {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+.erp-fv-fin-alert__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 52, 96, 0.18);
+    pointer-events: auto;
+}
+.erp-fv-fin-alert__box {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+    width: min(92vw, 22.5rem);
+    background: #fffbeb;
+    border: 2px solid #eab308;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(202, 138, 4, 0.28);
+    padding: 0.75rem 0.85rem 0.65rem;
+    text-align: left;
+}
+.erp-fv-fin-alert__close {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.3rem;
+    z-index: 2;
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #facc15;
+    border-radius: 6px;
+    background: #fef9c3;
+    color: #854d0e;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.erp-fv-fin-alert__close:hover {
+    background: #fde047;
+    color: #713f12;
+}
+.erp-fv-fin-alert__head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding-right: 1.6rem;
+    margin-bottom: 0.2rem;
+}
+.erp-fv-fin-alert__icon {
+    flex: 0 0 auto;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    background: #eab308;
+    color: #422006;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.45rem;
+    text-align: center;
+}
+.erp-fv-fin-alert__title {
+    margin: 0;
+    color: #a16207;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+.erp-fv-fin-alert__linha {
+    margin: 0 0 0.45rem;
+    color: #334155;
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
+.erp-fv-fin-alert__block {
+    margin: 0 0 0.4rem;
+    padding: 0.35rem 0.45rem;
+    background: #fff;
+    border: 1px solid #fde047;
+    border-radius: 7px;
+}
+.erp-fv-fin-alert__label {
+    margin: 0 0 0.2rem;
+    color: #a16207;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.erp-fv-fin-alert__motivos {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+.erp-fv-fin-alert__motivos li {
+    position: relative;
+    padding-left: 0.7rem;
+    color: #0f172a;
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+.erp-fv-fin-alert__motivos li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #ca8a04;
+    font-weight: 800;
+}
+.erp-fv-fin-alert__grid {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+}
+.erp-fv-fin-alert__row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: baseline;
+}
+.erp-fv-fin-alert__row dt {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+.erp-fv-fin-alert__row dd {
+    margin: 0;
+    color: #0f172a;
+    font-size: 0.76rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.erp-fv-fin-alert__actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: stretch;
+    margin-top: 0.45rem;
+}
+.erp-fv-fin-alert__btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0.38rem 0.6rem;
+    background: #ca8a04;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+.erp-fv-fin-alert__btn:hover {
+    background: #a16207;
+}
+.erp-fv-fin-alert__btn--secondary {
+    background: #fff;
+    color: #854d0e;
+    border: 1px solid #eab308;
+}
+.erp-fv-fin-alert__btn--secondary:hover {
+    background: #fef9c3;
+}
+.erp-fv-fin-alert__hint {
+    margin: 0.35rem 0 0;
+    color: #78716c;
+    font-size: 0.65rem;
+    line-height: 1.25;
+    text-align: center;
 }
 
 /* ---- Linha selecionada (azul forte, igual às outras telas) ---- */
@@ -827,4 +1034,36 @@
 .erp-fv-monitor-page .erp-nfe-actions__label {
     font-size: 0.625rem;
     line-height: 1.1;
+}
+
+/* Dropdowns compactos (Tipo de Pedido / Filtrar por) */
+.erp-fv-monitor-page .erp-fv-mon__field .erp-field-dd {
+    width: 100%;
+    min-width: 0;
+}
+
+.erp-fv-monitor-page .erp-fv-mon__dd-btn {
+    width: 100%;
+    min-height: calc(1.95rem - 2mm);
+    height: calc(1.95rem - 2mm);
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .erp-fv-mon__dd-btn--filtro {
+    width: 5cm;
+    min-width: 5cm;
+}
+
+.erp-fv-monitor-page .erp-fv-mon__filtro .erp-field-dd {
+    flex: 0 0 5cm;
+    width: 5cm;
+}
+
+.erp-fv-monitor-page .erp-field-dd__item {
+    font-weight: 700;
+    padding: 0.06rem 0.4rem;
+}
+
+.erp-fv-monitor-page .erp-field-dd__label {
+    font-weight: 700;
 }

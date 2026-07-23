@@ -123,10 +123,44 @@ class ForcaVendasMonitorResource extends Resource
                     ->wrap(false),
                 TextColumn::make('plataforma')
                     ->label('Plataforma')
-                    ->state('Vendas Mobile')
+                    ->state(fn (ForcaVendasOrder $record): string => self::plataformaLabel($record))
                     ->badge()
-                    ->color('gray')
+                    ->color(fn (ForcaVendasOrder $record): string => self::plataformaColor($record))
                     ->alignCenter(),
+                TextColumn::make('financeiro')
+                    ->label('Financeiro')
+                    ->alignCenter()
+                    ->state(function (ForcaVendasOrder $record): string {
+                        if ($record->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+                            return 'Financeiro';
+                        }
+                        $payload = is_array($record->payload) ? $record->payload : [];
+
+                        return ! empty($payload['financeiro_liberado']) ? 'Liberado' : '—';
+                    })
+                    ->badge(fn (ForcaVendasOrder $record): bool => $record->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO
+                        || ! empty((is_array($record->payload) ? $record->payload : [])['financeiro_liberado']))
+                    ->color(function (ForcaVendasOrder $record): string {
+                        if ($record->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+                            return 'warning';
+                        }
+                        $payload = is_array($record->payload) ? $record->payload : [];
+
+                        return ! empty($payload['financeiro_liberado']) ? 'success' : 'gray';
+                    })
+                    ->extraCellAttributes(function (ForcaVendasOrder $record): array {
+                        if ($record->situacao !== ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+                            return [];
+                        }
+
+                        return [
+                            'class' => 'erp-fv-mon__fin-cell',
+                            'data-fv-fin' => (string) $record->getKey(),
+                            'role' => 'button',
+                            'tabindex' => '0',
+                            'title' => 'Abrir liberação financeira',
+                        ];
+                    }),
             ])
             ->defaultSort('client_created_at', 'desc')
             ->striped()
@@ -144,5 +178,22 @@ class ForcaVendasMonitorResource extends Resource
         return [
             'index' => Pages\ListForcaVendasMonitor::route('/'),
         ];
+    }
+
+    public static function plataformaLabel(ForcaVendasOrder $record): string
+    {
+        return self::isVendasInternas($record) ? 'Vendas Internas' : 'Força de Vendas';
+    }
+
+    public static function plataformaColor(ForcaVendasOrder $record): string
+    {
+        return self::isVendasInternas($record) ? 'info' : 'gray';
+    }
+
+    public static function isVendasInternas(ForcaVendasOrder $record): bool
+    {
+        $payload = is_array($record->payload) ? $record->payload : [];
+
+        return ($payload['origem'] ?? '') === 'vendas_internas';
     }
 }

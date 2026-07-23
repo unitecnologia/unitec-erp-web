@@ -8,6 +8,7 @@ use App\Models\ForcaVendasOrder;
 use App\Models\Orcamento;
 use App\Models\PixCobranca;
 use App\Models\Product;
+use App\Models\User;
 use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
@@ -38,6 +39,14 @@ class ForcaVendasFaturamentoService
      */
     public function faturar(ForcaVendasOrder $order, Orcamento $orcamento): Venda
     {
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+            throw new \RuntimeException('Pedido aguarda liberação financeira antes de faturar.');
+        }
+
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
+            throw new \RuntimeException('Pedido cancelado não pode ser faturado.');
+        }
+
         $orcamento->loadMissing('itens');
 
         $dataVenda = ErpTimezone::toLocal($order->dataAberturaAt());
@@ -216,6 +225,29 @@ class ForcaVendasFaturamentoService
 
             (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($order);
         });
+    }
+
+    /**
+     * Libera pedido com restrição financeira → volta para pendente (pronto para faturar).
+     */
+    public function liberarFinanceiro(ForcaVendasOrder $order, ?User $user = null): void
+    {
+        if ($order->situacao !== ForcaVendasOrder::SITUACAO_FINANCEIRO) {
+            throw new \RuntimeException('Pedido não está aguardando liberação financeira.');
+        }
+
+        $payload = is_array($order->payload) ? $order->payload : [];
+        $payload['financeiro_liberado'] = true;
+        $payload['financeiro_liberado_at'] = now()->toIso8601String();
+        if ($user !== null) {
+            $payload['financeiro_liberado_por'] = $user->id;
+            $payload['financeiro_liberado_por_nome'] = $user->name;
+        }
+
+        $order->forceFill([
+            'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
+            'payload' => $payload,
+        ])->save();
     }
 
     /**
