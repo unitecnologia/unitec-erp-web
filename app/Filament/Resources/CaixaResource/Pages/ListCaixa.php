@@ -8,6 +8,7 @@ use App\Filament\Resources\CaixaResource\Pages\Concerns\ManagesCaixaViewModal;
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -50,21 +51,12 @@ class ListCaixa extends ListRecords
 
         ErpScreen::set('Caixa');
 
-        if ($this->periodoDe === '') {
-            $this->periodoDe = now()->startOfMonth()->format('Y-m-d');
-        }
+        // Sessões PDV fechadas antes da correção: gera o lançamento faltante no Livro Caixa.
+        app(PdvCaixaFechamentoService::class)->backfillSessoesRecentes();
 
-        if ($this->periodoAte === '') {
-            $this->periodoAte = now()->format('Y-m-d');
-        }
-
-        if ($this->periodoDeApplied === '') {
-            $this->periodoDeApplied = $this->periodoDe;
-        }
-
-        if ($this->periodoAteApplied === '') {
-            $this->periodoAteApplied = $this->periodoAte;
-        }
+        // Sem filtro de período padrão: campos vazios = listar todos os lançamentos.
+        // O usuário aplica o intervalo explicitamente em "Filtrar Período".
+        // (Antes o mês atual escondia lançamentos migrados de outros períodos.)
     }
 
     protected static function erpListPageClass(): string

@@ -11,12 +11,13 @@ class CaixaSeeder extends Seeder
     public function run(): void
     {
         $conta = CaixaConta::query()->updateOrCreate(
-            ['nome' => 'CAIXA GERAL'],
+            ['nome' => CaixaConta::NOME_CAIXA_GERAL],
             [
                 'codigo' => 1,
-                'tipo' => CaixaConta::TIPO_CAIXA,
+                'tipo' => CaixaConta::TIPO_SUBCAIXA,
                 'situacao' => CaixaConta::SITUACAO_ABERTO,
                 'ativo' => true,
+                'sistema' => true,
             ],
         );
 

@@ -81,6 +81,11 @@ final class PdvCaixaMovimentoService
                 continue;
             }
 
+            // Cartão com Contas à Receber: conciliação via título, sem entrada no caixa.
+            if ($this->pagamentoVaiParaContasReceberCartao($pagamento, $forma)) {
+                continue;
+            }
+
             $liquido = $valor;
 
             if ($forma === 'DINHEIRO' && $trocoRestante > 0) {
@@ -126,5 +131,29 @@ final class PdvCaixaMovimentoService
         }
 
         return $payload;
+    }
+
+    /**
+     * @param  array{forma?: string, tipo?: string, aparece_contas_receber?: bool|int|string}  $pagamento
+     */
+    private function pagamentoVaiParaContasReceberCartao(array $pagamento, string $forma): bool
+    {
+        if (array_key_exists('aparece_contas_receber', $pagamento) || array_key_exists('tipo', $pagamento)) {
+            return PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber($pagamento);
+        }
+
+        $cadastro = \App\Models\FormaPagamento::query()
+            ->whereRaw('UPPER(TRIM(descricao)) = ?', [$forma])
+            ->first(['tipo', 'aparece_contas_receber']);
+
+        if (! $cadastro) {
+            return false;
+        }
+
+        return PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
+            'forma' => $forma,
+            'tipo' => (string) ($cadastro->tipo ?? ''),
+            'aparece_contas_receber' => (bool) $cadastro->aparece_contas_receber,
+        ]);
     }
 }

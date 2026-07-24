@@ -45,8 +45,6 @@ class ForcaVendasMonitorResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $money = fn ($v): string => 'R$ ' . number_format((float) $v, 2, ',', '.');
-
         return $table
             ->columns([
                 ViewColumn::make('selecionar')
@@ -100,23 +98,26 @@ class ForcaVendasMonitorResource extends Resource
                     ->label('Sincronizado')
                     ->state(fn (ForcaVendasOrder $record): string => $record->received_at ? ErpTimezone::toLocal($record->received_at)->format('d/m/Y H:i') : '—')
                     ->alignCenter(),
-                TextColumn::make('desconto')
+                ViewColumn::make('desconto')
                     ->label('Desc.')
-                    ->state(fn (ForcaVendasOrder $record): string => $money((float) ($record->orcamento?->desconto_valor ?? 0)))
-                    ->alignEnd(),
-                TextColumn::make('acrescimo')
+                    ->state(fn (ForcaVendasOrder $record): float => (float) ($record->orcamento?->desconto_valor ?? 0))
+                    ->view('filament.components.erp.forca-vendas.monitor-money-cell')
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
+                ViewColumn::make('acrescimo')
                     ->label('Acmo.')
-                    ->state(fn (ForcaVendasOrder $record): string => $money((float) (($record->payload['frete'] ?? 0))))
-                    ->alignEnd(),
-                TextColumn::make('tt_bruto')
+                    ->state(fn (ForcaVendasOrder $record): float => (float) (($record->payload['frete'] ?? 0)))
+                    ->view('filament.components.erp.forca-vendas.monitor-money-cell')
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
+                ViewColumn::make('tt_bruto')
                     ->label('TT Bruto')
-                    ->state(fn (ForcaVendasOrder $record): string => $money((float) ($record->orcamento?->subtotal ?? $record->total)))
-                    ->alignEnd(),
-                TextColumn::make('total')
+                    ->state(fn (ForcaVendasOrder $record): float => (float) ($record->orcamento?->subtotal ?? $record->total))
+                    ->view('filament.components.erp.forca-vendas.monitor-money-cell')
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
+                ViewColumn::make('total')
                     ->label('TT Líquido')
-                    ->formatStateUsing(fn ($state): string => 'R$ ' . number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
-                    ->weight(FontWeight::Bold),
+                    ->state(fn (ForcaVendasOrder $record): float => (float) $record->total)
+                    ->view('filament.components.erp.forca-vendas.monitor-money-cell')
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell erp-fv-mon-money-cell--bold']),
                 TextColumn::make('identificacao')
                     ->label('Identificação')
                     ->placeholder('—')

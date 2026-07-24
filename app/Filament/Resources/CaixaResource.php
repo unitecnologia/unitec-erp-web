@@ -49,6 +49,7 @@ class CaixaResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('historico')
                     ->label('Histórico')
+                    ->formatStateUsing(fn (?string $state): string => mb_strtoupper((string) ($state ?? ''), 'UTF-8'))
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
                 TextColumn::make('plano_contas')
@@ -60,16 +61,16 @@ class CaixaResource extends Resource
                     ->label('Contas')
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('entrada')
+                ViewColumn::make('entrada')
                     ->label('Entrada')
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('saida')
+                    ->sortable()
+                    ->view('filament.components.erp.caixa.columns.money-cell')
+                    ->extraCellAttributes(['class' => 'erp-caixa-money-cell']),
+                ViewColumn::make('saida')
                     ->label('Saída')
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
+                    ->sortable()
+                    ->view('filament.components.erp.caixa.columns.money-cell')
+                    ->extraCellAttributes(['class' => 'erp-caixa-money-cell']),
                 ViewColumn::make('ver_itens')
                     ->label('')
                     ->state(fn (): bool => true)
@@ -78,7 +79,7 @@ class CaixaResource extends Resource
                     ->alignCenter()
                     ->disabledClick(),
             ])
-            ->defaultSort('codigo', 'asc')
+            ->defaultSort('codigo', 'desc')
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

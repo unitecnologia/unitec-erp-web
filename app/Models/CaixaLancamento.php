@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'documento',
     'historico',
     'plano_contas',
+    'plano_conta_id',
     'caixa_conta_id',
     'entrada',
     'saida',
@@ -28,6 +29,11 @@ class CaixaLancamento extends Model
     public function conta(): BelongsTo
     {
         return $this->belongsTo(CaixaConta::class, 'caixa_conta_id');
+    }
+
+    public function planoConta(): BelongsTo
+    {
+        return $this->belongsTo(PlanoConta::class, 'plano_conta_id');
     }
 
     protected function casts(): array

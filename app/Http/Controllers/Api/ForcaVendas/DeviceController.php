@@ -50,7 +50,21 @@ class DeviceController
         $device->platform = $data['platform'] ?? $device->platform;
         $device->app_version = $data['app_version'] ?? $device->app_version;
         $device->last_seen_at = now();
+
+        $isNew = ! $device->exists;
+        $statusMudou = $device->isDirty('status') || $device->isDirty('revoked_at');
         $device->save();
+
+        if (
+            $device->status === ForcaVendasDevice::STATUS_PENDENTE
+            && ($isNew || $statusMudou)
+        ) {
+            try {
+                app(\App\Support\Gestor\GestorPushService::class)->notifyAparelhoPendente($device);
+            } catch (\Throwable) {
+                // ignore
+            }
+        }
 
         return response()->json([
             'status' => $device->status,

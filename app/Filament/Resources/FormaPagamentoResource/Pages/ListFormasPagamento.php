@@ -5,6 +5,8 @@ namespace App\Filament\Resources\FormaPagamentoResource\Pages;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpSimpleListPage;
 use App\Filament\Resources\FormaPagamentoResource;
+use App\Filament\Resources\FormaPagamentoResource\Pages\Concerns\ManagesFormaPagamentoBandeiras;
+use App\Filament\Resources\FormaPagamentoResource\Pages\Concerns\ManagesFormaPagamentoMaquininhas;
 use App\Models\CaixaConta;
 use App\Models\FormaPagamento;
 use App\Models\TabelaPrazo;
@@ -23,6 +25,8 @@ class ListFormasPagamento extends ListRecords
 {
     use InteractsWithErpListPage;
     use InteractsWithErpSimpleListPage;
+    use ManagesFormaPagamentoBandeiras;
+    use ManagesFormaPagamentoMaquininhas;
 
     protected static string $resource = FormaPagamentoResource::class;
 
@@ -110,6 +114,7 @@ class ListFormasPagamento extends ListRecords
                 EmbeddedTable::make()->columnSpanFull(),
                 View::make('filament.components.erp.formas-pagamento.action-bar'),
                 View::make('filament.components.erp.formas-pagamento.modal'),
+                View::make('filament.components.erp.formas-pagamento.bandeiras-modal'),
             ]);
     }
 
@@ -185,21 +190,29 @@ class ListFormasPagamento extends ListRecords
                 'required',
                 'integer',
                 'min:1',
-                Rule::unique('formas_pagamento', 'codigo')->ignore($this->formId),
+                Rule::unique(FormaPagamento::class, 'codigo')->ignore($this->formId),
             ],
             'form.descricao' => ['required', 'string', 'max:120'],
-            'form.conta_destino_id' => ['nullable', 'integer', 'exists:caixa_contas,id'],
+            'form.conta_destino_id' => [
+                'nullable',
+                'integer',
+                Rule::exists(CaixaConta::class, 'id'),
+            ],
             'form.tipo' => ['nullable', Rule::in(array_keys(FormaPagamento::tipoLabels()))],
             'form.taxa_cartao' => ['nullable', 'numeric', 'min:0'],
             'form.prazo_cartao' => ['nullable', 'integer', 'min:0'],
-            'form.max_parcelas' => ['nullable', 'integer', 'min:1'],
+            'form.max_parcelas' => ['nullable', 'integer', 'min:0'],
             'form.intervalo_parcelas' => ['nullable', 'integer', 'min:0'],
             'form.atalho' => ['nullable', 'string', 'max:5'],
             'form.tipo_movimento' => ['required', Rule::in(array_keys(FormaPagamento::tipoMovimentoLabels()))],
-        ], [], [
+        ], [
+            'form.max_parcelas.min' => 'O nº máximo de parcelas deve ser zero ou maior.',
+        ], [
             'form.codigo' => 'código',
             'form.descricao' => 'nome',
             'form.tipo_movimento' => 'tipo de movimento',
+            'form.max_parcelas' => 'nº máximo de parcelas',
+            'form.conta_destino_id' => 'conta de destino',
         ])['form'];
 
         $payload = [
@@ -209,7 +222,7 @@ class ListFormasPagamento extends ListRecords
             'tipo' => $data['tipo'] ?: null,
             'taxa_cartao' => (float) ($data['taxa_cartao'] ?? 0),
             'prazo_cartao' => (int) ($data['prazo_cartao'] ?? 0),
-            'max_parcelas' => (int) ($data['max_parcelas'] ?? 1),
+            'max_parcelas' => (int) ($data['max_parcelas'] ?? 0),
             'intervalo_parcelas' => (int) ($data['intervalo_parcelas'] ?? 0),
             'atalho' => $data['atalho'] ? mb_strtoupper(trim($data['atalho']), 'UTF-8') : null,
             'tipo_movimento' => $data['tipo_movimento'],
@@ -244,6 +257,8 @@ class ListFormasPagamento extends ListRecords
 
     public function closeForm(): void
     {
+        $this->closeBandeiraForm();
+        $this->closeMaquininhaForm();
         $this->showForm = false;
         $this->resetForm();
     }

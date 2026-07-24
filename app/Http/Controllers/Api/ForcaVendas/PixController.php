@@ -60,7 +60,15 @@ class PixController
                 );
             }
         } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            $message = $e->getMessage();
+            $code = str_contains(mb_strtolower($message, 'UTF-8'), 'desabilitad')
+                ? 'pix_desabilitado'
+                : 'pix_erro';
+
+            return response()->json([
+                'message' => $message,
+                'code' => $code,
+            ], 422);
         }
 
         return response()->json($this->present($cobranca), 201);

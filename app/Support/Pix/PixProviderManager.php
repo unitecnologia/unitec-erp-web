@@ -47,12 +47,28 @@ class PixProviderManager
 
     private function construir(?Empresa $empresa, ?string $forcarProvedor = null): PixProvider
     {
+        if (! $this->apiHabilitada($empresa)) {
+            throw new RuntimeException(
+                'API PIX desabilitada nesta empresa. Habilite em Empresa > Parâmetros > Permissões.'
+            );
+        }
+
         $provedor = $forcarProvedor ?: (string) ($empresa?->param_pix_provedor ?: 'mercadopago');
 
         return match ($provedor) {
             'mercadopago' => $this->mercadopago($empresa),
             default => throw new RuntimeException('Provedor Pix não suportado: '.$provedor),
         };
+    }
+
+    public function apiHabilitada(?Empresa $empresa): bool
+    {
+        return (bool) ($empresa?->param_pix_habilitar ?? false);
+    }
+
+    public function apiHabilitadaParaEmpresa(?int $empresaId): bool
+    {
+        return $this->apiHabilitada($this->empresa($empresaId));
     }
 
     private function mercadopago(?Empresa $empresa): PixProvider

@@ -682,6 +682,40 @@
     color: #fff;
 }
 
+.erp-caixa-page .erp-caixa-money-cell .fi-ta-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
+}
+
+.erp-caixa-page .erp-caixa-money {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+}
+
+.erp-caixa-page .erp-caixa-money__currency {
+    flex: 0 0 auto;
+    color: inherit;
+    opacity: 0.85;
+}
+
+.erp-caixa-page .erp-caixa-money__amount {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 @media (max-width: 900px) {
     .erp-caixa-page .erp-caixa__filter-block {
         flex-wrap: wrap !important;

@@ -23,6 +23,7 @@ use App\Models\Vendedor;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Pix\PixProviderManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -49,6 +50,9 @@ class ForcaVendasSyncService
         return [
             'server_time' => now()->toIso8601String(),
             'since' => $since?->toIso8601String(),
+            'meta' => [
+                'pix_api_habilitada' => app(PixProviderManager::class)->apiHabilitadaParaEmpresa(null),
+            ],
             'products' => $this->products($since, $vendedorId),
             'price_tables' => $this->priceTables($since),
             'price_table_items' => $this->priceTableItems($since),
@@ -124,6 +128,8 @@ class ForcaVendasSyncService
             ? (int) (Vendedor::query()->whereKey($vendedorId)->value('estoque_id') ?? 0)
             : 0;
         $parts[] = "vendedor_estoque:{$estoqueVendedor}";
+
+        $parts[] = 'pix_api:'.(int) app(PixProviderManager::class)->apiHabilitadaParaEmpresa(null);
 
         return sha1(implode('|', $parts));
     }

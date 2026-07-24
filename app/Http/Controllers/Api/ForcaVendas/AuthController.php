@@ -123,6 +123,9 @@ class AuthController
         $caixa = $vendedor?->caixaContaDaEmpresa($user->empresa_id ? (int) $user->empresa_id : null);
         $estoque = $vendedor?->estoqueCadastro;
         $tabela = $vendedor?->tabelaVenda;
+        $empresa = $user->empresa_id
+            ? \App\Models\Empresa::query()->find($user->empresa_id)
+            : null;
 
         return [
             'id' => $user->id,
@@ -138,6 +141,7 @@ class AuthController
             'tabela_venda_id' => $tabela?->id ?? $vendedor?->tabela_venda_id,
             'tabela_venda_codigo' => $tabela?->codigo,
             'tabela_venda_descricao' => $tabela?->descricao,
+            'pix_api_habilitada' => (bool) ($empresa?->param_pix_habilitar ?? false),
             'is_admin' => (bool) $user->is_admin,
             'is_supervisor' => (bool) $user->is_supervisor,
             'permissions' => $user->effectivePermissionKeys(),
