@@ -39,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'salario',
     'inss',
     'estoque',
+    'estoque_id',
     'usar_agendamento',
     'setor_vendas',
     'tabela_venda_id',
@@ -96,7 +97,63 @@ class Vendedor extends Model
 
     public function empresas(): BelongsToMany
     {
-        return $this->belongsToMany(Empresa::class, 'empresa_vendedor')->withTimestamps();
+        return $this->belongsToMany(Empresa::class, 'empresa_vendedor')
+            ->withPivot('caixa_conta_id')
+            ->withTimestamps();
+    }
+
+    public function terminais(): BelongsToMany
+    {
+        return $this->belongsToMany(Terminal::class, 'terminal_vendedor')->withTimestamps();
+    }
+
+    /**
+     * Sem terminais marcados = sem restrição (pode usar qualquer PDV).
+     * Com terminais marcados = só esses.
+     */
+    public function podeUsarTerminal(?int $terminalId): bool
+    {
+        if (! $terminalId) {
+            return true;
+        }
+
+        if ($this->relationLoaded('terminais')) {
+            if ($this->terminais->isEmpty()) {
+                return true;
+            }
+
+            return $this->terminais->contains('id', $terminalId);
+        }
+
+        if (! $this->terminais()->exists()) {
+            return true;
+        }
+
+        return $this->terminais()->where('terminais.id', $terminalId)->exists();
+    }
+
+    /**
+     * Caixa amarrado ao colaborador na empresa informada (ou na principal).
+     */
+    public function caixaContaDaEmpresa(?int $empresaId = null): ?CaixaConta
+    {
+        $empresaId = $empresaId ?? ($this->empresa_id ? (int) $this->empresa_id : null);
+
+        if (! $empresaId) {
+            return null;
+        }
+
+        $empresa = $this->relationLoaded('empresas')
+            ? $this->empresas->firstWhere('id', $empresaId)
+            : $this->empresas()->where('empresas.id', $empresaId)->first();
+
+        $caixaId = $empresa?->pivot?->caixa_conta_id;
+
+        if (! $caixaId) {
+            return null;
+        }
+
+        return CaixaConta::query()->find($caixaId);
     }
 
     /**
@@ -116,8 +173,18 @@ class Vendedor extends Model
         return $this->belongsTo(PriceTable::class, 'tabela_venda_id');
     }
 
+    public function estoqueCadastro(): BelongsTo
+    {
+        return $this->belongsTo(Estoque::class, 'estoque_id');
+    }
+
     public function usuario(): HasOne
     {
         return $this->hasOne(User::class, 'vendedor_id');
+    }
+
+    public function rhFuncionario(): HasOne
+    {
+        return $this->hasOne(RhFuncionario::class, 'vendedor_id');
     }
 }

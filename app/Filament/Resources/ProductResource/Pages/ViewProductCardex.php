@@ -35,6 +35,11 @@ class ViewProductCardex extends Page
             'nfce' => 'R$ 0,00',
             'total_vendas' => 'R$ 0,00',
         ],
+        'resumo' => [
+            'e_medio' => '0,000',
+            'ult_compra' => '0,00',
+            'ult_compra_anterior' => '0,00',
+        ],
     ];
 
     public function mount(int | string $record): void

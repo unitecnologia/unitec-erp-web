@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendaResource\Pages;
+use App\Models\Entrega;
 use App\Models\Venda;
 use App\Support\Erp\ErpAccess;
 use BackedEnum;
@@ -84,14 +85,21 @@ class VendaResource extends Resource
                     ->placeholder('—')
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('total')
+                ViewColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn ($state): string => 'R$ ' . number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
+                    ->view('filament.components.erp.vendas.columns.total')
+                    ->disabledClick(),
                 TextColumn::make('status')
                     ->label('Situação')
                     ->formatStateUsing(fn (string $state): string => Venda::statusLabels()[$state] ?? $state)
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('entrega.status')
+                    ->label('Entrega')
+                    ->formatStateUsing(fn (?string $state): string => $state
+                        ? (Entrega::statusLabels()[$state] ?? ucfirst(str_replace('_', ' ', $state)))
+                        : '—')
+                    ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('tipo')
@@ -135,13 +143,18 @@ class VendaResource extends Resource
                         return substr((string) $state, 0, 5);
                     })
                     ->alignCenter()
+                    ->width('4.75rem')
+                    ->extraHeaderAttributes(['class' => 'fi-ta-header-cell-hora'])
+                    ->extraCellAttributes(['class' => 'fi-ta-cell-hora'])
                     ->weight(FontWeight::SemiBold),
                 ViewColumn::make('ver_itens')
                     ->label('')
                     ->state(fn (): bool => true)
-                    ->width('1.35rem')
+                    ->width('1.75rem')
                     ->view('filament.components.erp.vendas.columns.ver-itens')
                     ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'fi-ta-header-cell-ver-itens'])
+                    ->extraCellAttributes(['class' => 'fi-ta-cell-ver-itens'])
                     ->disabledClick(),
             ])
             ->defaultSort('numero', 'desc')

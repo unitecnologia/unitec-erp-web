@@ -31,6 +31,10 @@ class UserResource extends Resource
 
     public static function canAccess(): bool
     {
+        if (\App\Support\Erp\ErpOnboarding::step() === \App\Support\Erp\ErpOnboarding::STEP_USUARIO) {
+            return true;
+        }
+
         return ErpAccess::currentCan('acesso.usuarios.access');
     }
 
@@ -39,7 +43,7 @@ class UserResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('id')
-                    ->label('» Código')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
@@ -47,9 +51,6 @@ class UserResource extends Resource
                     ->label('Nome')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
-                TextColumn::make('email')
-                    ->label('E-mail')
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('erpProfile.nome')
                     ->label('Perfil')
                     ->placeholder('—'),

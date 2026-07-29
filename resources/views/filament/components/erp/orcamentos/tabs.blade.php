@@ -14,7 +14,15 @@
             <button
                 type="button"
                 wire:click="setStatusFilter('{{ $value }}')"
-                @class(['erp-orcamentos__tab', 'erp-orcamentos__tab--active' => $this->statusFilter === $value])
+                @class([
+                    'erp-orcamentos__tab',
+                    'erp-orcamentos__tab--active' => $this->statusFilter === $value,
+                    'erp-orcamentos__tab--todos' => $value === 'todos',
+                    'erp-orcamentos__tab--aberto' => $value === 'aberto',
+                    'erp-orcamentos__tab--fechado' => $value === 'fechado',
+                    'erp-orcamentos__tab--cancelado' => $value === 'cancelado',
+                    'erp-orcamentos__tab--importado' => $value === 'importado',
+                ])
             >{{ $label }}</button>
         @endforeach
     </div>

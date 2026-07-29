@@ -21,8 +21,8 @@ class ProductCloneService
         $clone->preco_compra = 0;
         $clone->preco_custo = 0;
         $clone->preco_venda = 0;
-        $clone->preco_venda_prazo = 0;
         $clone->preco_atacado = 0;
+        $clone->preco_especial = 0;
         $clone->e_medio = 0;
         $clone->ult_compra = 0;
         $clone->ult_compra_anterior = 0;

@@ -69,8 +69,6 @@
                         'btnClass' => 'erp-fv-mon__dd-btn erp-fv-mon__dd-btn--filtro',
                     ])
 
-                    @php($tipoFiltro = $this->filtroCampoTipo())
-
                     @if ($this->filtroCampo === 'cliente')
                         <div
                             class="erp-fv-mon__combo"
@@ -131,36 +129,154 @@
                                 <div class="erp-fv-mon__combo-empty" x-show="filtrados().length === 0 && q.trim() !== ''">Nenhum cliente encontrado</div>
                             </div>
                         </div>
-                    @elseif ($tipoFiltro === 'select')
-                        <select wire:model.live="filtroValor" class="erp-nfe__select erp-fv-mon__filtro-valor">
-                            <option value="todos">&lt;todos&gt;</option>
-                            @foreach ($this->filtroValorOptions() as $id => $nome)
-                                <option value="{{ $id }}">{{ $nome }}</option>
-                            @endforeach
-                        </select>
-                    @elseif ($tipoFiltro === 'date')
+                    @elseif ($this->filtroCampoTipo() === 'select')
+                        <div
+                            class="erp-fv-mon__combo erp-fv-mon__combo--select"
+                            wire:key="filtro-select-{{ $this->filtroCampo }}"
+                            x-data="{
+                                open: false,
+                                ativo: 0,
+                                valor: @js($this->filtroSelectCombo()['valor']),
+                                rotulo: @js($this->filtroSelectCombo()['rotulo']),
+                                todos: @js($this->filtroSelectCombo()['todos']),
+                                itens: @js($this->filtroSelectCombo()['itens']),
+                                opcoes() {
+                                    return [{ id: 'todos', nome: this.todos }, ...this.itens];
+                                },
+                                abrir() {
+                                    this.open = true;
+                                    const idx = this.opcoes().findIndex(o => o.id === this.valor);
+                                    this.ativo = idx >= 0 ? idx : 0;
+                                },
+                                mover(d) {
+                                    if (! this.open) { this.abrir(); return; }
+                                    const total = this.opcoes().length;
+                                    if (total === 0) return;
+                                    this.ativo = (this.ativo + d + total) % total;
+                                    this.$nextTick(() => {
+                                        const el = this.$refs.panel?.querySelector('.is-active');
+                                        if (el) el.scrollIntoView({ block: 'nearest' });
+                                    });
+                                },
+                                confirmar() {
+                                    const op = this.opcoes()[this.ativo];
+                                    if (op) this.escolher(op.id, op.nome);
+                                },
+                                escolher(id, nome) {
+                                    this.valor = id;
+                                    this.rotulo = id === 'todos' ? this.todos : nome;
+                                    this.$wire.set('filtroValor', String(id));
+                                    this.open = false;
+                                },
+                            }"
+                            @click.outside="open = false"
+                            @keydown.escape.stop="open = false"
+                        >
+                            <button
+                                type="button"
+                                class="erp-fv-mon__select-btn"
+                                @click="open ? open = false : abrir()"
+                                @keydown.arrow-down.prevent="mover(1)"
+                                @keydown.arrow-up.prevent="mover(-1)"
+                                @keydown.enter.prevent="open ? confirmar() : abrir()"
+                                :aria-expanded="open"
+                            >
+                                <span class="erp-fv-mon__select-btn-label" x-text="rotulo"></span>
+                                <span class="erp-fv-mon__select-btn-caret" aria-hidden="true">▾</span>
+                            </button>
+                            <div class="erp-fv-mon__combo-panel erp-fv-mon__combo-panel--compact" x-ref="panel" x-show="open" x-cloak x-transition.opacity>
+                                <template x-for="(op, i) in opcoes()" :key="op.id">
+                                    <button type="button"
+                                            class="erp-fv-mon__combo-item"
+                                            :class="{ 'is-active': i === ativo || op.id === valor }"
+                                            @mouseenter="ativo = i"
+                                            @click="escolher(op.id, op.nome)"
+                                            x-text="op.nome"></button>
+                                </template>
+                            </div>
+                        </div>
+                    @elseif ($this->filtroCampoTipo() === 'date')
                         <input type="date" wire:model.live="filtroValor" data-erp-date-wire="iso"
                                class="erp-nfe__input erp-fv-mon__filtro-valor">
-                    @elseif ($tipoFiltro === 'number')
+                    @elseif ($this->filtroCampoTipo() === 'number')
                         <input type="text" wire:model="filtroValor" wire:keydown.enter="consultar"
                                inputmode="decimal" class="erp-nfe__input erp-fv-mon__filtro-valor"
                                placeholder="Valor mínimo e Enter">
                     @else
                         <input type="text" wire:model="filtroValor" wire:keydown.enter="consultar"
                                class="erp-nfe__input erp-fv-mon__filtro-valor" autocomplete="off"
-                               placeholder="{{ $this->filtroCampo === 'dav' ? 'Digite o nº da DAV e Enter' : 'Digite a identificação e Enter' }}">
+                               placeholder="{{ $this->filtroCampo === 'dav' ? 'Digite o nº da DAV e Enter' : 'Digite e Enter' }}">
                     @endif
                 </div>
             </div>
 
             <label class="erp-fv-mon__field erp-fv-mon__field--plataforma">
                 <span>Plataforma</span>
-                <select wire:model.live="plataformaFilter" class="erp-nfe__select">
-                    <option value="todos">&lt;todas&gt;</option>
-                    @foreach ($this->plataformaOptions() as $valor => $rotulo)
-                        <option value="{{ $valor }}">{{ $rotulo }}</option>
-                    @endforeach
-                </select>
+                <div
+                    class="erp-fv-mon__combo erp-fv-mon__combo--plataforma"
+                    wire:key="filtro-plataforma"
+                    x-data="{
+                        open: false,
+                        ativo: 0,
+                        valor: @js($this->plataformaSelectCombo()['valor']),
+                        rotulo: @js($this->plataformaSelectCombo()['rotulo']),
+                        todos: @js($this->plataformaSelectCombo()['todos']),
+                        itens: @js($this->plataformaSelectCombo()['itens']),
+                        opcoes() {
+                            return [{ id: 'todos', nome: this.todos }, ...this.itens];
+                        },
+                        abrir() {
+                            this.open = true;
+                            const idx = this.opcoes().findIndex(o => o.id === this.valor);
+                            this.ativo = idx >= 0 ? idx : 0;
+                        },
+                        mover(d) {
+                            if (! this.open) { this.abrir(); return; }
+                            const total = this.opcoes().length;
+                            if (total === 0) return;
+                            this.ativo = (this.ativo + d + total) % total;
+                            this.$nextTick(() => {
+                                const el = this.$refs.panel?.querySelector('.is-active');
+                                if (el) el.scrollIntoView({ block: 'nearest' });
+                            });
+                        },
+                        confirmar() {
+                            const op = this.opcoes()[this.ativo];
+                            if (op) this.escolher(op.id, op.nome);
+                        },
+                        escolher(id, nome) {
+                            this.valor = id;
+                            this.rotulo = id === 'todos' ? this.todos : nome;
+                            this.$wire.set('plataformaFilter', String(id));
+                            this.open = false;
+                        },
+                    }"
+                    @click.outside="open = false"
+                    @keydown.escape.stop="open = false"
+                >
+                    <button
+                        type="button"
+                        class="erp-fv-mon__select-btn"
+                        @click="open ? open = false : abrir()"
+                        @keydown.arrow-down.prevent="mover(1)"
+                        @keydown.arrow-up.prevent="mover(-1)"
+                        @keydown.enter.prevent="open ? confirmar() : abrir()"
+                        :aria-expanded="open"
+                    >
+                        <span class="erp-fv-mon__select-btn-label" x-text="rotulo"></span>
+                        <span class="erp-fv-mon__select-btn-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="erp-fv-mon__combo-panel erp-fv-mon__combo-panel--compact" x-ref="panel" x-show="open" x-cloak x-transition.opacity>
+                        <template x-for="(op, i) in opcoes()" :key="op.id">
+                            <button type="button"
+                                    class="erp-fv-mon__combo-item"
+                                    :class="{ 'is-active': i === ativo || op.id === valor }"
+                                    @mouseenter="ativo = i"
+                                    @click="escolher(op.id, op.nome)"
+                                    x-text="op.nome"></button>
+                        </template>
+                    </div>
+                </div>
             </label>
 
             <fieldset class="erp-fv-mon__plataformas erp-fv-mon__plataformas--status">

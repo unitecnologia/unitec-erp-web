@@ -1,0 +1,24 @@
+# Cloudflare Tunnel — Unitec ERP / Gestor (Executivo)
+#
+# 1. Copie este arquivo para: %USERPROFILE%\.cloudflared\config.yml
+# 2. Substitua TUNNEL_ID e credentials-file pelo resultado de:
+#      cloudflared tunnel create unitec-gestor
+# 3. Aponte o DNS (domínio na Cloudflare):
+#      cloudflared tunnel route dns unitec-gestor gestor.seudominio.com.br
+# 4. No .env do ERP:
+#      APP_URL=https://gestor.seudominio.com.br
+#      SESSION_SECURE_COOKIE=true
+# 5. ERP local escutando em 127.0.0.1:8000 (artisan serve / Laragon)
+# 6. Inicie: .\scripts\cloudflare-tunnel-start.ps1
+#
+# Documentação completa: docs/GESTOR-CLOUDFLARE-TUNNEL.md
+
+tunnel: TUNNEL_ID
+credentials-file: C:\Users\SEU_USUARIO\.cloudflared\TUNNEL_ID.json
+
+ingress:
+  # Gestor + ERP (mesmo host). Troque o hostname pelo seu domínio.
+  - hostname: gestor.seudominio.com.br
+    service: http://127.0.0.1:8000
+  # Catch-all obrigatório
+  - service: http_status:404

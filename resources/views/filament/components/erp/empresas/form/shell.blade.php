@@ -53,6 +53,16 @@
 </div>
 
 @include('filament.components.erp.empresas.form.zerar-estoque-negativo-modal')
+@include('filament.components.erp.empresas.form.imposto-padrao-apply-modal')
+@include('filament.components.erp.empresas.form.portal-contador-log-modal')
+@include('filament.components.erp.empresas.form.portal-contador-vinculo-modal')
+@include('filament.components.erp.empresas.form.cclass-trib-modal')
+@include('filament.components.erp.empresas.form.ipbtax-modal')
 
 @include('filament.components.erp.form-scripts')
+@php
+    $cclassImportJsPath = public_path('js/erp-cclass-trib-import.js');
+    $cclassImportJsVersion = file_exists($cclassImportJsPath) ? filemtime($cclassImportJsPath) : time();
+@endphp
+<script src="{{ asset('js/erp-cclass-trib-import.js') }}?v={{ $cclassImportJsVersion }}" defer></script>
 <script src="{{ asset('js/erp-empresas-form.js') }}?v={{ $formJsVersion }}" defer></script>

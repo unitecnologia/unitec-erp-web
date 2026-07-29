@@ -49,7 +49,8 @@ class ComissaoVendedoresReportController extends Controller
             'empresa' => $empresa,
             'empresaEndereco' => $this->formatEmpresaEndereco($empresa),
             'logoDataUri' => $this->logoDataUri($empresa),
-            'reportTitle' => 'COMISSÃO DE VENDEDORES',
+            'logoUrl' => $empresa?->logoUrl(),
+            'reportTitle' => 'COMISSÃO DE OPERADORES',
             'linhas' => $relatorio['linhas'],
             'totais' => $relatorio['totais'],
             'periodoLabel' => $de->format('d/m/Y') . ' a ' . $ate->format('d/m/Y'),
@@ -93,7 +94,7 @@ class ComissaoVendedoresReportController extends Controller
             }
 
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['VENDEDOR', 'QTD', 'À VISTA', '% AV', 'COM. AV', 'A PRAZO', '% AP', 'COM. AP', 'TOTAL', 'COMISSÃO'], ';');
+            fputcsv($handle, ['OPERADOR', 'QTD', 'À VISTA', '% AV', 'COM. AV', 'A PRAZO', '% AP', 'COM. AP', 'TOTAL', 'COMISSÃO'], ';');
 
             foreach ($linhas as $l) {
                 fputcsv($handle, [
@@ -116,7 +117,7 @@ class ComissaoVendedoresReportController extends Controller
         ]);
     }
 
-    protected function parseDate(mixed $value, Carbon $default): Carbon
+    protected function parseDate(mixed $value, \Carbon\Carbon $default): \Carbon\Carbon
     {
         if (! filled($value)) {
             return $default;

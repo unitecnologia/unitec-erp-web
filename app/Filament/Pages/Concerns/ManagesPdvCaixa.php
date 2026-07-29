@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Models\Empresa;
 use App\Models\PdvCaixaMovimento;
 use App\Models\PdvCaixaSessao;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +20,43 @@ trait ManagesPdvCaixa
     public array $aberturaForm = [
         'valor' => '0,00',
     ];
+
+    /**
+     * Contexto exibido no modal Abrir/Fechar Caixa.
+     *
+     * @return array{usuario: string, operador: string, empresa: string, terminal: string}
+     */
+    public function getCaixaModalContextoProperty(): array
+    {
+        $user = Auth::user();
+        $empresaId = $this->resolveEmpresaId();
+        $empresaNome = '';
+
+        if ($empresaId) {
+            $empresaNome = (string) (Empresa::query()->whereKey($empresaId)->value('nome') ?? '');
+        }
+
+        $terminal = TerminalResolver::make()->resolveOrCreateDefault($empresaId);
+        $operador = trim((string) ($this->vendedor ?? ''));
+
+        if ($operador === '' && $user) {
+            $vendedor = $user->relationLoaded('vendedor')
+                ? $user->vendedor
+                : $user->vendedor()->first();
+            $operador = trim((string) ($vendedor?->nome ?? ''));
+        }
+
+        return [
+            'usuario' => mb_strtoupper(trim((string) ($user?->name ?? '—')), 'UTF-8'),
+            'operador' => $operador !== ''
+                ? mb_strtoupper($operador, 'UTF-8')
+                : '—',
+            'empresa' => $empresaNome !== ''
+                ? mb_strtoupper($empresaNome, 'UTF-8')
+                : '—',
+            'terminal' => mb_strtoupper(trim((string) ($terminal?->nome ?? 'PDV')), 'UTF-8'),
+        ];
+    }
 
     protected function resolveEmpresaId(): ?int
     {
@@ -120,6 +159,19 @@ trait ManagesPdvCaixa
             return;
         }
 
+        if (! $this->garantirOperadorDoUsuarioLogado()) {
+            $this->closePdvModal();
+
+            return;
+        }
+
+        if (! $this->aplicarVendedorDoUsuarioLogado() || ! $this->vendedorId) {
+            $this->notificarOperadorObrigatorio();
+            $this->closePdvModal();
+
+            return;
+        }
+
         $valorAbertura = ErpMoney::parseBr($this->aberturaForm['valor'] ?? '0');
 
         if ($valorAbertura < 0) {
@@ -132,6 +184,19 @@ trait ManagesPdvCaixa
         }
 
         $terminal = TerminalResolver::make()->resolveOrCreateDefault($this->resolveEmpresaId());
+
+        $user = Auth::user();
+        if ($user && ! $user->podeOperarPdvNoTerminal($terminal)) {
+            $nome = trim((string) ($terminal?->nome ?? '')) ?: 'este terminal';
+
+            Notification::make()
+                ->title('PDV não liberado para este usuário.')
+                ->body('Você não tem permissão para operar no PDV "'.$nome.'".')
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         $sessaoAberta = PdvCaixaSessao::query()
             ->where('user_id', Auth::id())
@@ -151,6 +216,7 @@ trait ManagesPdvCaixa
             $this->caixaSessaoId = $sessaoAberta->id;
             $this->caixaAberto = true;
             session(['erp.pdv.caixa_sessao_id' => $sessaoAberta->id]);
+            $this->aplicarVendedorDoUsuarioLogado();
             $this->closePdvModal();
 
             Notification::make()
@@ -187,11 +253,15 @@ trait ManagesPdvCaixa
         $this->caixaAberto = true;
         session(['erp.pdv.caixa_sessao_id' => $sessao->id]);
         $this->aberturaForm['valor'] = ErpMoney::formatBr($valorAbertura);
+        $this->aplicarVendedorDoUsuarioLogado();
         $this->closePdvModal();
 
         Notification::make()
             ->title('Caixa aberto.')
-            ->body('Valor inicial: R$ ' . ErpMoney::formatBr($valorAbertura))
+            ->body(
+                'Valor inicial: R$ '.ErpMoney::formatBr($valorAbertura)
+                .' · Operador: '.$this->vendedor
+            )
             ->success()
             ->send();
 
@@ -225,19 +295,35 @@ trait ManagesPdvCaixa
             return;
         }
 
-        DB::transaction(function () use ($sessao): void {
+        $lancamentos = [];
+
+        DB::transaction(function () use ($sessao, &$lancamentos): void {
+            $saldoFechamento = $sessao->saldoTotal();
+
             $sessao->update([
-                'valor_fechamento' => $sessao->saldoTotal(),
+                'valor_fechamento' => $saldoFechamento,
                 'fechado_em' => now(),
             ]);
+
+            $lancamentos = app(PdvCaixaFechamentoService::class)->lancarNoLivroCaixa($sessao->fresh());
         });
 
         $this->persistCaixaState(false);
         $this->limparCupom();
         $this->closePdvModal();
 
+        $totalLivro = round(array_sum(array_map(
+            fn ($l): float => (float) $l->entrada,
+            $lancamentos,
+        )), 2);
+
+        $body = $totalLivro > 0
+            ? 'Dinheiro lançado no Livro Caixa: R$ '.ErpMoney::formatBr($totalLivro)
+            : 'Sem dinheiro em espécie. Cartões ficam no Contas a Receber até cair na conta.';
+
         Notification::make()
             ->title('Caixa fechado.')
+            ->body($body)
             ->success()
             ->send();
     }

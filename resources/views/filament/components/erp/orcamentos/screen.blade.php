@@ -1,6 +1,4 @@
 @php
-    use Illuminate\Support\Carbon;
-
     $searchFields = [
         'cliente' => 'CLIENTE',
         'numero' => 'NÚMERO',
@@ -10,12 +8,8 @@
     ];
 
     $pageSizeOptions = [25, 50, 100];
-    $periodoDeValor = filled($this->periodoDe)
-        ? Carbon::parse($this->periodoDe)->format('d/m/Y')
-        : '';
-    $periodoAteValor = filled($this->periodoAte)
-        ? Carbon::parse($this->periodoAte)->format('d/m/Y')
-        : '';
+    $periodoDeIso = filled($this->periodoDe) ? $this->periodoDe : '';
+    $periodoAteIso = filled($this->periodoAte) ? $this->periodoAte : '';
 @endphp
 
 <div class="erp-orcamentos">
@@ -40,20 +34,21 @@
 
             <div
                 class="erp-orcamentos__period-group"
-                wire:ignore.self
+                wire:ignore
                 data-erp-date-group
-                data-erp-date-apply-method="applyPeriodFilter"
+                data-erp-date-auto-apply="1"
+                data-erp-date-apply-method="applyPeriodFilterAuto"
             >
                 <span class="erp-orcamentos__filter-title">Filtro</span>
                 <label class="erp-orcamentos__period-label">
                     Período de
                     <input
-                        type="text"
+                        type="date"
                         data-erp-date
                         data-wire-field="periodoDe"
                         data-erp-date-wire="iso"
-                        data-erp-date-initial="{{ $this->periodoDe }}"
-                        value="{{ $periodoDeValor }}"
+                        data-erp-date-initial="{{ $periodoDeIso }}"
+                        value="{{ $periodoDeIso }}"
                         inputmode="numeric"
                         autocomplete="off"
                         placeholder="dd/mm/aaaa"
@@ -63,25 +58,18 @@
                 <label class="erp-orcamentos__period-label">
                     até
                     <input
-                        type="text"
+                        type="date"
                         data-erp-date
                         data-wire-field="periodoAte"
                         data-erp-date-wire="iso"
-                        data-erp-date-initial="{{ $this->periodoAte }}"
-                        value="{{ $periodoAteValor }}"
+                        data-erp-date-initial="{{ $periodoAteIso }}"
+                        value="{{ $periodoAteIso }}"
                         inputmode="numeric"
                         autocomplete="off"
                         placeholder="dd/mm/aaaa"
                         class="erp-orcamentos__period-input erp-date-input"
                     >
                 </label>
-                <button
-                    type="button"
-                    onclick="window.ErpDatepicker?.applyPeriodGroupFromButton(this)"
-                    class="erp-orcamentos__btn"
-                >
-                    Filtrar Período
-                </button>
             </div>
 
             <div class="erp-orcamentos__page-size-group">

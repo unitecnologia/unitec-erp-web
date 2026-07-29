@@ -15,29 +15,32 @@ trait InteractsWithLocalClienteSearchLookup
 
     public function isLocalClienteSearchColumn(): bool
     {
-        return $this->searchColumn === 'cliente';
+        $active = property_exists($this, 'searchFieldsActive') && is_array($this->searchFieldsActive)
+            ? $this->searchFieldsActive
+            : [];
+
+        return in_array('cliente', $active, true)
+            || ($this->searchColumn ?? null) === 'cliente';
     }
 
     public function updatedLocalSearch(string $value): void
     {
         $this->onLocalSearchChanged($value);
 
-        if (! $this->isLocalClienteSearchColumn()) {
-            $this->closeLocalClienteLookup();
+        if (! $this->isLocalClienteSearchColumn() || $this->usesLocalSearchByField()) {
+            if (! $this->isLocalClienteSearchColumn()) {
+                $this->closeLocalClienteLookup();
+            }
+
             $this->clearListSelection();
             $this->resetTable();
 
             return;
         }
 
-        $upper = mb_strtoupper($value, 'UTF-8');
-
-        if ($this->localSearch !== $upper) {
-            $this->localSearch = $upper;
-        }
-
-        $this->localClienteLookupOpen = true;
-        $this->refreshLocalClienteResults();
+        $this->onLocalClienteSearchTyped($value);
+        $this->clearListSelection();
+        $this->resetTable();
     }
 
     public function openLocalClienteLookup(): void
@@ -48,14 +51,14 @@ trait InteractsWithLocalClienteSearchLookup
 
         $this->localClienteLookupOpen = true;
 
-        if (filled(trim($this->localSearch))) {
+        if (filled(trim($this->localClienteSearchTerm()))) {
             $this->refreshLocalClienteResults();
         }
     }
 
     public function refreshLocalClienteResults(): void
     {
-        $term = trim($this->localSearch);
+        $term = trim($this->localClienteSearchTerm());
 
         if ($term === '') {
             $this->localClienteResults = [];
@@ -73,7 +76,7 @@ trait InteractsWithLocalClienteSearchLookup
      */
     protected function searchClientesByTerm(string $term): array
     {
-        $like = '%' . $term . '%';
+        $like = '%'.$term.'%';
         $digits = preg_replace('/\D/', '', $term) ?? '';
 
         $query = Person::query()
@@ -85,7 +88,7 @@ trait InteractsWithLocalClienteSearchLookup
                     ->orWhere('cpf_cnpj', 'like', $like);
 
                 if (strlen($digits) >= 2) {
-                    $digitsLike = '%' . $digits . '%';
+                    $digitsLike = '%'.$digits.'%';
                     $sub->orWhereRaw(
                         "replace(replace(replace(replace(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') like ?",
                         [$digitsLike]
@@ -157,7 +160,8 @@ trait InteractsWithLocalClienteSearchLookup
             return;
         }
 
-        $this->localSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
+        $this->setLocalClienteSearchTerm(mb_strtoupper($person->nome_razao, 'UTF-8'));
+        $this->setLocalClienteFilter((string) $person->id);
         $this->onLocalClienteConfirmed($person);
         $this->localClienteLookupOpen = false;
         $this->localClienteResults = [];
@@ -172,7 +176,8 @@ trait InteractsWithLocalClienteSearchLookup
             return;
         }
 
-        if (trim($this->localSearch) === '') {
+        if (trim($this->localClienteSearchTerm()) === '') {
+            $this->setLocalClienteFilter('todos');
             $this->closeLocalClienteLookup();
             $this->clearListSelection();
             $this->resetTable();
@@ -204,7 +209,68 @@ trait InteractsWithLocalClienteSearchLookup
     {
         return $this->isLocalClienteSearchColumn()
             && $this->localClienteLookupOpen
-            && filled(trim($this->localSearch));
+            && filled(trim($this->localClienteSearchTerm()))
+            && $this->localClienteFilter() === 'todos';
+    }
+
+    protected function onLocalClienteSearchTyped(string $value): void
+    {
+        if (! $this->isLocalClienteSearchColumn()) {
+            $this->closeLocalClienteLookup();
+
+            return;
+        }
+
+        $upper = mb_strtoupper($value, 'UTF-8');
+
+        if ($this->localClienteSearchTerm() !== $upper) {
+            $this->setLocalClienteSearchTerm($upper);
+        }
+
+        $this->setLocalClienteFilter('todos');
+        $this->localClienteLookupOpen = true;
+        $this->refreshLocalClienteResults();
+    }
+
+    protected function localClienteFilter(): string
+    {
+        if (property_exists($this, 'clienteFilter')) {
+            return (string) $this->clienteFilter;
+        }
+
+        return 'todos';
+    }
+
+    protected function setLocalClienteFilter(string $value): void
+    {
+        if (property_exists($this, 'clienteFilter')) {
+            $this->clienteFilter = $value;
+        }
+    }
+
+    protected function localClienteSearchTerm(): string
+    {
+        if ($this->usesLocalSearchByField()) {
+            return (string) ($this->localSearchByField['cliente'] ?? '');
+        }
+
+        return (string) ($this->localSearch ?? '');
+    }
+
+    protected function setLocalClienteSearchTerm(string $value): void
+    {
+        if ($this->usesLocalSearchByField()) {
+            $this->localSearchByField['cliente'] = $value;
+
+            return;
+        }
+
+        $this->localSearch = $value;
+    }
+
+    protected function usesLocalSearchByField(): bool
+    {
+        return property_exists($this, 'localSearchByField') && is_array($this->localSearchByField);
     }
 
     protected function onLocalSearchChanged(string $value): void

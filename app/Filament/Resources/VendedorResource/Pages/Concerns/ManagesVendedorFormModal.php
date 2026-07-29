@@ -2,14 +2,22 @@
 
 namespace App\Filament\Resources\VendedorResource\Pages\Concerns;
 
+use App\Models\CaixaConta;
 use App\Models\Empresa;
+use App\Models\Estoque;
 use App\Models\PriceTable;
+use App\Models\RhCargo;
+use App\Models\RhFuncionario;
+use App\Models\Terminal;
 use App\Models\User;
 use App\Models\Vendedor;
 use App\Rules\DocumentoBrasileiroValido;
+use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpUppercase;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 trait ManagesVendedorFormModal
@@ -30,6 +38,7 @@ trait ManagesVendedorFormModal
         $this->vendedorModalRecordId = null;
         $this->vendedorForm = $this->defaultVendedorFormData();
         $this->vendedorModalOpen = true;
+        $this->focusVendedorNome();
     }
 
     public function editVendedor(): void
@@ -38,11 +47,11 @@ trait ManagesVendedorFormModal
             return;
         }
 
-        $record = Vendedor::query()->find($this->highlightedRecordId);
+        $record = Vendedor::query()->with(['empresas', 'terminais'])->find($this->highlightedRecordId);
 
         if (! $record) {
             Notification::make()
-                ->title('Colaborador não encontrado.')
+                ->title('Operador não encontrado.')
                 ->warning()
                 ->send();
 
@@ -52,10 +61,117 @@ trait ManagesVendedorFormModal
         $this->vendedorModalRecordId = $record->getKey();
         $this->vendedorForm = $this->vendedorFormDataFromRecord($record);
         $this->vendedorModalOpen = true;
+        $this->focusVendedorNome();
+    }
+
+    /**
+     * Força caixa alta em tempo real (Livewire).
+     */
+    public function updatedVendedorForm(mixed $value, string $key): void
+    {
+        if ($key === 'empresas' || str_starts_with($key, 'empresas.')) {
+            if (! is_array($this->vendedorForm['empresas'] ?? null)) {
+                $this->vendedorForm['empresas'] = [];
+            }
+
+            return;
+        }
+
+        if ($key === 'terminais' || str_starts_with($key, 'terminais.')) {
+            if (! is_array($this->vendedorForm['terminais'] ?? null)) {
+                $this->vendedorForm['terminais'] = [];
+            }
+
+            return;
+        }
+
+        if ($key === 'caixas_por_empresa' || str_starts_with($key, 'caixas_por_empresa.')) {
+            if (! is_array($this->vendedorForm['caixas_por_empresa'] ?? null)) {
+                $this->vendedorForm['caixas_por_empresa'] = [];
+            }
+
+            return;
+        }
+
+        if (! is_string($value)) {
+            return;
+        }
+
+        if ($key === 'rh_funcionario_id') {
+            $this->aplicarRhFuncionarioNoFormulario(
+                filled($value) ? (int) $value : null
+            );
+
+            return;
+        }
+
+        if (in_array($key, [
+            'comissao_av', 'comissao_ap', 'comissao_servico', 'salario', 'mobile_meta_venda',
+            'usuario_id', 'tabela_venda_id', 'estoque_id', 'ativo', 'rh_funcionario_id',
+            'data_nascimento', 'admissao', 'demissao',
+            'cpf', 'telefone', 'whatsapp', 'cep',
+        ], true)) {
+            return;
+        }
+
+        $upper = ErpUppercase::uppercase($value);
+
+        if ($upper !== $value) {
+            data_set($this->vendedorForm, $key, $upper);
+        }
+    }
+
+    protected function focusVendedorNome(): void
+    {
+        $this->js(<<<'JS'
+(() => {
+    const focusNome = () => {
+        const modal = document.querySelector('.erp-vendedor-form-modal');
+        if (modal && window.ErpMasks) {
+            window.ErpMasks.init(modal);
+        }
+
+        const rh = document.getElementById('vendedor-rh-funcionario');
+        const el = rh || document.getElementById('vendedor-nome');
+        if (!el) {
+            return false;
+        }
+        el.focus({ preventScroll: true });
+        return document.activeElement === el;
+    };
+
+    let tries = 0;
+    const tick = () => {
+        if (focusNome() || ++tries > 30) {
+            return;
+        }
+        setTimeout(tick, 16);
+    };
+
+    queueMicrotask(tick);
+    setTimeout(tick, 50);
+    setTimeout(tick, 150);
+    setTimeout(() => {
+        const modal = document.querySelector('.erp-vendedor-form-modal');
+        if (modal && window.ErpMasks?.init) {
+            window.ErpMasks.init(modal);
+        }
+    }, 80);
+})();
+JS);
     }
 
     public function closeVendedorModal(): void
     {
+        if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR) {
+            Notification::make()
+                ->title('Cadastre o operador (vinculado a um Funcionário RH) para concluir o primeiro acesso.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->vendedorModalOpen = false;
         $this->vendedorModalRecordId = null;
         $this->vendedorForm = [];
@@ -63,6 +179,12 @@ trait ManagesVendedorFormModal
 
     public function saveVendedor(): void
     {
+        $isCreate = $this->vendedorModalRecordId === null;
+
+        if ($isCreate) {
+            $this->vendedorForm['codigo'] = Vendedor::nextCodigo();
+        }
+
         foreach (['comissao_av', 'comissao_ap', 'comissao_servico', 'salario', 'mobile_meta_venda'] as $field) {
             $this->vendedorForm[$field] = (string) $this->parseVendedorComissao($this->vendedorForm[$field] ?? 0);
         }
@@ -75,27 +197,49 @@ trait ManagesVendedorFormModal
                     'max:20',
                     Rule::unique('vendedores', 'codigo')->ignore($this->vendedorModalRecordId),
                 ],
+                'vendedorForm.rh_funcionario_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('rh_funcionarios', 'id'),
+                ],
+                'vendedorForm.cargo' => ['required', 'string', 'max:80'],
                 'vendedorForm.nome' => ['required', 'string', 'max:120'],
                 'vendedorForm.cpf' => ['nullable', 'string', 'max:20', new DocumentoBrasileiroValido(cpfOnly: true)],
+                'vendedorForm.telefone' => ['nullable', 'string', 'max:20'],
+                'vendedorForm.whatsapp' => ['nullable', 'string', 'max:20'],
                 'vendedorForm.ativo' => ['required', 'in:S,N'],
-                'vendedorForm.empresas' => ['array'],
+                'vendedorForm.empresas' => ['required', 'array', 'min:1'],
                 'vendedorForm.empresas.*' => ['integer', Rule::exists('empresas', 'id')],
+                'vendedorForm.caixas_por_empresa' => ['array'],
+                'vendedorForm.caixas_por_empresa.*' => ['nullable', 'integer', Rule::exists('caixa_contas', 'id')],
+                'vendedorForm.terminais' => ['array'],
+                'vendedorForm.terminais.*' => ['integer', Rule::exists('terminais', 'id')],
                 'vendedorForm.tabela_venda_id' => ['nullable', 'integer', Rule::exists('price_tables', 'id')],
-                'vendedorForm.usuario_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+                'vendedorForm.usuario_id' => ['required', 'integer', Rule::exists('users', 'id')],
+                'vendedorForm.estoque_id' => ['required', 'integer', Rule::exists('estoques', 'id')],
                 'vendedorForm.email' => ['nullable', 'email', 'max:120'],
                 'vendedorForm.comissao_av' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
                 'vendedorForm.comissao_ap' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
                 'vendedorForm.comissao_servico' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             ],
-            [],
+            [
+                'vendedorForm.empresas.required' => 'Selecione ao menos uma empresa.',
+                'vendedorForm.empresas.min' => 'Selecione ao menos uma empresa.',
+            ],
             [
                 'vendedorForm.codigo' => 'código',
+                'vendedorForm.rh_funcionario_id' => 'funcionário',
+                'vendedorForm.cargo' => 'cargo',
                 'vendedorForm.nome' => 'nome',
                 'vendedorForm.cpf' => 'CPF',
                 'vendedorForm.ativo' => 'ativo',
-                'vendedorForm.empresas' => 'empresas',
+                'vendedorForm.empresas' => 'empresa',
+                'vendedorForm.caixas_por_empresa' => 'caixa',
+                'vendedorForm.caixas_por_empresa.*' => 'caixa',
+                'vendedorForm.terminais' => 'PDVs liberados',
                 'vendedorForm.tabela_venda_id' => 'tabela de venda',
                 'vendedorForm.usuario_id' => 'usuário',
+                'vendedorForm.estoque_id' => 'estoque',
                 'vendedorForm.email' => 'e-mail',
                 'vendedorForm.comissao_av' => 'comissão AV',
                 'vendedorForm.comissao_ap' => 'comissão AP',
@@ -103,12 +247,48 @@ trait ManagesVendedorFormModal
             ],
         );
 
+        $empresaIdsParaCaixa = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($this->vendedorForm['empresas'] ?? []))
+        )));
+        $caixasInformados = (array) ($this->vendedorForm['caixas_por_empresa'] ?? []);
+        foreach ($empresaIdsParaCaixa as $empresaIdCaixa) {
+            $caixaSelecionado = $caixasInformados[$empresaIdCaixa]
+                ?? $caixasInformados[(string) $empresaIdCaixa]
+                ?? null;
+            if ($caixaSelecionado === null || $caixaSelecionado === '') {
+                $this->addError(
+                    'vendedorForm.caixas_por_empresa.'.$empresaIdCaixa,
+                    'Informe o caixa de cada empresa selecionada.',
+                );
+            }
+        }
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        $rhFuncionarioId = $this->vendedorForm['rh_funcionario_id'] ?? null;
+        $rhFuncionarioId = $rhFuncionarioId !== null && $rhFuncionarioId !== ''
+            ? (int) $rhFuncionarioId
+            : null;
+
+        if ($rhFuncionarioId) {
+            $this->aplicarRhFuncionarioNoFormulario($rhFuncionarioId);
+        }
+
         $usuarioId = $this->vendedorForm['usuario_id'] ?? null;
         $usuarioId = $usuarioId !== null && $usuarioId !== '' ? (int) $usuarioId : null;
 
         $empresaIds = array_values(array_unique(array_filter(
             array_map('intval', (array) ($this->vendedorForm['empresas'] ?? []))
         )));
+
+        $caixasPorEmpresa = (array) ($this->vendedorForm['caixas_por_empresa'] ?? []);
+        $syncPayload = [];
+        foreach ($empresaIds as $empresaId) {
+            $caixaId = $caixasPorEmpresa[$empresaId] ?? $caixasPorEmpresa[(string) $empresaId] ?? null;
+            $caixaId = $caixaId !== null && $caixaId !== '' ? (int) $caixaId : null;
+            $syncPayload[$empresaId] = ['caixa_conta_id' => $caixaId];
+        }
 
         $data = $this->normalizeVendedorFormData($this->vendedorForm);
         $data['empresa_id'] = $empresaIds[0] ?? null;
@@ -118,7 +298,7 @@ trait ManagesVendedorFormModal
 
             if (! $record) {
                 Notification::make()
-                    ->title('Colaborador não encontrado.')
+                    ->title('Operador não encontrado.')
                     ->warning()
                     ->send();
 
@@ -128,21 +308,44 @@ trait ManagesVendedorFormModal
             $record->update($data);
 
             Notification::make()
-                ->title('Colaborador alterado.')
+                ->title('Operador alterado.')
                 ->success()
                 ->send();
         } else {
             $record = Vendedor::query()->create($data);
 
             Notification::make()
-                ->title('Colaborador incluído.')
+                ->title('Operador incluído.')
                 ->success()
                 ->send();
         }
 
-        $record->empresas()->sync($empresaIds);
+        $record->empresas()->sync($syncPayload);
+
+        $terminalIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($this->vendedorForm['terminais'] ?? []))
+        )));
+        $record->terminais()->sync($terminalIds);
 
         $this->syncVendedorUsuario((int) $record->getKey(), $usuarioId);
+        $this->syncVendedorRhFuncionario((int) $record->getKey(), $rhFuncionarioId);
+
+        $onboardingColaborador = $isCreate
+            && ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR;
+
+        if ($onboardingColaborador) {
+            ErpOnboarding::complete();
+            $this->vendedorModalOpen = false;
+            $this->vendedorModalRecordId = null;
+            $this->vendedorForm = [];
+            Notification::make()
+                ->title('Operador cadastrado. Sistema pronto para uso.')
+                ->success()
+                ->send();
+            $this->redirect(filament()->getUrl());
+
+            return;
+        }
 
         $this->closeVendedorModal();
         $this->clearListSelection();
@@ -201,6 +404,101 @@ trait ManagesVendedorFormModal
     }
 
     /**
+     * Vincula (ou desvincula) o funcionário RH ao colaborador e mantém o nome sincronizado.
+     */
+    protected function syncVendedorRhFuncionario(int $vendedorId, ?int $rhFuncionarioId): void
+    {
+        if (! Schema::hasTable('rh_funcionarios')) {
+            return;
+        }
+
+        RhFuncionario::query()
+            ->where('vendedor_id', $vendedorId)
+            ->when(
+                $rhFuncionarioId,
+                fn ($q) => $q->whereKeyNot($rhFuncionarioId)
+            )
+            ->update(['vendedor_id' => null]);
+
+        if (! $rhFuncionarioId) {
+            return;
+        }
+
+        $funcionario = RhFuncionario::query()->with('cargo')->find($rhFuncionarioId);
+
+        if (! $funcionario) {
+            return;
+        }
+
+        $funcionario->vendedor_id = $vendedorId;
+        $funcionario->save();
+
+        $cargoNome = trim((string) ($funcionario->cargo?->nome ?? ''));
+
+        Vendedor::query()->whereKey($vendedorId)->update([
+            'nome' => (string) $funcionario->nome,
+            'cargo' => $cargoNome !== '' ? ErpUppercase::uppercase($cargoNome) : null,
+        ]);
+    }
+
+    protected function aplicarRhFuncionarioNoFormulario(?int $rhFuncionarioId): void
+    {
+        $this->vendedorForm['rh_funcionario_id'] = $rhFuncionarioId ? (string) $rhFuncionarioId : '';
+
+        if (! $rhFuncionarioId) {
+            return;
+        }
+
+        $funcionario = RhFuncionario::query()->with('cargo')->find($rhFuncionarioId);
+
+        if (! $funcionario) {
+            return;
+        }
+
+        $this->vendedorForm['nome'] = (string) $funcionario->nome;
+        $cargoNome = trim((string) ($funcionario->cargo?->nome ?? ''));
+
+        if ($cargoNome !== '') {
+            $this->vendedorForm['cargo'] = ErpUppercase::uppercase($cargoNome);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function rhFuncionarioOptions(): array
+    {
+        if (! Schema::hasTable('rh_funcionarios')) {
+            return [];
+        }
+
+        $atualId = filled($this->vendedorForm['rh_funcionario_id'] ?? null)
+            ? (int) $this->vendedorForm['rh_funcionario_id']
+            : null;
+
+        return RhFuncionario::query()
+            ->where(function ($q) use ($atualId): void {
+                $q->where('ativo', true)
+                    ->where(function ($q2): void {
+                        $q2->whereNull('vendedor_id');
+                        if ($this->vendedorModalRecordId) {
+                            $q2->orWhere('vendedor_id', (int) $this->vendedorModalRecordId);
+                        }
+                    });
+
+                if ($atualId) {
+                    $q->orWhere('id', $atualId);
+                }
+            })
+            ->orderBy('nome')
+            ->get(['id', 'codigo', 'nome'])
+            ->mapWithKeys(fn (RhFuncionario $f): array => [
+                $f->id => trim($f->codigo.' — '.$f->nome),
+            ])
+            ->all();
+    }
+
+    /**
      * Vincula (ou desvincula) o usuário ao colaborador via users.vendedor_id,
      * garantindo que apenas um usuário aponte para este colaborador.
      */
@@ -214,6 +512,60 @@ trait ManagesVendedorFormModal
         if ($usuarioId !== null) {
             User::query()->whereKey($usuarioId)->update(['vendedor_id' => $vendedorId]);
         }
+    }
+
+    /**
+     * Contas caixa disponíveis para amarrar ao colaborador.
+     * Inclui PDV e SUBCAIXA operacionais (exclui contas de sistema como CAIXA GERAL).
+     *
+     * @return array<int|string, string>
+     */
+    public function caixaContaOptions(): array
+    {
+        return CaixaConta::query()
+            ->where('ativo', true)
+            ->where('sistema', false)
+            ->whereIn('tipo', [
+                CaixaConta::TIPO_PDV,
+                CaixaConta::TIPO_SUBCAIXA,
+                'CAIXA',
+                'X',
+            ])
+            ->orderBy('codigo')
+            ->get(['id', 'codigo', 'nome'])
+            ->mapWithKeys(fn (CaixaConta $conta): array => [
+                $conta->id => trim($conta->codigo.' - '.$conta->nome),
+            ])
+            ->all();
+    }
+
+    /**
+     * Terminais/PDVs disponíveis para liberar ao colaborador.
+     *
+     * @return array<int|string, string>
+     */
+    public function terminalOptions(): array
+    {
+        return Terminal::query()
+            ->orderBy('numero_logico_terminal')
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'numero_logico_terminal', 'pdv', 'eh_caixa'])
+            ->mapWithKeys(function (Terminal $terminal): array {
+                $numero = $terminal->numero_logico_terminal;
+                $prefix = filled($numero) ? str_pad((string) $numero, 2, '0', STR_PAD_LEFT).' - ' : '';
+                $nome = trim((string) $terminal->nome) ?: 'TERMINAL '.$terminal->id;
+                $flags = [];
+                if ($terminal->pdv) {
+                    $flags[] = 'PDV';
+                }
+                if ($terminal->eh_caixa) {
+                    $flags[] = 'CAIXA';
+                }
+                $suffix = $flags !== [] ? ' ('.implode(', ', $flags).')' : '';
+
+                return [$terminal->id => $prefix.$nome.$suffix];
+            })
+            ->all();
     }
 
     /**
@@ -244,12 +596,34 @@ trait ManagesVendedorFormModal
     public function tabelaVendaOptions(): array
     {
         return PriceTable::query()
+            ->when(
+                Schema::hasColumn('price_tables', 'ativo'),
+                fn ($q) => $q->where('ativo', true)
+            )
+            ->orderByRaw('CAST(codigo AS UNSIGNED) ASC')
             ->orderBy('descricao')
             ->get(['id', 'codigo', 'descricao'])
             ->mapWithKeys(fn (PriceTable $t): array => [
-                $t->id => trim(($t->codigo ? $t->codigo.' - ' : '').(string) $t->descricao),
+                $t->id => mb_strtoupper(
+                    trim(($t->codigo !== null && $t->codigo !== '' ? $t->codigo.' — ' : '').(string) $t->descricao),
+                    'UTF-8'
+                ),
             ])
             ->all();
+    }
+
+    protected function defaultTabelaVendaId(): string
+    {
+        $query = PriceTable::query()
+            ->when(
+                Schema::hasColumn('price_tables', 'ativo'),
+                fn ($q) => $q->where('ativo', true)
+            );
+
+        $id = (clone $query)->where('codigo', '1')->value('id')
+            ?? (clone $query)->orderByRaw('CAST(codigo AS UNSIGNED) ASC')->value('id');
+
+        return $id ? (string) $id : '';
     }
 
     /**
@@ -260,6 +634,53 @@ trait ManagesVendedorFormModal
         return User::query()
             ->orderBy('name')
             ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
+     * Cargos cadastrados no Mini RH (RH → Cargos).
+     *
+     * @return list<string>
+     */
+    public function cargoOptions(): array
+    {
+        if (! Schema::hasTable('rh_cargos')) {
+            return [];
+        }
+
+        $options = RhCargo::query()
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->pluck('nome')
+            ->map(fn ($nome): string => mb_strtoupper(trim((string) $nome), 'UTF-8'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $atual = mb_strtoupper(trim((string) ($this->vendedorForm['cargo'] ?? '')), 'UTF-8');
+        if ($atual !== '' && ! in_array($atual, $options, true)) {
+            array_unshift($options, $atual);
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    public function estoqueOptions(): array
+    {
+        $empresaId = (int) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+
+        return Estoque::query()
+            ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->where('ativo', true)
+            ->orderBy('codigo')
+            ->get(['id', 'codigo', 'nome'])
+            ->mapWithKeys(fn (Estoque $estoque): array => [
+                $estoque->id => $estoque->label(),
+            ])
             ->all();
     }
 
@@ -286,9 +707,12 @@ trait ManagesVendedorFormModal
     {
         return [
             'codigo' => Vendedor::nextCodigo(),
+            'rh_funcionario_id' => '',
             'nome' => '',
             'ativo' => 'S',
             'empresas' => [],
+            'caixas_por_empresa' => [],
+            'terminais' => [],
             'cargo' => '',
             'cpf' => '',
             'rg' => '',
@@ -313,10 +737,11 @@ trait ManagesVendedorFormModal
             'salario' => '0,00',
             'inss' => '',
             'estoque' => '',
+            'estoque_id' => '',
             'usar_agendamento' => false,
             'usuario_id' => '',
             'setor_vendas' => true,
-            'tabela_venda_id' => '',
+            'tabela_venda_id' => $this->defaultTabelaVendaId(),
             'comissao_av' => '0,00',
             'comissao_ap' => '0,00',
             'ganha_comissao_todas_vendas' => false,
@@ -336,11 +761,24 @@ trait ManagesVendedorFormModal
      */
     protected function vendedorFormDataFromRecord(Vendedor $record): array
     {
+        $rhId = Schema::hasTable('rh_funcionarios')
+            ? RhFuncionario::query()->where('vendedor_id', $record->getKey())->value('id')
+            : null;
+
         return [
             'codigo' => (string) $record->codigo,
+            'rh_funcionario_id' => $rhId ? (string) $rhId : '',
             'nome' => (string) $record->nome,
             'ativo' => $record->ativo ? 'S' : 'N',
             'empresas' => $record->empresas->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            'caixas_por_empresa' => $record->empresas
+                ->mapWithKeys(fn (Empresa $empresa): array => [
+                    (int) $empresa->id => $empresa->pivot->caixa_conta_id
+                        ? (string) $empresa->pivot->caixa_conta_id
+                        : '',
+                ])
+                ->all(),
+            'terminais' => $record->terminais->pluck('id')->map(fn ($id): int => (int) $id)->all(),
             'cargo' => (string) $record->cargo,
             'cpf' => (string) $record->cpf,
             'rg' => (string) $record->rg,
@@ -365,6 +803,7 @@ trait ManagesVendedorFormModal
             'salario' => $this->formatVendedorComissao($record->salario),
             'inss' => (string) $record->inss,
             'estoque' => (string) $record->estoque,
+            'estoque_id' => $record->estoque_id ? (string) $record->estoque_id : '',
             'usar_agendamento' => (bool) $record->usar_agendamento,
             'usuario_id' => optional($record->usuario)->id ? (string) $record->usuario->id : '',
             'setor_vendas' => (bool) $record->setor_vendas,
@@ -390,16 +829,23 @@ trait ManagesVendedorFormModal
     protected function normalizeVendedorFormData(array $data): array
     {
         $email = trim((string) ($data['email'] ?? ''));
-        unset($data['usuario_id'], $data['empresas']);
+        unset(
+            $data['usuario_id'],
+            $data['rh_funcionario_id'],
+            $data['empresas'],
+            $data['caixas_por_empresa'],
+            $data['terminais']
+        );
 
         $data = ErpUppercase::normalizeFormData($data);
 
         $data['codigo'] = trim((string) ($data['codigo'] ?? ''));
         $data['nome'] = trim((string) ($data['nome'] ?? ''));
         $data['ativo'] = strtoupper(trim((string) ($data['ativo'] ?? 'S'))) === 'S';
-        $data['email'] = $email !== '' ? mb_strtolower($email, 'UTF-8') : null;
+        $data['email'] = $email !== '' ? ErpUppercase::uppercase($email) : null;
 
         $data['tabela_venda_id'] = ($data['tabela_venda_id'] ?? '') !== '' ? (int) $data['tabela_venda_id'] : null;
+        $data['estoque_id'] = ($data['estoque_id'] ?? '') !== '' ? (int) $data['estoque_id'] : null;
 
         foreach (['data_nascimento', 'admissao', 'demissao'] as $dateField) {
             $data[$dateField] = ($data[$dateField] ?? '') !== '' ? $data[$dateField] : null;

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'numero',
     'data',
+    'hora',
     'cliente_id',
     'vendedor_id',
     'subtotal',
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'observacoes',
     'total',
     'status',
+    'plataforma',
 ])]
 class Orcamento extends Model
 {
@@ -32,6 +34,12 @@ class Orcamento extends Model
     public const STATUS_CANCELADO = 'cancelado';
 
     public const STATUS_IMPORTADO = 'importado';
+
+    public const PLATAFORMA_ERP = 'erp';
+
+    public const PLATAFORMA_FV = 'fv';
+
+    public const PLATAFORMA_VI = 'vi';
 
     /**
      * @return array<string, string>
@@ -44,6 +52,67 @@ class Orcamento extends Model
             self::STATUS_CANCELADO => 'Cancelado',
             self::STATUS_IMPORTADO => 'Importado',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function plataformaLabels(): array
+    {
+        return [
+            self::PLATAFORMA_ERP => 'ERP',
+            self::PLATAFORMA_FV => 'FV',
+            self::PLATAFORMA_VI => 'VI',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return self::statusLabels()[$this->status] ?? (string) $this->status;
+    }
+
+    public function plataformaEfetiva(): string
+    {
+        $plataforma = $this->plataforma;
+
+        if (filled($plataforma)) {
+            return (string) $plataforma;
+        }
+
+        if ($this->relationLoaded('forcaVendasOrder')) {
+            if ($this->forcaVendasOrder !== null) {
+                return self::PLATAFORMA_FV;
+            }
+        } elseif ($this->forcaVendasOrder()->exists()) {
+            return self::PLATAFORMA_FV;
+        }
+
+        if ($this->relationLoaded('vendasInternasOrder')) {
+            if ($this->vendasInternasOrder !== null) {
+                return self::PLATAFORMA_VI;
+            }
+        } elseif ($this->vendasInternasOrder()->exists()) {
+            return self::PLATAFORMA_VI;
+        }
+
+        return self::PLATAFORMA_ERP;
+    }
+
+    public function plataformaLabel(): string
+    {
+        $plataforma = $this->plataformaEfetiva();
+
+        return self::plataformaLabels()[$plataforma]
+            ?? mb_strtoupper($plataforma, 'UTF-8');
+    }
+
+    public function horaExibicao(): ?string
+    {
+        if (filled($this->hora)) {
+            return substr((string) $this->hora, 0, 5);
+        }
+
+        return $this->created_at?->format('H:i');
     }
 
     public static function nextNumero(): string
@@ -79,6 +148,11 @@ class Orcamento extends Model
     public function forcaVendasOrder(): HasOne
     {
         return $this->hasOne(ForcaVendasOrder::class, 'orcamento_id');
+    }
+
+    public function vendasInternasOrder(): HasOne
+    {
+        return $this->hasOne(VendasInternasOrder::class, 'orcamento_id');
     }
 
     /**

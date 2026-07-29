@@ -181,4 +181,24 @@
         line-height: 1.25;
         white-space: pre-wrap;
     }
+
+    .danfe__fatura-list {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px 6px;
+        font-size: 6pt;
+        line-height: 1.3;
+    }
+
+    .danfe__fatura-item {
+        white-space: nowrap;
+        font-weight: 700;
+    }
+
+    .danfe__fatura-sep {
+        color: #666;
+        font-weight: 400;
+        padding: 0 2px;
+    }
 </style>

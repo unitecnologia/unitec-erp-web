@@ -126,6 +126,16 @@ class ListAjustaEstoqueGrupo extends ListRecords
         $this->resetTable();
     }
 
+    public function limparFiltros(): void
+    {
+        $this->grupoFilter = 'todos';
+        $this->marcaFilter = 'todos';
+        $this->estoqueFilter = 'atual';
+        $this->statusFilter = 'ativo';
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
     public function updatedGrupoFilter(): void
     {
         $this->resetTable();

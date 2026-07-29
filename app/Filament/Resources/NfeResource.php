@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\NfeResource\Pages;
 use App\Models\Nfe;
 use BackedEnum;
@@ -9,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
 
 class NfeResource extends Resource
@@ -27,12 +29,23 @@ class NfeResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('nfe.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
+                ViewColumn::make('selecao')
+                    ->label('')
+                    ->view('filament.components.erp.nfe.select-cell')
+                    ->alignCenter()
+                    ->width('2.25rem')
+                    ->disabledClick(),
                 TextColumn::make('numero')
-                    ->label('>>Número')
+                    ->label('Número')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
@@ -60,13 +73,26 @@ class NfeResource extends Resource
                 TextColumn::make('protocolo')
                     ->label('Protocolo')
                     ->placeholder('—')
+                    ->wrap(false)
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('total')
+                ViewColumn::make('status')
+                    ->label('Situação')
+                    ->view('filament.components.erp.nfe.columns.status')
+                    ->alignCenter()
+                    ->disabledClick(),
+                ViewColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
+                    ->view('filament.components.erp.nfe.columns.total')
                     ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
+                    ->disabledClick(),
+                ViewColumn::make('historico')
+                    ->label('')
+                    ->state(fn (): bool => true)
+                    ->width('1.35rem')
+                    ->view('filament.components.erp.nfe.columns.historico')
+                    ->alignCenter()
+                    ->disabledClick(),
             ])
             ->defaultSort('numero', 'desc')
             ->striped()

@@ -17,6 +17,8 @@
         'is_cliente' => 'Clientes',
         'is_fornecedor' => 'Fornecedores',
         'is_funcionario' => 'Funcionários',
+        'is_atendente' => 'Atendente',
+        'is_tecnico' => 'Técnico',
         'is_administradora' => 'Administradoras',
         'is_parceiro' => 'Parceiros',
         'is_fabricante' => 'Fabricantes',
@@ -54,7 +56,7 @@
         </div>
 
         @if ($this->activeFormTab === 'dados')
-            <fieldset class="erp-pcad__group">
+            <fieldset class="erp-pcad__group erp-pessoas-params">
                 <legend class="erp-pcad__group-title">Parâmetros</legend>
                 <div class="erp-pcad__checks">
                     @foreach ($parametros as $field => $label)

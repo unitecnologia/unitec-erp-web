@@ -6,7 +6,9 @@ use Filament\Notifications\Notification;
 
 trait ManagesProductFormUi
 {
-    public string $activeFormTab = 'impostos';
+    public string $activeFormTab = 'estoques';
+
+    public string $activeEstoqueSubTab = 'estoques';
 
     /**
      * @return list<array{key: string, label: string, visible: bool}>
@@ -16,6 +18,7 @@ trait ManagesProductFormUi
         $data = $this->data ?? [];
 
         $tabs = [
+            ['key' => 'estoques', 'label' => 'Estoque', 'visible' => true],
             ['key' => 'impostos', 'label' => 'Impostos', 'visible' => true],
             ['key' => 'promocao', 'label' => 'Promoção', 'visible' => true],
             ['key' => 'adicionais', 'label' => 'Adicionais', 'visible' => true],
@@ -31,6 +34,17 @@ trait ManagesProductFormUi
         return array_values(array_filter($tabs, fn (array $tab): bool => $tab['visible']));
     }
 
+    public function setActiveEstoqueSubTab(string $tab): void
+    {
+        if (! in_array($tab, ['estoques', 'localizacoes', 'trocas', 'dados_anp'], true)) {
+            return;
+        }
+
+        // Ao sair de Localizações, grava partes já presentes no estado Livewire
+        // (o DOM é lido no save; aqui só garante a subaba).
+        $this->activeEstoqueSubTab = $tab;
+    }
+
     public function setActiveFormTab(string $tab): void
     {
         if ($this->embedsInPdv) {
@@ -43,6 +57,12 @@ trait ManagesProductFormUi
             if (in_array($tab, ['dados', 'impostos', 'promocao', 'foto'], true)) {
                 $this->activeFormTab = $tab;
 
+                if ($tab === 'impostos' && method_exists($this, 'refreshEmpresaImpostoPadraoOnImpostosTab')) {
+                    $this->refreshEmpresaImpostoPadraoOnImpostosTab();
+                }
+
+                $this->dispatch('erp-masks-refresh');
+
                 return;
             }
         }
@@ -54,6 +74,16 @@ trait ManagesProductFormUi
         }
 
         $this->activeFormTab = $tab;
+
+        if ($tab === 'impostos' && method_exists($this, 'refreshEmpresaImpostoPadraoOnImpostosTab')) {
+            $this->refreshEmpresaImpostoPadraoOnImpostosTab();
+        }
+
+        $this->dispatch('erp-masks-refresh');
+
+        if ($tab === 'estoques' && blank($this->activeEstoqueSubTab)) {
+            $this->activeEstoqueSubTab = 'estoques';
+        }
     }
 
     public function updatedData(mixed $value, string $key): void
@@ -102,7 +132,7 @@ trait ManagesProductFormUi
         $visibleKeys = collect($this->visibleProductFormTabs)->pluck('key')->all();
 
         if (! in_array($this->activeFormTab, $visibleKeys, true)) {
-            $this->activeFormTab = $visibleKeys[0] ?? 'impostos';
+            $this->activeFormTab = $visibleKeys[0] ?? 'estoques';
         }
     }
 

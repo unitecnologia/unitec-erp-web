@@ -3,7 +3,7 @@
     $itens = $this->itensSelecionado;
     $pagamentos = $this->pagamentosSelecionado;
 
-    $fmt = fn (float $v): string => 'R$ ' . number_format($v, 2, ',', '.');
+    $fmtNum = fn (float $v): string => number_format($v, 2, ',', '.');
     $fmtQtd = fn (float $v): string => rtrim(rtrim(number_format($v, 3, ',', '.'), '0'), ',');
 
     $totItens = array_sum(array_map(fn ($i) => (float) $i['total'], $itens));
@@ -23,9 +23,10 @@
                             <th class="erp-fv-mon__th--code">Cód. Barras</th>
                             <th>Produto</th>
                             <th class="erp-fv-mon__th--num">Qtde</th>
-                            <th class="erp-fv-mon__th--num">Vlr Unit.</th>
-                            <th class="erp-fv-mon__th--num">Desc.</th>
-                            <th class="erp-fv-mon__th--num">TT Líquido</th>
+                            <th class="erp-fv-mon__th--money">Vlr Unit.</th>
+                            <th class="erp-fv-mon__th--money">Desc.</th>
+                            <th class="erp-fv-mon__th--money">Acmo.</th>
+                            <th class="erp-fv-mon__th--money">TT Líquido</th>
                             <th>Vendedor</th>
                         </tr>
                     </thead>
@@ -36,14 +37,35 @@
                                 <td class="erp-fv-mon__td--code">{{ $item['codigo_barras'] ?: '—' }}</td>
                                 <td>{{ $item['descricao'] }}</td>
                                 <td class="erp-fv-mon__td--num">{{ $fmtQtd($item['quantidade']) }}</td>
-                                <td class="erp-fv-mon__td--num">{{ $fmt($item['preco_unitario']) }}</td>
-                                <td class="erp-fv-mon__td--num">{{ $fmt($item['desconto']) }}</td>
-                                <td class="erp-fv-mon__td--num">{{ $fmt($item['total']) }}</td>
+                                <td class="erp-fv-mon__td--money">
+                                    <span class="erp-fv-mon-money">
+                                        <span class="erp-fv-mon-money__currency">R$</span>
+                                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['preco_unitario']) }}</span>
+                                    </span>
+                                </td>
+                                <td class="erp-fv-mon__td--money">
+                                    <span class="erp-fv-mon-money">
+                                        <span class="erp-fv-mon-money__currency">R$</span>
+                                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['desconto']) }}</span>
+                                    </span>
+                                </td>
+                                <td class="erp-fv-mon__td--money">
+                                    <span class="erp-fv-mon-money">
+                                        <span class="erp-fv-mon-money__currency">R$</span>
+                                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['acrescimo']) }}</span>
+                                    </span>
+                                </td>
+                                <td class="erp-fv-mon__td--money">
+                                    <span class="erp-fv-mon-money">
+                                        <span class="erp-fv-mon-money__currency">R$</span>
+                                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['total']) }}</span>
+                                    </span>
+                                </td>
                                 <td>{{ $item['vendedor'] ?? '—' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="erp-fv-mon__empty">
+                                <td colspan="9" class="erp-fv-mon__empty">
                                     {{ $order ? 'Pedido sem itens detalhados.' : 'Não há dados para mostrar' }}
                                 </td>
                             </tr>
@@ -53,7 +75,12 @@
             </div>
             <footer class="erp-fv-mon__foot">
                 <span class="erp-fv-mon__foot-count">{{ count($itens) }}</span>
-                <span class="erp-fv-mon__foot-total">{{ $fmt($totItens) }}</span>
+                <span class="erp-fv-mon__foot-total">
+                    <span class="erp-fv-mon-money">
+                        <span class="erp-fv-mon-money__currency">R$</span>
+                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($totItens) }}</span>
+                    </span>
+                </span>
             </footer>
         </section>
 
@@ -66,7 +93,7 @@
                             <th>Meio Pgto</th>
                             <th class="erp-fv-mon__th--num">Parcela</th>
                             <th>Vencimento</th>
-                            <th class="erp-fv-mon__th--num">Valor</th>
+                            <th class="erp-fv-mon__th--money">Valor</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -75,7 +102,12 @@
                                 <td>{{ $pg['meio'] }}</td>
                                 <td class="erp-fv-mon__td--num">{{ $pg['parcela'] }}</td>
                                 <td>{{ $pg['vencimento'] }}</td>
-                                <td class="erp-fv-mon__td--num">{{ $fmt($pg['valor']) }}</td>
+                                <td class="erp-fv-mon__td--money">
+                                    <span class="erp-fv-mon-money">
+                                        <span class="erp-fv-mon-money__currency">R$</span>
+                                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($pg['valor']) }}</span>
+                                    </span>
+                                </td>
                             </tr>
                         @empty
                             <tr>
@@ -87,7 +119,12 @@
             </div>
             <footer class="erp-fv-mon__foot">
                 <span class="erp-fv-mon__foot-count">{{ count($pagamentos) }}</span>
-                <span class="erp-fv-mon__foot-total">{{ $fmt($totPag) }}</span>
+                <span class="erp-fv-mon__foot-total">
+                    <span class="erp-fv-mon-money">
+                        <span class="erp-fv-mon-money__currency">R$</span>
+                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($totPag) }}</span>
+                    </span>
+                </span>
             </footer>
         </section>
     </div>

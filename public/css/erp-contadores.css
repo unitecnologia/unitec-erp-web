@@ -540,15 +540,15 @@
     align-items: center;
     justify-content: center;
     min-width: 5.85rem;
-    height: 4rem;
+    height: 3rem;
 }
 
 .erp-contadores-page .erp-contador-form-modal__actions .erp-pcad-actions__icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.45rem;
-    height: 1.45rem;
+    width: 1.3rem;
+    height: 1.3rem;
     border-radius: 50%;
     font-size: 0.85rem;
     line-height: 1;
@@ -619,7 +619,7 @@
     align-items: center;
     justify-content: center;
     min-width: 5.85rem;
-    height: 4rem;
+    height: 3rem;
     cursor: pointer;
 }
 
@@ -627,8 +627,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.45rem;
-    height: 1.45rem;
+    width: 1.3rem;
+    height: 1.3rem;
     border-radius: 50%;
     font-size: 0.85rem;
     line-height: 1;

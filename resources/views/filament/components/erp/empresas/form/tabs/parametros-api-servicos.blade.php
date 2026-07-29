@@ -31,7 +31,13 @@
                     'erp-pcad-form__input--grow' => $field !== 'param_api_servicos_timeout',
                     'erp-pcad-form__input--xs' => $field === 'param_api_servicos_timeout',
                 ])
-                @if ($field === 'param_api_servicos_senha') autocomplete="off" @endif
+                @if ($field === 'param_api_servicos_senha')
+                    autocomplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    data-google-password-manager="ignore"
+                @endif
                 @if ($field === 'param_api_servicos_token') placeholder="Cole aqui o token Cosmos (Bluesoft)" @endif
             >
         </div>

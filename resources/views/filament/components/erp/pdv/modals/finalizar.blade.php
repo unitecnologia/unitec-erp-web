@@ -6,7 +6,7 @@
             default => 'requestCloseFinalizar',
         };
     @endphp
-    <div class="erp-pdv-modal erp-pdv-modal--centered" role="dialog" aria-labelledby="erp-pdv-finalizar-title">
+    <div class="erp-pdv-modal erp-pdv-modal--centered erp-pdv-modal--payment" role="dialog" aria-labelledby="erp-pdv-finalizar-title">
         <div
             class="erp-pdv-modal__backdrop"
             wire:click="{{ $finalizarBackdropAction }}"
@@ -23,7 +23,10 @@
                 >✕</button>
             </header>
 
-            <div class="erp-pdv-finalizar">
+            <div
+                class="erp-pdv-finalizar"
+                data-cliente-consulta="{{ $this->finalizarClienteEmConsulta ? '1' : '0' }}"
+            >
                 <div class="erp-pdv-finalizar__top">
                     <div class="erp-pdv-finalizar__cliente">
                         <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--cliente">
@@ -94,40 +97,325 @@
                             </label>
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--split">
                                 <span class="erp-pdv-finalizar__label">Valor por Pessoa:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarValorPorPessoa }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__money" aria-live="polite">
+                                    <span class="erp-pdv-finalizar__money-rs">R$</span>
+                                    <span class="erp-pdv-finalizar__money-value">{{ $this->finalizarValorPorPessoa }}</span>
+                                </span>
                             </label>
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total-pagar">
                                 <span class="erp-pdv-finalizar__label">Total à Pagar:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarTotalAPagar }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--total-pagar"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__total-pagar-value" aria-live="polite">
+                                    {{ $this->finalizarTotalAPagar }}
+                                </span>
                             </label>
                         </div>
                     @else
                         <div class="erp-pdv-finalizar__split erp-pdv-finalizar__split--single">
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total-pagar">
                                 <span class="erp-pdv-finalizar__label">Total à Pagar:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarTotalAPagar }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--total-pagar"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__total-pagar-value" aria-live="polite">
+                                    {{ $this->finalizarTotalAPagar }}
+                                </span>
                             </label>
                         </div>
                     @endif
                 </div>
+
+                @if ($this->finalizarCartaoCanhotoAberta)
+                    <div class="erp-pdv-canhoto-overlay" role="dialog" aria-labelledby="erp-pdv-canhoto-title">
+                        <div class="erp-pdv-parcelas erp-pdv-canhoto">
+                            <header class="erp-pdv-parcelas__header">
+                                <h3 id="erp-pdv-canhoto-title">Canhoto POS | Contas a Receber</h3>
+                                <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarCartaoCanhoto" title="Fechar">✕</button>
+                            </header>
+
+                            <div class="erp-pdv-parcelas__toolbar">
+                                <div class="erp-pdv-parcelas__avulso">
+                                    <span class="erp-pdv-parcelas__avulso-title">Dados do canhoto</span>
+                                    <div class="erp-pdv-parcelas__avulso-fields">
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Total</span>
+                                            <input type="text" value="{{ \App\Support\Erp\ErpMoney::formatBr($this->finalizarCartaoTotalValor) }}" readonly tabindex="-1">
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>NSU</span>
+                                            <input id="erp-pdv-canhoto-nsu" type="text" wire:model="finalizarCartaoNsu" autocomplete="off">
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Autorização</span>
+                                            <input id="erp-pdv-canhoto-autorizacao" type="text" wire:model="finalizarCartaoAutorizacao" autocomplete="off">
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
+                                            <span>Maquininha</span>
+                                            <select id="erp-pdv-canhoto-maquininha" wire:model="finalizarCartaoMaquininha">
+                                                <option value="">— Selecione —</option>
+                                                @foreach (\App\Models\CartaoMaquininha::optionsAtivas() as $nome)
+                                                    <option value="{{ $nome }}">{{ $nome }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field erp-pdv-parcelas__field--bandeira">
+                                            <span>Bandeira</span>
+                                            <select id="erp-pdv-canhoto-bandeira" wire:model="finalizarCartaoBandeira">
+                                                <option value="">— Selecione —</option>
+                                                @foreach (\App\Models\CartaoBandeira::optionsAtivas() as $nome)
+                                                    <option value="{{ $nome }}">{{ $nome }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <div class="erp-pdv-parcelas__avulso-fields" style="margin-top:0.5rem;">
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Qtd. Parcelas</span>
+                                            <input id="erp-pdv-canhoto-qtd" type="text" wire:model="finalizarCartaoParcelasQtd" data-mask="integer" autocomplete="off">
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Intervalo (dias)</span>
+                                            <input id="erp-pdv-canhoto-intervalo" type="text" wire:model="finalizarCartaoIntervalo" data-mask="integer" autocomplete="off">
+                                        </label>
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarParcelasCartaoCanhoto">
+                                            <kbd>F2</kbd> Gerar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="erp-pdv-parcelas__toolbar-actions">
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarCartaoCanhoto">
+                                        <kbd>F4</kbd> Cancelar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="erp-pdv-parcelas__grid-wrap" id="erp-pdv-finalizar-cartao-canhoto">
+                                <table class="erp-pdv__grid erp-pdv-parcelas__grid">
+                                    <thead>
+                                        <tr>
+                                            <th>Documento</th>
+                                            <th>Vencimento</th>
+                                            <th class="erp-pdv__grid-col-num">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($this->finalizarCartaoParcelasRows as $index => $row)
+                                            <tr
+                                                wire:click="selectFinalizarCartaoParcelaRow({{ $index }})"
+                                                wire:key="pdv-cartao-parcela-{{ $index }}"
+                                                id="erp-pdv-finalizar-canhoto-row-{{ $index }}"
+                                                @class([
+                                                    'erp-pdv__grid-row',
+                                                    'erp-pdv__grid-row--selected' => $this->selectedFinalizarCartaoParcelaIndex === $index,
+                                                ])
+                                            >
+                                                <td>{{ $row['documento'] ?? '—' }}</td>
+                                                <td>{{ $row['vencimento'] ?? '—' }}</td>
+                                                <td class="erp-pdv__grid-col-num">R$ {{ $row['valor'] ?? '0,00' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr class="erp-pdv__grid-empty">
+                                                <td colspan="3">Informe NSU/Autorização/Bandeira e use F2 | Gerar parcelas.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <footer class="erp-pdv-parcelas__footer">
+                                <div class="erp-pdv-parcelas__total">
+                                    <span>Total Parcelas</span>
+                                    <strong>{{ $this->finalizarCartaoParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarCartaoParcelasTotalLabel : '' }}</strong>
+                                </div>
+                                <div class="erp-pdv-parcelas__footer-actions">
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="concluirCartaoCanhoto">
+                                        <kbd>F7</kbd> Concluir
+                                    </button>
+                                </div>
+                            </footer>
+                        </div>
+                    </div>
+                @elseif ($this->finalizarTabelaPrazoEmConsulta)
+                    <div class="erp-pdv-parcelas-overlay" role="dialog" aria-labelledby="erp-pdv-parcelas-title">
+                        <div class="erp-pdv-parcelas">
+                            <header class="erp-pdv-parcelas__header">
+                                <h3 id="erp-pdv-parcelas-title">Contas Receber | Parcelas</h3>
+                                <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarTabelaPrazoConsulta" title="Fechar">✕</button>
+                            </header>
+
+                            <div class="erp-pdv-parcelas__toolbar">
+                                <div class="erp-pdv-parcelas__avulso">
+                                    <span class="erp-pdv-parcelas__avulso-title">Avulso</span>
+                                    <div class="erp-pdv-parcelas__avulso-fields">
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Total</span>
+                                            <input type="text" value="{{ \App\Support\Erp\ErpMoney::formatBr($this->finalizarCrediarioTotalValor) }}" readonly tabindex="-1">
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Parcelas</span>
+                                            <input
+                                                id="erp-pdv-parcelas-qtd"
+                                                type="text"
+                                                wire:model="finalizarParcelasQtd"
+                                                data-mask="integer"
+                                                autocomplete="off"
+                                            >
+                                        </label>
+                                        <label class="erp-pdv-parcelas__field">
+                                            <span>Intervalo</span>
+                                            <input
+                                                id="erp-pdv-parcelas-intervalo"
+                                                type="text"
+                                                wire:model="finalizarParcelasIntervalo"
+                                                data-mask="integer"
+                                                autocomplete="off"
+                                            >
+                                        </label>
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarParcelasCrediario">
+                                            <kbd>F2</kbd> Gerar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="erp-pdv-parcelas__toolbar-actions">
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--info" wire:click="abrirTabelasPrazoPredefinidas">
+                                        <kbd>F8</kbd> Tabelas
+                                    </button>
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--danger" wire:click="excluirParcelaCrediario">
+                                        <kbd>F3</kbd> Excluir
+                                    </button>
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarTabelaPrazoConsulta">
+                                        <kbd>F4</kbd> Cancelar
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if ($this->finalizarTabelasPrazoListaAberta)
+                                <div class="erp-pdv-parcelas__tabelas" id="erp-pdv-parcelas-tabelas">
+                                    <div class="erp-pdv-parcelas__tabelas-head">
+                                        <strong>Prazos pré-definidos</strong>
+                                        <button type="button" class="erp-pdv-parcelas__tabelas-close" wire:click="fecharTabelasPrazoPredefinidas" title="Fechar">✕</button>
+                                    </div>
+                                    <div class="erp-pdv-parcelas__tabelas-list">
+                                        <table class="erp-pdv__grid erp-pdv-parcelas__tabelas-grid">
+                                            <thead>
+                                                <tr>
+                                                    <th>Dias</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($this->finalizarTabelasPrazoPredefinidas as $index => $tabela)
+                                                    <tr
+                                                        wire:click="selectFinalizarTabelaPredefinida({{ $index }})"
+                                                        wire:dblclick="aplicarTabelaPrazoPredefinida"
+                                                        wire:key="pdv-tabela-predef-{{ $index }}-{{ $tabela['tabela_prazo_id'] }}"
+                                                        id="erp-pdv-tabela-predef-row-{{ $index }}"
+                                                        @class([
+                                                            'erp-pdv__grid-row',
+                                                            'erp-pdv__grid-row--selected' => $this->selectedFinalizarTabelaPredefinidaIndex === $index,
+                                                        ])
+                                                    >
+                                                        <td>{{ $tabela['label'] ?? $tabela['dias'] ?? '—' }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="erp-pdv-parcelas__tabelas-actions">
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="aplicarTabelaPrazoPredefinida">
+                                            Enter | Usar tabela
+                                        </button>
+                                        <button type="button" class="erp-pdv-modal__btn" wire:click="fecharTabelasPrazoPredefinidas">
+                                            ESC | Voltar
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="erp-pdv-parcelas__grid-wrap" id="erp-pdv-finalizar-tabela-prazo">
+                                <table class="erp-pdv__grid erp-pdv-parcelas__grid">
+                                    <thead>
+                                        <tr>
+                                            <th>Documento</th>
+                                            <th>Vencimento</th>
+                                            <th class="erp-pdv__grid-col-num">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($this->finalizarParcelasRows as $index => $row)
+                                            <tr
+                                                wire:click="selectFinalizarParcelaRow({{ $index }})"
+                                                wire:key="pdv-parcela-{{ $index }}"
+                                                id="erp-pdv-finalizar-prazo-row-{{ $index }}"
+                                                @class([
+                                                    'erp-pdv__grid-row',
+                                                    'erp-pdv__grid-row--selected' => $this->selectedFinalizarParcelaIndex === $index,
+                                                ])
+                                            >
+                                                <td>{{ $row['documento'] ?? '—' }}</td>
+                                                <td>{{ $row['vencimento'] ?? '—' }}</td>
+                                                <td class="erp-pdv__grid-col-num">R$ {{ $row['valor'] ?? '0,00' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr class="erp-pdv__grid-empty">
+                                                <td colspan="3">Avulso: Parcelas/Intervalo + F2 | Gerar — ou F8 | Tabelas pré-definidas.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <footer class="erp-pdv-parcelas__footer">
+                                <div class="erp-pdv-parcelas__total">
+                                    <span>Total Parcelas</span>
+                                    <strong>{{ $this->finalizarParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarParcelasTotalLabel : '' }}</strong>
+                                </div>
+                                <div class="erp-pdv-parcelas__footer-actions">
+                                    <button type="button" class="erp-pdv-modal__btn" disabled title="Em breve">
+                                        <kbd>F5</kbd> Boleto
+                                    </button>
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="abrirCarneImpressao">
+                                        <kbd>F6</kbd> Carnê
+                                    </button>
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="concluirParcelasCrediario">
+                                        <kbd>F7</kbd> Concluir
+                                    </button>
+                                </div>
+                            </footer>
+
+                            @if ($this->finalizarCarneImpressaoAberta)
+                                <div class="erp-pdv-carne-print" role="dialog" aria-labelledby="erp-pdv-carne-print-title">
+                                    <div class="erp-pdv-carne-print__backdrop" wire:click="fecharCarneImpressao"></div>
+                                    <div class="erp-pdv-carne-print__window">
+                                        <header class="erp-pdv-carne-print__header">
+                                            <h3 id="erp-pdv-carne-print-title">Impressão</h3>
+                                            <button type="button" class="erp-pdv-modal__close" wire:click="fecharCarneImpressao" title="Fechar">✕</button>
+                                        </header>
+                                        <div class="erp-pdv-carne-print__body">
+                                            <div class="erp-pdv-carne-print__icon" aria-hidden="true">🖨</div>
+                                            <div class="erp-pdv-carne-print__options">
+                                                <button type="button" id="erp-pdv-carne-print-a4-capa" class="erp-pdv-carne-print__option" wire:click="escolherCarneImpressaoA4ComCapa">
+                                                    <kbd>1</kbd> A4 com capa
+                                                </button>
+                                                <button type="button" id="erp-pdv-carne-print-a4" class="erp-pdv-carne-print__option" wire:click="escolherCarneImpressaoA4">
+                                                    <kbd>2</kbd> A4 só parcelas
+                                                </button>
+                                                <button type="button" id="erp-pdv-carne-print-bobina" class="erp-pdv-carne-print__option" wire:click="escolherCarneImpressaoBobina80">
+                                                    <kbd>3</kbd> bobina 80
+                                                </button>
+                                                <button type="button" id="erp-pdv-carne-print-sair" class="erp-pdv-carne-print__option erp-pdv-carne-print__option--exit" wire:click="fecharCarneImpressao">
+                                                    Sair
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @elseif (filled($this->finalizarTabelaPrazoLabel))
+                    <div class="erp-pdv-finalizar__prazo-resumo">
+                        <span>Parcelas:</span>
+                        <strong>{{ $this->finalizarTabelaPrazoLabel }}</strong>
+                    </div>
+                @endif
 
                 <div class="erp-pdv-finalizar__body">
                     <div class="erp-pdv-finalizar__grid-wrap">
@@ -164,7 +452,7 @@
                                                 str_contains($forma, 'PIX') => 'pix',
                                                 str_contains($forma, 'DÉBITO'), str_contains($forma, 'DEBITO') => 'debit',
                                                 str_contains($forma, 'CRÉDITO'), str_contains($forma, 'CREDITO') => 'credit',
-                                                str_contains($forma, 'CREDI') => 'wallet',
+                                                \App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper::isFormaCrediario($forma) => 'wallet',
                                                 str_contains($forma, 'CHEQUE') => 'cheque',
                                                 str_contains($forma, 'BOLETO') => 'boleto',
                                                 str_contains($forma, 'TRANSFER'), str_contains($forma, 'DEP'), str_contains($forma, 'TEF') => 'transfer',
@@ -172,7 +460,6 @@
                                                 default => 'cash',
                                             },
                                         };
-                                        $aPrazo = str_contains($forma, 'CREDI') || str_contains($forma, 'CHEQUE') || str_contains($forma, 'BOLETO');
                                         $temValor = \App\Support\Erp\ErpMoney::parseBr($pagamento['valor'] ?? '0') > 0;
                                     @endphp
                                     <tr
@@ -191,9 +478,6 @@
                                             <span class="erp-pdv-finalizar__forma">
                                                 <span class="erp-pdv-finalizar__forma-icon erp-pdv-finalizar__forma-icon--{{ $icone }}" aria-hidden="true"></span>
                                                 <span class="erp-pdv-finalizar__forma-nome">{{ $pagamento['forma'] }}</span>
-                                                @if ($aPrazo)
-                                                    <span class="erp-pdv-finalizar__forma-tag">a prazo</span>
-                                                @endif
                                             </span>
                                         </td>
                                         <td class="erp-pdv__grid-col-num">
@@ -224,13 +508,10 @@
                         <div class="erp-pdv-finalizar__totais">
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total">
                                 <span class="erp-pdv-finalizar__label">Subtotal:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarSubtotal }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__money" aria-live="polite">
+                                    <span class="erp-pdv-finalizar__money-rs">R$</span>
+                                    <span class="erp-pdv-finalizar__money-value">{{ $this->finalizarSubtotal }}</span>
+                                </span>
                             </label>
                             @if ($this->pdvHabilitarDescontoVenda)
                                 <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total">
@@ -258,23 +539,17 @@
                             @endif
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total">
                                 <span class="erp-pdv-finalizar__label">Valor Restante:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarValorRestante }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__money" aria-live="polite">
+                                    <span class="erp-pdv-finalizar__money-rs">R$</span>
+                                    <span class="erp-pdv-finalizar__money-value">{{ $this->finalizarValorRestante }}</span>
+                                </span>
                             </label>
                             <label class="erp-pdv-finalizar__field erp-pdv-finalizar__field--total erp-pdv-finalizar__field--troco">
                                 <span class="erp-pdv-finalizar__label">Troco:</span>
-                                <input
-                                    type="text"
-                                    value="{{ $this->finalizarTroco }}"
-                                    class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                    readonly
-                                    tabindex="-1"
-                                >
+                                <span class="erp-pdv-finalizar__money" aria-live="polite">
+                                    <span class="erp-pdv-finalizar__money-rs">R$</span>
+                                    <span class="erp-pdv-finalizar__money-value">{{ $this->finalizarTroco }}</span>
+                                </span>
                             </label>
                         </div>
                     </aside>
@@ -338,7 +613,7 @@
                         </button>
                     @endforeach
                 </div>
-                <button type="button" wire:click="requestCloseFinalizar" class="erp-pdv-modal__btn">
+                <button type="button" wire:click="requestCloseFinalizar" class="erp-pdv-modal__btn erp-pdv-modal__btn--danger">
                     <kbd>Esc</kbd> Cancelar
                 </button>
             </footer>

@@ -4,6 +4,10 @@ namespace App\Filament\Resources\NfceResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\NfceResource;
+use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceClienteEmail;
+use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceContadorEmail;
+use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceFiscalActions;
+use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceRelatorio;
 use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpScreen;
@@ -15,6 +19,7 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -22,6 +27,10 @@ use Livewire\Attributes\Url;
 class ListNfces extends ListRecords
 {
     use InteractsWithErpListPage;
+    use ManagesNfceFiscalActions;
+    use ManagesNfceRelatorio;
+    use ManagesNfceContadorEmail;
+    use ManagesNfceClienteEmail;
 
     protected static string $resource = NfceResource::class;
 
@@ -78,9 +87,30 @@ class ListNfces extends ListRecords
         return 'erp-nfe-page';
     }
 
+    protected function erpListExtraPageClasses(): array
+    {
+        return ['erp-nfce-page'];
+    }
+
     protected function erpListEntityName(): string
     {
         return 'uma NFC-e';
+    }
+
+    protected function defaultErpListSelectPrompt(string $action): string
+    {
+        $entity = $this->erpListEntityName();
+
+        return match ($action) {
+            'imprimir' => 'uma NFC-e na lista para imprimir',
+            'cancelar' => 'uma NFC-e autorizada para cancelar',
+            'recuperar' => 'uma NFC-e para consultar na SEFAZ',
+            'transmitir' => 'uma ou mais NFC-e em contingência para transmitir',
+            'email' => 'uma NFC-e na lista para enviar por e-mail',
+            'edit' => "{$entity} na lista",
+            'delete' => "{$entity} para excluir",
+            default => $entity,
+        };
     }
 
     protected function customErpListKeyboardConfig(): array
@@ -90,15 +120,15 @@ class ListNfces extends ListRecords
             'create' => 'modulePending',
             'edit' => 'imprimirNfce',
             'extraKeys' => [
-                'F2' => ['method' => 'modulePending', 'params' => ['Cancelar NFC-e']],
-                'F3' => ['method' => 'modulePending', 'params' => ['Inutilizar']],
-                'F4' => ['method' => 'modulePending', 'params' => ['Recuperar']],
-                'F5' => ['method' => 'modulePending', 'params' => ['Transmitir']],
+                'F2' => ['method' => 'cancelarNfce'],
+                'F3' => ['method' => 'inutilizarNfce'],
+                'F4' => ['method' => 'recuperarNfce'],
+                'F5' => ['method' => 'transmitirNfce'],
                 'F6' => ['method' => 'imprimirNfce'],
-                'F7' => ['method' => 'modulePending', 'params' => ['Relatório']],
-                'F8' => ['method' => 'modulePending', 'params' => ['Email']],
+                'F7' => ['method' => 'printNfceRelatorio'],
+                'F8' => ['method' => 'openNfceClienteEmailModal'],
                 'F9' => ['method' => 'modulePending', 'params' => ['Agrupar']],
-                'F11' => ['method' => 'modulePending', 'params' => ['Gerar PDF']],
+                'F11' => ['method' => 'openNfceContadorEmailModal'],
             ],
         ];
     }
@@ -106,6 +136,26 @@ class ListNfces extends ListRecords
     public function table(Table $table): Table
     {
         return $this->applyErpListSelection(NfceResource::table($table));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function erpListRecordClasses(Model $record): array
+    {
+        $classes = [];
+
+        if (in_array((string) $record->getKey(), $this->nfceSelecionadosTransmitir, true)) {
+            $classes[] = 'erp-nfce-row--checked';
+        }
+
+        return $classes;
+    }
+
+    protected function clearListSelection(): void
+    {
+        $this->highlightedRecordId = null;
+        $this->clearNfceTransmitirSelecao();
     }
 
     protected function getTableQuery(): Builder
@@ -204,7 +254,7 @@ class ListNfces extends ListRecords
 
         $empresa = $empresaId
             ? Empresa::query()->whereKey($empresaId)->where('ativo', true)->first()
-            : Empresa::query()->where('ativo', true)->orderBy('id')->first();
+            : null;
 
         if (! $empresa) {
             return '—';
@@ -261,6 +311,10 @@ class ListNfces extends ListRecords
                     ->columnSpanFull(),
                 View::make('filament.components.erp.nfce.footer-total'),
                 View::make('filament.components.erp.nfce.action-bar'),
+                View::make('filament.components.erp.nfce.fiscal-modals'),
+                View::make('filament.components.erp.nfce.fiscal-progress'),
+                View::make('filament.components.erp.nfce.email-contador-modal'),
+                View::make('filament.components.erp.nfce.email-cliente-modal'),
             ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\FormaPagamentoResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpSimpleListPage;
+use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\FormaPagamentoResource;
 use App\Filament\Resources\FormaPagamentoResource\Pages\Concerns\ManagesFormaPagamentoBandeiras;
 use App\Filament\Resources\FormaPagamentoResource\Pages\Concerns\ManagesFormaPagamentoMaquininhas;
@@ -27,6 +28,7 @@ class ListFormasPagamento extends ListRecords
     use InteractsWithErpSimpleListPage;
     use ManagesFormaPagamentoBandeiras;
     use ManagesFormaPagamentoMaquininhas;
+    use NormalizesErpUppercaseFormData;
 
     protected static string $resource = FormaPagamentoResource::class;
 
@@ -57,6 +59,11 @@ class ListFormasPagamento extends ListRecords
     protected static function erpListPageClass(): string
     {
         return 'erp-formas-pgto-page';
+    }
+
+    protected function erpUppercaseIgnoredProperties(): array
+    {
+        return ['form.tipo', 'form.tipo_movimento'];
     }
 
     protected function erpListEntityName(): string
@@ -185,6 +192,12 @@ class ListFormasPagamento extends ListRecords
 
     public function saveFormaPagamento(): void
     {
+        foreach (['tipo', 'tipo_movimento'] as $enumField) {
+            if (is_string($this->form[$enumField] ?? null)) {
+                $this->form[$enumField] = mb_strtolower(trim($this->form[$enumField]), 'UTF-8');
+            }
+        }
+
         $data = $this->validate([
             'form.codigo' => [
                 'required',
@@ -235,6 +248,15 @@ class ListFormasPagamento extends ListRecords
             'disponivel_mobile' => (bool) ($this->form['disponivel_mobile'] ?? false),
             'parcelas' => $this->normalizeParcelas($this->form['parcelas'] ?? []),
         ];
+
+        // Cartão com movimento Contas a Receber: mantém a flag alinhada ao rádio.
+        if (
+            ($payload['tipo_movimento'] ?? '') === 'contas_receber'
+            && in_array((string) ($payload['tipo'] ?? ''), ['cartao_credito', 'cartao_debito', 'tef'], true)
+        ) {
+            $payload['aparece_contas_receber'] = true;
+            $this->form['aparece_contas_receber'] = true;
+        }
 
         if ($this->formId) {
             FormaPagamento::whereKey($this->formId)->update($payload);

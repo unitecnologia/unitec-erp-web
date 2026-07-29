@@ -6,8 +6,16 @@ final class ErpMoney
 {
     public static function parseBr(mixed $value, int $decimals = 2): float
     {
+        return self::tryParseBr($value, $decimals) ?? 0.0;
+    }
+
+    /**
+     * Parse estrito: null quando inválido (não vira 0 em silêncio).
+     */
+    public static function tryParseBr(mixed $value, int $decimals = 2): ?float
+    {
         if ($value === null || $value === '') {
-            return 0.0;
+            return null;
         }
 
         if (is_int($value) || is_float($value)) {
@@ -17,7 +25,7 @@ final class ErpMoney
         $normalized = trim((string) $value);
 
         if ($normalized === '') {
-            return 0.0;
+            return null;
         }
 
         if (is_numeric($normalized) && ! str_contains($normalized, ',')) {
@@ -28,7 +36,7 @@ final class ErpMoney
         $normalized = str_replace(',', '.', $normalized);
 
         if (! is_numeric($normalized)) {
-            return 0.0;
+            return null;
         }
 
         return round((float) $normalized, $decimals);
@@ -42,8 +50,8 @@ final class ErpMoney
 
         $number = is_numeric($value) && ! is_string($value)
             ? (float) $value
-            : self::parseBr($value, $decimals);
+            : (self::tryParseBr($value, $decimals) ?? 0.0);
 
-        return number_format($number, $decimals, ',', '');
+        return number_format($number, $decimals, ',', '.');
     }
 }

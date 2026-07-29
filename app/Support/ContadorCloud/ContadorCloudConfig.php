@@ -44,7 +44,7 @@ readonly class ContadorCloudConfig
 
         return new self(
             habilitar: (bool) ($data['param_portal_contador_habilitar'] ?? false),
-            url: trim((string) ($data['param_portal_contador_url'] ?? '')),
+            url: ContadorCloudHttpHelper::normalizeUrl((string) ($data['param_portal_contador_url'] ?? '')),
             empresaId: trim((string) ($data['param_portal_contador_empresa_id'] ?? '')),
             token: trim((string) ($data['param_portal_contador_token'] ?? '')),
             ambiente: (string) ($data['param_portal_contador_ambiente'] ?? 'homologacao'),
@@ -64,9 +64,19 @@ readonly class ContadorCloudConfig
         return $this->url !== '' && $this->empresaId !== '' && $this->token !== '';
     }
 
+    public function isActive(): bool
+    {
+        return $this->habilitar && $this->isConfigured();
+    }
+
     public function healthUrl(): string
     {
-        return rtrim($this->url, '/').config('contador-cloud.health_path', '/api/v1/health');
+        return ContadorCloudHttpHelper::resolveHealthUrl($this->url);
+    }
+
+    public function syncUrl(): string
+    {
+        return ContadorCloudHttpHelper::resolveSyncUrl($this->url);
     }
 
     private static function nullableInt(mixed $value): ?int

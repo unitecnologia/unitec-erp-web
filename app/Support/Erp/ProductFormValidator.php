@@ -26,7 +26,7 @@ class ProductFormValidator
 
         if ($precoVenda <= 0) {
             throw ValidationException::withMessages([
-                'preco_venda' => 'Digite o Preço de Venda!',
+                'preco_venda' => 'Digite o Preço de Varejo!',
             ]);
         }
 
@@ -220,37 +220,71 @@ class ProductFormValidator
             STR_PAD_LEFT,
         );
 
+        $nullable = static function (mixed $value): ?string {
+            $trimmed = trim((string) ($value ?? ''));
+
+            return $trimmed === '' ? null : $trimmed;
+        };
+
         $cfopInterno = (string) ($empresa?->param_imp_cfop_venda ?? '5102');
-        $cst = $pad($empresa?->param_imp_icms_cst ?? null, '041', 3);
+        $cfopExterno = trim((string) ($empresa?->param_imp_cfop_externo ?? ''));
+        if ($cfopExterno === '') {
+            $cfopExterno = self::cfopExternoFromInterno($cfopInterno);
+        }
+
+        $cst = $pad($empresa?->param_imp_icms_cst ?? null, '000', 3);
         $csosn = $pad($empresa?->param_imp_csosn ?? null, '102', 3);
+        $cstExterno = $pad($empresa?->param_imp_icms_cst_externo ?? null, $cst, 3);
+        $csosnExterno = $pad($empresa?->param_imp_csosn_externo ?? null, $csosn, 3);
+
+        $fcp = $empresa?->param_imp_fcp_pct;
+        if ($fcp === null || $fcp === '') {
+            $fcp = $empresa?->param_difal_fcp_pct ?? 0;
+        }
+
+        $motivoDeson = $nullable($empresa?->param_imp_motivo_desoneracao);
 
         return [
             'cfop_interno' => $cfopInterno,
-            'origem' => 0,
+            'origem' => (int) ($empresa?->param_imp_origem ?? 0),
             'cst_icms' => $cst,
             'csosn' => $csosn,
             'aliq_icms' => (float) ($empresa?->param_imp_icms_aliquota ?? 0),
-            'cfop_externo' => self::cfopExternoFromInterno($cfopInterno),
-            'cst_externo' => $cst,
-            'csosn_externo' => $csosn,
-            'aliq_icms_externo' => (float) ($empresa?->param_imp_icms_aliquota ?? 0),
-            'cst_entrada' => $pad($empresa?->param_imp_pis_cst ?? null, '07', 2),
-            'cst_saida' => $pad($empresa?->param_imp_cofins_cst ?? null, '07', 2),
+            'cfop_externo' => $cfopExterno,
+            'cst_externo' => $cstExterno,
+            'csosn_externo' => $csosnExterno,
+            'aliq_icms_externo' => (float) ($empresa?->param_imp_icms_aliquota_externo ?? $empresa?->param_imp_icms_aliquota ?? 0),
+            'cst_entrada' => $pad($empresa?->param_imp_pis_cst ?? null, '99', 2),
+            'cst_saida' => $pad($empresa?->param_imp_cofins_cst ?? null, '99', 2),
+            'cst_cofins' => $pad(
+                $empresa?->param_imp_cst_cofins ?? $empresa?->param_imp_cofins_cst ?? null,
+                '99',
+                2,
+            ),
             'aliq_pis' => (float) ($empresa?->param_imp_pis_aliquota ?? 0),
             'aliq_cofins' => (float) ($empresa?->param_imp_cofins_aliquota ?? 0),
-            'cst_ipi' => $pad($empresa?->param_imp_ipi_cst ?? null, '53', 2),
+            'cst_ipi' => $pad($empresa?->param_imp_ipi_cst ?? null, '99', 2),
             'aliq_ipi' => (float) ($empresa?->param_imp_ipi_aliquota ?? 0),
-            'fcp_pct' => (float) ($empresa?->param_difal_fcp_pct ?? 0),
-            'mva_pct' => 0,
-            'mva_normal' => 0,
-            'reducao_base_pct' => 0,
-            'icms_diferido' => 0,
-            'aliq_deson' => 0,
-            'motivo_desoneracao' => null,
-            'tipo_tributacao' => null,
+            'cod_enq_ipi' => $nullable($empresa?->param_imp_cod_enq_ipi),
+            'fcp_pct' => (float) $fcp,
+            'mva_pct' => (float) ($empresa?->param_imp_mva_pct ?? 0),
+            'mva_normal' => (float) ($empresa?->param_imp_mva_normal ?? 0),
+            'reducao_base_pct' => (float) ($empresa?->param_imp_reducao_base_pct ?? 0),
+            'cod_beneficio' => $nullable($empresa?->param_imp_cod_beneficio),
+            'tipo_tributacao' => $nullable($empresa?->param_imp_tipo_tributacao),
+            'icms_diferido' => (float) ($empresa?->param_imp_icms_diferido ?? 0),
+            'aliq_deson' => (float) ($empresa?->param_imp_aliq_deson ?? 0),
+            'motivo_desoneracao' => $motivoDeson,
             'tributacao_monofasica' => false,
-            'cod_beneficio' => null,
-            'cod_enq_ipi' => null,
+            'iva_cst' => $nullable($empresa?->param_imp_iva_cst),
+            'cclass_trib' => $nullable($empresa?->param_imp_cclass_trib),
+            'aliq_ibs_uf' => (float) ($empresa?->param_imp_aliq_ibs_uf ?? 0),
+            'aliq_cbs' => (float) ($empresa?->param_imp_aliq_cbs ?? 0),
+            'aliq_ibs_mun' => (float) ($empresa?->param_imp_aliq_ibs_mun ?? 0),
+            'aliq_adrem_ibs' => (float) ($empresa?->param_imp_aliq_adrem_ibs ?? 0),
+            'aliq_adrem_cbs' => (float) ($empresa?->param_imp_aliq_adrem_cbs ?? 0),
+            'reducao_cbs' => (float) ($empresa?->param_imp_reducao_cbs ?? 0),
+            'reducao_ibs' => (float) ($empresa?->param_imp_reducao_ibs ?? 0),
             'glp_pct' => 0,
             'gnn_pct' => 0,
             'gni_pct' => 0,

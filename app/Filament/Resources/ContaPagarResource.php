@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\ContaPagarResource\Pages;
 use App\Models\ContaPagar;
 use BackedEnum;
@@ -27,12 +28,17 @@ class ContaPagarResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('contas_pagar.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('numero')
-                    ->label('>>Número')
+                    ->label('Número')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
@@ -42,16 +48,12 @@ class ContaPagarResource extends Resource
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('produto')
-                    ->label('Produto')
-                    ->wrap(false)
-                    ->placeholder('—')
-                    ->weight(FontWeight::Bold),
                 TextColumn::make('documento')
                     ->label('Doc')
                     ->placeholder('—')
                     ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
+                    ->weight(FontWeight::SemiBold)
+                    ->width('2cm'),
                 TextColumn::make('fornecedor.nome_razao')
                     ->label('Fornecedor')
                     ->wrap(false)

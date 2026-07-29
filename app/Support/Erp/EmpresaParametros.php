@@ -18,12 +18,12 @@ final class EmpresaParametros
                 'type' => 'integer',
             ],
             'param_plano_transferencia_credito' => [
-                'label' => 'Plano de Contas Transferência (Crédito)',
+                'label' => 'Plano Transf. Crédito',
                 'default' => 3,
                 'type' => 'integer',
             ],
             'param_plano_transferencia_debito' => [
-                'label' => 'Plano de Contas Transferência (Débito)',
+                'label' => 'Plano Transf. Débito',
                 'default' => 4,
                 'type' => 'integer',
             ],
@@ -32,14 +32,8 @@ final class EmpresaParametros
                 'default' => 1,
                 'type' => 'integer',
             ],
-            'param_prazo_max_nota_cliente' => [
-                'label' => 'Prazo Máximo da Nota Cliente',
-                'default' => '1.00',
-                'type' => 'decimal',
-                'decimals' => 2,
-            ],
             'param_plano_ficha_cliente' => [
-                'label' => 'Cód. Plano de Conta Ficha Cliente',
+                'label' => 'Plano Ficha Cliente',
                 'default' => 10,
                 'type' => 'integer',
             ],
@@ -47,11 +41,6 @@ final class EmpresaParametros
                 'label' => 'Último NSU',
                 'default' => '0000000000',
                 'type' => 'string',
-            ],
-            'param_tempo_bloqueio_pdv_min' => [
-                'label' => 'Tempo para bloqueio do PDV(minutos)',
-                'default' => null,
-                'type' => 'integer',
             ],
             'param_desconto_maximo' => [
                 'label' => 'Desconto Máximo',
@@ -66,22 +55,27 @@ final class EmpresaParametros
                 'decimals' => 2,
             ],
             'param_pdv_modelo_balanca' => [
-                'label' => 'Modelo Etiqueta Balança (1-4)',
+                'label' => 'Modelo Etiqueta Balança',
                 'default' => 4,
                 'type' => 'integer',
             ],
+            'param_pdv_carga_intervalo_min' => [
+                'label' => 'Intervalo Carga PDV (min)',
+                'default' => 15,
+                'type' => 'integer',
+            ],
+            'param_pdv_marquee_texto' => [
+                'label' => 'Letreiro do PDV',
+                'default' => '',
+                'type' => 'string',
+            ],
             'param_plano_abertura_caixa' => [
-                'label' => 'Plano de Contas Abertura de Caixa',
+                'label' => 'Plano Abertura de Caixa',
                 'default' => 14,
                 'type' => 'integer',
             ],
             'param_cod_dinheiro_fpg' => [
-                'label' => 'Código Padrão Dinheiro - FPG',
-                'default' => 1,
-                'type' => 'integer',
-            ],
-            'param_nfe_num_inicial' => [
-                'label' => 'Nº Inicial NFe',
+                'label' => 'Cód. Dinheiro FPG',
                 'default' => 1,
                 'type' => 'integer',
             ],
@@ -91,32 +85,32 @@ final class EmpresaParametros
                 'type' => 'integer',
             ],
             'param_plano_sangria' => [
-                'label' => 'Plano de Contas Sangria',
+                'label' => 'Plano Sangria',
                 'default' => 11,
                 'type' => 'integer',
             ],
             'param_plano_venda' => [
-                'label' => 'Plano de Contas Venda',
+                'label' => 'Plano Venda',
                 'default' => 2,
                 'type' => 'integer',
             ],
             'param_plano_taxa_cartao' => [
-                'label' => 'Plano de Contas Taxa Cartão',
+                'label' => 'Plano Taxa Cartão',
                 'default' => 8,
                 'type' => 'integer',
             ],
             'param_plano_devolucao' => [
-                'label' => 'Plano de Contas Devolução',
+                'label' => 'Plano Devolução',
                 'default' => 9,
                 'type' => 'integer',
             ],
             'param_plano_compra' => [
-                'label' => 'Plano de Contas de Compra',
+                'label' => 'Plano Compra',
                 'default' => 15,
                 'type' => 'integer',
             ],
             'param_plano_boleto' => [
-                'label' => 'Plano de Conta Boleto',
+                'label' => 'Plano Boleto',
                 'default' => 16,
                 'type' => 'integer',
             ],
@@ -138,6 +132,13 @@ final class EmpresaParametros
                 'type' => 'decimal',
                 'decimals' => 2,
             ],
+            'param_meta_vendas_mensal' => [
+                'label' => 'Meta Vendas Mensal',
+                'default' => '0.00',
+                'type' => 'decimal',
+                'decimals' => 2,
+                'hint' => 'Preenchida (> 0) aparece no dashboard; vazia ou zero some.',
+            ],
         ];
     }
 
@@ -150,41 +151,39 @@ final class EmpresaParametros
             'param_pdv_habilitar_tabela_preco' => ['label' => 'Habilitar Tabela Preço', 'default' => false],
             'param_pdv_exibir_resumo_caixa' => ['label' => 'Exibir Resumo Caixa', 'default' => true],
             'param_pdv_caixa_rapido' => ['label' => 'Caixa Rápido (sem enter)', 'default' => false],
-            'param_pdv_exibir_estoque_negativo' => ['label' => 'Exibir Produto c/ Estoque Negativo', 'default' => true],
             'param_pdv_checar_limite_cliente' => ['label' => 'Checar Limite de Cliente', 'default' => false],
             'param_pdv_pedido_duas_vias' => ['label' => 'Pedido em Duas Vias (PDV)', 'default' => false],
-            'param_pdv_bloquear_preco' => ['label' => 'Bloquear Preço no PDV', 'default' => false],
             'param_pdv_permitir_desconto_item' => ['label' => 'Permitir Desconto Item (PDV)', 'default' => true],
             'param_pdv_habilitar_desconto' => ['label' => 'Habilitar Desconto no PDV', 'default' => false],
-            'param_pdv_bloquear_inatividade' => ['label' => 'Bloquear PDV por inatividade', 'default' => null, 'tri' => true],
             'param_pdv_exibir_f3_vendedor' => ['label' => 'Exibir F3 Vendedor no PDV', 'default' => false],
-            'param_pdv_exibir_f4_busca_avancada' => ['label' => 'Exibir F4 Busca Avançada no PDV', 'default' => false],
             'param_pdv_ativar_som' => ['label' => 'Ativar Som no PDV (bip ao incluir item)', 'default' => false],
+            'param_pdv_nfce_descricao_completa' => ['label' => 'NFC-e: Descrição Completa dos Itens (sem abreviar)', 'default' => false],
+            'param_pdv_carga_auto' => ['label' => 'Carga Automática do PDV Offline', 'default' => true],
 
-            'param_geral_transmitir_cartao_auto' => ['label' => 'Transmitir Cartão Auto', 'default' => null, 'tri' => true],
             'param_geral_informar_gtin' => ['label' => 'Informar GTIN', 'default' => false],
-            'param_geral_usar_pdv_retaguarda' => ['label' => 'Usar PDV no Retaguarda', 'default' => true],
             'param_geral_desconto_prod_promocao' => ['label' => 'Dar Desconto Prod. Promoção', 'default' => false],
             'param_geral_bloquear_cpf_repetido' => ['label' => 'Bloquear Cadastro de CPF repetido', 'default' => null, 'tri' => true],
             'param_geral_ratear_preco_custo_xml' => ['label' => 'Ratear Preço de Custo (Compra XML)', 'default' => true],
             'param_geral_bloquear_estoque_negativo' => ['label' => 'Bloquear Estoque Negativo', 'default' => false],
             'param_geral_usar_transportadora' => ['label' => 'Usar Transportadora', 'default' => false],
-            'param_geral_ocultar_saldo_livro_caixa' => ['label' => 'Ocultar Saldo Anterior no Livro Caixa', 'default' => null, 'tri' => true],
-            'param_geral_usar_smtp_proprio' => ['label' => 'Usar Servidor SMTP próprio', 'default' => null, 'tri' => true],
             'param_geral_cadastrar_produtos_auto' => ['label' => 'Cadastrar Produtos Auto', 'default' => false],
-            'param_geral_lancar_cartao_caixa' => ['label' => 'Lançar Cartão no Caixa', 'default' => true],
+            'param_geral_lancar_cartao_caixa' => [
+                'label' => 'Lançar Cartão no Caixa',
+                'hint' => 'Marcado: cartão entra no caixa como se já tivesse caído. Desmarcado: cartão vai para Contas a Receber até a operadora depositar.',
+                'default' => false,
+            ],
             'param_geral_rateio_pessoa_pdv' => ['label' => 'Mostra Rateio por pessoa no PDV', 'default' => true],
+            'param_geral_perguntar_replicar_preco_filiais' => [
+                'label' => 'Perguntar ao replicar preço nas filiais',
+                'default' => false,
+            ],
 
-            'param_fiscal_perguntar_segunda_via_nfce' => ['label' => 'Perguntar - Imprimir Segunda via NFC-e', 'default' => false],
             'param_fiscal_enviar_email_nfe' => ['label' => 'Enviar Email NFe', 'default' => true],
             'param_fiscal_usar_credito_icms' => ['label' => 'Usar Crédito ICMS', 'default' => true],
-            'param_fiscal_usar_nfe_num_inicial' => ['label' => 'Usar Nº Inicial da NFe', 'default' => null, 'tri' => true],
             'param_fiscal_puxar_cfop_produto' => ['label' => 'Puxar CFOP do Produto', 'default' => false],
             'param_fiscal_recolhe_fcp' => ['label' => 'Empresa Recolhe FCP', 'default' => true],
-            'param_fiscal_resp_tecnico_xml' => ['label' => 'Informar Respons. Técnico XML NFe/NFCe', 'default' => true],
-            'param_fiscal_abrir_whatsapp_inicio' => ['label' => 'Abrir Whatsapp Server no início', 'default' => null, 'tri' => true],
-            'param_fiscal_imposto_custo_xml' => ['label' => 'Calcula Impostos no preço de Custo ao importar XML de Compra.', 'default' => true],
             'param_fiscal_bloquear_cancelamento_doc' => ['label' => 'Bloquear Cancelamento Venda com Documento Fiscal Emitido', 'default' => true],
+            'param_fiscal_motivo_estorno_automatico' => ['label' => 'Motivo de Estorno Automático', 'default' => false],
         ];
     }
 
@@ -194,17 +193,50 @@ final class EmpresaParametros
     public static function impostoFields(): array
     {
         return [
-            'param_imp_csosn' => ['label' => 'CSOSN Padrão', 'default' => '102', 'type' => 'string'],
-            'param_imp_icms_cst' => ['label' => 'CST ICMS Padrão', 'default' => '00', 'type' => 'string'],
-            'param_imp_icms_aliquota' => ['label' => 'Alíquota ICMS (%)', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
-            'param_imp_pis_cst' => ['label' => 'CST PIS Padrão', 'default' => '01', 'type' => 'string'],
-            'param_imp_pis_aliquota' => ['label' => 'Alíquota PIS (%)', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
-            'param_imp_cofins_cst' => ['label' => 'CST COFINS Padrão', 'default' => '01', 'type' => 'string'],
-            'param_imp_cofins_aliquota' => ['label' => 'Alíquota COFINS (%)', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
-            'param_imp_ipi_cst' => ['label' => 'CST IPI Padrão', 'default' => '99', 'type' => 'string'],
-            'param_imp_ipi_aliquota' => ['label' => 'Alíquota IPI (%)', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
-            'param_imp_cfop_venda' => ['label' => 'CFOP Venda Padrão', 'default' => '5102', 'type' => 'string'],
-            'param_imp_cfop_compra' => ['label' => 'CFOP Compra Padrão', 'default' => '1102', 'type' => 'string'],
+            // ICMS Interno
+            'param_imp_cfop_venda' => ['label' => 'CFOP Interno', 'default' => '5102', 'type' => 'string'],
+            'param_imp_origem' => ['label' => 'Origem', 'default' => '0', 'type' => 'string'],
+            'param_imp_icms_cst' => ['label' => 'CST ICMS', 'default' => '000', 'type' => 'string'],
+            'param_imp_csosn' => ['label' => 'CSOSN', 'default' => '102', 'type' => 'string'],
+            'param_imp_icms_aliquota' => ['label' => 'Alíq. ICMS %', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            // ICMS Externo
+            'param_imp_cfop_externo' => ['label' => 'CFOP Externo', 'default' => '6102', 'type' => 'string'],
+            'param_imp_icms_cst_externo' => ['label' => 'CST ICMS Ext.', 'default' => '000', 'type' => 'string'],
+            'param_imp_csosn_externo' => ['label' => 'CSOSN Ext.', 'default' => '102', 'type' => 'string'],
+            'param_imp_icms_aliquota_externo' => ['label' => 'Alíq. ICMS Ext. %', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            // PIS/COFINS — no Simples a NT oficial recomenda CST 99 (outras operações) com alíq. 0
+            'param_imp_pis_cst' => ['label' => 'CST Ent.', 'default' => '99', 'type' => 'string'],
+            'param_imp_cofins_cst' => ['label' => 'CST Saída', 'default' => '99', 'type' => 'string'],
+            'param_imp_cst_cofins' => ['label' => 'CST COFINS', 'default' => '99', 'type' => 'string'],
+            'param_imp_pis_aliquota' => ['label' => 'PIS %', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_cofins_aliquota' => ['label' => 'COFINS %', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            // IPI
+            'param_imp_ipi_cst' => ['label' => 'CST IPI', 'default' => '99', 'type' => 'string'],
+            'param_imp_ipi_aliquota' => ['label' => 'Alíquota IPI', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_cod_enq_ipi' => ['label' => 'Cód. Enq. IPI', 'default' => '', 'type' => 'string'],
+            // Outros
+            'param_imp_fcp_pct' => ['label' => '% FCP', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_mva_pct' => ['label' => '% MVA', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_mva_normal' => ['label' => '% MVA N.', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_reducao_base_pct' => ['label' => '% Base Red.', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_cod_beneficio' => ['label' => 'Cód. Benef.', 'default' => '', 'type' => 'string'],
+            // Fiscal avançado
+            'param_imp_tipo_tributacao' => ['label' => 'Tipo Trib.', 'default' => '', 'type' => 'string'],
+            'param_imp_icms_diferido' => ['label' => 'ICMS Dif.', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_aliq_deson' => ['label' => 'Alíq. Deson.', 'default' => '0.00', 'type' => 'decimal', 'decimals' => 2],
+            'param_imp_motivo_desoneracao' => ['label' => 'Mot. Deson.', 'default' => '0', 'type' => 'string'],
+            // IVA / IBS / CBS — padrão Simples + alíquotas-teste 2026 (LC 214/2025): IBS 0,1% + CBS 0,9%
+            'param_imp_iva_cst' => ['label' => 'CST IBS/CBS', 'default' => '000', 'type' => 'string'],
+            'param_imp_cclass_trib' => ['label' => 'Classificação Tributária', 'default' => '000001', 'type' => 'string'],
+            'param_imp_aliq_ibs_uf' => ['label' => 'Aliq IBS UF', 'default' => '0.1000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_aliq_cbs' => ['label' => 'Aliq CBS', 'default' => '0.9000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_aliq_ibs_mun' => ['label' => 'Aliq IBS Mun', 'default' => '0.0000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_aliq_adrem_ibs' => ['label' => 'Aliq Adrem IBS', 'default' => '0.0000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_aliq_adrem_cbs' => ['label' => 'Aliq Adrem CBS', 'default' => '0.0000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_reducao_cbs' => ['label' => 'Redução CBS', 'default' => '0.0000', 'type' => 'decimal', 'decimals' => 4],
+            'param_imp_reducao_ibs' => ['label' => 'Redução IBS', 'default' => '0.0000', 'type' => 'decimal', 'decimals' => 4],
+            // Compra (fora do layout do produto, mas útil no padrão da empresa)
+            'param_imp_cfop_compra' => ['label' => 'CFOP Compra', 'default' => '1102', 'type' => 'string'],
         ];
     }
 
@@ -768,7 +800,36 @@ final class EmpresaParametros
             'param_portal_contador_timeout' => ['label' => 'Timeout (segundos)', 'default' => 30, 'type' => 'integer'],
             'param_portal_contador_contador_id' => ['label' => 'Contador vinculado', 'default' => null, 'type' => 'integer'],
             'param_portal_contador_email' => ['label' => 'E-mail do escritório contábil', 'default' => '', 'type' => 'string'],
+            'param_portal_contador_vinculo_id' => ['label' => 'ID do vínculo no portal', 'default' => '', 'type' => 'string'],
+            'param_portal_contador_contador_nome_portal' => ['label' => 'Contador no portal', 'default' => '', 'type' => 'string'],
         ];
+    }
+
+    /**
+     * Campos preenchidos automaticamente após vínculo — não exibir no formulário manual.
+     *
+     * @return list<string>
+     */
+    public static function portalContadorAutoFields(): array
+    {
+        return [
+            'param_portal_contador_url',
+            'param_portal_contador_empresa_id',
+            'param_portal_contador_token',
+            'param_portal_contador_vinculo_id',
+            'param_portal_contador_contador_nome_portal',
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: int|float|string|null, type: string}>
+     */
+    public static function portalContadorManualFields(): array
+    {
+        return array_diff_key(
+            self::portalContadorFields(),
+            array_flip(self::portalContadorAutoFields()),
+        );
     }
 
     /**
@@ -815,6 +876,31 @@ final class EmpresaParametros
                 'default' => '',
                 'type' => 'string',
             ],
+            'param_balanca_modelo' => [
+                'label' => 'Modelo padrão da balança (arquivo)',
+                'default' => 'modFilizola',
+                'type' => 'string',
+            ],
+            'param_balanca_diretorio' => [
+                'label' => 'Diretório de arquivos da balança',
+                'default' => 'C:\\UNITECNOLOGIA_WEB\\balanca',
+                'type' => 'string',
+            ],
+            'param_balanca_etiqueta_modelo' => [
+                'label' => 'Modelo da etiqueta de balança (01–04)',
+                'default' => 4,
+                'type' => 'integer',
+            ],
+            'param_balanca_prefixo_barra' => [
+                'label' => 'Prefixo do código de barras da balança',
+                'default' => '2',
+                'type' => 'string',
+            ],
+            'param_balanca_digitos' => [
+                'label' => 'Dígitos do código do produto na etiqueta',
+                'default' => 6,
+                'type' => 'integer',
+            ],
             'param_backup_intervalo_horas' => [
                 'label' => 'Intervalo entre backups (horas)',
                 'default' => 24,
@@ -828,6 +914,11 @@ final class EmpresaParametros
             'param_backup_ultimo_status' => [
                 'label' => 'Status do último backup',
                 'default' => '',
+                'type' => 'string',
+            ],
+            'param_ui_density' => [
+                'label' => 'Tamanho da letra',
+                'default' => '14',
                 'type' => 'string',
             ],
         ];
@@ -857,6 +948,23 @@ final class EmpresaParametros
             'running' => 'Em andamento',
             'failed' => 'Falhou',
         ];
+    }
+
+    /**
+     * Tamanhos de letra (px) disponíveis na raiz do HTML.
+     *
+     * @return array<string, string>
+     */
+    public static function sistemaUiDensityOptions(): array
+    {
+        $options = [];
+
+        foreach ([12, 13, 14, 15, 16, 17, 18, 19, 20, 22] as $px) {
+            $suffix = $px === 14 ? ' (padrão)' : '';
+            $options[(string) $px] = $px.' px'.$suffix;
+        }
+
+        return $options;
     }
 
     /**
@@ -896,6 +1004,42 @@ final class EmpresaParametros
             'param_imp_observacao' => [
                 'label' => 'Observação — Consulte seu contador',
                 'default' => '',
+                'type' => 'text',
+            ],
+            'param_imp_cclass_trib_arquivo' => [
+                'label' => 'Arquivo Classificação Tributária IVA',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_cclass_trib_arquivo_nome' => [
+                'label' => 'Nome Classificação Tributária IVA',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_cclass_trib_importado_em' => [
+                'label' => 'Importado em — Classificação Tributária IVA',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_ipbtax_arquivo' => [
+                'label' => 'Arquivo IPBTAX',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_ipbtax_arquivo_nome' => [
+                'label' => 'Nome IPBTAX',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_ipbtax_importado_em' => [
+                'label' => 'Importado em — IPBTAX',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_imp_ibpt_token' => [
+                'label' => 'Token API IBPT (De Olho no Imposto)',
+                'default' => '',
+                // TEXT: evita estourar o limite de row size do InnoDB em unitec_empresas.
                 'type' => 'text',
             ],
         ];
@@ -980,6 +1124,14 @@ final class EmpresaParametros
             $defaults[$field] = $meta['default'];
         }
 
+        foreach (self::expedicaoBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::expedicaoFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
         return $defaults;
     }
 
@@ -992,41 +1144,42 @@ final class EmpresaParametros
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
     public static function numericColumnsByGroup(): array
     {
+        // 3 colunas equilibradas (mesmo padrão compacto label + input).
         $col1 = [
             'param_cod_caixa_geral',
-            'param_plano_transferencia_credito',
-            'param_plano_transferencia_debito',
             'param_empresa_padrao_relatorios',
-            'param_prazo_max_nota_cliente',
-            'param_plano_ficha_cliente',
             'param_ultimo_nsu',
-            'param_tempo_bloqueio_pdv_min',
+            'param_nfe_serie',
+            'param_desconto_maximo',
+            'param_acrescimo_maximo',
+            'param_carencia_juros',
+            'param_juros_diario_pct',
         ];
 
         $col2 = [
-            'param_desconto_maximo',
-            'param_acrescimo_maximo',
-            'param_pdv_modelo_balanca',
-            'param_plano_abertura_caixa',
-            'param_cod_dinheiro_fpg',
-            'param_nfe_num_inicial',
-            'param_nfe_serie',
-            'param_plano_sangria',
             'param_plano_venda',
+            'param_plano_compra',
+            'param_plano_devolucao',
+            'param_plano_boleto',
+            'param_plano_taxa_cartao',
+            'param_plano_sangria',
+            'param_plano_abertura_caixa',
+            'param_plano_ficha_cliente',
         ];
 
         $col3 = [
-            'param_plano_taxa_cartao',
-            'param_plano_devolucao',
-            'param_plano_compra',
-            'param_plano_boleto',
-            'param_carencia_juros',
-            'param_juros_diario_pct',
+            'param_plano_transferencia_credito',
+            'param_plano_transferencia_debito',
+            'param_cod_dinheiro_fpg',
+            'param_pdv_modelo_balanca',
+            'param_pdv_carga_intervalo_min',
             'param_lucro_padrao',
+            'param_meta_vendas_mensal',
+            'param_pdv_marquee_texto',
         ];
 
         return [
@@ -1037,12 +1190,42 @@ final class EmpresaParametros
     }
 
     /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function expedicaoBooleanFields(): array
+    {
+        return [
+            'param_expedicao_ativar' => ['label' => 'Ativar Expedição', 'default' => false],
+            'param_expedicao_pedir_quantidade' => ['label' => 'Pedir Quantidade', 'default' => false],
+            'param_expedicao_origem_pdv' => ['label' => 'Gerar expedição — PDV', 'default' => true],
+            'param_expedicao_origem_monitor' => ['label' => 'Gerar expedição — Monitor / Força de Vendas', 'default' => true],
+            'param_expedicao_origem_vi' => ['label' => 'Gerar expedição — Vendas Internas', 'default' => true],
+            'param_expedicao_origem_erp' => ['label' => 'Gerar expedição — ERP / Retaguarda', 'default' => true],
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: int|float|string|null, type: string, decimals?: int}>
+     */
+    public static function expedicaoFields(): array
+    {
+        return [
+            'param_expedicao_max_pedidos_controle' => [
+                'label' => 'Qtd. máxima de pedidos no Controle',
+                'default' => 5,
+                'type' => 'integer',
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function parametrosSubTabs(): array
     {
         return [
             'permissoes' => 'Permissões',
+            'expedicao' => 'Expedição',
             'imposto' => 'Imposto Padrão - Consulte seu contador',
             'difal' => 'DIFAL',
             'pix' => 'API PIX',
@@ -1050,6 +1233,8 @@ final class EmpresaParametros
             'api_servicos' => 'API de Serviços',
             'whatsapp' => 'WhatsApp',
             'portal_contador' => 'Portal do Contador',
+            'estoques' => 'Cadastro de Estoque',
+            'sistema' => 'Atualização e Backup',
         ];
     }
 }

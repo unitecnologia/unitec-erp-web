@@ -14,6 +14,7 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProductResource extends Resource
 {
@@ -46,27 +47,42 @@ class ProductResource extends Resource
     {
         $strings = [
             'codigo', 'referencia', 'codigo_barras', 'codigo_barras_caixa', 'descricao',
-            'tipo_produto', 'marca', 'grupo', 'unidade', 'localizacao', 'ncm', 'ncm_descricao', 'cest',
+            'tipo_produto', 'marca', 'grupo', 'unidade', 'localizacao',
+            'loc_corredor', 'loc_modulo', 'loc_prateleira', 'loc_gaveta', 'loc_legado',
+            'ncm', 'ncm_descricao', 'cest',
             'cfop_interno', 'cst_icms', 'csosn', 'cfop_externo', 'cst_externo', 'csosn_externo',
-            'cst_entrada', 'cst_saida', 'cst_ipi', 'cod_enq_ipi', 'cod_beneficio', 'anp_code', 'prefixo_balanca',
+            'cst_entrada', 'cst_saida', 'cst_cofins', 'cst_ipi', 'cod_enq_ipi', 'cod_beneficio', 'anp_code', 'prefixo_balanca',
             'tipo_restaurante', 'complemento', 'aplicacao', 'tipo_tributacao', 'tipo_alimento',
-            'foto_path', 'iva_cst', 'iva_classificacao',
+            'foto_path', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao',
         ];
 
         $dates = ['validade', 'promo_data_inicio', 'promo_data_fim'];
 
         $numbers = [
             'preco_compra', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda',
-            'preco_venda_prazo', 'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior',
-            'qtd_atacado', 'preco_atacado', 'comissao_pct', 'desconto_pct',
-            'estoque', 'estoque_minimo', 'estoque_inicial', 'peso_kg',
+            'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior',
+            'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'estoque_inicial', 'peso_kg',
             'origem', 'aliq_icms', 'aliq_icms_externo', 'aliq_pis', 'aliq_cofins', 'aliq_ipi',
             'fcp_pct', 'mva_pct', 'mva_normal', 'reducao_base_pct', 'icms_diferido', 'aliq_deson', 'motivo_desoneracao',
             'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'issqn',
             'tempo_espera', 'principio_ativo_id', 'menu_id', 'qtd_sabores',
             'valor_pequena', 'valor_media', 'valor_grande',
             'promo_preco_venda', 'promo_preco_atacado',
-            'iva_aliq', 'iva_red_base',
+            'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs',
+        ];
+
+        // Campos monetários/% no formulário customizado usam máscara BR (ex.: 0,1000).
+        // TextInput::numeric() interpreta vírgula como inválida e zera o valor no fill.
+        $brDecimalFields = [
+            'preco_compra', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda',
+            'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior',
+            'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'estoque_inicial', 'peso_kg',
+            'aliq_icms', 'aliq_icms_externo', 'aliq_pis', 'aliq_cofins', 'aliq_ipi',
+            'fcp_pct', 'mva_pct', 'mva_normal', 'reducao_base_pct', 'icms_diferido', 'aliq_deson',
+            'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'issqn',
+            'valor_pequena', 'valor_media', 'valor_grande',
+            'promo_preco_venda', 'promo_preco_atacado',
+            'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs',
         ];
 
         $booleans = [
@@ -96,11 +112,16 @@ class ProductResource extends Resource
         }
 
         foreach ($numbers as $field) {
-            $fields[] = TextInput::make($field)
-                ->numeric()
+            $input = TextInput::make($field)
                 ->nullable()
                 ->hidden()
                 ->dehydratedWhenHidden();
+
+            if (! in_array($field, $brDecimalFields, true)) {
+                $input->numeric();
+            }
+
+            $fields[] = $input;
         }
 
         foreach ($booleans as $field) {
@@ -115,18 +136,15 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         $columns = [
-            TextColumn::make('_marker')
-                ->label('')
-                ->alignCenter()
-                ->sortable(false)
-                ->getStateUsing(function (Product $record, $livewire): string {
-                    $selectedId = $livewire->highlightedRecordId ?? null;
-
-                    return $selectedId !== null && (int) $selectedId === (int) $record->getKey() ? '›' : '';
-                }),
             TextColumn::make('codigo')
                 ->label('Código')
-                ->sortable()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    $query->orderByRaw('CAST(codigo AS UNSIGNED) '.$dir);
+
+                    return $query;
+                })
                 ->alignCenter()
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('referencia')
@@ -139,25 +157,54 @@ class ProductResource extends Resource
                 ->placeholder('—')
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('descricao')
-                ->label('» Descrição')
+                ->label('Descrição')
                 ->wrap(false)
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    $query->orderBy('descricao', $dir);
+
+                    return $query;
+                })
                 ->weight(FontWeight::Bold),
             TextColumn::make('grupo')
                 ->label('Grupo')
                 ->alignCenter()
-                ->sortable()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    $query->orderBy('grupo', $dir);
+
+                    return $query;
+                })
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('preco_venda')
                 ->label('Preço')
-                ->formatStateUsing(fn ($state): string => 'R$ ' . number_format((float) $state, 2, ',', '.'))
-                ->alignEnd()
-                ->sortable()
+                ->formatStateUsing(function ($state): string {
+                    $valor = number_format((float) $state, 2, ',', '.');
+
+                    return '<span class="erp-produtos-preco"><span class="erp-produtos-preco__rs">R$</span><span class="erp-produtos-preco__val">'.e($valor).'</span></span>';
+                })
+                ->html()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    $query->orderBy('preco_venda', $dir);
+
+                    return $query;
+                })
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('estoque')
                 ->label('Est. Atual')
                 ->formatStateUsing(fn ($state): string => number_format((float) $state, 0, ',', '.'))
                 ->alignEnd()
-                ->sortable()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    $query->orderBy('estoque', $dir);
+
+                    return $query;
+                })
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('estoque_reservado_sum')
                 ->label('Est. Reserv.')
@@ -178,17 +225,35 @@ class ProductResource extends Resource
                 ->alignCenter()
                 ->weight(FontWeight::SemiBold),
             TextColumn::make('validade')
-                ->label('VALIDADE')
+                ->label('Validade')
                 ->formatStateUsing(fn ($state): string => filled($state) ? \Illuminate\Support\Carbon::parse($state)->format('d/m/Y') : '')
                 ->placeholder('')
                 ->alignCenter()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+                    // Sem validade no final ao ordenar do menor para o maior
+                    $query->orderByRaw('validade IS NULL ASC, validade '.$dir);
+
+                    return $query;
+                })
                 ->color(fn ($state, Product $record): ?string => $record->validadeVencida() ? 'danger' : null)
                 ->weight(fn ($state, Product $record): FontWeight => $record->validadeVencida() ? FontWeight::Bold : FontWeight::SemiBold),
         ];
 
         return $table
             ->columns($columns)
-            ->defaultSort('codigo')
+            ->defaultSort(function (Builder $query, string $direction, $livewire): Builder {
+                    // Se o usuário já escolheu outra coluna, não força código (senão sobrescreve).
+                    if (filled($livewire->getTableSortColumn())) {
+                        return $query;
+                    }
+
+                    $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+                    $query->orderByRaw('CAST(codigo AS UNSIGNED) '.$dir);
+
+                    return $query;
+                })
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

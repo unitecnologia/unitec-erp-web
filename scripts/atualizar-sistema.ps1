@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Baixa Unitec-ERP-Update.zip do Mega e aplica sobre a instalacao local.

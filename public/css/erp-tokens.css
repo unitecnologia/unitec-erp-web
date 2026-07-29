@@ -46,7 +46,7 @@
     --erp-action-danger: #dc2626;
     --erp-action-danger-dark: #b91c1c;
 
-    /* Tipografia */
+    /* Tipografia (escala com html font-size / densidade da empresa) */
     --erp-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
     --erp-font-size-sm: 0.875rem;
     --erp-font-size-xs: 0.8125rem;
@@ -60,6 +60,8 @@
     /* Transições */
     --erp-transition: 0.15s ease;
 }
+
+/* Tamanho da letra: definido em px no head (param_ui_density). Tokens em rem acompanham a raiz. */
 
 html,
 body,

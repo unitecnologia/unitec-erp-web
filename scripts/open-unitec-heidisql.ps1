@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Abre o HeidiSQL conectado ao banco unitec_erp (suporte Unitec).

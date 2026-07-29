@@ -8,6 +8,8 @@ trait EmbedsInPdvOverlay
 
     public bool $embedsInOrcamento = false;
 
+    public bool $embedsInNotaFornecedor = false;
+
     public function mountEmbedsInPdvOverlay(): void
     {
         if (request()->boolean('pdv')) {
@@ -16,6 +18,10 @@ trait EmbedsInPdvOverlay
 
         if (request()->boolean('orcamento')) {
             $this->embedsInOrcamento = true;
+        }
+
+        if (request()->boolean('nota_fornecedor')) {
+            $this->embedsInNotaFornecedor = true;
         }
     }
 
@@ -26,7 +32,7 @@ trait EmbedsInPdvOverlay
 
     protected function embedsInParentOverlay(): bool
     {
-        return $this->embedsInPdv || $this->embedsInOrcamento;
+        return $this->embedsInPdv || $this->embedsInOrcamento || $this->embedsInNotaFornecedor;
     }
 
     /**
@@ -36,6 +42,14 @@ trait EmbedsInPdvOverlay
     {
         if ($this->embedsInPdv) {
             $this->js('window.parent.postMessage({ type: "erp-pdv-overlay-close" }, "*")');
+
+            return;
+        }
+
+        if ($this->embedsInNotaFornecedor) {
+            $message = array_merge(['type' => 'erp-nf-forn-overlay-close'], $payload ?? []);
+            $encoded = json_encode($message, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            $this->js('window.parent.postMessage(' . $encoded . ', "*")');
 
             return;
         }
@@ -63,7 +77,7 @@ trait EmbedsInPdvOverlay
             $attributes['class'] = trim(($attributes['class'] ?? '') . ' erp-pdv-embed-body');
         }
 
-        if ($this->embedsInOrcamento) {
+        if ($this->embedsInOrcamento || $this->embedsInNotaFornecedor) {
             $attributes['class'] = trim(($attributes['class'] ?? '') . ' erp-orcamento-embed-body');
         }
 

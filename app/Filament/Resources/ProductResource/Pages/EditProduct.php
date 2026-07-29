@@ -25,6 +25,9 @@ class EditProduct extends EditRecord
         ErpScreen::set('Cadastro de Produtos');
 
         $this->syncProductFormData();
+        $this->applyEmpresaPrecosToFormData($this->record);
+        $this->hydrateNcmDescricaoFromCatalog(fillForm: false);
+        $this->form->fill($this->data);
         $this->mountProductPhoto();
         $this->loadProductGrades($this->record);
         $this->loadProductCompositions($this->record);
@@ -32,6 +35,7 @@ class EditProduct extends EditRecord
         $this->loadProductPriceHistories($this->record);
         $this->loadProductImeis($this->record);
         $this->loadProductReservas($this->record);
+        $this->captureProductFormBaseline();
     }
 
     protected function getHeaderActions(): array

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EntregadorResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\EntregadorResource;
 use App\Models\Entregador;
 use App\Support\Erp\ErpScreen;
@@ -18,6 +19,7 @@ use Livewire\Attributes\Url;
 class ListEntregadores extends ListRecords
 {
     use InteractsWithErpListPage;
+    use ManagesErpSearchColumn;
 
     protected static string $resource = EntregadorResource::class;
 
@@ -33,7 +35,22 @@ class ListEntregadores extends ListRecords
     {
         parent::mount();
 
+        $this->erpRestoreSearchColumnFromSession();
+
         ErpScreen::set('Entregador');
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function erpAllowedSearchColumns(): array
+    {
+        return ['codigo', 'nome'];
+    }
+
+    protected function erpDefaultSearchColumn(): string
+    {
+        return 'codigo';
     }
 
     protected static function erpListPageClass(): string
@@ -92,9 +109,16 @@ class ListEntregadores extends ListRecords
             ]);
     }
 
-    public function updatedSearchColumn(): void
+    public function search(): void
+    {
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
+    public function clearSearch(): void
     {
         $this->localSearch = '';
+        $this->searchColumn = $this->erpDefaultSearchColumn();
         $this->clearListSelection();
         $this->resetTable();
     }

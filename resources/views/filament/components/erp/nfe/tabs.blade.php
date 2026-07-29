@@ -2,6 +2,7 @@
     use App\Models\Nfe;
 
     $statusTabs = [
+        'todas' => 'Todas',
         Nfe::STATUS_ABERTA => 'Aberta',
         Nfe::STATUS_TRANSMITIDA => 'Transmitida',
         Nfe::STATUS_CANCELADA => 'Cancelada',
@@ -18,7 +19,11 @@
             <button
                 type="button"
                 wire:click="setStatusFilter('{{ $value }}')"
-                @class(['erp-nfe__tab', 'erp-nfe__tab--active' => $this->statusFilter === $value])
+                @class([
+                    'erp-nfe__tab',
+                    'erp-nfe__tab--' . $value,
+                    'erp-nfe__tab--active' => $this->statusFilter === $value,
+                ])
             >{{ $label }}</button>
         @endforeach
     </div>

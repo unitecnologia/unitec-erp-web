@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\OrcamentoResource\Pages;
 use App\Models\Orcamento;
 use BackedEnum;
@@ -28,6 +29,11 @@ class OrcamentoResource extends Resource
     protected static ?string $recordTitleAttribute = 'numero';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('orcamentos.access');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -62,6 +68,11 @@ class OrcamentoResource extends Resource
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('hora')
+                    ->label('Hora')
+                    ->state(fn (Orcamento $record): string => $record->horaExibicao() ?? '—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.nome_razao')
                     ->label('Cliente')
                     ->wrap(false)
@@ -74,17 +85,27 @@ class OrcamentoResource extends Resource
                 TextColumn::make('cliente.cidade_nome')
                     ->label('Cidade')
                     ->placeholder('—')
+                    ->tooltip(fn (Orcamento $record): ?string => $record->cliente?->cidade_nome)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.uf')
                     ->label('UF')
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('total')
-                    ->label('Total')
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
+                TextColumn::make('plataforma')
+                    ->label('Plataforma')
+                    ->state(fn (Orcamento $record): string => $record->plataformaLabel())
+                    ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                ViewColumn::make('status')
+                    ->label('Situação')
+                    ->view('filament.components.erp.orcamentos.columns.status')
+                    ->alignCenter()
+                    ->disabledClick(),
+                ViewColumn::make('total')
+                    ->label('Total')
+                    ->view('filament.components.erp.orcamentos.columns.total')
+                    ->disabledClick(),
                 ViewColumn::make('ver_itens')
                     ->label('')
                     ->state(fn (): bool => true)

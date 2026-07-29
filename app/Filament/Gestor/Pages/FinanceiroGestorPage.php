@@ -73,7 +73,7 @@ class FinanceiroGestorPage extends Page
 
     public function abrirDetalhe(string $tipo): void
     {
-        $tipos = ['receber_hoje', 'pagar_hoje', 'receber_vencido', 'pagar_vencido', 'proximos_receber', 'inadimplencia', 'acima_limite'];
+        $tipos = ['receber_hoje', 'pagar_hoje', 'receber_vencido', 'pagar_vencido', 'proximos_receber', 'inadimplencia', 'acima_limite', 'cartoes'];
 
         if (! in_array($tipo, $tipos, true)) {
             return;
@@ -302,6 +302,7 @@ class FinanceiroGestorPage extends Page
             'proximos_receber' => 'Próximos a receber',
             'inadimplencia' => 'Inadimplência',
             'acima_limite' => 'Acima do limite',
+            'cartoes' => 'Cartões a receber',
             default => 'Títulos',
         };
     }

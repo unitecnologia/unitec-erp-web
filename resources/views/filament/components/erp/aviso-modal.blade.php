@@ -34,6 +34,12 @@
                 @foreach ($lines as $line)
                     <p class="erp-aviso-modal__text">{!! $line !!}</p>
                 @endforeach
+
+                @if (! empty($extraView))
+                    <div class="erp-aviso-modal__extra">
+                        @include($extraView)
+                    </div>
+                @endif
             </div>
 
             <div class="erp-aviso-modal__actions">

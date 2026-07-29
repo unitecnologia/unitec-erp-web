@@ -1,8 +1,10 @@
-@php
+﻿@php
     use App\Models\Person;
     use App\Models\FormaPagamento;
+    use App\Models\PriceTable;
     use App\Models\TabelaPrazo;
     use App\Models\Vendedor;
+    use App\Models\PersonVisitaDia;
 
     $formasPagamento = FormaPagamento::query()
         ->where('ativo', true)
@@ -17,13 +19,18 @@
     $formaSelecionada = $this->data['forma_pagamento_id'] ?? null;
     $tabelasDaForma = $formaSelecionada ? ($tabelasPorForma[$formaSelecionada] ?? collect()) : collect();
 
+    $tabelasPreco = PriceTable::query()
+        ->where('ativo', true)
+        ->orderBy('codigo')
+        ->get(['id', 'codigo', 'descricao']);
+
     $vendedores = Vendedor::query()
         ->where('ativo', true)
         ->orderBy('nome')
         ->get(['id', 'codigo', 'nome']);
 @endphp
 
-<div class="erp-pcad-form erp-pcad-form--adicionais">
+<div class="erp-pcad-form erp-pcad-form--adicionais erp-pessoas-panel">
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-mae">Nome da Mãe</label>
         <input id="pcad-mae" type="text" wire:model="data.nome_mae" class="erp-pcad-form__input erp-pcad-form__input--grow">
@@ -51,13 +58,35 @@
                 <option value="{{ $forma->id }}">{{ $forma->codigo }} - {{ $forma->descricao }}</option>
             @endforeach
         </select>
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-prazo">Tabela</label>
+        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-prazo">Tabela Prazo</label>
         <select id="pcad-prazo" wire:model="data.tabela_prazo_id" class="erp-pcad-form__select erp-pcad-form__select--grow" @disabled($tabelasDaForma->isEmpty())>
             <option value="">— Selecione —</option>
             @foreach ($tabelasDaForma as $tabela)
                 <option value="{{ $tabela->id }}">{{ $tabela->dias }}</option>
             @endforeach
         </select>
+    </div>
+
+    <div class="erp-pcad-form__row">
+        <label class="erp-pcad-form__label" for="pcad-tab-preco">Tabela de Preço</label>
+        <select id="pcad-tab-preco" wire:model="data.price_table_id" class="erp-pcad-form__select erp-pcad-form__select--grow">
+            <option value="">— Padrão do vendedor —</option>
+            @foreach ($tabelasPreco as $tabela)
+                <option value="{{ $tabela->id }}">{{ $tabela->codigo }} - {{ $tabela->descricao }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="erp-pcad-form__row erp-pcad-form__row--top">
+        <label class="erp-pcad-form__label">Dias de visita</label>
+        <div class="erp-pcad-form__flags">
+            @foreach (PersonVisitaDia::diasAbrev() as $dia => $label)
+                <label class="erp-pcad-form__flag">
+                    <input type="checkbox" value="{{ $dia }}" wire:model="data.visita_dias">
+                    <span>{{ $label }}</span>
+                </label>
+            @endforeach
+        </div>
     </div>
 
     <div class="erp-pcad-form__row">

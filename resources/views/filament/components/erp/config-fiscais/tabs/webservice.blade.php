@@ -48,19 +48,7 @@
             <label class="erp-pcad-form__label" for="cfg-proxy-user">Usuário</label>
             <input id="cfg-proxy-user" type="text" wire:model="form.proxy_usuario" class="erp-pcad-form__input erp-pcad-form__input--grow">
             <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-proxy-pass">Senha</label>
-            <input id="cfg-proxy-pass" type="password" wire:model="form.proxy_senha" class="erp-pcad-form__input erp-pcad-form__input--grow" autocomplete="off">
-        </div>
-    </fieldset>
-
-    <fieldset class="erp-pcad__group">
-        <legend class="erp-pcad__group-title">Numeração NF-e</legend>
-        <div class="erp-pcad-form__row">
-            <label class="erp-pcad-form__label" for="cfg-numero">Próximo número</label>
-            <input id="cfg-numero" type="number" wire:model="form.numero" class="erp-pcad-form__input erp-pcad-form__input--xs">
-            <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-serie">Série</label>
-            <input id="cfg-serie" type="text" wire:model="form.serie" class="erp-pcad-form__input erp-pcad-form__input--xs">
-            <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-serie-nfe">Série NF-e</label>
-            <input id="cfg-serie-nfe" type="number" wire:model="form.serie_nfe" class="erp-pcad-form__input erp-pcad-form__input--xs">
+            <input id="cfg-proxy-pass" type="password" wire:model="form.proxy_senha" class="erp-pcad-form__input erp-pcad-form__input--grow" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-google-password-manager="ignore">
         </div>
     </fieldset>
 </div>

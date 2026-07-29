@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
 use App\Filament\Concerns\InteractsWithErpFormReturnUrl;
 use App\Filament\Concerns\EmbedsInPdvOverlay;
+use App\Filament\Concerns\ManagesCclassTribLookup;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\ProductResource;
 use App\Models\Product;
@@ -12,6 +13,7 @@ use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\ProductFormValidator;
+use App\Support\Erp\ProductLocalizacao;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
@@ -26,6 +28,7 @@ trait ErpProductFormPage
 {
     use EmbedsInPdvOverlay;
     use InteractsWithErpFormReturnUrl;
+    use ManagesCclassTribLookup;
     use ManagesProductBarcodeLookup;
     use ManagesProductCardex;
     use ManagesProductPhoto;
@@ -39,7 +42,12 @@ trait ErpProductFormPage
     use ManagesProductTabPreco;
     use ManagesProductUltimosPrecos;
     use ManagesProductPriceCalculation;
+    use ManagesProductPrecificacao;
+    use ManagesProductEmpresaPrecos;
+    use ManagesProductImpostoPadrao;
+    use ManagesProductLocalizacao;
     use ManagesProductReservas;
+    use ManagesProductExitConfirm;
 
     public function getHeading(): string | Htmlable | null
     {
@@ -88,6 +96,10 @@ trait ErpProductFormPage
             $classes[] = 'erp-orcamento-embed';
         }
 
+        if ($this->embedsInNotaFornecedor) {
+            $classes[] = 'erp-orcamento-embed';
+        }
+
         return $classes;
     }
 
@@ -106,21 +118,33 @@ trait ErpProductFormPage
                 ]);
         }
 
+        // Standalone: rodapé vai dentro da janela (window.blade) para altura fullscreen.
+        // Embed (orçamento/nota): mantém action-bar externo como antes.
+        $components = [
+            View::make('filament.components.erp.produtos.form.window'),
+        ];
+
+        if ($this->embedsInOrcamento || $this->embedsInNotaFornecedor) {
+            $components[] = View::make('filament.components.erp.produtos.form.action-bar');
+        }
+
+        $components[] = Form::make([EmbeddedSchema::make('form')])
+            ->id('form')
+            ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName())
+            ->extraAttributes(['class' => 'erp-pcad__filament-hidden']);
+
         return $schema
             ->gap(false)
-            ->components([
-                View::make('filament.components.erp.produtos.form.window'),
-                View::make('filament.components.erp.produtos.form.action-bar'),
-                Form::make([EmbeddedSchema::make('form')])
-                    ->id('form')
-                    ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName())
-                    ->extraAttributes(['class' => 'erp-pcad__filament-hidden']),
-            ]);
+            ->components($components);
     }
 
-    public function saveForm(): void
+    public function saveForm(?string $localizacaoFormatted = null): void
     {
         $this->productPhotoDownloadFailureNotified = false;
+
+        if ($localizacaoFormatted !== null) {
+            $this->applyLocalizacaoFormatted($localizacaoFormatted);
+        }
 
         $this->syncProductFormDataBeforeSave();
 
@@ -200,6 +224,7 @@ trait ErpProductFormPage
             return;
         }
 
+        $this->syncLocalizacaoFromParts();
         $this->recalculateProductPricesBeforeSave();
         $this->form->fill($this->data);
     }
@@ -212,6 +237,7 @@ trait ErpProductFormPage
     {
         $data = $this->mergeLivewireFormData($data);
         $data = $this->ensureUniqueProductCodigo($data);
+        $data = $this->resolveNcmDescricaoInFormData($data);
 
         if ((float) ($data['estoque_inicial'] ?? 0) > 0 && (float) ($data['estoque'] ?? 0) <= 0) {
             $data['estoque'] = $data['estoque_inicial'];
@@ -226,7 +252,46 @@ trait ErpProductFormPage
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return $this->mergeLivewireFormData($data);
+        $data = $this->mergeLivewireFormData($data);
+        $data = $this->resolveNcmDescricaoInFormData($data);
+
+        return $this->preserveProductEstoqueOnUpdate($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function resolveNcmDescricaoInFormData(array $data): array
+    {
+        $catalog = app(\App\Support\Erp\Fiscal\NcmCatalogService::class);
+        $ncm = $catalog->normalizeCodigo((string) ($data['ncm'] ?? ''));
+
+        if ($ncm === null) {
+            return $data;
+        }
+
+        $data['ncm'] = $ncm;
+        $record = $catalog->findByCodigo($ncm);
+
+        if ($record) {
+            $data['ncm_descricao'] = (string) $record->descricao;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function preserveProductEstoqueOnUpdate(array $data): array
+    {
+        if ($this->isEditingProduct()) {
+            unset($data['estoque']);
+        }
+
+        return $data;
     }
 
     /**
@@ -236,8 +301,17 @@ trait ErpProductFormPage
     protected function mergeLivewireFormData(array $data): array
     {
         $merged = array_merge($data, $this->data ?? []);
+
+        if ($this->isEditingProduct() && $this->record) {
+            $merged['estoque'] = (float) $this->record->estoque;
+        }
+
         $merged = ErpUppercase::normalizeFormData($merged);
         $merged = $this->normalizeProductFormDataForSave($merged);
+
+        if (blank($merged['localizacao'] ?? null) && filled($this->data['localizacao'] ?? null)) {
+            $merged['localizacao'] = $this->data['localizacao'];
+        }
 
         if (! empty($merged['validade']) && is_string($merged['validade'])) {
             $validade = trim($merged['validade']);
@@ -292,6 +366,7 @@ trait ErpProductFormPage
         $this->form->fill($state);
         $this->refreshProductFotoPreviewUrl();
         $this->loadProductReservas($this->record ?? null);
+        $this->captureProductFormBaseline();
     }
 
     /**
@@ -300,11 +375,11 @@ trait ErpProductFormPage
      */
     protected function formatProductFormDataForDisplay(array $data): array
     {
-        foreach (['preco_compra', 'preco_custo', 'preco_venda', 'preco_venda_prazo', 'preco_atacado', 'preco_custo_anterior', 'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior', 'promo_preco_venda', 'promo_preco_atacado'] as $field) {
+        foreach (['preco_compra', 'preco_custo', 'preco_venda', 'preco_atacado', 'preco_especial', 'preco_custo_anterior', 'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior', 'promo_preco_venda', 'promo_preco_atacado'] as $field) {
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['pct_custos', 'pct_lucro', 'comissao_pct', 'desconto_pct'] as $field) {
+        foreach (['pct_custos', 'pct_lucro'] as $field) {
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
@@ -312,8 +387,8 @@ trait ErpProductFormPage
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'iva_aliq', 'iva_red_base'] as $field) {
-            $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
+        foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs'] as $field) {
+            $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 4);
         }
 
         foreach (['valor_pequena', 'valor_media', 'valor_grande'] as $field) {
@@ -339,7 +414,7 @@ trait ErpProductFormPage
             }
         }
 
-        return $data;
+        return $this->ensureLocalizacaoFormKeys($data);
     }
 
     protected function formatBrDateForDisplay(mixed $value): ?string
@@ -379,11 +454,11 @@ trait ErpProductFormPage
      */
     protected function normalizeProductFormDataForSave(array $data): array
     {
-        foreach (['preco_compra', 'preco_custo', 'preco_venda', 'preco_venda_prazo', 'preco_atacado', 'preco_custo_anterior', 'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior', 'promo_preco_venda', 'promo_preco_atacado'] as $field) {
+        foreach (['preco_compra', 'preco_custo', 'preco_venda', 'preco_atacado', 'preco_especial', 'preco_custo_anterior', 'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior', 'promo_preco_venda', 'promo_preco_atacado'] as $field) {
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['pct_custos', 'pct_lucro', 'comissao_pct', 'desconto_pct'] as $field) {
+        foreach (['pct_custos', 'pct_lucro'] as $field) {
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
@@ -391,8 +466,8 @@ trait ErpProductFormPage
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'iva_aliq', 'iva_red_base'] as $field) {
-            $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
+        foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs'] as $field) {
+            $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 4);
         }
 
         foreach (['valor_pequena', 'valor_media', 'valor_grande'] as $field) {
@@ -419,7 +494,7 @@ trait ErpProductFormPage
         $data['estoque_inicial'] = $this->parseBrDecimal($data['estoque_inicial'] ?? 0, 0);
         $data['peso_kg'] = $this->parseBrDecimal($data['peso_kg'] ?? 0, 3);
 
-        return $data;
+        return ProductLocalizacao::collapseFromForm($data);
     }
 
     protected function parseBrDecimal(mixed $value, int $decimals = 2): float
@@ -437,10 +512,25 @@ trait ErpProductFormPage
             ? (float) $value
             : $this->parseBrDecimal($value, $decimals);
 
-        return number_format($number, $decimals, ',', '');
+        return number_format($number, $decimals, ',', '.');
     }
 
     public function cancelForm(): void
+    {
+        if ($this->productExitConfirmOpen) {
+            return;
+        }
+
+        if ($this->productFormHasUnsavedChanges()) {
+            $this->productExitConfirmOpen = true;
+
+            return;
+        }
+
+        $this->leaveProductForm();
+    }
+
+    protected function leaveProductForm(): void
     {
         if ($this->embedsInParentOverlay()) {
             $this->closeEmbedOverlay();
@@ -474,6 +564,10 @@ trait ErpProductFormPage
             return ProductResource::getUrl('create') . '?orcamento=1';
         }
 
+        if ($this->embedsInNotaFornecedor) {
+            return ProductResource::getUrl('create') . '?nota_fornecedor=1';
+        }
+
         return $this->erpFormReturnRedirectUrl($this->getProductListRedirectUrl());
     }
 
@@ -501,7 +595,9 @@ trait ErpProductFormPage
     {
         $labels = [
             'descricao' => 'Descrição',
-            'preco_venda' => 'Preço Venda',
+            'preco_venda' => 'Preço Varejo',
+            'preco_atacado' => 'Preço Atacado',
+            'preco_especial' => 'Preço Especial',
             'unidade' => 'Unidade',
             'cst_icms' => 'CST ICMS',
             'cest' => 'CEST',
@@ -539,6 +635,61 @@ trait ErpProductFormPage
     }
 
     /**
+     * Empresas que o usuário logado pode usar no seletor do cadastro de produto.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\Empresa>
+     */
+    public function productFormEmpresas()
+    {
+        $user = auth()->user();
+        $query = \App\Models\Empresa::query()
+            ->where('ativo', true)
+            ->orderBy('nome');
+
+        if ($user instanceof \App\Models\User && ! $user->is_admin) {
+            $ids = $user->accessibleEmpresaIds();
+            $query->whereIn('id', $ids !== [] ? $ids : [0]);
+        }
+
+        return $query->get(['id', 'nome', 'codigo']);
+    }
+
+    public function switchProductFormEmpresa(int|string|null $empresaId): void
+    {
+        $empresaId = (int) $empresaId;
+        $user = auth()->user();
+        $fromEmpresaId = $this->currentProductEmpresaId();
+
+        if ($empresaId <= 0) {
+            return;
+        }
+
+        if ($user instanceof \App\Models\User && ! $user->canAccessEmpresa($empresaId)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Você não tem acesso a esta empresa.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! \App\Models\Empresa::query()->whereKey($empresaId)->where('ativo', true)->exists()) {
+            return;
+        }
+
+        if ($fromEmpresaId === $empresaId) {
+            return;
+        }
+
+        $this->switchProductFormEmpresaPrecos($fromEmpresaId, $empresaId);
+        session(['erp_empresa_id' => $empresaId]);
+
+        if (! $this->isEditingProduct()) {
+            $this->applyEmpresaImpostoPadraoToProductForm(notify: false);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function defaultProductFormData(?\App\Models\Empresa $empresa = null): array
@@ -555,7 +706,6 @@ trait ErpProductFormPage
             'preco_custo' => 0,
             'pct_lucro' => 0,
             'preco_venda' => 0,
-            'preco_venda_prazo' => 0,
             'preco_venda_anterior' => 0,
             'preco_custo_anterior' => 0,
             'e_medio' => 0,
@@ -563,8 +713,13 @@ trait ErpProductFormPage
             'ult_compra_anterior' => 0,
             'qtd_atacado' => 0,
             'preco_atacado' => 0,
-            'comissao_pct' => 0,
-            'desconto_pct' => 0,
+            'preco_especial' => 0,
+            'localizacao' => null,
+            'loc_corredor' => '',
+            'loc_modulo' => '',
+            'loc_prateleira' => '',
+            'loc_gaveta' => '',
+            'loc_legado' => null,
             'estoque' => 0,
             'estoque_minimo' => 1,
             'estoque_inicial' => 0,
@@ -600,10 +755,6 @@ trait ErpProductFormPage
             'promo_data_fim' => null,
             'promo_preco_venda' => 0,
             'promo_preco_atacado' => 0,
-            'iva_cst' => null,
-            'iva_aliq' => 0,
-            'iva_red_base' => 0,
-            'iva_classificacao' => null,
             ...ProductFormValidator::fiscalDefaultsFromEmpresa($empresa),
         ];
     }

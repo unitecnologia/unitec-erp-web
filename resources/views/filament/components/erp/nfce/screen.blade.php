@@ -7,15 +7,34 @@
 <div class="erp-nfe" wire:ignore.self>
     <div class="erp-nfe__filters">
         <div class="erp-nfe__filters-row">
-            <div class="erp-nfe__empresa-group">
-                <span class="erp-nfe__empresa-label">Empresa:</span>
-                <span class="erp-nfe__empresa-value">{{ $this->empresaNome }}</span>
+            @include('filament.components.erp.empresa-badge', [
+                'nome' => $this->empresaNome,
+                'prefix' => 'erp-nfe',
+            ])
+
+            <div class="erp-nfe__locate">
+                <span class="erp-nfe__locate-label">Localizar</span>
+                <select wire:model.live="searchColumn" class="erp-nfe__select erp-nfe__search-field">
+                    @foreach ($searchLabels as $value => $label)
+                        <option value="{{ $value }}">&lt;&lt;{{ $label }}&gt;&gt;</option>
+                    @endforeach
+                </select>
+                <input
+                    type="text"
+                    wire:model="localSearch"
+                    wire:keydown.enter="applyFooterSearch"
+                    wire:key="nfce-local-search-{{ $this->searchColumn }}"
+                    class="erp-nfe__input erp-nfe__search-text"
+                    placeholder="{{ $searchLabel }}"
+                    autocomplete="off"
+                >
             </div>
 
             <div class="erp-nfe__filters-main">
                 <div class="erp-nfe__period-group">
-                    <span class="erp-nfe__footer-label">Período de</span>
+                    <span class="erp-nfe__footer-label">Período</span>
                     <label class="erp-nfe__period-label">
+                        de
                         <input
                             type="date"
                             data-wire-field="periodoDe"
@@ -23,8 +42,8 @@
                             class="erp-nfe__period-input erp-nfe__period-from"
                         >
                     </label>
-                    <span class="erp-nfe__footer-label">até</span>
                     <label class="erp-nfe__period-label">
+                        até
                         <input
                             type="date"
                             data-wire-field="periodoAte"
@@ -38,29 +57,11 @@
                         onclick="window.ErpDatepicker?.commitAllIn(this.closest('.erp-nfe') ?? document)"
                         class="erp-nfe__btn erp-nfe__btn--filter"
                     >
-                        Filtrar Período
+                        Filtrar
                     </button>
                 </div>
 
-                <div class="erp-nfe__locate">
-                    <span class="erp-nfe__locate-label">Localizar</span>
-                    <select wire:model.live="searchColumn" class="erp-nfe__select erp-nfe__locate-select">
-                        @foreach ($searchLabels as $value => $label)
-                            <option value="{{ $value }}">&lt;&lt;{{ $label }}&gt;&gt;</option>
-                        @endforeach
-                    </select>
-                    <input
-                        type="text"
-                        wire:model="localSearch"
-                        wire:keydown.enter="applyFooterSearch"
-                        wire:key="nfce-local-search-{{ $this->searchColumn }}"
-                        class="erp-nfe__input erp-nfe__search-text"
-                        placeholder="{{ $searchLabel }}"
-                        autocomplete="off"
-                    >
-                </div>
-
-                <div class="erp-nfe__chave-group">
+                <div class="erp-nfe__chave-group erp-nfe__chave-group--inline">
                     <label class="erp-nfe__chave-label">
                         CHAVE NFC-e
                         <input

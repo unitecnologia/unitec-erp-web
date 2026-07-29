@@ -17,9 +17,11 @@ class SyncController
 
     public function pull(Request $request): JsonResponse
     {
-        $vendedorId = $request->user()?->vendedor_id;
+        $user = $request->user();
+        $vendedorId = $user?->vendedor_id;
+        $empresaId = $user?->empresa_id ? (int) $user->empresa_id : null;
 
-        $signature = $this->service->pullSignature($vendedorId);
+        $signature = $this->service->pullSignature($vendedorId, $empresaId);
         $etag = '"'.$signature.'"';
 
         $this->touchDevice($request, pull: true);
@@ -41,7 +43,7 @@ class SyncController
             }
         }
 
-        $payload = $this->service->buildPull($since, $vendedorId);
+        $payload = $this->service->buildPull($since, $vendedorId, $empresaId);
 
         return response()->json($payload)->setEtag($signature);
     }

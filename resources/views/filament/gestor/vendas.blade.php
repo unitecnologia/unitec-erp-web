@@ -1,5 +1,14 @@
 <x-filament-panels::page>
-    @php $s = $snapshot; @endphp
+    @php
+        $s = $snapshot;
+        $charts = $charts ?? [];
+        $salesChart = $charts['sales'] ?? ['defaultFrom' => '', 'defaultTo' => '', 'points' => []];
+        $mixChart = $charts['mix'] ?? ['labels' => [], 'values' => [], 'colors' => []];
+        $fiscalChart = $charts['fiscal'] ?? ['labels' => [], 'values' => [], 'colors' => []];
+        $paymentsChart = $charts['payments'] ?? ['labels' => [], 'values' => [], 'colors' => []];
+        $chartJsV = @filemtime(public_path('js/vendor/chart.umd.min.js')) ?: time();
+        $gestorChartsV = @filemtime(public_path('js/gestor-vendas-charts.js')) ?: time();
+    @endphp
     <div class="gestor-shell" data-theme="{{ $this->gestorTema }}">
         <div class="gestor-shell__inner">
             @include('filament.gestor.partials.top', [
@@ -31,6 +40,69 @@
                 </article>
             </section>
 
+            <section class="gestor-charts" aria-label="Indicadores de vendas">
+                <article class="gestor-chart-card gestor-chart-card--line">
+                    <header class="gestor-chart-card__head">
+                        <h2 class="gestor-chart-card__title">Vendas por período</h2>
+                        <div class="gestor-chart-filter" data-gestor-sales-filter>
+                            <label class="gestor-chart-filter__field">
+                                <span>de</span>
+                                <input
+                                    type="date"
+                                    data-gestor-sales-from
+                                    value="{{ $salesChart['defaultFrom'] ?? '' }}"
+                                    aria-label="Data inicial"
+                                >
+                            </label>
+                            <label class="gestor-chart-filter__field">
+                                <span>até</span>
+                                <input
+                                    type="date"
+                                    data-gestor-sales-to
+                                    value="{{ $salesChart['defaultTo'] ?? '' }}"
+                                    aria-label="Data final"
+                                >
+                            </label>
+                        </div>
+                    </header>
+                    <div class="gestor-chart-card__body gestor-chart-card__body--line">
+                        <canvas id="gestor-sales-chart" aria-label="Gráfico de vendas por período"></canvas>
+                    </div>
+                </article>
+
+                <div class="gestor-charts__pies">
+                    <article class="gestor-chart-card gestor-chart-card--pie">
+                        <header class="gestor-chart-card__head">
+                            <h2 class="gestor-chart-card__title">Mix do mês</h2>
+                            <span class="gestor-chart-card__meta">canais</span>
+                        </header>
+                        <div class="gestor-chart-card__body gestor-chart-card__body--pie">
+                            <canvas id="gestor-mix-chart" aria-label="Mix de canais do mês"></canvas>
+                        </div>
+                    </article>
+
+                    <article class="gestor-chart-card gestor-chart-card--pie">
+                        <header class="gestor-chart-card__head">
+                            <h2 class="gestor-chart-card__title">Docs. eletrônicos</h2>
+                            <span class="gestor-chart-card__meta">mês</span>
+                        </header>
+                        <div class="gestor-chart-card__body gestor-chart-card__body--pie">
+                            <canvas id="gestor-fiscal-chart" aria-label="Documentos eletrônicos do mês"></canvas>
+                        </div>
+                    </article>
+
+                    <article class="gestor-chart-card gestor-chart-card--pie">
+                        <header class="gestor-chart-card__head">
+                            <h2 class="gestor-chart-card__title">Meios de pagamento</h2>
+                            <span class="gestor-chart-card__meta">mês</span>
+                        </header>
+                        <div class="gestor-chart-card__body gestor-chart-card__body--pie">
+                            <canvas id="gestor-payments-chart" aria-label="Meios de pagamento do mês"></canvas>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
             @if (! empty($s['metas_vendedores']))
                 <section class="gestor-section">
                     <div class="gestor-section__head"><h2>Metas</h2></div>
@@ -57,5 +129,13 @@
         </div>
         @include('filament.gestor.partials.bottom-nav')
     </div>
+
+    <script type="application/json" id="gestor-sales-data">@json($salesChart)</script>
+    <script type="application/json" id="gestor-mix-data">@json($mixChart)</script>
+    <script type="application/json" id="gestor-fiscal-data">@json($fiscalChart)</script>
+    <script type="application/json" id="gestor-payments-data">@json($paymentsChart)</script>
+    <script src="{{ asset('js/vendor/chart.umd.min.js') }}?v={{ $chartJsV }}"></script>
+    <script src="{{ asset('js/gestor-vendas-charts.js') }}?v={{ $gestorChartsV }}" defer></script>
+
     @include('filament.gestor.partials.persist-snapshot')
 </x-filament-panels::page>

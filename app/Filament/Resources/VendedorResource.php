@@ -4,12 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendedorResource\Pages;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpTableSort;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class VendedorResource extends Resource
 {
@@ -19,27 +21,41 @@ class VendedorResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
 
-    protected static ?string $modelLabel = 'vendedor';
+    protected static ?string $modelLabel = 'operador';
 
-    protected static ?string $pluralModelLabel = 'vendedores';
+    protected static ?string $pluralModelLabel = 'operadores';
 
     protected static ?string $recordTitleAttribute = 'nome';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        if (\App\Support\Erp\ErpOnboarding::step() === \App\Support\Erp\ErpOnboarding::STEP_COLABORADOR) {
+            return true;
+        }
+
+        return parent::canAccess();
+    }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('>>Código')
-                    ->sortable()
+                    ->label('Código')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => ErpTableSort::orderByCodigoNumerico($query, $direction))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('nome')
                     ->label('Nome')
+                    ->sortable()
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
+                TextColumn::make('cargo')
+                    ->label('Cargo')
+                    ->placeholder('—')
+                    ->wrap(false),
                 TextColumn::make('empresa_numeros')
                     ->label('Empresa')
                     ->state(fn (Vendedor $record): string => $record->empresasNumeros())
@@ -61,7 +77,7 @@ class VendedorResource extends Resource
                     ->alignEnd()
                     ->weight(FontWeight::SemiBold),
             ])
-            ->defaultSort('codigo', 'asc')
+            ->defaultSort(fn (Builder $query, string $direction, $livewire): Builder => ErpTableSort::applyDefaultCodigoNumerico($query, $direction, $livewire))
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

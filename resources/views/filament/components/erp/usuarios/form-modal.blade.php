@@ -47,7 +47,11 @@
 
             <div class="erp-lookup-modal__titlebar">
 
-                <span id="erp-usuario-form-title">Sistema ERP — Usuários</span>
+                <span id="erp-usuario-form-title">
+                    {{ \App\Support\Erp\ErpOnboarding::step() === \App\Support\Erp\ErpOnboarding::STEP_USUARIO
+                        ? 'Primeiro acesso — Cadastro de Usuário'
+                        : 'Sistema ERP — Usuários' }}
+                </span>
 
                 <button
 
@@ -342,53 +346,78 @@
 
 
                         <div class="erp-pcad-form__row">
-
-                            <label class="erp-pcad-form__label" for="usuario-email">E-mail</label>
-
-                            <input
-
-                                id="usuario-email"
-
-                                type="email"
-
-                                wire:model="userForm.email"
-
-                                class="erp-pcad-form__input erp-pcad-form__input--grow"
-
-                                autocomplete="off"
-
-                            >
-
-                            @error('userForm.email')
-
-                                <span class="erp-usuario-form-modal__error">{{ $message }}</span>
-
-                            @enderror
-
-                        </div>
-
-
-
-                        <div class="erp-pcad-form__row">
-
-                            <label class="erp-pcad-form__label" for="usuario-empresa">Empresa</label>
-
+                            <label class="erp-pcad-form__label" for="usuario-empresa">Empresa padrão</label>
                             <select id="usuario-empresa" wire:model="userForm.empresa_id" class="erp-pcad-form__select erp-pcad-form__input--grow">
-
                                 @foreach ($empresas as $id => $nome)
-
                                     <option value="{{ $id }}">{{ $nome }}</option>
-
                                 @endforeach
-
                             </select>
-
+                            @error('userForm.empresa_id')
+                                <span class="erp-usuario-form-modal__error">{{ $message }}</span>
+                            @enderror
                         </div>
 
+                        <div class="erp-pcad-form__row">
+                            <label class="erp-pcad-form__label">Empresas liberadas</label>
+                            @php
+                                $empresaCodigos = $this->userEmpresaCodigos();
+                                $empresaNomes = $this->userEmpresaOptions();
+                            @endphp
+                            <div
+                                class="erp-vform__multi"
+                                x-data="{
+                                    open: false,
+                                    q: '',
+                                    codigos: @js($empresaCodigos),
+                                    nomes: @js($empresaNomes),
+                                    label(id) {
+                                        const key = String(id);
+                                        const codigo = this.codigos[key] ?? this.codigos[id] ?? '';
+                                        const nome = this.nomes[key] ?? this.nomes[id] ?? '';
+                                        return codigo && nome ? (codigo + ' — ' + nome) : (nome || codigo || key);
+                                    }
+                                }"
+                                @click.outside="open = false"
+                                @keydown.escape.stop="open = false"
+                            >
+                                <button type="button" class="erp-vform__multi-toggle" @click="open = !open">
+                                    <span
+                                        class="erp-vform__multi-summary"
+                                        :class="{ 'erp-vform__multi-summary--empty': !($wire.userForm.empresas || []).length }"
+                                        x-text="($wire.userForm.empresas || []).length
+                                            ? $wire.userForm.empresas.map(id => label(id)).filter(Boolean).join(', ')
+                                            : 'Selecione as empresas...'"
+                                    ></span>
+                                    <span class="erp-vform__multi-count" x-show="($wire.userForm.empresas || []).length"
+                                        x-text="($wire.userForm.empresas || []).length"></span>
+                                    <svg class="erp-vform__multi-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="open ? 'transform:rotate(180deg)' : ''" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
 
+                                <div class="erp-vform__multi-panel" x-show="open" x-cloak x-transition.opacity>
+                                    @if (count($empresaCodigos))
+                                        <input type="text" class="erp-vform__multi-search" placeholder="Pesquisar empresa..." x-model="q" @click.stop>
+                                        <div class="erp-vform__multi-list">
+                                            @foreach ($empresaNomes as $id => $nome)
+                                                <label
+                                                    class="erp-vform__check"
+                                                    x-show="q === '' || @js(mb_strtolower(($empresaCodigos[$id] ?? '').' '.$nome, 'UTF-8')).includes(q.toLowerCase())"
+                                                >
+                                                    <input type="checkbox" value="{{ $id }}" wire:model="userForm.empresas">
+                                                    <strong>{{ $empresaCodigos[$id] ?? '' }}</strong> {{ $nome }}
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="erp-vform__empresas-empty">Nenhuma empresa cadastrada.</span>
+                                    @endif
+                                </div>
+                            </div>
+                            @error('userForm.empresas')
+                                <span class="erp-usuario-form-modal__error">{{ $message }}</span>
+                            @enderror
+                        </div>
 
                         <div class="erp-pcad-form__row">
-
                             <label class="erp-pcad-form__label" for="usuario-perfil">Perfil</label>
 
                             <select id="usuario-perfil" wire:model="userForm.erp_profile_id" class="erp-pcad-form__select erp-pcad-form__input--grow">

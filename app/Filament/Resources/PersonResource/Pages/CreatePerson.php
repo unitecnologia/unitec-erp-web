@@ -48,6 +48,7 @@ class CreatePerson extends CreateRecord
             'limite_credito' => 0,
             'salario' => 0,
             'ativo' => true,
+            'visita_dias' => [],
             ...$flags,
         ];
 
@@ -55,12 +56,14 @@ class CreatePerson extends CreateRecord
         $this->form->fill($defaults);
 
         $this->loadPersonContacts();
+        $this->loadPersonVisitaDias();
         $this->mountPersonPhoto();
     }
 
     protected function afterCreate(): void
     {
         $this->syncPersonContacts($this->record);
+        $this->syncPersonVisitaDias($this->record);
 
         if ($this->embedsInOrcamento) {
             $this->closeEmbedOverlay([

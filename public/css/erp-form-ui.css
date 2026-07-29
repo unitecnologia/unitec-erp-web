@@ -23,6 +23,56 @@
     overflow: hidden;
 }
 
+/* Produtos: esconde chrome e ocupa quase toda a tela (cresce para baixo) */
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .erp-title-bar,
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .erp-status-bar,
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .erp-shell {
+    display: none !important;
+}
+
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0.2rem 0.35rem 0.15rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main > *,
+.fi-main:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) > :has(.erp-produtos-form-page) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+}
+
+.fi-page.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) {
+    position: fixed !important;
+    top: 0.12rem !important;
+    bottom: 0.12rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 50 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: min(calc(1280px + 4cm), calc(100vw - 0.35rem)) !important;
+    max-width: calc(100vw - 0.35rem) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
 .fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)) .erp-menu-bar,
 .fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed)) .erp-shortcut-bar,
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed)) .erp-menu-bar,
@@ -118,6 +168,14 @@
     box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35)) !important;
     background: var(--erp-bg-app, #eef4fb) !important;
     overflow: hidden;
+}
+
+.erp-produtos-window {
+    border: 1px solid #8fa8c8 !important;
+    background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%) !important;
+    box-shadow:
+        0 24px 48px rgb(15 52 96 / 28%),
+        0 0 0 1px rgb(255 255 255 / 35%) inset !important;
 }
 
 .erp-pessoas-window__titlebar,
@@ -219,6 +277,13 @@
     margin-bottom: 0 !important;
 }
 
+/* Pessoas — aba ativa azul ERP (menos verde) */
+.erp-pessoas-form-page .erp-pcad__tab--active {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%) !important;
+    border-color: var(--erp-brand-primary-dark, #0f3460) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
 .erp-pcad__workspace {
     background: var(--erp-bg-panel, #fff) !important;
     border: 1px solid var(--erp-border-light, #c7d5e8) !important;
@@ -243,6 +308,21 @@
     color: var(--erp-text, #0f172a) !important;
     box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.08));
     transition: border-color var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+/* Pessoas — inputs flat (sem sombra flutuante) */
+.erp-pessoas-form-page .erp-pcad-form__input,
+.erp-pessoas-form-page .erp-pcad-form__select,
+.erp-pessoas-form-page .erp-pcad-form__textarea {
+    border-color: #9eb4cf !important;
+    box-shadow: none !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__input:focus,
+.erp-pessoas-form-page .erp-pcad-form__select:focus,
+.erp-pessoas-form-page .erp-pcad-form__textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 16%) !important;
 }
 
 .erp-pcad-form__input:focus,
@@ -383,8 +463,8 @@
 }
 
 .erp-pcad-actions__btn {
-    min-width: 5.85rem !important;
-    height: 4rem !important;
+    min-width: 5.4rem !important;
+    height: 3rem !important;
     border: 1px solid rgba(255, 255, 255, 0.25) !important;
     border-radius: var(--erp-radius-md, 8px) !important;
     background: rgba(255, 255, 255, 0.95) !important;
@@ -507,38 +587,38 @@
 }
 
 .erp-produtos-pcad__bottom-tabs {
-    gap: 0.25rem !important;
+    gap: 0.2rem !important;
     border-top: none !important;
 }
 
 .erp-produtos-pcad__bottom-tab {
-    padding: 0.38rem 0.85rem !important;
-    font-size: var(--erp-font-size-xs, 0.8125rem) !important;
-    font-weight: 600 !important;
-    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    padding: 0.32rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    border: 1px solid #7f98b8 !important;
     border-bottom: none !important;
-    border-radius: var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) 0 0 !important;
-    background: var(--erp-bg-muted, #e2eaf4) !important;
-    color: var(--erp-text-muted, #64748b) !important;
-    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+    border-radius: 6px 6px 0 0 !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%) !important;
+    color: #0f3460 !important;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .erp-produtos-pcad__bottom-tab:hover {
-    background: var(--erp-bg-panel, #fff) !important;
-    color: var(--erp-brand-primary, #1e5a9e) !important;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+    color: #1d4ed8 !important;
 }
 
 .erp-produtos-pcad__bottom-tab--active {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
-    border-color: var(--erp-brand-accent, #15803d) !important;
-    color: var(--erp-text-inverse, #fff) !important;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
+    border-color: #15803d !important;
+    color: #fff !important;
     font-weight: 700 !important;
 }
 
 .erp-produtos-pcad__foto {
-    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
-    border-radius: var(--erp-radius-sm, 6px) !important;
-    background: var(--erp-bg-muted, #e2eaf4) !important;
+    border: 1px dashed #7f98b8 !important;
+    border-radius: 8px !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #dbe7f5 100%) !important;
 }
 
 .erp-produtos-pcad__brand {
@@ -645,17 +725,17 @@
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 1.45rem !important;
-    height: 1.45rem !important;
+    width: 1.3rem !important;
+    height: 1.3rem !important;
     border-radius: 50% !important;
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
     line-height: 1 !important;
-    margin-bottom: 0.15rem !important;
+    margin-bottom: 0.12rem !important;
     font-weight: 700 !important;
 }
 
 .erp-form-page .erp-pcad-actions__label {
-    font-size: 0.68rem !important;
+    font-size: 0.625rem !important;
     text-align: center !important;
     line-height: 1.1 !important;
 }
@@ -789,6 +869,15 @@
     font-size: 0.76rem;
     font-weight: 600;
     line-height: 1.35;
+}
+
+.erp-aviso-modal__extra {
+    margin-top: 0.75rem;
+    text-align: left;
+}
+
+.erp-aviso-modal__box:has(.erp-aviso-modal__extra) {
+    width: min(92vw, 32rem);
 }
 
 .erp-aviso-modal--warning .erp-aviso-modal__box {

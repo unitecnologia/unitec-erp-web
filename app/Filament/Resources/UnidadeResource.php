@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\UnidadeResource\Pages;
 use App\Models\Unidade;
 use BackedEnum;
@@ -27,6 +28,11 @@ class UnidadeResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('unidades.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -37,7 +43,7 @@ class UnidadeResource extends Resource
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('descricao')
-                    ->label('DescriÃ§Ã£o')
+                    ->label('Descrição')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
             ])

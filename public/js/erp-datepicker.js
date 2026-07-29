@@ -39,12 +39,18 @@ window.ErpDatepicker = {
             return '';
         }
 
-        if (this.isIsoDateString(trimmed) && window.flatpickr) {
-            const parsed = window.flatpickr.parseDate(trimmed, 'Y-m-d');
+        if (this.isIsoDateString(trimmed)) {
+            if (window.flatpickr) {
+                const parsed = window.flatpickr.parseDate(trimmed, 'Y-m-d');
 
-            if (parsed) {
-                return this.formatDisplay(parsed);
+                if (parsed) {
+                    return this.formatDisplay(parsed);
+                }
             }
+
+            const [year, month, day] = trimmed.split('-');
+
+            return `${day}/${month}/${year}`;
         }
 
         return trimmed;
@@ -52,6 +58,17 @@ window.ErpDatepicker = {
 
     formatDisplayValue(value, wireFormat = 'iso') {
         const coerced = this.coerceInputValue(value);
+
+        // Nunca aplicar máscara dd/mm em ISO cru (ex.: 2026-07-01 → 20/26/0701).
+        if (this.isIsoDateString(coerced)) {
+            const [year, month, day] = coerced.split('-');
+
+            return `${day}/${month}/${year}`;
+        }
+
+        if (this.isBrDisplayDate(coerced)) {
+            return coerced;
+        }
 
         if (window.ErpMasks?.formatDateBr) {
             return window.ErpMasks.formatDateBr(coerced);
@@ -428,6 +445,30 @@ window.ErpDatepicker = {
         return true;
     },
 
+    shouldAutoApplyPeriodGroup(input) {
+        const group = input?.closest?.('[data-erp-date-group]');
+
+        return group?.dataset?.erpDateAutoApply === '1';
+    },
+
+    maybeAutoApplyPeriodGroup(input) {
+        if (! this.shouldAutoApplyPeriodGroup(input)) {
+            return false;
+        }
+
+        const typed = String(input?.value ?? '').trim();
+
+        if (
+            typed !== ''
+            && ! this.isCompleteDisplayDate(typed)
+            && ! (input._flatpickr?.selectedDates?.length > 0)
+        ) {
+            return false;
+        }
+
+        return this.commitPeriodGroup(input);
+    },
+
     applyPeriodGroupFromButton(button) {
         const group = button?.closest?.('[data-erp-date-group]');
 
@@ -502,6 +543,7 @@ window.ErpDatepicker = {
 
                 if (parsed) {
                     picker.setDate(parsed, false);
+                    self.maybeAutoApplyPeriodGroup(input);
                 }
             }
         };
@@ -513,6 +555,7 @@ window.ErpDatepicker = {
                 }
 
                 self.commitValue(input, picker, wireFormat);
+                self.maybeAutoApplyPeriodGroup(input);
             }, 0);
         };
 
@@ -569,6 +612,17 @@ window.ErpDatepicker = {
         const self = this;
 
         const openCalendar = () => {
+            if (! picker?.calendarContainer?.isConnected) {
+                self.bindInput(input);
+                const rebound = input._flatpickr;
+
+                if (rebound) {
+                    self.scheduleOpen(rebound);
+                }
+
+                return;
+            }
+
             self.scheduleOpen(picker);
         };
 
@@ -591,7 +645,7 @@ window.ErpDatepicker = {
         const onClick = (event) => {
             event.preventDefault();
             event.stopPropagation();
-            self.scheduleOpen(picker);
+            openCalendar();
         };
 
         input._erpDateOpenHandlers = {
@@ -651,6 +705,10 @@ window.ErpDatepicker = {
             return;
         }
 
+        if (input.hasAttribute('data-erp-native-date') || input.dataset.erpDateSkip === '1') {
+            return;
+        }
+
         if (input.type === 'date') {
             input.type = 'text';
         }
@@ -678,6 +736,10 @@ window.ErpDatepicker = {
     },
 
     bindInput(input) {
+        if (input.hasAttribute('data-erp-native-date') || input.dataset.erpDateSkip === '1') {
+            return;
+        }
+
         this.prepInput(input);
 
         if (! window.flatpickr || input.disabled || input.readOnly) {
@@ -687,7 +749,12 @@ window.ErpDatepicker = {
         const wireFormat = this.getWireFormat(input);
 
         if (input.dataset.erpDateBound === '1' && input._flatpickr) {
-            const shouldRebind = this.isEmptyInput(input) && this.readInitialAttribute(input) !== '';
+            const pickerAlive = Boolean(
+                input._flatpickr.calendarContainer
+                && input._flatpickr.calendarContainer.isConnected
+            );
+            const shouldRebind = ! pickerAlive
+                || (this.isEmptyInput(input) && this.readInitialAttribute(input) !== '');
 
             if (! shouldRebind) {
                 this.normalizeDisplay(input, input._flatpickr, wireFormat);
@@ -739,6 +806,7 @@ window.ErpDatepicker = {
                         wireFormat,
                         true,
                     );
+                    self.maybeAutoApplyPeriodGroup(input);
                 },
                 onClose(_selectedDates, _dateStr, instance) {
                     if (self.isEmptyInput(instance.input)) {
@@ -746,6 +814,7 @@ window.ErpDatepicker = {
                     }
 
                     self.commitValue(instance.input, instance, wireFormat);
+                    self.maybeAutoApplyPeriodGroup(instance.input);
                 },
             });
         } catch (error) {
@@ -850,7 +919,17 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.on('erp-masks-refresh', () => bootErpDatepickers(document));
 
     window.Livewire.hook('morph.updated', ({ el }) => {
-        bootErpDatepickers(el instanceof HTMLElement ? el : document);
+        if (! (el instanceof HTMLElement)) {
+            bootErpDatepickers(document);
+
+            return;
+        }
+
+        if (typeof el.matches === 'function' && el.matches(window.ErpDatepicker.selectors)) {
+            window.ErpDatepicker.bindInput(el);
+        }
+
+        bootErpDatepickers(el);
     });
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\AniversarianteResource\Pages;
 use App\Models\Person;
 use BackedEnum;
@@ -27,12 +28,17 @@ class AniversarianteResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('aniversariantes.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('CÃ³digo')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
@@ -42,7 +48,7 @@ class AniversarianteResource extends Resource
                     ->weight(FontWeight::Bold),
                 TextColumn::make('apelido_fantasia')
                     ->label('Apelido')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
             ])

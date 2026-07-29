@@ -22,6 +22,9 @@ class VendasGestorPage extends Page
     /** @var array<string, mixed> */
     public array $snapshot = [];
 
+    /** @var array<string, mixed> */
+    public array $charts = [];
+
     public static function canAccess(): bool
     {
         return static::canAccessGestor();
@@ -30,7 +33,9 @@ class VendasGestorPage extends Page
     public function mount(): void
     {
         $this->mountGestorShell();
-        $this->snapshot = app(GestorExecutivoService::class)->snapshot();
+        $service = app(GestorExecutivoService::class);
+        $this->snapshot = $service->snapshot();
+        $this->charts = $service->vendasCharts();
     }
 
     public function getHeading(): string|Htmlable|null

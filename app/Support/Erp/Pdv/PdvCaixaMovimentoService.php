@@ -138,22 +138,27 @@ final class PdvCaixaMovimentoService
      */
     private function pagamentoVaiParaContasReceberCartao(array $pagamento, string $forma): bool
     {
-        if (array_key_exists('aparece_contas_receber', $pagamento) || array_key_exists('tipo', $pagamento)) {
-            return PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber($pagamento);
+        $tipoMovimento = (string) ($pagamento['tipo_movimento'] ?? '');
+        $tipo = (string) ($pagamento['tipo'] ?? '');
+        $aparece = $pagamento['aparece_contas_receber'] ?? null;
+
+        if ($tipoMovimento === '' || $tipo === '' || $aparece === null) {
+            $cadastro = \App\Models\FormaPagamento::query()
+                ->whereRaw('UPPER(TRIM(descricao)) = ?', [$forma])
+                ->first(['tipo', 'aparece_contas_receber', 'tipo_movimento']);
+
+            if ($cadastro) {
+                $tipo = $tipo !== '' ? $tipo : (string) ($cadastro->tipo ?? '');
+                $tipoMovimento = $tipoMovimento !== '' ? $tipoMovimento : (string) ($cadastro->tipo_movimento ?? '');
+                $aparece = $aparece !== null ? $aparece : (bool) $cadastro->aparece_contas_receber;
+            }
         }
 
-        $cadastro = \App\Models\FormaPagamento::query()
-            ->whereRaw('UPPER(TRIM(descricao)) = ?', [$forma])
-            ->first(['tipo', 'aparece_contas_receber']);
-
-        if (! $cadastro) {
-            return false;
-        }
-
-        return PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
+        return PdvFinalizarPagamentosHelper::cartaoVaiParaContasReceber([
             'forma' => $forma,
-            'tipo' => (string) ($cadastro->tipo ?? ''),
-            'aparece_contas_receber' => (bool) $cadastro->aparece_contas_receber,
-        ]);
+            'tipo' => $tipo,
+            'aparece_contas_receber' => (bool) $aparece,
+            'tipo_movimento' => $tipoMovimento,
+        ], ($this->config ?? PdvConfig::make())->lancarCartaoNoCaixa());
     }
 }

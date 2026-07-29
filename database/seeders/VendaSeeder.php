@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Person;
 use App\Models\Venda;
+use App\Models\Vendedor;
 use Illuminate\Database\Seeder;
 
 class VendaSeeder extends Seeder
@@ -11,7 +12,7 @@ class VendaSeeder extends Seeder
     public function run(): void
     {
         $clientes = Person::query()->where('is_cliente', true)->get()->keyBy('codigo');
-        $vendedores = Person::query()->where('is_funcionario', true)->get()->keyBy('codigo');
+        $vendedores = Vendedor::query()->get()->keyBy('codigo');
 
         $clientePadrao = $clientes->first();
         $vendedorPadrao = $vendedores->first();

@@ -1,0 +1,145 @@
+/* ERP — Log de operações */
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(1),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 11%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(2),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 12%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(3),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 10%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(4),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 10%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(5),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 8%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(6),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 12%;
+}
+
+.erp-operacao-logs-page .fi-ta-header-cell:nth-child(7),
+.erp-operacao-logs-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 37%;
+}
+
+.erp-operacao-logs {
+    margin-bottom: 0.45rem;
+}
+
+.erp-operacao-logs__filters {
+    padding: 0.55rem 0.75rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+}
+
+.erp-operacao-logs__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.65rem 0.85rem;
+}
+
+.erp-operacao-logs__period {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.55rem;
+}
+
+.erp-operacao-logs__label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.erp-operacao-logs__field {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text-muted);
+}
+
+.erp-operacao-logs__search {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1 1 14rem;
+    min-width: 12rem;
+}
+
+.erp-operacao-logs__input,
+.erp-operacao-logs__select {
+    min-height: 2rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--erp-border);
+    border-radius: var(--erp-radius-sm);
+    background: #fff;
+    font-size: var(--erp-font-size-sm);
+    color: var(--erp-text);
+}
+
+.erp-operacao-logs__search-input {
+    width: 100%;
+}
+
+.erp-operacao-logs__select {
+    min-width: 9.5rem;
+}
+
+.erp-operacao-logs__input:focus,
+.erp-operacao-logs__select:focus {
+    outline: 2px solid color-mix(in srgb, var(--erp-brand-primary) 35%, transparent);
+    outline-offset: 1px;
+    border-color: var(--erp-brand-primary);
+}
+
+.erp-operacao-logs__actions {
+    display: inline-flex;
+    gap: 0.4rem;
+}
+
+.erp-operacao-logs__btn {
+    min-height: 2rem;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-brand-primary);
+    color: #fff;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-operacao-logs__btn:hover {
+    filter: brightness(1.05);
+}
+
+.erp-operacao-logs__btn--secondary {
+    background: #fff;
+    color: var(--erp-brand-primary);
+}
+
+.erp-operacao-logs__btn--secondary:hover {
+    background: color-mix(in srgb, var(--erp-brand-primary) 8%, #fff);
+}

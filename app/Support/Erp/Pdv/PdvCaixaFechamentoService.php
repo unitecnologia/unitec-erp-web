@@ -12,14 +12,20 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Lança o saldo em dinheiro do fechamento do PDV no Livro Caixa (CAIXA GERAL).
+ * Lança no Livro Caixa (CAIXA GERAL) apenas o saldo em dinheiro do fechamento.
+ *
+ * Cartão (crédito/débito/POS) com Contas a Receber NÃO entra aqui: o valor
+ * fica em títulos até a operadora depositar e o título ser baixado.
  */
 final class PdvCaixaFechamentoService
 {
-    public function lancarNoLivroCaixa(PdvCaixaSessao $sessao, ?User $usuario = null): ?CaixaLancamento
+    /**
+     * @return list<CaixaLancamento>
+     */
+    public function lancarNoLivroCaixa(PdvCaixaSessao $sessao, ?User $usuario = null): array
     {
         if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
-            return null;
+            return [];
         }
 
         $documento = $this->documento($sessao);
@@ -29,13 +35,14 @@ final class PdvCaixaFechamentoService
             ->first();
 
         if ($existente) {
-            return $existente;
+            return [$existente];
         }
 
+        // Só dinheiro físico / suprimento — cartão ainda não "caiu" na conta.
         $valor = round((float) $sessao->saldoDinheiro(), 2);
 
         if ($valor <= 0) {
-            return null;
+            return [];
         }
 
         $conta = CaixaConta::ensureCaixaGeral();
@@ -45,7 +52,7 @@ final class PdvCaixaFechamentoService
             ? ErpTimezone::toLocal($sessao->fechado_em)
             : ErpTimezone::toLocal();
 
-        return CaixaLancamento::query()->create([
+        $lancamento = CaixaLancamento::query()->create([
             'codigo' => CaixaLancamento::nextCodigo(),
             'emissao' => $agora->toDateString(),
             'documento' => mb_substr($documento, 0, 40),
@@ -60,6 +67,8 @@ final class PdvCaixaFechamentoService
             'entrada' => $valor,
             'saida' => 0,
         ]);
+
+        return [$lancamento];
     }
 
     /**
@@ -86,7 +95,7 @@ final class PdvCaixaFechamentoService
                 continue;
             }
 
-            if ($this->lancarNoLivroCaixa($sessao, $sessao->user) !== null) {
+            if ($this->lancarNoLivroCaixa($sessao, $sessao->user) !== []) {
                 $criados++;
             }
         }

@@ -6,7 +6,6 @@ final class ErpUppercase
 {
     /** @var list<string> */
     private const LOWERCASE_FIELDS = [
-        'email',
         'tipo_atividade',
         'pessoa_tipo',
         'regime_tributario',
@@ -19,6 +18,20 @@ final class ErpUppercase
     /** @var list<string> */
     private const PRESERVE_CASE_FIELDS = [
         'param_whatsapp_interno_chave',
+        'password',
+        'password_confirmation',
+        'senha',
+        'senha_atual',
+        'senha_nova',
+        'senha_confirmacao',
+        'access_token',
+        'refresh_token',
+        'client_secret',
+        'api_key',
+        'api_secret',
+        'token',
+        'param_pix_mp_access_token',
+        'param_pix_mp_client_secret',
     ];
 
     /**

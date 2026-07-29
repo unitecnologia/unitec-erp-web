@@ -5,4 +5,5 @@
         @include('filament.components.erp.shortcut-bar')
     </header>
     @include('filament.components.erp.update-modal')
+    @livewire(\App\Livewire\Erp\AcessoRapidoModals::class)
 @endif

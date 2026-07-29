@@ -19,6 +19,10 @@
                 return;
             }
 
+            if (input.hasAttribute('data-erp-native-date') || input.dataset.erpDateSkip === '1') {
+                return;
+            }
+
             input.type = 'text';
             input.setAttribute('inputmode', 'numeric');
             input.setAttribute('autocomplete', 'off');

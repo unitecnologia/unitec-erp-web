@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'numero_logico_terminal',
     'eh_caixa',
     'pdv',
+    'ativo',
     'restaurante',
     'delivery',
     'logado',
@@ -34,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'time_tela_caixa_livre',
     'imprime',
     'usa_gaveta',
+    'usar_device_service',
     'fab_impressora',
     'modelo',
     'porta',
@@ -87,6 +90,7 @@ class Terminal extends Model
         return [
             'eh_caixa' => 'boolean',
             'pdv' => 'boolean',
+            'ativo' => 'boolean',
             'restaurante' => 'boolean',
             'delivery' => 'boolean',
             'logado' => 'boolean',
@@ -103,6 +107,7 @@ class Terminal extends Model
             'mostrar_tela_caixa_livre' => 'boolean',
             'imprime' => 'boolean',
             'usa_gaveta' => 'boolean',
+            'usar_device_service' => 'boolean',
             'usar_numero_inicial' => 'boolean',
             'meia_folha' => 'boolean',
             'tef_via_reduzida' => 'boolean',
@@ -127,6 +132,11 @@ class Terminal extends Model
         return $this->hasMany(PdvCaixaSessao::class);
     }
 
+    public function vendedores(): BelongsToMany
+    {
+        return $this->belongsToMany(Vendedor::class, 'terminal_vendedor')->withTimestamps();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -139,6 +149,7 @@ class Terminal extends Model
             'nvias' => 1,
             'eh_caixa' => true,
             'pdv' => true,
+            'ativo' => true,
             'imprime' => true,
             'busca_balanca_barras' => true,
         ];

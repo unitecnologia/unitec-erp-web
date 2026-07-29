@@ -11,9 +11,15 @@ class ErpDashboardDemoData
     {
         return [
             'kpis' => static::kpis(),
+            'gauges' => ErpDashboardGauges::build($empresaId),
+            'sellerGauges' => ErpDashboardGauges::buildVendedores($empresaId),
             'salesChart' => static::salesChart(),
             'cashflowChart' => static::cashflowChart(),
+            'salesMixChart' => static::salesMixChart(),
+            'fiscalDocsChart' => static::fiscalDocsChart(),
+            'paymentMethodsChart' => static::paymentMethodsChart(),
             'recentSales' => static::recentSales(),
+            'highlights' => static::highlights(),
             'alerts' => static::alerts($empresaId),
         ];
     }
@@ -154,6 +160,58 @@ class ErpDashboardDemoData
             'labels' => ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
             'entradas' => [68400, 72100, 69800, 74200],
             'saidas' => [51200, 54800, 53100, 56900],
+        ];
+    }
+
+    /**
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string}
+     */
+    public static function salesMixChart(): array
+    {
+        return [
+            'labels' => ['PDV', 'Pedidos', 'Orçamentos'],
+            'values' => [42850.0, 91240.0, 18630.0],
+            'colors' => ['#1e5a9e', '#0d9488', '#d97706'],
+            'unit' => 'money',
+        ];
+    }
+
+    /**
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string}
+     */
+    public static function fiscalDocsChart(): array
+    {
+        return [
+            'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
+            'values' => [42.0, 8.0, 186.0, 11.0],
+            'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
+            'unit' => 'count',
+        ];
+    }
+
+    /**
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string}
+     */
+    public static function paymentMethodsChart(): array
+    {
+        return [
+            'labels' => ['PIX', 'Dinheiro', 'Crédito', 'Débito'],
+            'values' => [48200.0, 21540.0, 19870.0, 12430.0],
+            'colors' => ['#1d4ed8', '#0f766e', '#7c3aed', '#6366f1'],
+            'unit' => 'money',
+        ];
+    }
+
+    /**
+     * @return list<array{label: string, value: string, hint: string}>
+     */
+    public static function highlights(): array
+    {
+        return [
+            ['label' => 'Ticket médio', 'value' => 'R$ 186,40', 'hint' => '214 vendas no mês'],
+            ['label' => 'Produto mais vendido', 'value' => 'OLEO 20W50 1L', 'hint' => '142 un. no mês'],
+            ['label' => 'Cliente que mais comprou', 'value' => 'João Comércio LTDA', 'hint' => 'R$ 12450,00 no mês'],
+            ['label' => 'Vendedor destaque', 'value' => 'LOJA', 'hint' => 'R$ 3135,00 no mês'],
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\Erp\EmpresaParametros;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -96,6 +97,7 @@ class Empresa extends Model
             ...EmpresaParametros::whatsAppBooleanFields(),
             ...EmpresaParametros::portalContadorBooleanFields(),
             ...EmpresaParametros::sistemaBooleanFields(),
+            ...EmpresaParametros::expedicaoBooleanFields(),
         ] as $field => $meta) {
             $casts[$field] = 'boolean';
         }
@@ -108,7 +110,13 @@ class Empresa extends Model
         $casts['param_whatsapp_msgs_data'] = 'date';
         $casts['param_portal_contador_timeout'] = 'integer';
         $casts['param_portal_contador_contador_id'] = 'integer';
+        $casts['param_portal_contador_vinculado_em'] = 'datetime';
         $casts['param_backup_intervalo_horas'] = 'integer';
+        $casts['param_balanca_etiqueta_modelo'] = 'integer';
+        $casts['param_balanca_digitos'] = 'integer';
+        $casts['param_ui_zoom'] = 'integer';
+        $casts['param_ui_density'] = 'string';
+        $casts['param_expedicao_max_pedidos_controle'] = 'integer';
 
         return $casts;
     }
@@ -116,6 +124,16 @@ class Empresa extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function usuariosLiberados(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'empresa_user')->withTimestamps();
+    }
+
+    public function estoques(): HasMany
+    {
+        return $this->hasMany(Estoque::class);
     }
 
     public function logoUrl(): ?string

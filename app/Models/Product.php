@@ -28,12 +28,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'e_medio',
     'pct_lucro',
     'preco_venda',
-    'preco_venda_prazo',
     'preco_venda_anterior',
     'qtd_atacado',
     'preco_atacado',
-    'comissao_pct',
-    'desconto_pct',
+    'preco_especial',
     'estoque',
     'estoque_minimo',
     'estoque_inicial',
@@ -54,6 +52,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'aliq_icms_externo',
     'cst_entrada',
     'cst_saida',
+    'cst_cofins',
     'aliq_pis',
     'aliq_cofins',
     'cst_ipi',
@@ -69,6 +68,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'tipo_tributacao',
     'tributacao_monofasica',
     'cod_beneficio',
+    'iva_cst',
+    'cclass_trib',
+    'cclass_trib_descricao',
+    'aliq_ibs_uf',
+    'aliq_cbs',
+    'aliq_ibs_mun',
+    'aliq_adrem_ibs',
+    'aliq_adrem_cbs',
+    'reducao_cbs',
+    'reducao_ibs',
     'glp_pct',
     'gnn_pct',
     'gni_pct',
@@ -118,7 +127,6 @@ class Product extends Model
             'preco_custo' => 'decimal:2',
             'pct_lucro' => 'decimal:2',
             'preco_venda' => 'decimal:2',
-            'preco_venda_prazo' => 'decimal:2',
             'preco_venda_anterior' => 'decimal:2',
             'ult_compra' => 'decimal:2',
             'ult_compra_anterior' => 'decimal:2',
@@ -126,8 +134,7 @@ class Product extends Model
             'e_medio' => 'decimal:3',
             'qtd_atacado' => 'decimal:3',
             'preco_atacado' => 'decimal:2',
-            'comissao_pct' => 'decimal:2',
-            'desconto_pct' => 'decimal:2',
+            'preco_especial' => 'decimal:2',
             'estoque' => 'decimal:3',
             'estoque_minimo' => 'decimal:3',
             'estoque_inicial' => 'decimal:3',
@@ -148,6 +155,13 @@ class Product extends Model
             'tributacao_monofasica' => 'boolean',
             'produto_pesado' => 'boolean',
             'principio_ativo_id' => 'integer',
+            'aliq_ibs_uf' => 'decimal:4',
+            'aliq_cbs' => 'decimal:4',
+            'aliq_ibs_mun' => 'decimal:4',
+            'aliq_adrem_ibs' => 'decimal:4',
+            'aliq_adrem_cbs' => 'decimal:4',
+            'reducao_cbs' => 'decimal:4',
+            'reducao_ibs' => 'decimal:4',
             'glp_pct' => 'decimal:2',
             'gnn_pct' => 'decimal:2',
             'gni_pct' => 'decimal:2',
@@ -209,6 +223,11 @@ class Product extends Model
     public function priceHistories(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ProductPriceHistory::class);
+    }
+
+    public function empresaPrecos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductEmpresaPreco::class);
     }
 
     public function imeis(): \Illuminate\Database\Eloquent\Relations\HasMany

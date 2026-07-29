@@ -1,0 +1,4138 @@
+[
+    {
+        "codigo": 1101,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1102,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1111,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO DE MERCADORIA RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1113,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO, DE MERCADORIA RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1116,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO ORIGINADA DE ENCOMENDA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1117,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO ORIGINADA DE ENCOMENDA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1118,
+        "descricao": "COMPRA DE MERCADORIA PARA COMERCIALIZAÇÃO PELO ADQUIRENTE ORIGINÁRIO, ENTREGUE PELO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1120,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO, EM VENDA À ORDEM, JÁ RECEBIDA DO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1121,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO, EM VENDA À ORDEM, JÁ RECEBIDA DO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1122,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO EM QUE A MERCADORIA FOI REMETIDA PELO FORNECEDOR AO INDUSTRIALIZADOR SEM T",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1124,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA POR OUTRA EMPRESA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1125,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA POR OUTRA EMPRESA QUANDO A MERCADORIA REMETIDA PARA UTILIZAÇÃO NO PROCESSO DE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1126,
+        "descricao": "COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1151,
+        "descricao": "TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1152,
+        "descricao": "TRANSFERÊNCIA PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1153,
+        "descricao": "TRANSFERÊNCIA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1154,
+        "descricao": "TRANSFERÊNCIA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1201,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1202,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1203,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE LIVRE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1204,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, DESTINADA À ZONA FRANCA DE MANAUS",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À VENDA DE ENERGIA ELÉTRICA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1208,
+        "descricao": "DEVOLUÇÃO DE PRODUÇÃO DO ESTABELECIMENTO, REMETIDA EM TRANSFERÊNCIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1209,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, REMETIDA EM TRANSFERÊNCIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1251,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO OU COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1252,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1253,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1254,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1255,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1256,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1257,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA PARA CONSUMO POR DEMANDA CONTRATADA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1301,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1302,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1303,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1304,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1305,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉT",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1306,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1351,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1352,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1353,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1354,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1355,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTR",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1356,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1401,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1403,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1406,
+        "descricao": "COMPRA DE BEM PARA O ATIVO IMOBILIZADO CUJA MERCADORIA ESTÁ SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRI",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1407,
+        "descricao": "COMPRA DE MERCADORIA PARA USO OU CONSUMO CUJA MERCADORIA ESTÁ SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁ",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1408,
+        "descricao": "TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUT",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1409,
+        "descricao": "TRANSFERÊNCIA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁ",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1410,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITU",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1411,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1414,
+        "descricao": "RETORNO DE PRODUÇÃO DO ESTABELECIMENTO, REMETIDA PARA VENDA FORA DO ESTABELECIMENTO EM OPERAÇÃO COM PRO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1415,
+        "descricao": "RETORNO DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, REMETIDA PARA VENDA FORA DO ESTABELECIMENTO E",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1451,
+        "descricao": "RETORNO DE ANIMAL DO ESTABELECIMENTO PRODUTOR",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1452,
+        "descricao": "RETORNO DE INSUMO NÃO UTILIZADO NA PRODUÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1501,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1503,
+        "descricao": "ENTRADA DECORRENTE DE DEVOLUÇÃO DE PRODUTO REMETIDO COM FIM ESPECÍFICO DE EXPORTAÇÃO, DE PRODUÇÃO DO ES",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1504,
+        "descricao": "ENTRADA DECORRENTE DE DEVOLUÇÃO DE MERCADORIA REMETIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO, ADQUIRIDA OU R",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1551,
+        "descricao": "COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1552,
+        "descricao": "TRANSFERÊNCIA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1553,
+        "descricao": "DEVOLUÇÃO DE VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1554,
+        "descricao": "RETORNO DE BEM DO ATIVO IMOBILIZADO REMETIDO PARA USO FORA DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1555,
+        "descricao": "ENTRADA DE BEM DO ATIVO IMOBILIZADO DE TERCEIRO, REMETIDO PARA USO NO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1556,
+        "descricao": "COMPRA DE MATERIAL PARA USO OU CONSUMO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1557,
+        "descricao": "TRANSFERÊNCIA DE MATERIAL PARA USO OU CONSUMO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1601,
+        "descricao": "RECEBIMENTO, POR TRANSFERÊNCIA, DE CRÉDITO DE ICMS",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1602,
+        "descricao": "RECEBIMENTO, POR TRANSFERÊNCIA, DE SALDO CREDOR DE ICMS DE OUTRO ESTABELECIMENTO DA MESMA EMPRESA, PARA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1603,
+        "descricao": "RESSARCIMENTO DE ICMS RETIDO POR SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1651,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1652,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1653,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE POR CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1658,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL E LUBRIFICANTE PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1659,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL E LUBRIFICANTE PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1660,
+        "descricao": "DEVOLUÇÃO DE VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DESTINADO À INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1661,
+        "descricao": "DEVOLUÇÃO DE VENDA COMBUSTÍVEL OU LUBRIFICANTE DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1662,
+        "descricao": "DEVOLUÇÃO DE VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DESTINADO A CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1663,
+        "descricao": "ENTRADA DE COMBUSTÍVEL OU LUBRIFICANTE PARA ARMAZENAGEM",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1664,
+        "descricao": "RETORNO DE COMBUSTÍVEL OU LUBRIFICANTE REMETIDO PARA ARMAZENAGEM",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1901,
+        "descricao": "ENTRADA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1902,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1903,
+        "descricao": "ENTRADA DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO E NÃO APLICADA NO REFERIDO PROCESSO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1904,
+        "descricao": "RETORNO DE REMESSA PARA VENDA FORA DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1905,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA PARA DEPÓSITO EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1906,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1907,
+        "descricao": "RETORNO SIMBÓLICO DE MERCADORIA REMETIDA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1908,
+        "descricao": "ENTRADA DE BEM POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1909,
+        "descricao": "RETORNO DE BEM REMETIDO POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1910,
+        "descricao": "ENTRADA DE BONIFICAÇÃO, DOAÇÃO OU BRINDE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 1911,
+        "descricao": "ENTRADA DE AMOSTRA GRÁTIS",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1912,
+        "descricao": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA DEMONSTRAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1913,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA DEMONSTRAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1914,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA EXPOSIÇÃO OU FEIRA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1915,
+        "descricao": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1916,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA CONSERTO OU REPARO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1917,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1918,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA REMETIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1919,
+        "descricao": "DEVOLUÇÃO SIMBÓLICA DE MERCADORIA VENDIDA OU UTILIZADA EM PROCESSO INDUSTRIAL, REMETIDA ANTERIORMENTE E",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1920,
+        "descricao": "ENTRADA DE VASILHAME OU SACARIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1921,
+        "descricao": "RETORNO DE VASILHAME OU SACARIA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1922,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE SIMPLES FATURAMENTO DECORRENTE DE COMPRA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1923,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA DO VENDEDOR REMETENTE, EM VENDA À ORDEM",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1924,
+        "descricao": "ENTRADA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUANDO ESTA NÃO TRANSITAR",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1925,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1926,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE RECLASSIFICAÇÃO DE MERCADORIA DECORRENTE DE FORMAÇÃO DE KIT OU DE SUA D",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 1949,
+        "descricao": "OUTRA ENTRADA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2101,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2102,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2111,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO DE MERCADORIA RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2113,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO, DE MERCADORIA RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2116,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO ORIGINADA DE ENCOMENDA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2117,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO ORIGINADA DE ENCOMENDA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2118,
+        "descricao": "COMPRA DE MERCADORIA PARA COMERCIALIZAÇÃO PELO ADQUIRENTE ORIGINÁRIO, ENTREGUE PELO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2120,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO, EM VENDA À ORDEM, JÁ RECEBIDA DO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2121,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO, EM VENDA À ORDEM, JÁ RECEBIDA DO VENDEDOR REMETENTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2122,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO EM QUE A MERCADORIA FOI REMETIDA PELO FORNECEDOR AO INDUSTRIALIZADOR SEM T",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2124,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA POR OUTRA EMPRESA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2125,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA POR OUTRA EMPRESA QUANDO A MERCADORIA REMETIDA PARA UTILIZAÇÃO NO PROCESSO DE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2126,
+        "descricao": "COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2151,
+        "descricao": "TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2152,
+        "descricao": "TRANSFERÊNCIA PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2153,
+        "descricao": "TRANSFERÊNCIA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2154,
+        "descricao": "TRANSFERÊNCIA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2201,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2202,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2203,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE LIVRE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2204,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, DESTINADA À ZONA FRANCA DE MANAUS",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À VENDA DE ENERGIA ELÉTRICA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2208,
+        "descricao": "DEVOLUÇÃO DE PRODUÇÃO DO ESTABELECIMENTO, REMETIDA EM TRANSFERÊNCIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2209,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, REMETIDA EM TRANSFERÊNCIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2251,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO OU COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2252,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2253,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2254,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2255,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2256,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2257,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA PARA CONSUMO POR DEMANDA CONTRATADA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2301,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2302,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2303,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2304,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2305,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉT",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2306,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2351,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2352,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2353,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2354,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2355,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTR",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2356,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2401,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2403,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2406,
+        "descricao": "COMPRA DE BEM PARA O ATIVO IMOBILIZADO CUJA MERCADORIA ESTÁ SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRI",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2407,
+        "descricao": "COMPRA DE MERCADORIA PARA USO OU CONSUMO CUJA MERCADORIA ESTÁ SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁ",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2408,
+        "descricao": "TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUT",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2409,
+        "descricao": "TRANSFERÊNCIA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁ",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2410,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITU",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2411,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2414,
+        "descricao": "RETORNO DE PRODUÇÃO DO ESTABELECIMENTO, REMETIDA PARA VENDA FORA DO ESTABELECIMENTO EM OPERAÇÃO COM PRO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2415,
+        "descricao": "RETORNO DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, REMETIDA PARA VENDA FORA DO ESTABELECIMENTO E",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2501,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2503,
+        "descricao": "ENTRADA DECORRENTE DE DEVOLUÇÃO DE PRODUTO REMETIDO COM FIM ESPECÍFICO DE EXPORTAÇÃO, DE PRODUÇÃO DO ES",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2504,
+        "descricao": "ENTRADA DECORRENTE DE DEVOLUÇÃO DE MERCADORIA REMETIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO, ADQUIRIDA OU R",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2551,
+        "descricao": "COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2552,
+        "descricao": "TRANSFERÊNCIA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2553,
+        "descricao": "DEVOLUÇÃO DE VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2554,
+        "descricao": "RETORNO DE BEM DO ATIVO IMOBILIZADO REMETIDO PARA USO FORA DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2555,
+        "descricao": "ENTRADA DE BEM DO ATIVO IMOBILIZADO DE TERCEIRO, REMETIDO PARA USO NO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2556,
+        "descricao": "COMPRA DE MATERIAL PARA USO OU CONSUMO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2557,
+        "descricao": "TRANSFERÊNCIA DE MATERIAL PARA USO OU CONSUMO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2603,
+        "descricao": "RESSARCIMENTO DE ICMS RETIDO POR SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2651,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2652,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2653,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE POR CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2658,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL E LUBRIFICANTE PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2659,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL E LUBRIFICANTE PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2660,
+        "descricao": "DEVOLUÇÃO DE VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DESTINADO À INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2661,
+        "descricao": "DEVOLUÇÃO DE VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2662,
+        "descricao": "DEVOLUÇÃO DE VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DESTINADO A CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2663,
+        "descricao": "ENTRADA DE COMBUSTÍVEL OU LUBRIFICANTE PARA ARMAZENAGEM",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2664,
+        "descricao": "RETORNO DE COMBUSTÍVEL OU LUBRIFICANTE REMETIDO PARA ARMAZENAGEM",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2901,
+        "descricao": "ENTRADA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2902,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2903,
+        "descricao": "ENTRADA DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO E NÃO APLICADA NO REFERIDO PROCESSO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2904,
+        "descricao": "RETORNO DE REMESSA PARA VENDA FORA DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2905,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA PARA DEPÓSITO EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2906,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2907,
+        "descricao": "RETORNO SIMBÓLICO DE MERCADORIA REMETIDA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2908,
+        "descricao": "ENTRADA DE BEM POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2909,
+        "descricao": "RETORNO DE BEM REMETIDO POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2910,
+        "descricao": "ENTRADA DE BONIFICAÇÃO, DOAÇÃO OU BRINDE",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 2911,
+        "descricao": "ENTRADA DE AMOSTRA GRÁTIS",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2912,
+        "descricao": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA DEMONSTRAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2913,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA DEMONSTRAÇÃO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2914,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA EXPOSIÇÃO OU FEIRA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2915,
+        "descricao": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2916,
+        "descricao": "RETORNO DE MERCADORIA OU BEM REMETIDO PARA CONSERTO OU REPARO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2917,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2918,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA REMETIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2919,
+        "descricao": "DEVOLUÇÃO SIMBÓLICA DE MERCADORIA VENDIDA OU UTILIZADA EM PROCESSO INDUSTRIAL, REMETIDA ANTERIORMENTE E",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2920,
+        "descricao": "ENTRADA DE VASILHAME OU SACARIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2921,
+        "descricao": "RETORNO DE VASILHAME OU SACARIA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2922,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE SIMPLES FATURAMENTO DECORRENTE DE COMPRA PARA RECEBIMENTO FUTURO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2923,
+        "descricao": "ENTRADA DE MERCADORIA RECEBIDA DO VENDEDOR REMETENTE, EM VENDA À ORDEM",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2924,
+        "descricao": "ENTRADA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUANDO ESTA NÃO TRANSITAR",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2925,
+        "descricao": "RETORNO DE MERCADORIA REMETIDA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUA",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 2949,
+        "descricao": "OUTRA ENTRADA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADO",
+        "tipo": "E",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 3101,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3102,
+        "descricao": "COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3126,
+        "descricao": "COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3127,
+        "descricao": "COMPRA PARA INDUSTRIALIZAÇÃO SOB O REGIME DE \"DRAWBACK\"",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3201,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3202,
+        "descricao": "DEVOLUÇÃO DE VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À PRESTAÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À VENDA DE ENERGIA ELÉTRICA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3211,
+        "descricao": "DEVOLUÇÃO DE VENDA DE PRODUÇÃO DO ESTABELECIMENTO SOB O REGIME DE \"DRAWBACK\"",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3251,
+        "descricao": "COMPRA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO OU COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3301,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3351,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3352,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3353,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO COMERCIAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3354,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3355,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTR",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3356,
+        "descricao": "AQUISIÇÃO DE SERVIÇO DE TRANSPORTE POR ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3503,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA EXPORTADA QUE TENHA SIDO RECEBIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3551,
+        "descricao": "COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3553,
+        "descricao": "DEVOLUÇÃO DE VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3556,
+        "descricao": "COMPRA DE MATERIAL PARA USO OU CONSUMO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3651,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3652,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE PARA COMERCIALIZAÇÃO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3653,
+        "descricao": "COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE POR CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3930,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE ENTRADA DE BEM SOB AMPARO DE REGIME ESPECIAL ADUANEIRO DE ADMISSÃO TEMP",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 3949,
+        "descricao": "OUTRA ENTRADA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADO",
+        "tipo": "E",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5101,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 5102,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 5103,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, EFETUADA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5104,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, EFETUADA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5105,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5106,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5109,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE LIVRE COMÉRCIO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5110,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE L",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5111,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5112,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5113,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5114,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5115,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5116,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO ORIGINADA DE ENCOMENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5117,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, ORIGINADA DE ENCOMENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5118,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO ENTREGUE AO DESTINATÁRIO POR CONTA E ORDEM DO ADQUIRENTE ORIGINÁRI",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5119,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS ENTREGUE AO DESTINATÁRIO POR CONTA E ORDEM DO AD",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5120,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS ENTREGUE AO DESTINATÁRIO PELO VENDEDOR REMETENTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5122,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA PARA INDUSTRIALIZAÇÃO, POR CONTA E ORDEM DO ADQUIRENTE, S",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5123,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA PARA INDUSTRIALIZAÇÃO, POR CONTA E ORDE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5124,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA PARA OUTRA EMPRESA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5125,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA PARA OUTRA EMPRESA QUANDO A MERCADORIA RECEBIDA PARA UTILIZAÇÃO NO PROCESSO D",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5151,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5152,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5153,
+        "descricao": "TRANSFERÊNCIA DE ENERGIA ELÉTRICA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5155,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5156,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5201,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5202,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO A AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO A AQUISIÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À COMPRA DE ENERGIA ELÉTRICA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5208,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5209,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM TRANSFERÊNCIA PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5210,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5251,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO OU COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5252,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5253,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5254,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5255,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5256,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5257,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA CONSUMO POR DEMANDA CONTRATADA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5258,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5301,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5302,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5303,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5304,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5305,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTRI",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5306,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5307,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5351,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5352,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5353,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5354,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5355,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTRIC",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5356,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5357,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5401,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO TRIBUTÁR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5402,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO DE PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA, EM OPERAÇ",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5403,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5405,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 5408,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5409,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA AO RE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5410,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5411,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO T",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5412,
+        "descricao": "DEVOLUÇÃO DE BEM DO ATIVO IMOBILIZADO, EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRI",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5413,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA DESTINADA AO USO OU CONSUMO, EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SU",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5414,
+        "descricao": "REMESSA DE PRODUÇÃO DO ESTABELECIMENTO PARA VENDA FORA DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEI",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5415,
+        "descricao": "REMESSA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS PARA VENDA FORA DO ESTABELECIMENTO, EM OPERAÇÃ",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5451,
+        "descricao": "REMESSA DE ANIMAL E DE INSUMO PARA ESTABELECIMENTO PRODUTOR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5501,
+        "descricao": "REMESSA DE PRODUÇÃO DO ESTABELECIMENTO, COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5502,
+        "descricao": "REMESSA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5503,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5551,
+        "descricao": "VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5552,
+        "descricao": "TRANSFERÊNCIA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5553,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5554,
+        "descricao": "REMESSA DE BEM DO ATIVO IMOBILIZADO PARA USO FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5555,
+        "descricao": "DEVOLUÇÃO DE BEM DO ATIVO IMOBILIZADO DE TERCEIRO, RECEBIDO PARA USO NO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5556,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE MATERIAL DE USO OU CONSUMO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5557,
+        "descricao": "TRANSFERÊNCIA DE MATERIAL DE USO OU CONSUMO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5601,
+        "descricao": "TRANSFERÊNCIA DE CRÉDITO DE ICMS ACUMULADO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5602,
+        "descricao": "TRANSFERÊNCIA DE SALDO CREDOR DE ICMS PARA OUTRO ESTABELECIMENTO DA MESMA EMPRESA, DESTINADO À COMPENSA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5603,
+        "descricao": "RESSARCIMENTO DE ICMS RETIDO POR SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5651,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO DESTINADO À INDUSTRIALIZAÇÃO SUBSEQ",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5652,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5653,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABALECIMENTO DESTINADO A CONSUMIDOR OU USUARIO F",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5654,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO À INDUSTRIALIZAÇÃO SU",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5655,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5656,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO A CONSUMIDOR USU. FIN",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5657,
+        "descricao": "REMESSA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS PARA VENDA FORA DO ESTABELECI",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5658,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5659,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIRO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5660,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO PARA INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5661,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5662,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO POR CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5663,
+        "descricao": "REMESSA PARA ARMAZENAGEM DE COMBUSTÍVEL OU LUBRIFICANTE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5664,
+        "descricao": "RETORNO DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5665,
+        "descricao": "RETORNO SIMBÓLICO DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5666,
+        "descricao": "REMESSA POR CONTA E ORDEM DE TERCEIROS DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5901,
+        "descricao": "REMESSA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5902,
+        "descricao": "RETORNO DE MERCADORIA UTILIZADA NA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5903,
+        "descricao": "RETORNO DE MERCADORIA RECEBIDA PARA INDUSTRIALIZAÇÃO E NÃO APLICADA NO REFERIDO PROCESSO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5904,
+        "descricao": "REMESSA PARA VENDA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5905,
+        "descricao": "REMESSA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5906,
+        "descricao": "RETORNO DE MERCADORIA DEPOSITADA EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5907,
+        "descricao": "RETORNO SIMBÓLICO DE MERCADORIA DEPOSITADA EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5908,
+        "descricao": "REMESSA DE BEM POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5909,
+        "descricao": "RETORNO DE BEM RECEBIDO POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5910,
+        "descricao": "REMESSA EM BONIFICAÇÃO, DOAÇÃO OU BRINDE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5911,
+        "descricao": "REMESSA DE AMOSTRA GRÁTIS",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5912,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA DEMONSTRAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5913,
+        "descricao": "RETORNO DE MERCADORIA OU BEM RECEBIDO PARA DEMONSTRAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5914,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA EXPOSIÇÃO OU FEIRA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5915,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA CONSERTO OU REPARO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5916,
+        "descricao": "RETORNO DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5917,
+        "descricao": "REMESSA DE MERCADORIA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5918,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5919,
+        "descricao": "DEVOLUÇÃO SIMBÓLICA DE MERCADORIA VENDIDA OU UTILIZADA EM PROCESSO INDUSTRIAL, RECEBIDA ANTERIORMENTE E",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5920,
+        "descricao": "REMESSA DE VASILHAME OU SACARIA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5921,
+        "descricao": "DEVOLUÇÃO DE VASILHAME OU SACARIA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5922,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE SIMPLES FATURAMENTO DECORRENTE DE VENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5923,
+        "descricao": "REMESSA DE MERCADORIA POR CONTA E ORDEM DE TERCEIROS, EM VENDA À ORDEM",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5924,
+        "descricao": "REMESSA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUANDO ESTA NÃO TRANSITAR",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5925,
+        "descricao": "RETORNO DE MERCADORIA RECEBIDA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5926,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE RECLASSIFICAÇÃO DE MERCADORIA DECORRENTE DE FORMAÇÃO DE KIT OU DE SUA D",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5927,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE BAIXA DE ESTOQUE DECORRENTE DE PERDA, ROUBO OU DETERIORAÇÃO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5928,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE BAIXA DE ESTOQUE DECORRENTE DO ENCERRAMENTO DA ATIVIDADE DA EMPRESA",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5929,
+        "descricao": "LANÇAMENTO EFETUADO EM DECORRÊNCIA DE EMISSÃO DE DOCUMENTO FISCAL RELATIVO A OPERAÇÃO OU PRESTAÇÃO TAMB",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": false,
+        "ativo": true
+    },
+    {
+        "codigo": 5931,
+        "descricao": "LANÇAMENTO EFETUADO EM DECORRÊNCIA DA RESPONSABILIDADE DE RETENÇÃO DO IMPOSTO ST, ATRIBUÍDA AO REMETENT",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 5932,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE INICIADA EM UNIDADE DA FEDERAÇÃO DIVERSA DAQUELA ONDE INSCRITO O PRE",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 5949,
+        "descricao": "OUTRA SAÍDA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADO",
+        "tipo": "S",
+        "operacao": "I",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6101,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 6102,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 6103,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, EFETUADA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6104,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, EFETUADA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6105,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6106,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6107,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, DESTINADA A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6108,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, DESTINADA A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6109,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE LIVRE COMÉRCIO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6110,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, DESTINADA À ZONA FRANCA DE MANAUS OU ÁREAS DE L",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6111,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6112,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6113,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6114,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6115,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, RECEBIDA ANTERIORMENTE EM CONSIGNAÇÃO MERCANTIL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6116,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO ORIGINADA DE ENCOMENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6117,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, ORIGINADA DE ENCOMENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6118,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO ENTREGUE AO DESTINATÁRIO POR CONTA E ORDEM DO ADQUIRENTE ORIGINÁRI",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6119,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS ENTREGUE AO DESTINATÁRIO POR CONTA E ORDEM DO AD",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6120,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS ENTREGUE AO DESTINATÁRIO PELO VENDEDOR REMETENTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6122,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO REMETIDA PARA INDUSTRIALIZAÇÃO, POR CONTA E ORDEM DO ADQUIRENTE, S",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6123,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS REMETIDA PARA INDUSTRIALIZAÇÃO, POR CONTA E ORDE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6124,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA PARA OUTRA EMPRESA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6125,
+        "descricao": "INDUSTRIALIZAÇÃO EFETUADA PARA OUTRA EMPRESA QUANDO A MERCADORIA RECEBIDA PARA UTILIZAÇÃO NO PROCESSO D",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6151,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6152,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6153,
+        "descricao": "TRANSFERÊNCIA DE ENERGIA ELÉTRICA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6155,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6156,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6201,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 6202,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 6205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO A AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO A AQUISIÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À COMPRA DE ENERGIA ELÉTRICA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6208,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM TRANSFERÊNCIA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6209,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM TRANSFERÊNCIA PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6210,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6251,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA DISTRIBUIÇÃO OU COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6252,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6253,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6254,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6255,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6256,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6257,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA CONSUMO POR DEMANDA CONTRATADA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6258,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6301,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6302,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6303,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6304,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6305,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTRI",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6306,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6307,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6351,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6352,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6353,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO COMERCIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6354,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE PRESTADOR DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6355,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE GERADORA OU DE DISTRIBUIDORA DE ENERGIA ELÉTRIC",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6356,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A ESTABELECIMENTO DE PRODUTOR RURAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6357,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE A NÃO CONTRIBUINTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6401,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO TRIBUTÁR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 6402,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO DE PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA, EM OPERAÇ",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6403,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6404,
+        "descricao": "VENDA DE MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRIBUTÁRIA, CUJO IMPOSTO JÁ TENHA SIDO RETIDO ANT",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6408,
+        "descricao": "TRANSFERÊNCIA DE PRODUÇÃO DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEITO AO REGIME DE SUBSTITUIÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6409,
+        "descricao": "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS EM OPERAÇÃO COM MERCADORIA SUJEITA AO RE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6410,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA INDUSTRIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6411,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA COMERCIALIZAÇÃO EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO T",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6412,
+        "descricao": "DEVOLUÇÃO DE BEM DO ATIVO IMOBILIZADO, EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SUBSTITUIÇÃO TRI",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6413,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA DESTINADA AO USO OU CONSUMO, EM OPERAÇÃO COM MERCADORIA SUJEITA AO REGIME DE SU",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6414,
+        "descricao": "REMESSA DE PRODUÇÃO DO ESTABELECIMENTO PARA VENDA FORA DO ESTABELECIMENTO EM OPERAÇÃO COM PRODUTO SUJEI",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6415,
+        "descricao": "REMESSA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS PARA VENDA FORA DO ESTABELECIMENTO, EM OPERAÇÃ",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6501,
+        "descricao": "REMESSA DE PRODUÇÃO DO ESTABELECIMENTO, COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6502,
+        "descricao": "REMESSA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6503,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6551,
+        "descricao": "VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6552,
+        "descricao": "TRANSFERÊNCIA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6553,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6554,
+        "descricao": "REMESSA DE BEM DO ATIVO IMOBILIZADO PARA USO FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6555,
+        "descricao": "DEVOLUÇÃO DE BEM DO ATIVO IMOBILIZADO DE TERCEIRO, RECEBIDO PARA USO NO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6556,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE MATERIAL DE USO OU CONSUMO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6557,
+        "descricao": "TRANSFERÊNCIA DE MATERIAL DE USO OU CONSUMO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6603,
+        "descricao": "RESSARCIMENTO DE ICMS RETIDO POR SUBSTITUIÇÃO TRIBUTÁRIA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6651,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO DESTINADO À INDUSTRIALIZAÇÃO SUBSEQ",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6652,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6653,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO DESTINADO A CONSUMIDOR OU USU. FINA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6654,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO À INDUSTRIALIZAÇÃO SU",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6655,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO À COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6656,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS DESTINADO A CONSUMIDOR OU USU.F",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6657,
+        "descricao": "REMESSA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS PARA VENDA FORA DO ESTABELECI",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6658,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6659,
+        "descricao": "TRANSFERÊNCIA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIRO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6660,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO PARA INDUSTRIALIZAÇÃO SUBSEQÜENTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6661,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6662,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO POR CONSUMIDOR OU USUÁRIO FINAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6663,
+        "descricao": "REMESSA PARA ARMAZENAGEM DE COMBUSTÍVEL OU LUBRIFICANTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6664,
+        "descricao": "RETORNO DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6665,
+        "descricao": "RETORNO SIMBÓLICO DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6666,
+        "descricao": "REMESSA POR CONTA E ORDEM DE TERCEIROS DE COMBUSTÍVEL OU LUBRIFICANTE RECEBIDO PARA ARMAZENAGEM",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6901,
+        "descricao": "REMESSA PARA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6902,
+        "descricao": "RETORNO DE MERCADORIA UTILIZADA NA INDUSTRIALIZAÇÃO POR ENCOMENDA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6903,
+        "descricao": "RETORNO DE MERCADORIA RECEBIDA PARA INDUSTRIALIZAÇÃO E NÃO APLICADA NO REFERIDO PROCESSO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6904,
+        "descricao": "REMESSA PARA VENDA FORA DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6905,
+        "descricao": "REMESSA PARA DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6906,
+        "descricao": "RETORNO DE MERCADORIA DEPOSITADA EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6907,
+        "descricao": "RETORNO SIMBÓLICO DE MERCADORIA DEPOSITADA EM DEPÓSITO FECHADO OU ARMAZÉM GERAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6908,
+        "descricao": "REMESSA DE BEM POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6909,
+        "descricao": "RETORNO DE BEM RECEBIDO POR CONTA DE CONTRATO DE COMODATO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6910,
+        "descricao": "REMESSA EM BONIFICAÇÃO, DOAÇÃO OU BRINDE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6911,
+        "descricao": "REMESSA DE AMOSTRA GRÁTIS",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6912,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA DEMONSTRAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6913,
+        "descricao": "RETORNO DE MERCADORIA OU BEM RECEBIDO PARA DEMONSTRAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6914,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA EXPOSIÇÃO OU FEIRA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6915,
+        "descricao": "REMESSA DE MERCADORIA OU BEM PARA CONSERTO OU REPARO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6916,
+        "descricao": "RETORNO DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6917,
+        "descricao": "REMESSA DE MERCADORIA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6918,
+        "descricao": "DEVOLUÇÃO DE MERCADORIA RECEBIDA EM CONSIGNAÇÃO MERCANTIL OU INDUSTRIAL",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6919,
+        "descricao": "DEVOLUÇÃO SIMBÓLICA DE MERCADORIA VENDIDA OU UTILIZADA EM PROCESSO INDUSTRIAL, RECEBIDA ANTERIORMENTE E",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6920,
+        "descricao": "REMESSA DE VASILHAME OU SACARIA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6921,
+        "descricao": "DEVOLUÇÃO DE VASILHAME OU SACARIA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6922,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE SIMPLES FATURAMENTO DECORRENTE DE VENDA PARA ENTREGA FUTURA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6923,
+        "descricao": "REMESSA DE MERCADORIA POR CONTA E ORDEM DE TERCEIROS, EM VENDA À ORDEM",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6924,
+        "descricao": "REMESSA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUANDO ESTA NÃO TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6925,
+        "descricao": "RETORNO DE MERCADORIA RECEBIDA PARA INDUSTRIALIZAÇÃO POR CONTA E ORDEM DO ADQUIRENTE DA MERCADORIA, QUA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6929,
+        "descricao": "LANÇAMENTO EFETUADO EM DECORRÊNCIA DE EMISSÃO DE DOCUMENTO FISCAL RELATIVO A OPERAÇÃO OU PRESTAÇÃO TAMB",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": false,
+        "ativo": true
+    },
+    {
+        "codigo": 6931,
+        "descricao": "LANÇAMENTO EFETUADO EM DECORRÊNCIA DA RESPONSABILIDADE DE RETENÇÃO DO IMPOSTO ST, ATRIBUÍDA AO REMETENT",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6932,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE INICIADA EM UNIDADE DA FEDERAÇÃO DIVERSA DAQUELA ONDE INSCRITO O PRE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 6949,
+        "descricao": "OUTRA SAÍDA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": true
+    },
+    {
+        "codigo": 7101,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7102,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7105,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7106,
+        "descricao": "VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS, QUE NÃO DEVA POR ELE TRANSITAR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7127,
+        "descricao": "VENDA DE PRODUÇÃO DO ESTABELECIMENTO SOB O REGIME DE \"DRAWBACK\"",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7201,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA INDUSTRIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7202,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA COMERCIALIZAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7205,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À AQUISIÇÃO DE SERVIÇO DE COMUNICAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7206,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO A AQUISIÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7207,
+        "descricao": "ANULAÇÃO DE VALOR RELATIVO À COMPRA DE ENERGIA ELÉTRICA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7210,
+        "descricao": "DEVOLUÇÃO DE COMPRA PARA UTILIZAÇÃO NA PRESTAÇÃO DE SERVIÇO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7211,
+        "descricao": "DEVOLUÇÃO DE COMPRAS PARA INDUSTRIALIZAÇÃO SOB O REGIME DE DRAWBACK\"",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7251,
+        "descricao": "VENDA DE ENERGIA ELÉTRICA PARA O EXTERIOR",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7301,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE COMUNICAÇÃO PARA EXECUÇÃO DE SERVIÇO DA MESMA NATUREZA",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7358,
+        "descricao": "PRESTAÇÃO DE SERVIÇO DE TRANSPORTE",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7501,
+        "descricao": "EXPORTAÇÃO DE MERCADORIAS RECEBIDAS COM FIM ESPECÍFICO DE EXPORTAÇÃO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7551,
+        "descricao": "VENDA DE BEM DO ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7553,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE BEM PARA O ATIVO IMOBILIZADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7556,
+        "descricao": "DEVOLUÇÃO DE COMPRA DE MATERIAL DE USO OU CONSUMO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7651,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE DE PRODUÇÃO DO ESTABELECIMENTO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7654,
+        "descricao": "VENDA DE COMBUSTÍVEL OU LUBRIFICANTE ADQUIRIDO OU RECEBIDO DE TERCEIROS",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7930,
+        "descricao": "LANÇAMENTO EFETUADO A TÍTULO DE DEVOLUÇÃO DE BEM CUJA ENTRADA TENHA OCORRIDO SOB AMPARO DE REGIME ESPEC",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    },
+    {
+        "codigo": 7949,
+        "descricao": "OUTRA SAÍDA DE MERCADORIA OU PRESTAÇÃO DE SERVIÇO NÃO ESPECIFICADO",
+        "tipo": "S",
+        "operacao": "E",
+        "movimenta_estoque": true,
+        "ativo": false
+    }
+]

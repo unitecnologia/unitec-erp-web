@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\EmpresaResource\Pages\Concerns;
 
+use App\Filament\Concerns\ManagesCclassTribLookup;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
 use App\Rules\DocumentoBrasileiroValido;
+use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\EmpresaParametros;
@@ -19,10 +21,17 @@ use Illuminate\Contracts\Support\Htmlable;
 
 trait ErpEmpresaFormPage
 {
+    use ManagesCclassTribLookup;
     use ManagesEmpresaBloquearEstoqueNegativo;
+    use ManagesEmpresaEstoques;
     use ManagesEmpresaFormUi;
+    use ManagesEmpresaImpostoPadraoApply;
+    use ManagesEmpresaImpostoTabelasImport;
+    use ManagesEmpresaIpbtaxModal;
     use ManagesEmpresaLogo;
     use ManagesEmpresaLookup;
+    use ManagesEmpresaPortalContadorLog;
+    use ManagesEmpresaPortalContadorVinculo;
     use NormalizesErpUppercaseFormData;
 
     public function getHeading(): string | Htmlable | null
@@ -82,15 +91,27 @@ trait ErpEmpresaFormPage
     {
         $this->whatsAppQr = null;
         $this->data['cnpj_representante'] = static::normalizeOptionalCnpjRepresentante($this->data['cnpj_representante'] ?? null);
+        $this->ensureEmpresaRequiredDefaults();
 
         try {
             $this->validate(
                 [
-                    'data.cnpj' => ['nullable', 'string', 'max:20', new DocumentoBrasileiroValido(cnpjOnly: true)],
+                    'data.codigo' => ['required'],
+                    'data.razao_social' => ['required', 'string', 'max:255'],
+                    'data.fantasia' => ['required', 'string', 'max:255'],
+                    'data.cnpj' => ['required', 'string', 'max:20', new DocumentoBrasileiroValido(cnpjOnly: true)],
                     'data.cnpj_representante' => ['nullable', 'string', 'max:20', new DocumentoBrasileiroValido(cnpjOnly: true)],
                 ],
-                [],
                 [
+                    'data.codigo.required' => 'Informe o código da empresa.',
+                    'data.razao_social.required' => 'Informe a razão social / nome.',
+                    'data.fantasia.required' => 'Informe o nome fantasia / apelido.',
+                    'data.cnpj.required' => 'Informe o CNPJ da empresa.',
+                ],
+                [
+                    'data.codigo' => 'Código',
+                    'data.razao_social' => 'Razão social',
+                    'data.fantasia' => 'Nome fantasia',
                     'data.cnpj' => 'CNPJ',
                     'data.cnpj_representante' => 'CNPJ do representante',
                 ],
@@ -108,6 +129,19 @@ trait ErpEmpresaFormPage
             if ($empresa) {
                 app(\App\Support\Erp\WhatsApp\WhatsAppGatewayManager::class)->writeRuntimeConfig($empresa->fresh());
             }
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $body = collect($exception->errors())->flatten()->unique()->filter()->implode(' ');
+
+            // Traduz chave crua do Laravel (ex.: validation.required) quando não houver locale.
+            if ($body === '' || $body === 'validation.required') {
+                $body = 'Preencha os campos obrigatórios (CNPJ, Razão Social e Nome Fantasia).';
+            }
+
+            \Filament\Notifications\Notification::make()
+                ->title('Não foi possível gravar')
+                ->body($body)
+                ->danger()
+                ->send();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -117,6 +151,31 @@ trait ErpEmpresaFormPage
                 ->danger()
                 ->send();
         }
+    }
+
+    protected function ensureEmpresaRequiredDefaults(): void
+    {
+        if (blank($this->data['codigo'] ?? null)) {
+            $this->data['codigo'] = (string) Empresa::nextCodigo();
+        }
+
+        $razao = trim((string) ($this->data['razao_social'] ?? ''));
+        $fantasia = trim((string) ($this->data['fantasia'] ?? ''));
+
+        if ($fantasia === '' && $razao !== '') {
+            $this->data['fantasia'] = $razao;
+            $fantasia = $razao;
+        }
+
+        if ($razao === '' && $fantasia !== '') {
+            $this->data['razao_social'] = $fantasia;
+        }
+
+        if (blank($this->data['nome'] ?? null)) {
+            $this->data['nome'] = $fantasia !== '' ? $fantasia : $razao;
+        }
+
+        $this->safeFillEmpresaForm();
     }
 
     public function cancelForm(): void
@@ -153,8 +212,23 @@ trait ErpEmpresaFormPage
         $merged = array_merge($data, $this->data ?? []);
         $merged = ErpUppercase::normalizeFormData($merged);
 
+        $razao = trim((string) ($merged['razao_social'] ?? ''));
         $fantasia = trim((string) ($merged['fantasia'] ?? ''));
-        $merged['nome'] = $fantasia !== '' ? $fantasia : ($merged['nome'] ?? '');
+
+        if ($fantasia === '' && $razao !== '') {
+            $fantasia = $razao;
+            $merged['fantasia'] = $razao;
+        }
+
+        if ($razao === '' && $fantasia !== '') {
+            $merged['razao_social'] = $fantasia;
+        }
+
+        $merged['nome'] = $fantasia !== '' ? $fantasia : ($merged['nome'] ?? $razao);
+
+        if (blank($merged['codigo'] ?? null)) {
+            $merged['codigo'] = Empresa::nextCodigo();
+        }
 
         if (isset($merged['codigo']) && $merged['codigo'] !== '') {
             $merged['codigo'] = (int) $merged['codigo'];
@@ -162,6 +236,24 @@ trait ErpEmpresaFormPage
 
         $merged = $this->normalizeEmpresaParametrosFormData($merged);
         $merged = $this->normalizeEmpresaDocumentFormData($merged);
+
+        if (array_key_exists('param_ui_density', $merged)) {
+            $raw = strtolower(trim((string) ($merged['param_ui_density'] ?? '14')));
+            $px = match ($raw) {
+                'compact', 'compacto' => 13,
+                'large', 'grande' => 18,
+                'normal', '' => 14,
+                default => (int) preg_replace('/\D/', '', $raw),
+            };
+            $allowed = [12, 13, 14, 15, 16, 17, 18, 19, 20, 22];
+            if (! in_array($px, $allowed, true)) {
+                $px = max(12, min(22, $px > 0 ? $px : 14));
+                if (! in_array($px, $allowed, true)) {
+                    $px = 14;
+                }
+            }
+            $merged['param_ui_density'] = (string) $px;
+        }
 
         return $merged;
     }
@@ -229,6 +321,8 @@ trait ErpEmpresaFormPage
 
             if (($meta['type'] ?? '') === 'integer') {
                 $data[$field] = (int) $data[$field];
+            } elseif (($meta['type'] ?? '') === 'decimal') {
+                $data[$field] = BrDecimal::parse($data[$field] ?? 0, $meta['decimals'] ?? 2);
             }
         }
 
@@ -270,6 +364,18 @@ trait ErpEmpresaFormPage
             }
         }
 
+        foreach (EmpresaParametros::expedicaoFields() as $field => $meta) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            if ($data[$field] === '' || $data[$field] === null) {
+                $data[$field] = (int) ($meta['default'] ?? 1);
+            } else {
+                $data[$field] = max(1, (int) $data[$field]);
+            }
+        }
+
         foreach (EmpresaParametros::whatsAppBooleanFields() as $field => $meta) {
             if (! array_key_exists($field, $data)) {
                 continue;
@@ -303,6 +409,21 @@ trait ErpEmpresaFormPage
             }
         }
 
+        foreach (EmpresaParametros::impostoFields() as $field => $meta) {
+            if (($meta['type'] ?? '') === 'decimal') {
+                $data[$field] = BrDecimal::parse($data[$field] ?? ($meta['default'] ?? 0), $meta['decimals'] ?? 2);
+
+                continue;
+            }
+
+            // Colunas string de imposto são NOT NULL no MySQL (default '').
+            // Não converter vazio para null — isso quebra o INSERT.
+            $value = trim((string) ($data[$field] ?? ''));
+            $data[$field] = $value !== ''
+                ? $value
+                : (string) ($meta['default'] ?? '');
+        }
+
         return $data;
     }
 
@@ -320,7 +441,7 @@ trait ErpEmpresaFormPage
             $this->data[$field] = mb_strtolower(trim($value), 'UTF-8');
         }
 
-        $this->form->fill($this->data);
+        $this->safeFillEmpresaForm();
     }
 
     protected function prepareEmpresaParametrosForForm(): void
@@ -341,7 +462,39 @@ trait ErpEmpresaFormPage
             }
         }
 
-        $this->form->fill($this->data);
+        foreach (EmpresaParametros::impostoFields() as $field => $meta) {
+            if (($meta['type'] ?? '') !== 'decimal') {
+                if (! array_key_exists($field, $this->data) || $this->data[$field] === null) {
+                    $this->data[$field] = (string) ($meta['default'] ?? '');
+                }
+
+                continue;
+            }
+
+            $decimals = $meta['decimals'] ?? 2;
+            $this->data[$field] = number_format(
+                BrDecimal::parse($this->data[$field] ?? ($meta['default'] ?? 0), $decimals),
+                $decimals,
+                ',',
+                '.',
+            );
+        }
+
+        foreach (EmpresaParametros::numericFields() as $field => $meta) {
+            if (($meta['type'] ?? '') !== 'decimal') {
+                continue;
+            }
+
+            $decimals = $meta['decimals'] ?? 2;
+            $this->data[$field] = number_format(
+                BrDecimal::parse($this->data[$field] ?? ($meta['default'] ?? 0), $decimals),
+                $decimals,
+                ',',
+                '.',
+            );
+        }
+
+        $this->safeFillEmpresaForm();
     }
 
     protected function getEmpresaListRedirectUrl(): string
@@ -349,6 +502,32 @@ trait ErpEmpresaFormPage
         ErpScreen::set('Empresa');
 
         return EmpresaResource::getUrl('index');
+    }
+
+    /**
+     * Evita ActionNotResolvableException do Filament ao sincronizar o form após modais/upload.
+     */
+    protected function purgeInvalidFilamentMountedActions(): void
+    {
+        if (property_exists($this, 'mountedActions') && is_array($this->mountedActions)) {
+            $this->mountedActions = array_values(array_filter(
+                $this->mountedActions,
+                static fn ($action): bool => is_array($action) && filled($action['name'] ?? null),
+            ));
+        }
+
+        if (property_exists($this, 'mountedAction') && blank($this->mountedAction)) {
+            $this->mountedAction = null;
+        }
+    }
+
+    protected function safeFillEmpresaForm(): void
+    {
+        $this->purgeInvalidFilamentMountedActions();
+
+        if (isset($this->form) && method_exists($this->form, 'fill')) {
+            $this->form->fill($this->data);
+        }
     }
 
     /**

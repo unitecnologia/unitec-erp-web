@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ContadorResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\ContadorResource;
 use App\Filament\Resources\ContadorResource\Pages\Concerns\ManagesContadorDeleteConfirm;
 use App\Filament\Resources\ContadorResource\Pages\Concerns\ManagesContadorFormModal;
@@ -20,6 +21,7 @@ class ListContadores extends ListRecords
     use InteractsWithErpListPage;
     use ManagesContadorDeleteConfirm;
     use ManagesContadorFormModal;
+    use ManagesErpSearchColumn;
 
     protected static string $resource = ContadorResource::class;
 
@@ -35,7 +37,22 @@ class ListContadores extends ListRecords
     {
         parent::mount();
 
+        $this->erpRestoreSearchColumnFromSession();
+
         ErpScreen::set('Contadores');
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function erpAllowedSearchColumns(): array
+    {
+        return ['codigo', 'nome', 'cnpj_cpf', 'cidade', 'email', 'fone'];
+    }
+
+    protected function erpDefaultSearchColumn(): string
+    {
+        return 'codigo';
     }
 
     protected static function erpListPageClass(): string
@@ -101,13 +118,6 @@ class ListContadores extends ListRecords
                 View::make('filament.components.erp.contadores.form-modal'),
                 View::make('filament.components.erp.contadores.confirm-delete-modal'),
             ]);
-    }
-
-    public function updatedSearchColumn(): void
-    {
-        $this->localSearch = '';
-        $this->clearListSelection();
-        $this->resetTable();
     }
 
     public function updatedTableRecordsPerPage(): void

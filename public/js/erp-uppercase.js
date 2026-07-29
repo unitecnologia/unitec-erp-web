@@ -1,107 +1,86 @@
 window.ErpUppercase = {
-    selectors: [
-        '[data-erp-uppercase]',
-        '.erp-pcad-form__input[type="text"]:not([readonly]):not([data-mask])',
-        '.erp-pcad-form__textarea:not([readonly])',
-        '.erp-produtos__input:not([readonly])',
-        '.erp-orcamentos__input:not([readonly])',
-        '.erp-vendas__input:not([readonly])',
-        '.erp-caixa__input:not([readonly])',
-        '.erp-compras__input:not([readonly])',
-        '.erp-receber__input:not([readonly])',
-        '.erp-pagar__input:not([readonly])',
-        '.erp-vendedores__input:not([readonly])',
-        '.erp-entregadores__input:not([readonly])',
-        '.erp-contadores__input:not([readonly])',
-        '.erp-grupos__input:not([readonly])',
-        '.erp-marcas__input:not([readonly])',
-        '.erp-unidades__input:not([readonly])',
-        '.erp-ajustes-estoque__input:not([readonly])',
-        '.erp-ajusta-precos__input:not([readonly])',
-        '.erp-impressao-etiquetas__input:not([readonly])',
-        '.erp-pdv-form__input:not([data-mask]):not(.erp-pdv-form__input--money)',
-    ],
-
     shouldSkip(input) {
-        if (input.readOnly || input.disabled) {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
             return true;
         }
-
-        const type = (input.type || 'text').toLowerCase();
-
-        if (type === 'email' || type === 'password') {
+        if (input.disabled) {
             return true;
         }
-
-        if (input.hasAttribute('data-mask')) {
+        if (input.hasAttribute("data-erp-preserve-case") || input.dataset.erpPreserveCase === "1") {
             return true;
         }
-
-        if (input.classList.contains('erp-pdv-form__input--money')) {
+        if (input.readOnly && input.dataset.erpNoAutofill !== "1") {
             return true;
         }
-
+        const type = (input.type || "text").toLowerCase();
+        if (["password","number","date","datetime-local","time","month","week","file","checkbox","radio","hidden","range","color"].includes(type)) {
+            return true;
+        }
+        if (input.hasAttribute("data-mask") || input.dataset.erpPasswordMask) {
+            return true;
+        }
+        if (input.classList.contains("erp-pcad-form__input--password")) {
+            return true;
+        }
+        if (input.classList.contains("erp-pdv-form__input--money")) {
+            return true;
+        }
+        if (input.classList.contains("erp-pcad-form__input--comissao") || input.inputMode === "decimal") {
+            return true;
+        }
+        if (input.classList.contains("erp-fpgto-field__input--num")) {
+            return true;
+        }
         return false;
     },
-
-    bindInput(input) {
-        if (input.dataset.erpUppercaseBound === '1' || this.shouldSkip(input)) {
+    applyUppercase(input) {
+        const upper = input.value.toLocaleUpperCase("pt-BR");
+        if (input.value === upper) {
             return;
         }
-
-        input.dataset.erpUppercaseBound = '1';
-        input.setAttribute('data-erp-uppercase', '');
-
-        input.addEventListener('input', () => {
-            const upper = input.value.toLocaleUpperCase('pt-BR');
-
-            if (input.value === upper) {
-                return;
-            }
-
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
-
-            input.value = upper;
-
-            if (start !== null && end !== null) {
-                input.setSelectionRange(start, end);
-            }
-
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-        });
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        input.value = upper;
+        if (document.activeElement === input && start !== null && end !== null) {
+            try { input.setSelectionRange(start, end); } catch (_) {}
+        }
+        input.dispatchEvent(new Event("input", { bubbles: true }));
     },
-
+    bindInput(input) {
+        if (input.dataset.erpUppercaseBound === "1" || this.shouldSkip(input)) {
+            return;
+        }
+        input.dataset.erpUppercaseBound = "1";
+        input.setAttribute("data-erp-uppercase", "");
+        input.setAttribute("autocapitalize", "characters");
+        input.style.textTransform = "uppercase";
+        const onType = () => this.applyUppercase(input);
+        input.addEventListener("input", onType);
+        input.addEventListener("change", onType);
+        input.addEventListener("blur", onType);
+        input.addEventListener("animationstart", onType);
+    },
     bind(root = document) {
-        const seen = new Set();
-
-        this.selectors.forEach((selector) => {
-            root.querySelectorAll(selector).forEach((input) => {
-                if (seen.has(input)) {
-                    return;
-                }
-
-                seen.add(input);
-                this.bindInput(input);
-            });
-        });
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        root.querySelectorAll("input[type=\"text\"], input[type=\"search\"], input[type=\"tel\"], input[type=\"email\"], input[type=\"url\"], input:not([type]), textarea").forEach((input) => this.bindInput(input));
+        root.querySelectorAll("[data-erp-uppercase]").forEach((input) => this.bindInput(input));
     },
 };
-
 function initErpUppercase() {
     window.ErpUppercase?.bind(document);
 }
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initErpUppercase);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initErpUppercase);
 } else {
     initErpUppercase();
 }
-
-document.addEventListener('livewire:navigated', initErpUppercase);
-
+document.addEventListener("livewire:navigated", initErpUppercase);
 if (window.Livewire) {
-    window.Livewire.hook('morph.updated', ({ el }) => {
-        window.ErpUppercase?.bind(el);
+    window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
+} else {
+    document.addEventListener("livewire:init", () => {
+        window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
     });
 }

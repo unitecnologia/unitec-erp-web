@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Sobe MySQL e servidor do Unitec ERP ao iniciar o Windows (sem abrir navegador).

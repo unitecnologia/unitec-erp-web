@@ -5,7 +5,11 @@
     $booleans = EmpresaParametros::sistemaBooleanFields();
     $backupStatus = EmpresaParametros::sistemaBackupStatusOptions();
     $updateUrl = $fields['param_update_download_url'] ?? null;
-    unset($fields['param_update_download_url'], $fields['param_backup_ultimo_status']);
+    unset(
+        $fields['param_update_download_url'],
+        $fields['param_backup_ultimo_status'],
+        $fields['param_ui_density'],
+    );
 @endphp
 
 <div class="erp-empresas-parametros__section-title">Atualização do sistema</div>

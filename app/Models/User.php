@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -17,7 +18,6 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'name',
-    'email',
     'password',
     'senha',
     'senha_app_forca_vendas',
@@ -40,7 +40,6 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'is_supervisor' => 'boolean',
@@ -50,12 +49,66 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->ativo;
+        if (! $this->ativo) {
+            return false;
+        }
+
+        if ($panel->getId() !== 'gestor') {
+            return true;
+        }
+
+        if ($this->is_admin) {
+            return true;
+        }
+
+        return \App\Support\Erp\ErpAccess::can($this, 'produtos.access')
+            || \App\Support\Erp\ErpAccess::can($this, 'ajusta_preco.access')
+            || \App\Support\Erp\ErpAccess::can($this, 'ajuste_estoque.access');
     }
 
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function empresas(): BelongsToMany
+    {
+        return $this->belongsToMany(Empresa::class, 'empresa_user')->withTimestamps();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function accessibleEmpresaIds(): array
+    {
+        if ($this->is_admin) {
+            return Empresa::query()
+                ->where('ativo', true)
+                ->orderBy('codigo')
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+        }
+
+        $ids = $this->empresas()
+            ->pluck('empresas.id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if (filled($this->empresa_id)) {
+            $ids[] = (int) $this->empresa_id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    public function canAccessEmpresa(int $empresaId): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        return in_array($empresaId, $this->accessibleEmpresaIds(), true);
     }
 
     public function erpProfile(): BelongsTo
@@ -66,6 +119,36 @@ class User extends Authenticatable implements FilamentUser
     public function vendedor(): BelongsTo
     {
         return $this->belongsTo(Vendedor::class);
+    }
+
+    /**
+     * Admin e usuário sem colaborador vinculado: sem restrição de PDV.
+     * Colaborador sem PDVs marcados: sem restrição.
+     * Colaborador com PDVs marcados: só esses terminais.
+     */
+    public function podeOperarPdvNoTerminal(?Terminal $terminal): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        if (! $terminal?->id) {
+            return true;
+        }
+
+        $vendedor = $this->relationLoaded('vendedor')
+            ? $this->vendedor
+            : $this->vendedor()->with('terminais')->first();
+
+        if (! $vendedor) {
+            return true;
+        }
+
+        if (! $vendedor->relationLoaded('terminais')) {
+            $vendedor->load('terminais');
+        }
+
+        return $vendedor->podeUsarTerminal((int) $terminal->id);
     }
 
     public function userPermissions(): HasMany

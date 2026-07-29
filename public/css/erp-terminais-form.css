@@ -179,14 +179,28 @@
 }
 
 .erp-terminais-master__sidebar {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    flex: 0 0 10.5rem;
-    width: 10.5rem;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 14.5rem;
+    width: 14.5rem;
     min-height: 0;
     overflow: hidden;
     border-right: 1px solid #8ea8c3;
     background: #fff;
+}
+
+.erp-terminais-master__sidebar-new {
+    padding: 0.35rem 0.4rem;
+    border-bottom: 1px solid #8ea8c3;
+    background: #fff8e6;
+}
+
+.erp-terminais-master__sidebar-new-label {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #0f3460;
 }
 
 .erp-terminais-master__sidebar-head {
@@ -205,14 +219,30 @@
     color: var(--erp-brand-primary-dark, #0f3460);
 }
 
+.erp-terminais-master__grid-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.6rem 2.2rem;
+    gap: 0.15rem;
+    align-items: center;
+    padding: 0.22rem 0.3rem;
+    border-bottom: 1px solid #8ea8c3;
+    background: #d9e6f2;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #0f3460;
+}
+
 .erp-terminais-master__nome-input {
     width: 100%;
-    margin-top: 0.25rem;
+    margin-top: 0;
     font-size: 0.82rem;
     font-weight: 600;
     padding: 0.2rem 0.35rem;
     border: 1px solid var(--erp-border-light, #c7d5e8);
     border-radius: var(--erp-radius-sm, 6px);
+    box-sizing: border-box;
 }
 
 .erp-terminais-master__list {
@@ -234,22 +264,25 @@
 .erp-terminais-master__list > li {
     margin: 0;
     padding: 0;
+    position: relative;
 }
 
 .erp-terminais-master__item {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.6rem 2.2rem;
+    gap: 0.15rem;
+    align-items: center;
     width: 100%;
-    min-height: 1.65rem;
-    padding: 0.18rem 0.35rem;
+    min-height: 2rem;
+    padding: 0.18rem 0.25rem;
     border: 0;
     border-bottom: 1px solid #c5d4e4;
     border-radius: 0;
     background: #fff;
     text-align: left;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: #000;
-    cursor: pointer;
     font-family: inherit;
     box-sizing: border-box;
 }
@@ -264,16 +297,158 @@
     box-shadow: none;
 }
 
-.erp-terminais-master__item-label {
+.erp-terminais-master__select {
     display: block;
-    line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
-.erp-terminais-master__item--selected .erp-terminais-master__item-label {
-    color: #fff;
+.erp-terminais-master__col {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.erp-terminais-master__col--nome {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    white-space: normal;
+}
+
+.erp-terminais-master__col--ativo,
+.erp-terminais-master__col--info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.erp-terminais-master__ativo-flag {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: #15803d;
+    cursor: pointer;
+}
+
+.erp-terminais-master__info-btn {
+    padding: 0.15rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    line-height: 0;
+}
+
+.erp-terminais-master__info-btn:hover {
+    background: rgba(15, 52, 96, 0.12);
+}
+
+.erp-terminais-master__item--selected .erp-terminais-master__info-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.erp-terminais-master__item-num {
+    font-size: 0.58rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.1;
+}
+
+.erp-terminais-master__item--selected .erp-terminais-master__item-num {
+    color: #dbeafe;
+}
+
+.erp-terminais-master__item--inactive .erp-terminais-master__col--nome {
+    opacity: 0.72;
+}
+
+.erp-terminais-master__info-panel {
+    position: relative;
+    margin: 0;
+    padding: 0.45rem 1.5rem 0.5rem 0.45rem;
+    border-bottom: 1px solid #8ea8c3;
+    background: #f8fafc;
+    font-size: 0.7rem;
+    color: #0f172a;
+}
+
+.erp-terminais-master__info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 0.55rem;
+}
+
+.erp-terminais-master__info-label {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+}
+
+.erp-terminais-master__info-grid strong {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-terminais-master__info-status {
+    grid-column: 1 / -1;
+}
+
+.erp-terminais-master__info-close {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.erp-terminais-master__info-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.erp-terminais-form__ativo-bar {
+    border: 1px solid #86efac !important;
+    background: #f0fdf4 !important;
+}
+
+.erp-terminais-form__ativo-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
+    gap: 0.45rem 0.65rem;
+    align-items: end;
+}
+
+.erp-terminais-form__ativo-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.erp-terminais-form__ativo-field--xs {
+    max-width: 5.5rem;
 }
 
 .erp-terminais-master__empty {

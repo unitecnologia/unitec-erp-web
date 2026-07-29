@@ -20,21 +20,31 @@ final class ErpSystemConfig
 
     public static function updateDownloadUrl(?int $empresaId = null): string
     {
+        $github = 'https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip';
+
         $fromDb = trim((string) static::empresa($empresaId)?->param_update_download_url);
 
-        if ($fromDb !== '') {
+        if ($fromDb !== '' && ! static::isDeadUpdateHost($fromDb)) {
             return $fromDb;
         }
 
         $fromEnv = trim((string) config('unitec.update_download_url', ''));
 
-        if ($fromEnv !== '') {
+        if ($fromEnv !== '' && ! static::isDeadUpdateHost($fromEnv)) {
             return $fromEnv;
         }
 
-        return rtrim((string) config('unitec.pagamento_url'), '/')
-            .'/updates/'
-            .urlencode((string) config('unitec.update_zip_name', 'Unitec-ERP-Update.zip'));
+        return $github;
+    }
+
+    private static function isDeadUpdateHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return in_array($host, [
+            'unitecnologiasistemas.com.br',
+            'www.unitecnologiasistemas.com.br',
+        ], true);
     }
 
     public static function backupEnabled(?int $empresaId = null): bool
@@ -82,5 +92,64 @@ final class ErpSystemConfig
         $fromEnv = config('unitec.backup_last_at');
 
         return filled($fromEnv) ? (string) $fromEnv : null;
+    }
+
+    /**
+     * Tamanho da letra da interface (px na raiz html). Padrão 14.
+     */
+    public static function uiFontSizePx(?int $empresaId = null): int
+    {
+        $empresa = static::empresa($empresaId);
+        $raw = strtolower(trim((string) ($empresa?->param_ui_density ?? '')));
+
+        $px = match ($raw) {
+            'compact', 'compacto' => 13,
+            'large', 'grande' => 18,
+            'normal', '' => 14,
+            default => (int) preg_replace('/\D/', '', $raw),
+        };
+
+        return max(12, min(24, $px > 0 ? $px : 14));
+    }
+
+    /**
+     * @deprecated Use uiFontSizePx().
+     */
+    public static function uiDensity(?int $empresaId = null): string
+    {
+        return (string) static::uiFontSizePx($empresaId);
+    }
+
+    /**
+     * @deprecated Use uiFontSizePx().
+     */
+    public static function uiDensityRootPercent(?string $density = null): float
+    {
+        $px = $density !== null && is_numeric($density)
+            ? max(12, min(24, (int) $density))
+            : static::uiFontSizePx();
+
+        return round(($px / 16) * 100, 2);
+    }
+
+    /**
+     * @deprecated Mantido por compatibilidade; preferir uiFontSizePx().
+     */
+    public static function browserZoom(?int $empresaId = null): int
+    {
+        return static::uiFontSizePx($empresaId);
+    }
+
+    /**
+     * @deprecated Zoom por CSS/navegador foi substituído por tamanho tipográfico.
+     */
+    public static function syncBrowserZoomPreference(?int $zoom = null, ?int $empresaId = null): int
+    {
+        return static::uiFontSizePx($empresaId);
+    }
+
+    public static function browserZoomPreferencePath(): string
+    {
+        return storage_path('app/erp-browser-zoom.txt');
     }
 }

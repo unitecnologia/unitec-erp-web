@@ -1,8 +1,10 @@
-const CACHE_NAME = 'unitec-executivo-v6';
+const CACHE_NAME = 'unitec-executivo-v10';
 const OFFLINE_URL = '/pwa-gestor/offline.html';
 const PRECACHE = [
   OFFLINE_URL,
   '/css/erp-gestor.css',
+  '/js/gestor-gauge.js',
+  '/js/gestor-scan.js',
   '/pwa-gestor/icons/icon-192.png',
   '/pwa-gestor/icons/icon-512.png',
 ];
@@ -125,16 +127,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // CSS/assets: rede primeiro para não “congelar” estilos antigos (ex.: card Cartões).
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(req).then((res) => {
+    fetch(req)
+      .then((res) => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
         return res;
-      });
-    })
+      })
+      .catch(async () => (await caches.match(req)) || Response.error())
   );
 });

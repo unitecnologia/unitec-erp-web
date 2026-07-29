@@ -62,7 +62,7 @@ class ListTerminais extends ListRecords
 
 
 
-        ErpScreen::set('ConfiguraÃ§Ãµes de Terminais');
+        ErpScreen::set('Configurações de Terminais');
 
         $this->bootTerminalMasterDetail();
 
@@ -163,7 +163,7 @@ class ListTerminais extends ListRecords
 
             ->orderBy('nome')
 
-            ->get(['id', 'nome', 'ip']);
+            ->get(['id', 'nome', 'ip', 'empresa_id', 'ativo', 'numero_logico_terminal']);
 
     }
 
@@ -263,7 +263,7 @@ class ListTerminais extends ListRecords
 
         Notification::make()
 
-            ->title('Terminal excluÃ­do.')
+            ->title('Terminal excluído.')
 
             ->success()
 

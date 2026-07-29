@@ -1,16 +1,19 @@
 @php
-    use App\Models\Empresa;
-    use App\Models\Product;
     use App\Support\Erp\ErpContext;
 
     $jsPath = public_path('js/erp-produtos-form.js');
-    $jsVersion = file_exists($jsPath) ? filemtime($jsPath) : time();
+    $precifEnterPath = public_path('js/erp-precif-enter-v5.js');
+    $jsVersion = max(
+        file_exists($jsPath) ? (int) filemtime($jsPath) : time(),
+        file_exists($precifEnterPath) ? (int) filemtime($precifEnterPath) : 0,
+    );
     $masksJsPath = public_path('js/erp-masks.js');
     $masksJsVersion = file_exists($masksJsPath) ? filemtime($masksJsPath) : time();
 
     $status = ErpContext::statusBar();
-    $empresaId = session('erp_empresa_id', auth()->user()?->empresa_id);
-    $empresas = Empresa::query()->where('ativo', true)->orderBy('nome')->get();
+    $empresaId = (int) (session('erp_empresa_id') ?? auth()->user()?->empresa_id ?? 0);
+    $empresas = $this->productFormEmpresas();
+    $podeTrocarEmpresa = $empresas->count() > 1;
 
     $dataCadastro = isset($this->record?->created_at)
         ? $this->record->created_at->format('d/m/Y')
@@ -30,6 +33,7 @@
         ['field' => 'usa_imei', 'label' => 'Usa IMEI', 'disabled' => false],
         ['field' => 'contr_est_grade', 'label' => 'Contr. Est. Grade', 'disabled' => false],
         ['field' => 'mostrar_no_app', 'label' => 'Mostrar no App', 'disabled' => false],
+        ['field' => 'produto_pesado', 'label' => 'Produto Pesado', 'disabled' => false],
     ];
 @endphp
 
@@ -40,9 +44,13 @@
     <div class="erp-produtos-pcad__top">
         <fieldset class="erp-produtos-pcad__empresa-box">
             <legend class="erp-produtos-pcad__fieldset-legend">Selecione empresa</legend>
-            <select class="erp-pcad-form__select erp-produtos-pcad__empresa-select" disabled>
+            <select
+                class="erp-pcad-form__select erp-produtos-pcad__empresa-select"
+                @disabled(! $podeTrocarEmpresa)
+                wire:change="switchProductFormEmpresa($event.target.value)"
+            >
                 @forelse ($empresas as $empresa)
-                    <option value="{{ $empresa->id }}" @selected((int) $empresaId === (int) $empresa->id)>
+                    <option value="{{ $empresa->id }}" @selected($empresaId === (int) $empresa->id)>
                         {{ $empresa->nome }}
                     </option>
                 @empty
@@ -73,13 +81,13 @@
     </div>
 
     <div class="erp-produtos-pcad__workspace">
-        <div class="erp-produtos-pcad__fields">
+        <div class="erp-produtos-pcad__fields erp-produtos-pcad__panel">
             @include('filament.components.erp.produtos.form.tabs.dados-basicos')
         </div>
 
         <div class="erp-produtos-pcad__lower">
             <div class="erp-produtos-pcad__tabs-col">
-                <div class="erp-produtos-pcad__tabs-area">
+                <div class="erp-produtos-pcad__tabs-area erp-produtos-pcad__panel erp-produtos-pcad__panel--tabs">
                     <div class="erp-produtos-pcad__bottom-tabs">
                         @foreach ($this->visibleProductFormTabs as $tab)
                             <button
@@ -93,6 +101,8 @@
                     <div class="erp-produtos-pcad__bottom-panel">
                         @if ($this->activeFormTab === 'impostos')
                             @include('filament.components.erp.produtos.form.tabs.impostos')
+                        @elseif ($this->activeFormTab === 'estoques')
+                            @include('filament.components.erp.produtos.form.tabs.estoques')
                         @elseif ($this->activeFormTab === 'promocao')
                             @include('filament.components.erp.produtos.form.tabs.promocao')
                         @elseif ($this->activeFormTab === 'adicionais')
@@ -119,11 +129,13 @@
             </div>
 
             <div class="erp-produtos-pcad__foto-col">
-                @include('filament.components.erp.produtos.form.product-foto')
+                <div class="erp-produtos-pcad__panel erp-produtos-pcad__panel--foto">
+                    @include('filament.components.erp.produtos.form.product-foto')
+                </div>
             </div>
 
             <aside class="erp-produtos-pcad__aside">
-                <fieldset class="erp-pcad__group erp-produtos-pcad__params">
+                <fieldset class="erp-pcad__group erp-produtos-pcad__params erp-produtos-pcad__panel erp-produtos-pcad__panel--params">
                     <legend class="erp-pcad__group-title">Parâmetros</legend>
                     <div class="erp-pcad__checks">
                         @foreach ($parametros as $param)
@@ -143,9 +155,20 @@
     </div>
 
     @include('filament.components.erp.produtos.form.lookup-modal')
+    @include('filament.components.erp.produtos.form.ncm-confirm-modal')
     @include('filament.components.erp.produtos.form.duplicate-confirm-modal')
+    @include('filament.components.erp.produtos.form.exit-confirm-modal')
+    @include('filament.components.erp.produtos.form.precificacao-modal')
+    @include('filament.components.erp.produtos.form.replica-precos-modal')
+    @include('filament.components.erp.fiscal.cclass-trib-modal')
 </div>
 @endif
 
 @include('filament.components.erp.form-scripts')
+@php
+    $cclassImportJsPath = public_path('js/erp-cclass-trib-import.js');
+    $cclassImportJsVersion = file_exists($cclassImportJsPath) ? filemtime($cclassImportJsPath) : time();
+@endphp
+<script src="{{ asset('js/erp-cclass-trib-import.js') }}?v={{ $cclassImportJsVersion }}" defer></script>
+<script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $jsVersion }}"></script>
 <script src="{{ asset('js/erp-produtos-form.js') }}?v={{ $jsVersion }}" defer></script>

@@ -68,7 +68,7 @@ return new class extends Migration
             DB::table('price_tables')->insert([
                 [
                     'codigo' => '1',
-                    'descricao' => 'PADRAO',
+                    'descricao' => 'VAREJO',
                     'ativo' => true,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -76,6 +76,13 @@ return new class extends Migration
                 [
                     'codigo' => '2',
                     'descricao' => 'ATACADO',
+                    'ativo' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'codigo' => '3',
+                    'descricao' => 'ESPECIAL',
                     'ativo' => true,
                     'created_at' => now(),
                     'updated_at' => now(),

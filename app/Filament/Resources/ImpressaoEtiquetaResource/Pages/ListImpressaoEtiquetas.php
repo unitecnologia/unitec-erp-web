@@ -24,6 +24,8 @@ class ListImpressaoEtiquetas extends ListRecords
     #[Url(as: 'q')]
     public string $localSearch = '';
 
+    public string $searchColumn = 'q';
+
     public function mount(): void
     {
         parent::mount();
@@ -33,7 +35,7 @@ class ListImpressaoEtiquetas extends ListRecords
 
     protected static function erpListPageClass(): string
     {
-        return 'erp-impressao-etiquetas-page erp-impressao-etiquetas-page--sidebar';
+        return 'erp-impressao-etiquetas-page';
     }
 
     protected function erpListEntityName(): string
@@ -45,13 +47,10 @@ class ListImpressaoEtiquetas extends ListRecords
     {
         return [
             'searchInput' => '.erp-impressao-etiquetas__input',
-            'searchFocusKey' => 'F5',
             'create' => null,
             'edit' => null,
             'delete' => null,
             'extraKeys' => [
-                'F2' => ['method' => 'pesquisar'],
-                'F3' => ['method' => 'limparBusca'],
                 'F4' => ['method' => 'modulePending', 'params' => ['Imprimir']],
             ],
         ];
@@ -93,15 +92,26 @@ class ListImpressaoEtiquetas extends ListRecords
             ]);
     }
 
-    public function pesquisar(): void
+    public function search(): void
     {
+        $this->clearListSelection();
         $this->resetTable();
     }
 
-    public function limparBusca(): void
+    public function clearSearch(): void
     {
         $this->localSearch = '';
         $this->clearListSelection();
         $this->resetTable();
+    }
+
+    public function pesquisar(): void
+    {
+        $this->search();
+    }
+
+    public function limparBusca(): void
+    {
+        $this->clearSearch();
     }
 }

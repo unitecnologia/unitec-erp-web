@@ -14,8 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cliente_id',
     'vendedor_id',
     'orcamento_id',
+    'forca_vendas_order_id',
     'venda_id',
     'total',
+    'tipo',
     'status',
     'situacao',
     'erro',
@@ -26,13 +28,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class VendasInternasOrder extends Model
 {
+    public const TIPO_ORCAMENTO = 'orcamento';
+
+    public const TIPO_PEDIDO = 'pedido';
+
     public const STATUS_IMPORTADO = 'importado';
 
     public const STATUS_ERRO = 'erro';
 
     public const SITUACAO_AGUARDANDO = 'aguardando';
 
+    public const SITUACAO_PENDENTE = 'pendente';
+
     public const SITUACAO_NO_CAIXA = 'no_caixa';
+
+    public const SITUACAO_FATURADO = 'faturado';
 
     public const SITUACAO_PAGO = 'pago';
 
@@ -58,10 +68,20 @@ class VendasInternasOrder extends Model
     {
         return [
             self::SITUACAO_AGUARDANDO => 'Aguardando PDV',
+            self::SITUACAO_PENDENTE => 'Pendente (Monitor)',
             self::SITUACAO_NO_CAIXA => 'No caixa',
+            self::SITUACAO_FATURADO => 'Faturado',
             self::SITUACAO_PAGO => 'Pago',
             self::SITUACAO_CANCELADO => 'Cancelado',
         ];
+    }
+
+    public function tipoLabel(): string
+    {
+        return match ($this->tipo) {
+            self::TIPO_PEDIDO => 'Pedido',
+            default => 'Orçamento',
+        };
     }
 
     public function situacaoLabel(): string
@@ -86,6 +106,11 @@ class VendasInternasOrder extends Model
     public function orcamento(): BelongsTo
     {
         return $this->belongsTo(Orcamento::class);
+    }
+
+    public function forcaVendasOrder(): BelongsTo
+    {
+        return $this->belongsTo(ForcaVendasOrder::class);
     }
 
     public function venda(): BelongsTo

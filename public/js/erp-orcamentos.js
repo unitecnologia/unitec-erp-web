@@ -31,19 +31,26 @@
         };
 
         Object.entries(fields).forEach(([field, isoValue]) => {
-            if (! isoValue) {
-                return;
-            }
-
             const input = page.querySelector(`input[data-wire-field="${field}"]`);
 
             if (! input) {
                 return;
             }
 
-            input.dataset.erpDateInitial = isoValue;
+            if (isoValue) {
+                input.dataset.erpDateInitial = isoValue;
+            }
 
             if (input.dataset.erpDateBound === '1' && input._flatpickr) {
+                if (isoValue && window.ErpDatepicker.isIsoDateString(isoValue)) {
+                    const parsed = window.ErpDatepicker.parseValue(isoValue, 'iso');
+
+                    if (parsed) {
+                        window.ErpDatepicker.applyLocalDate(input, input._flatpickr, parsed);
+                        input.dataset.erpDateSynced = isoValue;
+                    }
+                }
+
                 window.ErpDatepicker.normalizeDisplay?.(input, input._flatpickr, window.ErpDatepicker.getWireFormat(input));
 
                 return;

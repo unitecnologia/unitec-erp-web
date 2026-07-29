@@ -2,15 +2,18 @@
 
 namespace App\Filament\Resources\ContaReceberResource\Pages;
 
+use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberBaixaModal;
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberViewModal;
 use App\Filament\Concerns\InteractsWithLocalClienteSearchLookup;
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\ContaReceberResource;
 use App\Models\ContaReceber;
 use App\Models\Person;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberExclusaoService;
+use App\Support\Erp\Queries\ContaReceberListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -25,7 +28,9 @@ use Livewire\Attributes\Url;
 class ListContasReceber extends ListRecords
 {
     use InteractsWithErpListPage;
+    use \App\Filament\Concerns\InteractsWithErpPermissions;
     use InteractsWithLocalClienteSearchLookup;
+    use ManagesContaReceberBaixaModal;
     use ManagesContaReceberViewModal;
 
     protected static string $resource = ContaReceberResource::class;
@@ -88,11 +93,9 @@ class ListContasReceber extends ListRecords
     {
         return [
             'searchInput' => '.erp-receber__input',
-            'create' => 'createConta',
-            'edit' => 'editConta',
             'delete' => 'deleteConta',
             'extraKeys' => [
-                'F4' => ['method' => 'modulePending', 'params' => ['Imprimir']],
+                'F4' => ['method' => 'printContasReceber'],
                 'F8' => ['method' => 'baixarConta'],
             ],
         ];
@@ -108,11 +111,15 @@ class ListContasReceber extends ListRecords
      */
     protected function erpListRecordClasses(Model $record): array
     {
-        return (float) $record->saldo > 0
-            && $record->vencimento
-            && $record->vencimento->isBefore(now()->startOfDay())
-                ? ['erp-receber-row--vencida']
-                : [];
+        if ((float) $record->saldo <= 0) {
+            return ['erp-receber-row--recebida'];
+        }
+
+        if ($record->vencimento && $record->vencimento->isBefore(now()->startOfDay())) {
+            return ['erp-receber-row--vencida'];
+        }
+
+        return [];
     }
 
     protected function getTableQuery(): Builder
@@ -346,6 +353,7 @@ class ListContasReceber extends ListRecords
                 View::make('filament.components.erp.receber.footer-summary'),
                 View::make('filament.components.erp.receber.action-bar'),
                 View::make('filament.components.erp.receber.view-modal'),
+                View::make('filament.components.erp.receber.baixa-modal'),
             ]);
     }
 
@@ -520,42 +528,36 @@ class ListContasReceber extends ListRecords
             ->send();
     }
 
-    public function baixarConta(): void
-    {
-        $ids = collect($this->selecionadosParaBaixa)
-            ->map(fn ($id): int => (int) $id)
-            ->filter()
-            ->values()
-            ->all();
-
-        if ($ids !== []) {
-            if ($this->clienteFilter === 'todos' || ! is_numeric($this->clienteFilter)) {
-                Notification::make()
-                    ->title('Selecione um cliente antes de marcar contas para baixa.')
-                    ->warning()
-                    ->send();
-
-                return;
-            }
-
-            $quantidade = count($ids);
-            $this->modulePending('Baixa de ' . $quantidade . ' conta' . ($quantidade === 1 ? '' : 's') . ' (Fase 2)');
-
-            return;
-        }
-
-        if (! $this->highlightedRecordIdOrNotify('baixar')) {
-            return;
-        }
-
-        $this->modulePending('Baixa de conta (Fase 2)');
-    }
-
     protected function erpListSelectPrompt(string $action): string
     {
         return match ($action) {
             'baixar' => 'uma conta para baixar',
             default => $this->defaultErpListSelectPrompt($action),
         };
+    }
+
+    public function printContasReceber(): void
+    {
+        if (! $this->erpAuthorizeOrNotify('contas_receber.print')) {
+            return;
+        }
+
+        // F4 gera o relatório de cartões, respeitando situação/período/cliente da tela.
+        $builder = new ContaReceberListQueryBuilder(
+            situacaoFilter: $this->situacaoFilter,
+            formaFilter: 'cartao',
+            clienteFilter: $this->clienteFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDe: $this->periodoDeApplied,
+            periodoAte: $this->periodoAteApplied,
+        );
+
+        $params = array_filter(
+            $builder->reportFilters(),
+            fn ($value): bool => filled($value),
+        );
+
+        $this->redirect(route('erp.reports.contas-receber-cartoes', $params), navigate: false);
     }
 }

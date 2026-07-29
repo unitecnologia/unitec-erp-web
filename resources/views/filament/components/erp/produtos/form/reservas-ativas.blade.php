@@ -2,7 +2,7 @@
     <div class="erp-produtos-form__reservas">
         <div class="erp-produtos-form__reservas-summary">
             <span class="erp-produtos-form__reservas-chip erp-produtos-form__reservas-chip--reserved">
-                Reservado: <strong>{{ $this->productEstoqueReservadoLabel }}</strong>
+                Reservado (app): <strong>{{ $this->productEstoqueReservadoLabel }}</strong>
             </span>
             <span class="erp-produtos-form__reservas-chip erp-produtos-form__reservas-chip--available">
                 Disponível: <strong>{{ $this->productEstoqueDisponivelLabel }}</strong>

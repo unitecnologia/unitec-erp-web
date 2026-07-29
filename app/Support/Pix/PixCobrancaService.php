@@ -3,8 +3,10 @@
 namespace App\Support\Pix;
 
 use App\Models\ContaReceber;
+use App\Models\FormaPagamento;
 use App\Models\PixCobranca;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Pix\Contracts\PixProvider;
 use App\Support\Pix\Data\PixCobrancaInput;
 use Illuminate\Support\Str;
@@ -191,14 +193,50 @@ class PixCobrancaService
             return;
         }
 
-        $recebido = (float) $conta->valor_recebido + (float) $cobranca->valor;
-        $maximo = (float) $conta->valor - (float) $conta->desconto + (float) $conta->juros;
+        $valorBaixa = min((float) $cobranca->valor, (float) $conta->saldo);
 
-        $conta->forceFill([
-            'valor_recebido' => min($recebido, $maximo),
-            'recebido_em' => $cobranca->pago_em ?? now(),
-            'forma' => ContaReceber::FORMA_PIX,
-        ])->save(); // saldo é recalculado no saving()
+        if ($valorBaixa <= 0) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($cobranca, $conta, $valorBaixa): void {
+            $recebido = (float) $conta->valor_recebido + $valorBaixa;
+            $maximo = (float) $conta->valor - (float) $conta->desconto + (float) $conta->juros;
+
+            $conta->forceFill([
+                'valor_recebido' => min($recebido, $maximo),
+                'recebido_em' => $cobranca->pago_em ?? now(),
+                'forma' => ContaReceber::FORMA_PIX,
+            ])->save(); // saldo é recalculado no saving()
+
+            // PIX de título: baixa o CR e gera entrada no Livro Caixa (paridade FV).
+            $data = ($cobranca->pago_em ?? now())->toDateString();
+            $documento = (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id));
+
+            app(ContaReceberBaixaService::class)->registrarEntradaCaixa(
+                valor: $valorBaixa,
+                data: $data,
+                documento: $documento,
+                historico: 'Recebimento PIX #'.($conta->numero ?: $conta->id),
+                caixaContaId: $this->resolveCaixaContaIdPix($cobranca),
+            );
+        });
+    }
+
+    private function resolveCaixaContaIdPix(PixCobranca $cobranca): ?int
+    {
+        $formaPix = FormaPagamento::query()
+            ->where('ativo', true)
+            ->where(function ($q): void {
+                $q->where('tipo', 'pix')
+                    ->orWhere('descricao', 'like', '%PIX%');
+            })
+            ->orderBy('codigo')
+            ->first();
+
+        $caixaId = (int) ($formaPix?->conta_destino_id ?? 0);
+
+        return $caixaId > 0 ? $caixaId : null;
     }
 
     public function cancelar(PixCobranca $cobranca): PixCobranca

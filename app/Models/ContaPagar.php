@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'numero',
@@ -42,6 +43,11 @@ class ContaPagar extends Model
     public function fornecedor(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'fornecedor_id');
+    }
+
+    public function pagamentos(): HasMany
+    {
+        return $this->hasMany(ContaPagarPagamento::class, 'conta_pagar_id');
     }
 
     protected function casts(): array

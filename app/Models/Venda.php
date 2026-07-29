@@ -6,10 +6,11 @@ namespace App\Models;
 
 
 
+use App\Models\Nfe;
+use App\Models\PdvVendaNfce;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -39,6 +40,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'tipo',
 
     'plataforma',
+
+    'requer_entrega',
 
 ])]
 
@@ -208,8 +211,18 @@ class Venda extends Model
 
     public function vendedorNome(): string
     {
-        return $this->vendedor_nome
-            ?: ($this->vendedor?->nome ?? 'LOJA');
+        // Preferir o cadastro atual do operador (snapshot legado "LOJA" não vale).
+        $cadastro = trim((string) ($this->vendedor?->nome ?? ''));
+        if ($cadastro !== '') {
+            return $cadastro;
+        }
+
+        $snap = trim((string) ($this->vendedor_nome ?? ''));
+        if ($snap !== '' && mb_strtoupper($snap, 'UTF-8') !== 'LOJA') {
+            return $snap;
+        }
+
+        return 'SEM OPERADOR';
     }
 
     public function itens(): HasMany
@@ -227,6 +240,37 @@ class Venda extends Model
         return $this->hasOne(ForcaVendasOrder::class, 'venda_id');
     }
 
+    public function nfes(): HasMany
+    {
+        return $this->hasMany(Nfe::class);
+    }
+
+    public function entrega(): HasOne
+    {
+        return $this->hasOne(Entrega::class);
+    }
+
+    /**
+     * Pedidos ainda sem documento fiscal emitido (NF-e ou NFC-e autorizada).
+     */
+    public function scopeSemDocumentoFiscalEmitido(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('nfes', function (Builder $nfe): void {
+                $nfe->whereIn('status', [
+                    Nfe::STATUS_TRANSMITIDA,
+                    Nfe::STATUS_CONTINGENCIA,
+                ]);
+            })
+            ->whereDoesntHave('pdvVenda.nfce', function (Builder $nfc): void {
+                $nfc->whereIn('status', [
+                    PdvVendaNfce::STATUS_AUTORIZADA,
+                    PdvVendaNfce::STATUS_SIMULADA,
+                    PdvVendaNfce::STATUS_CONTINGENCIA,
+                ]);
+            });
+    }
+
     protected function casts(): array
 
     {
@@ -236,6 +280,8 @@ class Venda extends Model
             'data' => 'date',
 
             'total' => 'decimal:2',
+
+            'requer_entrega' => 'boolean',
 
         ];
 

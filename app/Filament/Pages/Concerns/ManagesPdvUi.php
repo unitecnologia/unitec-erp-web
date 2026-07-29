@@ -67,7 +67,7 @@ trait ManagesPdvUi
         'tipo_conta' => '',
     ];
 
-    public string $vendedor = 'LOJA';
+    public string $vendedor = '';
 
     /**
      * @return list<string>
@@ -146,6 +146,9 @@ trait ManagesPdvUi
 
     public function closePdvModal(): void
     {
+        $wasSair = $this->activeModal === 'sair';
+        $wasFinalizar = $this->activeModal === 'finalizar';
+
         if ($this->activeModal === 'finalizar') {
             $this->finalizarConfirmSair = false;
             $this->cancelFinalizarImprimir();
@@ -154,6 +157,10 @@ trait ManagesPdvUi
         }
 
         $this->activeModal = null;
+
+        if ($wasSair || $wasFinalizar) {
+            $this->dispatch('erp-pdv-focus-search');
+        }
     }
 
     public function handlePdvEscape(): void
@@ -166,6 +173,12 @@ trait ManagesPdvUi
 
         if ($this->overlayPersonOpen) {
             $this->closePersonOverlay();
+
+            return;
+        }
+
+        if ($this->pdvConfirmCancelarVenda) {
+            $this->cancelCancelarCupom();
 
             return;
         }
@@ -200,6 +213,24 @@ trait ManagesPdvUi
                     return;
                 }
 
+                if ($this->finalizarCarneImpressaoAberta) {
+                    $this->fecharCarneImpressao();
+
+                    return;
+                }
+
+                if ($this->finalizarTabelaPrazoConsulta) {
+                    $this->cancelFinalizarTabelaPrazoConsulta();
+
+                    return;
+                }
+
+                if ($this->finalizarCartaoCanhotoAberta) {
+                    $this->cancelFinalizarCartaoCanhoto();
+
+                    return;
+                }
+
                 $this->requestCloseFinalizar();
 
                 return;
@@ -210,10 +241,14 @@ trait ManagesPdvUi
                 'serial' => $this->cancelPdvSerial(),
                 'busca_avancada' => $this->cancelBuscaAvancada(),
                 'busca_preco' => $this->cancelBuscaPreco(),
+                'importar_menu' => $this->cancelImportarMenu(),
+                'importar_pedido' => $this->cancelImportar(),
                 'importar' => $this->cancelImportar(),
                 'receber' => $this->cancelReceber(),
                 'reimprimir' => $this->cancelReimprimir(),
                 'consulta_venda' => $this->cancelConsultaVenda(),
+                'estorno_venda' => $this->cancelEstornoVenda(),
+                'fiscal_aviso' => $this->sairPdvFiscalOverlay(),
                 'tabela_preco' => $this->cancelTabelaPreco(),
                 'remover_itens' => $this->cancelRemoverItens(),
                 'autorizacao' => $this->cancelPdvAutorizacao(),
@@ -262,12 +297,26 @@ trait ManagesPdvUi
             return;
         }
 
+        if (! $this->garantirOperadorDoUsuarioLogado()) {
+            return;
+        }
+
         $this->aberturaForm['valor'] = '0,00';
         $this->openPdvModal('abrir_caixa');
     }
 
     public function openProductOverlay(): void
     {
+        if (! $this->caixaAberto) {
+            Notification::make()
+                ->title('Caixa fechado.')
+                ->body('Abra o caixa com F2 antes de continuar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->overlayProductOpen = true;
         $this->dispatch('erp-pdv-overlay-opened', type: 'product');
     }
@@ -284,6 +333,16 @@ trait ManagesPdvUi
 
     public function openPersonOverlay(): void
     {
+        if (! $this->caixaAberto) {
+            Notification::make()
+                ->title('Caixa fechado.')
+                ->body('Abra o caixa com F2 antes de continuar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->overlayPersonOpen = true;
         $this->dispatch('erp-pdv-overlay-opened', type: 'person');
     }
@@ -320,7 +379,7 @@ trait ManagesPdvUi
     {
         Notification::make()
             ->title('NFC-e')
-            ->body('Emissão e reimpressão de NFC-e em implementação no web.')
+            ->body('Use o fechamento fiscal (F4/F6) no PDV para emitir NFC-e.')
             ->info()
             ->send();
     }

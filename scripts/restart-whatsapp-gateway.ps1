@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Reinicia o gateway WhatsApp interno (Node/Baileys na porta 8091).

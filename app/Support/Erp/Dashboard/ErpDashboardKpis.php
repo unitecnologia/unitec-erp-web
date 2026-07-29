@@ -2,14 +2,20 @@
 
 namespace App\Support\Erp\Dashboard;
 
-use App\Models\ContaReceber;
 use App\Models\Nfe;
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
-use Carbon\Carbon;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
+/**
+ * KPIs do dashboard ERP — alinhados às mesmas bases do Painel Executivo
+ * (ErpFinanceiroMetricas + ErpDashboardSalesMetrics).
+ *
+ * Indicadores exclusivos do ERP (notas, licença) ficam aqui; aprovações FV
+ * ficam só no Executivo.
+ */
 final class ErpDashboardKpis
 {
     /**
@@ -20,8 +26,9 @@ final class ErpDashboardKpis
         return [
             static::faturamentoHoje(),
             static::vendasMes(),
-            static::contasReceber(),
+            static::saldoCaixa(),
             static::contasVencidas(),
+            static::contasPagarVencidas(),
             static::estoqueCritico(),
             static::notasRejeitadas($empresaId),
             ErpDashboardLicense::kpi(),
@@ -33,13 +40,14 @@ final class ErpDashboardKpis
      */
     private static function faturamentoHoje(): array
     {
-        $hoje = ErpDashboardSalesMetrics::faturamentoDia(Carbon::today());
-        $ontem = ErpDashboardSalesMetrics::faturamentoDia(Carbon::yesterday());
+        $dia = ErpFinanceiroMetricas::hoje();
+        $hoje = ErpDashboardSalesMetrics::faturamentoDia($dia);
+        $ontem = ErpDashboardSalesMetrics::faturamentoDia($dia->copy()->subDay());
 
         return [
             'key' => 'faturamento_hoje',
             'label' => 'Faturamento hoje',
-            'value' => 'R$ ' . ErpMoney::formatBr($hoje),
+            'value' => 'R$ '.ErpMoney::formatBr($hoje),
             'hint' => ErpDashboardSalesMetrics::hintVariacaoDia($hoje, $ontem),
             'tone' => 'blue',
             'icon' => 'heroicon-o-banknotes',
@@ -51,19 +59,18 @@ final class ErpDashboardKpis
      */
     private static function vendasMes(): array
     {
-        $inicioMes = Carbon::today()->startOfMonth();
-        $fimMes = Carbon::today();
+        $fimMes = ErpFinanceiroMetricas::hoje();
+        $inicioMes = $fimMes->copy()->startOfMonth();
         $totalMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $fimMes);
-
         $diasNoMes = max(1, (int) $inicioMes->diffInDays($fimMes) + 1);
         $mediaDia = round($totalMes / $diasNoMes, 2);
 
         return [
             'key' => 'vendas_mes',
             'label' => 'Vendas do mês',
-            'value' => 'R$ ' . ErpMoney::formatBr($totalMes),
+            'value' => 'R$ '.ErpMoney::formatBr($totalMes),
             'hint' => $totalMes > 0
-                ? 'Média diária: R$ ' . ErpMoney::formatBr($mediaDia)
+                ? 'Média diária: R$ '.ErpMoney::formatBr($mediaDia)
                 : 'Nenhuma venda no mês',
             'tone' => 'green',
             'icon' => 'heroicon-o-shopping-bag',
@@ -73,19 +80,19 @@ final class ErpDashboardKpis
     /**
      * @return array<string, mixed>
      */
-    private static function contasReceber(): array
+    private static function saldoCaixa(): array
     {
-        [$total, $titulos] = static::receberAberto();
+        $saldo = ErpFinanceiroMetricas::saldoCaixa();
+        $hoje = ErpFinanceiroMetricas::movimentosCaixaNoDia(ErpFinanceiroMetricas::hoje());
 
         return [
-            'key' => 'contas_receber',
-            'label' => 'Contas a receber',
-            'value' => 'R$ ' . ErpMoney::formatBr($total),
-            'hint' => $titulos === 1
-                ? '1 título em aberto'
-                : "{$titulos} títulos em aberto",
-            'tone' => 'teal',
-            'icon' => 'heroicon-o-arrow-down-circle',
+            'key' => 'saldo_caixa',
+            'label' => 'Saldo de caixa',
+            'value' => 'R$ '.ErpMoney::formatBr($saldo),
+            'hint' => 'Hoje: entr. R$ '.ErpMoney::formatBr((float) $hoje['entradas'])
+                .' · saí. R$ '.ErpMoney::formatBr((float) $hoje['saidas']),
+            'tone' => $saldo >= 0 ? 'teal' : 'red',
+            'icon' => 'heroicon-o-wallet',
         ];
     }
 
@@ -94,17 +101,40 @@ final class ErpDashboardKpis
      */
     private static function contasVencidas(): array
     {
-        [$total, $titulos] = static::receberVencido();
+        $base = ErpFinanceiroMetricas::receberVencido();
+        $total = (float) $base['valor'];
+        $titulos = (int) $base['qtd'];
 
         return [
             'key' => 'contas_vencidas',
-            'label' => 'Contas vencidas',
-            'value' => 'R$ ' . ErpMoney::formatBr($total),
+            'label' => 'Receber vencido',
+            'value' => 'R$ '.ErpMoney::formatBr($total),
             'hint' => $titulos === 1
                 ? '1 título vencido'
                 : "{$titulos} títulos vencidos",
             'tone' => 'red',
             'icon' => 'heroicon-o-exclamation-triangle',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function contasPagarVencidas(): array
+    {
+        $base = ErpFinanceiroMetricas::pagarVencido();
+        $total = (float) $base['valor'];
+        $titulos = (int) $base['qtd'];
+
+        return [
+            'key' => 'contas_pagar_vencidas',
+            'label' => 'Pagar vencido',
+            'value' => 'R$ '.ErpMoney::formatBr($total),
+            'hint' => $titulos === 1
+                ? '1 título vencido'
+                : "{$titulos} títulos vencidos",
+            'tone' => 'orange',
+            'icon' => 'heroicon-o-arrow-up-circle',
         ];
     }
 
@@ -150,50 +180,6 @@ final class ErpDashboardKpis
             'tone' => 'indigo',
             'icon' => 'heroicon-o-document-text',
         ];
-    }
-
-    /**
-     * @return array{0: float, 1: int}
-     */
-    private static function receberAberto(): array
-    {
-        try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
-                return [0.0, 0];
-            }
-
-            $query = ContaReceber::query()->where('saldo', '>', 0);
-
-            return [
-                (float) (clone $query)->sum('saldo'),
-                (int) $query->count(),
-            ];
-        } catch (Throwable) {
-            return [0.0, 0];
-        }
-    }
-
-    /**
-     * @return array{0: float, 1: int}
-     */
-    private static function receberVencido(): array
-    {
-        try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
-                return [0.0, 0];
-            }
-
-            $query = ContaReceber::query()
-                ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<', Carbon::today()->toDateString());
-
-            return [
-                (float) (clone $query)->sum('saldo'),
-                (int) $query->count(),
-            ];
-        } catch (Throwable) {
-            return [0.0, 0];
-        }
     }
 
     private static function countEstoqueCritico(): int

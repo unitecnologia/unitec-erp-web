@@ -1,29 +1,25 @@
-<div class="erp-empresas" wire:ignore.self>
-    <div class="erp-empresas__locate">
-        <span class="erp-empresas__locate-label">F5 | Localizar &lt;&lt;Código&gt;&gt;</span>
-        <div class="erp-empresas__locate-controls">
-            <input
-                id="erp-empresas-search"
-                type="text"
-                wire:model.live.debounce.300ms="localSearch"
-                class="erp-empresas__input"
-                autocomplete="off"
-            >
-        </div>
-    </div>
-
-    @include('filament.components.erp.list-scripts', [
-        'config' => $this->getErpListKeyboardConfigForView(),
-    ])
-</div>
+@include('filament.components.erp.shared.cadastro-list-screen', [
+    'pageClass' => 'erp-empresas',
+    'searchFields' => [
+        'codigo' => 'CÓDIGO',
+        'fantasia' => 'FANTASIA',
+        'razao_social' => 'RAZÃO',
+        'cidade' => 'CIDADE',
+        'cnpj' => 'CNPJ',
+        'ie' => 'IE',
+    ],
+    'uppercaseColumns' => 'fantasia,razao_social,cidade',
+    'wireKeyPrefix' => 'empresas',
+    'hint' => 'Pressione Enter ou clique em Pesquisa. Use as setas para navegar na lista.',
+])
 
 <script data-navigate-track>
     if (! window.__erpEmpresaFocusBound) {
         window.__erpEmpresaFocusBound = true;
 
         window.Livewire.on('erp-empresa-focus-search', () => {
-            document.getElementById('erp-empresas-search')?.focus();
-            document.getElementById('erp-empresas-search')?.select?.();
+            document.querySelector('.erp-empresas__search-text')?.focus();
+            document.querySelector('.erp-empresas__search-text')?.select?.();
         });
     }
 </script>

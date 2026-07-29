@@ -12,11 +12,10 @@
         <div class="erp-vendedores__filters-row">
             <div class="erp-vendedores__search-group">
                 <span class="erp-vendedores__locate-label">F6 | Localizar</span>
-                <select wire:model.live="searchColumn" class="erp-vendedores__select erp-vendedores__search-field">
-                    @foreach ($searchFields as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
+                @include('filament.components.erp.shared.search-field-dropdown', [
+                    'fields' => $searchFields,
+                    'searchColumn' => $this->searchColumn,
+                ])
                 <input
                     type="text"
                     wire:model="localSearch"
@@ -49,7 +48,7 @@
     </div>
 
     <p class="erp-vendedores__hint">
-        Clique na tecla [DELETE] para excluir vendedor.
+        Clique na tecla [DELETE] para excluir operador.
     </p>
 
     @include('filament.components.erp.list-scripts', [

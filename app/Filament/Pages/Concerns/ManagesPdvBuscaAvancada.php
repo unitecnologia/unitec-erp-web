@@ -24,12 +24,6 @@ trait ManagesPdvBuscaAvancada
             return;
         }
 
-        if (! $this->pdvConfig()->exibirF4BuscaAvancada()) {
-            $this->notifyPdvError('Busca avançada (F4) desabilitada nos parâmetros da empresa.');
-
-            return;
-        }
-
         $this->buscaAvancadaSearch = trim($this->pdvSearch);
         $this->refreshBuscaAvancadaResults();
         $this->openPdvModal('busca_avancada');
@@ -73,12 +67,6 @@ trait ManagesPdvBuscaAvancada
         $column = $this->buscaAvancadaColumn;
 
         $query = Product::query()->where('ativo', true);
-
-        if (! $config->exibirEstoqueNegativo()) {
-            $query->where(function ($q): void {
-                $q->where('is_servico', true)->orWhere('estoque', '>', 0);
-            });
-        }
 
         $query->where(function ($q) use ($column, $like): void {
             match ($column) {

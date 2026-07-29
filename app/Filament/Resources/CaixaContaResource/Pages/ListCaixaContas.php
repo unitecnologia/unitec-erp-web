@@ -4,6 +4,7 @@ namespace App\Filament\Resources\CaixaContaResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpSimpleListPage;
+use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\CaixaContaResource;
 use App\Models\CaixaConta;
 use App\Models\FormaPagamento;
@@ -23,6 +24,7 @@ class ListCaixaContas extends ListRecords
 {
     use InteractsWithErpListPage;
     use InteractsWithErpSimpleListPage;
+    use NormalizesErpUppercaseFormData;
 
     protected static string $resource = CaixaContaResource::class;
 
@@ -45,6 +47,7 @@ class ListCaixaContas extends ListRecords
     {
         parent::mount();
 
+        CaixaConta::ensureCaixaGeral();
         ErpScreen::set('Contas');
     }
 
@@ -80,7 +83,10 @@ class ListCaixaContas extends ListRecords
 
     protected function customErpListKeyboardConfig(): array
     {
-        return $this->buildSimpleListKeyboardConfig();
+        return [
+            ...$this->buildSimpleListKeyboardConfig(),
+            'refresh' => null,
+        ];
     }
 
     public function table(Table $table): Table
@@ -104,11 +110,23 @@ class ListCaixaContas extends ListRecords
         return $schema
             ->gap(false)
             ->components([
+                View::make('filament.components.erp.contas-caixa.titlebar'),
                 View::make('filament.components.erp.contas-caixa.screen'),
                 EmbeddedTable::make()->columnSpanFull(),
                 View::make('filament.components.erp.contas-caixa.action-bar'),
                 View::make('filament.components.erp.contas-caixa.modal'),
             ]);
+    }
+
+    public function handleContasCaixaEscape(): void
+    {
+        if ($this->showForm) {
+            $this->closeForm();
+
+            return;
+        }
+
+        $this->closeScreen();
     }
 
     public function createContaCaixa(): void
@@ -140,12 +158,24 @@ class ListCaixaContas extends ListRecords
             return;
         }
 
+        if ($record->isSistema()) {
+            Notification::make()
+                ->title('Conta do sistema.')
+                ->body('O CAIXA GERAL é protegido (fechamento do PDV) e não pode ser alterado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->formId = $record->id;
         $this->form = [
             'codigo' => $record->codigo,
             'nome' => $record->nome,
-            'tipo' => $record->tipo,
-            'situacao' => $record->situacao,
+            'tipo' => match ((string) $record->tipo) {
+                'CAIXA', 'X' => CaixaConta::TIPO_PDV,
+                default => $record->tipo,
+            },
             'ativo' => $record->ativo,
         ];
         $this->showForm = true;
@@ -153,6 +183,21 @@ class ListCaixaContas extends ListRecords
 
     public function saveContaCaixa(): void
     {
+        if ($this->formId) {
+            $existing = CaixaConta::find($this->formId);
+
+            if ($existing?->isSistema()) {
+                Notification::make()
+                    ->title('Conta do sistema não pode ser alterada.')
+                    ->warning()
+                    ->send();
+
+                $this->closeForm();
+
+                return;
+            }
+        }
+
         $data = $this->validate([
             'form.codigo' => [
                 'required',
@@ -162,20 +207,31 @@ class ListCaixaContas extends ListRecords
             ],
             'form.nome' => ['required', 'string', 'max:120'],
             'form.tipo' => ['required', Rule::in(CaixaConta::tiposValidos())],
-            'form.situacao' => ['required', Rule::in(array_keys(CaixaConta::situacaoLabels()))],
         ], [], [
             'form.codigo' => 'código',
             'form.nome' => 'descrição',
             'form.tipo' => 'tipo',
-            'form.situacao' => 'situação',
         ])['form'];
+
+        $nome = mb_strtoupper(trim($data['nome']), 'UTF-8');
+
+        if ($nome === CaixaConta::NOME_CAIXA_GERAL) {
+            Notification::make()
+                ->title('Nome reservado.')
+                ->body('CAIXA GERAL é uma conta do sistema e não pode ser recriada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         $payload = [
             'codigo' => (int) $data['codigo'],
-            'nome' => mb_strtoupper(trim($data['nome']), 'UTF-8'),
+            'nome' => $nome,
             'tipo' => $data['tipo'],
-            'situacao' => $data['situacao'],
+            'situacao' => CaixaConta::SITUACAO_ABERTO,
             'ativo' => (bool) ($this->form['ativo'] ?? true),
+            'sistema' => false,
             'ultimo_usuario_id' => Auth::id(),
         ];
 
@@ -219,6 +275,16 @@ class ListCaixaContas extends ListRecords
             return;
         }
 
+        if ($record->isSistema()) {
+            Notification::make()
+                ->title('Conta do sistema.')
+                ->body('O CAIXA GERAL é protegido e não pode ser excluído.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         if ($record->lancamentos()->exists()) {
             Notification::make()
                 ->title('Conta possui lançamentos no livro caixa e não pode ser excluída.')
@@ -254,8 +320,7 @@ class ListCaixaContas extends ListRecords
         $this->form = [
             'codigo' => null,
             'nome' => '',
-            'tipo' => CaixaConta::TIPO_CAIXA,
-            'situacao' => CaixaConta::SITUACAO_ABERTO,
+            'tipo' => CaixaConta::TIPO_PDV,
             'ativo' => true,
         ];
     }

@@ -13,12 +13,12 @@ $script:UnitecMariaDbFolderName = 'mariadb-11.4.5-winx64'
 $script:UnitecToolsFolderName = 'tools'
 $script:UnitecDefaultAppPath = 'C:\UNITECNOLOGIA_WEB'
 $script:UnitecServeHost = '127.0.0.1'
-# Host de bind do servidor web. 0.0.0.0 expõe o ERP na rede local (necessário
-# para terminais e para o app Força de Vendas). A porta 8765 ja e liberada no firewall.
+# Host de bind do servidor web. 0.0.0.0 expÃµe o ERP na rede local (necessÃ¡rio
+# para terminais e para o app ForÃ§a de Vendas). A porta 8765 ja e liberada no firewall.
 $script:UnitecServeBindHost = '0.0.0.0'
 $script:UnitecServePort = 8765
 # Numero de workers do servidor embutido do PHP (atende varios aparelhos/terminais
-# simultaneos, ex.: app Força de Vendas sincronizando). PHP 8+.
+# simultaneos, ex.: app ForÃ§a de Vendas sincronizando). PHP 8+.
 $script:UnitecServeWorkers = 8
 $script:UnitecDefaultAppUrl = 'http://127.0.0.1:8765'
 $script:UnitecServePidFileName = '.unitec-serve.pid'
@@ -1263,11 +1263,13 @@ function Test-UnitecApplicationServerRunning {
         [string]$AppUrl = ''
     )
 
-    if (-not (Test-UnitecTcpPortOpen -Port $script:UnitecServePort -HostName $script:UnitecServeHost)) {
-        return $false
+    # Nao confiar so em TCP: porta "zumbi" (LISTEN com PID morto) aceita connect
+    # mas nao responde HTTP — isso travava o ERP apos crash do artisan serve.
+    if ([string]::IsNullOrWhiteSpace($AppUrl)) {
+        $AppUrl = Get-UnitecDefaultAppUrl
     }
 
-    return (Wait-UnitecApplicationReady -AppUrl $AppUrl -MaxAttempts 1 -Quiet)
+    return (Wait-UnitecApplicationReady -AppUrl $AppUrl -MaxAttempts 1 -DelaySeconds 0 -Quiet)
 }
 
 function Start-UnitecApplicationServer {
@@ -1305,7 +1307,7 @@ function Start-UnitecApplicationServer {
         $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
 
         # Habilita multiplos workers no servidor embutido do PHP para suportar
-        # acessos simultaneos (terminais + app Força de Vendas).
+        # acessos simultaneos (terminais + app ForÃ§a de Vendas).
         $env:PHP_CLI_SERVER_WORKERS = "$($script:UnitecServeWorkers)"
 
         $proc = Start-Process -FilePath $phpExe -ArgumentList @(
@@ -1725,7 +1727,7 @@ function New-UnitecLeigoWelcomeCard {
    Duplo clique no atalho "Unitec ERP" na Area de Trabalho.
 
 2) Login
-   E-mail: usuario@unitecnologia.local
+   Usuario: USUARIO
    Senha:  01
    (Troque a senha depois do primeiro acesso.)
 
@@ -1735,9 +1737,9 @@ function New-UnitecLeigoWelcomeCard {
    Pre-venda:  $($urls.PreVenda)
 
 4) Se nao abrir
-   - Reinicie o computador e tente de novo.
-   - Pasta do sistema: $AppPath
-   - Suporte: https://unitecnologiasc.com.br/
+ - Reinicie o computador e tente de novo.
+ - Pasta do sistema: $AppPath
+ - Suporte: https://unitecnologiasc.com.br/
 
 ========================================
 "@
@@ -1825,7 +1827,7 @@ function New-UnitecDesktopShortcuts {
 
     $launcher = Join-Path $AppPath 'Unitec ERP.bat'
     if (-not (Test-Path $launcher)) {
-        Write-Warn 'Unitec ERP.bat nao encontrado — atalho nao criado.'
+        Write-Warn 'Unitec ERP.bat nao encontrado - atalho nao criado.'
         return
     }
 
@@ -1990,7 +1992,7 @@ function Install-UnitecHeidiSqlSupport {
     $AppPath = Resolve-UnitecAppPath -Path $AppPath
 
     if (-not (Test-Path (Join-Path $AppPath '.env'))) {
-        Write-Warn 'HeidiSQL ignorado — .env ainda nao existe.'
+        Write-Warn 'HeidiSQL ignorado - .env ainda nao existe.'
         return $false
     }
 
@@ -1998,7 +2000,7 @@ function Install-UnitecHeidiSqlSupport {
         $exe = Resolve-HeidiSqlExecutable -AppPath $AppPath -AllowInstall
     } catch {
         Write-Warn $_.Exception.Message
-        Write-Warn 'HeidiSQL nao instalado — o ERP funciona normalmente; suporte pode instalar depois.'
+        Write-Warn 'HeidiSQL nao instalado - o ERP funciona normalmente; suporte pode instalar depois.'
         return $false
     }
 
@@ -2475,7 +2477,7 @@ function Install-VcRedistributable {
     }
 
     if ($proc.ExitCode -eq 3010) {
-        Write-Warn 'Visual C++ instalado — reinicio do Windows recomendado (continuando testes).'
+        Write-Warn 'Visual C++ instalado - reinicio do Windows recomendado (continuando testes).'
     } else {
         Write-Ok 'Visual C++ Redistributable instalado/atualizado.'
     }
@@ -2619,13 +2621,13 @@ function Invoke-UnitecSystemRequirementsCheck {
     }
 
     if (Test-UnitecTcpPortInUse -Port 80) {
-        $results += @{ Name = 'Porta 80 (HTTP)'; Ok = $true; Detail = 'AVISO: em uso — pode conflitar com Apache.' }
+        $results += @{ Name = 'Porta 80 (HTTP)'; Ok = $true; Detail = 'AVISO: em uso - pode conflitar com Apache.' }
     } else {
         $results += @{ Name = 'Porta 80 (HTTP)'; Ok = $true; Detail = 'Livre' }
     }
 
     if (Test-UnitecTcpPortInUse -Port 3306) {
-        $results += @{ Name = 'Porta 3306 (MySQL)'; Ok = $true; Detail = 'AVISO: em uso — outro MySQL pode conflitar.' }
+        $results += @{ Name = 'Porta 3306 (MySQL)'; Ok = $true; Detail = 'AVISO: em uso - outro MySQL pode conflitar.' }
     } else {
         $results += @{ Name = 'Porta 3306 (MySQL)'; Ok = $true; Detail = 'Livre' }
     }
@@ -2677,9 +2679,9 @@ function Invoke-UnitecSystemRequirementsCheck {
         Write-Title 'Checklist do PC'
         foreach ($item in $results) {
             if ($item.Ok) {
-                Write-Ok ('{0} — {1}' -f $item.Name, $item.Detail)
+                Write-Ok ('{0} - {1}' -f $item.Name, $item.Detail)
             } else {
-                Write-Err ('{0} — {1}' -f $item.Name, $item.Detail)
+                Write-Err ('{0} - {1}' -f $item.Name, $item.Detail)
             }
         }
     }
@@ -3193,6 +3195,15 @@ function Sync-UnitecEnvPerformanceSettings {
     }
 
     $lines = @(Get-Content $envFile -Encoding UTF8)
+    $isLocalDev = ($lines | Where-Object { $_ -match '^\s*APP_ENV\s*=\s*local\b' }).Count -gt 0 -or
+        ($lines | Where-Object { $_ -match '^\s*DEV_RUNTIME\s*=\s*windows\b' }).Count -gt 0
+
+    if ($isLocalDev) {
+        $values['LOG_LEVEL'] = 'warning'
+        $values['BCRYPT_ROUNDS'] = '4'
+        $values['PHP_CLI_SERVER_WORKERS'] = '4'
+    }
+
     $updated = $false
 
     foreach ($key in $values.Keys) {
@@ -4419,8 +4430,8 @@ function Test-UnitecNeedsInitialSeed {
     }
 
     $table = "${prefix}users"
-    $escapedEmail = Escape-MySqlStringLiteral -Value 'usuario@unitecnologia.local'
-    $sql = "SELECT COUNT(*) FROM ``$table`` WHERE email = '$escapedEmail'"
+    $escapedName = Escape-MySqlStringLiteral -Value 'USUARIO'
+    $sql = "SELECT COUNT(*) FROM ``$table`` WHERE name = '$escapedName'"
     $hosts = Get-UnitecDatabaseConnectionHostsFromEnv -AppPath $AppPath
 
     foreach ($hostName in $hosts) {
@@ -4824,8 +4835,12 @@ function Start-UnitecPhpArtisanServer {
         return $false
     }
 
-    if (-not $Foreground -and (Test-UnitecWebServerListening -Port $Port)) {
-        return $true
+    if (-not $Foreground) {
+        # Porta TCP aberta nao basta: listener zumbi aceita connect e nao responde HTTP.
+        $probeUrl = "http://127.0.0.1:$Port/admin/login"
+        if (Wait-UnitecApplicationReady -AppUrl "http://127.0.0.1:$Port" -MaxAttempts 1 -DelaySeconds 0 -Quiet) {
+            return $true
+        }
     }
 
     Initialize-UnitecRuntimePath -AppPath $AppPath
@@ -4836,7 +4851,7 @@ function Start-UnitecPhpArtisanServer {
         throw "PHP nao encontrado: $phpExe"
     }
 
-    # Multiplos workers para suportar acessos simultaneos (terminais + app Força de Vendas).
+    # Multiplos workers para suportar acessos simultaneos (terminais + app ForÃ§a de Vendas).
     $env:PHP_CLI_SERVER_WORKERS = "$($script:UnitecServeWorkers)"
 
     Push-Location $AppPath
@@ -5075,7 +5090,8 @@ function Ensure-UnitecPhpIniForWindowsDev {
         return $false
     }
 
-    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+    # OPcache ligado no dev acelera muito o Filament/Laravel; validate_timestamps mantem hot-reload.
+    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath
 
     return $true
 }
@@ -5156,9 +5172,15 @@ function Configure-LaragonPhpIni {
             'opcache.interned_strings_buffer=16',
             'opcache.max_accelerated_files=10000',
             'opcache.validate_timestamps=1',
-            'opcache.revalidate_freq=60'
+            'opcache.revalidate_freq=2'
         )
     }
+
+    $devTuning = @(
+        'realpath_cache_size=4096k',
+        'realpath_cache_ttl=600',
+        'memory_limit=256M'
+    )
 
     if ($DisableOpcache) {
         $content = $content -replace '(?m)^\s*zend_extension\s*=\s*opcache\s*$', ';zend_extension=opcache'
@@ -5176,6 +5198,17 @@ function Configure-LaragonPhpIni {
             $content = $content -replace ('(?m)^\s*{0}\s*=.*$' -f [regex]::Escape($key)), $setting
         } else {
             $content += [Environment]::NewLine + $setting
+        }
+    }
+
+    if (-not $DisableOpcache) {
+        foreach ($setting in $devTuning) {
+            $key = ($setting -split '=', 2)[0]
+            if ($content -match ('(?m)^\s*{0}\s*=' -f [regex]::Escape($key))) {
+                $content = $content -replace ('(?m)^\s*{0}\s*=.*$' -f [regex]::Escape($key)), $setting
+            } else {
+                $content += [Environment]::NewLine + $setting
+            }
         }
     }
 
@@ -5453,7 +5486,7 @@ function Assert-LaragonInstallCompatible {
     throw @"
 Encontramos um Laragon antigo ($version) que nao e compativel.
 
-Peça ao suporte da Unitecnologia ou renomeie a pasta C:\laragon para C:\laragon_antigo e instale novamente.
+PeÃ§a ao suporte da Unitecnologia ou renomeie a pasta C:\laragon para C:\laragon_antigo e instale novamente.
 "@
 }
 

@@ -2,9 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Erp\ErpAccess;
 use App\Models\Empresa;
+use App\Models\Nfe;
+use App\Models\PdvVendaNfce;
+use App\Models\Terminal;
 use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -30,15 +35,29 @@ class ConfigFiscaisPage extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('config_fiscais.access');
+    }
+
     public string $activeTab = 'webservice';
 
     /** @var array<string, mixed> */
     public array $form = [];
 
+    /**
+     * Série NFC-e por caixa (PDVs offline), editável na aba "PDVs Offline".
+     *
+     * @var array<int, array{id: int, nome: string, terminal: string, serie: string, numero_inicial: int, usar_numero_inicial: bool}>
+     */
+    public array $terminais = [];
+
     public ?TemporaryUploadedFile $certificadoUpload = null;
 
     /** @var array{titulo: string, emissor: string, validade_inicio: string, validade: string, numero_serie: string}|null */
     public ?array $certificadoInfo = null;
+
+    public string $emailTestTo = '';
 
     public function mount(): void
     {
@@ -56,6 +75,8 @@ class ConfigFiscaisPage extends Page
         $this->form = NfeFiscalConfig::toFormArray($params->fresh());
         $this->syncNfeStoragePathsToForm();
         $this->refreshCertificadoInfo();
+        $this->loadTerminais();
+        $this->emailTestTo = (string) ($empresa?->email ?? '');
     }
 
     public function getHeading(): string|Htmlable|null
@@ -79,13 +100,108 @@ class ConfigFiscaisPage extends Page
 
     public function setActiveTab(string $tab): void
     {
-        $allowed = ['webservice', 'certificado', 'nfe', 'email'];
+        $allowed = ['webservice', 'certificado', 'nfce', 'nfe', 'pdv_offline', 'email', 'resp_tecnico'];
 
         $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'webservice';
 
         if ($this->activeTab === 'nfe') {
             $this->syncNfeStoragePathsToForm();
         }
+
+        if ($this->activeTab === 'pdv_offline') {
+            $this->loadTerminais();
+        }
+    }
+
+    /**
+     * Carrega os caixas da empresa para edição da série NFC-e por PDV offline.
+     */
+    protected function loadTerminais(): void
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            $this->terminais = [];
+
+            return;
+        }
+
+        $this->terminais = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->orderBy('numero_logico_terminal')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Terminal $t): array => [
+                'id' => (int) $t->id,
+                'nome' => (string) ($t->nome ?: 'Caixa'),
+                'terminal' => (string) ($t->numero_logico_terminal ?: $t->id),
+                'serie' => (string) ($t->serie ?: ''),
+                'numero_inicial' => (int) ($t->numeracao_inicial ?: 1),
+                'usar_numero_inicial' => (bool) $t->usar_numero_inicial,
+            ])
+            ->all();
+    }
+
+    /**
+     * Grava a série NFC-e (e número inicial) de cada caixa. Bloqueia séries
+     * duplicadas entre caixas — cada PDV offline precisa de série exclusiva.
+     */
+    public function saveTerminaisSeries(): void
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            Notification::make()->title('Empresa não identificada.')->warning()->send();
+
+            return;
+        }
+
+        $seriesUsadas = [];
+
+        foreach ($this->terminais as $linha) {
+            $serie = trim((string) ($linha['serie'] ?? ''));
+
+            if ($serie === '') {
+                continue;
+            }
+
+            $chave = ltrim($serie, '0') ?: '0';
+
+            if (isset($seriesUsadas[$chave])) {
+                Notification::make()
+                    ->title('Série duplicada entre caixas')
+                    ->body("A série {$serie} está repetida. Cada PDV offline precisa de série exclusiva.")
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $seriesUsadas[$chave] = true;
+        }
+
+        foreach ($this->terminais as $linha) {
+            $terminal = Terminal::query()
+                ->where('empresa_id', $empresaId)
+                ->whereKey($linha['id'] ?? 0)
+                ->first();
+
+            if (! $terminal) {
+                continue;
+            }
+
+            $serie = trim((string) ($linha['serie'] ?? ''));
+
+            $terminal->update([
+                'serie' => $serie !== '' ? $serie : null,
+                'numeracao_inicial' => max(1, (int) ($linha['numero_inicial'] ?? 1)),
+                'usar_numero_inicial' => (bool) ($linha['usar_numero_inicial'] ?? false),
+            ]);
+        }
+
+        $this->loadTerminais();
+
+        Notification::make()->title('Séries dos PDVs offline gravadas.')->success()->send();
     }
 
     protected function syncNfeStoragePathsToForm(): void
@@ -121,6 +237,17 @@ class ConfigFiscaisPage extends Page
             'form.tentativas' => ['required', 'integer', 'min:1'],
             'form.numero' => ['required', 'integer', 'min:1'],
             'form.serie' => ['required', 'string', 'max:10'],
+            'form.numero_nfe' => ['required', 'integer', 'min:1'],
+            'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
+            'form.id_token' => ['nullable', 'string', 'max:40'],
+            'form.token' => ['nullable', 'string', 'max:120'],
+            'form.versao_qrcode' => ['nullable', 'integer', 'in:2,3'],
+            'form.resp_tecnico_cnpj' => ['nullable', 'string', 'max:18'],
+            'form.resp_tecnico_contato' => ['nullable', 'string', 'max:60'],
+            'form.resp_tecnico_email' => ['nullable', 'string', 'max:60'],
+            'form.resp_tecnico_fone' => ['nullable', 'string', 'max:20'],
+            'form.resp_tecnico_id_csrt' => ['nullable', 'string', 'max:6'],
+            'form.resp_tecnico_csrt' => ['nullable', 'string', 'max:100'],
         ]);
 
         $params = VendasParametro::forEmpresa($empresaId);
@@ -141,16 +268,26 @@ class ConfigFiscaisPage extends Page
             'tipo_emissao' => (int) ($this->form['tipo_emissao'] ?? 1),
             'id_token' => $this->form['id_token'] ?: null,
             'token' => $this->form['token'] ?: null,
+            'versao_qrcode' => (int) ($this->form['versao_qrcode'] ?? 2),
             'logomarca' => $this->form['logomarca'] ?: null,
             'numero' => (int) $this->form['numero'],
             'serie' => (string) $this->form['serie'],
             'serie_nfe' => (int) ($this->form['serie_nfe'] ?? 1),
+            'numero_nfe' => (int) ($this->form['numero_nfe'] ?? 1),
             'email_host' => $this->form['email_host'] ?: null,
             'email_porta' => $this->form['email_porta'] ?: null,
             'email_user' => $this->form['email_user'] ?: null,
             'email_assunto' => $this->form['email_assunto'] ?: null,
             'email_ssl' => ! empty($this->form['email_ssl']) ? 'S' : 'N',
             'email_tls' => ! empty($this->form['email_tls']) ? 'S' : 'N',
+            'email_modo' => FiscalMailService::normalizeModo((string) ($this->form['email_modo'] ?? FiscalMailService::MODO_SMTP)),
+            'email_api_provedor' => FiscalMailService::normalizeApiProvider((string) ($this->form['email_api_provedor'] ?? FiscalMailService::API_BREVO)),
+            'resp_tecnico_cnpj' => NfeFiscalConfig::defaultRespTecnico()['cnpj'],
+            'resp_tecnico_contato' => NfeFiscalConfig::defaultRespTecnico()['contato'],
+            'resp_tecnico_email' => NfeFiscalConfig::defaultRespTecnico()['email'],
+            'resp_tecnico_fone' => NfeFiscalConfig::defaultRespTecnico()['fone'],
+            'resp_tecnico_id_csrt' => $this->form['resp_tecnico_id_csrt'] ?: null,
+            'resp_tecnico_csrt' => $this->form['resp_tecnico_csrt'] ?: null,
         ];
 
         if (filled($this->form['proxy_senha'] ?? '')) {
@@ -165,6 +302,10 @@ class ConfigFiscaisPage extends Page
             $payload['email_senha'] = $this->form['email_senha'];
         }
 
+        if (filled($this->form['email_api_key'] ?? '')) {
+            $payload['email_api_key'] = $this->form['email_api_key'];
+        }
+
         $payload = [
             ...$payload,
             ...NfeFiscalConfig::defaultStoragePaths($empresaId),
@@ -176,7 +317,6 @@ class ConfigFiscaisPage extends Page
         $params = NfeFiscalConfig::syncWebStack($params);
 
         $this->form = NfeFiscalConfig::toFormArray($params);
-        $this->form['email_senha'] = '';
         $this->form['proxy_senha'] = '';
 
         Notification::make()->title('Configurações fiscais gravadas.')->success()->send();
@@ -248,6 +388,35 @@ class ConfigFiscaisPage extends Page
             ->body($validade !== '' ? "Válido até {$validade}." : null)
             ->success()
             ->send();
+    }
+
+    public function testEmailSmtp(): void
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            Notification::make()->title('Empresa não identificada.')->warning()->send();
+
+            return;
+        }
+
+        $params = VendasParametro::forEmpresa($empresaId);
+        $empresa = Empresa::query()->find($empresaId);
+
+        $result = FiscalMailService::testEmail(
+            $this->form,
+            $params,
+            $this->emailTestTo,
+            $empresa,
+        );
+
+        $notification = Notification::make()->title($result['message']);
+
+        if ($result['ok']) {
+            $notification->success()->send();
+        } else {
+            $notification->danger()->send();
+        }
     }
 
     public function testCertificado(): void
@@ -366,6 +535,64 @@ class ConfigFiscaisPage extends Page
         $this->redirect(filament()->getUrl());
     }
 
+    public function ultimaNfceNumeroLabel(): string
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            return '—';
+        }
+
+        $serie = trim((string) ($this->form['serie'] ?? '1'));
+        $serieSemZeros = ltrim($serie, '0') ?: '0';
+        $series = array_values(array_unique([
+            $serie,
+            $serieSemZeros,
+            str_pad($serieSemZeros, 3, '0', STR_PAD_LEFT),
+        ]));
+
+        $ultimo = PdvVendaNfce::query()
+            ->where('empresa_id', $empresaId)
+            ->whereIn('serie', $series)
+            ->max('numero');
+
+        if ($ultimo === null) {
+            return '0';
+        }
+
+        return (string) (int) $ultimo;
+    }
+
+    public function ultimaNfeNumeroLabel(): string
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            return '—';
+        }
+
+        $serie = trim((string) ($this->form['serie_nfe'] ?? '1'));
+        $serieSemZeros = ltrim($serie, '0') ?: '0';
+        $series = array_values(array_unique([
+            $serie,
+            $serieSemZeros,
+            str_pad($serieSemZeros, 3, '0', STR_PAD_LEFT),
+        ]));
+
+        $ultimo = Nfe::query()
+            ->where('empresa_id', $empresaId)
+            ->whereIn('serie', $series)
+            ->pluck('numero')
+            ->map(fn (string $numero): int => (int) preg_replace('/\D/', '', $numero))
+            ->max();
+
+        if ($ultimo === null) {
+            return '0';
+        }
+
+        return (string) (int) $ultimo;
+    }
+
     #[Computed]
     public function empresaNome(): string
     {
@@ -381,12 +608,6 @@ class ConfigFiscaisPage extends Page
 
     protected function resolveEmpresaId(): ?int
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
-
-        if ($empresaId) {
-            return (int) $empresaId;
-        }
-
-        return Empresa::query()->where('ativo', true)->orderBy('id')->value('id');
+        return \App\Support\Erp\ErpContext::currentEmpresaId();
     }
 }

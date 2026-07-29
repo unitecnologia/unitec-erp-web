@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmpresaResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\EmpresaResource;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\ListRecords;
@@ -16,6 +17,7 @@ use Livewire\Attributes\Url;
 class ListEmpresas extends ListRecords
 {
     use InteractsWithErpListPage;
+    use ManagesErpSearchColumn;
 
     protected static string $resource = EmpresaResource::class;
 
@@ -24,11 +26,29 @@ class ListEmpresas extends ListRecords
     #[Url(as: 'q')]
     public string $localSearch = '';
 
+    #[Url(as: 'campo')]
+    public string $searchColumn = 'codigo';
+
     public function mount(): void
     {
         parent::mount();
 
+        $this->erpRestoreSearchColumnFromSession();
+
         ErpScreen::set('Empresa');
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function erpAllowedSearchColumns(): array
+    {
+        return ['codigo', 'fantasia', 'razao_social', 'cidade', 'cnpj', 'ie'];
+    }
+
+    protected function erpDefaultSearchColumn(): string
+    {
+        return 'codigo';
     }
 
     protected static function erpListPageClass(): string
@@ -60,11 +80,23 @@ class ListEmpresas extends ListRecords
     {
         $query = parent::getTableQuery();
 
-        if (filled($this->localSearch)) {
-            $query->where('codigo', 'like', '%' . trim($this->localSearch) . '%');
+        if (! filled($this->localSearch)) {
+            return $query;
         }
 
-        return $query;
+        $term = trim($this->localSearch);
+        $column = $this->erpNormalizeSearchColumn($this->searchColumn);
+        $like = '%'.$term.'%';
+
+        if ($column === 'codigo') {
+            if (is_numeric($term)) {
+                return $query->where('codigo', (int) $term);
+            }
+
+            return $query->where('codigo', 'like', $like);
+        }
+
+        return $query->where($column, 'like', $like);
     }
 
     public function content(Schema $schema): Schema
@@ -82,6 +114,7 @@ class ListEmpresas extends ListRecords
     public function clearSearch(): void
     {
         $this->localSearch = '';
+        $this->searchColumn = $this->erpDefaultSearchColumn();
         $this->clearListSelection();
         $this->resetTable();
     }

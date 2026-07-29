@@ -29,4 +29,19 @@ class PdvFinalizarPagamentosHelperTest extends TestCase
         $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaAPrazo('POS CREDITO'));
         $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaAPrazo('CREDIÁRIO'));
     }
+
+    public function test_pos_credito_com_aparece_contas_receber_e_cartao_cr(): void
+    {
+        $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'aparece_contas_receber' => true,
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaCartaoContasReceber([
+            'forma' => 'POS CREDITO',
+            'tipo' => 'cartao_credito',
+            'aparece_contas_receber' => false,
+        ]));
+    }
 }

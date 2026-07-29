@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 use App\Models\Orcamento;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Orcamento\OrcamentoReportService;
+use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
 use App\Support\Erp\WhatsApp\WhatsAppPhone;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
 use Filament\Notifications\Notification;
@@ -73,11 +74,24 @@ trait ManagesOrcamentoWhatsAppModal
         $this->cleanupWhatsAppPdf();
     }
 
+    public function updatedWhatsAppMessage(string $value): void
+    {
+        $clean = WhatsAppMessageHelper::stripSystemFooter($value);
+
+        if ($clean !== $value) {
+            $this->whatsAppMessage = $clean;
+        }
+    }
+
     public function sendOrcamentoWhatsApp(): void
     {
+        $this->whatsAppMessage = WhatsAppMessageHelper::stripSystemFooter($this->whatsAppMessage);
+
+        $maxLength = WhatsAppMessageHelper::maxUserMessageLength();
+
         $this->validate([
             'whatsAppTo' => ['required', 'string', 'max:30', new CelularBrasileiroValido()],
-            'whatsAppMessage' => ['required', 'string', 'max:1000'],
+            'whatsAppMessage' => ['required', 'string', 'max:' . $maxLength],
         ], [
             'whatsAppTo.required' => 'Informe o WhatsApp do destinatário.',
             'whatsAppMessage.required' => 'Informe a mensagem.',

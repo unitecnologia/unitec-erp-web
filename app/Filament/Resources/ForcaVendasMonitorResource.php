@@ -70,6 +70,12 @@ class ForcaVendasMonitorResource extends Resource
                     ->wrap(false)
                     ->weight(FontWeight::Bold)
                     ->state(fn (ForcaVendasOrder $record): string => $record->clienteNome()),
+                TextColumn::make('vendedor')
+                    ->label('Vendedor')
+                    ->wrap(false)
+                    ->state(fn (ForcaVendasOrder $record): string => $record->vendedor?->nome
+                        ?? $record->user?->name
+                        ?? '—'),
                 TextColumn::make('data_abert')
                     ->label('Data Abert.')
                     ->state(fn (ForcaVendasOrder $record): string => $record->dataAberturaAt() ? ErpTimezone::toLocal($record->dataAberturaAt())->format('d/m/Y') : '—')
@@ -100,12 +106,12 @@ class ForcaVendasMonitorResource extends Resource
                     ->alignCenter(),
                 ViewColumn::make('desconto')
                     ->label('Desc.')
-                    ->state(fn (ForcaVendasOrder $record): float => (float) ($record->orcamento?->desconto_valor ?? 0))
+                    ->state(fn (ForcaVendasOrder $record): float => self::totalDesconto($record))
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
                     ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
                 ViewColumn::make('acrescimo')
                     ->label('Acmo.')
-                    ->state(fn (ForcaVendasOrder $record): float => (float) (($record->payload['frete'] ?? 0)))
+                    ->state(fn (ForcaVendasOrder $record): float => self::totalAcrescimo($record))
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
                     ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
                 ViewColumn::make('tt_bruto')
@@ -118,8 +124,9 @@ class ForcaVendasMonitorResource extends Resource
                     ->state(fn (ForcaVendasOrder $record): float => (float) $record->total)
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
                     ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell erp-fv-mon-money-cell--bold']),
-                TextColumn::make('identificacao')
-                    ->label('Identificação')
+                TextColumn::make('meio_pgto')
+                    ->label('Meio Pgto')
+                    ->state(fn (ForcaVendasOrder $record): string => self::meioPagamentoLabel($record))
                     ->placeholder('—')
                     ->wrap(false),
                 TextColumn::make('plataforma')
@@ -196,5 +203,80 @@ class ForcaVendasMonitorResource extends Resource
         $payload = is_array($record->payload) ? $record->payload : [];
 
         return ($payload['origem'] ?? '') === 'vendas_internas';
+    }
+
+    /**
+     * Desconto do pedido: soma dos itens (rateio da tela de venda) ou cabeçalho do DAV/payload.
+     */
+    public static function totalDesconto(ForcaVendasOrder $record): float
+    {
+        $somaItens = round((float) ($record->orcamento?->itens?->sum('desconto') ?? 0), 2);
+
+        if ($somaItens > 0) {
+            return $somaItens;
+        }
+
+        $payload = is_array($record->payload) ? $record->payload : [];
+
+        return round((float) (
+            $record->orcamento?->desconto_valor
+            ?? $payload['desconto_valor']
+            ?? 0
+        ), 2);
+    }
+
+    /**
+     * Acréscimo do pedido: payload (tela de venda) ou frete legado do app.
+     */
+    public static function totalAcrescimo(ForcaVendasOrder $record): float
+    {
+        $payload = is_array($record->payload) ? $record->payload : [];
+
+        if (isset($payload['acrescimo_valor']) && (float) $payload['acrescimo_valor'] > 0) {
+            return round((float) $payload['acrescimo_valor'], 2);
+        }
+
+        $itens = is_array($payload['itens'] ?? null) ? $payload['itens'] : [];
+        $soma = 0.0;
+
+        foreach ($itens as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $soma += (float) ($item['acrescimo'] ?? 0);
+        }
+
+        if ($soma > 0) {
+            return round($soma, 2);
+        }
+
+        return round((float) ($payload['frete'] ?? 0), 2);
+    }
+
+    public static function meioPagamentoLabel(ForcaVendasOrder $record): string
+    {
+        $payload = is_array($record->payload) ? $record->payload : [];
+        $forma = trim((string) (
+            $payload['forma_pagamento']
+            ?? $record->orcamento?->forma_pagamento
+            ?? ''
+        ));
+
+        if ($forma === '') {
+            return '—';
+        }
+
+        $chave = mb_strtoupper($forma, 'UTF-8');
+        $chave = str_replace(['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'], ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'], $chave);
+
+        return match ($chave) {
+            'DINHEIRO' => 'Dinheiro',
+            'PIX' => 'PIX',
+            'POS DEBITO' => 'POS Débito',
+            'POS CREDITO' => 'POS Crédito',
+            'CREDIARIO' => 'Crediário',
+            default => $forma,
+        };
     }
 }

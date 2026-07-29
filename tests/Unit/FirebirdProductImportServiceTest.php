@@ -13,7 +13,6 @@ class FirebirdProductImportServiceTest extends TestCase
             'CODIGO' => 123,
             'DESCRICAO' => 'Produto teste',
             'PR_VENDA' => 10.5,
-            'PR_VENDA_PRAZO' => '12,50',
             'ATIVO' => 'S',
             'GRADE' => 'N',
             'RESTAUTANTE' => 'S',
@@ -24,7 +23,7 @@ class FirebirdProductImportServiceTest extends TestCase
         $this->assertSame('123', $mapped['codigo']);
         $this->assertSame('PRODUTO TESTE', $mapped['descricao']);
         $this->assertSame(10.5, $mapped['preco_venda']);
-        $this->assertSame(12.5, $mapped['preco_venda_prazo']);
+        $this->assertArrayNotHasKey('preco_venda_prazo', $mapped);
         $this->assertTrue($mapped['ativo']);
         $this->assertFalse($mapped['is_grade']);
         $this->assertTrue($mapped['is_restaurante']);

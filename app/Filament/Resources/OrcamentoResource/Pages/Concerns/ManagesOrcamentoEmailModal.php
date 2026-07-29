@@ -2,11 +2,10 @@
 
 namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 
-use App\Mail\OrcamentoEmail;
 use App\Models\Orcamento;
+use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Orcamento\OrcamentoReportService;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\On;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -166,8 +165,19 @@ trait ManagesOrcamentoEmailModal
 
         $empresa = app(OrcamentoReportService::class)->resolveEmpresa();
 
+        if (! $empresa) {
+            Notification::make()
+                ->title('Empresa não identificada na sessão.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         try {
-            Mail::to($this->emailTo)->send(new OrcamentoEmail(
+            FiscalMailService::sendForEmpresa(
+                empresaId: (int) $empresa->id,
+                to: $this->emailTo,
                 messageBody: $this->emailMessage,
                 subjectLine: $this->emailSubject,
                 fileAttachments: collect($this->emailAttachments)
@@ -176,15 +186,15 @@ trait ManagesOrcamentoEmailModal
                         'name' => $attachment['name'],
                     ])
                     ->all(),
-                fromAddress: $empresa?->email ?: config('mail.from.address'),
-                fromName: $empresa?->nome ?: config('mail.from.name'),
-            ));
+                fromAddress: $empresa->email ?: null,
+                fromName: $empresa->nome ?: null,
+            );
         } catch (\Throwable $exception) {
             report($exception);
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail do servidor.')
+                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
                 ->danger()
                 ->send();
 

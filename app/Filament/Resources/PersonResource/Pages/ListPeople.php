@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PersonResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
+use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\PersonResource;
 use App\Models\Person;
 use App\Support\Erp\Queries\PersonListQueryBuilder;
@@ -21,6 +22,7 @@ class ListPeople extends ListRecords
 {
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
+    use ManagesErpSearchColumn;
 
     protected static string $resource = PersonResource::class;
 
@@ -42,12 +44,25 @@ class ListPeople extends ListRecords
     {
         parent::mount();
 
-        $this->searchColumn = $this->normalizeSearchColumn($this->searchColumn);
+        $this->erpRestoreSearchColumnFromSession();
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->tipoFilter = $this->normalizeTipoFilter($this->tipoFilter);
 
         $this->normalizeLocalSearchCase();
         $this->syncErpScreenTitle();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function erpAllowedSearchColumns(): array
+    {
+        return ['codigo', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj', 'rg_ie', 'endereco'];
+    }
+
+    protected function erpDefaultSearchColumn(): string
+    {
+        return 'nome_razao';
     }
 
     protected function normalizeTipoFilter(mixed $value): string
@@ -68,13 +83,6 @@ class ListPeople extends ListRecords
     protected function normalizeStatusFilter(mixed $value): string
     {
         return in_array($value, ['ativos', 'inativos', 'todos'], true) ? (string) $value : 'ativos';
-    }
-
-    protected function normalizeSearchColumn(mixed $value): string
-    {
-        $allowed = ['codigo', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj', 'rg_ie', 'endereco'];
-
-        return in_array($value, $allowed, true) ? (string) $value : 'nome_razao';
     }
 
     protected function syncErpScreenTitle(): void
@@ -160,14 +168,6 @@ class ListPeople extends ListRecords
     public function setStatusFilter(string $filter): void
     {
         $this->statusFilter = $this->normalizeStatusFilter($filter);
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedSearchColumn(): void
-    {
-        $this->searchColumn = $this->normalizeSearchColumn($this->searchColumn);
-        $this->localSearch = '';
         $this->clearListSelection();
         $this->resetTable();
     }

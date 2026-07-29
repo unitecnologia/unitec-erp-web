@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
+    'empresa_id',
     'numero',
     'data_emissao',
     'data_entrada',
@@ -45,6 +46,11 @@ class Compra extends Model
             ->max();
 
         return str_pad((string) (($max ?? 0) + 1), 6, '0', STR_PAD_LEFT);
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
     }
 
     public function fornecedor(): BelongsTo

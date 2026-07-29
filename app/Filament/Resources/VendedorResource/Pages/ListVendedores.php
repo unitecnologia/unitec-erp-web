@@ -3,10 +3,15 @@
 namespace App\Filament\Resources\VendedorResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\ManagesErpSearchColumn;
+use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Resources\VendedorResource;
 use App\Filament\Resources\VendedorResource\Pages\Concerns\ManagesVendedorDeleteConfirm;
 use App\Filament\Resources\VendedorResource\Pages\Concerns\ManagesVendedorFormModal;
+use App\Models\RhFuncionario;
+use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
@@ -18,6 +23,7 @@ use Livewire\Attributes\Url;
 class ListVendedores extends ListRecords
 {
     use InteractsWithErpListPage;
+    use ManagesErpSearchColumn;
     use ManagesVendedorDeleteConfirm;
     use ManagesVendedorFormModal;
 
@@ -35,7 +41,42 @@ class ListVendedores extends ListRecords
     {
         parent::mount();
 
-        ErpScreen::set('Vendedores');
+        $this->erpRestoreSearchColumnFromSession();
+
+        $onboardingTitle = ErpOnboarding::screenTitle();
+        ErpScreen::set($onboardingTitle ?? 'Operadores');
+
+        if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR && ! $this->vendedorModalOpen) {
+            $temFuncionarioRh = \Illuminate\Support\Facades\Schema::hasTable('rh_funcionarios')
+                && RhFuncionario::query()->exists();
+
+            if (! $temFuncionarioRh) {
+                Notification::make()
+                    ->title('Cadastre um Funcionário no RH antes de criar o Operador.')
+                    ->body('O Operador usa o nome do Funcionário RH.')
+                    ->warning()
+                    ->send();
+
+                $this->redirect(RhFuncionarioResource::getUrl('index'));
+
+                return;
+            }
+
+            $this->createVendedor();
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function erpAllowedSearchColumns(): array
+    {
+        return ['codigo', 'nome'];
+    }
+
+    protected function erpDefaultSearchColumn(): string
+    {
+        return 'codigo';
     }
 
     protected static function erpListPageClass(): string
@@ -94,13 +135,6 @@ class ListVendedores extends ListRecords
                 View::make('filament.components.erp.vendedores.form-modal'),
                 View::make('filament.components.erp.vendedores.confirm-delete-modal'),
             ]);
-    }
-
-    public function updatedSearchColumn(): void
-    {
-        $this->localSearch = '';
-        $this->clearListSelection();
-        $this->resetTable();
     }
 
     public function updatedTableRecordsPerPage(): void

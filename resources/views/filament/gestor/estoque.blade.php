@@ -1,5 +1,10 @@
 <x-filament-panels::page>
-    @php $s = $snapshot; @endphp
+    @php
+        $g = $saudeEstoque;
+        $tone = (string) ($g['tone'] ?? 'slate');
+        $percent = max(0, (float) ($g['percent'] ?? 0));
+        $rightTone = (string) ($g['stat_right_tone'] ?? '');
+    @endphp
     <div class="gestor-shell" data-theme="{{ $this->gestorTema }}">
         <div class="gestor-shell__inner">
             @include('filament.gestor.partials.top', [
@@ -8,12 +13,39 @@
                 'eyebrow' => 'Disponibilidade',
             ])
 
-            <section class="gestor-spotlight">
-                <div class="gestor-spotlight__card {{ (($s['estoque_baixo'] ?? 0) > 0) ? 'gestor-spotlight__card--warn' : '' }}">
-                    <p class="gestor-kicker">Itens críticos</p>
-                    <p class="gestor-spotlight__value">{{ (int) ($s['estoque_baixo'] ?? 0) }}</p>
-                    <p class="gestor-spotlight__hint">Abaixo do estoque mínimo</p>
+            <section class="gestor-estoque-gauge gestor-estoque-gauge--{{ $tone }}" aria-label="Saúde do estoque">
+                <header class="gestor-estoque-gauge__head">
+                    <h2>{{ $g['label'] ?? 'Saúde do Estoque' }}</h2>
+                </header>
+                <div class="gestor-estoque-gauge__body">
+                    <div class="gestor-estoque-gauge__stats">
+                        <div class="gestor-estoque-gauge__stat">
+                            <span>{{ $g['stat_left_label'] ?? 'OK' }}</span>
+                            <strong>{{ $g['stat_left'] ?? '—' }}</strong>
+                        </div>
+                        <div @class([
+                            'gestor-estoque-gauge__stat',
+                            'gestor-estoque-gauge__stat--'.$rightTone => filled($rightTone),
+                        ])>
+                            <span>{{ $g['stat_right_label'] ?? 'Crítico' }}</span>
+                            <strong>{{ $g['stat_right'] ?? '—' }}</strong>
+                        </div>
+                    </div>
+                    <div class="gestor-estoque-gauge__meter" aria-hidden="true">
+                        <canvas
+                            class="gestor-estoque-gauge__canvas"
+                            data-gestor-gauge-canvas
+                            data-percent="{{ $percent }}"
+                            data-tone="{{ $tone }}"
+                            width="280"
+                            height="160"
+                        ></canvas>
+                        <div class="gestor-estoque-gauge__pct">{{ $g['display_percent'] ?? '0,0%' }}</div>
+                    </div>
                 </div>
+                @if (filled($g['meta_label'] ?? null))
+                    <p class="gestor-estoque-gauge__meta">{{ $g['meta_label'] }}</p>
+                @endif
             </section>
 
             <a class="gestor-cta" href="{{ \App\Filament\Gestor\Pages\ProdutosGestorPage::getUrl(panel: 'gestor') }}" wire:navigate>
@@ -51,4 +83,5 @@
         @include('filament.gestor.partials.bottom-nav')
     </div>
     @include('filament.gestor.partials.persist-snapshot')
+    <script src="{{ asset('js/gestor-gauge.js') }}?v=1" defer></script>
 </x-filament-panels::page>

@@ -1,4 +1,4 @@
-/* ERP — Cadastro de Pessoas (janela modal Delphi) */
+/* ERP — Cadastro de Pessoas (janela modal) */
 
 /* Viewport — retaguarda (PDV/orçamento embed usam regras dedicadas) */
 .fi-body:has(.erp-pessoas-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) {
@@ -436,10 +436,11 @@
     font-size: 0.72rem;
     padding: 0.15rem 0.45rem;
     border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: linear-gradient(180deg, #fff 0%, var(--erp-bg-app, #e3ecf7) 100%);
+    background: #fff;
     cursor: pointer;
-    color: #000;
+    color: #0f172a;
     white-space: nowrap;
+    border-radius: 6px;
 }
 
 .erp-pcad-form__btn:hover {
@@ -452,9 +453,10 @@
 
 .erp-pcad-form__checks-inline {
     display: flex;
-    gap: 1rem;
-    padding-left: 6.2rem;
-    margin-top: 0.15rem;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    padding-left: 0;
+    margin-top: 0;
 }
 
 /* Parâmetros group box */
@@ -558,11 +560,12 @@
     width: 1.35rem;
     height: 1.35rem;
     border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: linear-gradient(180deg, #fff 0%, var(--erp-bg-app, #e3ecf7) 100%);
+    background: #fff;
     cursor: pointer;
     font-size: 0.85rem;
     line-height: 1;
     padding: 0;
+    border-radius: 6px;
 }
 
 .erp-pessoas-contatos__mini-btn--ok {
@@ -668,82 +671,513 @@
     display: none !important;
 }
 
-/* Rodapé F5/ESC — visual em erp-form-ui.css */
+/* ═══════════════════════════════════════════════════════════════════
+   Cadastro de Pessoas — UI profissional (todas as abas)
+   Flat inputs, abas azuis ERP, rodapé moderno, painéis slate.
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* Tipografia — alinhada ao cadastro de produtos */
+.erp-pessoas-form-page .erp-pessoas-window {
+    background: #e4ebf5 !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 10px !important;
+    box-shadow:
+        0 18px 40px rgb(15 52 96 / 22%),
+        0 0 0 1px rgb(255 255 255 / 28%) inset !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-window__titlebar {
+    padding: 0.45rem 0.7rem !important;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-window__title {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em;
+}
+
 .erp-pessoas-form-page .erp-pcad {
-    font-size: 0.82rem;
+    background: #e4ebf5 !important;
+    padding: 0.45rem 0.5rem 0 !important;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: #000;
+    color: #0f172a !important;
+}
+
+/* Abas — azul ERP (sem verde chamativo) */
+.erp-pessoas-form-page .erp-pcad__tabs {
+    gap: 0.2rem !important;
+    margin-bottom: 0;
 }
 
 .erp-pessoas-form-page .erp-pcad__tab {
-    font-size: 0.82rem;
-    font-weight: 600;
+    padding: 0.32rem 0.85rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    border: 1px solid #b7c9de !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    background: #d5e0ee !important;
+    color: #475569 !important;
+    box-shadow: none !important;
+}
+
+.erp-pessoas-form-page .erp-pcad__tab:hover {
+    background: #eef4fb !important;
+    color: #1e5a9e !important;
 }
 
 .erp-pessoas-form-page .erp-pcad__tab--active {
-    font-weight: 700;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    border-color: #0f3460 !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    margin-bottom: -1px;
+    z-index: 1;
+}
+
+/* Workspace — painel slate integrado */
+.erp-pessoas-form-page .erp-pcad__workspace {
+    background: #eef3f9 !important;
+    border: 1px solid #b7c9de !important;
+    border-radius: 0 8px 8px 8px !important;
+    box-shadow: none !important;
+    padding: 0.55rem 0.6rem !important;
+}
+
+.erp-pessoas-form-page .erp-pcad__workspace--dados {
+    gap: 0.55rem;
+    grid-template-columns: 1fr 10rem;
+}
+
+.erp-pessoas-form-page .erp-pessoas-panel {
+    min-width: 0;
+    padding: 0.45rem 0.55rem 0.5rem;
+    border: 1px solid #c5d0de;
+    border-radius: 8px;
+    background: #f8fafc;
+    box-shadow: none;
+}
+
+.erp-pessoas-form-page .erp-pcad-form {
+    gap: 0.32rem;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__row {
+    gap: 0.4rem;
+    min-height: 1.7rem;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__row + .erp-pcad-form__row {
+    padding-top: 0.18rem;
+    border-top: 1px solid #e8eef6;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__label,
+.erp-pessoas-form-page .erp-pcad-form__label--inline {
+    color: #334155 !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    line-height: 1.15;
 }
 
 .erp-pessoas-form-page .erp-pcad-form__label {
-    font-size: 0.78rem;
-    font-weight: 700;
+    width: 5.9rem;
 }
 
+/* Campos flat — sem sombra flutuante */
 .erp-pessoas-form-page .erp-pcad-form__input,
 .erp-pessoas-form-page .erp-pcad-form__select,
 .erp-pessoas-form-page .erp-pcad-form__textarea {
-    font-size: 0.82rem;
-    font-weight: 600;
-    min-height: 1.45rem;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    min-height: 1.55rem;
+    padding: 0.2rem 0.4rem !important;
+    border: 1px solid #9eb4cf !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__input:focus,
+.erp-pessoas-form-page .erp-pcad-form__select:focus,
+.erp-pessoas-form-page .erp-pcad-form__textarea:focus {
+    outline: none;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 16%) !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__input[readonly],
+.erp-pessoas-form-page .erp-pcad-form__input:disabled,
+.erp-pessoas-form-page .erp-pcad-form__select:disabled {
+    background: #eef2f7 !important;
+    color: #475569 !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__textarea {
+    min-height: 7.5rem;
+    line-height: 1.35;
 }
 
 .erp-pessoas-form-page .erp-pcad-form__btn {
-    font-size: 0.78rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    min-height: 1.55rem;
+    padding: 0.18rem 0.55rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    border: 1px solid #9eb4cf !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #1e3a5f !important;
+    box-shadow: none !important;
+    cursor: pointer;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__btn:hover {
+    background: #eff6ff !important;
+    border-color: #1e5a9e !important;
+    color: #0f3460 !important;
 }
 
 .erp-pessoas-form-page .erp-pcad-form__btn-icon {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__checks-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.1rem;
+    padding-left: 0;
+    margin: 0;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__row--checks {
+    align-items: center;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__flags {
+    gap: 0.3rem 0.65rem;
+    padding: 0.2rem 0.35rem;
+    border: 1px solid #d5e0ee;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__flag {
+    font-size: 0.74rem;
+    font-weight: 650;
+    color: #334155;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__flag input {
+    accent-color: #1e5a9e;
+}
+
+/* Parâmetros (sidebar) — integrado ao workspace */
+.erp-pessoas-form-page .erp-pessoas-params.erp-pcad__group,
+.erp-pessoas-form-page .erp-pcad__group {
+    border: 1px solid #b7c9de !important;
+    border-radius: 8px !important;
+    background: #f1f5f9 !important;
+    box-shadow: none !important;
+    padding: 0.4rem 0.5rem 0.55rem !important;
 }
 
 .erp-pessoas-form-page .erp-pcad__group-title {
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-size: 0.74rem !important;
+    font-weight: 700 !important;
+    color: #0f3460 !important;
+    padding: 0 0.2rem;
+}
+
+.erp-pessoas-form-page .erp-pcad__checks {
+    gap: 0.28rem;
+    margin-top: 0.2rem;
 }
 
 .erp-pessoas-form-page .erp-pcad__check {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.76rem !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    padding: 0.12rem 0.2rem;
+    border-radius: 4px;
+}
+
+.erp-pessoas-form-page .erp-pcad__check:hover {
+    background: rgb(30 90 158 / 6%);
+}
+
+.erp-pessoas-form-page .erp-pcad__check input {
+    width: 0.9rem;
+    height: 0.9rem;
+    accent-color: #1e5a9e;
+}
+
+/* Adicionais */
+.erp-pessoas-form-page .erp-pcad-form--adicionais {
+    max-width: 46rem;
+}
+
+/* Contatos */
+.erp-pessoas-form-page .erp-pessoas-panel--contatos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 20rem;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__grid-wrap {
+    border: 1px solid #b7c9de !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    overflow: hidden;
+    height: 9.5rem;
 }
 
 .erp-pessoas-form-page .erp-pessoas-contatos__grid {
-    font-size: 0.82rem;
+    font-size: 0.78rem !important;
     font-weight: 600;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__grid th,
+.erp-pessoas-form-page .erp-pessoas-contatos__grid td {
+    border-color: #d5e0ee !important;
+    padding: 0.28rem 0.45rem !important;
 }
 
 .erp-pessoas-form-page .erp-pessoas-contatos__grid th {
-    font-weight: 700;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__row:hover {
+    background: #e8f0fa;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__row--selected {
+    background: #bfdbfe !important;
+    color: #0f172a !important;
+    box-shadow: inset 3px 0 0 #1d4ed8;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__empty {
+    color: #64748b;
+    font-style: normal;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__form {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0.15rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__mini-btn {
+    width: 1.55rem;
+    height: 1.55rem;
+    border: 1px solid #9eb4cf !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__mini-btn:hover {
+    background: #eff6ff !important;
+    border-color: #1e5a9e !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__mini-btn--ok {
+    color: #15803d !important;
+    border-color: #86efac !important;
+    background: #f0fdf4 !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-contatos__mini-btn--cancel {
+    color: #b91c1c !important;
+    border-color: #fca5a5 !important;
+    background: #fef2f2 !important;
+}
+
+/* Foto */
+.erp-pessoas-form-page .erp-pessoas-panel--foto {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    max-width: 22rem;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__preview {
+    width: 12.5rem;
+    height: 15rem;
+    border: 1px solid #9eb4cf !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__preview--empty {
+    background:
+        linear-gradient(135deg, #f1f5f9 25%, transparent 25%) -8px 0 / 16px 16px,
+        linear-gradient(225deg, #f1f5f9 25%, transparent 25%) -8px 0 / 16px 16px,
+        linear-gradient(315deg, #f1f5f9 25%, transparent 25%) 0 0 / 16px 16px,
+        linear-gradient(45deg, #f1f5f9 25%, #e2e8f0 25%) 0 0 / 16px 16px !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__actions {
+    gap: 0.45rem;
+    margin-top: 0;
 }
 
 .erp-pessoas-form-page .erp-pessoas-foto__hint {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    color: #64748b !important;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__modal-panel {
+    border-radius: 10px !important;
+    border: 1px solid #8fa8c8 !important;
+    background: #f8fafc !important;
+    box-shadow: 0 18px 40px rgb(15 52 96 / 28%) !important;
+    padding: 0.65rem !important;
 }
 
 .erp-pessoas-form-page .erp-pessoas-foto__modal-header {
-    font-size: 0.88rem;
-    font-weight: 700;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    color: #0f3460;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__modal-close {
+    border: 1px solid #9eb4cf;
+    border-radius: 6px;
+    background: #fff;
+    width: 1.5rem;
+    height: 1.5rem;
+    cursor: pointer;
+}
+
+.erp-pessoas-form-page .erp-pessoas-foto__video {
+    border-radius: 8px;
+    border-color: #9eb4cf;
 }
 
 .erp-pessoas-form-page .erp-pessoas-foto__modal-error {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.76rem !important;
+    font-weight: 600 !important;
+    color: #b91c1c;
+}
+
+/* Rodapé F5 / ESC — padrão sistema 3D (erp-form-ui / Empresas / Produtos) */
+.erp-pessoas-form-page:not(.erp-pdv-embed) .erp-pessoas-window__body > .erp-pcad-actions,
+.erp-pessoas-form-page .erp-pcad-actions--split {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem !important;
+    width: 100%;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions--split .erp-pcad-actions__btn,
+.erp-pessoas-form-page:not(.erp-pdv-embed) .erp-pessoas-window__body > .erp-pcad-actions .erp-pcad-actions__btn {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 5.4rem !important;
+    height: 3rem !important;
+    padding: 0.28rem 0.65rem !important;
+    border-radius: var(--erp-radius-md, 8px) !important;
+    box-shadow: 0 4px 12px rgb(15 52 96 / 18%) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    cursor: pointer;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions--split .erp-pcad-actions__btn:hover,
+.erp-pessoas-form-page:not(.erp-pdv-embed) .erp-pessoas-window__body > .erp-pcad-actions .erp-pcad-actions__btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgb(15 52 96 / 22%) !important;
+    filter: brightness(1.03);
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__btn--primary,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
+    border: 1px solid #86efac !important;
+    color: #fff !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__btn--primary:hover,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="F5"]:hover {
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%) !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__btn--danger,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%) !important;
+    border: 1px solid #fca5a5 !important;
+    color: #fff !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__btn--danger:hover,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-pessoas-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: #fff !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.3rem !important;
+    height: 1.3rem !important;
+    margin-bottom: 0.12rem !important;
+    border-radius: 50% !important;
+    font-size: 0.8rem !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+    background: rgb(255 255 255 / 22%) !important;
+    border: 1px solid rgb(255 255 255 / 28%);
+    color: #fff !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__icon--save,
+.erp-pessoas-form-page .erp-pcad-actions__icon--exit {
+    background: rgb(255 255 255 / 22%) !important;
+    color: #fff !important;
 }
 
 .erp-pessoas-form-page .erp-pcad-actions__label {
-    font-size: 0.78rem;
+    font-size: 0.625rem !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    line-height: 1.1 !important;
+}
+
+.erp-pessoas-form-page .erp-pcad-actions__label kbd {
+    font-size: 0.6rem;
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgb(255 255 255 / 18%);
+    border: 1px solid rgb(255 255 255 / 35%);
     font-weight: 700;
 }
 
@@ -791,8 +1225,33 @@
         flex-wrap: wrap;
     }
 
-    .erp-pcad-actions {
-        flex-wrap: wrap;
-        justify-content: center;
+    .erp-pessoas-form-page .erp-pcad-actions--split {
+        justify-content: space-between;
     }
+}
+
+.erp-pcad-form__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    align-items: center;
+    padding-top: 0.15rem;
+}
+
+.erp-pcad-form__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.78rem;
+    font-weight: 650;
+    color: var(--erp-text, #1f2a37);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.erp-pcad-form__flag input {
+    width: 0.95rem;
+    height: 0.95rem;
+    accent-color: var(--erp-brand-primary, #2f5d8c);
 }

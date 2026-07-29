@@ -9,9 +9,14 @@ use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\Venda;
 use App\Support\Erp\Pdv\PdvCupomPrinter;
+use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Queries\VendaListQueryBuilder;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Vendas\EstornarVendaService;
+use DomainException;
 use Filament\Notifications\Notification;
+use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
@@ -43,7 +48,7 @@ class ListVendas extends ListRecords
     public string $localSearchHoraAte = '';
 
     #[Url(as: 'campo')]
-    public string $searchColumn = 'cliente';
+    public string $searchColumn = 'data';
 
     #[Url(as: 'status')]
     public string $statusFilter = 'todos';
@@ -66,12 +71,37 @@ class ListVendas extends ListRecords
 
     public function mount(): void
     {
+        // Datas padrão antes do parent::mount (loadTable / query).
+        $this->applyTodayDateFilter();
+
         parent::mount();
 
         ErpScreen::set('Vendas');
 
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->tipoFilter = $this->normalizeTipoFilter($this->tipoFilter);
+        // Sempre abre em DATA de/até = hoje (amanhã vira o dia seguinte).
+        $this->applyTodayDateFilter();
+        $this->dispatch('erp-masks-refresh');
+    }
+
+    public function booted(): void
+    {
+        if ($this->searchColumn === 'data'
+            && ($this->localSearchDe === '' || $this->localSearchAte === '')) {
+            $this->applyTodayDateFilter();
+        }
+    }
+
+    protected function applyTodayDateFilter(): void
+    {
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $this->searchColumn = 'data';
+        $this->localSearch = '';
+        $this->localSearchDe = $hoje;
+        $this->localSearchAte = $hoje;
+        $this->localSearchHoraDe = '';
+        $this->localSearchHoraAte = '';
     }
 
     protected static function erpListPageClass(): string
@@ -87,15 +117,11 @@ class ListVendas extends ListRecords
     protected function customErpListKeyboardConfig(): array
     {
         return [
-            'searchInput' => '.erp-vendas__search-text, .erp-vendas__search-value-select, .erp-vendas__search-date-from, .erp-vendas__search-time-from',
+            'searchInput' => '.erp-vendas__search-text, .erp-vendas__search-value-select, .erp-vendas__search-date-from, .erp-vendas__search-time-from, .erp-field-dd__btn',
             'searchFocusKey' => 'F8',
-            'create' => 'createVenda',
-            'edit' => 'editVenda',
             'extraKeys' => [
                 'F4' => ['method' => 'cancelVenda'],
                 'F6' => ['method' => 'printVendas'],
-                'F9' => ['method' => 'modulePending', 'params' => ['E-mail']],
-                'F10' => ['method' => 'modulePending', 'params' => ['WhatsApp']],
             ],
         ];
     }
@@ -122,21 +148,6 @@ class ListVendas extends ListRecords
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
         ))->build();
-    }
-
-    protected function isDateSearchColumn(): bool
-    {
-        return $this->searchColumn === 'data';
-    }
-
-    protected function isTimeSearchColumn(): bool
-    {
-        return $this->searchColumn === 'hora';
-    }
-
-    protected function isOptionSearchColumn(): bool
-    {
-        return in_array($this->searchColumn, ['meio_pagamento', 'plataforma', 'situacao', 'tipo'], true);
     }
 
     /**
@@ -316,84 +327,35 @@ class ListVendas extends ListRecords
         $this->resetTable();
     }
 
-    public function clearSearch(): void
+    public function setSearchColumn(string $column): void
     {
+        $this->searchColumn = $this->normalizeSearchColumn($column);
         $this->localSearch = '';
         $this->localSearchDe = '';
         $this->localSearchAte = '';
         $this->localSearchHoraDe = '';
         $this->localSearchHoraAte = '';
-        $this->searchColumn = 'cliente';
+
+        if ($this->searchColumn === 'data') {
+            $this->applyTodayDateFilter();
+        }
+
         $this->clearListSelection();
         $this->resetTable();
+        $this->dispatch('erp-masks-refresh');
+    }
+
+    public function clearSearch(): void
+    {
+        $this->applyTodayDateFilter();
+        $this->clearListSelection();
+        $this->resetTable();
+        $this->dispatch('erp-masks-refresh');
     }
 
     public function updatedSearchColumn(): void
     {
-        $this->localSearch = '';
-        $this->localSearchDe = '';
-        $this->localSearchAte = '';
-        $this->localSearchHoraDe = '';
-        $this->localSearchHoraAte = '';
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedLocalSearch(): void
-    {
-        if ($this->isDateSearchColumn() || $this->isTimeSearchColumn()) {
-            return;
-        }
-
-        if ($this->isOptionSearchColumn() && ! filled($this->localSearch)) {
-            $this->clearListSelection();
-            $this->resetTable();
-
-            return;
-        }
-
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedLocalSearchDe(): void
-    {
-        if (! $this->isDateSearchColumn()) {
-            return;
-        }
-
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedLocalSearchAte(): void
-    {
-        if (! $this->isDateSearchColumn()) {
-            return;
-        }
-
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedLocalSearchHoraDe(): void
-    {
-        if (! $this->isTimeSearchColumn()) {
-            return;
-        }
-
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedLocalSearchHoraAte(): void
-    {
-        if (! $this->isTimeSearchColumn()) {
-            return;
-        }
-
-        $this->clearListSelection();
-        $this->resetTable();
+        $this->setSearchColumn($this->searchColumn);
     }
 
     public function updatedTableRecordsPerPage(): void
@@ -406,6 +368,24 @@ class ListVendas extends ListRecords
     {
         $this->clearListSelection();
         $this->resetTable();
+    }
+
+    protected function normalizeSearchColumn(mixed $value): string
+    {
+        $allowed = [
+            'numero',
+            'data',
+            'cliente',
+            'vendedor',
+            'plataforma',
+            'meio_pagamento',
+            'total',
+            'situacao',
+            'tipo',
+            'hora',
+        ];
+
+        return in_array($value, $allowed, true) ? (string) $value : 'data';
     }
 
     public function createVenda(): void
@@ -457,13 +437,49 @@ class ListVendas extends ListRecords
             return;
         }
 
-        $venda->update(['status' => Venda::STATUS_CANCELADO]);
+        try {
+            $result = (new EstornarVendaService())->fromVenda(
+                $venda,
+                PdvEstornoMotivo::MOTIVO_AUTOMATICO,
+                EstornarVendaService::ORIGEM_LISTA_VENDAS,
+            );
+        } catch (DomainException $exception) {
+            Notification::make()
+                ->title('Não foi possível cancelar a venda.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        } catch (FiscalEngineException $exception) {
+            Notification::make()
+                ->title('Falha no cancelamento fiscal.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if ($result->alreadyCancelled) {
+            Notification::make()
+                ->title('Venda já está cancelada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         $this->clearListSelection();
         $this->resetTable();
 
+        $body = $result->protocoloCancelamento
+            ? 'Protocolo NFC-e: '.$result->protocoloCancelamento
+            : null;
+
         Notification::make()
-            ->title('Venda cancelada.')
+            ->title('Venda cancelada / estornada.')
+            ->body($body)
             ->success()
             ->send();
     }

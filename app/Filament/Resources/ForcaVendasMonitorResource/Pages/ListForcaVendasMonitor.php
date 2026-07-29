@@ -2,20 +2,24 @@
 
 namespace App\Filament\Resources\ForcaVendasMonitorResource\Pages;
 
+use App\Filament\Pages\ForcaVendasTelaVendaPage;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
-use App\Filament\Resources\OrcamentoResource;
 use App\Models\ContaReceber;
 use App\Models\ForcaVendasOrder;
+use App\Models\FormaPagamento;
 use App\Models\Orcamento;
 use App\Models\Person;
 use App\Models\Vendedor;
 use App\Models\Venda;
-use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Pdv\PdvEstornoMotivo;
+use App\Support\Erp\Vendas\EstornarVendaService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
+use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
+use DomainException;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -119,9 +123,11 @@ class ListForcaVendasMonitor extends ListRecords
 
     public function table(Table $table): Table
     {
+        // Seleção do pedido é feita apenas pela flag da linha; clicar em
+        // qualquer outra célula não altera nada.
         return ForcaVendasMonitorResource::table($table)
             ->recordUrl(null)
-            ->recordAction('highlightRecord')
+            ->recordAction(null)
             ->recordClasses(function (Model $record): string {
                 $situacao = $record->situacao ?? ForcaVendasOrder::SITUACAO_PENDENTE;
                 $tint = 'erp-fv-mon--' . $situacao;
@@ -144,7 +150,7 @@ class ListForcaVendasMonitor extends ListRecords
     {
         $query = parent::getTableQuery()
             ->where('tipo', 'pedido')
-            ->with(['user', 'orcamento', 'cliente']);
+            ->with(['user', 'vendedor', 'orcamento.itens', 'cliente']);
 
         if (array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
             if ($this->situacaoFilter === ForcaVendasOrder::SITUACAO_PENDENTE) {
@@ -237,8 +243,12 @@ class ListForcaVendasMonitor extends ListRecords
                 $query->whereHas('orcamento', fn (Builder $s) => $s->where('numero', 'like', '%' . $valor . '%'));
                 break;
 
-            case 'identificacao':
-                $query->where('identificacao', 'like', '%' . $valor . '%');
+            case 'meio_pgto':
+                $query->where(function (Builder $q) use ($valor): void {
+                    $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))) = ?", [mb_strtolower($valor, 'UTF-8')])
+                        ->orWhereHas('orcamento', fn (Builder $s) => $s
+                            ->whereRaw('LOWER(forma_pagamento) = ?', [mb_strtolower($valor, 'UTF-8')]));
+                });
                 break;
 
             case 'cliente':
@@ -371,19 +381,26 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         $vendedor = $order?->vendedor?->nome ?? $order?->user?->name ?? '—';
+        $payloadItens = is_array($order?->payload['itens'] ?? null) ? $order->payload['itens'] : [];
 
         return $orcamento->itens
-            ->map(fn ($item): array => [
-                'codigo' => $item->product?->codigo ?? '',
-                'codigo_barras' => $item->product?->codigo_barras ?? '',
-                'descricao' => $item->descricao
-                    ?: ($item->product?->descricao ?? 'Item'),
-                'quantidade' => (float) $item->quantidade,
-                'preco_unitario' => (float) $item->preco_unitario,
-                'desconto' => (float) $item->desconto,
-                'total' => (float) $item->total,
-                'vendedor' => $vendedor,
-            ])
+            ->values()
+            ->map(function ($item, int $index) use ($vendedor, $payloadItens): array {
+                $payloadItem = is_array($payloadItens[$index] ?? null) ? $payloadItens[$index] : [];
+
+                return [
+                    'codigo' => $item->product?->codigo ?? '',
+                    'codigo_barras' => $item->product?->codigo_barras ?? '',
+                    'descricao' => $item->descricao
+                        ?: ($item->product?->descricao ?? 'Item'),
+                    'quantidade' => (float) $item->quantidade,
+                    'preco_unitario' => (float) $item->preco_unitario,
+                    'desconto' => (float) $item->desconto,
+                    'acrescimo' => (float) ($payloadItem['acrescimo'] ?? 0),
+                    'total' => (float) $item->total,
+                    'vendedor' => $vendedor,
+                ];
+            })
             ->all();
     }
 
@@ -614,7 +631,7 @@ class ListForcaVendasMonitor extends ListRecords
             'acrescimo' => 'Acréscimo',
             'tt_bruto' => 'TT Bruto',
             'tt_liquido' => 'TT Líquido',
-            'identificacao' => 'Identificação',
+            'meio_pgto' => 'Meio Pgto',
         ];
     }
 
@@ -624,7 +641,7 @@ class ListForcaVendasMonitor extends ListRecords
     public function filtroCampoTipo(): string
     {
         return match ($this->filtroCampo) {
-            'cliente', 'vendedor', 'status' => 'select',
+            'cliente', 'vendedor', 'status', 'meio_pgto' => 'select',
             'data_abert', 'data_fech', 'sincronizado' => 'date',
             'desconto', 'acrescimo', 'tt_bruto', 'tt_liquido' => 'number',
             default => 'text',
@@ -669,6 +686,59 @@ class ListForcaVendasMonitor extends ListRecords
         return (string) (Person::query()->whereKey((int) $this->filtroValor)->value('nome_razao') ?? '');
     }
 
+    #[Computed]
+    public function meiosPagamentoOptions(): array
+    {
+        $formas = FormaPagamento::query()
+            ->where('ativo', true)
+            ->orderBy('descricao')
+            ->pluck('descricao', 'descricao')
+            ->all();
+
+        // Meios já usados em pedidos (mesmo inativos / textos do app).
+        $usados = ForcaVendasOrder::query()
+            ->where('tipo', 'pedido')
+            ->whereNotNull('payload')
+            ->selectRaw("DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento')) as forma")
+            ->pluck('forma')
+            ->filter(fn ($forma): bool => filled($forma) && $forma !== 'null')
+            ->map(fn ($forma): string => trim((string) $forma))
+            ->filter()
+            ->all();
+
+        foreach ($usados as $forma) {
+            $formas[$forma] = $forma;
+        }
+
+        asort($formas, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $rotulos = [];
+
+        foreach ($formas as $forma) {
+            $rotulos[$forma] = $this->rotuloMeioPagamento($forma);
+        }
+
+        return $rotulos;
+    }
+
+    private function rotuloMeioPagamento(string $descricao): string
+    {
+        $chave = mb_strtoupper(trim($descricao), 'UTF-8');
+        $chave = str_replace(['Á', 'À', 'Ã', 'Â', 'É', 'Ê', 'Í', 'Ó', 'Ô', 'Õ', 'Ú', 'Ç'], ['A', 'A', 'A', 'A', 'E', 'E', 'I', 'O', 'O', 'O', 'U', 'C'], $chave);
+
+        return match ($chave) {
+            'DINHEIRO' => 'Dinheiro',
+            'PIX' => 'PIX',
+            'POS DEBITO' => 'POS Débito',
+            'POS CREDITO' => 'POS Crédito',
+            'CREDIARIO' => 'Crediário',
+            'CARTAO', 'CARTAO DE CREDITO' => 'Cartão',
+            'BOLETO' => 'Boleto',
+            'CHEQUE' => 'Cheque',
+            default => mb_convert_case(mb_strtolower(trim($descricao), 'UTF-8'), MB_CASE_TITLE, 'UTF-8'),
+        };
+    }
+
     /**
      * Opções de valor para o campo atual quando ele for do tipo "select".
      *
@@ -680,8 +750,65 @@ class ListForcaVendasMonitor extends ListRecords
             'cliente' => $this->clientesOptions,
             'vendedor' => $this->vendedoresOptions,
             'status' => ForcaVendasOrder::situacaoLabels(),
+            'meio_pgto' => $this->meiosPagamentoOptions,
             default => [],
         };
+    }
+
+    /**
+     * Dados do combo compacto do filtro unificado (select).
+     *
+     * @return array{itens: list<array{id: string, nome: string}>, valor: string, rotulo: string, todos: string}
+     */
+    public function filtroSelectCombo(): array
+    {
+        return $this->montarSelectCombo(
+            $this->filtroValorOptions(),
+            (string) $this->filtroValor,
+            '<todos>',
+        );
+    }
+
+    /**
+     * Dados do combo compacto de plataforma.
+     *
+     * @return array{itens: list<array{id: string, nome: string}>, valor: string, rotulo: string, todos: string}
+     */
+    public function plataformaSelectCombo(): array
+    {
+        return $this->montarSelectCombo(
+            $this->plataformaOptions(),
+            (string) $this->plataformaFilter,
+            '<todas>',
+        );
+    }
+
+    /**
+     * @param  array<int|string, string>  $options
+     * @return array{itens: list<array{id: string, nome: string}>, valor: string, rotulo: string, todos: string}
+     */
+    private function montarSelectCombo(array $options, string $valorAtual, string $todosLabel): array
+    {
+        $itens = [];
+
+        foreach ($options as $id => $nome) {
+            $itens[] = [
+                'id' => (string) $id,
+                'nome' => (string) $nome,
+            ];
+        }
+
+        $valor = $valorAtual === '' ? 'todos' : $valorAtual;
+        $rotulo = $valor === 'todos'
+            ? $todosLabel
+            : (string) ($options[$valor] ?? $valor);
+
+        return [
+            'itens' => $itens,
+            'valor' => $valor,
+            'rotulo' => $rotulo,
+            'todos' => $todosLabel,
+        ];
     }
 
     /**
@@ -716,6 +843,30 @@ class ListForcaVendasMonitor extends ListRecords
     // ---- Seleção em lote ---------------------------------------------------
 
     /**
+     * Marca/desmarca a flag da linha e acompanha o destaque do pedido:
+     * marcar seleciona a linha, desmarcar tira o destaque dela.
+     */
+    public function alternarSelecionado(int|string $recordId): void
+    {
+        $key = (string) $recordId;
+        $index = array_search($key, $this->selecionados, true);
+
+        if ($index !== false) {
+            unset($this->selecionados[$index]);
+            $this->selecionados = array_values($this->selecionados);
+
+            if ((int) $this->highlightedRecordId === (int) $recordId) {
+                $this->highlightedRecordId = null;
+            }
+
+            return;
+        }
+
+        $this->selecionados[] = $key;
+        $this->highlightedRecordId = (int) $recordId;
+    }
+
+    /**
      * Marca todos os pedidos pendentes do filtro atual.
      */
     public function selecionarPendentes(): void
@@ -734,6 +885,7 @@ class ListForcaVendasMonitor extends ListRecords
     public function limparSelecao(): void
     {
         $this->selecionados = [];
+        $this->highlightedRecordId = null;
     }
 
     /**
@@ -815,7 +967,10 @@ class ListForcaVendasMonitor extends ListRecords
 
     /**
      * Estorna em lote os pedidos faturados selecionados: devolve o estoque,
-     * cancela a venda e apaga as contas a receber (pula os com título recebido).
+     * cancela a venda e apaga as contas a receber em aberto.
+     *
+     * Pedidos com título já recebido (baixado) são bloqueados pelo serviço e
+     * contados à parte; demais falhas entram em "com erro".
      */
     public function estornarSelecionados(): void
     {
@@ -830,7 +985,8 @@ class ListForcaVendasMonitor extends ListRecords
         $estornados = 0;
         $ignorados = 0;
         $bloqueados = 0;
-        $serv = new ForcaVendasFaturamentoService();
+        $erros = 0;
+        $serv = new EstornarVendaService();
 
         foreach ($orders as $order) {
             if (! $order->venda_id || $order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
@@ -839,16 +995,34 @@ class ListForcaVendasMonitor extends ListRecords
                 continue;
             }
 
+            $venda = Venda::query()->find($order->venda_id);
+
+            if (! $venda) {
+                $ignorados++;
+
+                continue;
+            }
+
             try {
-                $serv->estornar($order);
+                $serv->fromVenda(
+                    $venda,
+                    PdvEstornoMotivo::MOTIVO_AUTOMATICO,
+                    EstornarVendaService::ORIGEM_MONITOR_FV,
+                );
+
+                $order->refresh();
 
                 if ($order->orcamento && $order->orcamento->status !== Orcamento::STATUS_CANCELADO) {
                     $order->orcamento->update(['status' => Orcamento::STATUS_CANCELADO]);
                 }
 
                 $estornados++;
-            } catch (\RuntimeException $e) {
-                $bloqueados++;
+            } catch (DomainException|\RuntimeException $e) {
+                if (str_contains(mb_strtolower($e->getMessage(), 'UTF-8'), 'recebid')) {
+                    $bloqueados++;
+                } else {
+                    $erros++;
+                }
             }
         }
 
@@ -856,9 +1030,10 @@ class ListForcaVendasMonitor extends ListRecords
 
         $msg = "Estornados: {$estornados}."
             . ($ignorados > 0 ? " Ignorados: {$ignorados}." : '')
-            . ($bloqueados > 0 ? " Bloqueados (título recebido): {$bloqueados}." : '');
+            . ($bloqueados > 0 ? " Bloqueados (título já recebido): {$bloqueados}." : '')
+            . ($erros > 0 ? " Com erro: {$erros}." : '');
 
-        $this->avisa($msg, $bloqueados > 0 ? 'warning' : 'success');
+        $this->avisa($msg, ($bloqueados > 0 || $erros > 0) ? 'warning' : 'success');
     }
 
     /**
@@ -1014,9 +1189,37 @@ class ListForcaVendasMonitor extends ListRecords
      */
     protected function diasParcelas(ForcaVendasOrder $order): array
     {
-        $diasStr = (string) ($order->payload['tabela_prazo_dias'] ?? '');
+        $payload = is_array($order->payload) ? $order->payload : [];
 
-        $dias = collect(explode(',', $diasStr))
+        // 1º Canhoto POS (crédito/débito) gerado na Tela de Venda.
+        $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
+
+        if (is_array($canhotoDias) && $canhotoDias !== []) {
+            $dias = collect($canhotoDias)
+                ->map(fn ($d): int => (int) $d)
+                ->filter(fn (int $d): bool => $d >= 0)
+                ->values()
+                ->all();
+
+            if ($dias !== []) {
+                return $dias;
+            }
+        }
+
+        // 2º Tabela de prazo (string "30,60" ou lista).
+        $prazoRaw = $payload['tabela_prazo_dias'] ?? '';
+
+        if (is_array($prazoRaw)) {
+            $dias = collect($prazoRaw)
+                ->map(fn ($d): int => (int) $d)
+                ->filter(fn (int $d): bool => $d >= 0)
+                ->values()
+                ->all();
+
+            return $dias === [] ? [0] : $dias;
+        }
+
+        $dias = collect(explode(',', (string) $prazoRaw))
             ->map(fn ($d): int => (int) trim((string) $d))
             ->filter(fn ($d): bool => $d >= 0)
             ->values()
@@ -1035,32 +1238,53 @@ class ListForcaVendasMonitor extends ListRecords
         return match (true) {
             str_contains($forma, 'boleto') => ContaReceber::FORMA_BOLETO,
             str_contains($forma, 'cheque') => ContaReceber::FORMA_CHEQUE,
-            str_contains($forma, 'cart') => ContaReceber::FORMA_CARTAO,
+            str_contains($forma, 'cart') || str_contains($forma, 'pos') || str_contains($forma, 'tef') => ContaReceber::FORMA_CARTAO,
             default => ContaReceber::FORMA_CARTEIRA,
         };
     }
 
     public function telaVenda(): void
     {
-        $monitorReturn = ForcaVendasMonitorResource::getUrl('index');
+        // Sem seleção: abre tela em branco (nova venda).
+        if (! $this->highlightedRecordId && $this->selecionados === []) {
+            $this->redirect(ForcaVendasTelaVendaPage::getUrl());
 
-        if ($this->highlightedRecordId) {
-            $order = ForcaVendasOrder::query()->find($this->highlightedRecordId);
-
-            if ($order?->orcamento_id) {
-                $this->redirect(ErpFormReturnUrl::appendToUrl(
-                    OrcamentoResource::getUrl('edit', ['record' => $order->orcamento_id]),
-                    $monitorReturn,
-                ));
-
-                return;
-            }
+            return;
         }
 
-        $this->redirect(ErpFormReturnUrl::appendToUrl(
-            OrcamentoResource::getUrl('create'),
-            $monitorReturn,
-        ));
+        $recordId = $this->highlightedRecordId
+            ?: (int) ($this->selecionados[count($this->selecionados) - 1] ?? 0);
+
+        if ($recordId <= 0) {
+            Notification::make()
+                ->title('Selecione um pedido na lista (flag).')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $order = ForcaVendasOrder::query()->with('orcamento')->find($recordId);
+
+        if (! $order) {
+            $this->avisa('Pedido não encontrado.', 'warning');
+
+            return;
+        }
+
+        try {
+            app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('Não é possível editar este pedido.')
+                ->body($e->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirect(ForcaVendasTelaVendaPage::getUrl(['pedido' => $order->id]));
     }
 
     protected function documentoReceber(ForcaVendasOrder $order): string

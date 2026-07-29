@@ -25,9 +25,7 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
+            'name' => fake()->unique()->userName(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'ativo' => true,
@@ -37,11 +35,11 @@ class UserFactory extends Factory
 
     /**
      * Indicate that the model's email address should be unverified.
+     *
+     * @deprecated E-mail removido do cadastro de usuários.
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn (array $attributes) => []);
     }
 }

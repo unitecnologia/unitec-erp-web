@@ -11,7 +11,8 @@ use Illuminate\Support\Carbon;
 
 final class PdvVendaRetaguardaMirrorService
 {
-    public const CONSUMIDOR_FINAL_CODIGO = 'CF';
+    /** @deprecated Use Person::CODIGO_CONSUMIDOR_FINAL */
+    public const CONSUMIDOR_FINAL_CODIGO = Person::CODIGO_CONSUMIDOR_FINAL;
 
     public function espelhar(PdvVenda $pdvVenda): Venda
     {
@@ -23,7 +24,7 @@ final class PdvVendaRetaguardaMirrorService
             }
         }
 
-        $pdvVenda->loadMissing('itens');
+        $pdvVenda->loadMissing(['itens', 'pagamentos']);
 
         $fechamento = $this->resolveFechamento($pdvVenda);
 
@@ -35,9 +36,9 @@ final class PdvVendaRetaguardaMirrorService
             'vendedor_id' => $pdvVenda->vendedor_id,
             'vendedor_nome' => $pdvVenda->vendedor_nome,
             'total' => $pdvVenda->total,
-            'forma_pagamento' => $pdvVenda->forma_pagamento,
+            'forma_pagamento' => $this->resolveFormaPagamento($pdvVenda),
             'status' => Venda::STATUS_FECHADO,
-            'tipo' => Venda::TIPO_CUPOM,
+            'tipo' => $pdvVenda->fiscal ? Venda::TIPO_CUPOM : Venda::TIPO_PEDIDO,
             'plataforma' => Venda::PLATAFORMA_PDV,
         ]);
 
@@ -71,6 +72,18 @@ final class PdvVendaRetaguardaMirrorService
             ->update(['status' => Venda::STATUS_CANCELADO]);
     }
 
+    private function resolveFormaPagamento(PdvVenda $pdvVenda): string
+    {
+        if ($pdvVenda->pagamentos->isNotEmpty()) {
+            return $pdvVenda->pagamentos
+                ->map(fn ($pagamento): string => $pagamento->descricaoComCanhoto())
+                ->filter()
+                ->implode(' / ');
+        }
+
+        return (string) ($pdvVenda->forma_pagamento ?? '');
+    }
+
     private function resolveClienteId(PdvVenda $pdvVenda): int
     {
         if ($pdvVenda->person_id) {
@@ -83,15 +96,24 @@ final class PdvVendaRetaguardaMirrorService
     private function resolveConsumidorFinalClienteId(): int
     {
         $person = Person::query()
-            ->where('codigo', self::CONSUMIDOR_FINAL_CODIGO)
+            ->whereIn('codigo', Person::codigosConsumidorFinal())
+            ->orderByRaw('CASE WHEN codigo = ? THEN 0 ELSE 1 END', [Person::CODIGO_CONSUMIDOR_FINAL])
+            ->orderBy('id')
             ->first();
 
         if ($person) {
+            if (
+                (string) $person->codigo === Person::CODIGO_CONSUMIDOR_FINAL_LEGADO
+                && ! Person::query()->where('codigo', Person::CODIGO_CONSUMIDOR_FINAL)->exists()
+            ) {
+                $person->forceFill(['codigo' => Person::CODIGO_CONSUMIDOR_FINAL])->save();
+            }
+
             return (int) $person->id;
         }
 
         $person = Person::query()->create([
-            'codigo' => self::CONSUMIDOR_FINAL_CODIGO,
+            'codigo' => Person::CODIGO_CONSUMIDOR_FINAL,
             'pessoa_tipo' => Person::PESSOA_FISICA,
             'nome_razao' => 'CONSUMIDOR FINAL',
             'is_cliente' => true,

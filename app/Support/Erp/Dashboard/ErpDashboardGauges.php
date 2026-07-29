@@ -12,6 +12,7 @@ use App\Models\PdvVendaItem;
 use App\Models\Product;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -26,8 +27,9 @@ final class ErpDashboardGauges
         $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
 
-        $inicio = Carbon::today()->startOfMonth();
-        $fim = Carbon::today()->endOfMonth();
+        $hoje = ErpFinanceiroMetricas::hoje();
+        $inicio = $hoje->copy()->startOfMonth();
+        $fim = $hoje->copy()->endOfMonth();
         $gauges = [];
 
         // Visão geral da empresa (agrega os demais indicadores).
@@ -48,6 +50,43 @@ final class ErpDashboardGauges
     }
 
     /**
+     * Gauge "Saúde do Estoque" (mesmo cálculo do dashboard ERP).
+     *
+     * @return array<string, mixed>
+     */
+    public static function saudeEstoqueGauge(): array
+    {
+        return static::saudeEstoque();
+    }
+
+    /**
+     * Saúde da empresa (mesmo cálculo do gauge do dashboard ERP).
+     * Usado pelo Painel Executivo para não divergir do /admin.
+     *
+     * @return array{percent: float, tone: string, label: string, short: string, message: string, factors: list<array<string, mixed>>}
+     */
+    public static function saudeSnapshot(?int $empresaId = null): array
+    {
+        $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+        $hoje = ErpFinanceiroMetricas::hoje();
+        $inicio = $hoje->copy()->startOfMonth();
+        $fim = $hoje->copy()->endOfMonth();
+
+        $gauge = static::saudeEmpresa($empresa, $inicio, $fim);
+        $status = static::healthStatus((float) ($gauge['percent'] ?? 0));
+
+        return [
+            'percent' => (float) ($gauge['percent'] ?? 0),
+            'tone' => (string) ($gauge['tone'] ?? $status['tone']),
+            'label' => (string) ($status['label'] ?? $gauge['label'] ?? 'Saúde'),
+            'short' => (string) ($status['short'] ?? ''),
+            'message' => (string) ($status['message'] ?? ($gauge['meta_label'] ?? '')),
+            'factors' => (array) ($gauge['detail']['factors'] ?? []),
+        ];
+    }
+
+    /**
      * Gauges individuais: colaborador com Meta Venda Mensal preenchida (> 0).
      *
      * @return list<array<string, mixed>>
@@ -61,8 +100,9 @@ final class ErpDashboardGauges
 
             $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
 
-            $inicio = Carbon::today()->startOfMonth();
-            $fim = Carbon::today()->endOfMonth();
+            $hoje = ErpFinanceiroMetricas::hoje();
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje->copy()->endOfMonth();
 
             $query = Vendedor::query()
                 ->where('ativo', true)
@@ -452,10 +492,16 @@ final class ErpDashboardGauges
             $ok = 0;
             $abaixo = 0;
             $zerado = 0;
+            $critico = 0;
 
             foreach ($rows as $product) {
                 $qty = (float) $product->estoque;
                 $min = max(0.0, (float) ($product->estoque_minimo ?? 0));
+
+                // Mesma regra do KPI "Estoque crítico": mínimo > 0 e estoque < mínimo.
+                if ($min > 0 && $qty < $min) {
+                    $critico++;
+                }
 
                 if ($qty <= 0) {
                     $zerado++;
@@ -474,19 +520,21 @@ final class ErpDashboardGauges
                 'percent' => $percent,
                 'display_percent' => static::formatPercent($percent),
                 'value_label' => number_format($ok, 0, ',', '.').' OK · '
-                    .number_format($abaixo, 0, ',', '.').' abaixo · '
-                    .number_format($zerado, 0, ',', '.').' zerados',
+                    .number_format($critico, 0, ',', '.').' crítico'
+                    .($zerado > 0 ? ' · '.number_format($zerado, 0, ',', '.').' zerados' : ''),
                 'meta_label' => 'Produtos: '.number_format($total, 0, ',', '.'),
                 'stat_left_label' => 'OK',
                 'stat_left' => number_format($ok, 0, ',', '.'),
-                'stat_right_label' => 'Total',
-                'stat_right' => number_format($total, 0, ',', '.'),
+                'stat_right_label' => 'Crítico',
+                'stat_right' => number_format($critico, 0, ',', '.'),
+                'stat_right_tone' => $critico > 0 ? 'orange' : null,
                 'tone' => static::toneByProgress($percent),
                 'detail' => [
                     'total' => $total,
                     'ok' => $ok,
                     'abaixo' => $abaixo,
                     'zerado' => $zerado,
+                    'critico' => $critico,
                 ],
             ];
         } catch (Throwable) {
@@ -635,28 +683,35 @@ final class ErpDashboardGauges
     private static function factorCaixa(): array
     {
         try {
-            $saldo = 0.0;
-            if (Schema::hasTable((new CaixaLancamento)->getTable())) {
-                $saldo = (float) CaixaLancamento::query()->sum('entrada')
-                    - (float) CaixaLancamento::query()->sum('saida');
-            }
-
+            $saldo = ErpFinanceiroMetricas::saldoCaixa();
+            $hoje = ErpFinanceiroMetricas::hoje();
             $obrigacoes = 0.0;
+
             if (Schema::hasTable((new ContaPagar)->getTable())) {
-                $limite = Carbon::today()->addDays(7)->toDateString();
+                // Inclui vencidos + a vencer em até 7 dias (pressão de caixa).
                 $obrigacoes = (float) ContaPagar::query()
                     ->where('saldo', '>', 0)
-                    ->whereDate('vencimento', '<=', $limite)
+                    ->whereDate('vencimento', '<=', $hoje->copy()->addDays(7)->toDateString())
                     ->sum('saldo');
             }
 
             if ($obrigacoes <= 0.01) {
-                $percent = $saldo >= 0 ? 100.0 : 35.0;
+                $percent = $saldo >= 0 ? 100.0 : 20.0;
                 $hint = $saldo >= 0
                     ? 'Sem obrigações urgentes · caixa R$ '.ErpMoney::formatBr($saldo)
-                    : 'Caixa negativo sem obrigações próximas';
+                    : 'Caixa negativo sem obrigações próximas · R$ '.ErpMoney::formatBr($saldo);
+            } elseif ($saldo >= $obrigacoes) {
+                $percent = 100.0;
+                $hint = 'Caixa cobre as obrigações de 7 dias · R$ '.ErpMoney::formatBr($saldo);
+            } elseif ($saldo >= 0) {
+                // Cobertura parcial: saldo / obrigações.
+                $percent = max(5.0, min(99.0, round(($saldo / $obrigacoes) * 100, 1)));
+                $hint = 'Caixa R$ '.ErpMoney::formatBr($saldo)
+                    .' · a pagar (7 dias) R$ '.ErpMoney::formatBr($obrigacoes);
             } else {
-                $percent = max(0.0, min(100.0, round(($saldo / $obrigacoes) * 100, 1)));
+                // Caixa negativo: nota baixa (0–25), nunca “falsa” cobertura positiva.
+                $ratio = abs($saldo) / max($obrigacoes, 0.01);
+                $percent = max(0.0, min(25.0, round(25.0 / (1 + $ratio), 1)));
                 $hint = 'Caixa R$ '.ErpMoney::formatBr($saldo)
                     .' · a pagar (7 dias) R$ '.ErpMoney::formatBr($obrigacoes);
             }
@@ -679,7 +734,8 @@ final class ErpDashboardGauges
     private static function factorVendas(?Empresa $empresa, Carbon $inicio, Carbon $fim): array
     {
         try {
-            $realizado = static::realizadoPdvMonitor($inicio, $fim);
+            // Mesma base do KPI "Faturamento" / Executivo (vendas + PDV sem venda_id).
+            $realizado = ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim);
             $meta = (float) ($empresa?->param_meta_vendas_mensal ?: 0);
 
             if ($meta > 0) {
@@ -694,18 +750,19 @@ final class ErpDashboardGauges
                 ];
             }
 
-            $dias = max(1, (int) $inicio->diffInDays(Carbon::today()) + 1);
+            $dias = max(1, (int) $inicio->diffInDays(ErpFinanceiroMetricas::hoje()) + 1);
             $inicioAnt = $inicio->copy()->subMonthNoOverflow()->startOfDay();
             $fimAnt = $inicioAnt->copy()->addDays($dias - 1)->endOfDay();
             $corte = $inicio->copy()->subDay()->endOfDay();
             if ($fimAnt->gt($corte)) {
                 $fimAnt = $corte;
             }
-            $anterior = static::realizadoPdvMonitor($inicioAnt, $fimAnt);
+            $anterior = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioAnt, $fimAnt);
 
             if ($anterior <= 0.01) {
                 $percent = $realizado > 0 ? 80.0 : 50.0;
             } else {
+                // 100% = igualou o mesmo período do mês anterior (não é “nota escolar”).
                 $percent = min(100.0, round(($realizado / $anterior) * 100, 1));
             }
 
@@ -729,6 +786,7 @@ final class ErpDashboardGauges
     {
         $gauge = static::margemLucro($inicio, $fim);
         $margem = (float) ($gauge['percent'] ?? 0);
+        // Margem de contribuição → nota: ~40% de margem ≈ 100 na saúde.
         $percent = max(0.0, min(100.0, round($margem * 2.5, 1)));
 
         return [
@@ -736,7 +794,10 @@ final class ErpDashboardGauges
             'label' => 'Lucro',
             'percent' => $percent,
             'weight' => 15,
-            'hint' => (string) ($gauge['value_label'] ?? ('Margem '.($gauge['display_percent'] ?? ''))),
+            'hint' => trim(
+                (string) ($gauge['value_label'] ?? '')
+                .' · margem '.($gauge['display_percent'] ?? number_format($margem, 1, ',', '.').'%')
+            ),
         ];
     }
 
@@ -757,18 +818,24 @@ final class ErpDashboardGauges
     }
 
     /**
+     * Recebimento dos títulos com vencimento no mês (recebido ÷ previsto).
+     *
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
     private static function factorRecebimento(Carbon $inicio, Carbon $fim): array
     {
         $gauge = static::recebimento($inicio, $fim);
+        $recebidoLabel = (string) ($gauge['value_label'] ?? 'R$ 0,00');
+        $previstoLabel = (string) ($gauge['meta_label'] ?? 'Previsto: R$ 0,00');
+        // meta_label vem como "Previsto: R$ X" — monta dica completa.
+        $previstoValor = str_replace('Previsto: ', '', $previstoLabel);
 
         return [
             'key' => 'receber',
-            'label' => 'Contas a receber',
+            'label' => 'Recebimento',
             'percent' => (float) ($gauge['percent'] ?? 0),
             'weight' => 15,
-            'hint' => (string) ($gauge['meta_label'] ?? ''),
+            'hint' => $recebidoLabel.' recebidos de '.$previstoValor.' com vencimento no mês',
         ];
     }
 
@@ -783,10 +850,7 @@ final class ErpDashboardGauges
             }
 
             $aberto = (float) ContaPagar::query()->where('saldo', '>', 0)->sum('saldo');
-            $vencido = (float) ContaPagar::query()
-                ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<', Carbon::today()->toDateString())
-                ->sum('saldo');
+            $vencido = (float) ErpFinanceiroMetricas::pagarVencido()['valor'];
 
             if ($aberto <= 0.01) {
                 return [
@@ -824,10 +888,7 @@ final class ErpDashboardGauges
             }
 
             $aberto = (float) ContaReceber::query()->where('saldo', '>', 0)->sum('saldo');
-            $vencido = (float) ContaReceber::query()
-                ->where('saldo', '>', 0)
-                ->whereDate('vencimento', '<', Carbon::today()->toDateString())
-                ->sum('saldo');
+            $vencido = (float) ErpFinanceiroMetricas::receberVencido()['valor'];
 
             if ($aberto <= 0.01) {
                 return [

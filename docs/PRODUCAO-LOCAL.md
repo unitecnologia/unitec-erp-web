@@ -1,4 +1,4 @@
-# Unitec ERP — desenvolvimento local (Windows)
+﻿# Unitec ERP â€” desenvolvimento local (Windows)
 
 ## Subir o ambiente
 
@@ -20,7 +20,7 @@ Ou: `.\scripts\subir.ps1` (mesma coisa)
 3. Sobe MySQL local e `php artisan serve` na porta **8000**
 4. Abre http://127.0.0.1:8000/admin
 
-**Login demo:** USUARIO / **01**
+**Login:** USUARIO / **01** (sem empresa no seed — cadastra no primeiro acesso)
 
 ---
 
@@ -61,7 +61,7 @@ php artisan migrate
 
 ## Primeira vez no browser
 
-1. F12 → Application → **Clear site data** (remove Service Worker antigo)
+1. F12 â†’ Application â†’ **Clear site data** (remove Service Worker antigo)
 2. Abra http://127.0.0.1:8000/admin
 3. Faca login
 

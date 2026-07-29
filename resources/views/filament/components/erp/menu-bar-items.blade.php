@@ -2,12 +2,12 @@
     @if (($item['type'] ?? null) === 'separator')
         <div class="erp-menu-bar__separator"></div>
     @elseif (! empty($item['items']))
-        <details class="erp-menu-bar__submenu">
-            <summary class="erp-menu-bar__link erp-menu-bar__link--submenu">{{ $item['label'] }}</summary>
-            <div class="erp-menu-bar__submenu-panel">
+        <div class="erp-menu-bar__submenu">
+            <span class="erp-menu-bar__link erp-menu-bar__link--submenu" role="button" tabindex="0">{{ $item['label'] }}</span>
+            <div class="erp-menu-bar__submenu-panel" role="menu">
                 @include('filament.components.erp.menu-bar-items', ['items' => $item['items']])
             </div>
-        </details>
+        </div>
     @elseif (filled($item['url'] ?? null))
         <a href="{{ $item['url'] }}" wire:navigate="false" class="erp-menu-bar__link">{{ $item['label'] }}</a>
     @elseif (filled($item['action'] ?? null))
@@ -17,12 +17,22 @@
                 <kbd class="erp-kbd">{{ $item['shortcut'] }}</kbd>
             @endif
         </button>
-    @else
-        <button type="button" class="erp-menu-bar__link" data-erp-module="{{ $item['label'] }}">
-            {{ $item['label'] }}
+    @elseif (! empty($item['pending']))
+        <span
+            class="erp-menu-bar__link erp-menu-bar__link--pending"
+            title="Em breve"
+            aria-disabled="true"
+        >
+            <span>{{ $item['label'] }}</span>
+            <span class="erp-menu-bar__badge">Em breve</span>
             @if (filled($item['shortcut'] ?? null))
                 <kbd class="erp-kbd">{{ $item['shortcut'] }}</kbd>
             @endif
-        </button>
+        </span>
+    @else
+        <span class="erp-menu-bar__link erp-menu-bar__link--pending" title="Em breve" aria-disabled="true">
+            <span>{{ $item['label'] }}</span>
+            <span class="erp-menu-bar__badge">Em breve</span>
+        </span>
     @endif
 @endforeach

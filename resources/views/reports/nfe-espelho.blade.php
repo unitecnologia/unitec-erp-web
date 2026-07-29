@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>Espelho — NF-e {{ $numeroNota }}</title>
+    <style>
+        @page { margin: 5mm; size: A4 portrait; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background: #c7d5e8; }
+        body.viewer-body--auto-print,
+        body.viewer-body--embed { background: #fff; }
+        .viewer { min-height: 100vh; display: flex; flex-direction: column; }
+        .viewer--embed .viewer__toolbar { display: none; }
+        .viewer--embed .viewer__canvas { padding: 0.35rem; }
+        .viewer--auto-print .viewer__toolbar { display: none; }
+        .viewer--auto-print .viewer__canvas { padding: 0; overflow: visible; }
+        .viewer--auto-print .viewer__paper { width: 100%; margin: 0; padding: 0; box-shadow: none; }
+        .viewer__toolbar {
+            display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+            padding: 0.35rem 0.5rem;
+            background: linear-gradient(180deg, #f8fafc 0%, #dbeafe 100%);
+            border-bottom: 1px solid #94a3b8;
+        }
+        .viewer__title {
+            margin-right: auto;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #0f2847;
+        }
+        .viewer__btn {
+            min-width: 5.5rem;
+            padding: 0.28rem 0.65rem;
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+            color: #0f172a;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .viewer__btn:hover { border-color: #1e5a9e; }
+        .viewer__btn--close { background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%); }
+        .viewer__canvas { flex: 1; overflow: auto; padding: 0.75rem; }
+        .viewer__paper {
+            width: min(210mm, 100%);
+            margin: 0 auto;
+            padding: 0.25rem;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(15, 40, 71, 0.18);
+        }
+        .nfe-espelho-banner {
+            margin-bottom: 6px;
+            padding: 8px 10px;
+            border: 2px solid #b91c1c;
+            background: #fee2e2;
+            color: #7f1d1d;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            text-align: center;
+        }
+        .nfe-espelho-banner strong { display: block; font-size: 12px; margin-bottom: 2px; }
+        @media print {
+            body { background: #fff; }
+            .viewer__toolbar { display: none; }
+            .viewer__canvas { padding: 0; overflow: visible; }
+            .viewer__paper { width: 100%; box-shadow: none; padding: 0; }
+        }
+    </style>
+    @include('reports.partials.compra-danfe-styles')
+</head>
+<body @class([
+    'viewer-body--auto-print' => $autoPrint,
+    'viewer-body--embed' => $embedded,
+])>
+    <div @class([
+        'viewer',
+        'viewer--auto-print' => $autoPrint,
+        'viewer--embed' => $embedded,
+    ])>
+        @unless ($autoPrint || $embedded)
+            <div class="viewer__toolbar">
+                <span class="viewer__title">Espelho NF-e {{ $numeroNota }} — sem valor fiscal</span>
+                <button type="button" class="viewer__btn" onclick="window.print()">Imprimir</button>
+                <button type="button" class="viewer__btn" onclick="saveReport()">Salvar PDF</button>
+                <button type="button" class="viewer__btn viewer__btn--close" onclick="closePreview()">Fechar</button>
+            </div>
+        @endunless
+
+        <div class="viewer__canvas">
+            <div class="viewer__paper">
+                @include('reports.partials.nfe-espelho-banner')
+                @include('reports.partials.compra-danfe-body')
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pdfDownloadUrl = @json(route('erp.reports.nfe-espelho', ['nfe' => $nfe->id, 'pdf' => 1]));
+        const autoPrint = @json($autoPrint);
+
+        function saveReport() {
+            window.open(pdfDownloadUrl, '_blank');
+        }
+
+        function closePreview() {
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            window.close();
+        }
+
+        if (autoPrint) {
+            window.addEventListener('afterprint', () => {
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'erp-nfe-danfe-print-done' }, '*');
+                    return;
+                }
+                window.close();
+            });
+            window.addEventListener('load', () => window.print(), { once: true });
+        }
+    </script>
+</body>
+</html>

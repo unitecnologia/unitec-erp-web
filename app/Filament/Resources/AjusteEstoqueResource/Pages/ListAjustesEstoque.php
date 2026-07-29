@@ -145,6 +145,20 @@ class ListAjustesEstoque extends ListRecords
         Notification::make()->title('Período filtrado.')->success()->send();
     }
 
+    public function search(): void
+    {
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
+    public function clearSearch(): void
+    {
+        $this->localSearch = '';
+        $this->searchColumn = 'produto';
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
     public function updatedInformarPeriodo(): void
     {
         $this->clearListSelection();

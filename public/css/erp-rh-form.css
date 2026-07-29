@@ -1,0 +1,420 @@
+/* RH — modal cadastro funcionário (mesmo padrão do Veículos) */
+
+.erp-rh-funcionarios-page .erp-contador-form-modal {
+    --erp-contador-modal-bump: 0cm;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__window {
+    width: min(calc(34rem + var(--erp-contador-modal-bump) + 1cm), calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-rh-funcionarios-page .erp-rh-func-modal.erp-contador-form-modal__window {
+    width: min(52rem, calc(100vw - 2rem));
+    max-height: none;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem 0.35rem 0.7rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__body {
+    padding: 0.6rem 0.7rem 0.4rem;
+    overflow: auto;
+    overflow-x: hidden;
+    background: #fff;
+}
+
+.erp-rh-funcionarios-page .erp-rh-func-modal__body.erp-contador-form-modal__body {
+    overflow: hidden;
+    overflow-x: hidden;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form.erp-pcad-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 1.85rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__label {
+    width: 5.8rem;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 0.75rem;
+    color: #000;
+    padding-right: 0.15rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__label--inline {
+    width: auto;
+    min-width: 4.2rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input,
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__select {
+    font-family: inherit;
+    font-size: 0.75rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    color: #000;
+    padding: 0.15rem 0.3rem;
+    min-height: 1.55rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--xs {
+    width: calc(3.2rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--md {
+    width: calc(9.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--cep {
+    width: calc(5.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--doc {
+    width: calc(11.5rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--phone {
+    width: calc(7.25rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--city {
+    width: calc(14rem + var(--erp-contador-modal-bump));
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__input--grow {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__form .erp-pcad-form__select--uf {
+    width: 3.2rem;
+    flex: 0 0 auto;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__error {
+    font-size: 0.68rem;
+    color: #b91c1c;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    background: var(--erp-bg-app, #e3ecf7);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 3rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+    font-weight: 700;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__label {
+    font-size: 0.68rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__icon--save,
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-rh-funcionarios-page .erp-contador-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff);
+}
+
+/* ── Modal confirmar exclusão ───────────────────────────────────── */
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__window {
+    width: min(22rem, calc(100vw - 2rem));
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__body {
+    padding: 1rem 0.85rem 0.75rem;
+    background: #fff;
+    text-align: center;
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__message {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__detail {
+    margin: 0.45rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions {
+    justify-content: center;
+    padding: 0.45rem 0.65rem 0.65rem;
+    background: var(--erp-bg-app, #e3ecf7);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 3rem;
+    cursor: pointer;
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions .erp-pcad-actions__label {
+    font-size: 0.68rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-rh-funcionarios-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label {
+    color: var(--erp-text-inverse, #fff);
+}
+
+/* ── Modal veículo (painéis) ───────────────────────────────────── */
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__body.erp-contador-form-modal__body {
+    padding: 0.55rem 0.65rem 0.5rem;
+    background: linear-gradient(180deg, #d9e6f5 0%, #e8f0fa 42%, #eef4fb 100%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form.erp-contador-form-modal__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__section {
+    margin: 0;
+    padding: 0.45rem 0.55rem 0.55rem;
+    border: 1px solid #a8bdd4;
+    border-left: 4px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: var(--erp-radius-md, 8px);
+    background: linear-gradient(180deg, #f7fafd 0%, #fff 18%, #fff 100%);
+    box-shadow:
+        0 1px 0 rgb(255 255 255 / 80%) inset,
+        0 2px 8px rgb(15 52 96 / 8%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__section-title {
+    margin: 0 0 0.45rem;
+    padding: 0 0 0.3rem;
+    border-bottom: 1px solid #d4e0ef;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__section-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__row.erp-pcad-form__row {
+    display: grid;
+    grid-template-columns: 5.8rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    min-height: 1.9rem;
+    padding: 0.18rem 0.35rem;
+    border-radius: var(--erp-radius-sm, 4px);
+    background: rgb(227 236 247 / 42%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__row.erp-pcad-form__row:nth-child(even) {
+    background: rgb(227 236 247 / 68%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__row--single {
+    grid-template-columns: 5.8rem minmax(0, 1fr);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__row--duo {
+    grid-template-columns: 5.8rem minmax(5rem, 7rem) auto minmax(0, 1fr);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form__row--check {
+    grid-template-columns: 5.8rem minmax(0, 1fr);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__label {
+    width: auto;
+    min-width: 0;
+    text-align: right;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    padding-right: 0;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__label--inline {
+    justify-self: end;
+    min-width: 0;
+    padding-left: 0.35rem;
+    text-align: right;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input,
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__select {
+    min-height: 1.65rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.78rem;
+    border: 1px solid #9eb4cf;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 7%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input:focus,
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__select:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow:
+        inset 0 1px 2px rgb(15 52 96 / 7%),
+        0 0 0 2px rgb(30 90 158 / 18%);
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input--xs,
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input--md,
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input--grow {
+    width: 100%;
+    max-width: none;
+    flex: unset;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__form .erp-pcad-form__input--md {
+    max-width: 11rem;
+}
+
+.erp-rh-funcionarios-page .erp-veiculo-form-modal__actions {
+    border-top: 1px solid #a8bdd4;
+    background: linear-gradient(180deg, #dce8f6 0%, #d2e0f0 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__error--row {
+    grid-column: 1 / -1;
+    margin: 0 0 0 5.8rem;
+}

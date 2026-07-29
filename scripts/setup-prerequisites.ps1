@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 
 <#
 .SYNOPSIS
@@ -41,7 +41,7 @@ if (-not $SkipMysql) {
     }
     Write-Ok 'MySQL pronto.'
 } else {
-    Write-Ok 'Terminal remoto — MariaDB local nao sera instalado; conexao ao servidor sera testada via PHP (pdo_mysql).'
+    Write-Ok 'Terminal remoto - MariaDB local nao sera instalado; conexao ao servidor sera testada via PHP (pdo_mysql).'
 }
 
 Write-Ok 'Pre-requisitos concluidos.'

@@ -13,9 +13,15 @@ final class ErpDashboardData
 
         return [
             'kpis' => ErpDashboardKpis::build($empresaId),
+            'gauges' => ErpDashboardGauges::build($empresaId),
+            'sellerGauges' => ErpDashboardGauges::buildVendedores($empresaId),
             'salesChart' => ErpDashboardSalesChart::data(),
             'cashflowChart' => ErpDashboardCashflowChart::data(),
+            'salesMixChart' => ErpDashboardSalesMixChart::data(),
+            'fiscalDocsChart' => ErpDashboardFiscalDocsChart::data($empresaId),
+            'paymentMethodsChart' => ErpDashboardPaymentMethodsChart::data(),
             'recentSales' => ErpDashboardRecentSales::list(),
+            'highlights' => ErpDashboardHighlights::build(),
             'alerts' => static::alerts($empresaId),
         ];
     }

@@ -112,7 +112,7 @@
 
 .erp-pessoas-page .erp-pessoas__status-wrap {
     flex-shrink: 0;
-    margin: 0 0.65rem 0.35rem;
+    margin: 0 0.65rem 0;
 }
 
 .erp-pessoas-page .erp-pessoas__status {
@@ -145,7 +145,7 @@
 }
 
 .erp-pessoas-page .erp-pessoas__tabs {
-    margin: 0 0 0.35rem;
+    margin: 0;
     gap: 0.25rem;
     flex-wrap: wrap;
 }
@@ -360,62 +360,45 @@
     line-height: 1.1;
 }
 
-/* ── Larguras de colunas (ordem Delphi + marcador) ──────────────── */
+/* ── Larguras de colunas ───────────────────────────────────────── */
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(1),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
-    width: 1.35rem;
-    max-width: 1.35rem;
-    padding-inline: 0.08rem !important;
-    text-align: center !important;
-}
-
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
-    font-weight: 800 !important;
-    color: #1e3a8a !important;
-}
-
-.erp-pessoas-page .fi-ta-row.erp-row-selected .fi-ta-cell:nth-child(1) {
-    color: #0f172a !important;
-}
-
-.erp-pessoas-page .fi-ta-header-cell:nth-child(2),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
     width: 4.25rem;
     max-width: 4.25rem;
 }
 
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
     padding-inline: 0.12rem !important;
 }
 
-.erp-pessoas-page .fi-ta-header-cell:nth-child(3),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+.erp-pessoas-page .fi-ta-header-cell:nth-child(2),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
     width: auto;
     min-width: 12rem;
 }
 
-.erp-pessoas-page .fi-ta-header-cell:nth-child(4),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+.erp-pessoas-page .fi-ta-header-cell:nth-child(3),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
     width: calc(6.5rem + 6cm);
     max-width: calc(8rem + 6cm);
 }
 
-.erp-pessoas-page .fi-ta-header-cell:nth-child(5),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+.erp-pessoas-page .fi-ta-header-cell:nth-child(4),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
     width: 9rem;
     max-width: 10rem;
 }
 
-.erp-pessoas-page .fi-ta-header-cell:nth-child(6),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+.erp-pessoas-page .fi-ta-header-cell:nth-child(5),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
     width: 5rem;
     max-width: 6rem;
     padding-inline: 0.15rem !important;
 }
 
-.erp-pessoas-page .fi-ta-header-cell:nth-child(7),
-.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+.erp-pessoas-page .fi-ta-header-cell:nth-child(6),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
     width: auto;
     min-width: 10rem;
 }

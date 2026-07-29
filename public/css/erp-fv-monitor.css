@@ -281,6 +281,78 @@
     color: var(--erp-text-muted, #64748b);
 }
 
+.erp-fv-mon__combo--select {
+    flex: 0 0 7.5rem;
+    width: 7.5rem;
+}
+
+.erp-fv-mon__combo--plataforma {
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+.erp-fv-mon__combo--plataforma .erp-fv-mon__combo-panel {
+    max-height: none;
+    overflow: visible;
+}
+
+.erp-fv-mon__select-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    width: 100%;
+    height: 1.55rem;
+    padding: 0.1rem 0.45rem;
+    box-sizing: border-box;
+    font-size: var(--erp-font-size-xs, 0.8125rem);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--erp-text, #0f172a);
+    background: #fff;
+    border: 1px solid var(--erp-border, #94a3b8);
+    border-radius: var(--erp-radius-sm, 6px);
+    box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+}
+
+.erp-fv-mon__select-btn:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-fv-mon__select-btn:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+}
+
+.erp-fv-mon__select-btn-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.erp-fv-mon__select-btn-caret {
+    flex: 0 0 auto;
+    font-size: 0.65rem;
+    color: var(--erp-text-muted, #64748b);
+    line-height: 1;
+}
+
+.erp-fv-mon__combo-panel--compact {
+    max-height: 11rem;
+    padding: 0.15rem;
+    border-radius: 8px;
+}
+
+.erp-fv-mon__combo-panel--compact .erp-fv-mon__combo-item {
+    padding: 0.28rem 0.45rem;
+    border-radius: 5px;
+    font-weight: 600;
+}
+
 /* ---- Itens da direita na mesma linha (mobile / legenda / consultar) ---- */
 .erp-fv-mon__mobile-check {
     display: inline-flex;
@@ -737,6 +809,36 @@
     white-space: nowrap;
 }
 
+.erp-fv-mon__th--money,
+.erp-fv-mon__td--money {
+    text-align: left;
+    white-space: nowrap;
+    min-width: 5.5rem;
+}
+
+.erp-fv-mon__td--money .erp-fv-mon-money,
+.erp-fv-mon__foot-total .erp-fv-mon-money {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-mon__td--money .erp-fv-mon-money__currency,
+.erp-fv-mon__foot-total .erp-fv-mon-money__currency {
+    flex: 0 0 auto;
+}
+
+.erp-fv-mon__td--money .erp-fv-mon-money__amount,
+.erp-fv-mon__foot-total .erp-fv-mon-money__amount {
+    flex: 1 1 auto;
+    text-align: right;
+    white-space: nowrap;
+}
+
 .erp-fv-mon__th--code,
 .erp-fv-mon__td--code {
     white-space: nowrap;
@@ -812,6 +914,17 @@
 
 .erp-fv-monitor-page .fi-ta-row {
     height: calc(1.375rem - 1mm);
+    cursor: default !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row .fi-ta-cell,
+.erp-fv-monitor-page .fi-ta-row .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-row button.fi-ta-col {
+    cursor: default !important;
+}
+
+.erp-fv-monitor-page .erp-fv-mon__check {
+    cursor: pointer !important;
 }
 
 .erp-fv-monitor-page .fi-ta-row .fi-ta-cell {
@@ -1066,4 +1179,56 @@
 
 .erp-fv-monitor-page .erp-field-dd__label {
     font-weight: 700;
+}
+
+/* R$ fixo à esquerda · valor à direita (Desc. / Acmo. / TT Bruto / TT Líquido) */
+.erp-fv-monitor-page .erp-fv-mon-money-cell .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-desconto .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-acrescimo .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-tt_bruto .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-tt-bruto .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell-total .fi-ta-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-money {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-money__currency {
+    flex: 0 0 auto;
+    color: inherit;
+    opacity: 0.85;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-money__amount {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-money-cell--bold .erp-fv-mon-money,
+.erp-fv-monitor-page .fi-ta-cell-total .erp-fv-mon-money {
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__amount,
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .erp-fv-mon-money__amount {
+    color: inherit;
+    opacity: 1;
 }

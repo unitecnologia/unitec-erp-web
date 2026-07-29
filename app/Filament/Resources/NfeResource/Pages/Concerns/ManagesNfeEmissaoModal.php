@@ -2,18 +2,32 @@
 
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
+use App\Models\Cfop;
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\NfeEvento;
 use App\Models\NfeFatura;
 use App\Models\NfeItem;
 use App\Models\NfeReferencia;
 use App\Models\Person;
 use App\Models\VendasParametro;
+use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Nfe\NfeCalculoService;
+use App\Support\Erp\Nfe\NfeDanfeReportService;
+use App\Support\Erp\Nfe\NfeEspelhoReportService;
+use App\Support\Erp\Nfe\NfeEventoLogger;
+use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
+use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
+use App\Support\Erp\WhatsApp\WhatsAppPhone;
+use App\Support\Erp\WhatsApp\WhatsAppSender;
+use App\Support\Fiscal\NfeEmissionService;
 use Filament\Notifications\Notification;
+use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
+use Livewire\Attributes\Computed;
 
 trait ManagesNfeEmissaoModal
 {
@@ -48,6 +62,70 @@ trait ManagesNfeEmissaoModal
 
     public int $nfeSelectedRowIndex = 0;
 
+    public ?string $nfeFiscalOverlayTitulo = null;
+
+    public ?string $nfeFiscalOverlayMensagem = null;
+
+    public ?string $nfeFiscalOverlayCodigo = null;
+
+    public ?string $nfeFiscalSucessoDetalhe = null;
+
+    public ?int $nfeFiscalSucessoNfeId = null;
+
+    public ?string $nfeFiscalInfoTitulo = null;
+
+    public ?string $nfeFiscalInfoMensagem = null;
+
+    public bool $nfeWhatsAppModalOpen = false;
+
+    public ?int $nfeWhatsAppNfeId = null;
+
+    public string $nfeWhatsAppTo = '';
+
+    public string $nfeWhatsAppMessage = '';
+
+    public ?string $nfeWhatsAppPdfPath = null;
+
+    public string $nfeWhatsAppPdfName = '';
+
+    public string $nfeWhatsAppPdfDisplay = '';
+
+    public string $nfeWhatsAppDocumento = 'danfe';
+
+    public string $nfeWhatsAppDestinatario = 'cliente';
+
+    public string $nfeClienteCodigo = '';
+
+    public string $nfeClienteBusca = '';
+
+    /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string}> */
+    public array $nfeClienteSugestoes = [];
+
+    public bool $nfeClienteSugestoesOpen = false;
+
+    public int $nfeSelectedClienteSugestaoIndex = 0;
+
+    public string $nfeClienteFone = '';
+
+    public string $nfeClienteWhatsapp = '';
+
+    public string $nfeClienteEndereco = '';
+
+    public string $nfeClienteNumeroEnd = '';
+
+    public string $nfeClienteBairro = '';
+
+    public string $nfeClienteCep = '';
+
+    public string $nfeClienteCidade = '';
+
+    /** @var list<array{codigo: string, label: string}> */
+    public array $nfeNaturezaSugestoes = [];
+
+    public bool $nfeNaturezaSugestoesOpen = false;
+
+    public int $nfeSelectedNaturezaIndex = 0;
+
     public function createNfe(): void
     {
         if ($this->nfeModalOpen) {
@@ -64,6 +142,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeSelectedRowIndex = 0;
         $this->nfeReferenciaInput = '';
         $this->clearNfeItemEntryRow();
+        $this->clearNfeClienteDisplay();
         $this->nfeForm = $this->defaultNfeFormData($params);
         $this->nfeModalRows = [];
         $this->nfeModalFaturas = [];
@@ -96,6 +175,15 @@ trait ManagesNfeEmissaoModal
 
     public function closeNfeModal(): void
     {
+        $this->closeNfeFiscalOverlay();
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeFiscalInfoOverlay();
+        $this->closeNfeWhatsAppModal();
+        $this->closeNfeCancelModal();
+        $this->closeNfeCceModal();
+        $this->closeNfeCceSucessoOverlay();
+        $this->closeNfeCceDispatchModals();
+        $this->closeNfeImportModals();
         $this->nfeModalOpen = false;
         $this->nfeModalRecordId = null;
         $this->nfeModalStatus = 'ABERTA';
@@ -104,6 +192,8 @@ trait ManagesNfeEmissaoModal
         $this->nfeSelectedRowIndex = 0;
         $this->nfeReferenciaInput = '';
         $this->clearNfeItemEntryRow();
+        $this->clearNfeClienteDisplay();
+        $this->fecharNfeSugestoesNatureza();
         $this->nfeForm = [];
         $this->nfeModalRows = [];
         $this->nfeModalFaturas = [];
@@ -224,9 +314,9 @@ trait ManagesNfeEmissaoModal
             $params = $empresaId ? VendasParametro::forEmpresa($empresaId) : null;
             $numero = $isEditing
                 ? $this->nfeForm['numero']
-                : (string) ($params?->peekNumero() ?? Nfe::nextNumero($empresaId));
+                : (string) ($params?->peekNumeroNfe() ?? Nfe::nextNumero($empresaId));
 
-            $serie = $this->nfeForm['serie'] ?: (string) ($params?->serie ?? '1');
+            $serie = $this->nfeForm['serie'] ?: (string) ($params?->serie_nfe ?? 1);
 
             if (! $isEditing && $empresaId) {
                 $duplicada = Nfe::query()
@@ -258,7 +348,10 @@ trait ManagesNfeEmissaoModal
                 'forma_pgto' => $this->nfeForm['forma_pgto'] ?? null,
                 'meio_pgto' => $this->nfeForm['meio_pgto'] ?? null,
                 'obs_fisco' => $this->nfeForm['obs_fisco'] ?? null,
-                'obs_contribuinte' => $this->nfeForm['obs_contribuinte'] ?? null,
+                'obs_contribuinte' => $this->mergeObsContribuinteWithIbpt(
+                    (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
+                    (string) ($totais['ibpt_texto'] ?? ''),
+                ),
                 'subtotal' => $totais['subtotal'],
                 'desconto' => $totais['desconto'],
                 'total' => $totais['total'],
@@ -271,6 +364,10 @@ trait ManagesNfeEmissaoModal
                 'total_icms_pis' => $totais['valor_pis'],
                 'base_icms_cofins' => $totais['base_cofins'],
                 'total_icms_cofins' => $totais['valor_cofins'],
+                'trib_fed' => $totais['trib_fed'] ?? 0,
+                'trib_est' => $totais['trib_est'] ?? 0,
+                'trib_mun' => $totais['trib_mun'] ?? 0,
+                'trib_imp' => $totais['trib_imp'] ?? 0,
                 'situacao' => Nfe::SITUACAO_ABERTA,
                 'status' => Nfe::STATUS_ABERTA,
             ];
@@ -293,7 +390,7 @@ trait ManagesNfeEmissaoModal
                 $nfe->update($payload);
             } else {
                 $nfe = Nfe::query()->create($payload);
-                $params?->consumeNumero();
+                $params?->consumeNumeroNfe();
                 $this->nfeModalRecordId = $nfe->id;
                 $this->nfeForm['numero'] = $numero;
             }
@@ -349,6 +446,10 @@ trait ManagesNfeEmissaoModal
                     'alq_cbs' => $row['alq_cbs'] ?? 0,
                     'alq_ibs_mun' => $row['alq_ibs_mun'] ?? 0,
                     'alq_ibs_uf' => $row['alq_ibs_uf'] ?? 0,
+                    'trib_fed' => $row['trib_fed'] ?? 0,
+                    'trib_est' => $row['trib_est'] ?? 0,
+                    'trib_mun' => $row['trib_mun'] ?? 0,
+                    'trib_imp' => $row['trib_imp'] ?? 0,
                 ]);
             }
 
@@ -387,31 +488,80 @@ trait ManagesNfeEmissaoModal
         $this->clearListSelection();
         $this->resetTable();
         $this->highlightRecord($savedId);
+
+        NfeEventoLogger::registrar(
+            nfeId: $savedId,
+            tipo: $isEditing ? NfeEvento::TIPO_EDITADA : NfeEvento::TIPO_CRIADA,
+            titulo: $isEditing ? 'NF-e alterada' : 'NF-e criada',
+            descricao: $isEditing
+                ? 'Dados da nota fiscal foram atualizados no sistema.'
+                : 'NF-e incluída no sistema em situação aberta.',
+        );
     }
 
     public function transmitNfe(): void
     {
-        $this->modulePending('Transmissão de NF-e');
-    }
+        if (! $this->nfeModalRecordId) {
+            Notification::make()
+                ->title('Grave a NF-e antes de transmitir.')
+                ->warning()
+                ->send();
 
-    public function importNfeModal(): void
-    {
-        $this->modulePending('Importação de NF-e');
+            return;
+        }
+
+        $nfe = Nfe::query()->with(['itens', 'faturas', 'cliente'])->find($this->nfeModalRecordId);
+        $empresaId = $this->resolveEmpresaId();
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        if (! $nfe || ! $empresa) {
+            Notification::make()
+                ->title('Não foi possível localizar os dados para transmissão.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($nfe->status !== Nfe::STATUS_ABERTA) {
+            Notification::make()
+                ->title('Somente NF-e aberta pode ser transmitida.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $nfe = (new NfeEmissionService())->transmitir($nfe, $empresa);
+        } catch (FiscalEngineException $exception) {
+            $this->showNfeFiscalOverlayErro($exception);
+
+            return;
+        } catch (\Throwable $exception) {
+            $this->showNfeFiscalOverlayErroGenerico($exception->getMessage());
+
+            return;
+        }
+
+        $this->loadNfeIntoModal($nfe);
+        $this->resetTable();
+        $this->showNfeFiscalOverlaySucesso($nfe);
     }
 
     public function openNfeProdutos(): void
     {
-        $this->modulePending('Consulta de produtos');
+        $this->openNfeProdutoLookup();
     }
 
     public function openNfePessoas(): void
     {
-        $this->modulePending('Consulta de pessoas');
+        // Lookup dedicado em breve — cliente no Destinatário.
     }
 
     public function openNfeTransportadora(): void
     {
-        $this->modulePending('Transportadora');
+        // Lookup dedicado em breve.
     }
 
     public function updatedNfeFormClienteId(): void
@@ -419,6 +569,7 @@ trait ManagesNfeEmissaoModal
         $clienteId = (int) ($this->nfeForm['cliente_id'] ?? 0);
 
         if ($clienteId <= 0) {
+            $this->clearNfeClienteDisplay(keepBusca: true);
             $this->nfeForm['uf'] = '';
             $this->nfeForm['cnpj'] = '';
 
@@ -427,9 +578,482 @@ trait ManagesNfeEmissaoModal
 
         $cliente = Person::query()->find($clienteId);
 
-        $this->nfeForm['uf'] = $cliente?->uf ?? '';
-        $this->nfeForm['cnpj'] = $this->formatNfeCpfCnpj($cliente?->cpf_cnpj);
+        if (! $cliente) {
+            $this->clearNfeClienteDisplay(keepBusca: true);
+
+            return;
+        }
+
+        $this->aplicarNfeCliente($cliente, syncBusca: $this->nfeClienteBusca === '');
         $this->recalculateNfeTotais();
+    }
+
+    public function updatedNfeClienteBusca(string $value): void
+    {
+        $term = trim($value);
+
+        if ($term === '') {
+            $this->fecharNfeSugestoesCliente();
+
+            return;
+        }
+
+        if ($this->nfeClienteJaSelecionadoCorresponde($term)) {
+            $this->fecharNfeSugestoesCliente();
+
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', $term) ?: '';
+
+        $people = Person::query()
+            ->where('is_cliente', true)
+            ->where('ativo', true)
+            ->where(function ($q) use ($term, $digits): void {
+                $q->where('codigo', 'like', $term.'%')
+                    ->orWhere('nome_razao', 'like', '%'.$term.'%')
+                    ->orWhere('apelido_fantasia', 'like', '%'.$term.'%');
+
+                if ($digits !== '') {
+                    $q->orWhere('cpf_cnpj', 'like', '%'.$digits.'%');
+                }
+            })
+            ->orderByRaw('CASE WHEN codigo = ? OR codigo = ? THEN 0 WHEN codigo LIKE ? THEN 1 ELSE 2 END', [
+                $term,
+                ltrim($term, '0') ?: $term,
+                $term.'%',
+            ])
+            ->orderBy('nome_razao')
+            ->limit(12)
+            ->get(['id', 'codigo', 'nome_razao', 'cpf_cnpj']);
+
+        $this->nfeClienteSugestoes = $people
+            ->map(fn (Person $p): array => [
+                'id' => (int) $p->id,
+                'codigo' => (string) ($p->codigo ?? ''),
+                'nome' => (string) ($p->nome_razao ?? ''),
+                'cpf_cnpj' => (string) ($p->cpf_cnpj ?? ''),
+            ])
+            ->values()
+            ->all();
+        $this->nfeClienteSugestoesOpen = $this->nfeClienteSugestoes !== [];
+        $this->nfeSelectedClienteSugestaoIndex = 0;
+    }
+
+    public function confirmarNfeClienteBusca(): void
+    {
+        $term = trim($this->nfeClienteBusca);
+
+        if ($term === '') {
+            $this->fecharNfeSugestoesCliente();
+
+            return;
+        }
+
+        if ($this->nfeClienteJaSelecionadoCorresponde($term)) {
+            $this->fecharNfeSugestoesCliente();
+
+            return;
+        }
+
+        // Código puro (ex.: 15 + Enter) — prioriza match exato de código
+        if (preg_match('/^\d+$/', $term)) {
+            $this->nfeClienteCodigo = $term;
+            $this->buscarNfeClientePorCodigo();
+
+            if ((int) ($this->nfeForm['cliente_id'] ?? 0) > 0) {
+                return;
+            }
+        }
+
+        if (preg_match('/^(\d+)\s*[—\-]\s*(.*)$/u', $term, $m)) {
+            $this->nfeClienteCodigo = $m[1];
+            $this->buscarNfeClientePorCodigo();
+
+            return;
+        }
+
+        if ($this->nfeClienteSugestoesOpen && $this->nfeClienteSugestoes !== []) {
+            $index = $this->nfeSelectedClienteSugestaoIndex;
+            if (! isset($this->nfeClienteSugestoes[$index])) {
+                $index = 0;
+            }
+            $this->selecionarNfeCliente((int) $this->nfeClienteSugestoes[$index]['id']);
+
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', $term) ?: '';
+        $person = Person::query()
+            ->where('is_cliente', true)
+            ->where('ativo', true)
+            ->where(function ($q) use ($term, $digits): void {
+                $q->where('codigo', $term)
+                    ->orWhere('codigo', ltrim($term, '0'))
+                    ->orWhere('nome_razao', $term);
+
+                if ($digits !== '' && strlen($digits) >= 11) {
+                    $q->orWhere('cpf_cnpj', 'like', '%'.$digits.'%');
+                }
+            })
+            ->orderBy('nome_razao')
+            ->first();
+
+        if (! $person) {
+            Notification::make()->title('Cliente não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->selecionarNfeCliente((int) $person->id);
+    }
+
+    public function buscarNfeClientePorCodigo(): void
+    {
+        $term = trim($this->nfeClienteCodigo);
+
+        if ($term === '') {
+            return;
+        }
+
+        $person = Person::query()
+            ->where('is_cliente', true)
+            ->where('ativo', true)
+            ->where(function ($q) use ($term): void {
+                $q->where('codigo', $term)
+                    ->orWhere('codigo', ltrim($term, '0'));
+            })
+            ->first();
+
+        if (! $person) {
+            Notification::make()->title('Cliente não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->selecionarNfeCliente((int) $person->id);
+    }
+
+    public function selecionarNfeCliente(int $id): void
+    {
+        $person = Person::query()
+            ->where('is_cliente', true)
+            ->where('ativo', true)
+            ->find($id);
+
+        if (! $person) {
+            Notification::make()->title('Cliente não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->aplicarNfeCliente($person, syncBusca: true);
+        $this->fecharNfeSugestoesCliente();
+        $this->recalculateNfeTotais();
+    }
+
+    public function moverNfeSugestaoCliente(int $delta): void
+    {
+        if (! $this->nfeClienteSugestoesOpen || $this->nfeClienteSugestoes === []) {
+            return;
+        }
+
+        $count = count($this->nfeClienteSugestoes);
+        $index = $this->nfeSelectedClienteSugestaoIndex + $delta;
+        $this->nfeSelectedClienteSugestaoIndex = max(0, min($count - 1, $index));
+    }
+
+    public function fecharNfeSugestoesCliente(): void
+    {
+        $this->nfeClienteSugestoes = [];
+        $this->nfeClienteSugestoesOpen = false;
+        $this->nfeSelectedClienteSugestaoIndex = 0;
+    }
+
+    public function updatedNfeFormNaturezaOperacao(string $value): void
+    {
+        $term = trim($value);
+
+        if ($term === '') {
+            $this->fecharNfeSugestoesNatureza();
+
+            return;
+        }
+
+        // Já selecionado no formato completo → não reabre lista
+        if (preg_match('/^\d{3,4}\s*-\s+.+/u', $term) && mb_strlen($term) > 14) {
+            $this->fecharNfeSugestoesNatureza();
+
+            return;
+        }
+
+        $this->refreshNfeNaturezaSugestoes($term);
+    }
+
+    public function abrirNfeSugestoesNatureza(): void
+    {
+        $term = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($term === '') {
+            $this->refreshNfeNaturezaSugestoes('');
+
+            return;
+        }
+
+        if (preg_match('/^\d{3,4}\s*-\s+.+/u', $term) && mb_strlen($term) > 14) {
+            return;
+        }
+
+        $this->refreshNfeNaturezaSugestoes($term);
+    }
+
+    public function confirmarNfeNaturezaBusca(?string $termFromInput = null): void
+    {
+        if ($termFromInput !== null) {
+            $this->nfeForm['natureza_operacao'] = trim($termFromInput);
+        }
+
+        $term = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($term === '') {
+            $this->fecharNfeSugestoesNatureza();
+
+            return;
+        }
+
+        if (preg_match('/^\d{3,4}$/', $term)) {
+            if ($this->aplicarNfeNaturezaPorCodigo((int) $term)) {
+                return;
+            }
+
+            Notification::make()->title('CFOP não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        if (preg_match('/^(\d{3,4})\s*[-—]/s*/u', $term, $m)) {
+            if ($this->aplicarNfeNaturezaPorCodigo((int) $m[1])) {
+                return;
+            }
+        }
+
+        if ($this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== []) {
+            $index = $this->nfeSelectedNaturezaIndex;
+            if (! isset($this->nfeNaturezaSugestoes[$index])) {
+                $index = 0;
+            }
+            $this->selecionarNfeNatureza($this->nfeNaturezaSugestoes[$index]['label']);
+
+            return;
+        }
+
+        $this->refreshNfeNaturezaSugestoes($term);
+
+        if (count($this->nfeNaturezaSugestoes) === 1) {
+            $this->selecionarNfeNatureza($this->nfeNaturezaSugestoes[0]['label']);
+
+            return;
+        }
+
+        if ($this->nfeNaturezaSugestoes === []) {
+            Notification::make()->title('CFOP não encontrado.')->warning()->send();
+        }
+    }
+
+    public function selecionarNfeNatureza(string $label): void
+    {
+        $this->nfeForm['natureza_operacao'] = $label;
+        $this->fecharNfeSugestoesNatureza();
+    }
+
+    public function moverNfeSugestaoNatureza(int $delta): void
+    {
+        if (! $this->nfeNaturezaSugestoesOpen || $this->nfeNaturezaSugestoes === []) {
+            return;
+        }
+
+        $count = count($this->nfeNaturezaSugestoes);
+        $index = $this->nfeSelectedNaturezaIndex + $delta;
+        $this->nfeSelectedNaturezaIndex = max(0, min($count - 1, $index));
+    }
+
+    public function fecharNfeSugestoesNatureza(): void
+    {
+        $this->nfeNaturezaSugestoes = [];
+        $this->nfeNaturezaSugestoesOpen = false;
+        $this->nfeSelectedNaturezaIndex = 0;
+    }
+
+    protected function refreshNfeNaturezaSugestoes(string $term): void
+    {
+        $tipoPreferido = ($this->nfeForm['movimento'] ?? 'saida') === 'entrada'
+            ? Cfop::TIPO_ENTRADA
+            : Cfop::TIPO_SAIDA;
+
+        $term = trim($term);
+        $termUpper = mb_strtoupper($term, 'UTF-8');
+        $digits = preg_replace('/\D/', '', $term) ?: '';
+
+        $query = Cfop::query()->ativos();
+
+        if ($term !== '') {
+            $like = '%'.$termUpper.'%';
+
+            $query->where(function ($q) use ($like, $digits): void {
+                $q->whereRaw('UPPER(descricao) LIKE ?', [$like]);
+
+                if ($digits !== '') {
+                    $q->orWhere('codigo', (int) $digits)
+                        ->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', [$digits.'%'])
+                        ->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', ['%'.$digits.'%']);
+                } else {
+                    $q->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', [$like]);
+                }
+            });
+        }
+
+        $cfops = (clone $query)
+            ->orderByRaw('CASE WHEN tipo = ? THEN 0 ELSE 1 END', [$tipoPreferido])
+            ->orderByRaw(
+                'CASE WHEN codigo = ? THEN 0 WHEN CAST(codigo AS CHAR) LIKE ? THEN 1 ELSE 2 END',
+                [(int) ($digits ?: 0), $digits !== '' ? $digits.'%' : '']
+            )
+            ->orderBy('codigo')
+            ->limit(20)
+            ->get(['codigo', 'descricao', 'tipo']);
+
+        if ($cfops->isEmpty() && $digits !== '') {
+            $cfops = Cfop::query()
+                ->ativos()
+                ->where(function ($q) use ($digits): void {
+                    $q->where('codigo', (int) $digits)
+                        ->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', [$digits.'%']);
+                })
+                ->orderBy('codigo')
+                ->limit(20)
+                ->get(['codigo', 'descricao', 'tipo']);
+        }
+
+        if ($cfops->isEmpty() && $digits !== '') {
+            $cfops = Cfop::query()
+                ->where(function ($q) use ($digits): void {
+                    $q->where('codigo', (int) $digits)
+                        ->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', [$digits.'%']);
+                })
+                ->orderBy('codigo')
+                ->limit(20)
+                ->get(['codigo', 'descricao', 'tipo']);
+        }
+
+        if ($cfops->isEmpty()) {
+            $fallback = Cfop::query()
+                ->orderByRaw('CASE WHEN tipo = ? THEN 0 ELSE 1 END', [$tipoPreferido])
+                ->orderBy('codigo')
+                ->limit(20);
+
+            if ($term !== '') {
+                $like = '%'.mb_strtoupper($term, 'UTF-8').'%';
+                $fallback->where(function ($q) use ($like, $digits): void {
+                    $q->whereRaw('UPPER(descricao) LIKE ?', [$like]);
+                    if ($digits !== '') {
+                        $q->orWhere('codigo', (int) $digits)
+                            ->orWhereRaw('CAST(codigo AS CHAR) LIKE ?', [$digits.'%']);
+                    }
+                });
+            }
+
+            $cfops = $fallback->get(['codigo', 'descricao', 'tipo']);
+        }
+
+        $this->nfeNaturezaSugestoes = $cfops
+            ->map(function (Cfop $cfop): array {
+                $descricao = mb_strtoupper((string) $cfop->descricao, 'UTF-8');
+                $label = trim($cfop->codigo.' - '.$descricao);
+
+                return [
+                    'codigo' => (string) $cfop->codigo,
+                    'descricao' => $descricao,
+                    'label' => $label,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $this->nfeNaturezaSugestoesOpen = $this->nfeNaturezaSugestoes !== [];
+        $this->nfeSelectedNaturezaIndex = 0;
+    }
+
+    protected function aplicarNfeNaturezaPorCodigo(int $codigo): bool
+    {
+        if ($codigo <= 0) {
+            return false;
+        }
+
+        $tipo = ($this->nfeForm['movimento'] ?? 'saida') === 'entrada'
+            ? Cfop::TIPO_ENTRADA
+            : Cfop::TIPO_SAIDA;
+
+        $cfop = Cfop::query()
+            ->ativos()
+            ->where('codigo', $codigo)
+            ->where('tipo', $tipo)
+            ->first(['codigo', 'descricao']);
+
+        if (! $cfop) {
+            $cfop = Cfop::query()->ativos()->where('codigo', $codigo)->first(['codigo', 'descricao']);
+        }
+
+        if (! $cfop) {
+            $cfop = Cfop::query()->where('codigo', $codigo)->first(['codigo', 'descricao']);
+        }
+
+        if (! $cfop) {
+            return false;
+        }
+
+        $this->selecionarNfeNatureza(
+            trim($cfop->codigo.' - '.mb_strtoupper((string) $cfop->descricao, 'UTF-8'))
+        );
+
+        return true;
+    }
+    #[Computed]
+    public function naturezaOperacaoOptions(): array
+    {
+        $tipo = ($this->nfeForm['movimento'] ?? 'saida') === 'entrada'
+            ? Cfop::TIPO_ENTRADA
+            : Cfop::TIPO_SAIDA;
+
+        $options = Cfop::query()
+            ->where('tipo', $tipo)
+            ->orderBy('codigo')
+            ->get(['codigo', 'descricao'])
+            ->mapWithKeys(function (Cfop $cfop): array {
+                $label = trim($cfop->codigo.' - '.mb_strtoupper((string) $cfop->descricao, 'UTF-8'));
+
+                return [$label => $label];
+            })
+            ->all();
+
+        $atual = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($atual !== '' && ! array_key_exists($atual, $options)) {
+            $options = [$atual => $atual] + $options;
+        }
+
+        return $options;
+    }
+
+    public function updatedNfeFormMovimento(): void
+    {
+        unset($this->naturezaOperacaoOptions);
+
+        $options = $this->naturezaOperacaoOptions;
+        $atual = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($atual === '' || ! array_key_exists($atual, $options)) {
+            $this->nfeForm['natureza_operacao'] = array_key_first($options) ?? '';
+        }
     }
 
     public function updatedNfeFormFormaPgto(): void
@@ -465,7 +1089,9 @@ trait ManagesNfeEmissaoModal
             'numero_pedido' => $nfe->npedido ?? ($nfe->venda?->numero ?? ''),
             'data_emissao' => $nfe->data_emissao?->format('Y-m-d') ?? now()->format('Y-m-d'),
             'data_saida' => $nfe->data_saida?->format('Y-m-d') ?? now()->format('Y-m-d'),
-            'consumidor_final' => $nfe->consumidor_final === '1' || $nfe->consumidor_final === true,
+            'consumidor_final' => $nfe->cliente?->isConsumidorFinalPadrao()
+                || $nfe->consumidor_final === '1'
+                || $nfe->consumidor_final === true,
             'finalidade' => $this->unmapFinalidade((string) $nfe->finalidade),
             'movimento' => ($nfe->movimento ?? '1') === '0' ? 'entrada' : 'saida',
             'forma_pgto' => $nfe->forma_pgto ?? 'a_vista',
@@ -473,6 +1099,12 @@ trait ManagesNfeEmissaoModal
             'obs_fisco' => $nfe->obs_fisco ?? '',
             'obs_contribuinte' => $nfe->obs_contribuinte ?? '',
         ];
+
+        if ($nfe->cliente) {
+            $this->aplicarNfeCliente($nfe->cliente, syncBusca: true);
+        } else {
+            $this->clearNfeClienteDisplay();
+        }
 
         $this->nfeModalRows = $nfe->itens->map(fn (NfeItem $item): array => [
             'key' => 'item-' . $item->id,
@@ -570,7 +1202,7 @@ trait ManagesNfeEmissaoModal
 
         return [
             'numero' => Nfe::nextNumero($empresaId),
-            'serie' => (string) ($params?->serie ?? '1'),
+            'serie' => (string) ($params?->serie_nfe ?? 1),
             'empresa' => $this->empresaNome,
             'cliente_id' => '',
             'uf' => '',
@@ -625,6 +1257,26 @@ trait ManagesNfeEmissaoModal
         };
     }
 
+    protected function mergeObsContribuinteWithIbpt(string $obs, string $ibptTexto): ?string
+    {
+        $obs = trim($obs);
+        $ibptTexto = trim($ibptTexto);
+
+        if ($ibptTexto === '') {
+            return $obs !== '' ? $obs : null;
+        }
+
+        if ($obs === '') {
+            return $ibptTexto;
+        }
+
+        if (str_contains($obs, 'Lei 12.741') || str_contains($obs, 'Trib. aprox.')) {
+            return $obs;
+        }
+
+        return rtrim($obs, " .\n").'. '.$ibptTexto;
+    }
+
     protected function unmapFinalidade(string $value): string
     {
         return match ($value) {
@@ -637,13 +1289,67 @@ trait ManagesNfeEmissaoModal
 
     protected function resolveEmpresaId(): ?int
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        return \App\Support\Erp\ErpContext::currentEmpresaId();
+    }
 
-        if ($empresaId) {
-            return (int) $empresaId;
+    protected function aplicarNfeCliente(Person $person, bool $syncBusca = true): void
+    {
+        $this->nfeForm['cliente_id'] = (string) $person->id;
+        $this->nfeForm['uf'] = (string) ($person->uf ?? '');
+        $this->nfeForm['cnpj'] = $this->formatNfeCpfCnpj($person->cpf_cnpj);
+        $this->nfeForm['consumidor_final'] = $person->isConsumidorFinalPadrao();
+
+        $this->nfeClienteCodigo = (string) ($person->codigo ?? '');
+        $this->nfeClienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
+        $this->nfeClienteWhatsapp = (string) ($person->whatsapp ?? $person->celular1 ?? '');
+        $this->nfeClienteEndereco = (string) ($person->endereco ?? '');
+        $this->nfeClienteNumeroEnd = (string) ($person->numero ?? '');
+        $this->nfeClienteBairro = (string) ($person->bairro ?? '');
+        $this->nfeClienteCep = (string) ($person->cep ?? '');
+        $this->nfeClienteCidade = (string) ($person->cidade_nome ?? '');
+
+        if ($syncBusca) {
+            $this->nfeClienteBusca = $this->formatarNfeClienteBusca($person);
+        }
+    }
+
+    protected function clearNfeClienteDisplay(bool $keepBusca = false): void
+    {
+        $this->nfeClienteCodigo = '';
+        if (! $keepBusca) {
+            $this->nfeClienteBusca = '';
+        }
+        $this->nfeClienteFone = '';
+        $this->nfeClienteWhatsapp = '';
+        $this->nfeClienteEndereco = '';
+        $this->nfeClienteNumeroEnd = '';
+        $this->nfeClienteBairro = '';
+        $this->nfeClienteCep = '';
+        $this->nfeClienteCidade = '';
+        $this->fecharNfeSugestoesCliente();
+    }
+
+    protected function formatarNfeClienteBusca(Person $person): string
+    {
+        $nome = trim((string) ($person->nome_razao ?? ''));
+
+        return trim(($person->codigo ? $person->codigo.' — ' : '').$nome);
+    }
+
+    protected function nfeClienteJaSelecionadoCorresponde(string $term): bool
+    {
+        $clienteId = (int) ($this->nfeForm['cliente_id'] ?? 0);
+
+        if ($clienteId <= 0) {
+            return false;
         }
 
-        return Empresa::query()->where('ativo', true)->orderBy('id')->value('id');
+        $termNorm = mb_strtoupper(trim($term), 'UTF-8');
+        $buscaNorm = mb_strtoupper(trim($this->nfeClienteBusca), 'UTF-8');
+        $codigoNorm = mb_strtoupper(trim($this->nfeClienteCodigo), 'UTF-8');
+
+        return $termNorm !== ''
+            && ($termNorm === $buscaNorm || $termNorm === $codigoNorm);
     }
 
     protected function formatNfeCpfCnpj(?string $value): string
@@ -668,5 +1374,406 @@ trait ManagesNfeEmissaoModal
     protected function parseMoney(string $value): float
     {
         return ErpMoney::parseBr($value);
+    }
+
+    public function closeNfeFiscalOverlay(): void
+    {
+        $this->nfeFiscalOverlayTitulo = null;
+        $this->nfeFiscalOverlayMensagem = null;
+        $this->nfeFiscalOverlayCodigo = null;
+    }
+
+    public function closeNfeFiscalSucessoOverlay(): void
+    {
+        $this->closeNfeWhatsAppModal();
+        $this->closeNfeDanfeEmailModal();
+        $this->closeNfeCancelModal();
+        $this->closeNfeCceModal();
+        $this->closeNfeCceSucessoOverlay();
+        $this->closeNfeCceDispatchModals();
+        $this->nfeFiscalSucessoDetalhe = null;
+        $this->nfeFiscalSucessoNfeId = null;
+    }
+
+    public function acknowledgeNfeFiscalSucessoOverlay(): void
+    {
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeModal();
+    }
+
+    public function printNfeDanfe(): void
+    {
+        if (! $this->nfeFiscalSucessoNfeId) {
+            $this->showNfeFiscalOverlayInfo('Imprimir DANFE', 'NF-e não encontrada para impressão.');
+
+            return;
+        }
+
+        $this->openNfeDanfePrint((int) $this->nfeFiscalSucessoNfeId);
+    }
+
+    public function printNfeDanfeFromList(): void
+    {
+        $nfeId = $this->resolveNfePrintTargetId();
+
+        if (! $nfeId) {
+            return;
+        }
+
+        $this->openNfeDanfePrint($nfeId);
+    }
+
+    protected function resolveNfePrintTargetId(): ?int
+    {
+        if ($this->nfeFiscalSucessoNfeId) {
+            return (int) $this->nfeFiscalSucessoNfeId;
+        }
+
+        if ($this->nfeModalOpen && $this->nfeModalRecordId) {
+            return (int) $this->nfeModalRecordId;
+        }
+
+        return $this->highlightedRecordIdOrNotify('imprimir');
+    }
+
+    protected function openNfeDanfePrint(int $nfeId): void
+    {
+        if (! Nfe::query()->whereKey($nfeId)->exists()) {
+            Notification::make()
+                ->title('NF-e não encontrada para impressão.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $url = route('erp.reports.nfe-danfe', [
+            'nfe' => $nfeId,
+        ]);
+
+        $this->js('window.ErpNfePrint?.openDanfe(' . Js::from($url) . ')');
+    }
+
+    public function openNfeWhatsAppModal(): void
+    {
+        if (! $this->nfeFiscalSucessoNfeId) {
+            $this->showNfeFiscalOverlayInfo('WhatsApp', 'NF-e não encontrada para envio.');
+
+            return;
+        }
+
+        $this->prepareNfeWhatsAppModal($this->nfeFiscalSucessoNfeId, true);
+    }
+
+    public function openNfeWhatsAppFromList(): void
+    {
+        $nfeId = $this->resolveNfeWhatsAppTargetId();
+
+        if (! $nfeId) {
+            return;
+        }
+
+        $this->prepareNfeWhatsAppModal(
+            $nfeId,
+            $this->nfeModalOpen && filled($this->nfeFiscalSucessoDetalhe),
+        );
+    }
+
+    protected function resolveNfeWhatsAppTargetId(): ?int
+    {
+        if ($this->nfeFiscalSucessoNfeId) {
+            return $this->nfeFiscalSucessoNfeId;
+        }
+
+        if ($this->nfeModalOpen && $this->nfeModalRecordId) {
+            return $this->nfeModalRecordId;
+        }
+
+        return $this->highlightedRecordIdOrNotify('whatsapp');
+    }
+
+    protected function prepareNfeWhatsAppModal(
+        int $nfeId,
+        bool $useFiscalOverlayErrors = false,
+        string $documento = 'danfe',
+        string $destinatario = 'cliente',
+    ): void {
+        $nfe = Nfe::query()->with(['cliente', 'transportadora'])->find($nfeId);
+
+        if (! $nfe) {
+            $this->notifyNfeWhatsAppError('NF-e não encontrada para envio.', $useFiscalOverlayErrors);
+
+            return;
+        }
+
+        if ($documento === 'danfe' && $nfe->status !== Nfe::STATUS_TRANSMITIDA) {
+            $this->notifyNfeWhatsAppError('Somente NF-e transmitida pode ser enviada por WhatsApp.', $useFiscalOverlayErrors);
+
+            return;
+        }
+
+        if ($documento === 'espelho' && $nfe->status !== Nfe::STATUS_ABERTA) {
+            $this->notifyNfeWhatsAppError('Somente NF-e aberta possui espelho para envio.', $useFiscalOverlayErrors);
+
+            return;
+        }
+
+        $this->cleanupNfeWhatsAppPdf();
+
+        try {
+            if ($documento === 'espelho') {
+                $report = app(NfeEspelhoReportService::class);
+                $pdf = $report->storePdfAttachment($nfe);
+                $message = $report->defaultWhatsAppMessage($nfe, $destinatario);
+            } else {
+                $report = app(NfeDanfeReportService::class);
+                $pdf = $report->storePdfAttachment($nfe);
+                $message = $report->defaultWhatsAppMessage($nfe);
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->notifyNfeWhatsAppError(
+                $documento === 'espelho'
+                    ? 'Não foi possível gerar o PDF do espelho para envio.'
+                    : 'Não foi possível gerar o PDF da DANFE para envio.',
+                $useFiscalOverlayErrors,
+            );
+
+            return;
+        }
+
+        $party = match ($destinatario) {
+            'fornecedor' => $nfe->transportadora,
+            default => $nfe->cliente,
+        };
+
+        $phoneDigits = WhatsAppPhone::digitsOnly($party?->celular1 ?: ($party?->whatsapp ?: ($party?->fone1 ?: '')));
+
+        $this->nfeWhatsAppNfeId = $nfe->id;
+        $this->nfeWhatsAppDocumento = $documento;
+        $this->nfeWhatsAppDestinatario = $destinatario;
+        $this->nfeWhatsAppTo = strlen($phoneDigits) === 11
+            ? WhatsAppPhone::formatDisplay($phoneDigits)
+            : ($phoneDigits !== '' ? WhatsAppPhone::formatDisplay('55' . $phoneDigits) : '');
+        $this->nfeWhatsAppMessage = $message;
+        $this->nfeWhatsAppPdfPath = $pdf['path'];
+        $this->nfeWhatsAppPdfName = $pdf['name'];
+        $this->nfeWhatsAppPdfDisplay = $pdf['display'];
+        $this->nfeWhatsAppModalOpen = true;
+
+        $this->dispatch('erp-nfe-focus-whatsapp-modal');
+    }
+
+    protected function notifyNfeWhatsAppError(string $message, bool $useFiscalOverlayErrors): void
+    {
+        if ($useFiscalOverlayErrors) {
+            $this->showNfeFiscalOverlayInfo('WhatsApp', $message);
+
+            return;
+        }
+
+        Notification::make()
+            ->title('WhatsApp')
+            ->body($message)
+            ->warning()
+            ->send();
+    }
+
+    public function closeNfeWhatsAppModal(): void
+    {
+        $this->nfeWhatsAppModalOpen = false;
+        $this->nfeWhatsAppNfeId = null;
+        $this->nfeWhatsAppTo = '';
+        $this->nfeWhatsAppMessage = '';
+        $this->nfeWhatsAppPdfName = '';
+        $this->nfeWhatsAppPdfDisplay = '';
+        $this->nfeWhatsAppDocumento = 'danfe';
+        $this->nfeWhatsAppDestinatario = 'cliente';
+        $this->cleanupNfeWhatsAppPdf();
+    }
+
+    public function updatedNfeWhatsAppMessage(string $value): void
+    {
+        $clean = WhatsAppMessageHelper::stripSystemFooter($value);
+
+        if ($clean !== $value) {
+            $this->nfeWhatsAppMessage = $clean;
+        }
+    }
+
+    public function sendNfeWhatsApp(): void
+    {
+        $this->nfeWhatsAppMessage = WhatsAppMessageHelper::stripSystemFooter($this->nfeWhatsAppMessage);
+
+        $maxLength = WhatsAppMessageHelper::maxUserMessageLength();
+
+        $this->validate([
+            'nfeWhatsAppTo' => ['required', 'string', 'max:30', new CelularBrasileiroValido()],
+            'nfeWhatsAppMessage' => ['required', 'string', 'max:' . $maxLength],
+        ], [
+            'nfeWhatsAppTo.required' => 'Informe o WhatsApp do destinatário.',
+            'nfeWhatsAppMessage.required' => 'Informe a mensagem.',
+        ]);
+
+        if (! is_string($this->nfeWhatsAppPdfPath) || ! is_file($this->nfeWhatsAppPdfPath)) {
+            Notification::make()
+                ->title('PDF da NF-e não encontrado.')
+                ->body('Feche e abra novamente o envio por WhatsApp.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $nfe = Nfe::query()->find($this->nfeWhatsAppNfeId);
+
+        if (! $nfe) {
+            Notification::make()
+                ->title('NF-e não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresa = Empresa::query()->find($nfe->empresa_id);
+
+        if (! $empresa) {
+            Notification::make()
+                ->title('Empresa não identificada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $sender = app(WhatsAppSender::class);
+
+        try {
+            $result = $sender->sendDocumentMessage(
+                empresa: $empresa,
+                tipo: WhatsAppSender::TIPO_NFE,
+                number: $this->nfeWhatsAppTo,
+                text: $this->nfeWhatsAppMessage,
+                documentPath: $this->nfeWhatsAppPdfPath,
+                documentName: $this->nfeWhatsAppPdfName !== '' ? $this->nfeWhatsAppPdfName : 'DANFE-NFE.PDF',
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body('Verifique a conexão em Empresa → Parâmetros → WhatsApp.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('WhatsApp enviado.')
+            ->success()
+            ->send();
+
+        NfeEventoLogger::registrar(
+            nfeId: (int) $nfe->id,
+            tipo: NfeEvento::TIPO_WHATSAPP,
+            titulo: $this->nfeWhatsAppDocumento === 'espelho'
+                ? 'Espelho enviado por WhatsApp'
+                : 'DANFE enviada por WhatsApp',
+            descricao: $this->nfeWhatsAppDocumento === 'espelho'
+                ? 'Espelho da NF-e em aberto enviado com anexo em PDF.'
+                : 'Documento auxiliar da NF-e enviado com anexo em PDF.',
+            destinatario: WhatsAppPhone::formatDisplay($this->nfeWhatsAppTo) ?? $this->nfeWhatsAppTo,
+            metadata: [
+                'contexto' => $this->nfeWhatsAppDocumento,
+                'destinatario_tipo' => $this->nfeWhatsAppDestinatario,
+                'arquivo' => $this->nfeWhatsAppPdfName !== '' ? $this->nfeWhatsAppPdfName : 'DANFE-NFE.PDF',
+            ],
+        );
+
+        $this->closeNfeWhatsAppModal();
+    }
+
+    protected function cleanupNfeWhatsAppPdf(): void
+    {
+        if (is_string($this->nfeWhatsAppPdfPath) && is_file($this->nfeWhatsAppPdfPath)) {
+            @unlink($this->nfeWhatsAppPdfPath);
+        }
+
+        $this->nfeWhatsAppPdfPath = null;
+    }
+
+    public function closeNfeFiscalInfoOverlay(): void
+    {
+        $this->nfeFiscalInfoTitulo = null;
+        $this->nfeFiscalInfoMensagem = null;
+    }
+
+    public function showNfeFiscalOverlayInfo(string $titulo, string $mensagem = 'Em implementação.'): void
+    {
+        $this->closeNfeFiscalOverlay();
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeFiscalInfoOverlay();
+
+        $this->nfeFiscalInfoTitulo = trim($titulo);
+        $this->nfeFiscalInfoMensagem = trim($mensagem) !== '' ? trim($mensagem) : null;
+
+        $this->dispatch('erp-nfe-focus-fiscal-info');
+    }
+
+    protected function showNfeFiscalOverlaySucesso(Nfe $nfe): void
+    {
+        $this->closeNfeFiscalOverlay();
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeFiscalInfoOverlay();
+
+        $numero = ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero;
+        $protocolo = trim((string) ($nfe->protocolo ?? ''));
+
+        $this->nfeFiscalSucessoDetalhe = $protocolo !== ''
+            ? "Nota {$numero} — Protocolo: {$protocolo}"
+            : "Nota {$numero} autorizada pela SEFAZ.";
+        $this->nfeFiscalSucessoNfeId = $nfe->id;
+
+        $this->dispatch('erp-nfe-focus-fiscal-sucesso');
+    }
+
+    protected function showNfeFiscalOverlayErro(FiscalEngineException $exception): void
+    {
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeFiscalInfoOverlay();
+
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $mensagem = $resolvido['corpo'] ?? trim($exception->getMessage());
+
+        $this->nfeFiscalOverlayTitulo = mb_strtoupper($resolvido['titulo'], 'UTF-8');
+        $this->nfeFiscalOverlayMensagem = $mensagem !== '' ? $mensagem : null;
+        $this->nfeFiscalOverlayCodigo = $exception->sefazCodigo;
+        $this->dispatch('erp-nfe-focus-fiscal-overlay');
+    }
+
+    protected function showNfeFiscalOverlayErroGenerico(string $mensagem): void
+    {
+        $this->closeNfeFiscalSucessoOverlay();
+        $this->closeNfeFiscalInfoOverlay();
+
+        $mensagem = trim($mensagem);
+
+        $this->nfeFiscalOverlayTitulo = 'NÃO FOI POSSÍVEL TRANSMITIR A NF-E';
+        $this->nfeFiscalOverlayMensagem = $mensagem !== '' ? $mensagem : 'Tente novamente em instantes.';
+        $this->nfeFiscalOverlayCodigo = null;
+        $this->dispatch('erp-nfe-focus-fiscal-overlay');
     }
 }

@@ -4,6 +4,8 @@ let erpPdvIdleTimer = null;
 let erpPdvIdleBound = false;
 let erpPdvClockTimer = null;
 let erpPdvStatusBarSync = null;
+/** Evita atalho de pagamento (D/P/…) enquanto digita o cliente no finalizar. */
+let erpPdvFinalizarClienteTyping = false;
 
 /** @type {Record<string, [string, ...unknown[]]>} */
 const ERP_PDV_FN_SHORTCUTS = {
@@ -40,6 +42,16 @@ const ERP_PDV_CTRL_SHORTCUTS = {
 document.addEventListener('DOMContentLoaded', initErpPdv);
 document.addEventListener('livewire:navigated', initErpPdv);
 document.addEventListener('livewire:init', bindErpPdvLivewireEvents);
+window.addEventListener('focus', () => {
+    const pdv = document.querySelector('.erp-pdv');
+    if (pdv?.dataset.caixaAberto === '1' && ! pdvHasBlockingUi(pdv)) {
+        focusPdvSearchField();
+    }
+});
+window.addEventListener('erp-pdv-refocus-search', () => {
+    window.__erpPdvForceSearchFocusUntil = Date.now() + 4000;
+    focusPdvSearchField();
+});
 
 function bindErpPdvLivewireEvents() {
     if (erpPdvLivewireBound || ! window.Livewire) {
@@ -54,8 +66,13 @@ function bindErpPdvLivewireEvents() {
                 document.getElementById('erp-pdv-sair-sim')?.focus();
             } else if (payload?.modal === 'excluir_item') {
                 document.getElementById('erp-pdv-excluir-sim')?.focus();
+            } else if (payload?.modal === 'remover_itens') {
+                document.getElementById('erp-pdv-remover-itens-search')?.focus()
+                    || document.getElementById('erp-pdv-remover-itens-sim')?.focus();
             } else if (payload?.modal === 'finalizar') {
                 focusPdvFinalizarPagamento(0);
+            } else if (payload?.modal === 'abrir_caixa' || payload?.modal === 'fechar_caixa') {
+                focusPdvModalField();
             } else {
                 focusPdvModalField();
             }
@@ -67,7 +84,19 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-item-added', () => {
+        window.__erpPdvForceSearchFocusUntil = Date.now() + 3000;
         focusPdvSearchField();
+
+        window.setTimeout(() => {
+            const component = findPdvLivewireComponent();
+
+            if (component) {
+                component.call('clearPdvFlashLancamento');
+            }
+
+            window.__erpPdvForceSearchFocusUntil = Date.now() + 2500;
+            focusPdvSearchField();
+        }, 600);
     });
 
     window.Livewire.on('erp-pdv-beep', () => {
@@ -87,19 +116,54 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-focus-search', () => {
+        window.__erpPdvForceSearchFocusUntil = Date.now() + 2200;
         focusPdvSearchField();
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar', () => {
+        erpPdvFinalizarClienteTyping = false;
         focusPdvFinalizarPagamento(0);
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar-pagamento', (payload) => {
+        erpPdvFinalizarClienteTyping = false;
         focusPdvFinalizarPagamento(payload?.index ?? 0, payload?.valor ?? null);
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar-cliente', () => {
         focusPdvFinalizarCliente();
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-tabela-prazo', () => {
+        window.setTimeout(() => focusPdvFinalizarParcelas(), 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-parcelas', () => {
+        window.setTimeout(() => focusPdvFinalizarParcelas(), 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-cartao-canhoto', () => {
+        window.setTimeout(() => focusPdvFinalizarCartaoCanhoto(), 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-tabelas-predefinidas', () => {
+        window.setTimeout(() => {
+            document.querySelector('#erp-pdv-parcelas-tabelas .erp-pdv__grid-row--selected')
+                ?.scrollIntoView({ block: 'nearest' });
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-carne-impressao', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-carne-print-a4-capa')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-ok', () => {
+        window.setTimeout(() => {
+            document.querySelector('.erp-pdv-finalizar__operacao-btn')?.focus()
+                || document.querySelector('.erp-pdv-finalizar__footer-actions button')?.focus();
+        }, 50);
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar-informacoes', () => {
@@ -114,9 +178,9 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
-    window.Livewire.on('erp-pdv-finalizar-imprimir-opened', () => {
+    window.Livewire.on('erp-pdv-cancelar-venda-opened', () => {
         window.setTimeout(() => {
-            document.getElementById('erp-pdv-finalizar-imprimir-nao')?.focus();
+            document.getElementById('erp-pdv-cancelar-venda-sim')?.focus();
         }, 50);
     });
 
@@ -126,7 +190,25 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.hook('commit', ({ succeed }) => {
+        succeed(() => {
+            if (window.__erpPdvForceSearchFocusUntil && Date.now() < window.__erpPdvForceSearchFocusUntil) {
+                window.setTimeout(() => tryFocusPdvSearchField(), 0);
+                window.setTimeout(() => tryFocusPdvSearchField(), 30);
+                window.setTimeout(() => tryFocusPdvSearchField(), 100);
+            }
+        });
+    });
+
     window.Livewire.hook('morph.updated', ({ el }) => {
+        if (window.__erpPdvForceSearchFocusUntil && Date.now() < window.__erpPdvForceSearchFocusUntil) {
+            window.requestAnimationFrame(() => {
+                tryFocusPdvSearchField();
+                window.setTimeout(() => tryFocusPdvSearchField(), 0);
+                window.setTimeout(() => tryFocusPdvSearchField(), 40);
+            });
+        }
+
         if (el?.querySelector?.('.erp-pdv__grid--consulta')) {
             scrollPdvSearchSelectionIntoView();
         } else if (el?.querySelector?.('.erp-pdv__grid--cupom') || el?.classList?.contains('erp-pdv__grid-row--selected')) {
@@ -134,7 +216,25 @@ function bindErpPdvLivewireEvents() {
         }
 
         if (el?.querySelector?.('.erp-pdv-finalizar__cliente-list')) {
+            erpPdvFinalizarClienteTyping = true;
             scrollPdvFinalizarClienteIntoView();
+            // Remontagem Livewire pode tirar o foco do input no meio da digitação.
+            window.requestAnimationFrame(() => {
+                const input = document.getElementById('erp-pdv-finalizar-cliente');
+                const active = document.activeElement;
+
+                if (! input || active === input) {
+                    return;
+                }
+
+                if (! active || active === document.body || active.id?.startsWith('erp-pdv-finalizar-valor-')) {
+                    input.focus();
+                }
+            });
+        }
+
+        if (el?.querySelector?.('#erp-pdv-abertura-valor') || el?.id === 'erp-pdv-abertura-valor') {
+            focusPdvModalField();
         }
 
         if (el?.querySelector?.('.erp-pdv-finalizar__grid-input') || el?.classList?.contains('erp-pdv-finalizar__grid-input')) {
@@ -149,7 +249,9 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.on('erp-pdv-focus-vendedor', () => {
         window.setTimeout(() => {
-            document.getElementById('erp-pdv-vendedor-search')?.focus();
+            const input = document.getElementById('erp-pdv-vendedor-search');
+            input?.focus();
+            input?.select();
         }, 50);
     });
 
@@ -185,13 +287,26 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.on('erp-pdv-focus-remover-itens', () => {
         window.setTimeout(() => {
-            const input = document.getElementById('erp-pdv-remover-itens-qtd');
+            const confirmSim = document.getElementById('erp-pdv-remover-itens-sim');
+
+            if (confirmSim) {
+                confirmSim.focus();
+
+                return;
+            }
+
+            const input = document.getElementById('erp-pdv-remover-itens-search');
 
             if (input) {
-                window.ErpMasks?.refresh(input.closest('.erp-pdv-modal') ?? document);
                 input.focus();
-                input.select();
+                input.select?.();
             }
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-remover-itens-confirm', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-remover-itens-sim')?.focus();
         }, 50);
     });
 
@@ -213,6 +328,21 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-importar-menu', () => {
+        window.setTimeout(() => {
+            const selected = document.querySelector('.erp-pdv-importar-menu__btn--selected')
+                ?? document.getElementById('erp-pdv-importar-menu-row-0');
+
+            selected?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-importar-pedido', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-importar-pedido-numero')?.focus();
+        }, 50);
+    });
+
     window.Livewire.on('erp-pdv-focus-receber', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-receber-search')?.focus();
@@ -228,6 +358,43 @@ function bindErpPdvLivewireEvents() {
     window.Livewire.on('erp-pdv-focus-consulta-venda', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-consulta-venda-search')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-estorno-venda', () => {
+        window.setTimeout(() => {
+            const motivo = document.getElementById('erp-pdv-estorno-motivo');
+            motivo?.focus();
+            motivo?.select();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-fiscal-overlay', () => {
+        hidePdvFiscalTransmitProgress();
+        window.setTimeout(() => {
+            (
+                document.getElementById('erp-pdv-fiscal-overlay-imprimir')
+                ?? document.getElementById('erp-pdv-fiscal-overlay-entendido')
+                ?? document.getElementById('erp-pdv-fiscal-overlay-sair')
+            )?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-hide-fiscal-progress', () => {
+        hidePdvFiscalTransmitProgress();
+    });
+
+    window.Livewire.on('erp-pdv-imprimir-pos-venda-opened', () => {
+        hidePdvFiscalTransmitProgress();
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-imprimir-pos-venda-nao')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-finalizar-imprimir-opened', () => {
+        hidePdvFiscalTransmitProgress();
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-finalizar-imprimir-nao')?.focus();
         }, 50);
     });
 
@@ -275,18 +442,494 @@ function initErpPdv() {
     bindErpPdvKeys();
     bindPdvIdleMonitor();
     bindPdvStatusBar();
+    bindPdvFiscalTransmitTriggers();
+    bindPdvClickGuard();
+    bindPdvSearchFocusTrap();
 
     const page = document.querySelector('.erp-pdv-page');
 
     if (! page) {
+        // Saiu do PDV (navegou para outra tela): devolve a barra do Windows.
+        exitPdvFullscreen();
+
         return;
     }
+
+    armPdvKioskFullscreen();
+
+    // Remove cursor customizado antigo, se ainda estiver no DOM.
+    page.querySelectorAll('.erp-pdv__search-caret').forEach((el) => el.remove());
 
     if (page.querySelector('.erp-pdv')?.dataset.caixaAberto === '1') {
         focusPdvSearchField();
     }
 
     resetPdvIdleTimer();
+}
+
+/**
+ * Tela cheia "quiosque" ao abrir o PDV pela retaguarda (esconde a barra do Windows).
+ *
+ * O navegador só permite entrar em tela cheia a partir de um gesto do usuário,
+ * então armamos a entrada no primeiro toque/tecla dentro do PDV. Usamos o
+ * Keyboard Lock (quando disponível, Chrome/Edge) para que o Esc continue
+ * funcionando no PDV — para sair da tela cheia o operador segura o Esc ou usa
+ * Alt+F4.
+ */
+function armPdvKioskFullscreen() {
+    if (window.__erpPdvKioskArmed || document.fullscreenElement) {
+        return;
+    }
+
+    const enterOnce = () => {
+        window.__erpPdvKioskArmed = false;
+        document.removeEventListener('pointerdown', enterOnce, true);
+        document.removeEventListener('keydown', enterOnce, true);
+        enterPdvFullscreen();
+    };
+
+    window.__erpPdvKioskArmed = true;
+    document.addEventListener('pointerdown', enterOnce, true);
+    document.addEventListener('keydown', enterOnce, true);
+}
+
+function enterPdvFullscreen() {
+    if (document.fullscreenElement) {
+        lockPdvEscapeKey();
+
+        return;
+    }
+
+    const target = document.documentElement;
+    const request = target.requestFullscreen
+        ? target.requestFullscreen({ navigationUI: 'hide' })
+        : null;
+
+    if (! request || typeof request.then !== 'function') {
+        lockPdvEscapeKey();
+
+        return;
+    }
+
+    request.then(lockPdvEscapeKey).catch(() => {
+        // Bloqueado pelo navegador: mantém o comportamento normal, sem tela cheia.
+    });
+}
+
+function lockPdvEscapeKey() {
+    try {
+        if (navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+            navigator.keyboard.lock(['Escape']).catch(() => {});
+        }
+    } catch (error) {
+        // Keyboard Lock indisponível: Esc sai da tela cheia (fallback do navegador).
+    }
+}
+
+function exitPdvFullscreen() {
+    try {
+        if (navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
+            navigator.keyboard.unlock();
+        }
+    } catch (error) {
+        // Ignora: nada a desbloquear.
+    }
+
+    if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+let pdvFiscalProgressTimer = null;
+let pdvFiscalProgressStepIndex = 0;
+let pdvFiscalProgressActive = false;
+
+function bindPdvFiscalTransmitTriggers() {
+    if (window.__erpPdvFiscalTransmitTriggersBound) {
+        return;
+    }
+
+    window.__erpPdvFiscalTransmitTriggersBound = true;
+
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.erp-pdv-finalizar__operacao-btn--fiscal');
+
+        if (! button || button.disabled) {
+            return;
+        }
+
+        window.setTimeout(startPdvFiscalTransmitProgress, 30);
+    }, true);
+}
+
+/**
+ * No PDV, clique do mouse só vale em botões, grid, inputs e modais.
+ * Clique em área “morta” (título, foto, totais, status…) devolve o foco ao código.
+ */
+function bindPdvClickGuard() {
+    if (window.__erpPdvClickGuardBound) {
+        return;
+    }
+
+    window.__erpPdvClickGuardBound = true;
+
+    const allowedSelector = [
+        'button',
+        'a[href]',
+        'input',
+        'select',
+        'textarea',
+        'label',
+        'summary',
+        '[role="button"]',
+        '[role="dialog"]',
+        '[role="listbox"]',
+        '[role="option"]',
+        '[contenteditable="true"]',
+        '.erp-pdv__grid-row',
+        '.erp-pdv__tool-btn',
+        '.erp-pdv__search-field',
+        '.erp-pdv__search-input',
+        '.erp-pdv__total-input',
+        '.erp-pdv__total-box--active',
+        '.erp-pdv-modal',
+        '.erp-pdv-overlay',
+        '.erp-pdv-naoencontrado',
+        '.erp-pdv-fiscal-overlay',
+        '[data-erp-pdv-fiscal-progress]',
+        '[data-erp-pdv-clickable]',
+    ].join(',');
+
+    document.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const target = event.target;
+
+        if (! (target instanceof Element)) {
+            return;
+        }
+
+        const pdv = target.closest('.erp-pdv--click-guard');
+
+        if (! pdv) {
+            return;
+        }
+
+        // Cadastro embutido / overlay fora do fluxo principal.
+        if (document.querySelector('.erp-pdv-overlay')) {
+            return;
+        }
+
+        // Qualquer clique dentro de modal/overlay fiscal é válido.
+        if (target.closest('.erp-pdv-modal, .erp-pdv-overlay, .erp-pdv-naoencontrado, [data-erp-pdv-fiscal-progress]')) {
+            return;
+        }
+
+        if (target.closest(allowedSelector)) {
+            return;
+        }
+
+        // Permite arrastar a barra de rolagem do grid.
+        if (target.closest('.erp-pdv__grid-wrap') && isPdvScrollbarClick(event, target.closest('.erp-pdv__grid-wrap'))) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (pdv.dataset.caixaAberto === '1') {
+            focusPdvSearchField();
+        }
+    }, true);
+}
+
+function isPdvScrollbarClick(event, scrollEl) {
+    if (! scrollEl) {
+        return false;
+    }
+
+    const rect = scrollEl.getBoundingClientRect();
+    const hasVScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1;
+    const hasHScroll = scrollEl.scrollWidth > scrollEl.clientWidth + 1;
+    const sb = 18;
+
+    if (hasVScroll && event.clientX >= rect.right - sb) {
+        return true;
+    }
+
+    if (hasHScroll && event.clientY >= rect.bottom - sb) {
+        return true;
+    }
+
+    return false;
+}
+
+function getPdvFiscalTransmitProgressOverlay() {
+    return document.querySelector('[data-erp-pdv-fiscal-progress]');
+}
+
+function resetPdvFiscalTransmitProgressUi(overlay) {
+    if (! overlay) {
+        return;
+    }
+
+    pdvFiscalProgressStepIndex = 0;
+
+    const panel = overlay.querySelector('[data-erp-pdv-fiscal-progress-panel]') ?? overlay;
+    const steps = Array.from(panel.querySelectorAll('[data-erp-pdv-fiscal-step]'));
+    const statusEl = panel.querySelector('[data-erp-pdv-fiscal-step-status]');
+    const barEl = panel.querySelector('[data-erp-pdv-fiscal-step-bar]');
+
+    steps.forEach((step, index) => {
+        step.classList.toggle('is-active', index === 0);
+        step.classList.toggle('is-done', false);
+    });
+
+    if (statusEl && steps[0]) {
+        statusEl.textContent = `${steps[0].textContent.trim()}…`;
+    }
+
+    if (barEl) {
+        barEl.style.width = '12%';
+    }
+}
+
+function advancePdvFiscalTransmitProgress(overlay) {
+    const panel = overlay.querySelector('[data-erp-pdv-fiscal-progress-panel]') ?? overlay;
+    const steps = Array.from(panel.querySelectorAll('[data-erp-pdv-fiscal-step]'));
+    const statusEl = panel.querySelector('[data-erp-pdv-fiscal-step-status]');
+    const barEl = panel.querySelector('[data-erp-pdv-fiscal-step-bar]');
+
+    if (steps.length === 0) {
+        return;
+    }
+
+    if (pdvFiscalProgressStepIndex < steps.length - 1) {
+        steps[pdvFiscalProgressStepIndex].classList.remove('is-active');
+        steps[pdvFiscalProgressStepIndex].classList.add('is-done');
+        pdvFiscalProgressStepIndex += 1;
+        steps[pdvFiscalProgressStepIndex].classList.add('is-active');
+    }
+
+    if (statusEl && steps[pdvFiscalProgressStepIndex]) {
+        statusEl.textContent = `${steps[pdvFiscalProgressStepIndex].textContent.trim()}…`;
+    }
+
+    if (barEl) {
+        const percent = Math.min(100, Math.round(((pdvFiscalProgressStepIndex + 1) / steps.length) * 100));
+        barEl.style.width = `${percent}%`;
+    }
+}
+
+function stopPdvFiscalTransmitProgress() {
+    pdvFiscalProgressActive = false;
+
+    if (pdvFiscalProgressTimer) {
+        window.clearInterval(pdvFiscalProgressTimer);
+        pdvFiscalProgressTimer = null;
+    }
+}
+
+function startPdvFiscalTransmitProgress() {
+    const overlay = getPdvFiscalTransmitProgressOverlay();
+
+    if (! overlay) {
+        return;
+    }
+
+    stopPdvFiscalTransmitProgress();
+    pdvFiscalProgressActive = true;
+    overlay.classList.add('is-visible');
+    overlay.setAttribute('aria-busy', 'true');
+    resetPdvFiscalTransmitProgressUi(overlay);
+
+    window.setTimeout(() => {
+        if (! pdvFiscalProgressActive) {
+            return;
+        }
+
+        advancePdvFiscalTransmitProgress(overlay);
+    }, 700);
+
+    pdvFiscalProgressTimer = window.setInterval(() => {
+        const currentOverlay = getPdvFiscalTransmitProgressOverlay();
+
+        if (! pdvFiscalProgressActive || ! currentOverlay) {
+            stopPdvFiscalTransmitProgress();
+
+            return;
+        }
+
+        advancePdvFiscalTransmitProgress(currentOverlay);
+    }, 850);
+}
+
+function hidePdvFiscalTransmitProgress() {
+    stopPdvFiscalTransmitProgress();
+
+    document.querySelectorAll('.erp-pdv-fiscal-progress').forEach((overlay) => {
+        overlay.classList.remove('is-visible');
+        overlay.setAttribute('aria-busy', 'false');
+    });
+
+    resetPdvFiscalTransmitProgressUi(getPdvFiscalTransmitProgressOverlay());
+}
+
+function focusPdvSearchField() {
+    const delays = [0, 20, 60, 120, 250, 450, 800, 1200, 1800, 2400];
+
+    delays.forEach((delay) => {
+        window.setTimeout(() => {
+            tryFocusPdvSearchField();
+        }, delay);
+    });
+}
+
+function findPdvLivewireComponent() {
+    if (! window.Livewire?.all) {
+        return null;
+    }
+
+    try {
+        return window.Livewire.all().find((component) => component?.el?.querySelector?.('#erp-pdv-search')) ?? null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function pdvHasBlockingUi(pdv) {
+    if (! pdv) {
+        return true;
+    }
+
+    // Aviso "produto não encontrado" NÃO bloqueia (permite seguir bipando).
+    // Confirmações/fiscal (classes extras) bloqueiam.
+    const candidates = pdv.querySelectorAll(
+        '.erp-pdv-modal, .erp-pdv-overlay, .erp-pdv-confirm-overlay, .erp-pdv-fiscal-overlay, [data-erp-pdv-fiscal-progress].is-visible',
+    );
+
+    for (const el of candidates) {
+        const style = window.getComputedStyle(el);
+
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+function tryFocusPdvSearchField() {
+    const pdv = document.querySelector('.erp-pdv');
+
+    if (! pdv || pdv.dataset.caixaAberto !== '1') {
+        return false;
+    }
+
+    // Não rouba foco enquanto houver modal/overlay PDV visível.
+    if (pdvHasBlockingUi(pdv)) {
+        return false;
+    }
+
+    // Em fluxo normal (sem Caixa Rápido): respeita o passo Qtde/Preço.
+    const launchQtd = document.getElementById('erp-pdv-launch-qtd');
+    const launchPreco = document.getElementById('erp-pdv-launch-preco');
+
+    if (launchQtd && ! launchQtd.disabled && ! launchQtd.readOnly) {
+        return false;
+    }
+
+    if (launchPreco && ! launchPreco.disabled && ! launchPreco.readOnly) {
+        return false;
+    }
+
+    const input = document.getElementById('erp-pdv-search');
+
+    if (! input || input.disabled) {
+        return false;
+    }
+
+    try {
+        input.focus({ preventScroll: true });
+    } catch (_) {
+        input.focus();
+    }
+
+    try {
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+    } catch (_) {
+        // ignore
+    }
+
+    // Garante caret visível em alguns browsers após morph do Livewire.
+    if (document.activeElement !== input) {
+        try {
+            input.focus({ preventScroll: true });
+        } catch (_) {
+            // ignore
+        }
+    }
+
+    return document.activeElement === input;
+}
+
+/**
+ * Trap estilo PDV: se o foco “sumiu” (body / área morta), devolve ao Código.
+ * Não interfere em inputs/botões/modais em uso.
+ */
+function bindPdvSearchFocusTrap() {
+    if (window.__erpPdvSearchFocusTrapBound) {
+        return;
+    }
+
+    window.__erpPdvSearchFocusTrapBound = true;
+
+    window.setInterval(() => {
+        const pdv = document.querySelector('.erp-pdv');
+
+        if (! pdv || pdv.dataset.caixaAberto !== '1' || pdvHasBlockingUi(pdv)) {
+            return;
+        }
+
+        const input = document.getElementById('erp-pdv-search');
+
+        if (! input || input.disabled) {
+            return;
+        }
+
+        const active = document.activeElement;
+
+        if (active === input) {
+            return;
+        }
+
+        if (active && pdv.contains(active)) {
+            const tag = (active.tagName || '').toUpperCase();
+
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') {
+                return;
+            }
+
+            if (active.isContentEditable) {
+                return;
+            }
+        }
+
+        // Força após lançamento, ou quando o foco caiu fora do PDV / no body.
+        const forceUntil = window.__erpPdvForceSearchFocusUntil || 0;
+        const lostFocus = ! active
+            || active === document.body
+            || active === document.documentElement
+            || ! pdv.contains(active);
+
+        if (lostFocus || Date.now() < forceUntil) {
+            tryFocusPdvSearchField();
+        }
+    }, 160);
 }
 
 function bindPdvStatusBar() {
@@ -462,16 +1105,62 @@ function bindErpPdvKeys() {
     erpPdvKeysBound = true;
 
     document.addEventListener('keydown', handlePdvKeydown);
+    document.addEventListener('focusin', (event) => {
+        if (event.target?.id === 'erp-pdv-finalizar-cliente') {
+            erpPdvFinalizarClienteTyping = true;
+        }
+    });
+    document.addEventListener('focusout', (event) => {
+        if (event.target?.id !== 'erp-pdv-finalizar-cliente') {
+            return;
+        }
+
+        window.setTimeout(() => {
+            if (document.activeElement?.id === 'erp-pdv-finalizar-cliente') {
+                return;
+            }
+
+            // Mantém bloqueio dos atalhos enquanto a lista de clientes estiver aberta.
+            if (document.querySelector('.erp-pdv-finalizar__cliente-list')
+                || document.querySelector('.erp-pdv-finalizar[data-cliente-consulta="1"]')) {
+                return;
+            }
+
+            erpPdvFinalizarClienteTyping = false;
+        }, 0);
+    });
 }
 
 function dispatchPdvShortcut(event, component) {
     const pdvRoot = document.querySelector('.erp-pdv');
+    const caixaAberto = pdvRoot?.dataset.caixaAberto === '1';
 
     if (event.key === 'Escape') {
         event.preventDefault();
         component.call('handlePdvEscape');
 
         return true;
+    }
+
+    // Caixa fechado: só F1 (Opções) e F2 (Abrir Caixa) ficam ativos.
+    if (! caixaAberto) {
+        if (event.key === 'F1' || event.key === 'F2') {
+            const callArgs = ERP_PDV_FN_SHORTCUTS[event.key];
+
+            if (callArgs) {
+                event.preventDefault();
+                component.call(...callArgs);
+
+                return true;
+            }
+        }
+
+        if (ERP_PDV_FN_SHORTCUTS[event.key]
+            || (event.ctrlKey && ERP_PDV_CTRL_SHORTCUTS[event.key.toLowerCase()])) {
+            event.preventDefault();
+        }
+
+        return false;
     }
 
     if (event.ctrlKey && ! event.altKey && ! event.metaKey) {
@@ -581,6 +1270,12 @@ function handlePdvKeydown(event) {
     }
 
     if (event.key === 'Delete' && ! pdvRoot.querySelector('.erp-pdv__grid--consulta')) {
+        if (pdvRoot.dataset.caixaAberto !== '1') {
+            event.preventDefault();
+
+            return;
+        }
+
         event.preventDefault();
         component.call('deletarItemCupom');
 
@@ -679,18 +1374,266 @@ function triggerFinalizarOperacao(component, atalho) {
     }
 
     commitPdvFinalizarValor(document.activeElement);
+
+    if (btn.classList.contains('erp-pdv-finalizar__operacao-btn--fiscal')) {
+        window.setTimeout(startPdvFiscalTransmitProgress, 30);
+    }
+
     component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
 
     return true;
+}
+
+function focusPdvFinalizarParcelas() {
+    const qtd = document.getElementById('erp-pdv-parcelas-qtd');
+
+    if (qtd) {
+        qtd.focus();
+        qtd.select?.();
+
+        return;
+    }
+
+    document.querySelector('#erp-pdv-finalizar-tabela-prazo .erp-pdv__grid-row--selected')
+        ?.scrollIntoView({ block: 'nearest' });
+}
+
+function focusPdvFinalizarCartaoCanhoto() {
+    const nsu = document.getElementById('erp-pdv-canhoto-nsu');
+
+    if (nsu) {
+        nsu.focus();
+        nsu.select?.();
+
+        return;
+    }
+
+    document.querySelector('#erp-pdv-finalizar-cartao-canhoto .erp-pdv__grid-row--selected')
+        ?.scrollIntoView({ block: 'nearest' });
+}
+
+function isFinalizarClienteTyping(event) {
+    if (erpPdvFinalizarClienteTyping) {
+        return true;
+    }
+
+    const target = event?.target;
+
+    if (target?.id === 'erp-pdv-finalizar-cliente') {
+        return true;
+    }
+
+    if (target?.closest?.('.erp-pdv-finalizar__cliente-list')) {
+        return true;
+    }
+
+    if (document.activeElement?.id === 'erp-pdv-finalizar-cliente') {
+        return true;
+    }
+
+    if (document.querySelector('.erp-pdv-finalizar__cliente-list') !== null) {
+        return true;
+    }
+
+    if (document.querySelector('.erp-pdv-finalizar[data-cliente-consulta="1"]') !== null) {
+        return true;
+    }
+
+    return false;
 }
 
 function handlePdvFinalizarModalKeydown(event, component) {
     const valorFocused = document.activeElement?.id?.startsWith('erp-pdv-finalizar-valor-');
     const cpfFocused = document.activeElement?.id === 'erp-pdv-finalizar-cpf';
     const informacoesFocused = document.activeElement?.id === 'erp-pdv-finalizar-informacoes';
-    const clienteFocused = document.activeElement?.id === 'erp-pdv-finalizar-cliente';
+    const clienteTyping = isFinalizarClienteTyping(event);
     const operacaoFocused = document.activeElement?.classList?.contains('erp-pdv-finalizar__operacao-btn');
-    const clienteConsulta = document.querySelector('.erp-pdv-finalizar__cliente-list') !== null;
+    const canhotoModal = document.querySelector('.erp-pdv-canhoto-overlay') !== null;
+    const parcelasModal = document.querySelector('.erp-pdv-parcelas-overlay') !== null;
+
+    if (canhotoModal) {
+        if (event.key === 'F2') {
+            event.preventDefault();
+            component.call('gerarParcelasCartaoCanhoto');
+
+            return;
+        }
+
+        if (event.key === 'F4' || event.key === 'Escape') {
+            event.preventDefault();
+            component.call('cancelFinalizarCartaoCanhoto');
+
+            return;
+        }
+
+        if (event.key === 'F7') {
+            event.preventDefault();
+            component.call('concluirCartaoCanhoto');
+
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            const typing = ['erp-pdv-canhoto-nsu', 'erp-pdv-canhoto-autorizacao', 'erp-pdv-canhoto-maquininha', 'erp-pdv-canhoto-bandeira', 'erp-pdv-canhoto-qtd', 'erp-pdv-canhoto-intervalo']
+                .includes(document.activeElement?.id);
+
+            if (typing) {
+                event.preventDefault();
+                const order = ['erp-pdv-canhoto-nsu', 'erp-pdv-canhoto-autorizacao', 'erp-pdv-canhoto-maquininha', 'erp-pdv-canhoto-bandeira', 'erp-pdv-canhoto-qtd', 'erp-pdv-canhoto-intervalo'];
+                const idx = order.indexOf(document.activeElement.id);
+
+                if (idx >= 0 && idx < order.length - 1) {
+                    document.getElementById(order[idx + 1])?.focus();
+
+                    return;
+                }
+
+                if (document.activeElement?.id === 'erp-pdv-canhoto-intervalo' || document.activeElement?.id === 'erp-pdv-canhoto-qtd') {
+                    component.call('gerarParcelasCartaoCanhoto');
+
+                    return;
+                }
+            }
+
+            event.preventDefault();
+            component.call('concluirCartaoCanhoto');
+
+            return;
+        }
+
+        return;
+    }
+
+    if (parcelasModal) {
+        const carnePrint = document.querySelector('.erp-pdv-carne-print') !== null;
+        const tabelasLista = document.querySelector('.erp-pdv-parcelas__tabelas') !== null;
+
+        if (carnePrint) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                component.call('fecharCarneImpressao');
+
+                return;
+            }
+
+            if (event.key === '1' || event.key.toLowerCase() === 'c') {
+                event.preventDefault();
+                component.call('escolherCarneImpressaoA4ComCapa');
+
+                return;
+            }
+
+            if (event.key === '2' || event.key.toLowerCase() === 'a') {
+                event.preventDefault();
+                component.call('escolherCarneImpressaoA4');
+
+                return;
+            }
+
+            if (event.key === '3' || event.key.toLowerCase() === 'b') {
+                event.preventDefault();
+                component.call('escolherCarneImpressaoBobina80');
+
+                return;
+            }
+
+            return;
+        }
+
+        if (tabelasLista) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                component.call('moveFinalizarTabelaPredefinidaSelection', event.key === 'ArrowDown' ? 1 : -1);
+                window.setTimeout(() => {
+                    document.querySelector('#erp-pdv-parcelas-tabelas .erp-pdv__grid-row--selected')
+                        ?.scrollIntoView({ block: 'nearest' });
+                }, 30);
+
+                return;
+            }
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                component.call('aplicarTabelaPrazoPredefinida');
+
+                return;
+            }
+
+            if (event.key === 'Escape' || event.key === 'F4') {
+                event.preventDefault();
+                component.call('fecharTabelasPrazoPredefinidas');
+
+                return;
+            }
+
+            return;
+        }
+
+        if (event.key === 'F2') {
+            event.preventDefault();
+            component.call('gerarParcelasCrediario');
+
+            return;
+        }
+
+        if (event.key === 'F8') {
+            event.preventDefault();
+            component.call('abrirTabelasPrazoPredefinidas');
+
+            return;
+        }
+
+        if (event.key === 'F6') {
+            event.preventDefault();
+            component.call('abrirCarneImpressao');
+
+            return;
+        }
+
+        if (event.key === 'F3') {
+            event.preventDefault();
+            component.call('excluirParcelaCrediario');
+
+            return;
+        }
+
+        if (event.key === 'F4' || event.key === 'Escape') {
+            event.preventDefault();
+            component.call('cancelFinalizarTabelaPrazoConsulta');
+
+            return;
+        }
+
+        if (event.key === 'F7' || event.key === 'Enter') {
+            const typing = document.activeElement?.id === 'erp-pdv-parcelas-qtd'
+                || document.activeElement?.id === 'erp-pdv-parcelas-intervalo';
+
+            if (event.key === 'Enter' && typing) {
+                event.preventDefault();
+                component.call('gerarParcelasCrediario');
+
+                return;
+            }
+
+            event.preventDefault();
+            component.call('concluirParcelasCrediario');
+
+            return;
+        }
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            component.call('moveFinalizarParcelaSelection', event.key === 'ArrowDown' ? 1 : -1);
+            window.setTimeout(() => {
+                document.querySelector('#erp-pdv-finalizar-tabela-prazo .erp-pdv__grid-row--selected')
+                    ?.scrollIntoView({ block: 'nearest' });
+            }, 30);
+
+            return;
+        }
+
+        return;
+    }
 
     if (event.key === 'Enter' && (cpfFocused || informacoesFocused || operacaoFocused)) {
         event.preventDefault();
@@ -698,15 +1641,25 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    if (clienteConsulta || clienteFocused) {
+    // Campo / lista de cliente: digitar nome livremente (ex.: "AD").
+    // Não capturar atalhos de pagamento (D=Dinheiro, P=Pix…) até confirmar com Enter.
+    if (clienteTyping) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('handlePdvEscape');
+
+            return;
+        }
+
         if (event.key === 'F2') {
             event.preventDefault();
+            erpPdvFinalizarClienteTyping = true;
             component.call('openFinalizarClienteConsulta');
 
             return;
         }
 
-        if (clienteFocused && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
             component.call('moveFinalizarClienteSelection', event.key === 'ArrowDown' ? 1 : -1);
             scrollPdvFinalizarClienteIntoView();
@@ -714,9 +1667,8 @@ function handlePdvFinalizarModalKeydown(event, component) {
             return;
         }
 
-        if (clienteConsulta) {
-            return;
-        }
+        // Letras/números/espaço etc. ficam no input — não viram atalho de pagamento.
+        return;
     }
 
     if (valorFocused && event.key === 'Enter') {
@@ -767,6 +1719,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
 
     if (event.key === 'F2') {
         event.preventDefault();
+        erpPdvFinalizarClienteTyping = true;
         component.call('openFinalizarClienteConsulta');
 
         return;
@@ -812,12 +1765,40 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         return;
     }
 
+    const fiscalOverlayImprimir = document.getElementById('erp-pdv-fiscal-overlay-imprimir');
+    const fiscalOverlayEntendido = document.getElementById('erp-pdv-fiscal-overlay-entendido');
+    const fiscalOverlaySair = document.getElementById('erp-pdv-fiscal-overlay-sair');
+
+    if (fiscalOverlayImprimir || fiscalOverlayEntendido || fiscalOverlaySair) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+
+            if (fiscalOverlayImprimir) {
+                component.call('imprimirProtocoloCancelamentoNfce');
+            } else {
+                component.call('sairPdvFiscalOverlay');
+            }
+        }
+
+        if (event.key.toLowerCase() === 's' && fiscalOverlaySair && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('sairPdvFiscalOverlay');
+        }
+
+        return;
+    }
+
     const sairModal = document.getElementById('erp-pdv-sair-title');
 
     if (sairModal) {
         if (event.key === 'Enter') {
             event.preventDefault();
             component.call('confirmSairPdv');
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('closePdvModal');
         }
 
         return;
@@ -837,9 +1818,23 @@ function handlePdvModalKeydown(event, component, isFormModal) {
     const finalizarImprimirConfirm = document.getElementById('erp-pdv-finalizar-imprimir-title');
 
     if (finalizarImprimirConfirm) {
+        const sim = document.getElementById('erp-pdv-finalizar-imprimir-sim');
+        const nao = document.getElementById('erp-pdv-finalizar-imprimir-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmFinalizarImprimir', false);
+            component.call('confirmFinalizarImprimir', document.activeElement === sim);
 
             return;
         }
@@ -847,6 +1842,13 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
             event.preventDefault();
             component.call('confirmFinalizarImprimir', true);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmFinalizarImprimir', false);
 
             return;
         }
@@ -861,24 +1863,145 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         return;
     }
 
-    const finalizarSairConfirm = document.getElementById('erp-pdv-finalizar-sair-title');
+    const imprimirPosVenda = document.getElementById('erp-pdv-imprimir-pos-venda-title');
 
-    if (finalizarSairConfirm) {
+    if (imprimirPosVenda) {
+        const sim = document.getElementById('erp-pdv-imprimir-pos-venda-sim');
+        const nao = document.getElementById('erp-pdv-imprimir-pos-venda-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmCloseFinalizar');
+            component.call('confirmImprimirPosVenda', document.activeElement === sim);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirPosVenda', true);
 
             return;
         }
 
         if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
             event.preventDefault();
-            component.call('cancelCloseFinalizar');
+            component.call('confirmImprimirPosVenda', false);
+
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('confirmImprimirPosVenda', false);
 
             return;
         }
 
         return;
+    }
+
+    const cancelarVendaConfirm = document.getElementById('erp-pdv-cancelar-venda-title');
+
+    if (cancelarVendaConfirm) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const active = document.activeElement;
+
+            if (active?.id === 'erp-pdv-cancelar-venda-nao') {
+                component.call('cancelCancelarCupom');
+            } else {
+                component.call('confirmCancelarCupom');
+            }
+
+            return true;
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const sim = document.getElementById('erp-pdv-cancelar-venda-sim');
+            const nao = document.getElementById('erp-pdv-cancelar-venda-nao');
+
+            if (document.activeElement === nao) {
+                sim?.focus();
+            } else {
+                nao?.focus();
+            }
+
+            return true;
+        }
+
+        if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmCancelarCupom');
+
+            return true;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('cancelCancelarCupom');
+
+            return true;
+        }
+
+        return true;
+    }
+    const finalizarSairConfirm = document.getElementById('erp-pdv-finalizar-sair-title');
+
+    if (finalizarSairConfirm) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const active = document.activeElement;
+
+            if (active?.id === 'erp-pdv-finalizar-sair-nao') {
+                component.call('cancelCloseFinalizar');
+            } else {
+                component.call('confirmCloseFinalizar');
+            }
+
+            return true;
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const sim = document.getElementById('erp-pdv-finalizar-sair-sim');
+            const nao = document.getElementById('erp-pdv-finalizar-sair-nao');
+
+            if (document.activeElement === nao) {
+                sim?.focus();
+            } else {
+                nao?.focus();
+            }
+
+            return true;
+        }
+
+        if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmCloseFinalizar');
+
+            return true;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('cancelCloseFinalizar');
+
+            return true;
+        }
+
+        return true;
     }
 
     const finalizarModal = document.getElementById('erp-pdv-finalizar-title');
@@ -927,6 +2050,91 @@ function handlePdvModalKeydown(event, component, isFormModal) {
 }
 
 function handlePdvListModalKeydown(event, component) {
+    const importarMenu = document.getElementById('erp-pdv-importar-menu-panel');
+
+    if (importarMenu) {
+        const fnMap = {
+            F2: 'pedido',
+            F3: 'orcamento',
+            F4: 'ordem_servico',
+            F5: 'pre_venda',
+        };
+
+        if (fnMap[event.key]) {
+            event.preventDefault();
+            component.call('selectImportarTipo', fnMap[event.key]);
+
+            return true;
+        }
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            component.call('moveImportarMenuSelection', event.key === 'ArrowDown' ? 1 : -1);
+            window.setTimeout(() => {
+                document.querySelector('.erp-pdv-importar-menu__btn--selected')?.focus();
+            }, 60);
+
+            return true;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmImportarMenuSelection');
+
+            return true;
+        }
+
+        return true;
+    }
+
+    const importarPedidoPanel = document.getElementById('erp-pdv-importar-pedido-panel');
+
+    if (importarPedidoPanel) {
+        const pedidoNumeroFocused = document.activeElement?.id === 'erp-pdv-importar-pedido-numero';
+        const pedidoDeFocused = document.activeElement?.id === 'erp-pdv-importar-pedido-de';
+        const pedidoAteFocused = document.activeElement?.id === 'erp-pdv-importar-pedido-ate';
+
+        if (event.key === 'F9') {
+            event.preventDefault();
+            component.call('refreshImportarPedidoResults');
+
+            return true;
+        }
+
+        if (event.key === 'F2') {
+            event.preventDefault();
+            component.call('confirmImportarPedido');
+
+            return true;
+        }
+
+        if ((pedidoNumeroFocused || pedidoDeFocused || pedidoAteFocused)
+            && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            component.call('moveImportarPedidoSelection', event.key === 'ArrowDown' ? 1 : -1);
+            scrollPdvModalRowIntoView('erp-pdv-importar-pedido-row-');
+
+            return true;
+        }
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            component.call('moveImportarPedidoSelection', event.key === 'ArrowDown' ? 1 : -1);
+            scrollPdvModalRowIntoView('erp-pdv-importar-pedido-row-');
+
+            return true;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmImportarPedido');
+
+            return true;
+        }
+
+        return true;
+    }
+
     const gradeModal = document.getElementById('erp-pdv-grade-confirm');
 
     if (gradeModal) {
@@ -941,6 +2149,27 @@ function handlePdvListModalKeydown(event, component) {
             event.preventDefault();
             component.call('movePdvGradeSelection', event.key === 'ArrowDown' ? 1 : -1);
             scrollPdvModalRowIntoView('erp-pdv-grade-row-');
+
+            return true;
+        }
+
+        return false;
+    }
+
+    const vendedorSearch = document.getElementById('erp-pdv-vendedor-search');
+
+    if (vendedorSearch) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            component.call('moveVendedorSelection', event.key === 'ArrowDown' ? 1 : -1);
+            scrollPdvModalRowIntoView('erp-pdv-vendedor-row-');
+
+            return true;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmVendedor');
 
             return true;
         }
@@ -994,12 +2223,43 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
-    const removerQtd = document.getElementById('erp-pdv-remover-itens-qtd');
+    const removerSearch = document.getElementById('erp-pdv-remover-itens-search');
+    const removerSim = document.getElementById('erp-pdv-remover-itens-sim');
+    const removerNao = document.getElementById('erp-pdv-remover-itens-nao');
 
-    if (removerQtd) {
+    if (removerSim || removerNao) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmRemoverItens');
+            const active = document.activeElement;
+
+            if (active === removerNao) {
+                component.call('cancelRemoverItensConfirm');
+            } else {
+                component.call('confirmRemoverItens');
+            }
+
+            return true;
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+
+            if (document.activeElement === removerNao) {
+                removerSim?.focus();
+            } else {
+                removerNao?.focus();
+            }
+
+            return true;
+        }
+
+        return true;
+    }
+
+    if (removerSearch) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('handleRemoverItensSearchEnter', removerSearch.value || '');
 
             return true;
         }
@@ -1120,12 +2380,26 @@ function handlePdvListModalKeydown(event, component) {
     const consultaVendaSearch = document.getElementById('erp-pdv-consulta-venda-search');
 
     if (consultaVendaSearch) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('cancelConsultaVenda');
+
+            return true;
+        }
+
         const consultaFocused = document.activeElement?.id === 'erp-pdv-consulta-venda-search';
 
         if (consultaFocused && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
             component.call('moveConsultaVendaSelection', event.key === 'ArrowDown' ? 1 : -1);
             scrollPdvModalRowIntoView('erp-pdv-consulta-venda-row-');
+
+            return true;
+        }
+
+        if (consultaFocused && event.key === ' ') {
+            event.preventDefault();
+            component.call('toggleMarkCurrentConsultaVendaRow');
 
             return true;
         }
@@ -1173,19 +2447,18 @@ function handlePdvListModalKeydown(event, component) {
 
 function scrollPdvModalRowIntoView(prefix) {
     window.requestAnimationFrame(() => {
-        document.querySelector(`[id^="${prefix}"]`)?.closest('.erp-pdv-vendedor-row--selected, .erp-pdv__grid-row--selected')
-            ?.scrollIntoView({ block: 'nearest' });
+        const rows = document.querySelectorAll(`.erp-pdv-modal [id^="${prefix}"]`);
 
-        document.querySelector('.erp-pdv-modal .erp-pdv__grid-row--selected')?.scrollIntoView({
-            block: 'nearest',
-        });
+        for (const row of rows) {
+            if (row.classList.contains('erp-pdv__grid-row--marked')
+                || row.classList.contains('erp-pdv__grid-row--selected')
+                || row.classList.contains('erp-pdv-vendedor-row--selected')) {
+                row.scrollIntoView({ block: 'nearest' });
+
+                return;
+            }
+        }
     });
-}
-
-function focusPdvSearchField() {
-    window.setTimeout(() => {
-        document.getElementById('erp-pdv-search')?.focus();
-    }, 50);
 }
 
 let erpPdvConfirmTimer = null;
@@ -1300,12 +2573,19 @@ function playPdvErrorBeep() {
 }
 
 function focusPdvLaunchField(field) {
+    // Evita o trap do Código roubar o foco no passo Qtde/Preço.
+    window.__erpPdvForceSearchFocusUntil = 0;
+
     const tryFocus = (attempt = 0) => {
         const id = field === 'preco' ? 'erp-pdv-launch-preco' : 'erp-pdv-launch-qtd';
         const input = document.getElementById(id);
 
-        if (input) {
-            input.focus();
+        if (input && ! input.disabled && ! input.readOnly) {
+            try {
+                input.focus({ preventScroll: true });
+            } catch (_) {
+                input.focus();
+            }
             input.select?.();
 
             if (window.ErpMasks?.refresh) {
@@ -1315,12 +2595,14 @@ function focusPdvLaunchField(field) {
             return;
         }
 
-        if (attempt < 6) {
-            window.setTimeout(() => tryFocus(attempt + 1), 80);
+        if (attempt < 8) {
+            window.setTimeout(() => tryFocus(attempt + 1), 60);
         }
     };
 
-    window.setTimeout(() => tryFocus(), 50);
+    window.setTimeout(() => tryFocus(), 30);
+    window.setTimeout(() => tryFocus(0), 120);
+    window.setTimeout(() => tryFocus(0), 280);
 }
 
 function scrollPdvSearchSelectionIntoView() {
@@ -1391,8 +2673,53 @@ function focusPdvModalField() {
     const abertura = document.getElementById('erp-pdv-abertura-valor');
 
     if (abertura) {
-        abertura.focus();
-        abertura.select?.();
+        const modal = abertura.closest('.erp-pdv-caixa-modal')
+            ?? abertura.closest('.erp-pdv-modal')
+            ?? document;
+
+        // Garante máscara de dinheiro no modal recém-aberto (Livewire morph).
+        delete abertura.dataset.erpMaskBound;
+        window.ErpMasks?.refresh(modal);
+
+        abertura.value = '0,00';
+        abertura.setAttribute('autocomplete', 'off');
+        abertura.setAttribute('title', '');
+        abertura.removeAttribute('list');
+
+        window.ErpMasks?.apply(abertura, { sync: false });
+
+        const selectAll = () => {
+            try {
+                abertura.focus({ preventScroll: true });
+            } catch (_) {
+                abertura.focus();
+            }
+            // Seleção total (azul) para digitar por cima.
+            abertura.select();
+            if (typeof abertura.setSelectionRange === 'function') {
+                abertura.setSelectionRange(0, abertura.value.length);
+            }
+        };
+
+        if (abertura.dataset.erpAberturaSelectBound !== '1') {
+            abertura.dataset.erpAberturaSelectBound = '1';
+            abertura.addEventListener('focus', () => {
+                window.requestAnimationFrame(selectAll);
+            });
+            // Evita o Chrome “desselecionar” no clique.
+            abertura.addEventListener('mouseup', (event) => {
+                if (abertura.selectionStart === abertura.selectionEnd) {
+                    event.preventDefault();
+                    selectAll();
+                }
+            });
+        }
+
+        window.requestAnimationFrame(() => {
+            selectAll();
+            window.setTimeout(selectAll, 40);
+            window.setTimeout(selectAll, 120);
+        });
 
         return;
     }
@@ -1423,23 +2750,246 @@ if (window.Livewire) {
 }
 
 window.ErpPdvPrint = {
-    openCupom({ url, copias = 1 }) {
+    openCupom(payload) {
+        if (window.ErpPrint?.openCupom) {
+            window.ErpPrint.openCupom(payload);
+            return;
+        }
+
+        const url = payload?.url;
+        const copias = payload?.copias ?? 1;
+
         if (! url) {
             return;
         }
 
-        const popup = window.open(url, '_blank');
-
-        if (! popup) {
-            window.open(url, '_blank');
-        }
+        this.printUrl(url);
 
         if (copias > 1) {
             window.setTimeout(() => {
-                window.open(url.replace('auto=1', 'auto=0'), '_blank');
+                this.printUrl(String(url).replace(/([?&])auto=1\b/, '$1auto=0').replace(/([?&])auto=0\b/, '$1auto=1'));
             }, 800);
         }
+    },
+
+    /**
+     * Imprime relatório em iframe oculto (sem abrir aba no navegador).
+     * @param {string} url
+     */
+    printUrl(url) {
+        if (! url) {
+            return;
+        }
+
+        let printUrl = String(url);
+
+        try {
+            const parsed = new URL(printUrl, window.location.origin);
+            parsed.searchParams.set('auto', '1');
+            printUrl = parsed.toString();
+        } catch (_) {
+            printUrl = printUrl.includes('auto=')
+                ? printUrl.replace(/([?&])auto=\d/, '$1auto=1')
+                : `${printUrl}${printUrl.includes('?') ? '&' : '?'}auto=1`;
+        }
+
+        document.getElementById('erp-pdv-print-frame')?.remove();
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'erp-pdv-print-frame';
+        iframe.src = printUrl;
+        iframe.title = 'Impressão PDV';
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.cssText = [
+            'position:fixed',
+            'width:0',
+            'height:0',
+            'border:0',
+            'opacity:0',
+            'pointer-events:none',
+            'left:-9999px',
+            'top:-9999px',
+        ].join(';');
+
+        let cleanedUp = false;
+
+        const cleanup = () => {
+            if (cleanedUp) {
+                return;
+            }
+
+            cleanedUp = true;
+            window.removeEventListener('message', onMessage);
+            iframe.remove();
+        };
+
+        const onMessage = (event) => {
+            if (event.source !== iframe.contentWindow) {
+                return;
+            }
+
+            if (event.data?.type === 'erp-pdv-carne-print-done') {
+                cleanup();
+            }
+        };
+
+        window.addEventListener('message', onMessage);
+
+        iframe.addEventListener('load', () => {
+            // O relatório com ?auto=1 dispara window.print() sozinho.
+            // Só limpamos o iframe após afterprint (postMessage) ou timeout.
+            window.setTimeout(cleanup, 120000);
+        }, { once: true });
+
+        document.body.appendChild(iframe);
     },
 };
 
 initErpPdv();
+
+/**
+ * Descanso de tela do letreiro (marquee).
+ * Regra: após 30s SEM atividade e SEM venda em andamento (cupom vazio),
+ * troca o título "CAIXA ABERTO" pelas mensagens correndo. Qualquer atividade
+ * (tecla/mouse) ou item no cupom volta imediatamente para "CAIXA ABERTO".
+ */
+(function initPdvScreensaver() {
+    const IDLE_MS = 30000;
+    let idleTimer = null;
+    let idle = false;
+
+    const getHeader = () => document.querySelector('.erp-pdv__header');
+    const getPdv = () => document.querySelector('.erp-pdv');
+
+    function canScreensave() {
+        const header = getHeader();
+        const pdv = getPdv();
+
+        if (! header || header.dataset.marquee !== '1') {
+            return false;
+        }
+
+        // Venda em andamento (cupom com itens): mantém "CAIXA ABERTO".
+        if (header.dataset.vendaAndamento === '1') {
+            return false;
+        }
+
+        // Só substitui quando o caixa está aberto.
+        if (pdv && pdv.dataset.caixaAberto !== '1') {
+            return false;
+        }
+
+        return true;
+    }
+
+    function syncMarqueeFontSize() {
+        const header = getHeader();
+
+        if (! header) {
+            return;
+        }
+
+        const title = header.querySelector('.erp-pdv__title:not(.erp-pdv__marquee-text)');
+        const marquees = header.querySelectorAll('.erp-pdv__marquee-text');
+
+        if (! title || marquees.length === 0) {
+            return;
+        }
+
+        // Lê o tamanho real renderizado do "CAIXA ABERTO" (inclui overrides do Filament).
+        const wasHidden = getComputedStyle(title).display === 'none';
+        let size = '';
+        let lineHeight = '';
+        let fontWeight = '';
+
+        if (wasHidden) {
+            // Mede com o título temporariamente visível fora da tela.
+            const prev = {
+                display: title.style.display,
+                visibility: title.style.visibility,
+                position: title.style.position,
+                left: title.style.left,
+            };
+            title.style.display = 'block';
+            title.style.visibility = 'hidden';
+            title.style.position = 'absolute';
+            title.style.left = '-9999px';
+            const cs = getComputedStyle(title);
+            size = cs.fontSize;
+            lineHeight = cs.lineHeight;
+            fontWeight = cs.fontWeight;
+            title.style.display = prev.display;
+            title.style.visibility = prev.visibility;
+            title.style.position = prev.position;
+            title.style.left = prev.left;
+        } else {
+            const cs = getComputedStyle(title);
+            size = cs.fontSize;
+            lineHeight = cs.lineHeight;
+            fontWeight = cs.fontWeight;
+        }
+
+        if (! size) {
+            return;
+        }
+
+        header.style.setProperty('--erp-pdv-banner-font-size', size);
+        marquees.forEach((el) => {
+            el.style.fontSize = size;
+            el.style.lineHeight = lineHeight || '1.15';
+            el.style.fontWeight = fontWeight || '800';
+        });
+    }
+
+    function apply() {
+        const header = getHeader();
+
+        if (! header) {
+            return;
+        }
+
+        if (idle && canScreensave()) {
+            // Mede com o título ainda visível, depois troca para o letreiro.
+            syncMarqueeFontSize();
+            header.classList.add('is-screensaver');
+        } else {
+            header.classList.remove('is-screensaver');
+        }
+    }
+
+    function goIdle() {
+        idle = true;
+        apply();
+    }
+
+    function resetIdle() {
+        idle = false;
+        apply();
+
+        if (idleTimer) {
+            window.clearTimeout(idleTimer);
+        }
+
+        idleTimer = window.setTimeout(goIdle, IDLE_MS);
+    }
+
+    ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'click'].forEach((evt) => {
+        document.addEventListener(evt, resetIdle, { passive: true });
+    });
+
+    document.addEventListener('livewire:init', () => {
+        resetIdle();
+
+        try {
+            if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                // Reaplica o estado após cada re-render (o morph reescreve o header).
+                window.Livewire.hook('morph.updated', apply);
+            }
+        } catch (e) {
+            // Hook indisponível: o timer de inatividade ainda funciona.
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', resetIdle);
+    resetIdle();
+})();

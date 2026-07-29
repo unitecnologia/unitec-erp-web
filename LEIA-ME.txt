@@ -1,4 +1,4 @@
-UNITEC ERP — INSTALACAO
+﻿UNITEC ERP â€” INSTALACAO
 
 
 
@@ -22,7 +22,7 @@ DEPOIS DE INSTALAR
 
 Login:
 
-  E-mail: usuario@unitecnologia.local
+  Usuário: USUARIO
 
   Senha:  01
 

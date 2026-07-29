@@ -35,9 +35,17 @@ class ComissaoVendedoresReport
             $vid = $venda->vendedor_id ? (int) $venda->vendedor_id : 0;
 
             if (! isset($grupos[$vid])) {
+                $nome = trim((string) ($venda->vendedor?->nome ?? ''));
+                if ($nome === '') {
+                    $snap = trim((string) ($venda->vendedor_nome ?? ''));
+                    $nome = ($snap !== '' && mb_strtoupper($snap, 'UTF-8') !== 'LOJA')
+                        ? $snap
+                        : 'SEM OPERADOR';
+                }
+
                 $grupos[$vid] = [
                     'vendedor_id' => $vid ?: null,
-                    'nome' => $venda->vendedorNome() ?: 'LOJA',
+                    'nome' => $nome,
                     'comissao_av' => (float) ($venda->vendedor?->comissao_av ?? 0),
                     'comissao_ap' => (float) ($venda->vendedor?->comissao_ap ?? 0),
                     'qtd' => 0,

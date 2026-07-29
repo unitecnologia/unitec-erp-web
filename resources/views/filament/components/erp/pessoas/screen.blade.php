@@ -16,11 +16,10 @@
         <div class="erp-pessoas__filters-row">
             <div class="erp-pessoas__search-group">
                 <span class="erp-pessoas__locate-label">F6 | Localizar</span>
-                <select wire:model.live="searchColumn" class="erp-pessoas__select erp-pessoas__search-field">
-                    @foreach ($searchFields as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
+                @include('filament.components.erp.shared.search-field-dropdown', [
+                    'fields' => $searchFields,
+                    'searchColumn' => $this->searchColumn,
+                ])
                 <input
                     type="text"
                     wire:model="localSearch"

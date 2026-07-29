@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\AjustaEstoqueGrupoResource\Pages;
 use App\Models\Product;
 use BackedEnum;
@@ -25,11 +26,16 @@ class AjustaEstoqueGrupoResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('ajuste_estoque.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('codigo')->label('CÃ³digo')->alignCenter()->weight(FontWeight::SemiBold),
+                TextColumn::make('codigo')->label('Código')->alignCenter()->weight(FontWeight::SemiBold),
                 TextColumn::make('descricao')->label('Produto')->wrap(false)->weight(FontWeight::Bold),
                 TextColumn::make('estoque')
                     ->label('Qtd. Atual')

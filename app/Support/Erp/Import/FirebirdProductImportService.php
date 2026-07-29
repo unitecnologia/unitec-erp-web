@@ -9,6 +9,9 @@ use Illuminate\Support\Str;
 
 class FirebirdProductImportService
 {
+    /** @var array<string, string> */
+    protected array $grupoNomeByCodigo = [];
+
     /**
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
@@ -33,11 +36,8 @@ class FirebirdProductImportService
             'preco_custo' => BrDecimalImport::parse($row['PR_CUSTO2'] ?? $row['PR_CUSTO'] ?? 0),
             'pct_lucro' => BrDecimalImport::parse($row['MARGEM'] ?? 0),
             'preco_venda' => BrDecimalImport::parse($row['PR_VENDA'] ?? 0),
-            'preco_venda_prazo' => BrDecimalImport::parse($row['PR_VENDA_PRAZO'] ?? 0),
             'preco_atacado' => BrDecimalImport::parse($row['PRECO_ATACADO'] ?? 0),
             'qtd_atacado' => BrDecimalImport::parse($row['QTD_ATACADO'] ?? 0, 3),
-            'comissao_pct' => BrDecimalImport::parse($row['COMISSAO'] ?? 0),
-            'desconto_pct' => BrDecimalImport::parse($row['DESCONTO'] ?? 0),
             'estoque' => BrDecimalImport::parse($row['QTD_ATUAL'] ?? 0, 3),
             'estoque_minimo' => BrDecimalImport::parse($row['QTD_MIN'] ?? 0, 3),
             'estoque_inicial' => BrDecimalImport::parse($row['ESTOQUE_INICIAL'] ?? 0, 3),
@@ -121,8 +121,28 @@ class FirebirdProductImportService
     public function importRows(array $rows, bool $updateExisting = false, bool $dryRun = false): array
     {
         $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        $this->warmGrupoCache();
 
-        DB::transaction(function () use ($rows, $updateExisting, $dryRun, &$stats): void {
+        $codigos = [];
+        foreach ($rows as $row) {
+            if (is_array($row)) {
+                $codigo = (string) ($row['CODIGO'] ?? $row['codigo'] ?? '');
+                if ($codigo !== '') {
+                    $codigos[] = $codigo;
+                }
+            }
+        }
+
+        /** @var array<string, Product> $existingByCodigo */
+        $existingByCodigo = $codigos === []
+            ? []
+            : Product::query()
+                ->whereIn('codigo', array_values(array_unique($codigos)))
+                ->get()
+                ->keyBy(fn (Product $p): string => (string) $p->codigo)
+                ->all();
+
+        DB::transaction(function () use ($rows, $updateExisting, $dryRun, &$stats, &$existingByCodigo): void {
             foreach ($rows as $row) {
                 if (! is_array($row)) {
                     $stats['skipped']++;
@@ -138,7 +158,7 @@ class FirebirdProductImportService
                     continue;
                 }
 
-                $existing = Product::query()->where('codigo', $payload['codigo'])->first();
+                $existing = $existingByCodigo[$payload['codigo']] ?? null;
 
                 if ($existing && ! $updateExisting) {
                     $stats['skipped']++;
@@ -153,16 +173,32 @@ class FirebirdProductImportService
                 }
 
                 if ($existing) {
-                    $existing->update($payload);
+                    $existing->fill($payload)->save();
                     $stats['updated']++;
                 } else {
-                    Product::query()->create($payload);
+                    $created = Product::query()->create($payload);
+                    $existingByCodigo[$payload['codigo']] = $created;
                     $stats['created']++;
                 }
             }
         });
 
         return $stats;
+    }
+
+    protected function warmGrupoCache(): void
+    {
+        if ($this->grupoNomeByCodigo !== []) {
+            return;
+        }
+
+        $this->grupoNomeByCodigo = Grupo::query()
+            ->get(['id', 'nome'])
+            ->mapWithKeys(fn (Grupo $g): array => [
+                (string) $g->id => Str::upper((string) $g->nome),
+                Str::upper((string) $g->nome) => Str::upper((string) $g->nome),
+            ])
+            ->all();
     }
 
     /**
@@ -181,11 +217,14 @@ class FirebirdProductImportService
         $grupoId = $row['GRUPO'] ?? null;
 
         if ($grupoId !== null && $grupoId !== '') {
-            $nome = Grupo::query()->where('id', (int) $grupoId)->value('nome')
-                ?? Grupo::query()->where('nome', (string) $grupoId)->value('nome');
+            $key = (string) $grupoId;
+            if (isset($this->grupoNomeByCodigo[$key])) {
+                return $this->grupoNomeByCodigo[$key];
+            }
 
-            if ($nome) {
-                return Str::upper($nome);
+            $upper = Str::upper($key);
+            if (isset($this->grupoNomeByCodigo[$upper])) {
+                return $this->grupoNomeByCodigo[$upper];
             }
         }
 

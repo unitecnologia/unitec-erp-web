@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Gera dist/pacote-update/unitec-erp-web e dist/Unitec-ERP-Update.zip para publicar na nuvem.
@@ -127,8 +127,8 @@ Versao: $versao
 Gerado em: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
 Arquivos:
-  - dist\pacote-update\unitec-erp-web\   (pasta para conferencia)
-  - dist\Unitec-ERP-Update.zip           (enviar para a nuvem)
+ - dist\pacote-update\unitec-erp-web\   (pasta para conferencia)
+ - dist\Unitec-ERP-Update.zip           (enviar para a nuvem)
 
 Publicacao:
   1. Envie Unitec-ERP-Update.zip para o Dropbox (ou site Unitec) com link direto dl=1.

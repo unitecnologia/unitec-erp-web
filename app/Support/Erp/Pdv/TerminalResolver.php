@@ -210,31 +210,32 @@ final class TerminalResolver
 
 
 
+        $nextNumero = (int) (Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->max('numero_logico_terminal') ?? 0) + 1;
+
         $terminal = Terminal::query()->firstOrCreate(
-
             [
-
                 'empresa_id' => $empresaId,
-
                 'nome' => $machineName,
-
             ],
-
             [
-
                 ...Terminal::defaultAttributes($empresaId),
-
                 'nome' => $machineName,
-
                 'ip' => $this->resolveClientIp(),
-
                 'velocidade' => 9600,
-
+                'numero_logico_terminal' => $nextNumero,
+                'ativo' => true,
             ],
-
         );
 
-
+        if ($terminal->numero_logico_terminal === null) {
+            $terminal->forceFill([
+                'numero_logico_terminal' => $nextNumero,
+                'ativo' => $terminal->ativo ?? true,
+            ])->saveQuietly();
+            $terminal = $terminal->fresh() ?? $terminal;
+        }
 
         return $this->touchMachineMetadata($terminal);
 

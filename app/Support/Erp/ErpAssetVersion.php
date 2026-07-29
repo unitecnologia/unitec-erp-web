@@ -18,6 +18,7 @@ class ErpAssetVersion
                 public_path('css/erp-home.css'),
                 public_path('js/erp-shell.js'),
                 public_path('js/erp-home-charts.js'),
+                public_path('js/erp-silent-print.js'),
             ];
 
             foreach (glob(public_path('css/erp-*.css')) ?: [] as $path) {

@@ -4,11 +4,13 @@ namespace App\Support\Erp;
 
 use App\Filament\Pages\ImpressaoEtiquetasNovoPage;
 use App\Filament\Pages\ConfigFiscaisPage;
+use App\Filament\Pages\TabelaIcmsPage;
 use App\Filament\Pages\ForcaVendasAppPage;
+use App\Filament\Pages\ForcaVendasTelaVendaPage;
+use App\Filament\Pages\RotasVendedoresPage;
 use App\Filament\Pages\PermissoesPage;
 use App\Filament\Resources\ForcaVendasDeviceResource;
 use App\Filament\Resources\ForcaVendasMonitorResource;
-use App\Filament\Resources\ForcaVendasPedidoResource;
 use App\Filament\Resources\NfceResource;
 use App\Filament\Resources\NfeResource;
 use App\Filament\Pages\PdvPage;
@@ -20,24 +22,47 @@ use App\Filament\Resources\AjusteEstoqueResource;
 use App\Filament\Resources\AniversarianteResource;
 use App\Filament\Resources\CaixaContaResource;
 use App\Filament\Resources\CaixaResource;
+use App\Filament\Resources\CfopResource;
+use App\Filament\Resources\ReciboResource;
 use App\Filament\Resources\CompraResource;
 use App\Filament\Resources\ContaPagarResource;
 use App\Filament\Resources\ContaReceberResource;
 use App\Filament\Resources\ContadorResource;
 use App\Filament\Resources\EmpresaResource;
+use App\Filament\Resources\ErpOperacaoLogResource;
 use App\Filament\Resources\TerminalResource;
-use App\Filament\Resources\EntregadorResource;
 use App\Filament\Resources\FormaPagamentoResource;
+use App\Filament\Pages\RhDashboardPage;
+use App\Filament\Pages\BackupPage;
+use App\Filament\Pages\BalancaConfigPage;
+use App\Filament\Resources\RhCargoResource;
+use App\Filament\Resources\RhDepartamentoResource;
+use App\Filament\Resources\RhFuncionarioResource;
+use App\Filament\Pages\BoletoConfigPage;
+use App\Filament\Pages\MigraFirebirdPage;
+use App\Filament\Resources\BoletoRemessaResource;
+use App\Filament\Resources\BoletoRetornoResource;
+use App\Filament\Resources\ExpedicaoResource;
+use App\Filament\Resources\LogisticaDestinatarioResource;
+use App\Filament\Resources\LogisticaRemetenteResource;
+use App\Filament\Resources\NotaFornecedorResource;
+use App\Filament\Resources\PlanoContaResource;
 use App\Filament\Resources\GrupoResource;
 use App\Filament\Resources\ImpressaoEtiquetaResource;
 use App\Filament\Resources\MarcaResource;
 use App\Filament\Resources\OrcamentoResource;
+use App\Filament\Resources\OrdemServicoResource;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\TomadorServicoResource;
+use App\Filament\Resources\TransportadoraResource;
 use App\Filament\Resources\UnidadeResource;
 use App\Filament\Resources\UserResource;
+use App\Filament\Resources\VeiculoResource;
+use App\Filament\Resources\DevolucaoVendaResource;
 use App\Filament\Resources\VendaResource;
 use App\Filament\Resources\VendasInternasDeviceResource;
+use App\Filament\Resources\VendedorResource;
 
 use App\Support\Erp\ErpAccess;
 
@@ -51,6 +76,7 @@ class ErpMenu
             ['label' => 'Estoque', 'items' => static::estoqueItems()],
             ['label' => 'Compras', 'items' => static::comprasItems()],
             ['label' => 'Vendas', 'items' => static::vendasItems()],
+            ['label' => 'Logística', 'items' => static::logisticaItems()],
             ['label' => 'Financeiro', 'items' => static::financeiroItems()],
             ['label' => 'Fiscal', 'items' => static::fiscalItems()],
             ['label' => 'OS', 'items' => static::osItems()],
@@ -155,8 +181,8 @@ class ErpMenu
             static::link('Usuários', UserResource::getUrl('index'), permission: 'acesso.usuarios.access'),
             static::link('Permissões', PermissoesPage::getUrl(), permission: 'acesso.permissoes.manage'),
             static::sep(),
-            static::stub('Alterar Senha'),
-            static::stub('Trocar de Usuário'),
+            static::action('Alterar Senha', 'alterar-senha'),
+            static::action('Trocar de Usuário', 'trocar-usuario'),
         ];
     }
 
@@ -167,9 +193,8 @@ class ErpMenu
     {
         return [
             static::link('Contatos', PersonResource::getUrl('index') . '?tipo=todos', 'F2', 'pessoas.access'),
-            static::link('Colaboradores', VendedorResource::getUrl('index'), permission: 'vendedores.access'),
-            static::link('Entregador', EntregadorResource::getUrl('index'), permission: 'entregadores.access'),
-            static::link('Contador', ContadorResource::getUrl('index'), permission: 'contadores.access'),
+            static::link('Operadores', VendedorResource::getUrl('index'), permission: 'vendedores.access'),
+            static::group('RH', static::rhItems()),
             static::sep(),
             static::link('Lista SPC/CCF', PersonResource::getUrl('index') . '?tipo=ccf_spc', permission: 'pessoas.access'),
             static::link('Lista Aniversariantes', AniversarianteResource::getUrl('index'), permission: 'aniversariantes.access'),
@@ -189,10 +214,9 @@ class ErpMenu
             static::link('Impressão Etiquetas Novo', ImpressaoEtiquetasNovoPage::getUrl(), permission: 'etiquetas.access'),
             static::link('Impressão de Etiquetas', ImpressaoEtiquetaResource::getUrl('index'), permission: 'etiquetas.access'),
             static::sep(),
-            static::link('Ajusta Preço', AjustaPrecoResource::getUrl('index'), permission: 'ajusta_preco.access'),
+            static::link('Ajuste de Preço em Lote', AjustaPrecoResource::getUrl('index'), permission: 'ajusta_preco.access'),
             static::link('Ajusta Estoque', AjusteEstoqueResource::getUrl('index'), permission: 'ajuste_estoque.access'),
             static::link('Ajuste Estoque Grupo', AjustaEstoqueGrupoResource::getUrl('index'), permission: 'ajuste_estoque.access'),
-            static::stub('Ajusta Saldo de Estoque'),
             static::link('Zera Estoque Negativo', ZeraEstoqueNegativoPage::getUrl(), permission: 'ajuste_estoque.access'),
             static::sep(),
             static::stub('Fabricar Produto'),
@@ -206,7 +230,7 @@ class ErpMenu
     {
         return [
             static::link('Lista Compras', CompraResource::getUrl('index'), permission: 'compras.access'),
-            static::stub('Notas de Fornecedores'),
+            static::link('Notas de Fornecedores', NotaFornecedorResource::getUrl('index'), permission: 'compras.access'),
             static::stub('Devolução de Compra'),
         ];
     }
@@ -229,14 +253,16 @@ class ErpMenu
             static::stub('Delivery'),
             static::stub('Restaurante'),
             static::link('Lista de Vendas', VendaResource::getUrl('index'), permission: 'vendas.access'),
+            static::link('Tela de Venda', ForcaVendasTelaVendaPage::getUrl(), permission: 'vendas.access'),
             static::link('Monitor de Vendas', ForcaVendasMonitorResource::getUrl('index'), permission: 'vendas.access'),
-            static::stub('Devolução de Venda'),
+            static::link('Devolução de Venda', DevolucaoVendaResource::getUrl('index'), permission: 'devolucoes_venda.access'),
         ];
     }
 
     protected static function pdvHabilitado(): bool
     {
-        return PdvConfig::make()->usarPdvRetaguarda();
+        // Flag param_geral_usar_pdv_retaguarda foi removida; PDV no menu (acesso via permissão).
+        return true;
     }
 
     /**
@@ -246,21 +272,18 @@ class ErpMenu
     {
         return [
             static::link('Forma de Pagamentos', FormaPagamentoResource::getUrl('index'), permission: 'formas_pagamento.access'),
-            static::stub('Tabela de Preço'),
-            static::stub('Plano de Contas'),
+            static::link('Plano de Contas', PlanoContaResource::getUrl('index'), permission: 'planos_contas.access'),
             static::link('Contas', CaixaContaResource::getUrl('index'), permission: 'contas_caixa.access'),
             static::link('Contas a Pagar', ContaPagarResource::getUrl('index'), permission: 'contas_pagar.access'),
             static::link('Contas a Receber', ContaReceberResource::getUrl('index'), permission: 'contas_receber.access'),
-            static::stub('Ficha de Clientes'),
             static::link('Livro Caixa', CaixaResource::getUrl('index'), permission: 'caixa.access'),
-            static::stub('Transferência de Contas'),
             static::sep(),
-            static::stub('Impressão de Recibo'),
+            static::link('Impressão de Recibos', ReciboResource::getUrl('index'), permission: 'recibos.access'),
             static::sep(),
             static::group('Boleto', [
-                static::stub('Configuração'),
-                static::stub('Remessa'),
-                static::stub('Retorno'),
+                static::link('Configuração', BoletoConfigPage::getUrl(), permission: 'boletos.access'),
+                static::link('Remessa', BoletoRemessaResource::getUrl('index'), permission: 'boletos.access'),
+                static::link('Retorno', BoletoRetornoResource::getUrl('index'), permission: 'boletos.access'),
             ]),
         ];
     }
@@ -277,12 +300,8 @@ class ErpMenu
             static::stub('CTe'),
             static::stub('MDFe'),
             static::sep(),
-            static::stub('Lote XML NFC-e'),
-            static::stub('Lote XML NF-e (Compra)'),
-            static::stub('Lote XML NF-e (Venda)'),
-            static::stub('CFOP'),
-            static::stub('IBPT'),
-            static::stub('Tabela ICMS'),
+            static::link('CFOP', CfopResource::getUrl('index'), permission: 'cfops.access'),
+            static::link('Tabela ICMS', TabelaIcmsPage::getUrl(), permission: 'tabela_icms.access'),
             static::sep(),
             static::stub('Sped Fiscal'),
             static::stub('Sped Contribuições'),
@@ -290,12 +309,23 @@ class ErpMenu
             static::stub('Enviar Sped'),
             static::sep(),
             static::stub('Inventário por CSOSN / CST'),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function logisticaItems(): array
+    {
+        return [
+            static::link('Controle de Expedição', ExpedicaoResource::getUrl('index'), permission: 'logistica.access'),
+            static::sep(),
             static::group('Transportadora', [
-                static::stub('Motorista / Transportador'),
-                static::stub('Veículos'),
-                static::stub('Tomador de Serviço'),
-                static::stub('Destinatário'),
-                static::stub('Remetente'),
+                static::link('Motorista / Transportador', TransportadoraResource::getUrl('index'), permission: 'transportadoras.access'),
+                static::link('Veículos', VeiculoResource::getUrl('index'), permission: 'veiculos.access'),
+                static::link('Tomador de Serviço', TomadorServicoResource::getUrl('index'), permission: 'tomadores_servico.access'),
+                static::link('Destinatário', LogisticaDestinatarioResource::getUrl('index'), permission: 'logistica_destinatarios.access'),
+                static::link('Remetente', LogisticaRemetenteResource::getUrl('index'), permission: 'logistica_remetentes.access'),
             ]),
         ];
     }
@@ -306,7 +336,34 @@ class ErpMenu
     protected static function osItems(): array
     {
         return [
-            static::stub('Ordem de Serviço'),
+            static::link('Ordem de Serviço', OrdemServicoResource::getUrl('index'), permission: 'ordens_servico.access'),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function rhItems(): array
+    {
+        return [
+            static::link('Painel RH', RhDashboardPage::getUrl(), permission: 'rh.dashboard.access'),
+            static::sep(),
+            static::link('Funcionários', RhFuncionarioResource::getUrl('index'), permission: 'rh.funcionarios.access'),
+            static::link('Contador', ContadorResource::getUrl('index'), permission: 'contadores.access'),
+            static::link('Cargos', RhCargoResource::getUrl('index'), permission: 'rh.cargos.access'),
+            static::link('Departamentos', RhDepartamentoResource::getUrl('index'), permission: 'rh.departamentos.access'),
+            static::sep(),
+            static::stub('Documentos'),
+            static::stub('EPIs'),
+            static::stub('Exames / ASO'),
+            static::stub('Treinamentos'),
+            static::stub('Uniformes'),
+            static::sep(),
+            static::stub('Holerites'),
+            static::stub('Benefícios'),
+            static::stub('Ocorrências'),
+            static::stub('Férias'),
+            static::stub('Escalas'),
         ];
     }
 
@@ -316,8 +373,8 @@ class ErpMenu
     protected static function forcaVendaItems(): array
     {
         return [
-            static::link('Orçamentos recebidos', ForcaVendasPedidoResource::getUrl('index'), permission: 'forca_vendas.access'),
             static::link('Aparelhos (autorizar)', ForcaVendasDeviceResource::getUrl('index'), permission: 'forca_vendas.access'),
+            static::link('Rotas de Vendedores', RotasVendedoresPage::getUrl(), permission: 'forca_vendas.access'),
             static::sep(),
             static::link('App / Como conectar', ForcaVendasAppPage::getUrl(), permission: 'forca_vendas.config'),
         ];
@@ -340,47 +397,49 @@ class ErpMenu
     {
         return [
             static::group('Produtos', [
-                static::stub('Curva ABC'),
-                static::stub('Histórico de Produtos'),
-                static::stub('Histórico de Compras'),
-                static::stub('Histórico de Compras p/ Fornecedor'),
-                static::stub('Produtos Lucratividade'),
-                static::stub('Produtos menos lucrativos'),
-                static::stub('Produtos mais lucrativos'),
-                static::stub('Produtos menos vendidos'),
-                static::stub('Produtos mais vendidos'),
-                static::stub('Relatório de Produtos com Preço Alterado'),
-                static::stub('Relatório de Estoque - Composição'),
-                static::stub('Relatório de Estoque - Grade'),
-                static::stub('Relatório de Estoque - Mínimo'),
-                static::stub('Relatório de Estoque - Negativo'),
+                static::link('Curva ABC', route('erp.reports.tabular', ['slug' => 'curva-abc']), permission: 'produtos.print'),
+                static::link('Histórico de Produtos', route('erp.reports.tabular', ['slug' => 'historico-produtos']), permission: 'produtos.print'),
+                static::link('Histórico de Compras', route('erp.reports.tabular', ['slug' => 'historico-compras']), permission: 'compras.print'),
+                static::link('Histórico de Compras p/ Fornecedor', route('erp.reports.tabular', ['slug' => 'historico-compras-fornecedor']), permission: 'compras.print'),
+                static::link('Produtos Lucratividade', route('erp.reports.tabular', ['slug' => 'produtos-lucratividade']), permission: 'produtos.print'),
+                static::link('Produtos menos lucrativos', route('erp.reports.tabular', ['slug' => 'produtos-menos-lucrativos']), permission: 'produtos.print'),
+                static::link('Produtos mais lucrativos', route('erp.reports.tabular', ['slug' => 'produtos-mais-lucrativos']), permission: 'produtos.print'),
+                static::link('Produtos menos vendidos', route('erp.reports.tabular', ['slug' => 'produtos-menos-vendidos']), permission: 'produtos.print'),
+                static::link('Produtos mais vendidos', route('erp.reports.tabular', ['slug' => 'produtos-mais-vendidos']), permission: 'produtos.print'),
+                static::link('Relatório de Produtos com Preço Alterado', route('erp.reports.tabular', ['slug' => 'preco-alterado']), permission: 'produtos.print'),
+                static::link('Relatório de Estoque - Composição', route('erp.reports.tabular', ['slug' => 'estoque-composicao']), permission: 'produtos.print'),
+                static::link('Relatório de Estoque - Grade', route('erp.reports.tabular', ['slug' => 'estoque-grade']), permission: 'produtos.print'),
+                static::link('Relatório de Estoque - Mínimo', route('erp.reports.tabular', ['slug' => 'estoque-minimo']), permission: 'produtos.print'),
+                static::link('Relatório de Estoque - Negativo', route('erp.reports.tabular', ['slug' => 'estoque-negativo']), permission: 'produtos.print'),
                 static::sep(),
-                static::stub('Listagem - Conferência de Estoque'),
+                static::link('Listagem - Conferência de Estoque', route('erp.reports.tabular', ['slug' => 'conferencia-estoque']), permission: 'produtos.print'),
             ]),
             static::group('Vendas', [
-                static::stub('Histórico de Vendas'),
-                static::stub('Histórico de Orçamentos'),
-                static::stub('Histórico de Vendas p/ Cliente'),
-                static::stub('Histórico de Vendas p/ Vendedor'),
-                static::stub('Relatório de Vendas por PDV'),
-                static::stub('Relatório Comissão de Vendedores'),
-                static::stub('Relatório Vendas por Forma de Pagamento'),
-                static::stub('Relatório de Vendas por Produtos - Geral'),
-                static::stub('Relatório de Vendas de Produtos - Clientes'),
-                static::stub('Relatório de Vendas de Produtos - Vendedores'),
-                static::stub('Relatório de Vendas Por CFOP/CSOSN'),
-                static::stub('Relatório de Vendas de Produtos c/ Trib.Monofásica'),
+                static::link('Histórico de Vendas', route('erp.reports.tabular', ['slug' => 'historico-vendas']), permission: 'vendas.print'),
+                static::link('Histórico de Orçamentos', route('erp.reports.tabular', ['slug' => 'historico-orcamentos']), permission: 'vendas.print'),
+                static::link('Histórico de Vendas p/ Cliente', route('erp.reports.tabular', ['slug' => 'historico-vendas-cliente']), permission: 'vendas.print'),
+                static::link('Histórico de Vendas p/ Vendedor', route('erp.reports.tabular', ['slug' => 'historico-vendas-vendedor']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas por PDV', route('erp.reports.tabular', ['slug' => 'vendas-pdv']), permission: 'vendas.print'),
+                static::link('Relatório Vendas por Forma de Pagamento', route('erp.reports.tabular', ['slug' => 'vendas-forma-pagamento']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas por Produtos - Geral', route('erp.reports.tabular', ['slug' => 'vendas-produtos-geral']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas de Produtos - Clientes', route('erp.reports.tabular', ['slug' => 'vendas-produtos-clientes']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas de Produtos - Vendedores', route('erp.reports.tabular', ['slug' => 'vendas-produtos-vendedores']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas Por CFOP/CSOSN', route('erp.reports.tabular', ['slug' => 'vendas-cfop-csosn']), permission: 'vendas.print'),
+                static::link('Relatório de Vendas de Produtos c/ Trib.Monofásica', route('erp.reports.tabular', ['slug' => 'vendas-produtos-monofasica']), permission: 'vendas.print'),
             ]),
             static::group('Financeiro', [
-                static::link('Relatório Comissão de Vendedores', route('erp.reports.comissao-vendedores'), permission: 'vendas.print'),
-                static::stub('Relatório de Contas a Receber'),
-                static::stub('Relatório de Contas a Pagar'),
-                static::stub('Relatório Resumo Caixa'),
-                static::stub('Relatório de Movimento Caixa'),
-                static::stub('Relatório Balanço Financeiro'),
-                static::stub('Relatório Resumo Financeiro p/ Conta'),
-                static::stub('Relatório Financeiro - Cartão'),
-                static::stub('Relatório por Plano de Contas'),
+                static::link('Relatório Comissão de Operadores', route('erp.reports.comissao-vendedores'), permission: 'vendas.print'),
+                static::link('Relatório de Contas a Receber', route('erp.reports.tabular', ['slug' => 'contas-receber']), permission: 'contas_receber.print'),
+                static::link('Relatório de Contas a Pagar', route('erp.reports.tabular', ['slug' => 'contas-pagar']), permission: 'contas_pagar.print'),
+                static::link('Relatório Resumo Caixa', route('erp.reports.tabular', ['slug' => 'resumo-caixa']), permission: 'caixa.print'),
+                static::link('Relatório de Movimento Caixa', route('erp.reports.tabular', ['slug' => 'movimento-caixa']), permission: 'caixa.print'),
+                static::link('Relatório Balanço Financeiro', route('erp.reports.tabular', ['slug' => 'balanco-financeiro']), permission: 'caixa.print'),
+                static::link('Relatório Resumo Financeiro p/ Conta', route('erp.reports.tabular', ['slug' => 'resumo-financeiro-conta']), permission: 'contas_caixa.print'),
+                static::link('Relatório Financeiro - Cartão', route('erp.reports.contas-receber-cartoes'), permission: 'contas_receber.print'),
+                static::link('Relatório por Plano de Contas', route('erp.reports.tabular', ['slug' => 'plano-contas']), permission: 'planos_contas.print'),
+            ]),
+            static::group('Auditoria', [
+                static::link('Log de Operações', ErpOperacaoLogResource::getUrl('index'), permission: 'vendas.access'),
             ]),
         ];
     }
@@ -395,12 +454,11 @@ class ErpMenu
             static::link('Terminais', TerminalResource::getUrl('index'), permission: 'terminais.access'),
             static::stub('Mesas'),
             static::link('Config. Fiscais', ConfigFiscaisPage::getUrl(), permission: 'config_fiscais.access'),
-            static::stub('Balança'),
-            static::stub('SoftHouse'),
-            static::stub('Backup'),
-            static::stub('Abrir WhatsApp'),
+            static::link('Balança', BalancaConfigPage::getUrl(), permission: 'balanca.access'),
+            static::link('Backup', BackupPage::getUrl(), permission: 'backup.access'),
             static::sep(),
             static::group('Comandos', [
+                static::link('Migra dados FB', MigraFirebirdPage::getUrl(), permission: 'migra_firebird.access'),
                 static::stub('Ajusta Menu'),
                 static::stub('Ajusta Campos'),
                 static::stub('Atualiza Tabelas e Campos'),
@@ -536,11 +594,16 @@ class ErpMenu
     }
 
     /**
-     * @return array<string, string>
+     * Item de menu ainda não implementado — exibido como "Em breve", sem toast.
+     *
+     * @return array{label: string, pending: true, shortcut?: string}
      */
     protected static function stub(string $label, ?string $shortcut = null): array
     {
-        $item = ['label' => $label];
+        $item = [
+            'label' => $label,
+            'pending' => true,
+        ];
 
         if ($shortcut !== null) {
             $item['shortcut'] = $shortcut;

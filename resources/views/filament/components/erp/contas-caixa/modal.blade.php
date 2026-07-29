@@ -1,12 +1,13 @@
 @php
     $tipos = \App\Models\CaixaConta::tipoLabels();
-    $situacoes = \App\Models\CaixaConta::situacaoLabels();
 @endphp
 
 @if ($this->showForm)
     <div class="erp-fpgto-modal" x-data
-         x-on:keydown.escape.window="$wire.closeForm()"
-         x-on:keydown.window="if ($event.key === 'F2') { $event.preventDefault(); $wire.saveContaCaixa(); }">
+         x-on:keydown.window="
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.handleContasCaixaEscape(); }
+            if ($event.key === 'F2') { $event.preventDefault(); $wire.saveContaCaixa(); }
+         ">
         <div class="erp-fpgto-modal__backdrop" wire:click="closeForm"></div>
 
         <div class="erp-fpgto-modal__dialog" role="dialog" aria-modal="true">
@@ -38,16 +39,6 @@
                         </select>
                     </label>
                     @error('form.tipo') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
-
-                    <label class="erp-fpgto-field">
-                        <span class="erp-fpgto-field__label">Situação</span>
-                        <select wire:model="form.situacao" class="erp-fpgto-field__input">
-                            @foreach ($situacoes as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    @error('form.situacao') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                     <label class="erp-fpgto-check">
                         <input type="checkbox" wire:model="form.ativo"> Ativo

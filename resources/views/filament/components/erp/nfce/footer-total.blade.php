@@ -1,4 +1,4 @@
-<div class="erp-nfe__total">
+<div class="erp-nfe__total erp-nfe__total--nfce">
     <div class="erp-nfe__chave-group erp-nfe__chave-group--footer">
         <label class="erp-nfe__chave-label">
             CHAVE NFC-e
@@ -11,8 +11,10 @@
             >
         </label>
     </div>
-    <span class="erp-nfe__total-label">TOTAL DE NFC-E</span>
-    <span class="erp-nfe__total-value">
-        R$ {{ number_format($this->filteredTotal, 2, ',', '.') }}
-    </span>
+    <div class="erp-nfe__total-summary">
+        <span class="erp-nfe__total-label">TOTAL DE NFC-E</span>
+        <span class="erp-nfe__total-value">
+            R$ {{ number_format($this->filteredTotal, 2, ',', '.') }}
+        </span>
+    </div>
 </div>

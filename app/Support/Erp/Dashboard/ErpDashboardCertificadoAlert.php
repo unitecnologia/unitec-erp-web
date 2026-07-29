@@ -26,23 +26,7 @@ final class ErpDashboardCertificadoAlert
 
     {
 
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
-
-
-
-        if ($empresaId) {
-
-            return (int) $empresaId;
-
-        }
-
-
-
-        $fallback = Empresa::query()->where('ativo', true)->orderBy('id')->value('id');
-
-
-
-        return $fallback ? (int) $fallback : null;
+        return \App\Support\Erp\ErpContext::currentEmpresaId();
 
     }
 

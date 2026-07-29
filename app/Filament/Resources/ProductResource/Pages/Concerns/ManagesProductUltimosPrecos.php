@@ -61,6 +61,7 @@ trait ManagesProductUltimosPrecos
         $this->syncProductCompositions($product);
         $this->syncProductPriceTableItems($product);
         $this->syncProductImeis($product);
+        $this->syncProductEmpresaPrecos($product);
         $this->recordProductPriceHistoryIfChanged($product);
         $this->loadProductGrades($product);
         $this->loadProductCompositions($product);

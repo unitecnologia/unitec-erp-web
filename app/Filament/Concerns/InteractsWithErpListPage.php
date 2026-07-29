@@ -3,6 +3,7 @@
 namespace App\Filament\Concerns;
 
 use App\Support\Erp\ErpScreen;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -43,6 +44,16 @@ trait InteractsWithErpListPage
     }
 
     /**
+     * Classes extras no container da página (ex.: variante NFC-e).
+     *
+     * @return array<int, string>
+     */
+    protected function erpListExtraPageClasses(): array
+    {
+        return [];
+    }
+
+    /**
      * @return array<string>
      */
     public function getPageClasses(): array
@@ -51,18 +62,30 @@ trait InteractsWithErpListPage
             ...parent::getPageClasses(),
             'erp-list-page',
             static::erpListPageClass(),
+            ...$this->erpListExtraPageClasses(),
         ];
     }
 
     protected function applyErpListSelection(Table $table): Table
     {
+        // Filament v4 row clicks call mountTableAction(name), so the Livewire
+        // method must also be registered as a table action.
+        // Do NOT use ->hidden(): Filament's isDisabled() treats hidden actions as
+        // disabled, so mountTableAction silently no-ops and selection never sticks.
+        // Toolbar UI is already hidden via .erp-list-page CSS.
         return $table
             ->recordUrl(null)
             ->recordAction('highlightRecord')
+            ->pushToolbarActions([
+                Action::make('highlightRecord')
+                    ->action(function (Model $record): void {
+                        $this->highlightRecord($record->getKey());
+                    }),
+            ])
             ->recordClasses(function (Model $record): string {
                 $classes = $this->erpListRecordClasses($record);
 
-                if ($this->highlightedRecordId === $record->getKey()) {
+                if ((int) $this->highlightedRecordId === (int) $record->getKey()) {
                     $classes[] = 'erp-row-selected';
                 }
 

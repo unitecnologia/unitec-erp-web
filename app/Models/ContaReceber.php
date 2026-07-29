@@ -20,6 +20,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'recebido_em',
     'saldo',
     'forma',
+    'cartao_nsu',
+    'cartao_autorizacao',
+    'cartao_maquininha',
+    'cartao_bandeira',
+    'cartao_parcela',
 ])]
 class ContaReceber extends Model
 {
@@ -42,10 +47,12 @@ class ContaReceber extends Model
     {
         return [
             self::FORMA_CARTEIRA => 'Carteira',
+            'dinheiro' => 'Dinheiro',
             self::FORMA_CHEQUE => 'Cheques',
             self::FORMA_CARTAO => 'Cartão',
             self::FORMA_BOLETO => 'Boleto',
             self::FORMA_PIX => 'Pix',
+            'deposito' => 'Depósito',
         ];
     }
 

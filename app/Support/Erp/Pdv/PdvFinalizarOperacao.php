@@ -109,18 +109,26 @@ final class PdvFinalizarOperacao
         };
     }
 
+    /**
+     * Pedido: pergunta impressão antes de fechar.
+     * NFC-e Transmitir pergunta depois da autorização (com progress bar).
+     */
     public static function solicitaConfirmacaoImpressao(string $operacao): bool
     {
-        return in_array($operacao, [self::NFCE_TRANSMITIR, self::PEDIDO], true);
+        return $operacao === self::PEDIDO;
+    }
+
+    public static function solicitaConfirmacaoImpressaoApos(string $operacao): bool
+    {
+        return $operacao === self::NFCE_TRANSMITIR;
     }
 
     public static function mensagemStub(string $operacao): string
     {
         return match ($operacao) {
-            self::NFCE_CONTINGENCIA => 'Emissão NFC-e em contingência em implementação no web.',
-            self::NFCE_TRANSMITIR => 'Emissão e transmissão de NFC-e em implementação no web.',
-            self::FINALIZAR => 'Finalização fiscal em implementação no web.',
-            default => 'Operação fiscal em implementação no web.',
+            self::NFCE_TRANSMITIR => 'Configure certificado, CSC e responsável técnico para emitir NFC-e real.',
+            self::FINALIZAR => 'Configure a emissão fiscal real antes de finalizar com NFC-e.',
+            default => 'Emissão fiscal real não configurada.',
         };
     }
 

@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Checklist de requisitos do PC para instalar o Unitec ERP (sem instalar o sistema).

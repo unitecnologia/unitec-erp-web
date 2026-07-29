@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\CaixaResource\Pages;
 use App\Models\CaixaLancamento;
 use BackedEnum;
@@ -27,6 +28,11 @@ class CaixaResource extends Resource
     protected static ?string $recordTitleAttribute = 'codigo';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('caixa.access');
+    }
 
     public static function table(Table $table): Table
     {

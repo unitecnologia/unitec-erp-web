@@ -33,9 +33,16 @@ final class PdvCupomPrinter
         }
 
         $url = self::cupomUrl($pdvVendaId, true);
-        $payload = json_encode(['url' => $url, 'copias' => max(1, $copias)], JSON_THROW_ON_ERROR);
+        $payload = json_encode(
+            PdvNfceCupomPrinter::printPayload($url, max(1, $copias), $pdvVendaId),
+            JSON_THROW_ON_ERROR,
+        );
 
         return '(function (payload) {
+            if (window.ErpPrint?.openCupom) {
+                window.ErpPrint.openCupom(payload);
+                return;
+            }
             if (window.ErpPdvPrint?.openCupom) {
                 window.ErpPdvPrint.openCupom(payload);
                 return;

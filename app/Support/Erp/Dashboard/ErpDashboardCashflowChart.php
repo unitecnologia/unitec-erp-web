@@ -2,12 +2,15 @@
 
 namespace App\Support\Erp\Dashboard;
 
-use App\Models\ContaPagar;
-use App\Models\ContaReceber;
-use Carbon\Carbon;
+use App\Models\CaixaLancamento;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
+/**
+ * Fluxo de caixa do dashboard ERP — mesma base do Contas Caixa / Executivo:
+ * caixa_lancamentos (entrada/saída por emissão).
+ */
 final class ErpDashboardCashflowChart
 {
     /**
@@ -30,22 +33,23 @@ final class ErpDashboardCashflowChart
     private static function fromDatabase(): ?array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())
-                && ! Schema::hasTable((new ContaPagar)->getTable())) {
+            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
                 return null;
             }
 
+            $hoje = ErpFinanceiroMetricas::hoje();
             $labels = [];
             $entradas = [];
             $saidas = [];
 
+            // Últimas 4 semanas (Sem 1 = mais antiga, Sem 4 = atual)
             for ($week = 3; $week >= 0; $week--) {
-                $inicio = Carbon::today()->startOfWeek()->subWeeks($week);
-                $fim = $inicio->copy()->endOfWeek();
+                $inicio = $hoje->copy()->startOfWeek()->subWeeks($week)->startOfDay();
+                $fim = $inicio->copy()->endOfWeek()->endOfDay();
 
-                $labels[] = 'Sem ' . (4 - $week);
-                $entradas[] = static::sumRecebimentos($inicio, $fim);
-                $saidas[] = static::sumPagamentos($inicio, $fim);
+                $labels[] = 'Sem '.(4 - $week);
+                $entradas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'entrada');
+                $saidas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'saida');
             }
 
             if (array_sum($entradas) <= 0 && array_sum($saidas) <= 0) {
@@ -60,31 +64,5 @@ final class ErpDashboardCashflowChart
         } catch (Throwable) {
             return null;
         }
-    }
-
-    private static function sumRecebimentos(Carbon $from, Carbon $to): float
-    {
-        if (! Schema::hasTable((new ContaReceber)->getTable())) {
-            return 0.0;
-        }
-
-        return (float) ContaReceber::query()
-            ->whereNotNull('recebido_em')
-            ->whereDate('recebido_em', '>=', $from->toDateString())
-            ->whereDate('recebido_em', '<=', $to->toDateString())
-            ->sum('valor_recebido');
-    }
-
-    private static function sumPagamentos(Carbon $from, Carbon $to): float
-    {
-        if (! Schema::hasTable((new ContaPagar)->getTable())) {
-            return 0.0;
-        }
-
-        return (float) ContaPagar::query()
-            ->whereNotNull('pago_em')
-            ->whereDate('pago_em', '>=', $from->toDateString())
-            ->whereDate('pago_em', '<=', $to->toDateString())
-            ->sum('valor_pago');
     }
 }

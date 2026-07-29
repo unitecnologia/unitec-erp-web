@@ -2,6 +2,8 @@
 
 namespace App\Support\VendasInternas;
 
+use App\Models\EstoqueReserva;
+use App\Models\ForcaVendasOrder;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Models\Person;
@@ -12,6 +14,7 @@ use App\Models\User;
 use App\Models\VendasInternasOrder;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\EstoqueReservaService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -57,6 +60,10 @@ class VendasInternasSyncService
             $parts[] = "{$label}:{$count}:{$max}";
         }
 
+        $reservaCount = EstoqueReserva::query()->where('status', EstoqueReserva::STATUS_ATIVA)->count();
+        $reservaMax = (string) EstoqueReserva::query()->max('updated_at');
+        $parts[] = "estoque_reservas:{$reservaCount}:{$reservaMax}";
+
         return sha1(implode('|', $parts));
     }
 
@@ -96,10 +103,38 @@ class VendasInternasSyncService
      */
     private function products(?Carbon $since): array
     {
-        return $this->applySince(Product::query(), $since, 'products')
+        $reservados = (new EstoqueReservaService())->totaisReservadosAtivos();
+
+        $query = Product::query();
+
+        if ($since !== null && Schema::hasColumn('products', 'updated_at')) {
+            $idsReservaAlterada = EstoqueReserva::query()
+                ->where('updated_at', '>', $since)
+                ->distinct()
+                ->pluck('product_id')
+                ->all();
+
+            $idsComReservaAtiva = array_keys($reservados);
+            $idsExtras = array_values(array_unique(array_merge($idsReservaAlterada, $idsComReservaAtiva)));
+
+            $query->where(function ($q) use ($since, $idsExtras): void {
+                $q->where('updated_at', '>', $since);
+
+                if ($idsExtras !== []) {
+                    $q->orWhereIn('id', $idsExtras);
+                }
+            });
+        }
+
+        return $query
             ->orderBy('id')
             ->get()
-            ->map(fn (Product $p): array => [
+            ->map(function (Product $p) use ($reservados): array {
+                $fisico = (float) $p->estoque;
+                $reservado = (float) ($reservados[$p->id] ?? 0);
+                $disponivel = $fisico - $reservado;
+
+                return [
                 'id' => $p->id,
                 'codigo' => $p->codigo,
                 'codigo_barras' => $p->codigo_barras,
@@ -108,10 +143,12 @@ class VendasInternasSyncService
                 'marca' => $p->marca,
                 'grupo' => $p->grupo,
                 'preco_venda' => (float) $p->preco_venda,
-                'preco_venda_prazo' => (float) $p->preco_venda_prazo,
                 'preco_atacado' => (float) $p->preco_atacado,
+                'preco_especial' => (float) ($p->preco_especial ?? 0),
                 'qtd_atacado' => (float) $p->qtd_atacado,
-                'estoque' => (float) $p->estoque,
+                'estoque' => $fisico,
+                'estoque_reservado' => $reservado,
+                'estoque_disponivel' => $disponivel,
                 'usa_tab_preco' => (bool) $p->usa_tab_preco,
                 'mostrar_no_app' => (bool) $p->mostrar_no_app,
                 'promo_preco_venda' => (float) $p->promo_preco_venda,
@@ -120,7 +157,8 @@ class VendasInternasSyncService
                 'foto_url' => $this->fotoApp($p),
                 'ativo' => (bool) $p->ativo,
                 'updated_at' => optional($p->updated_at)->toIso8601String(),
-            ])
+                ];
+            })
             ->all();
     }
 
@@ -239,6 +277,7 @@ class VendasInternasSyncService
             ->with([
                 'orcamento.itens.product:id,descricao',
                 'venda:id,numero',
+                'forcaVendasOrder:id,situacao,venda_id',
             ])
             ->where('received_at', '>=', now()->subDays(self::HISTORICO_DIAS));
 
@@ -267,9 +306,10 @@ class VendasInternasSyncService
 
                 return [
                     'uuid' => $order->uuid,
+                    'tipo' => $order->tipo ?? VendasInternasOrder::TIPO_ORCAMENTO,
                     'numero' => $orcamento?->numero,
                     'numero_pedido' => $order->venda?->numero,
-                    'situacao' => $order->situacao,
+                    'situacao' => $this->situacaoParaApp($order),
                     'status' => $order->status,
                     'total' => (float) $order->total,
                     'cliente_id' => $order->cliente_id,
@@ -295,8 +335,9 @@ class VendasInternasSyncService
 
         return [
             'uuid' => $order->uuid,
+            'tipo' => $order->tipo ?? VendasInternasOrder::TIPO_ORCAMENTO,
             'status' => $order->status,
-            'situacao' => $order->situacao,
+            'situacao' => $this->situacaoParaApp($order),
             'orcamento_id' => $order->orcamento_id,
             'numero' => $order->orcamento?->numero,
             'numero_pedido' => $order->venda?->numero,
@@ -305,106 +346,40 @@ class VendasInternasSyncService
         ];
     }
 
+    private function situacaoParaApp(VendasInternasOrder $order): string
+    {
+        if ($order->tipo === VendasInternasOrder::TIPO_PEDIDO && $order->relationLoaded('forcaVendasOrder') && $order->forcaVendasOrder) {
+            return match ($order->forcaVendasOrder->situacao) {
+                ForcaVendasOrder::SITUACAO_FATURADO => VendasInternasOrder::SITUACAO_FATURADO,
+                ForcaVendasOrder::SITUACAO_CANCELADO => VendasInternasOrder::SITUACAO_CANCELADO,
+                default => VendasInternasOrder::SITUACAO_PENDENTE,
+            };
+        }
+
+        return (string) $order->situacao;
+    }
+
     /**
      * @param  array<string, mixed>  $order
      * @return array<string, mixed>
      */
     private function createOrder(string $uuid, array $order, User $user): array
     {
+        $tipo = (string) ($order['tipo'] ?? VendasInternasOrder::TIPO_ORCAMENTO);
+
+        if (! in_array($tipo, [VendasInternasOrder::TIPO_ORCAMENTO, VendasInternasOrder::TIPO_PEDIDO], true)) {
+            $tipo = VendasInternasOrder::TIPO_ORCAMENTO;
+        }
+
         try {
-            return DB::transaction(function () use ($uuid, $order, $user): array {
-                $clienteId = (int) ($order['cliente_id'] ?? 0);
+            return DB::transaction(function () use ($uuid, $order, $user, $tipo): array {
+                [$orcamento, $total, $clientCreatedAt] = $this->buildOrcamentoFromPush($order, $user);
 
-                if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
-                    throw new \RuntimeException('Cliente inválido ou não encontrado.');
+                if ($tipo === VendasInternasOrder::TIPO_PEDIDO) {
+                    return $this->finalizePedidoPush($uuid, $order, $user, $orcamento, $total, $clientCreatedAt);
                 }
 
-                $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
-
-                if ($itens === []) {
-                    throw new \RuntimeException('Orçamento sem itens.');
-                }
-
-                $subtotal = 0.0;
-                $descontoValor = (float) ($order['desconto_valor'] ?? 0);
-                $clientCreatedAt = isset($order['created_at']) ? Carbon::parse($order['created_at']) : null;
-                $dataPedido = $clientCreatedAt
-                    ? ErpTimezone::toLocal($clientCreatedAt)->toDateString()
-                    : ErpTimezone::toLocal()->toDateString();
-
-                $orcamento = Orcamento::query()->create([
-                    'numero' => Orcamento::nextNumero(),
-                    'data' => $dataPedido,
-                    'cliente_id' => $clienteId,
-                    'vendedor_id' => $user->vendedor_id,
-                    'subtotal' => 0,
-                    'percentual_desconto' => (float) ($order['percentual_desconto'] ?? 0),
-                    'desconto_valor' => $descontoValor,
-                    'forma_pagamento' => $order['forma_pagamento'] ?? null,
-                    'validade_dias' => (int) ($order['validade_dias'] ?? 0),
-                    'observacoes' => $order['observacoes'] ?? null,
-                    'total' => 0,
-                    'status' => Orcamento::STATUS_ABERTO,
-                ]);
-
-                $linha = 1;
-
-                foreach ($itens as $item) {
-                    $productId = (int) ($item['product_id'] ?? 0);
-
-                    if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
-                        throw new \RuntimeException('Produto inválido no item '.$linha.'.');
-                    }
-
-                    $quantidade = (float) ($item['quantidade'] ?? 0);
-                    $preco = (float) ($item['preco_unitario'] ?? 0);
-                    $descItem = (float) ($item['desconto'] ?? 0);
-                    $totalItem = round(($quantidade * $preco) - $descItem, 2);
-                    $subtotal += $totalItem;
-
-                    OrcamentoItem::query()->create([
-                        'orcamento_id' => $orcamento->id,
-                        'item' => $linha,
-                        'product_id' => $productId,
-                        'product_grade_id' => $item['product_grade_id'] ?? null,
-                        'quantidade' => $quantidade,
-                        'preco_unitario' => $preco,
-                        'total' => $totalItem,
-                        'desconto' => $descItem,
-                        'descricao' => $item['descricao'] ?? null,
-                    ]);
-
-                    $linha++;
-                }
-
-                $total = round($subtotal - $descontoValor, 2);
-
-                $orcamento->update([
-                    'subtotal' => $subtotal,
-                    'total' => $total,
-                ]);
-
-                $viOrder = VendasInternasOrder::query()->create([
-                    'uuid' => $uuid,
-                    'device_uuid' => $order['device_uuid'] ?? null,
-                    'user_id' => $user->id,
-                    'empresa_id' => $user->empresa_id,
-                    'cliente_id' => $clienteId,
-                    'vendedor_id' => $user->vendedor_id,
-                    'orcamento_id' => $orcamento->id,
-                    'venda_id' => null,
-                    'total' => $total,
-                    'status' => VendasInternasOrder::STATUS_IMPORTADO,
-                    'situacao' => VendasInternasOrder::SITUACAO_AGUARDANDO,
-                    'payload' => $order,
-                    'client_created_at' => $clientCreatedAt,
-                    'received_at' => now(),
-                ]);
-
-                return array_merge(
-                    $this->orderPushResult($viOrder),
-                    ['orcamento_id' => $orcamento->id],
-                );
+                return $this->finalizeOrcamentoPush($uuid, $order, $user, $orcamento, $total, $clientCreatedAt);
             });
         } catch (\Throwable $e) {
             VendasInternasOrder::query()->updateOrCreate(
@@ -413,6 +388,7 @@ class VendasInternasSyncService
                     'device_uuid' => $order['device_uuid'] ?? null,
                     'user_id' => $user->id,
                     'empresa_id' => $user->empresa_id,
+                    'tipo' => $tipo,
                     'cliente_id' => $order['cliente_id'] ?? null,
                     'vendedor_id' => $user->vendedor_id,
                     'total' => 0,
@@ -426,10 +402,195 @@ class VendasInternasSyncService
 
             return [
                 'uuid' => $uuid,
+                'tipo' => $tipo,
                 'status' => VendasInternasOrder::STATUS_ERRO,
                 'erro' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     * @return array{0: Orcamento, 1: float, 2: ?Carbon}
+     */
+    private function buildOrcamentoFromPush(array $order, User $user): array
+    {
+        $clienteId = (int) ($order['cliente_id'] ?? 0);
+
+        if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
+            throw new \RuntimeException('Cliente inválido ou não encontrado.');
+        }
+
+        $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
+
+        if ($itens === []) {
+            throw new \RuntimeException('Documento sem itens.');
+        }
+
+        $subtotal = 0.0;
+        $descontoValor = (float) ($order['desconto_valor'] ?? 0);
+        $clientCreatedAt = isset($order['created_at']) ? Carbon::parse($order['created_at']) : null;
+        $momentoLocal = $clientCreatedAt
+            ? ErpTimezone::toLocal($clientCreatedAt)
+            : ErpTimezone::toLocal();
+        $dataPedido = $momentoLocal->toDateString();
+
+        $orcamento = Orcamento::query()->create([
+            'numero' => Orcamento::nextNumero(),
+            'data' => $dataPedido,
+            'hora' => $momentoLocal->format('H:i:s'),
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id,
+            'subtotal' => 0,
+            'percentual_desconto' => (float) ($order['percentual_desconto'] ?? 0),
+            'desconto_valor' => $descontoValor,
+            'forma_pagamento' => $order['forma_pagamento'] ?? null,
+            'validade_dias' => (int) ($order['validade_dias'] ?? 0),
+            'observacoes' => $order['observacoes'] ?? null,
+            'total' => 0,
+            'status' => Orcamento::STATUS_ABERTO,
+            'plataforma' => Orcamento::PLATAFORMA_VI,
+        ]);
+
+        $linha = 1;
+
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+
+            if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
+                throw new \RuntimeException('Produto inválido no item '.$linha.'.');
+            }
+
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $preco = (float) ($item['preco_unitario'] ?? 0);
+            $descItem = (float) ($item['desconto'] ?? 0);
+            $totalItem = round(($quantidade * $preco) - $descItem, 2);
+            $subtotal += $totalItem;
+
+            OrcamentoItem::query()->create([
+                'orcamento_id' => $orcamento->id,
+                'item' => $linha,
+                'product_id' => $productId,
+                'product_grade_id' => $item['product_grade_id'] ?? null,
+                'quantidade' => $quantidade,
+                'preco_unitario' => $preco,
+                'total' => $totalItem,
+                'desconto' => $descItem,
+                'descricao' => $item['descricao'] ?? null,
+            ]);
+
+            $linha++;
+        }
+
+        $total = round($subtotal - $descontoValor, 2);
+
+        $orcamento->update([
+            'subtotal' => $subtotal,
+            'total' => $total,
+        ]);
+
+        return [$orcamento, $total, $clientCreatedAt];
+    }
+
+    /**
+     * Orçamento VI → lista Orçamentos / importação PDV.
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function finalizeOrcamentoPush(
+        string $uuid,
+        array $order,
+        User $user,
+        Orcamento $orcamento,
+        float $total,
+        ?Carbon $clientCreatedAt,
+    ): array {
+        $viOrder = VendasInternasOrder::query()->create([
+            'uuid' => $uuid,
+            'device_uuid' => $order['device_uuid'] ?? null,
+            'user_id' => $user->id,
+            'empresa_id' => $user->empresa_id,
+            'tipo' => VendasInternasOrder::TIPO_ORCAMENTO,
+            'cliente_id' => $orcamento->cliente_id,
+            'vendedor_id' => $user->vendedor_id,
+            'orcamento_id' => $orcamento->id,
+            'forca_vendas_order_id' => null,
+            'venda_id' => null,
+            'total' => $total,
+            'status' => VendasInternasOrder::STATUS_IMPORTADO,
+            'situacao' => VendasInternasOrder::SITUACAO_AGUARDANDO,
+            'payload' => $order,
+            'client_created_at' => $clientCreatedAt,
+            'received_at' => now(),
+        ]);
+
+        return array_merge(
+            $this->orderPushResult($viOrder),
+            ['orcamento_id' => $orcamento->id],
+        );
+    }
+
+    /**
+     * Pedido VI → Monitor de Vendas (forca_vendas_orders).
+     *
+     * @param  array<string, mixed>  $order
+     * @return array<string, mixed>
+     */
+    private function finalizePedidoPush(
+        string $uuid,
+        array $order,
+        User $user,
+        Orcamento $orcamento,
+        float $total,
+        ?Carbon $clientCreatedAt,
+    ): array {
+        $fvOrder = ForcaVendasOrder::query()->create([
+            'uuid' => $uuid,
+            'device_uuid' => $order['device_uuid'] ?? null,
+            'user_id' => $user->id,
+            'empresa_id' => $user->empresa_id,
+            'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
+            'cliente_id' => $orcamento->cliente_id,
+            'vendedor_id' => $user->vendedor_id,
+            'orcamento_id' => $orcamento->id,
+            'venda_id' => null,
+            'total' => $total,
+            'status' => ForcaVendasOrder::STATUS_IMPORTADO,
+            'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
+            'payload' => array_merge($order, ['origem' => 'vendas_internas']),
+            'client_created_at' => $clientCreatedAt,
+            'received_at' => now(),
+        ]);
+
+        (new EstoqueReservaService())->reservarPedido($fvOrder, $orcamento, $user);
+
+        $viOrder = VendasInternasOrder::query()->create([
+            'uuid' => $uuid,
+            'device_uuid' => $order['device_uuid'] ?? null,
+            'user_id' => $user->id,
+            'empresa_id' => $user->empresa_id,
+            'tipo' => VendasInternasOrder::TIPO_PEDIDO,
+            'cliente_id' => $orcamento->cliente_id,
+            'vendedor_id' => $user->vendedor_id,
+            'orcamento_id' => $orcamento->id,
+            'forca_vendas_order_id' => $fvOrder->id,
+            'venda_id' => null,
+            'total' => $total,
+            'status' => VendasInternasOrder::STATUS_IMPORTADO,
+            'situacao' => VendasInternasOrder::SITUACAO_PENDENTE,
+            'payload' => $order,
+            'client_created_at' => $clientCreatedAt,
+            'received_at' => now(),
+        ]);
+
+        return array_merge(
+            $this->orderPushResult($viOrder),
+            [
+                'orcamento_id' => $orcamento->id,
+                'forca_vendas_order_id' => $fvOrder->id,
+            ],
+        );
     }
 
     /**

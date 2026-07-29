@@ -4,6 +4,7 @@ namespace App\Filament\Gestor\Pages;
 
 use App\Filament\Gestor\Concerns\InteractsWithGestorShell;
 use App\Models\Product;
+use App\Support\Erp\Dashboard\ErpDashboardGauges;
 use App\Support\Gestor\GestorExecutivoService;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -23,6 +24,9 @@ class EstoqueGestorPage extends Page
     /** @var array<string, mixed> */
     public array $snapshot = [];
 
+    /** @var array<string, mixed> */
+    public array $saudeEstoque = [];
+
     /** @var list<array{id: int, codigo: string, descricao: string, estoque: float, minimo: float}> */
     public array $criticos = [];
 
@@ -35,6 +39,7 @@ class EstoqueGestorPage extends Page
     {
         $this->mountGestorShell();
         $this->snapshot = app(GestorExecutivoService::class)->snapshot();
+        $this->saudeEstoque = ErpDashboardGauges::saudeEstoqueGauge();
         $this->criticos = Product::query()
             ->estoqueCritico()
             ->orderBy('descricao')

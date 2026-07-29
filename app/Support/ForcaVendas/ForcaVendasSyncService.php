@@ -45,13 +45,15 @@ class ForcaVendasSyncService
      *
      * @return array<string, mixed>
      */
-    public function buildPull(?Carbon $since, ?int $vendedorId = null): array
+    public function buildPull(?Carbon $since, ?int $vendedorId = null, ?int $empresaId = null): array
     {
         return [
             'server_time' => now()->toIso8601String(),
             'since' => $since?->toIso8601String(),
             'meta' => [
-                'pix_api_habilitada' => app(PixProviderManager::class)->apiHabilitadaParaEmpresa(null),
+                // Mesma regra do login: flag PIX da empresa do usuário autenticado.
+                'pix_api_habilitada' => app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId),
+                'empresa_id' => $empresaId,
             ],
             'products' => $this->products($since, $vendedorId),
             'price_tables' => $this->priceTables($since),
@@ -72,11 +74,13 @@ class ForcaVendasSyncService
     /**
      * Assinatura barata para ETag: contagens + maior updated_at de cada tabela.
      */
-    public function pullSignature(?int $vendedorId = null): string
+    public function pullSignature(?int $vendedorId = null, ?int $empresaId = null): string
     {
-        // O histÃ³rico de vendas Ã© por vendedor, entÃ£o o ETag tambÃ©m precisa
-        // variar por vendedor (senÃ£o um vendedor recebe o cache do outro).
-        $parts = ['vendedor:'.($vendedorId ?? 0)];
+        // Histórico por vendedor + empresa (flag PIX não pode reutilizar cache de outra empresa).
+        $parts = [
+            'vendedor:'.($vendedorId ?? 0),
+            'empresa:'.($empresaId ?? 0),
+        ];
 
         foreach ([
             'products' => Product::query(),
@@ -129,7 +133,7 @@ class ForcaVendasSyncService
             : 0;
         $parts[] = "vendedor_estoque:{$estoqueVendedor}";
 
-        $parts[] = 'pix_api:'.(int) app(PixProviderManager::class)->apiHabilitadaParaEmpresa(null);
+        $parts[] = 'pix_api:'.(int) app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId);
 
         return sha1(implode('|', $parts));
     }
@@ -702,6 +706,17 @@ class ForcaVendasSyncService
             $existing = ForcaVendasOrder::query()->where('uuid', $uuid)->first();
 
             if ($existing !== null) {
+                // Pedido que falhou na importação (STATUS_ERRO) pode ser
+                // reprocessado pelo mesmo UUID no próximo push: o registro de
+                // erro não gerou orçamento/venda (a transação deu rollback),
+                // então é seguro descartá-lo e tentar importar de novo.
+                if ($this->podeReprocessarErro($existing)) {
+                    $existing->delete();
+                    $results[] = $this->createOrder($uuid, $order, $user);
+
+                    continue;
+                }
+
                 $results[] = $this->orderPushResult($existing, duplicado: true);
 
                 continue;
@@ -711,6 +726,20 @@ class ForcaVendasSyncService
         }
 
         return $results;
+    }
+
+    /**
+     * Um pedido só pode ser reprocessado pelo mesmo UUID quando a importação
+     * anterior falhou (STATUS_ERRO) e nada foi efetivado (sem orçamento, sem
+     * venda e não cancelado manualmente). Pedidos importados com sucesso são
+     * tratados como duplicados, preservando a idempotência do push.
+     */
+    private function podeReprocessarErro(ForcaVendasOrder $order): bool
+    {
+        return $order->status === ForcaVendasOrder::STATUS_ERRO
+            && $order->orcamento_id === null
+            && $order->venda_id === null
+            && $order->situacao !== ForcaVendasOrder::SITUACAO_CANCELADO;
     }
 
     /**
@@ -724,7 +753,7 @@ class ForcaVendasSyncService
                 $clienteId = (int) ($order['cliente_id'] ?? 0);
 
                 if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
-                    throw new \RuntimeException('Cliente invÃ¡lido ou nÃ£o encontrado.');
+                    throw new \RuntimeException('Cliente inválido ou não encontrado.');
                 }
 
                 $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
@@ -764,7 +793,7 @@ class ForcaVendasSyncService
                     $productId = (int) ($item['product_id'] ?? 0);
 
                     if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
-                        throw new \RuntimeException('Produto invÃ¡lido no item '.$linha.'.');
+                        throw new \RuntimeException('Produto inválido no item '.$linha.'.');
                     }
 
                     $quantidade = (float) ($item['quantidade'] ?? 0);
@@ -907,7 +936,7 @@ class ForcaVendasSyncService
                     $nome = trim((string) ($customer['nome_razao'] ?? ''));
 
                     if ($nome === '') {
-                        throw new \RuntimeException('Informe o nome ou razÃ£o social do cliente.');
+                        throw new \RuntimeException('Informe o nome ou razão social do cliente.');
                     }
 
                     $person = $this->findExistingCustomerByDocument($customer)
@@ -1152,7 +1181,7 @@ class ForcaVendasSyncService
                 $clienteId = (int) ($visita['cliente_id'] ?? 0);
 
                 if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
-                    throw new \RuntimeException('Cliente invÃ¡lido ou nÃ£o encontrado.');
+                    throw new \RuntimeException('Cliente inválido ou não encontrado.');
                 }
 
                 $motivo = trim((string) ($visita['motivo'] ?? ''));

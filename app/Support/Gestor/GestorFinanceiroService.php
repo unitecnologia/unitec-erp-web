@@ -80,6 +80,8 @@ final class GestorFinanceiroService
             projecao: $projecao,
         );
 
+        $cartoes = $this->resumoCartoes($hoje);
+
         return [
             'atualizado_em' => ErpFinanceiroMetricas::agoraLabelHora(),
             'data_label' => ErpFinanceiroMetricas::agoraLabelData(),
@@ -109,6 +111,7 @@ final class GestorFinanceiroService
             'proximos' => $proximos,
             'saude' => $saude,
             'atencao' => $atencao,
+            'cartoes' => $cartoes,
             'fluxo_previsto_hoje' => round(
                 (float) $receberHoje['valor'] - (float) $pagarHoje['valor'],
                 2
@@ -147,8 +150,152 @@ final class GestorFinanceiroService
             'proximos_receber' => $this->listarReceber($hoje, $hoje->copy()->addDays(14), 8),
             'inadimplencia' => $this->listarClientesInadimplentes($hoje),
             'acima_limite' => $this->listarClientesAcimaLimite(),
+            'cartoes' => $this->listarCartoes($hoje),
             default => [],
         };
+    }
+
+    /**
+     * Resumo de cartões a receber (POS crédito/débito lançados no Contas a Receber).
+     *
+     * @return array{
+     *   qtd: int,
+     *   valor: float,
+     *   vendido_hoje: float,
+     *   vence_hoje: float,
+     *   proximos_7d: float,
+     *   bandeiras: list<array{nome: string, qtd: int, valor: float}>
+     * }
+     */
+    private function resumoCartoes(Carbon $hoje): array
+    {
+        $vazio = [
+            'qtd' => 0,
+            'valor' => 0.0,
+            'vendido_hoje' => 0.0,
+            'vence_hoje' => 0.0,
+            'proximos_7d' => 0.0,
+            'bandeiras' => [],
+        ];
+
+        try {
+            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+                return $vazio;
+            }
+
+            $abertos = ContaReceber::query()
+                ->where('forma', ContaReceber::FORMA_CARTAO)
+                ->where('saldo', '>', 0)
+                ->get(['saldo', 'vencimento', 'cartao_bandeira', 'emissao']);
+
+            if ($abertos->isEmpty()) {
+                $vendidoHoje = (float) ContaReceber::query()
+                    ->where('forma', ContaReceber::FORMA_CARTAO)
+                    ->whereDate('emissao', $hoje->toDateString())
+                    ->sum('valor');
+
+                return array_merge($vazio, ['vendido_hoje' => round($vendidoHoje, 2)]);
+            }
+
+            $valor = round((float) $abertos->sum('saldo'), 2);
+            $venceHoje = 0.0;
+            $proximos7 = 0.0;
+            $ate7 = $hoje->copy()->addDays(7);
+            $bandeirasMap = [];
+
+            foreach ($abertos as $titulo) {
+                $saldo = (float) $titulo->saldo;
+                $venc = $titulo->vencimento;
+                if ($venc && $venc->isSameDay($hoje)) {
+                    $venceHoje += $saldo;
+                } elseif ($venc && $venc->gt($hoje) && $venc->lte($ate7)) {
+                    $proximos7 += $saldo;
+                }
+
+                $bandeira = mb_strtoupper(trim((string) ($titulo->cartao_bandeira ?: 'SEM BANDEIRA')), 'UTF-8');
+                if (! isset($bandeirasMap[$bandeira])) {
+                    $bandeirasMap[$bandeira] = ['nome' => $bandeira, 'qtd' => 0, 'valor' => 0.0];
+                }
+                $bandeirasMap[$bandeira]['qtd']++;
+                $bandeirasMap[$bandeira]['valor'] += $saldo;
+            }
+
+            $bandeiras = array_values(array_map(
+                fn (array $b): array => [
+                    'nome' => $b['nome'],
+                    'qtd' => (int) $b['qtd'],
+                    'valor' => round((float) $b['valor'], 2),
+                ],
+                $bandeirasMap,
+            ));
+            usort($bandeiras, fn (array $a, array $b): int => $b['valor'] <=> $a['valor']);
+
+            $vendidoHoje = round((float) ContaReceber::query()
+                ->where('forma', ContaReceber::FORMA_CARTAO)
+                ->whereDate('emissao', $hoje->toDateString())
+                ->sum('valor'), 2);
+
+            return [
+                'qtd' => $abertos->count(),
+                'valor' => $valor,
+                'vendido_hoje' => $vendidoHoje,
+                'vence_hoje' => round($venceHoje, 2),
+                'proximos_7d' => round($proximos7, 2),
+                'bandeiras' => array_slice($bandeiras, 0, 4),
+            ];
+        } catch (Throwable) {
+            return $vazio;
+        }
+    }
+
+    /**
+     * @return list<array{id: int, pessoa: string, documento: string, valor: float, vencimento: string, situacao: string, vencido?: bool, pode_receber?: bool, pode_pagar?: bool}>
+     */
+    private function listarCartoes(Carbon $hoje, int $limit = 80): array
+    {
+        try {
+            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+                return [];
+            }
+
+            return ContaReceber::query()
+                ->with('cliente:id,nome_razao')
+                ->where('forma', ContaReceber::FORMA_CARTAO)
+                ->where('saldo', '>', 0)
+                ->orderBy('vencimento')
+                ->limit($limit)
+                ->get()
+                ->map(function (ContaReceber $c) use ($hoje): array {
+                    $venc = $c->vencimento;
+                    $situacao = $venc && $venc->lt($hoje)
+                        ? 'Vencido'
+                        : ($venc && $venc->isSameDay($hoje) ? 'Vence hoje' : 'A vencer');
+
+                    $extras = array_filter([
+                        filled($c->cartao_bandeira) ? (string) $c->cartao_bandeira : null,
+                        filled($c->cartao_parcela) ? 'Parc. '.$c->cartao_parcela : null,
+                        filled($c->cartao_maquininha) ? (string) $c->cartao_maquininha : null,
+                    ]);
+
+                    return [
+                        'id' => (int) $c->id,
+                        'pessoa' => (string) ($c->cliente?->nome_razao ?? '—'),
+                        'documento' => trim(implode(' · ', array_filter([
+                            (string) ($c->documento ?: '#'.$c->id),
+                            $extras !== [] ? implode(' · ', $extras) : null,
+                        ]))),
+                        'valor' => round((float) $c->saldo, 2),
+                        'vencimento' => $venc?->format('d/m/Y') ?? '—',
+                        'situacao' => $situacao,
+                        'vencido' => $venc && $venc->lt($hoje),
+                        'pode_pagar' => false,
+                        'pode_receber' => true,
+                    ];
+                })
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**

@@ -2,15 +2,24 @@
     $tipos = \App\Models\FormaPagamento::tipoLabels();
     $movimentos = \App\Models\FormaPagamento::tipoMovimentoLabels();
     $contas = $this->contaDestinoOptions();
+    $tipoAtual = (string) ($this->form['tipo'] ?? '');
+    $mostraBandeiras = in_array($tipoAtual, ['cartao_credito', 'cartao_debito', 'tef'], true);
 @endphp
 
 @if ($this->showForm)
     <div class="erp-fpgto-modal" x-data
-         x-on:keydown.escape.window="$wire.closeForm()"
-         x-on:keydown.window="if ($event.key === 'F2') { $event.preventDefault(); $wire.saveFormaPagamento(); }">
+         x-on:keydown.escape.window="
+            if ($wire.showBandeiraForm) { $wire.closeBandeiraForm(); }
+            else if ($wire.showMaquininhaForm) { $wire.closeMaquininhaForm(); }
+            else { $wire.closeForm(); }
+         "
+         x-on:keydown.window="
+            if ($wire.showBandeiraForm || $wire.showMaquininhaForm) { return; }
+            if ($event.key === 'F2') { $event.preventDefault(); $wire.saveFormaPagamento(); }
+         ">
         <div class="erp-fpgto-modal__backdrop" wire:click="closeForm"></div>
 
-        <div class="erp-fpgto-modal__dialog" role="dialog" aria-modal="true">
+        <div class="erp-fpgto-modal__dialog @if ($mostraBandeiras) erp-fpgto-modal__dialog--wide @endif" role="dialog" aria-modal="true">
             <div class="erp-fpgto-modal__titlebar">
                 <span>Formas de Pagamento</span>
                 <button type="button" class="erp-fpgto-modal__close" wire:click="closeForm" aria-label="Fechar">&times;</button>
@@ -40,36 +49,42 @@
                                 @endforeach
                             </select>
                         </label>
+                        @error('form.conta_destino_id') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Tipo</span>
-                            <select wire:model="form.tipo" class="erp-fpgto-field__input">
+                            <select wire:model.live="form.tipo" class="erp-fpgto-field__input">
                                 <option value="">— Selecione —</option>
                                 @foreach ($tipos as $value => $label)
                                     <option value="{{ $value }}">{{ $label }}</option>
                                 @endforeach
                             </select>
                         </label>
+                        @error('form.tipo') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Taxa Cartão</span>
                             <input type="number" step="0.01" min="0" wire:model="form.taxa_cartao" class="erp-fpgto-field__input erp-fpgto-field__input--num">
                         </label>
+                        @error('form.taxa_cartao') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Prazo Cartão</span>
                             <input type="number" min="0" wire:model="form.prazo_cartao" class="erp-fpgto-field__input erp-fpgto-field__input--num">
                         </label>
+                        @error('form.prazo_cartao') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Nº Máximo de Parcelas</span>
-                            <input type="number" min="1" wire:model="form.max_parcelas" class="erp-fpgto-field__input erp-fpgto-field__input--num">
+                            <input type="number" min="0" wire:model="form.max_parcelas" class="erp-fpgto-field__input erp-fpgto-field__input--num">
                         </label>
+                        @error('form.max_parcelas') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Intervalo entre Parcelas</span>
                             <input type="number" min="0" wire:model="form.intervalo_parcelas" class="erp-fpgto-field__input erp-fpgto-field__input--num">
                         </label>
+                        @error('form.intervalo_parcelas') <p class="erp-fpgto-modal__error">{{ $message }}</p> @enderror
 
                         <label class="erp-fpgto-field">
                             <span class="erp-fpgto-field__label">Atalho</span>
@@ -122,6 +137,98 @@
                         </fieldset>
                     </div>
                 </div>
+
+                @if ($mostraBandeiras)
+                    <div class="erp-fpgto-cartao-lookups">
+                        <fieldset class="erp-fpgto-fieldset erp-fpgto-bandeiras">
+                            <legend>Bandeiras de Cartão</legend>
+                            <div class="erp-fpgto-bandeiras__toolbar">
+                                <p class="erp-fpgto-bandeiras__hint">Cadastre aqui as bandeiras usadas no canhoto do PDV (POS).</p>
+                                <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createBandeira">
+                                    + Nova bandeira
+                                </button>
+                            </div>
+                            <div class="erp-fpgto-bandeiras__grid-wrap">
+                                <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:4.5rem;">Código</th>
+                                            <th>Nome</th>
+                                            <th style="width:4rem;" class="erp-pdv__grid-col-center">Ativo</th>
+                                            <th style="width:7rem;" class="erp-pdv__grid-col-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($this->bandeirasLista as $bandeira)
+                                            <tr wire:key="fpgto-bandeira-{{ $bandeira['id'] }}" class="erp-pdv__grid-row">
+                                                <td>{{ $bandeira['codigo'] }}</td>
+                                                <td>{{ $bandeira['nome'] }}</td>
+                                                <td class="erp-pdv__grid-col-center">{{ $bandeira['ativo'] ? 'Sim' : 'Não' }}</td>
+                                                <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
+                                                    <button type="button" class="erp-bandeiras-modal__link" wire:click="editBandeira({{ $bandeira['id'] }})">Alterar</button>
+                                                    <button
+                                                        type="button"
+                                                        class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
+                                                        wire:click="deleteBandeira({{ $bandeira['id'] }})"
+                                                        wire:confirm="Excluir a bandeira {{ $bandeira['nome'] }}?"
+                                                    >Excluir</button>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr class="erp-pdv__grid-empty">
+                                                <td colspan="4">Nenhuma bandeira cadastrada. Clique em Nova bandeira.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="erp-fpgto-fieldset erp-fpgto-bandeiras">
+                            <legend>Maquininhas (POS)</legend>
+                            <div class="erp-fpgto-bandeiras__toolbar">
+                                <p class="erp-fpgto-bandeiras__hint">Cadastre as adquirentes/maquininhas usadas nas vendas com cartão.</p>
+                                <button type="button" class="erp-fpgto-parcelas__btn erp-fpgto-parcelas__btn--apply" wire:click="createMaquininha">
+                                    + Nova maquininha
+                                </button>
+                            </div>
+                            <div class="erp-fpgto-bandeiras__grid-wrap">
+                                <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:4.5rem;">Código</th>
+                                            <th>Nome</th>
+                                            <th style="width:4rem;" class="erp-pdv__grid-col-center">Ativo</th>
+                                            <th style="width:7rem;" class="erp-pdv__grid-col-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($this->maquininhasLista as $maquininha)
+                                            <tr wire:key="fpgto-maquininha-{{ $maquininha['id'] }}" class="erp-pdv__grid-row">
+                                                <td>{{ $maquininha['codigo'] }}</td>
+                                                <td>{{ $maquininha['nome'] }}</td>
+                                                <td class="erp-pdv__grid-col-center">{{ $maquininha['ativo'] ? 'Sim' : 'Não' }}</td>
+                                                <td class="erp-pdv__grid-col-center erp-bandeiras-modal__actions">
+                                                    <button type="button" class="erp-bandeiras-modal__link" wire:click="editMaquininha({{ $maquininha['id'] }})">Alterar</button>
+                                                    <button
+                                                        type="button"
+                                                        class="erp-bandeiras-modal__link erp-bandeiras-modal__link--danger"
+                                                        wire:click="deleteMaquininha({{ $maquininha['id'] }})"
+                                                        wire:confirm="Excluir a maquininha {{ $maquininha['nome'] }}?"
+                                                    >Excluir</button>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr class="erp-pdv__grid-empty">
+                                                <td colspan="4">Nenhuma maquininha cadastrada. Clique em Nova maquininha.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </fieldset>
+                    </div>
+                @endif
 
                 <fieldset class="erp-fpgto-fieldset erp-fpgto-fieldset--acoes">
                     <legend>Ações</legend>

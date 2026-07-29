@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Gera dist/Unitec-ERP-Instalador.zip para o cliente (extrair + Instalar Tudo.bat).

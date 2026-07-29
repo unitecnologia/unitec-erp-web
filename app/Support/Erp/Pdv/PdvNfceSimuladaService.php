@@ -5,6 +5,7 @@ namespace App\Support\Erp\Pdv;
 use App\Models\Empresa;
 use App\Models\PdvVenda;
 use App\Support\Erp\Compra\CompraDanfeReportService;
+use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
 use App\Support\ForcaVendas\ForcaVendasPairing;
 use Illuminate\Support\Carbon;
 
@@ -33,7 +34,7 @@ final class PdvNfceSimuladaService
         bool $autoPrint = false,
         ?Carbon $printedAt = null,
     ): array {
-        $venda->loadMissing(['itens', 'pagamentos', 'person', 'nfce']);
+        $venda->loadMissing(['itens.product', 'pagamentos', 'person', 'nfce']);
         $printedAt ??= now();
         $documento = $venda->nfce;
         $operacao = $this->resolveOperacao($venda, $operacao, $documento);
@@ -43,19 +44,24 @@ final class PdvNfceSimuladaService
         $numeroNf = str_pad((string) ($documento?->numero ?? $venda->numero), 9, '0', STR_PAD_LEFT);
         $protocolo = $documento?->protocolo ?? $this->gerarProtocolo($venda);
         $qrTexto = $documento?->qr_code_conteudo ?? $this->gerarQrTexto($chave, $operacao);
+        $ibpt = $this->calcularIbptDaVenda($venda);
+        $consumidor = NfceConsumidorIdentificado::resolvePerson($venda);
 
         return [
             'venda' => $venda,
             'empresa' => $empresa,
             'usuario' => $usuario,
             'operacao' => $operacao,
+            'simulada' => $documento === null || $documento->simulada,
+            'pageTitle' => $this->pageTitle($documento, $venda),
             'modoLabel' => $this->modoLabel($operacao),
             'statusLabel' => $this->statusLabel($operacao, $documento),
-            'ambienteLabel' => 'SIMULADO — SEM VALOR FISCAL',
+            'ambienteLabel' => $this->ambienteLabel($documento),
             'chave' => $chave,
             'chaveFormatada' => $this->danfe->formatChave($chave),
             'barcodeDataUri' => $this->danfe->barcodeDataUri($chave),
-            'qrSvg' => ForcaVendasPairing::qrSvg($qrTexto, 180),
+            'qrTexto' => $qrTexto,
+            'qrSvg' => ForcaVendasPairing::qrSvg($qrTexto, 140),
             'protocolo' => $protocolo,
             'protocoloFormatado' => $this->formatarProtocolo($protocolo),
             'serie' => str_pad($serie, 3, '0', STR_PAD_LEFT),
@@ -65,10 +71,59 @@ final class PdvNfceSimuladaService
             'dataEmissao' => $emissao->format('d/m/Y'),
             'horaEmissao' => $emissao->format('H:i:s'),
             'emitente' => $this->buildEmitente($empresa),
+            'consumidorNome' => NfceConsumidorIdentificado::nome($consumidor),
+            'consumidorEndereco' => NfceConsumidorIdentificado::endereco($consumidor),
+            'cpfNotaMascarado' => NfceConsumidorIdentificado::cpfMascarado($venda),
             'obsNfce' => trim((string) ($empresa?->obs_nfce ?? '')),
+            'textoIbpt' => $ibpt['texto'],
+            'tribFed' => $ibpt['trib_fed'],
+            'tribEst' => $ibpt['trib_est'],
+            'tribMun' => $ibpt['trib_mun'],
+            'vTotTrib' => $ibpt['v_tot_trib'],
+            'economizado' => PdvDavCupomLayout::totalDescontosEconomizados($venda),
+            'itemHeader' => PdvDavCupomLayout::itemHeaderLine(PdvDavCupomLayout::WIDTH_ITEMS),
+            'itemLines' => $venda->itens->map(
+                static fn ($item) => PdvDavCupomLayout::formatItemLines(
+                    $item,
+                    PdvDavCupomLayout::WIDTH_ITEMS,
+                    (bool) ($empresa?->param_pdv_nfce_descricao_completa ?? false),
+                )
+            )->all(),
             'copias' => max(1, min(3, $copias)),
             'autoPrint' => $autoPrint,
             'printedAt' => $printedAt,
+        ];
+    }
+
+    /**
+     * @return array{texto: string, trib_fed: float, trib_est: float, trib_mun: float, v_tot_trib: float}
+     */
+    private function calcularIbptDaVenda(PdvVenda $venda): array
+    {
+        $lookup = app(\App\Support\Erp\Fiscal\IbptLookupService::class);
+        $rows = [];
+
+        foreach ($venda->itens as $item) {
+            $ibpt = $lookup->calcularParaProduto($item->product, (float) $item->total);
+            $rows[] = [
+                'trib_fed' => $ibpt['trib_fed'],
+                'trib_est' => $ibpt['trib_est'],
+                'trib_mun' => $ibpt['trib_mun'],
+                'trib_imp' => $ibpt['trib_imp'],
+                'ibpt_fonte' => $ibpt['fonte'],
+                'ibpt_chave' => $ibpt['chave'],
+                'ibpt_versao' => $ibpt['versao'],
+            ];
+        }
+
+        $agg = $lookup->agregarItens($rows);
+
+        return [
+            'texto' => $lookup->formatarTextoLei12741($agg),
+            'trib_fed' => (float) $agg['trib_fed'],
+            'trib_est' => (float) $agg['trib_est'],
+            'trib_mun' => (float) $agg['trib_mun'],
+            'v_tot_trib' => (float) $agg['v_tot_trib'],
         ];
     }
 
@@ -101,6 +156,34 @@ final class PdvNfceSimuladaService
         $tipo = $operacao === PdvFinalizarOperacao::NFCE_CONTINGENCIA ? '9' : '1';
 
         return 'NFC-e SIMULADA|chNFe=' . $chave . '|tpAmb=2|tpEmis=' . $tipo;
+    }
+
+    private function ambienteLabel(?\App\Models\PdvVendaNfce $documento): string
+    {
+        if ($documento !== null && ! $documento->simulada) {
+            if ($documento->status === \App\Models\PdvVendaNfce::STATUS_CONTINGENCIA) {
+                return $documento->ambiente === \App\Models\PdvVendaNfce::AMBIENTE_PRODUCAO
+                    ? 'CONTINGÊNCIA — PRODUÇÃO'
+                    : 'CONTINGÊNCIA — HOMOLOGAÇÃO';
+            }
+
+            return $documento->ambiente === \App\Models\PdvVendaNfce::AMBIENTE_PRODUCAO
+                ? 'PRODUÇÃO'
+                : 'HOMOLOGAÇÃO';
+        }
+
+        return 'SIMULADO — SEM VALOR FISCAL';
+    }
+
+    private function pageTitle(?\App\Models\PdvVendaNfce $documento, PdvVenda $venda): string
+    {
+        $numero = str_pad((string) ($documento?->numero ?? $venda->numero), 6, '0', STR_PAD_LEFT);
+
+        if ($documento !== null && ! $documento->simulada) {
+            return 'NFC-e #' . $numero;
+        }
+
+        return 'NFC-e Simulada #' . $numero;
     }
 
     private function resolveOperacao(PdvVenda $venda, string $operacao, ?\App\Models\PdvVendaNfce $documento = null): string

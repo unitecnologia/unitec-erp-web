@@ -35,6 +35,9 @@ use Illuminate\Support\Facades\Schema;
  * As contas a receber usam o documento "FV-{orderId}" (e "FV-{orderId}/{n}"
  * quando há mais de uma parcela), mesma convenção da tela Monitor de Vendas.
  *
+ * Caixa: FV lança no Livro Caixa (`caixa_lancamentos`) na hora do faturamento.
+ * PDV usa `pdv_caixa_movimentos` da sessão e consolida no Livro só no fechamento.
+ *
  * Observação: a baixa de estoque NÃO bloqueia por saldo (permite negativo),
  * por decisão de negócio para o faturamento automático.
  */
@@ -141,10 +144,15 @@ class ForcaVendasFaturamentoService
     }
 
     /**
-     * Estorna um pedido faturado: devolve o estoque, remove lançamentos de caixa
-     * do pedido, apaga as contas a receber e cancela a venda.
+     * Estorna um pedido faturado: devolve o estoque (mesma grade da baixa),
+     * remove lançamentos de caixa do pedido, apaga as contas a receber em aberto
+     * e cancela a venda.
      *
-     * @throws \RuntimeException quando não há venda.
+     * Bloqueia o estorno quando alguma conta a receber do pedido já foi recebida
+     * (valor_recebido > 0): apagar o título "sumiria" com dinheiro já baixado.
+     * Nesse caso é preciso estornar o recebimento antes.
+     *
+     * @throws \RuntimeException quando não há venda ou há título já recebido.
      */
     public function estornar(ForcaVendasOrder $order): void
     {
@@ -158,31 +166,16 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException('Esta venda já está cancelada.');
         }
 
+        $this->garantirTitulosNaoRecebidos($order);
+
         DB::transaction(function () use ($order, $venda): void {
-            $venda->loadMissing('itens');
             $stock = new PdvStockService();
             $vendedor = $order->vendedor_id
                 ? Vendedor::query()->find($order->vendedor_id)
                 : null;
             $estoqueId = $vendedor?->estoque_id ? (int) $vendedor->estoque_id : null;
 
-            foreach ($venda->itens as $item) {
-                if (! $item->product_id) {
-                    continue;
-                }
-
-                $product = Product::query()->find($item->product_id);
-
-                if ($product) {
-                    $stock->estornoItemVenda(
-                        $product,
-                        (float) $item->quantidade,
-                        null,
-                        null,
-                        $estoqueId,
-                    );
-                }
-            }
+            $this->estornarEstoque($order, $venda, $stock, $estoqueId);
 
             $this->removerLancamentosCaixaDoPedido($order);
             $this->contasDoPedido($order)->delete();
@@ -196,6 +189,90 @@ class ForcaVendasFaturamentoService
                 'canceled_at' => now(),
             ])->save();
         });
+    }
+
+    /**
+     * Bloqueia o estorno se houver título do pedido já recebido (baixado).
+     *
+     * @throws \RuntimeException
+     */
+    private function garantirTitulosNaoRecebidos(ForcaVendasOrder $order): void
+    {
+        if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            return;
+        }
+
+        $temRecebido = $this->contasDoPedido($order)
+            ->where('valor_recebido', '>', 0)
+            ->exists();
+
+        if ($temRecebido) {
+            throw new \RuntimeException(
+                'Não é possível estornar: existe título deste pedido já recebido (baixado). '
+                .'Estorne o recebimento no Contas a Receber antes de estornar o pedido.'
+            );
+        }
+    }
+
+    /**
+     * Devolve o estoque usando a mesma grade da baixa (lida do orçamento de
+     * origem, que é a fonte da baixa em `faturar`). Sem orçamento disponível,
+     * cai para os itens da venda (sem grade).
+     */
+    private function estornarEstoque(
+        ForcaVendasOrder $order,
+        Venda $venda,
+        PdvStockService $stock,
+        ?int $estoqueId,
+    ): void {
+        $orcamento = $order->orcamento;
+        $orcamento?->loadMissing('itens');
+
+        $itens = $orcamento && $orcamento->itens->isNotEmpty()
+            ? $orcamento->itens
+            : null;
+
+        if ($itens !== null) {
+            foreach ($itens as $item) {
+                if (! $item->product_id) {
+                    continue;
+                }
+
+                $product = Product::query()->find($item->product_id);
+
+                if ($product) {
+                    $stock->estornoItemVenda(
+                        $product,
+                        (float) $item->quantidade,
+                        $item->product_grade_id ? (int) $item->product_grade_id : null,
+                        null,
+                        $estoqueId,
+                    );
+                }
+            }
+
+            return;
+        }
+
+        $venda->loadMissing('itens');
+
+        foreach ($venda->itens as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+
+            $product = Product::query()->find($item->product_id);
+
+            if ($product) {
+                $stock->estornoItemVenda(
+                    $product,
+                    (float) $item->quantidade,
+                    null,
+                    null,
+                    $estoqueId,
+                );
+            }
+        }
     }
 
     /**
@@ -473,11 +550,40 @@ class ForcaVendasFaturamentoService
      */
     private function parcelasDias(array $payload): array
     {
+        // 1º Canhoto POS da Tela de Venda.
+        $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
+
+        if (is_array($canhotoDias) && $canhotoDias !== []) {
+            $dias = collect($canhotoDias)
+                ->map(fn ($d): int => (int) $d)
+                ->filter(fn (int $d): bool => $d >= 0)
+                ->values()
+                ->all();
+
+            if ($dias !== []) {
+                return $dias;
+            }
+        }
+
         $avulso = $this->diasDeString((string) ($payload['condicao_pagamento'] ?? ''));
 
-        $dias = $avulso !== []
-            ? $avulso
-            : $this->diasDeString((string) ($payload['tabela_prazo_dias'] ?? ''));
+        if ($avulso !== []) {
+            return $avulso;
+        }
+
+        $prazoRaw = $payload['tabela_prazo_dias'] ?? '';
+
+        if (is_array($prazoRaw)) {
+            $dias = collect($prazoRaw)
+                ->map(fn ($d): int => (int) $d)
+                ->filter(fn (int $d): bool => $d >= 0)
+                ->values()
+                ->all();
+
+            return $dias === [] ? [0] : $dias;
+        }
+
+        $dias = $this->diasDeString((string) $prazoRaw);
 
         return $dias === [] ? [0] : $dias;
     }

@@ -2,8 +2,11 @@
     $tabs = [
         'webservice' => 'WebService',
         'certificado' => 'Certificado',
+        'nfce' => 'NFC-e',
         'nfe' => 'NF-e',
+        'pdv_offline' => 'PDVs Offline',
         'email' => 'E-mail',
+        'resp_tecnico' => 'Técnico Responsável',
     ];
 
     $configFiscaisJsPath = public_path('js/erp-config-fiscais.js');
@@ -47,16 +50,22 @@
                         @include('filament.components.erp.config-fiscais.tabs.webservice')
                     @elseif ($this->activeTab === 'certificado')
                         @include('filament.components.erp.config-fiscais.tabs.certificado')
+                    @elseif ($this->activeTab === 'nfce')
+                        @include('filament.components.erp.config-fiscais.tabs.nfce')
                     @elseif ($this->activeTab === 'nfe')
                         @include('filament.components.erp.config-fiscais.tabs.nfe')
+                    @elseif ($this->activeTab === 'pdv_offline')
+                        @include('filament.components.erp.config-fiscais.tabs.pdv-offline')
+                    @elseif ($this->activeTab === 'resp_tecnico')
+                        @include('filament.components.erp.config-fiscais.tabs.resp-tecnico')
                     @else
                         @include('filament.components.erp.config-fiscais.tabs.email')
                     @endif
                 </div>
             </div>
-        </div>
 
-        @include('filament.components.erp.config-fiscais.action-bar')
+            @include('filament.components.erp.config-fiscais.action-bar')
+        </div>
     </div>
 </div>
 

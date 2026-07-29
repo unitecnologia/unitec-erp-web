@@ -49,15 +49,39 @@ class ListProducts extends ListRecords
     {
         parent::mount();
 
-        $this->searchColumn = $this->isSeriaisView()
-            ? $this->normalizeSerialSearchColumn($this->searchColumn)
-            : $this->normalizeSearchColumn($this->searchColumn);
-        $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->viewFilter = in_array($this->viewFilter, ['produtos', 'seriais'], true)
             ? $this->viewFilter
             : 'produtos';
 
+        // Sem ?campo= na URL: usa o campo marcado como padrão (sessão).
+        if (! request()->has('campo')) {
+            $this->searchColumn = $this->isSeriaisView()
+                ? (string) session('erp_produtos_search_column_seriais', 'descricao')
+                : (string) session('erp_produtos_search_column', 'descricao');
+        }
+
+        $this->searchColumn = $this->isSeriaisView()
+            ? $this->normalizeSerialSearchColumn($this->searchColumn)
+            : $this->normalizeSearchColumn($this->searchColumn);
+        $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
+
         ErpScreen::set($this->isSeriaisView() ? 'Seriais' : 'Produtos');
+    }
+
+    public function setSearchColumn(string $column): void
+    {
+        $this->searchColumn = $this->isSeriaisView()
+            ? $this->normalizeSerialSearchColumn($column)
+            : $this->normalizeSearchColumn($column);
+
+        $sessionKey = $this->isSeriaisView()
+            ? 'erp_produtos_search_column_seriais'
+            : 'erp_produtos_search_column';
+        session([$sessionKey => $this->searchColumn]);
+
+        $this->localSearch = '';
+        $this->clearListSelection();
+        $this->resetTable();
     }
 
     protected function normalizeStatusFilter(mixed $value): string
@@ -194,12 +218,7 @@ class ListProducts extends ListRecords
 
     public function updatedSearchColumn(): void
     {
-        $this->searchColumn = $this->isSeriaisView()
-            ? $this->normalizeSerialSearchColumn($this->searchColumn)
-            : $this->normalizeSearchColumn($this->searchColumn);
-        $this->localSearch = '';
-        $this->clearListSelection();
-        $this->resetTable();
+        $this->setSearchColumn($this->searchColumn);
     }
 
     public function updatedTableRecordsPerPage(): void
@@ -246,6 +265,7 @@ class ListProducts extends ListRecords
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             empresa: $this->currentEmpresa(),
+            applyDefaultOrder: false,
         ))->build();
     }
 

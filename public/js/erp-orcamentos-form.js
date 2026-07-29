@@ -199,7 +199,7 @@ function bindErpOrcamentosFormKeys() {
     window.__erpOrcFormKeysBound = true;
 
     document.addEventListener('keydown', (event) => {
-        if (! document.querySelector('.erp-orcamentos-form-page')) {
+        if (! document.querySelector('.erp-orcamentos-form-page') || document.querySelector('.erp-os-form-page')) {
             return;
         }
 

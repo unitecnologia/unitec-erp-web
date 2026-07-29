@@ -2,10 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Pages\Dashboard;
+use App\Support\Erp\ErpAccess;
 use App\Filament\Pages\Concerns\ManagesPdvUi;
 use App\Support\Erp\ErpScreen;
-use App\Support\Erp\Pdv\PdvConfig;
 use App\Support\Erp\Pdv\TerminalResolver;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -13,6 +12,7 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Auth;
 use BackedEnum;
 
 class PdvPage extends Page
@@ -29,6 +29,11 @@ class PdvPage extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('pdv.access');
+    }
+
     public static function getRoutePath(\Filament\Panel $panel): string
     {
         return 'pdv';
@@ -36,24 +41,33 @@ class PdvPage extends Page
 
     public function mount(): void
     {
-        if (! PdvConfig::make()->usarPdvRetaguarda()) {
+        ErpScreen::set('PDV');
+
+        $terminal = TerminalResolver::make()->resolveOrCreateDefault();
+
+        $user = Auth::user();
+        if ($user && ! $user->podeOperarPdvNoTerminal($terminal)) {
+            $nome = trim((string) ($terminal?->nome ?? '')) ?: 'este terminal';
+
             Notification::make()
-                ->title('PDV desabilitado.')
-                ->body('Ative "Usar PDV no Retaguarda" nos parâmetros da empresa.')
-                ->warning()
+                ->title('PDV não liberado para este usuário.')
+                ->body('Você não tem permissão para operar no PDV "'.$nome.'". Solicite liberação ao gerente.')
+                ->danger()
                 ->send();
 
-            $this->redirect(Dashboard::getUrl(), navigate: false);
+            $this->redirect(filament()->getUrl());
 
             return;
         }
 
-        ErpScreen::set('PDV');
-
-        TerminalResolver::make()->resolveOrCreateDefault();
-
         $this->loadPdvSessionState();
         $this->loadCupomFromSession();
+
+        if (! $this->garantirOperadorDoUsuarioLogado()) {
+            $this->redirect(filament()->getUrl());
+
+            return;
+        }
 
         if (! $this->caixaAberto) {
             $this->aberturaForm['valor'] = '0,00';

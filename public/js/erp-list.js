@@ -35,6 +35,8 @@ function initErpListPage(config) {
 }
 
 function bindDoubleClickEdit(page, config) {
+    page.dataset.erpListDblEdit = config.doubleClickEdit === false ? '0' : '1';
+
     if (page.dataset.erpListDblBound === '1') {
         return;
     }
@@ -42,16 +44,50 @@ function bindDoubleClickEdit(page, config) {
     page.dataset.erpListDblBound = '1';
 
     page.addEventListener('dblclick', (event) => {
+        if (page.dataset.erpListDblEdit === '0') {
+            return;
+        }
+
         const row = event.target.closest('.fi-ta-row');
 
         if (! isDataRow(page, row)) {
             return;
         }
 
-        if (config.edit) {
-            getLivewireComponent(page)?.call(config.edit);
+        if (! config.edit) {
+            return;
         }
+
+        const component = getLivewireComponent(page);
+
+        if (! component) {
+            return;
+        }
+
+        // Ensure selection is set before edit (single-click Livewire may still be in flight).
+        const recordKey = getRecordKeyFromRow(row);
+
+        if (recordKey) {
+            Promise.resolve(component.call('highlightRecord', recordKey))
+                .then(() => component.call(config.edit))
+                .catch(() => component.call(config.edit));
+
+            return;
+        }
+
+        component.call(config.edit);
     });
+}
+
+function getRecordKeyFromRow(row) {
+    if (! row) {
+        return null;
+    }
+
+    const wireKey = row.getAttribute('wire:key') || '';
+    const match = wireKey.match(/\.table\.records\.(.+)$/);
+
+    return match?.[1] ?? null;
 }
 
 function bindKeyboardShortcuts(page, config) {

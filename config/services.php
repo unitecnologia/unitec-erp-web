@@ -46,4 +46,10 @@ return [
         'base_url' => env('MERCADOPAGO_BASE_URL', 'https://api.mercadopago.com'),
     ],
 
+    'webpush' => [
+        'subject' => env('VAPID_SUBJECT', 'mailto:suporte@unitecnologia.com.br'),
+        'public_key' => env('VAPID_PUBLIC_KEY', ''),
+        'private_key' => env('VAPID_PRIVATE_KEY', ''),
+    ],
+
 ];

@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
+use App\Models\Cfop;
 use App\Models\Empresa;
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Nfe\NfeCalculoService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Str;
@@ -28,6 +30,23 @@ trait ManagesNfeItemGrid
     public string $nfeItemEntryUnidade = 'UN';
 
     public string $nfeItemEntryTotalDisplay = '';
+
+    public string $nfeItemEntryDesconto = '0,00';
+
+    public string $nfeItemEntryOutros = '0,00';
+
+    public bool $nfeDescontoModalOpen = false;
+
+    /** @var 'form'|'grid'|null */
+    public ?string $nfeItemAjusteAlvo = null;
+
+    /** @var 'desconto'|'acrescimo' */
+    public string $nfeItemAjusteTipo = 'desconto';
+
+    /** @var 'percentual'|'valor' */
+    public string $nfeItemAjusteModo = 'percentual';
+
+    public string $nfeItemAjusteValor = '0,00';
 
     public bool $nfeProdutoLookupOpen = false;
 
@@ -53,20 +72,377 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $this->submitNfeItemByCodigo();
+        $this->submitNfeItemByCodigo(confirm: false);
+        $this->dispatch('erp-nfe-focus-item-quantidade');
     }
 
-    public function handleNfeItemProdutoEnter(): void
+    public function confirmarNfeInclusaoProduto(?string $termFromInput = null): void
     {
+        // Enter manda o valor do input (evita perder o código pelo debounce do wire:model).
+        if ($termFromInput !== null) {
+            $fromInput = mb_strtoupper(trim($termFromInput), 'UTF-8');
+
+            if ($fromInput !== '') {
+                $this->nfeItemProdutoSearch = $fromInput;
+            }
+        }
+
+        $term = mb_strtoupper(trim($this->nfeItemProdutoSearch), 'UTF-8');
+
+        if ($term === '') {
+            Notification::make()->title('Informe o código, barras ou nome do produto.')->warning()->send();
+            $this->dispatch('erp-nfe-focus-item-produto');
+
+            return;
+        }
+
+        // Já confirmado (campo mostra a descrição): só avança para quantidade.
+        if ($this->nfeItemPendingProductId !== null) {
+            $pendingNome = $this->nfePendingProductNome();
+
+            if ($pendingNome !== '' && $term === $pendingNome) {
+                $this->dispatch('erp-nfe-focus-item-quantidade');
+
+                return;
+            }
+        }
+
+        $this->nfeItemProdutoSearch = $term;
+        $this->nfeItemCodigoInput = $term;
+
+        // Código/barras exato tem prioridade (leitor / Enter rápido).
+        $byCodigo = $this->findNfeProductByCodigo($term);
+
+        if ($byCodigo) {
+            $this->stageNfeProductForEntry($byCodigo);
+
+            return;
+        }
+
+        // Lista aberta por nome: confirma a sugestão selecionada (↑ ↓ + Enter).
+        if ($this->nfeProdutoLookupOpen && $this->nfeProdutoResults !== []) {
+            $index = $this->nfeSelectedProdutoIndex;
+
+            if ($index === null || ! isset($this->nfeProdutoResults[$index])) {
+                $index = 0;
+            }
+
+            $this->selectNfeProdutoResult((int) $index);
+
+            return;
+        }
+
+        $this->nfeProdutoLookupOpen = true;
+        $this->refreshNfeProdutoResults();
+
+        if ($this->nfeProdutoResults === []) {
+            Notification::make()
+                ->title('Produto não encontrado.')
+                ->body('Verifique o código, barras ou nome informado.')
+                ->warning()
+                ->send();
+            $this->dispatch('erp-nfe-focus-item-produto');
+
+            return;
+        }
+
+        if (count($this->nfeProdutoResults) === 1) {
+            $this->selectNfeProdutoResult(0);
+
+            return;
+        }
+
+        $this->nfeSelectedProdutoIndex = 0;
+        $this->syncNfeProdutoPreviewFotoFromSelection();
+        Notification::make()->title('Selecione o produto na lista (↑ ↓ + Enter).')->info()->send();
+        $this->dispatch('erp-nfe-focus-item-produto');
+    }
+
+    public function focoNfeInclusaoPrecoAposQtd(?string $qtdFromInput = null): void
+    {
+        if ($qtdFromInput !== null && trim($qtdFromInput) !== '') {
+            $this->nfeItemEntryQtd = trim($qtdFromInput);
+        }
+
+        if ($this->nfeItemPendingProductId === null) {
+            $this->confirmarNfeInclusaoProduto();
+
+            return;
+        }
+
+        $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 4);
+
+        if ($qtd <= 0) {
+            Notification::make()->title('Quantidade inválida.')->warning()->send();
+            $this->dispatch('erp-nfe-focus-item-quantidade');
+
+            return;
+        }
+
+        $this->recalcNfeEntryRowPreview();
+        $this->dispatch('erp-nfe-focus-item-preco');
+    }
+
+    public function confirmarNfeInclusaoPreco(?string $precoFromInput = null): void
+    {
+        if ($precoFromInput !== null && trim($precoFromInput) !== '') {
+            $this->nfeItemEntryPreco = trim($precoFromInput);
+        }
+
+        if ($this->nfeItemPendingProductId === null) {
+            $this->confirmarNfeInclusaoProduto();
+
+            return;
+        }
+
+        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+
+        if ($preco <= 0) {
+            Notification::make()->title('Informe o valor unitário.')->warning()->send();
+            $this->dispatch('erp-nfe-focus-item-preco');
+
+            return;
+        }
+
+        $this->confirmPendingNfeItemEntry();
+    }
+
+    public function abrirNfeModalDescontoItem(): void
+    {
+        if ($this->nfeDescontoModalOpen) {
+            return;
+        }
+
+        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+
+        if ($this->nfeItemPendingProductId && $preco > 0) {
+            $this->nfeItemAjusteAlvo = 'form';
+        } elseif ($this->nfeModalRows !== [] && isset($this->nfeModalRows[$this->nfeSelectedRowIndex])) {
+            $this->nfeItemAjusteAlvo = 'grid';
+        } else {
+            Notification::make()
+                ->title('Informe o produto (ou selecione um item) para desconto/acréscimo.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->nfeItemAjusteTipo = 'desconto';
+        $this->nfeItemAjusteModo = 'percentual';
+        $this->nfeItemAjusteValor = '0,00';
+        $this->nfeDescontoModalOpen = true;
+        $this->dispatch('erp-nfe-focus-desconto-item');
+    }
+
+    public function fecharNfeModalDescontoItem(): void
+    {
+        $this->nfeDescontoModalOpen = false;
+        $this->nfeItemAjusteAlvo = null;
+    }
+
+    public function handleNfeModalEscape(): void
+    {
+        if ($this->nfeDescontoModalOpen) {
+            $this->fecharNfeModalDescontoItem();
+
+            return;
+        }
+
+        if ($this->nfeNaturezaSugestoesOpen) {
+            $this->fecharNfeSugestoesNatureza();
+
+            return;
+        }
+
+        if ($this->nfeClienteSugestoesOpen) {
+            $this->fecharNfeSugestoesCliente();
+
+            return;
+        }
+
+        $this->closeNfeModal();
+    }
+
+    public function updatedNfeItemAjusteValor(): void
+    {
+        $raw = preg_replace('/[^\d,.\-]/', '', (string) $this->nfeItemAjusteValor) ?? '';
+        $this->nfeItemAjusteValor = $raw === '' ? '0,00' : $raw;
+    }
+
+    public function setNfeItemAjusteTipo(string $tipo): void
+    {
+        $this->nfeItemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
+    }
+
+    public function setNfeItemAjusteModo(string $modo): void
+    {
+        $this->nfeItemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
+    }
+
+    /**
+     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     */
+    public function getNfeItemAjustePreviewProperty(): array
+    {
+        $ctx = $this->contextoNfeItemAjuste();
+
+        if ($ctx === null) {
+            return [
+                'descricao' => '',
+                'base' => ErpMoney::formatBr(0, 2),
+                'novoPreco' => ErpMoney::formatBr(0, 2),
+                'total' => ErpMoney::formatBr(0, 2),
+                'tipo' => $this->nfeItemAjusteTipo,
+                'temAjuste' => false,
+            ];
+        }
+
+        $calc = $this->calcularNfeItemAjuste($ctx['preco'], $ctx['quantidade']);
+
+        return [
+            'descricao' => $ctx['descricao'],
+            'base' => ErpMoney::formatBr($calc['base'], 2),
+            'novoPreco' => ErpMoney::formatBr($calc['novoPreco'], 2),
+            'total' => ErpMoney::formatBr($calc['total'], 2),
+            'tipo' => $this->nfeItemAjusteTipo,
+            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+        ];
+    }
+
+    public function confirmarNfeItemAjuste(): void
+    {
+        $ctx = $this->contextoNfeItemAjuste();
+
+        if ($ctx === null) {
+            $this->fecharNfeModalDescontoItem();
+
+            return;
+        }
+
+        $calc = $this->calcularNfeItemAjuste($ctx['preco'], $ctx['quantidade']);
+        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+
+        if ($this->nfeItemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
+            Notification::make()->title('Desconto inválido.')->warning()->send();
+
+            return;
+        }
+
+        if ($this->nfeItemAjusteAlvo === 'form') {
+            if ($this->nfeItemAjusteTipo === 'desconto') {
+                $this->nfeItemEntryDesconto = ErpMoney::formatBr($ajusteLinha, 2);
+                $this->nfeItemEntryOutros = '0,00';
+            } else {
+                $this->nfeItemEntryOutros = ErpMoney::formatBr($ajusteLinha, 2);
+                $this->nfeItemEntryDesconto = '0,00';
+            }
+
+            $this->recalcNfeEntryRowPreview();
+        } else {
+            $index = (int) $this->nfeSelectedRowIndex;
+
+            if (! isset($this->nfeModalRows[$index])) {
+                $this->fecharNfeModalDescontoItem();
+
+                return;
+            }
+
+            if ($this->nfeItemAjusteTipo === 'desconto') {
+                $this->nfeModalRows[$index]['desconto'] = $ajusteLinha;
+                $this->nfeModalRows[$index]['outros'] = 0.0;
+            } else {
+                $this->nfeModalRows[$index]['outros'] = $ajusteLinha;
+                $this->nfeModalRows[$index]['desconto'] = 0.0;
+            }
+
+            $this->recalculateNfeTotais();
+        }
+
+        $tipo = $this->nfeItemAjusteTipo;
+        $this->fecharNfeModalDescontoItem();
+        Notification::make()
+            ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return array{descricao: string, preco: float, quantidade: float}|null
+     */
+    protected function contextoNfeItemAjuste(): ?array
+    {
+        if ($this->nfeItemAjusteAlvo === 'form' && $this->nfeItemPendingProductId) {
+            return [
+                'descricao' => (string) $this->nfeItemProdutoSearch,
+                'preco' => ErpMoney::parseBr($this->nfeItemEntryPreco, 4),
+                'quantidade' => max(0.0, ErpMoney::parseBr($this->nfeItemEntryQtd, 4)),
+            ];
+        }
+
+        if ($this->nfeItemAjusteAlvo === 'grid' && isset($this->nfeModalRows[$this->nfeSelectedRowIndex])) {
+            $item = $this->nfeModalRows[$this->nfeSelectedRowIndex];
+
+            return [
+                'descricao' => (string) ($item['descricao'] ?? ''),
+                'preco' => ErpMoney::parseBr($item['valor_unitario'] ?? 0, 4),
+                'quantidade' => ErpMoney::parseBr($item['quantidade'] ?? 0, 4),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     */
+    protected function calcularNfeItemAjuste(float $base, float $quantidade): array
+    {
+        $valor = ErpMoney::parseBr($this->nfeItemAjusteValor, 2);
+
+        if ($this->nfeItemAjusteModo === 'percentual') {
+            $deltaUnit = round($base * ($valor / 100), 2);
+        } else {
+            $deltaUnit = round($valor, 2);
+        }
+
+        $novoPreco = $this->nfeItemAjusteTipo === 'acrescimo'
+            ? round($base + $deltaUnit, 2)
+            : round($base - $deltaUnit, 2);
+
+        if ($novoPreco < 0) {
+            $novoPreco = 0.0;
+        }
+
+        return [
+            'base' => $base,
+            'deltaUnit' => $deltaUnit,
+            'novoPreco' => $novoPreco,
+            'total' => round($quantidade * $novoPreco, 2),
+        ];
+    }
+
+    public function handleNfeItemProdutoEnter(?string $term = null): void
+    {
+        if ($term !== null) {
+            $term = mb_strtoupper(trim($term), 'UTF-8');
+
+            if ($term !== '' && $term !== $this->nfeItemProdutoSearch) {
+                $this->nfeItemProdutoSearch = $term;
+            }
+        }
+
         if ($this->nfeProdutoLookupOpen && $this->nfeProdutoResults !== []) {
             if (count($this->nfeProdutoResults) === 1) {
-                $this->selectNfeProdutoResult(0, advanceToCfop: true);
+                $this->selectNfeProdutoResult(0);
+                $this->confirmPendingNfeItemEntry();
 
                 return;
             }
 
             if ($this->nfeSelectedProdutoIndex !== null && isset($this->nfeProdutoResults[$this->nfeSelectedProdutoIndex])) {
-                $this->confirmNfeProdutoSelection(advanceToCfop: true);
+                $this->confirmNfeProdutoSelection();
+                $this->confirmPendingNfeItemEntry();
 
                 return;
             }
@@ -74,14 +450,14 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        if ($this->nfeItemPendingProductId === null) {
-            $this->submitNfeItemProdutoSearch(advanceToCfop: true);
+        if ($this->nfeItemPendingProductId !== null) {
+            $this->closeNfeProdutoLookup();
+            $this->confirmPendingNfeItemEntry();
 
             return;
         }
 
-        $this->closeNfeProdutoLookup();
-        $this->dispatch('erp-nfe-focus-item-cfop');
+        $this->submitNfeItemProdutoSearch(confirm: true);
     }
 
     public function advanceNfeEntryField(string $from): void
@@ -100,7 +476,7 @@ trait ManagesNfeItemGrid
         };
     }
 
-    public function submitNfeItemByCodigo(): void
+    public function submitNfeItemByCodigo(bool $confirm = false): void
     {
         $codigo = mb_strtoupper(trim($this->nfeItemCodigoInput), 'UTF-8');
 
@@ -122,37 +498,68 @@ trait ManagesNfeItemGrid
         }
 
         $this->stageNfeProductForEntry($product);
+
+        if ($confirm) {
+            $this->confirmPendingNfeItemEntry();
+        }
     }
 
     public function updatedNfeItemProdutoSearch(string $value): void
     {
-        $upper = mb_strtoupper($value, 'UTF-8');
+        $upper = mb_strtoupper(trim($value), 'UTF-8');
 
         if ($this->nfeItemProdutoSearch !== $upper) {
             $this->nfeItemProdutoSearch = $upper;
         }
 
-        $this->prepareNfeProdutoSearch();
+        // Produto já confirmado e campo ainda com a descrição: não limpa preço/qtde.
+        if ($this->nfeItemPendingProductId !== null) {
+            $pendingNome = $this->nfePendingProductNome();
+
+            if ($upper === '' || ($pendingNome !== '' && $upper === $pendingNome)) {
+                $this->closeNfeProdutoLookup();
+
+                return;
+            }
+
+            // Digitou algo diferente da descrição confirmada → nova busca.
+            $this->clearNfePendingKeepSearchTerm();
+        }
+
+        if ($upper === '') {
+            $this->closeNfeProdutoLookup();
+            $this->nfeProdutoResults = [];
+            $this->nfeSelectedProdutoIndex = null;
+
+            return;
+        }
+
         $this->nfeProdutoLookupOpen = true;
         $this->refreshNfeProdutoResults();
     }
 
     public function openNfeProdutoLookup(): void
     {
-        $this->nfeProdutoLookupOpen = true;
+        $term = trim($this->nfeItemProdutoSearch);
 
-        if (filled(trim($this->nfeItemProdutoSearch))) {
-            $this->prepareNfeProdutoSearch();
-            $this->refreshNfeProdutoResults();
-        }
-    }
-
-    protected function prepareNfeProdutoSearch(): void
-    {
-        if ($this->nfeItemPendingProductId === null) {
+        if ($term === '') {
             return;
         }
 
+        if ($this->nfeItemPendingProductId !== null) {
+            $pendingNome = $this->nfePendingProductNome();
+
+            if ($pendingNome !== '' && mb_strtoupper($term, 'UTF-8') === $pendingNome) {
+                return;
+            }
+        }
+
+        $this->nfeProdutoLookupOpen = true;
+        $this->refreshNfeProdutoResults();
+    }
+
+    protected function clearNfePendingKeepSearchTerm(): void
+    {
         $this->nfeItemPendingProductId = null;
         $this->nfeItemCodigoInput = '';
         $this->nfeItemEntryCfop = '';
@@ -160,7 +567,20 @@ trait ManagesNfeItemGrid
         $this->nfeItemEntryPreco = '';
         $this->nfeItemEntryQtd = '1,0000';
         $this->nfeItemEntryUnidade = 'UN';
-        $this->nfeItemEntryTotalDisplay = '';
+        $this->nfeItemEntryDesconto = '0,00';
+        $this->nfeItemEntryOutros = '0,00';
+        $this->nfeItemEntryTotalDisplay = '0,00';
+    }
+
+    protected function nfePendingProductNome(): string
+    {
+        if ($this->nfeItemPendingProductId === null) {
+            return '';
+        }
+
+        $product = Product::query()->find($this->nfeItemPendingProductId);
+
+        return $product ? mb_strtoupper(trim((string) $product->descricao), 'UTF-8') : '';
     }
 
     public function refreshNfeProdutoResults(): void
@@ -175,9 +595,10 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $like = '%' . $term . '%';
+        $like = '%'.$term.'%';
+        $reservas = app(EstoqueReservaService::class)->totaisReservadosAtivos(null);
 
-        $this->nfeProdutoResults = Product::query()
+        $produtos = Product::query()
             ->where('ativo', true)
             ->where(function ($query) use ($like, $term): void {
                 $query->where('codigo', 'like', $like)
@@ -190,18 +611,47 @@ trait ManagesNfeItemGrid
                     $query->orWhere('codigo', $term);
                 }
             })
+            ->orderByRaw('CASE WHEN codigo = ? THEN 0 WHEN descricao LIKE ? THEN 1 ELSE 2 END', [$term, $term.'%'])
             ->orderBy('descricao')
-            ->limit(50)
-            ->get()
-            ->map(fn (Product $product): array => [
-                'id' => $product->id,
-                'codigo' => mb_strtoupper((string) $product->codigo, 'UTF-8'),
-                'descricao' => mb_strtoupper($product->descricao, 'UTF-8'),
-            ])
+            ->limit(12)
+            ->get(['id', 'codigo', 'descricao', 'preco_venda', 'estoque']);
+
+        $this->nfeProdutoResults = $produtos
+            ->map(function (Product $product) use ($reservas): array {
+                $atual = (float) ($product->estoque ?? 0);
+                $reservado = (float) ($reservas[$product->id] ?? 0);
+                $preco = (float) ($product->preco_venda ?? 0);
+                $nome = mb_strtoupper((string) ($product->descricao ?? ''), 'UTF-8');
+
+                return [
+                    'id' => (int) $product->id,
+                    'codigo' => mb_strtoupper((string) ($product->codigo ?? ''), 'UTF-8'),
+                    'descricao' => $nome,
+                    'nome' => $nome,
+                    'atual' => ErpMoney::formatBr($atual, 3),
+                    'reservado' => ErpMoney::formatBr($reservado, 3),
+                    'disponivel' => ErpMoney::formatBr($atual - $reservado, 3),
+                    'preco' => ErpMoney::formatBr($preco, 2),
+                ];
+            })
+            ->values()
             ->all();
 
         $this->nfeSelectedProdutoIndex = $this->nfeProdutoResults === [] ? null : 0;
         $this->syncNfeProdutoPreviewFotoFromSelection();
+    }
+
+    public function selecionarNfeProdutoInclusao(int $id): void
+    {
+        $product = Product::query()->where('ativo', true)->find($id);
+
+        if (! $product) {
+            Notification::make()->title('Produto não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->stageNfeProductForEntry($product);
     }
 
     public function moveNfeProdutoSelection(int $delta): void
@@ -245,7 +695,7 @@ trait ManagesNfeItemGrid
         $this->stageNfeProductForEntry($product, advanceToCfop: $advanceToCfop);
     }
 
-    public function submitNfeItemProdutoSearch(bool $advanceToCfop = false): void
+    public function submitNfeItemProdutoSearch(bool $advanceToCfop = false, bool $confirm = false): void
     {
         $term = trim($this->nfeItemProdutoSearch);
 
@@ -267,13 +717,21 @@ trait ManagesNfeItemGrid
         }
 
         if (count($this->nfeProdutoResults) === 1) {
-            $this->selectNfeProdutoResult(0, advanceToCfop: $advanceToCfop);
+            $this->selectNfeProdutoResult(0, advanceToCfop: $advanceToCfop && ! $confirm);
+
+            if ($confirm) {
+                $this->confirmPendingNfeItemEntry();
+            }
 
             return;
         }
 
         if ($this->nfeSelectedProdutoIndex !== null && isset($this->nfeProdutoResults[$this->nfeSelectedProdutoIndex])) {
-            $this->confirmNfeProdutoSelection(advanceToCfop: $advanceToCfop);
+            $this->confirmNfeProdutoSelection(advanceToCfop: $advanceToCfop && ! $confirm);
+
+            if ($confirm) {
+                $this->confirmPendingNfeItemEntry();
+            }
 
             return;
         }
@@ -332,7 +790,8 @@ trait ManagesNfeItemGrid
             'quantidade' => ErpMoney::formatBr($qtd, 4),
             'valor_unitario' => ErpMoney::formatBr(ErpMoney::parseBr($this->nfeItemEntryPreco, 4), 4),
             'unidade' => mb_strtoupper(trim($this->nfeItemEntryUnidade) ?: 'UN', 'UTF-8'),
-            'desconto' => 0.0,
+            'desconto' => ErpMoney::parseBr($this->nfeItemEntryDesconto, 2),
+            'outros' => ErpMoney::parseBr($this->nfeItemEntryOutros, 2),
         ];
 
         $this->nfeSelectedRowIndex = count($this->nfeModalRows) - 1;
@@ -363,6 +822,49 @@ trait ManagesNfeItemGrid
 
         $qtd = ErpMoney::parseBr($this->nfeModalRows[$index]['quantidade'] ?? '1', 4);
         $this->applyProductToNfeRow($index, $product, max(0.0001, $qtd));
+        $this->recalculateNfeTotais();
+    }
+
+    public function resolveNfeItemCfop(int $index, ?string $cfopFromInput = null): void
+    {
+        if (! isset($this->nfeModalRows[$index])) {
+            return;
+        }
+
+        if ($cfopFromInput !== null) {
+            $this->nfeModalRows[$index]['cfop'] = trim($cfopFromInput);
+        }
+
+        $raw = trim((string) ($this->nfeModalRows[$index]['cfop'] ?? ''));
+        $digits = preg_replace('/\D/', '', $raw) ?: '';
+
+        if ($digits === '') {
+            Notification::make()->title('Informe o código CFOP.')->warning()->send();
+
+            return;
+        }
+
+        $codigo = (int) $digits;
+        $tipo = ($this->nfeForm['movimento'] ?? 'saida') === 'entrada'
+            ? Cfop::TIPO_ENTRADA
+            : Cfop::TIPO_SAIDA;
+
+        $cfop = Cfop::query()
+            ->where('codigo', $codigo)
+            ->where('tipo', $tipo)
+            ->first(['codigo', 'descricao']);
+
+        if (! $cfop) {
+            $cfop = Cfop::query()->where('codigo', $codigo)->first(['codigo', 'descricao']);
+        }
+
+        if (! $cfop) {
+            Notification::make()->title('CFOP não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        $this->nfeModalRows[$index]['cfop'] = (string) $cfop->codigo;
         $this->recalculateNfeTotais();
     }
 
@@ -413,15 +915,21 @@ trait ManagesNfeItemGrid
         $this->nfeItemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
         $this->nfeItemEntryCfop = (string) ($preview['cfop'] ?? '');
         $this->nfeItemEntryCst = (string) (($preview['cst'] ?? '') ?: ($preview['csosn'] ?? ''));
-        $this->nfeItemEntryPreco = ErpMoney::formatBr((float) ($preview['valor_unitario'] ?? $product->preco_venda), 4);
+        $preco = (float) ($preview['valor_unitario'] ?? 0);
+        if ($preco <= 0) {
+            $preco = (float) ($product->preco_venda ?? 0);
+        }
+        $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 4);
         $this->nfeItemEntryQtd = ErpMoney::formatBr(1, 4);
         $this->nfeItemEntryUnidade = mb_strtoupper((string) ($preview['unidade'] ?? $product->unidade ?: 'UN'), 'UTF-8');
+        $this->nfeItemEntryDesconto = '0,00';
+        $this->nfeItemEntryOutros = '0,00';
         $this->recalcNfeEntryRowPreview();
         $this->nfeProdutoLookupOpen = false;
         $this->nfeProdutoResults = [];
         $this->nfeSelectedProdutoIndex = null;
         $this->clearNfeProdutoPreviewFoto();
-        $this->dispatch($advanceToCfop ? 'erp-nfe-focus-item-cfop' : 'erp-nfe-focus-item-produto');
+        $this->dispatch('erp-nfe-focus-item-quantidade');
     }
 
     protected function applyProductToNfeRow(int $index, Product $product, float $qtd): void
@@ -463,6 +971,8 @@ trait ManagesNfeItemGrid
     {
         $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 4);
         $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+        $desconto = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
+        $outros = ErpMoney::parseBr($this->nfeItemEntryOutros, 2);
 
         if ($qtd <= 0) {
             $qtd = 1;
@@ -472,9 +982,22 @@ trait ManagesNfeItemGrid
             $preco = 0;
         }
 
+        if ($desconto < 0) {
+            $desconto = 0;
+        }
+
+        if ($outros < 0) {
+            $outros = 0;
+        }
+
         $this->nfeItemEntryQtd = ErpMoney::formatBr($qtd, 4);
         $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 4);
-        $this->nfeItemEntryTotalDisplay = ErpMoney::formatBr(round($qtd * $preco, 2), 2);
+        $this->nfeItemEntryDesconto = ErpMoney::formatBr($desconto, 2);
+        $this->nfeItemEntryOutros = ErpMoney::formatBr($outros, 2);
+        $this->nfeItemEntryTotalDisplay = ErpMoney::formatBr(
+            round(($qtd * $preco) + $outros - $desconto, 2),
+            2,
+        );
     }
 
     protected function clearNfeItemEntryRow(): void
@@ -487,7 +1010,11 @@ trait ManagesNfeItemGrid
         $this->nfeItemEntryPreco = '';
         $this->nfeItemEntryQtd = '1,0000';
         $this->nfeItemEntryUnidade = 'UN';
-        $this->nfeItemEntryTotalDisplay = '';
+        $this->nfeItemEntryDesconto = '0,00';
+        $this->nfeItemEntryOutros = '0,00';
+        $this->nfeItemEntryTotalDisplay = '0,00';
+        $this->nfeDescontoModalOpen = false;
+        $this->nfeItemAjusteAlvo = null;
         $this->nfeProdutoLookupOpen = false;
         $this->nfeProdutoResults = [];
         $this->nfeSelectedProdutoIndex = null;

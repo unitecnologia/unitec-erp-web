@@ -486,6 +486,13 @@
     color: #dc2626 !important;
 }
 
+.erp-receber-page .fi-ta-row.erp-receber-row--recebida:not(.erp-row-selected) .fi-ta-cell,
+.erp-receber-page .fi-ta-row.erp-receber-row--recebida:not(.erp-row-selected) .fi-ta-text-item,
+.erp-receber-page .fi-ta-row.erp-receber-row--recebida:not(.erp-row-selected) .fi-ta-col,
+.erp-receber-page .fi-ta-row.erp-receber-row--recebida:not(.erp-row-selected) .fi-ta-col .fi-ta-text {
+    color: #15803d !important;
+}
+
 .erp-receber-page .fi-ta-row.erp-row-selected {
     box-shadow: inset 5px 0 0 #1e3a8a;
     outline: none;
@@ -924,38 +931,100 @@
     flex-wrap: wrap;
     gap: 0.75rem;
     margin-left: auto;
+    align-items: flex-end;
 }
 
 .erp-receber-page .erp-receber__filter-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.28rem;
+    align-items: flex-start;
 }
 
-.erp-receber-page .erp-receber__filter-link {
+.erp-receber-page .erp-receber__filter-group-label {
+    font-size: 0.62rem;
+    font-weight: 750;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+    padding-left: 0.15rem;
+}
+
+.erp-receber-page .erp-receber__filter-segment {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.18rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.erp-receber-page .erp-receber__filter-chip {
+    appearance: none;
     font-family: inherit;
-    font-size: var(--erp-font-size-xs);
-    font-weight: 600;
-    padding: 0.2rem 0.55rem;
-    border: none;
+    font-size: 0.74rem;
+    font-weight: 650;
+    line-height: 1.2;
+    padding: 0.38rem 0.7rem;
+    border: 0;
+    border-radius: 7px;
     background: transparent;
-    color: var(--erp-brand-primary);
+    color: #475569;
     cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-receber-page .erp-receber__filter-chip:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.erp-receber-page .erp-receber__filter-chip--active {
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    font-weight: 750;
+    box-shadow: 0 4px 10px -6px rgba(30, 90, 158, 0.75);
+}
+
+.erp-receber-page .erp-receber__filter-chip--active:hover {
+    background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
+    color: #fff;
+}
+
+.erp-receber-page .erp-receber__filter-chip:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+}
+
+/* Compatível se alguma view antiga ainda usar filter-link */
+.erp-receber-page .erp-receber__filter-link {
+    appearance: none;
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 650;
+    line-height: 1.2;
+    padding: 0.38rem 0.7rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+    text-decoration: none;
 }
 
 .erp-receber-page .erp-receber__filter-link:hover {
-    color: var(--erp-brand-primary-dark);
+    background: #e2e8f0;
+    color: #0f172a;
 }
 
 .erp-receber-page .erp-receber__filter-link--active {
-    font-weight: 800;
-    text-decoration: none;
-    background: var(--erp-brand-accent-soft);
-    border-radius: var(--erp-radius-sm);
-    padding: 0.25rem 0.6rem;
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    font-weight: 750;
 }
 
 .erp-receber-page .erp-receber-actions {
@@ -1021,6 +1090,127 @@
     opacity: 0.45;
     cursor: not-allowed;
     transform: none;
+}
+
+/* ── Modal Baixa (F8) ─────────────────────────────────────────── */
+
+.erp-receber-page .erp-receber-baixa-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, calc(100vw - 2rem));
+    max-height: min(90vh, 28rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f3f6fa;
+    border: 1px solid #8fa3bc;
+    border-radius: 8px;
+    box-shadow: 0 18px 40px rgba(15, 52, 96, 0.28);
+}
+
+.erp-receber-page .erp-receber-baixa-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem 0.75rem;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__resumo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__resumo-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #c5d0de;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f3460;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__value--money {
+    color: #166534;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__select {
+    width: 100%;
+    min-height: 2.2rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__hint {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem 0.85rem;
+    border-top: 1px solid #c5d0de;
+    background: #e8eef6;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__btn {
+    min-width: 5.5rem;
+    min-height: 2.1rem;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__btn--cancel {
+    background: #fff;
+    color: #334155;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__btn--cancel:hover {
+    background: #f8fafc;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__btn--ok {
+    border-color: #16a34a;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+    color: #fff;
+}
+
+.erp-receber-page .erp-receber-baixa-modal__btn--ok:hover {
+    filter: brightness(1.05);
 }
 
 @media (max-width: 900px) {

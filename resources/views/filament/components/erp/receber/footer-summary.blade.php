@@ -43,24 +43,32 @@
     </div>
 
     <div class="erp-receber__footer-filters">
-        <div class="erp-receber__filter-group">
-            @foreach ($situacaoFilters as $value => $label)
-                <button
-                    type="button"
-                    wire:click="setSituacaoFilter('{{ $value }}')"
-                    @class(['erp-receber__filter-link', 'erp-receber__filter-link--active' => $this->situacaoFilter === $value])
-                >{{ $label }}</button>
-            @endforeach
+        <div class="erp-receber__filter-group" role="group" aria-label="Situação">
+            <span class="erp-receber__filter-group-label">Situação</span>
+            <div class="erp-receber__filter-segment">
+                @foreach ($situacaoFilters as $value => $label)
+                    <button
+                        type="button"
+                        wire:click="setSituacaoFilter('{{ $value }}')"
+                        @class(['erp-receber__filter-chip', 'erp-receber__filter-chip--active' => $this->situacaoFilter === $value])
+                        @if ($this->situacaoFilter === $value) aria-pressed="true" @else aria-pressed="false" @endif
+                    >{{ $label }}</button>
+                @endforeach
+            </div>
         </div>
 
-        <div class="erp-receber__filter-group">
-            @foreach ($formaFilters as $value => $label)
-                <button
-                    type="button"
-                    wire:click="setFormaFilter('{{ $value }}')"
-                    @class(['erp-receber__filter-link', 'erp-receber__filter-link--active' => $this->formaFilter === $value])
-                >{{ $label }}</button>
-            @endforeach
+        <div class="erp-receber__filter-group" role="group" aria-label="Forma">
+            <span class="erp-receber__filter-group-label">Forma</span>
+            <div class="erp-receber__filter-segment">
+                @foreach ($formaFilters as $value => $label)
+                    <button
+                        type="button"
+                        wire:click="setFormaFilter('{{ $value }}')"
+                        @class(['erp-receber__filter-chip', 'erp-receber__filter-chip--active' => $this->formaFilter === $value])
+                        @if ($this->formaFilter === $value) aria-pressed="true" @else aria-pressed="false" @endif
+                    >{{ $label }}</button>
+                @endforeach
+            </div>
         </div>
     </div>
 </div>

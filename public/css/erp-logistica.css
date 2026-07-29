@@ -1,0 +1,269 @@
+/* ERP — Logística (Central + Operação) */
+
+.erp-logistica-page .fi-ta-header-cell:nth-child(1),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(1) { width: 7%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(2),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(2) { width: 8%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(3),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(3) { width: 22%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(4),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 12%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(5),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(5) { width: 12%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(6),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(6) { width: 14%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(7),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(7) { width: 8%; }
+.erp-logistica-page .fi-ta-header-cell:nth-child(8),
+.erp-logistica-page .fi-ta-row .fi-ta-cell:nth-child(8) { width: 12%; }
+
+.erp-logistica__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem 0.5rem;
+}
+
+.erp-logistica__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e3a5f;
+}
+
+.erp-logistica__header-actions,
+.erp-logistica-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem 0.75rem;
+}
+
+.erp-logistica-actions__btn {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.erp-logistica-actions__btn:hover {
+    background: #f8fafc;
+}
+
+.erp-logistica-actions__btn--close {
+    margin-left: auto;
+}
+
+.erp-logistica-kanban {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding: 0 1rem 1rem;
+    min-height: 420px;
+}
+
+.erp-logistica-kanban__col {
+    flex: 0 0 220px;
+    background: #f1f5f9;
+    border: 1px solid #dbeafe;
+    border-radius: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+}
+
+.erp-logistica-kanban__col-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.65rem;
+    background: #e2e8f0;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-logistica-kanban__col-count {
+    background: #fff;
+    border-radius: 999px;
+    min-width: 1.5rem;
+    text-align: center;
+    padding: 0 0.35rem;
+}
+
+.erp-logistica-kanban__col-body {
+    padding: 0.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.erp-logistica-kanban__empty {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 1rem 0.25rem;
+}
+
+.erp-logistica-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.erp-logistica-card__top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.erp-logistica-card__cliente {
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+}
+
+.erp-logistica-card__endereco,
+.erp-logistica-card__meta {
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.erp-logistica-card__btn {
+    width: 100%;
+    margin-top: 0.25rem;
+    border: 1px solid #93c5fd;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 0.25rem;
+    padding: 0.25rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.erp-logistica__tabs-wrap {
+    padding: 0.5rem 1rem 0;
+}
+
+.erp-logistica__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.erp-logistica__tab {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.erp-logistica__tab--active {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+}
+
+.erp-logistica__locate {
+    padding: 0.5rem 1rem;
+}
+
+.erp-logistica__locate-label {
+    font-weight: 700;
+    color: #1e3a5f;
+}
+
+.erp-logistica__hint {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.erp-logistica-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.erp-logistica-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.erp-logistica-modal__panel {
+    position: relative;
+    width: min(920px, 95vw);
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-logistica-modal__head,
+.erp-logistica-modal__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-logistica-modal__foot {
+    border-bottom: 0;
+    border-top: 1px solid #e2e8f0;
+}
+
+.erp-logistica-modal__head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.erp-logistica-modal__close {
+    border: 0;
+    background: transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.erp-logistica-modal__body {
+    overflow: auto;
+    padding: 0.75rem 1rem;
+}
+
+.erp-logistica-modal__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.erp-logistica-modal__table th,
+.erp-logistica-modal__table td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.4rem 0.35rem;
+    text-align: left;
+}
+
+.erp-logistica-modal__actions button {
+    border: 1px solid #93c5fd;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+}

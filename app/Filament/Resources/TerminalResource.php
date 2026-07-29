@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\TerminalResource\Pages;
 use App\Models\Terminal;
 use BackedEnum;
@@ -31,6 +32,11 @@ class TerminalResource extends Resource
     protected static ?string $recordTitleAttribute = 'nome';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('terminais.access');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -65,10 +71,10 @@ class TerminalResource extends Resource
         ];
 
         $booleans = [
-            'eh_caixa', 'pdv', 'restaurante', 'delivery', 'logado', 'usa_tef', 'usa_pos',
+            'eh_caixa', 'pdv', 'ativo', 'restaurante', 'delivery', 'logado', 'usa_tef', 'usa_pos',
             'exibe_f3', 'exibe_f4', 'exibe_f5', 'exibe_f6', 'pesquisa_rapida', 'ler_peso',
             'busca_balanca_barras', 'mostrar_mensagem_pdv', 'mostrar_tela_caixa_livre',
-            'imprime', 'usa_gaveta', 'usar_numero_inicial', 'meia_folha',
+            'imprime', 'usa_gaveta', 'usar_device_service', 'usar_numero_inicial', 'meia_folha',
             'tef_via_reduzida', 'tef_multiplos_cartoes',
         ];
 
@@ -123,7 +129,7 @@ class TerminalResource extends Resource
                     ->weight(FontWeight::Bold),
                 TextColumn::make('ip')
                     ->label('IP')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 IconColumn::make('eh_caixa')
                     ->label('Caixa')
@@ -135,7 +141,7 @@ class TerminalResource extends Resource
                     ->alignCenter(),
                 TextColumn::make('porta')
                     ->label('Porta Impressora')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
             ])
             ->defaultSort('nome')

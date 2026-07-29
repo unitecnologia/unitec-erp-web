@@ -1,4 +1,4 @@
-<div class="erp-pessoas-contatos">
+<div class="erp-pessoas-contatos erp-pessoas-panel erp-pessoas-panel--contatos">
     <div class="erp-pessoas-contatos__grid-wrap">
         <table class="erp-pessoas-contatos__grid">
             <thead>

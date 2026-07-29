@@ -15,6 +15,7 @@ use App\Models\Vendedor;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use App\Support\Erp\Orcamento\OrcamentoPrecoService;
 use App\Support\Erp\Orcamento\OrcamentoTotaisService;
@@ -1307,9 +1308,13 @@ trait ErpOrcamentoFormPage
                     $orcamento = $this->record;
                     $orcamento->update($attributes);
                 } else {
+                    $momento = ErpTimezone::toLocal();
+
                     $orcamento = Orcamento::query()->create([
                         'numero' => Orcamento::nextNumero(),
                         ...$attributes,
+                        'hora' => $momento->format('H:i:s'),
+                        'plataforma' => Orcamento::PLATAFORMA_ERP,
                     ]);
                     $createdId = $orcamento->getKey();
                 }

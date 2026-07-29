@@ -73,12 +73,8 @@ class ListCaixa extends ListRecords
     {
         return [
             'searchInput' => '.erp-caixa__input',
-            'create' => 'createLancamento',
-            'edit' => 'editLancamento',
             'delete' => 'deleteLancamento',
-            'extraKeys' => [
-                'F6' => ['method' => 'modulePending', 'params' => ['Imprimir']],
-            ],
+            'extraKeys' => [],
         ];
     }
 

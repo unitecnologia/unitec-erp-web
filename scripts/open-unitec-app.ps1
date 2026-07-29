@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Inicia o Unitec ERP e abre o navegador.
+    Inicia o Unitec ERP e abre o navegador (Chrome/Edge) com o zoom configurado.
 #>
 
 param(
@@ -9,13 +9,56 @@ param(
     [string]$AppUrl = '',
     [string]$RelativePath = '/admin',
     [switch]$SkipBrowser,
-    [switch]$LeigoMode
+    [switch]$LeigoMode,
+    [switch]$Kiosk
 )
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 . (Join-Path $PSScriptRoot 'unitec-install-lib.ps1')
+
+function Get-UnitecBrowserExe {
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+        (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe')
+    )
+
+    foreach ($path in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path $path)) {
+            return $path
+        }
+    }
+
+    return $null
+}
+
+function Open-UnitecBrowser {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$AppPath,
+        [switch]$Kiosk
+    )
+
+    # Zoom fica na página (param_ui_zoom) — funciona igual abrindo a URL direto no navegador.
+    $browser = Get-UnitecBrowserExe
+
+    if ([string]::IsNullOrWhiteSpace($browser)) {
+        Start-Process $Url
+        return
+    }
+
+    $arguments = @()
+    if ($Kiosk) {
+        $arguments += '--kiosk'
+    }
+    $arguments += $Url
+
+    Start-Process -FilePath $browser -ArgumentList $arguments
+}
 
 $AppPath = Resolve-UnitecAppPath -Path $AppPath -FallbackFromScriptRoot $PSScriptRoot
 
@@ -39,7 +82,7 @@ try {
     Start-UnitecStack -AppPath $AppPath -WaitSeconds 15
 
     if (-not $SkipBrowser) {
-        Start-Process $targetUrl
+        Open-UnitecBrowser -Url $targetUrl -AppPath $AppPath -Kiosk:$Kiosk
     }
 
     exit 0

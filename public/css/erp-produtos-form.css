@@ -1,6 +1,6 @@
-/* ERP — Cadastro de Produtos (janela modal Delphi; viewport = empresas/pessoas) */
+/* ERP ? Cadastro de Produtos (janela modal Delphi; viewport = empresas/pessoas) */
 
-/* Viewport — retaguarda (PDV/orçamento embed usam regras dedicadas) */
+/* Viewport ? retaguarda (PDV/orï¿½amento embed usam regras dedicadas) */
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) {
     display: flex;
     flex-direction: column;
@@ -22,6 +22,10 @@
     display: none !important;
 }
 
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .erp-status-bar {
+    display: none !important;
+}
+
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-layout,
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main-ctn {
     display: flex;
@@ -33,38 +37,51 @@
 }
 
 .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
     min-height: 0;
     overflow: hidden;
-    padding: 0.5rem 0.5rem 0.25rem !important;
+    padding: 0.2rem 0.35rem 0.15rem !important;
     background: transparent !important;
 }
 
-.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main > * {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
+/* Janela inteira quase tela cheia ? fixed para nï¿½o depender da cadeia flex do Filament */
+.fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main > *,
+.fi-main:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) > :has(.erp-produtos-form-page) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
     width: 100%;
-    max-width: min(1280px, 98vw);
-    min-height: 0;
-    max-height: 100%;
-    height: 100%;
+    max-width: none;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow: hidden;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .fi-page.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    width: 100%;
+    position: fixed !important;
+    top: 0.12rem !important;
+    bottom: 0.12rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 50 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: min(calc(1280px + 4cm), calc(100vw - 0.35rem)) !important;
+    max-width: calc(100vw - 0.35rem) !important;
+    height: auto !important;
     min-height: 0 !important;
-    max-height: 100%;
-    height: 100%;
-    overflow: hidden;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow: hidden !important;
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
@@ -75,22 +92,23 @@
 .fi-page.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .fi-page-main,
 .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .fi-page-content,
 .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .fi-sc {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: none !important;
     padding: 0 !important;
     gap: 0 !important;
     background: transparent;
 }
 
 .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .fi-sc > div:has(> .erp-produtos-window) {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .fi-sc > div:has(> .erp-produtos-pcad__footer) {
@@ -100,7 +118,10 @@
     z-index: 5;
 }
 
-.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .erp-produtos-window {
+.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .erp-produtos-window:not(.erp-produtos-window--fullscreen) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
     border-bottom: none !important;
@@ -147,6 +168,43 @@
     width: 100%;
     min-width: 0;
     overflow: hidden;
+    border: 1px solid #8fa8c8 !important;
+    background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%) !important;
+    box-shadow:
+        0 24px 48px rgb(15 52 96 / 28%),
+        0 0 0 1px rgb(255 255 255 / 35%) inset !important;
+}
+
+/* Fullscreen na janela real â€” altura fixa/centralizada (evita vÃ£o branco em telas grandes) */
+.erp-produtos-window--fullscreen {
+    position: fixed !important;
+    top: 50% !important;
+    bottom: auto !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 50 !important;
+    width: min(calc(1280px + 4cm), calc(100vw - 0.3rem)) !important;
+    max-width: calc(100vw - 0.3rem) !important;
+    height: min(52rem, calc(100dvh - 0.6rem)) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 0.6rem) !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
+    flex: none !important;
+}
+
+.erp-produtos-window--fullscreen .erp-produtos-window__body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+}
+
+.erp-produtos-window--fullscreen .erp-produtos-pcad__footer {
+    flex: 0 0 auto !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-top: 1px solid #8fa8c8 !important;
+    box-shadow: none !important;
+    background: linear-gradient(180deg, #e8f0fa 0%, #d7e4f3 100%) !important;
 }
 
 .erp-produtos-window__titlebar {
@@ -155,6 +213,8 @@
     justify-content: space-between;
     gap: 0.75rem;
     flex-shrink: 0;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    border-bottom: 1px solid #0a2548 !important;
 }
 
 .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .erp-produtos-window__titlebar {
@@ -261,7 +321,7 @@
     display: none !important;
 }
 
-/* Embed no overlay do orçamento — mesma janela do cadastro, preenche o iframe */
+/* Embed no overlay do orï¿½amento ? mesma janela do cadastro, preenche o iframe */
 .fi-body:has(.erp-produtos-form-page.erp-orcamento-embed),
 .fi-body.erp-orcamento-embed-body {
     display: flex;
@@ -362,11 +422,11 @@
     flex: 1 1 auto;
     height: 100%;
     max-height: none;
-    border: 1px solid var(--erp-brand-primary-dark, #0f3460) !important;
+    border: 1px solid #8fa8c8 !important;
     border-bottom: none !important;
     border-radius: var(--erp-radius-lg, 10px) var(--erp-radius-lg, 10px) 0 0 !important;
     box-shadow: none !important;
-    background: var(--erp-bg-app, #eef4fb) !important;
+    background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%) !important;
     overflow: hidden;
 }
 
@@ -394,6 +454,10 @@
     --erp-prod-field-font-extra: 1mm;
 }
 
+.erp-produtos-form-page [x-cloak] {
+    display: none !important;
+}
+
 .erp-produtos-form-page .erp-pcad-form__input,
 .erp-produtos-form-page .erp-pcad-form__select,
 .erp-produtos-form-page .erp-pcad-form__textarea {
@@ -404,12 +468,14 @@
 .erp-produtos-form-page .erp-pcad-form__input:focus,
 .erp-produtos-form-page .erp-pcad-form__select:focus,
 .erp-produtos-form-page .erp-pcad-form__textarea:focus {
-    box-shadow: none !important;
+    outline: none !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 22%) !important;
 }
 
 .erp-produtos-form-page .erp-produtos-pcad__foto {
-    border-radius: 0 !important;
-    box-shadow: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset !important;
 }
 
 .erp-produtos-pcad {
@@ -421,17 +487,15 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 0.8rem;
     font-weight: 600;
-    color: #000;
-    background: var(--erp-bg-app, #eef4fb);
-    padding: 0.28rem 0.4rem 0.25rem;
-    --erp-prod-input-height: 1.35rem;
+    color: #0f172a;
+    background: transparent;
+    padding: 0.22rem 0.32rem 0.2rem;
+    gap: 0.2rem;
+    --erp-prod-input-height: 1.28rem;
     --erp-prod-input-height-extra: 0;
-    --erp-impostos-shrink: 4.6cm;
-    --erp-prod-foto-col: calc(var(--erp-impostos-shrink) - 0.55rem);
-}
-
-.erp-produtos-pcad__top {
-    flex-shrink: 0;
+    --erp-impostos-shrink: 5.2cm;
+    --erp-prod-foto-col: calc(var(--erp-impostos-shrink) - 0.4rem);
+    --erp-prod-params-col: 9rem;
 }
 
 .erp-produtos-pcad .erp-pcad-form__input,
@@ -459,29 +523,36 @@
     font-weight: 700;
 }
 
-/* Cabeçalho — empresa, data, título Produtos */
+/* Cabeï¿½alho ? empresa, data, tï¿½tulo Produtos */
 .erp-produtos-pcad__top {
     display: grid;
     grid-template-columns: 1fr auto auto;
-    gap: 0.45rem;
+    gap: 0.28rem;
     align-items: end;
-    margin-bottom: 0.12rem;
+    margin-bottom: 0;
     flex-shrink: 0;
+    padding: 0.18rem 0.28rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
 }
 
 .erp-produtos-pcad__empresa-box {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border: 1px solid #9eb4ce;
+    border-radius: 5px;
     margin: 0;
-    padding: 0.25rem 0.45rem 0.4rem;
-    background: var(--erp-bg-app, #eef4fb);
+    padding: 0.12rem 0.35rem 0.22rem;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
     min-width: 0;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
 }
 
 .erp-produtos-pcad__fieldset-legend,
 .erp-produtos-pcad__cadastro-label {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    color: #000;
+    color: #0f3460;
 }
 
 .erp-produtos-pcad__empresa-select {
@@ -513,45 +584,55 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.15rem;
+    height: 2.15rem;
     border-radius: 8px;
-    color: var(--erp-brand-primary, #1e5a9e);
-    background: rgba(30, 90, 158, 0.08);
+    color: #fff;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border: 1px solid #1e40af;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 35%) inset;
 }
 
 .erp-produtos-pcad__brand-title {
     display: none;
 }
 
-/* Área principal — campos fixos + abas inferiores + foto/parâmetros (Delphi) */
+/* ï¿½rea principal ? campos fixos + abas inferiores + foto/parï¿½metros */
 .erp-produtos-pcad__workspace {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.28rem;
     overflow: hidden;
 }
 
+.erp-produtos-pcad__panel {
+    border: 1px solid #8fa8c8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+}
+
 .erp-produtos-pcad__fields {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     min-height: 0;
-    max-height: min(34dvh, 250px);
+    max-height: none;
     overflow-x: hidden;
-    overflow-y: auto;
-    padding-right: 0.1rem;
+    overflow-y: visible;
+    padding: 0.12rem 0.2rem 0.15rem;
 }
 
 .erp-produtos-pcad__lower {
-    flex: 1;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 11rem;
+    max-height: none;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 10.5rem;
+    grid-template-columns: minmax(0, 1fr) var(--erp-prod-params-col);
     grid-template-rows: minmax(0, 1fr);
-    gap: 0.4rem;
+    gap: 0.35rem;
     align-items: stretch;
     overflow: hidden;
     position: relative;
@@ -561,7 +642,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    right: calc(10.5rem + 0.55rem);
+    right: calc(var(--erp-prod-params-col) + 0.45rem);
     width: var(--erp-prod-foto-col);
     display: flex;
     flex-direction: column;
@@ -589,35 +670,125 @@
 }
 
 .erp-produtos-form {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    grid-template-columns: repeat(10, var(--erp-prod-r3-col)) var(--erp-prod-r3-validade) var(--erp-prod-r3-localizacao);
-    column-gap: 0.32rem;
-    row-gap: 0.08rem;
-    padding: 0.12rem 0.28rem 0.08rem;
-    --erp-prod-r1-codigo: 3cm;
-    --erp-prod-r1-barras: 5cm;
-    --erp-prod-r1-barras-caixa: 5cm;
-    --erp-prod-r1-barras-lookup-btn: 1.45rem;
-    --erp-prod-r1-barras-block: calc(var(--erp-prod-r1-barras) + var(--erp-prod-r1-barras-lookup-btn) + 0.1rem);
-    --erp-prod-r1-descricao: 17cm;
-    --erp-prod-r3-localizacao: 5cm;
-    --erp-prod-r3-col: calc(3cm - 0.6cm);
-    --erp-prod-r3-validade: calc(5.5rem + 1.58cm);
-    --erp-prod-r5-estoque-col: var(--erp-prod-r3-col);
-    --erp-prod-r5-ncm-col: calc(2 * var(--erp-prod-r3-col) + 0.38rem);
+    gap: 0.22rem;
+    padding: 0;
+    --erp-prod-col-gap: 0.28rem;
+    --erp-prod-track: minmax(0, 1fr);
+}
+
+.erp-produtos-form__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    padding: 0.12rem 0.28rem 0.14rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+}
+
+.erp-produtos-form__section-title {
+    margin: 0;
+    padding: 0 0.05rem;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f3460;
+    line-height: 1.1;
+}
+
+.erp-produtos-form__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.15rem;
+}
+
+.erp-produtos-form__section-head .erp-produtos-form__section-title {
+    margin: 0;
+}
+
+.erp-produtos-form__btn-precificar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin: 0;
+    padding: 0.12rem 0.45rem;
+    border: 1px solid #b45309;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #ffedd5 0%, #fdba74 100%);
+    color: #7c2d12;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+    white-space: nowrap;
+}
+
+.erp-produtos-form__btn-precificar:hover {
+    background: linear-gradient(180deg, #fed7aa 0%, #fb923c 100%);
+}
+
+.erp-produtos-form__btn-precificar:focus-visible {
+    outline: 2px solid #ea580c;
+    outline-offset: 1px;
+}
+
+.erp-produtos-form__section--precos {
+    width: fit-content;
+    max-width: 100%;
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: #d6b86a;
+}
+
+.erp-produtos-form__section--precos .erp-produtos-form__section-title {
+    color: #92400e;
+}
+
+.erp-produtos-form__section--precos .erp-produtos-form__section-head {
+    width: 100%;
+}
+
+.erp-produtos-form__section--precos .erp-produtos-form__grid--r3 {
+    width: auto;
+    max-width: 100%;
+    grid-template-columns: repeat(4, minmax(4.6rem, 5.6rem)) minmax(5.8rem, 6.8rem);
+}
+
+.erp-produtos-form__section--precos .erp-produtos-form__grid--r3 > .erp-produtos-form__cell {
+    grid-column: auto !important;
+    width: auto;
+}
+
+.erp-produtos-form__section--estoque {
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+    border-color: #86efac;
+}
+
+.erp-produtos-form__section--estoque .erp-produtos-form__section-title {
+    color: #166534;
 }
 
 .erp-produtos-form__grid {
     display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    gap: 0.18rem 0.38rem;
+    width: 100%;
+    gap: 0.1rem var(--erp-prod-col-gap);
     align-items: end;
 }
 
-.erp-produtos-form__grid--r1 {
-    grid-template-columns: repeat(10, var(--erp-prod-r3-col)) var(--erp-prod-r3-validade) var(--erp-prod-r3-localizacao);
+/* Grade ï¿½nica de 12 colunas ? todas as seï¿½ï¿½es alinham nas mesmas bordas */
+.erp-produtos-form__grid--r1,
+.erp-produtos-form__grid--r2,
+.erp-produtos-form__grid--r3-loc,
+.erp-produtos-form__grid--r5 {
+    grid-template-columns: repeat(12, var(--erp-prod-track));
 }
 
 .erp-produtos-form__grid--r1 .erp-produtos-form__cell--codigo {
@@ -625,67 +796,44 @@
 }
 
 .erp-produtos-form__grid--r1 .erp-produtos-form__cell--descricao {
-    grid-column: 2 / 8;
-    width: var(--erp-prod-r1-descricao);
-    min-width: var(--erp-prod-r1-descricao);
-    max-width: var(--erp-prod-r1-descricao);
-    justify-self: start;
+    grid-column: 2 / 7;
 }
 
 .erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras {
-    grid-column: 8 / 11;
-    justify-self: end;
-    align-items: flex-start;
-    width: var(--erp-prod-r1-barras-block);
-    min-width: var(--erp-prod-r1-barras-block);
-    max-width: var(--erp-prod-r1-barras-block);
-}
-
-.erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras label {
-    width: 100%;
-    text-align: left;
-}
-
-.erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras .erp-produtos-form__control--lookup {
-    width: 100%;
-    flex-shrink: 0;
-    justify-content: flex-end;
-}
-
-.erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras .erp-produtos-form__control--lookup .erp-pcad-form__input {
-    flex: 0 0 var(--erp-prod-r1-barras);
-    width: var(--erp-prod-r1-barras);
-    min-width: var(--erp-prod-r1-barras);
-    max-width: var(--erp-prod-r1-barras);
+    grid-column: 7 / 9;
 }
 
 .erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras-caixa {
-    grid-column: 11 / 12;
-    width: 100%;
-    min-width: 0;
-    max-width: none;
-    justify-self: stretch;
-    align-items: flex-start;
-}
-
-.erp-produtos-form__grid--r1 .erp-produtos-form__cell--barras-caixa label {
-    width: 100%;
-    text-align: left;
+    grid-column: 9 / 11;
 }
 
 .erp-produtos-form__grid--r1 .erp-produtos-form__cell--referencia {
-    grid-column: 12 / 13;
-    width: 100%;
-    align-items: flex-start;
+    grid-column: 11 / 13;
 }
 
-.erp-produtos-form__grid--r1 .erp-produtos-form__cell--referencia label {
-    width: 100%;
-    text-align: left;
+.erp-produtos-form__cell--r2-tipo {
+    grid-column: 1 / 4;
+}
+
+.erp-produtos-form__cell--r2-marca {
+    grid-column: 4 / 7;
+}
+
+.erp-produtos-form__cell--r2-grupo {
+    grid-column: 7 / 10;
 }
 
 .erp-produtos-form__grid--r2 .erp-produtos-form__cell--r2-unidade {
-    grid-column: 11 / 13;
+    grid-column: 10 / 13;
+}
+
+.erp-produtos-form__grid--r3 > .erp-produtos-form__cell {
+    min-width: 0;
+}
+
+.erp-produtos-form__grid--r3-loc .erp-produtos-form__cell--localizacao {
+    grid-column: 1 / 6;
+    min-width: 0;
 }
 
 .erp-produtos-form__grid--r5 .erp-produtos-form__cell--est-min {
@@ -696,71 +844,40 @@
     grid-column: 2 / 3;
 }
 
-.erp-produtos-form__grid--r5 .erp-produtos-form__cell--estoque {
+.erp-produtos-form__grid--r5 .erp-produtos-form__cell--peso {
     grid-column: 3 / 4;
 }
 
-.erp-produtos-form__grid--r5 .erp-produtos-form__cell--peso {
+.erp-produtos-form__grid--r5 .erp-produtos-form__cell--ncm {
     grid-column: 4 / 5;
 }
 
-.erp-produtos-form__grid--r5 .erp-produtos-form__cell--ncm {
-    grid-column: 5 / 7;
-}
-
 .erp-produtos-form__grid--r5 .erp-produtos-form__cell--ncm-desc {
-    grid-column: 7 / 12;
+    grid-column: 5 / 11;
 }
 
 .erp-produtos-form__grid--r5 .erp-produtos-form__cell--cest {
-    grid-column: 12 / 13;
-}
-
-.erp-produtos-form__grid--r6 {
-    margin-top: 0.15rem;
-}
-
-.erp-produtos-form__grid--r6 .erp-produtos-form__cell--e-medio {
-    grid-column: 1 / 5;
-}
-
-.erp-produtos-form__grid--r6 .erp-produtos-form__cell--ult-compra {
-    grid-column: 5 / 9;
-}
-
-.erp-produtos-form__grid--r6 .erp-produtos-form__cell--ult-compra-ant {
-    grid-column: 9 / 13;
-}
-
-.erp-produtos-form__cell--r2-tipo {
-    grid-column: 1 / 5;
-}
-
-.erp-produtos-form__cell--r2-marca {
-    grid-column: 5 / 8;
-}
-
-.erp-produtos-form__cell--r2-grupo {
-    grid-column: 8 / 11;
+    grid-column: 11 / 13;
 }
 
 .erp-produtos-form__input--readonly {
-    background: #eef2f7;
-    color: #333;
+    background: #e8eef6 !important;
+    color: #475569;
 }
 
 .erp-produtos-form__cell {
     display: flex;
     flex-direction: column;
-    gap: 0.05rem;
+    gap: 0.02rem;
     min-width: 0;
+    width: 100%;
 }
 
 .erp-produtos-form__cell label {
-    font-size: 0.78rem;
-    font-weight: 400;
-    color: #000;
-    line-height: 1.15;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -768,13 +885,121 @@
 
 .erp-produtos-form__cell--preco-venda label,
 .erp-produtos-form__cell--required label {
-    font-weight: 700;
+    font-weight: 800;
+}
+
+/* Nï¿½veis de preï¿½o ? mesma caixa/altura; sï¿½ a cor muda */
+.erp-produtos-form__cell--preco-venda,
+.erp-produtos-form__cell--preco-atacado,
+.erp-produtos-form__cell--preco-especial,
+.erp-produtos-pcad__preco-cell--venda,
+.erp-produtos-pcad__preco-cell--atacado,
+.erp-produtos-pcad__preco-cell--especial {
+    box-sizing: border-box;
+    padding: 0.08rem 0.12rem 0.1rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+}
+
+.erp-produtos-form__cell--preco-venda,
+.erp-produtos-pcad__preco-cell--venda {
+    position: relative;
+    background: linear-gradient(180deg, #d1fae5 0%, #a7f3d0 100%);
+    border: 1px solid #16a34a;
+}
+
+.erp-produtos-form__cell--preco-venda label,
+.erp-produtos-pcad__preco-cell--venda .erp-pcad-form__label {
+    color: #14532d;
+    letter-spacing: 0.01em;
+    font-weight: 800;
+}
+
+.erp-produtos-form__cell--preco-venda label::after {
+    content: ' ?';
+    color: #15803d;
+    font-size: 0.62rem;
+}
+
+.erp-produtos-form__cell--preco-atacado,
+.erp-produtos-pcad__preco-cell--atacado {
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #3b82f6;
+}
+
+.erp-produtos-form__cell--preco-atacado label,
+.erp-produtos-pcad__preco-cell--atacado .erp-pcad-form__label {
+    color: #1e3a8a;
+    font-weight: 800;
+}
+
+.erp-produtos-form__cell--preco-especial,
+.erp-produtos-pcad__preco-cell--especial {
+    background: linear-gradient(180deg, #ffedd5 0%, #fed7aa 100%);
+    border: 1px solid #f97316;
+}
+
+.erp-produtos-form__cell--preco-especial label,
+.erp-produtos-pcad__preco-cell--especial .erp-pcad-form__label {
+    color: #9a3412;
+    font-weight: 800;
+}
+
+.erp-produtos-form__cell--preco-venda .erp-pcad-form__input,
+.erp-produtos-form__cell--preco-atacado .erp-pcad-form__input,
+.erp-produtos-form__cell--preco-especial .erp-pcad-form__input,
+.erp-produtos-pcad__preco-cell--venda .erp-pcad-form__input,
+.erp-produtos-pcad__preco-cell--atacado .erp-pcad-form__input,
+.erp-produtos-pcad__preco-cell--especial .erp-pcad-form__input,
+.erp-produtos-form__input--preco-venda,
+#pprod-preco-venda,
+#pprod-preco-atacado,
+#pprod-preco-especial {
+    box-sizing: border-box !important;
+    height: var(--erp-prod-input-height, 1.28rem) !important;
+    min-height: var(--erp-prod-input-height, 1.28rem) !important;
+    max-height: var(--erp-prod-input-height, 1.28rem) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    border-width: 1px !important;
+    padding: 0 0.2rem !important;
 }
 
 .erp-produtos-form__cell--preco-venda .erp-pcad-form__input,
 .erp-produtos-pcad__preco-cell--venda .erp-pcad-form__input,
+.erp-produtos-form__input--preco-venda,
 #pprod-preco-venda {
-    font-weight: 700;
+    font-weight: 800 !important;
+    color: #14532d !important;
+    border-color: #15803d !important;
+    background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%) !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset !important;
+}
+
+.erp-produtos-form__cell--preco-atacado .erp-pcad-form__input,
+.erp-produtos-pcad__preco-cell--atacado .erp-pcad-form__input,
+#pprod-preco-atacado {
+    color: #1e3a8a !important;
+    border-color: #2563eb !important;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+}
+
+.erp-produtos-form__cell--preco-especial .erp-pcad-form__input,
+.erp-produtos-pcad__preco-cell--especial .erp-pcad-form__input,
+#pprod-preco-especial {
+    color: #9a3412 !important;
+    border-color: #ea580c !important;
+    background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%) !important;
+}
+
+.erp-produtos-form__cell--preco-venda .erp-pcad-form__input:focus,
+.erp-produtos-pcad__preco-cell--venda .erp-pcad-form__input:focus,
+.erp-produtos-form__input--preco-venda:focus,
+#pprod-preco-venda:focus {
+    outline: none !important;
+    border-color: #047857 !important;
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 35%) !important;
 }
 
 .erp-produtos-form__cell--grow {
@@ -789,6 +1014,7 @@
     display: flex;
     align-items: center;
     min-width: 0;
+    width: 100%;
 }
 
 .erp-produtos-form__control--lookup {
@@ -796,27 +1022,133 @@
 }
 
 .erp-produtos-form__control--lookup .erp-pcad-form__input,
-.erp-produtos-form__control--lookup .erp-pcad-form__select {
+.erp-produtos-form__control--lookup .erp-pcad-form__select,
+.erp-produtos-form__control--lookup .erp-prod-compact-select {
     flex: 1;
     min-width: 0;
+}
+
+/* Select compacto (Grupo) — lista com linhas baixas (nativo não permite no Windows) */
+.erp-prod-compact-select {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-prod-compact-select--grow {
+    flex: 1 1 auto;
+}
+
+.erp-prod-compact-select__trigger {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.erp-prod-compact-select__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-prod-compact-select__value:empty::before {
+    content: '\00a0';
+}
+
+.erp-prod-compact-select__caret {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    line-height: 1;
+    color: #475569;
+}
+
+.erp-prod-compact-select__menu {
+    position: absolute;
+    z-index: 80;
+    top: calc(100% + 1px);
+    left: 0;
+    right: auto;
+    min-width: 100%;
+    width: max-content;
+    max-width: min(28rem, calc(100vw - 2rem));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 11rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #64748b;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 16%);
+}
+
+.erp-prod-compact-select__menu li {
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.erp-prod-compact-select__item {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0.05rem 0.35rem;
+    border: 0;
+    background: transparent;
+    color: #0f172a;
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.15;
+    min-height: 1.15rem;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-prod-compact-select__item:hover,
+.erp-prod-compact-select__item:focus-visible {
+    background: #316ac5;
+    color: #fff;
+    outline: none;
+}
+
+.erp-prod-compact-select__item.is-selected {
+    background: #316ac5;
+    color: #fff;
 }
 
 .erp-produtos-form .erp-pcad-form__input,
 .erp-produtos-form .erp-pcad-form__select {
     width: 100%;
     font-size: calc(var(--erp-prod-field-font) + var(--erp-prod-field-font-extra));
-    font-weight: 400;
-    color: #000;
+    font-weight: 500;
+    color: #0f172a;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 4px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+    padding: 0.12rem 0.28rem !important;
 }
 
 .erp-produtos-form .erp-pcad-form__input.erp-produtos-form__input--codigo,
 .erp-produtos-pcad .erp-pcad-form__input.erp-produtos-form__input--codigo {
-    background: #fef9c3;
+    background: #fef9c3 !important;
     text-align: center;
     padding-left: 0.1rem;
     padding-right: 0.1rem;
     font-size: calc(var(--erp-prod-field-font) + var(--erp-prod-field-font-extra));
-    font-weight: 400 !important;
+    font-weight: 700 !important;
+    border-color: #eab308 !important;
 }
 
 .erp-produtos-form__input--num {
@@ -853,27 +1185,98 @@
 
 .erp-produtos-pcad .erp-pcad-form__btn--icon {
     flex-shrink: 0;
-    min-width: 1.35rem;
+    min-width: 1.45rem;
     min-height: calc(var(--erp-prod-input-height) + var(--erp-prod-input-height-extra));
     padding: 0.1rem 0.25rem;
     box-sizing: border-box;
+    border: 1px solid #7f98b8 !important;
+    border-radius: 5px !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%) !important;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
 }
 
-/* Foto — cinza, hint centralizado */
+.erp-produtos-pcad .erp-pcad-form__btn--icon:hover {
+    border-color: #1d4ed8 !important;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+    color: #1d4ed8;
+}
+
+.erp-produtos-pcad .erp-pcad-form__btn--icon .erp-pcad-form__btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.erp-produtos-pcad .erp-pcad-form__btn--icon .erp-pcad-form__btn-icon svg {
+    display: block;
+}
+
+/* Foto ? painel com hint */
+.erp-produtos-pcad__panel--foto {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0.2rem;
+    overflow: hidden;
+}
+
+.erp-produtos-pcad__foto-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    gap: 0.28rem;
+}
+
+.erp-produtos-pcad__foto-actions {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-produtos-pcad__foto-actions .erp-pcad-form__btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    min-height: 1.7rem;
+    padding: 0.15rem 0.45rem;
+}
+
+.erp-produtos-pcad__foto-actions .erp-pcad-form__btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .erp-produtos-pcad__foto {
     flex: 1 1 auto;
-    min-height: 8.25rem;
+    min-height: 5.5rem;
+    max-height: 100%;
     height: 100%;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: var(--erp-bg-muted, #e2eaf4);
+    border: 1px dashed #7f98b8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f8fbff 0%, #dbe7f5 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.35rem;
+    padding: 0.25rem;
     overflow: hidden;
-    cursor: default;
+    cursor: pointer;
     user-select: none;
     position: relative;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.erp-produtos-pcad__foto:hover {
+    border-color: #1d4ed8;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
 }
 
 .erp-produtos-pcad__foto-file {
@@ -894,21 +1297,22 @@
 }
 
 .erp-produtos-pcad__foto-hint {
-    font-size: 0.82rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    color: #333;
+    color: #475569;
     text-align: center;
-    line-height: 1.25;
+    line-height: 1.2;
+    padding: 0 0.2rem;
 }
 
 .erp-produtos-pcad__foto-img {
     display: block;
-    flex: 0 0 auto;
-    align-self: center;
+    flex: 1 1 auto;
+    align-self: stretch;
+    width: 100%;
+    height: 100%;
     max-width: 100%;
     max-height: 100%;
-    width: auto;
-    height: auto;
     object-fit: contain;
     object-position: center;
 }
@@ -917,22 +1321,44 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    margin: 0;
+    padding: 0.22rem 0.28rem 0.3rem;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 8px !important;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%) !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+}
+
+.erp-produtos-pcad__params .erp-pcad__group-title {
+    padding: 0 0.15rem;
+    font-size: 0.66rem !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f3460 !important;
 }
 
 .erp-produtos-pcad__params .erp-pcad__checks {
     display: flex;
     flex-direction: column;
-    gap: 0.12rem;
-    margin-top: 0.1rem;
+    gap: 0.04rem;
+    margin-top: 0.08rem;
 }
 
 .erp-produtos-pcad__params .erp-pcad__check {
     display: flex;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: 0.22rem;
     width: 100%;
-    line-height: 1.15;
-    font-size: 0.74rem;
+    line-height: 1.1;
+    font-size: 0.68rem;
+    padding: 0.06rem 0.12rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.erp-produtos-pcad__params .erp-pcad__check:hover:not(.erp-pcad__check--disabled) {
+    background: rgb(37 99 235 / 10%);
 }
 
 .erp-produtos-pcad__params .erp-pcad__check input {
@@ -962,31 +1388,62 @@
     overflow: hidden;
 }
 
+.erp-produtos-pcad__panel--tabs {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 .erp-produtos-pcad__bottom-tabs {
     display: flex;
     flex-wrap: wrap;
     flex-shrink: 0;
-    gap: 0.12rem;
-    padding: 0.2rem 0.35rem 0;
+    gap: 0.2rem;
+    padding: 0.35rem 0.4rem 0;
+    background: linear-gradient(180deg, #d7e4f3 0%, #c8d9ec 100%);
+    border-bottom: 1px solid #8fa8c8;
 }
 
 .erp-produtos-pcad__bottom-tab {
     cursor: pointer;
     font-family: inherit;
+    padding: 0.32rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    border: 1px solid #7f98b8 !important;
+    border-radius: 6px 6px 0 0 !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%) !important;
+    color: #0f3460 !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.erp-produtos-pcad__bottom-tab:hover {
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+    border-color: #1d4ed8 !important;
+    color: #1d4ed8 !important;
 }
 
 .erp-produtos-pcad__bottom-tab--active {
     position: relative;
     z-index: 1;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
+    border-color: #15803d !important;
+    color: #fff !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 25%) inset;
 }
 
 .erp-produtos-pcad__bottom-panel {
     flex: 1 1 auto;
-    min-height: 0;
+    min-height: 9.5rem;
     overflow-x: hidden;
     overflow-y: auto;
-    padding: 0.25rem 0.35rem 0.3rem;
-    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    padding: 0.18rem 0.25rem 0.2rem;
+    border-top: none;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
 }
 
 .erp-produtos-pcad__lower:has(.erp-produtos-pcad__foto-col) .erp-produtos-pcad__tabs-col {
@@ -998,6 +1455,8 @@
 
 .erp-produtos-pcad__tabs-col:has(.erp-produtos-impostos) .erp-produtos-pcad__bottom-panel {
     overflow-x: auto;
+    overflow-y: auto;
+    min-height: 9.75rem;
 }
 
 .erp-produtos-pcad__panel-hint {
@@ -1008,302 +1467,489 @@
     font-style: italic;
 }
 
-/* Impostos — grid 4 colunas estilo Delphi */
+/* Impostos ? faixa compacta (todos os grupos iguais) */
 .erp-produtos-impostos {
-    --erp-impostos-input-col: 1cm;
-    --erp-impostos-label-col: 6.65rem;
-    --erp-impostos-input-col-wide: calc(5.35rem - 0.5cm);
-    --erp-impostos-input-col-sm: calc(4.5rem - 0.5cm);
-    --erp-impostos-group-bg-shrink: calc(2cm - 0.5cm);
-    --erp-impostos-field-row-h: calc(var(--erp-prod-input-height) + var(--erp-prod-input-height-extra));
-    --erp-impostos-field-gap: 0.06rem;
-    --erp-impostos-fields-rows: 5;
-    --erp-impostos-fields-body-h: calc(
-        var(--erp-impostos-fields-rows) * var(--erp-impostos-field-row-h)
-        + (var(--erp-impostos-fields-rows) - 1) * var(--erp-impostos-field-gap)
-    );
+    --erp-impostos-input-col: 3rem;
+    --erp-impostos-label-col: 4.4rem;
     width: 100%;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-}
-
-.erp-produtos-impostos__grid {
-    display: grid;
-    grid-template-columns: repeat(4, max-content);
-    column-gap: 0.28rem;
-    align-items: start;
-    width: max-content;
-    max-width: 100%;
-}
-
-.erp-produtos-impostos__group--icms-interno {
-    grid-column: 1;
-}
-
-.erp-produtos-impostos__group--icms-externo {
-    grid-column: 2;
-}
-
-.erp-produtos-impostos__group--pis-cofins {
-    grid-column: 3;
-}
-
-.erp-produtos-impostos__ipi-row {
-    grid-column: 4;
-    display: flex;
-    flex-direction: row;
     align-items: stretch;
-    gap: 0.28rem;
-    flex-shrink: 0;
-    width: max-content;
-    min-height: 0;
+    gap: 0.12rem;
 }
 
-.erp-produtos-impostos__group--outros {
-    flex-shrink: 0;
-}
-
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--icms-interno,
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--icms-externo,
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--pis-cofins,
-.erp-produtos-impostos__ipi-row > .erp-produtos-impostos__group {
+.erp-produtos-impostos__toolbar {
     display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.65rem;
+    margin-bottom: 0.2rem;
+    padding: 0.15rem 0.1rem 0.25rem;
 }
 
-.erp-produtos-impostos__fiscal-row {
+.erp-produtos-impostos__reload-btn {
+    white-space: nowrap;
+}
+
+.erp-produtos-impostos__toolbar-hint {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: #5c6470;
+}
+
+/* Linha de cima: ICMS?Fiscal ? mesma altura em todos os blocos */
+.erp-produtos-impostos__row {
     display: flex;
-    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
-    gap: 0.28rem;
-    margin-top: 0.15rem;
-    flex-shrink: 0;
-    width: max-content;
-    max-width: 100%;
+    gap: 0.12rem;
+    width: 100%;
+    min-width: 0;
 }
 
-.erp-produtos-impostos__fiscal-row > .erp-produtos-impostos__group {
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    flex-shrink: 0;
+.erp-produtos-impostos__row > .erp-produtos-impostos__group {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    align-self: stretch;
 }
 
 .erp-produtos-impostos__group {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
     margin: 0;
-    padding: 0.12rem 0.3rem 0.18rem;
-    background: var(--erp-bg-app, #eef4fb);
-    min-width: 0;
+    padding: 0 0.18rem 0.06rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
     width: max-content;
-    max-width: none;
+    max-width: 100%;
     box-sizing: border-box;
 }
 
+.erp-produtos-impostos__row > .erp-produtos-impostos__group > .erp-produtos-impostos__fields {
+    flex: 1 1 auto;
+}
+
 .erp-produtos-impostos__legend {
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0 0.2rem;
+    margin: 0;
+    padding: 0 0.1rem;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #0f3460;
+    line-height: 1.15;
 }
 
 .erp-produtos-impostos__fields {
     display: flex;
     flex-direction: column;
-    gap: var(--erp-impostos-field-gap);
-    margin-top: 0.05rem;
-    box-sizing: border-box;
-}
-
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--icms-interno .erp-produtos-impostos__fields,
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--icms-externo .erp-produtos-impostos__fields,
-.erp-produtos-impostos__grid > .erp-produtos-impostos__group--pis-cofins .erp-produtos-impostos__fields,
-.erp-produtos-impostos__ipi-row > .erp-produtos-impostos__group .erp-produtos-impostos__fields {
-    flex: 1 1 auto;
-    min-height: var(--erp-impostos-fields-body-h);
+    gap: 0;
+    margin: 0;
 }
 
 .erp-produtos-impostos__field {
     display: grid;
     grid-template-columns: var(--erp-impostos-label-col) var(--erp-impostos-input-col);
-    column-gap: 0.28rem;
+    column-gap: 0.14rem;
     align-items: center;
 }
 
 .erp-produtos-impostos__field label {
-    font-size: 0.82rem;
+    margin: 0;
+    font-size: 0.64rem;
     font-weight: 700;
-    color: #000;
+    color: #334155;
     text-align: right;
     white-space: nowrap;
-    padding-right: 0.1rem;
+    line-height: 1;
+}
+
+.erp-produtos-impostos__label--hint {
+    color: #1d4ed8 !important;
+    border-bottom: 1px dotted #3b82f6;
+    cursor: help;
+}
+
+.erp-produtos-impostos__label--hint::after {
+    content: '?';
+    display: inline-block;
+    margin-left: 0.12rem;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    font-size: 0.5rem;
+    font-weight: 800;
+    line-height: 0.7rem;
+    text-align: center;
+    color: #fff;
+    background: #2563eb;
+    vertical-align: 0.05rem;
+}
+
+.erp-produtos-impostos__group[title] > .erp-produtos-impostos__legend {
+    cursor: help;
 }
 
 .erp-produtos-impostos__field > .erp-pcad-form__input,
-.erp-produtos-impostos__field > .erp-pcad-form__select,
-.erp-produtos-impostos__field .erp-produtos-impostos__lookup {
+.erp-produtos-impostos__field > .erp-pcad-form__select {
     width: var(--erp-impostos-input-col);
     max-width: var(--erp-impostos-input-col);
     min-width: 0;
+    min-height: 1.1rem !important;
+    height: 1.1rem !important;
+    padding: 0 0.12rem !important;
     box-sizing: border-box;
+    line-height: 1.1;
 }
 
-.erp-produtos-impostos__field--lookup .erp-produtos-impostos__lookup {
-    display: flex;
-    align-items: center;
-    gap: 0.12rem;
+.erp-pcad-form__input--tax-xs,
+.erp-pcad-form__input--tax-sm,
+.erp-produtos-impostos .erp-pcad-form__input--tax-xs,
+.erp-produtos-impostos .erp-pcad-form__input--tax-sm {
+    width: var(--erp-impostos-input-col) !important;
+    max-width: var(--erp-impostos-input-col) !important;
+    flex: 0 0 auto;
+    background: #fff !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 3px !important;
+    font-size: 0.72rem !important;
+    font-weight: 600;
 }
 
 .erp-pcad-form__input--tax-xs {
-    width: 2.8rem;
-    flex: 0 0 auto;
-    background: var(--erp-bg-app, #e3ecf7);
     text-align: center;
 }
 
 .erp-pcad-form__input--tax-sm {
-    width: 3.8rem;
-    flex: 0 0 auto;
-    background: var(--erp-bg-app, #e3ecf7);
     text-align: right;
-}
-
-.erp-pcad-form__input--tax-select {
-    width: 3.8rem;
-    flex: 0 0 auto;
-    min-height: calc(var(--erp-prod-input-height) + var(--erp-prod-input-height-extra));
-    padding: 0.08rem 0.2rem;
-    font-size: calc(var(--erp-prod-field-font) + var(--erp-prod-field-font-extra));
-    font-weight: 600;
-    background: #fff;
-    box-sizing: border-box;
-}
-
-.erp-produtos-impostos .erp-pcad-form__input--tax-xs,
-.erp-produtos-impostos .erp-pcad-form__input--tax-sm {
-    font-size: calc(var(--erp-prod-field-font) + var(--erp-prod-field-font-extra));
-    font-weight: 600;
-    width: var(--erp-impostos-input-col);
-    max-width: var(--erp-impostos-input-col);
 }
 
 .erp-produtos-impostos__cbenef-input {
+    width: var(--erp-impostos-input-col) !important;
+    max-width: var(--erp-impostos-input-col) !important;
+    background: #fff !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 3px !important;
+}
+
+.erp-pcad-form__input--tax-select {
     width: var(--erp-impostos-input-col);
-    max-width: var(--erp-impostos-input-col);
+    flex: 0 0 auto;
+    min-height: 1.2rem;
+    padding: 0.02rem 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 600;
     background: #fff;
     box-sizing: border-box;
 }
 
-.erp-produtos-impostos__group--wide {
-    margin-top: 0.15rem;
-    width: calc(100% - var(--erp-impostos-group-bg-shrink));
-    max-width: none;
-}
-
-.erp-produtos-impostos__fields--wide {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0.35rem 0.55rem;
-    min-width: 0;
-}
-
-.erp-produtos-impostos__fields--wide .erp-produtos-impostos__field {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    flex: 0 0 auto;
-    min-width: 0;
-}
-
-.erp-produtos-impostos__fields--wide .erp-produtos-impostos__field label {
-    flex: 0 0 auto;
-    text-align: right;
-    padding-right: 0;
-}
-
-.erp-produtos-impostos__fields--wide .erp-produtos-impostos__field > .erp-pcad-form__input {
-    flex: 0 0 auto;
-    width: var(--erp-impostos-input-col-wide);
-    max-width: none;
-}
-
-.erp-produtos-impostos__fields--wide .erp-produtos-impostos__field:first-child > .erp-pcad-form__input {
-    width: var(--erp-impostos-input-col-sm);
-}
-
-.erp-produtos-impostos__fields--wide .erp-produtos-impostos__check {
-    flex: 0 0 auto;
-    align-self: center;
-    white-space: nowrap;
-    margin-left: 0.15rem;
-}
-
-.erp-produtos-balanca__fields {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem 1rem;
-}
-
-.erp-produtos-promocao {
-    padding: 0.35rem 0.5rem;
-}
-
-.erp-produtos-promocao__group {
-    margin: 0;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: #d4e8f7;
-    width: fit-content;
-    max-width: 100%;
-}
-
-.erp-produtos-promocao__fields {
-    display: grid;
-    grid-template-columns: max-content 7rem;
-    column-gap: 0.65rem;
-    row-gap: 0.35rem;
-    align-items: center;
-}
-
-.erp-produtos-promocao__field {
+.erp-produtos-impostos__group--wide,
+.erp-produtos-impostos__fields--wide,
+.erp-produtos-impostos__grid,
+.erp-produtos-impostos__ipi-row,
+.erp-produtos-impostos__fiscal-row {
     display: contents;
 }
 
-.erp-produtos-promocao__field label {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: #000;
-    text-align: right;
-    white-space: nowrap;
-    justify-self: end;
-    padding-right: 0.1rem;
+.erp-produtos-impostos__group--iva {
+    --erp-impostos-label-col: 7.6rem;
+    --erp-impostos-input-col: 3.4rem;
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: 100%;
+    min-width: 0;
 }
 
-.erp-produtos-promocao__field .erp-pcad-form__input {
-    width: 100%;
+.erp-produtos-impostos__field--class-trib {
+    grid-template-columns: var(--erp-impostos-label-col) minmax(5.5rem, max-content);
+}
+
+.erp-produtos-impostos__cclass-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.18rem;
     min-width: 0;
+}
+
+.erp-produtos-impostos__field--class-trib > .erp-pcad-form__input,
+.erp-produtos-impostos__cclass-input {
+    width: var(--erp-impostos-input-col) !important;
+    max-width: var(--erp-impostos-input-col) !important;
+    text-align: center;
+}
+
+.erp-produtos-impostos__cclass-wrap .erp-produtos-impostos__cclass-input {
+    flex: 0 0 var(--erp-impostos-input-col);
+}
+
+.erp-produtos-impostos__cclass-lupa {
     flex: 0 0 auto;
+    min-width: 1.35rem !important;
+    min-height: 1.15rem !important;
+    height: 1.15rem !important;
+    padding: 0 0.15rem !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.erp-produtos-impostos__cclass-lupa .erp-pcad-form__btn-icon {
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.erp-produtos-impostos__iva {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    width: max-content;
+    max-width: 100%;
+}
+
+.erp-produtos-impostos__iva-class {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+}
+
+.erp-produtos-impostos__iva-class > label {
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-produtos-impostos__iva-class-row {
+    display: flex;
+    gap: 0.2rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.erp-produtos-impostos__iva-code {
+    width: 3.6rem !important;
+    max-width: 3.6rem !important;
+    flex: 0 0 3.6rem;
+    min-height: 1.1rem !important;
+    height: 1.1rem !important;
+    padding: 0 0.12rem !important;
     box-sizing: border-box;
+}
+
+.erp-produtos-impostos__iva-desc {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 1.1rem !important;
+    height: 1.1rem !important;
+    padding: 0 0.2rem !important;
+    background: #fef9c3 !important;
+    border: 1px solid #8fa8c8 !important;
+    box-sizing: border-box;
+}
+
+.erp-produtos-impostos__iva-cols {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    gap: 0.2rem 0.85rem;
+    width: max-content;
+    max-width: 100%;
+}
+
+.erp-produtos-impostos__iva-cols .erp-produtos-impostos__field {
+    grid-template-columns: var(--erp-impostos-label-col) var(--erp-impostos-input-col);
+}
+
+.erp-produtos-impostos__iva-cols .erp-produtos-impostos__field > .erp-pcad-form__input {
+    width: var(--erp-impostos-input-col) !important;
+    max-width: var(--erp-impostos-input-col) !important;
+}
+
+/* Abas auxiliares ? mesmo visual compacto dos impostos */
+.erp-produtos-promocao,
+.erp-produtos-balanca,
+.erp-produtos-combustivel,
+.erp-produtos-adicionais {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 0.14rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.erp-produtos-tab-group {
+    --erp-tab-label-col: 5rem;
+    --erp-tab-input-col: 5.5rem;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 0.22rem 0.1rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
+    width: max-content;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.erp-produtos-tab-group--wide {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+}
+
+.erp-produtos-tab-group__legend {
+    margin: 0;
+    padding: 0 0.12rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #0f3460;
+    line-height: 1.2;
+}
+
+.erp-produtos-tab-group__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.02rem;
+    margin: 0;
+}
+
+.erp-produtos-tab-group__fields--inline,
+.erp-produtos-tab-group__fields--wrap {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.18rem 0.55rem;
+}
+
+.erp-produtos-tab-group__fields--stack {
+    gap: 0.2rem;
+}
+
+.erp-produtos-tab-group__field {
+    display: grid;
+    grid-template-columns: var(--erp-tab-label-col) var(--erp-tab-input-col);
+    column-gap: 0.18rem;
+    align-items: center;
+}
+
+.erp-produtos-tab-group__fields--inline .erp-produtos-tab-group__field,
+.erp-produtos-tab-group__fields--wrap .erp-produtos-tab-group__field {
+    flex: 0 0 auto;
+}
+
+.erp-produtos-tab-group__field--full {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.08rem;
+    grid-template-columns: none;
+    width: 100%;
+}
+
+.erp-produtos-tab-group__field label {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #334155;
+    text-align: right;
+    white-space: nowrap;
+    line-height: 1.05;
+}
+
+.erp-produtos-tab-group__field--full label {
+    text-align: left;
+}
+
+.erp-produtos-tab-group__field > .erp-pcad-form__input,
+.erp-produtos-tab-group__field > .erp-pcad-form__select {
+    width: var(--erp-tab-input-col);
+    max-width: var(--erp-tab-input-col);
+    min-width: 0;
+    min-height: 1.2rem !important;
+    padding: 0.02rem 0.15rem !important;
+    box-sizing: border-box;
+    font-size: 0.72rem !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 3px !important;
+    background: #fff !important;
+}
+
+.erp-produtos-tab-group__field--full > .erp-pcad-form__textarea {
+    width: 100%;
+    min-height: 2.4rem;
+    max-width: 100%;
+    resize: vertical;
+    padding: 0.25rem 0.35rem !important;
+    font-size: 0.72rem !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 3px !important;
+    background: #fff !important;
+}
+
+.erp-produtos-tab-group__check {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    font-size: 0.68rem !important;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+.erp-produtos-tab-group__hint {
+    margin: 0.12rem 0 0;
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
 }
 
 .erp-produtos-promocao__input--date {
     text-align: center;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
 }
 
 .erp-produtos-promocao__input--money {
     text-align: right;
 }
 
+.erp-produtos-promocao .erp-produtos-tab-group {
+    --erp-tab-label-col: 5.2rem;
+    --erp-tab-input-col: 6.2rem;
+}
+
+.erp-produtos-combustivel .erp-produtos-tab-group {
+    --erp-tab-label-col: 4.4rem;
+    --erp-tab-input-col: 3.6rem;
+}
+
+.erp-produtos-balanca .erp-produtos-tab-group {
+    --erp-tab-label-col: 3.6rem;
+    --erp-tab-input-col: 5rem;
+}
+
+.erp-produtos-adicionais .erp-produtos-tab-group {
+    --erp-tab-label-col: 5rem;
+    --erp-tab-input-col: 4.8rem;
+}
+
 .erp-produtos-child-grid {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    min-height: 180px;
+    gap: 0.28rem;
+    min-height: 0;
 }
 
 .erp-produtos-child-grid__toolbar,
@@ -1312,47 +1958,59 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.25rem;
 }
 
 .erp-produtos-child-grid__btn {
-    border: 1px solid var(--erp-border, #8ea8c3);
-    background: linear-gradient(180deg, #fff 0%, #e8eef5 100%);
-    padding: 0.2rem 0.55rem;
-    font-size: 0.78rem;
+    border: 1px solid #7f98b8;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
     font-weight: 700;
+    color: #0f3460;
     cursor: pointer;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+}
+
+.erp-produtos-child-grid__btn:hover {
+    border-color: #1d4ed8;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
 }
 
 .erp-produtos-child-grid__hint {
     margin-left: auto;
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     font-weight: 700;
+    color: #475569;
 }
 
 .erp-produtos-child-grid__wrap {
     overflow: auto;
-    border: 1px solid var(--erp-border, #8ea8c3);
+    border: 1px solid #8fa8c8;
+    border-radius: 5px;
     background: #fff;
 }
 
 .erp-produtos-child-grid__table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
 }
 
 .erp-produtos-child-grid__table th,
 .erp-produtos-child-grid__table td {
     border: 1px solid #c5d4e4;
-    padding: 0.2rem 0.35rem;
+    padding: 0.12rem 0.28rem;
     vertical-align: middle;
 }
 
 .erp-produtos-child-grid__table th {
-    background: #d9e6f2;
+    background: linear-gradient(180deg, #d7e4f3 0%, #c8d9ec 100%);
     font-weight: 700;
     text-align: left;
+    color: #0f3460;
 }
 
 .erp-produtos-child-grid__row {
@@ -1360,18 +2018,19 @@
 }
 
 .erp-produtos-child-grid__row--selected {
-    background: #cfe3fb;
+    background: #bfdbfe;
 }
 
 .erp-produtos-child-grid__row .erp-pcad-form__input {
     width: 100%;
     min-width: 0;
-    padding: 0.15rem 0.25rem;
-    font-size: calc(var(--erp-prod-field-font-sm) + var(--erp-prod-field-font-extra));
+    min-height: 1.2rem !important;
+    padding: 0.05rem 0.2rem !important;
+    font-size: 0.72rem !important;
 }
 
 .erp-produtos-child-grid__input-sm {
-    max-width: 5rem;
+    max-width: 4.5rem;
 }
 
 .erp-produtos-child-grid__input-num,
@@ -1382,23 +2041,25 @@
 
 .erp-produtos-child-grid__empty {
     text-align: center;
-    color: #666;
+    color: #64748b;
     font-style: italic;
-    padding: 1rem;
+    padding: 0.55rem;
 }
 
 .erp-produtos-composicao__form,
 .erp-produtos-tabpreco__form {
-    border: 1px solid var(--erp-border, #8ea8c3);
-    background: #f7fafc;
-    padding: 0.45rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    padding: 0.28rem 0.35rem;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
 }
 
 .erp-produtos-composicao__fields,
 .erp-produtos-tabpreco__fields {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.28rem 0.45rem;
     align-items: flex-end;
 }
 
@@ -1406,101 +2067,32 @@
 .erp-produtos-tabpreco__field {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    min-width: 120px;
+    gap: 0.05rem;
+    min-width: 6.5rem;
 }
 
 .erp-produtos-composicao__field label,
 .erp-produtos-tabpreco__field label {
-    font-size: 0.72rem;
+    font-size: 0.66rem;
     font-weight: 700;
+    color: #334155;
 }
 
-.erp-produtos-combustivel,
-.erp-produtos-balanca {
-    padding: 0.25rem 0;
-}
-
-.erp-produtos-combustivel__fields {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(120px, 1fr));
-    gap: 0.5rem;
-}
-
-.erp-produtos-combustivel__field,
-.erp-produtos-balanca__field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-}
-
-.erp-produtos-combustivel__field label,
-.erp-produtos-balanca__field label {
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
-.erp-produtos-combustivel__hint {
-    margin: 0.35rem 0 0;
-    font-size: 0.75rem;
-    color: #444;
-}
-
-.erp-produtos-adicionais {
-    display: flex;
-    flex-direction: column;
-    gap: 0.65rem;
-}
-
-.erp-produtos-adicionais__grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(120px, 1fr));
-    gap: 0.5rem;
-    align-items: end;
-}
-
-.erp-produtos-adicionais__restaurante {
-    border: 1px solid #c5d4e8;
-    padding: 0.45rem 0.55rem 0.55rem;
-    margin: 0;
-}
-
-.erp-produtos-adicionais__legend {
-    font-size: 0.78rem;
-    font-weight: 700;
-    padding: 0 0.25rem;
-}
-
-.erp-produtos-adicionais__grid--restaurante {
-    grid-template-columns: repeat(6, minmax(90px, 1fr));
+.erp-produtos-composicao__field .erp-pcad-form__input,
+.erp-produtos-tabpreco__field .erp-pcad-form__input,
+.erp-produtos-tabpreco__field .erp-pcad-form__select {
+    min-height: 1.2rem !important;
+    padding: 0.02rem 0.15rem !important;
+    font-size: 0.72rem !important;
+    border: 1px solid #8fa8c8 !important;
+    border-radius: 3px !important;
 }
 
 .erp-produtos-child-grid__check {
     text-align: center;
 }
 
-.erp-produtos-adicionais__field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-}
-
-.erp-produtos-adicionais__field label {
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
-.erp-produtos-adicionais__field--full {
-    width: 100%;
-}
-
-.erp-produtos-adicionais .erp-pcad-form__textarea {
-    width: 100%;
-    min-height: 4rem;
-    resize: vertical;
-}
-
-/* Rodapé — botões + avisos (visual escuro em erp-form-ui.css) */
+/* Rodapï¿½ ? botï¿½es + avisos (visual escuro em erp-form-ui.css) */
 .erp-produtos-pcad__footer {
     display: flex;
     flex-wrap: wrap;
@@ -1534,127 +2126,309 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
+    padding: 0.75rem;
 }
 
 .erp-lookup-modal__backdrop {
     position: absolute;
     inset: 0;
-    background: rgb(0 0 0 / 35%);
+    background: rgb(15 23 42 / 40%);
 }
 
 .erp-lookup-modal__window {
     position: relative;
     z-index: 1;
-    width: min(34rem, calc(100vw - 2rem));
-    max-height: calc(100vh - 2rem);
+    width: min(28rem, calc(100vw - 1.5rem));
+    max-height: calc(100vh - 1.5rem);
     display: flex;
     flex-direction: column;
-    border: 1px solid #000;
-    background: var(--erp-bg-app, #e3ecf7);
-    box-shadow: 2px 2px 6px rgb(0 0 0 / 35%);
+    border: 1px solid #8fa8c8;
+    border-radius: 8px;
+    background: #f4f7fb;
+    box-shadow: 0 12px 32px rgb(15 52 96 / 28%);
+    overflow: hidden;
 }
 
 .erp-lookup-modal__titlebar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.25rem 0.35rem 0.25rem 0.5rem;
+    padding: 0.28rem 0.4rem 0.28rem 0.55rem;
     background: linear-gradient(180deg, #316ac5 0%, #214a8a 100%);
     color: #fff;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .erp-lookup-modal__close {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: var(--erp-bg-app, #e3ecf7);
-    color: #000;
-    width: 1.2rem;
-    height: 1.2rem;
+    border: 1px solid rgb(255 255 255 / 35%);
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+    width: 1.15rem;
+    height: 1.15rem;
     line-height: 1;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    border-radius: 4px;
+}
+
+.erp-lookup-modal__close:hover {
+    background: rgb(255 255 255 / 28%);
 }
 
 .erp-lookup-modal__body {
-    padding: 0.45rem;
+    padding: 0.4rem 0.45rem 0.3rem;
     min-height: 0;
     overflow: auto;
 }
 
 .erp-lookup-modal__body--form {
-    min-height: 8rem;
+    min-height: 5.5rem;
 }
 
 .erp-lookup-modal__search-box {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border: 1px solid #c7d5e8;
+    border-radius: 6px;
     margin: 0;
-    padding: 0.25rem 0.45rem 0.4rem;
-    background: var(--erp-bg-app, #e3ecf7);
+    padding: 0.15rem 0.4rem 0.3rem;
+    background: #fff;
 }
 
 .erp-lookup-modal__search-legend,
 .erp-lookup-modal__form-legend {
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    color: #000;
-    padding: 0 0.2rem;
+    color: #334155;
+    padding: 0 0.15rem;
 }
 
 .erp-lookup-modal__search-input {
     width: 100%;
-    margin-top: 0.15rem;
+    margin-top: 0.1rem;
+    min-height: 1.7rem !important;
+    height: 1.7rem !important;
+    padding: 0.15rem 0.4rem !important;
+    font-size: 0.8rem !important;
 }
 
 .erp-produtos-form-page .erp-lookup-modal .erp-pcad-form__input,
 .erp-produtos-form-page .erp-lookup-modal .erp-pcad-form__select,
 .erp-produtos-form-page .erp-lookup-modal .erp-pcad-form__textarea {
-    font-size: calc(var(--erp-prod-field-font) + var(--erp-prod-field-font-extra));
+    font-size: 0.8rem;
 }
 
 .erp-lookup-modal__hint {
-    margin: 0.35rem 0 0.25rem;
-    font-size: 0.78rem;
-    font-weight: 600;
+    margin: 0.25rem 0 0.2rem;
+    font-size: 0.68rem;
+    font-weight: 500;
     font-style: italic;
-    color: #333;
+    color: #64748b;
+    line-height: 1.25;
 }
 
 .erp-lookup-modal__grid-wrap {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border: 1px solid #c7d5e8;
+    border-radius: 6px;
     background: #fff;
-    max-height: 14rem;
+    max-height: 11rem;
     overflow: auto;
 }
 
 .erp-lookup-modal__grid {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
 }
 
 .erp-lookup-modal__grid th,
 .erp-lookup-modal__grid td {
-    border: 1px solid #b8b8b8;
-    padding: 0.18rem 0.35rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: none;
+    border-right: none;
+    padding: 0.22rem 0.45rem;
     text-align: left;
 }
 
+.erp-lookup-modal__grid thead th {
+    border-bottom: 1px solid #c7d5e8;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
 .erp-lookup-modal__grid-head {
-    background: var(--erp-bg-app, #e3ecf7);
+    background: #eef4fb;
     cursor: pointer;
     user-select: none;
     font-weight: 700;
+    font-size: 0.72rem;
+    color: #334155;
+}
+
+.erp-lookup-modal__grid-head--static {
+    cursor: default;
+}
+
+
+/* Lista auxiliar compacta (Grupo / Marca / Unidade) */
+.erp-lookup-modal--compact .erp-lookup-modal__window {
+    width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__body {
+    padding: 0.3rem 0.35rem 0.2rem;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__search-box {
+    padding: 0.08rem 0.3rem 0.2rem;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__search-input {
+    min-height: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0.1rem 0.35rem !important;
+    font-size: 0.76rem !important;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__grid-wrap {
+    max-height: 16.5rem;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__grid {
+    font-size: 0.74rem;
+    font-weight: 500;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__grid th,
+.erp-lookup-modal--compact .erp-lookup-modal__grid td {
+    padding: 0.06rem 0.4rem;
+    line-height: 1.15;
+    height: 1.3rem;
+    max-height: 1.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__grid-head {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.4rem;
+    height: 1.35rem;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__empty {
+    padding: 0.4rem;
+    font-size: 0.74rem;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__actions {
+    padding: 0.28rem 0.35rem 0.32rem !important;
+    gap: 0.25rem !important;
+}
+
+.erp-lookup-modal--compact .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn {
+    min-width: 4.8rem !important;
+    height: 1.7rem !important;
+}
+
+.erp-lookup-modal--grupo .erp-lookup-modal__window {
+    width: min(calc(20rem + 5cm), calc(100vw - 1.5rem));
+}
+
+.erp-lookup-modal--grupo .erp-lookup-modal__grid-wrap {
+    min-height: calc(16.5rem + 2cm);
+    max-height: calc(16.5rem + 2cm);
+}
+
+.erp-lookup-modal--grupo .erp-lookup-modal__grid th:last-child,
+.erp-lookup-modal--grupo .erp-lookup-modal__grid td:last-child {
+    width: 2.6rem;
+    text-align: center;
+}
+
+.erp-lookup-modal__cell--flag {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.erp-lookup-modal__flag {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #64748b;
+    border-radius: 2px;
+    background: #fff;
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+}
+
+.erp-lookup-modal__flag.is-on {
+    border-color: #1e5a9e;
+    background: #1e5a9e;
+}
+
+.erp-lookup-modal__flag.is-on::after {
+    content: '';
+    position: absolute;
+    left: 0.22rem;
+    top: 0.02rem;
+    width: 0.22rem;
+    height: 0.42rem;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.erp-lookup-modal__row--selected .erp-lookup-modal__flag {
+    border-color: #fff;
+}
+
+.erp-lookup-modal__row--selected .erp-lookup-modal__flag.is-on {
+    background: #fff;
+    border-color: #fff;
+}
+
+.erp-lookup-modal__row--selected .erp-lookup-modal__flag.is-on::after {
+    border-color: #316ac5;
+}
+
+.erp-lookup-modal__form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+}
+
+.erp-lookup-modal__form-check-input {
+    width: 0.9rem;
+    height: 0.9rem;
+    margin: 0;
+    accent-color: #1e5a9e;
+    cursor: pointer;
 }
 
 .erp-lookup-modal__grid-head--active {
-    background: var(--erp-bg-muted, #e2eaf4);
+    background: #dbe7f6;
+    color: #1e5a9e;
 }
 
 .erp-lookup-modal__row {
     cursor: pointer;
+}
+
+.erp-lookup-modal__row:hover:not(.erp-lookup-modal__row--selected) {
+    background: #f1f5f9;
 }
 
 .erp-lookup-modal__row--selected {
@@ -1664,39 +2438,139 @@
 
 .erp-lookup-modal__empty {
     text-align: center;
-    color: #666;
+    color: #64748b;
     font-style: italic;
-    padding: 0.75rem;
+    padding: 0.55rem;
+    font-size: 0.78rem;
+}
+
+.erp-lookup-modal__empty-actions {
+    margin-top: 0.4rem;
+    font-style: normal;
+}
+
+.erp-ncm-confirm-modal__window {
+    max-width: 28rem;
+}
+
+.erp-ncm-confirm-modal__body {
+    padding: 0.85rem 1rem;
+}
+
+.erp-ncm-confirm-modal__text,
+.erp-ncm-confirm-modal__question {
+    margin: 0 0 0.55rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: #1f2937;
+}
+
+.erp-ncm-confirm-modal__question {
+    font-weight: 700;
+    margin-bottom: 0;
 }
 
 .erp-lookup-modal__form-box {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border: 1px solid #c7d5e8;
+    border-radius: 6px;
     margin: 0;
-    padding: 0.35rem 0.45rem 0.5rem;
-    background: var(--erp-bg-app, #e3ecf7);
+    padding: 0.3rem 0.4rem 0.4rem;
+    background: #fff;
 }
 
 .erp-lookup-modal__form-field {
     display: flex;
     flex-direction: column;
-    gap: 0.12rem;
-    margin-top: 0.35rem;
-    font-size: 0.82rem;
+    gap: 0.1rem;
+    margin-top: 0.28rem;
+    font-size: 0.72rem;
     font-weight: 700;
+    color: #334155;
 }
 
 .erp-lookup-modal__actions {
     flex-shrink: 0;
+    display: flex !important;
+    flex-wrap: wrap;
     justify-content: center;
-    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    gap: 0.3rem !important;
+    padding: 0.35rem 0.4rem 0.4rem !important;
+    border-top: 1px solid #c7d5e8;
+    background: #eef2f7;
 }
 
 .erp-lookup-modal__actions--form {
-    justify-content: flex-start;
+    justify-content: flex-end;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.3rem !important;
+    min-width: 5.2rem !important;
+    height: 1.85rem !important;
+    padding: 0 0.45rem !important;
+    border: 1px solid #c7d5e8 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 6%) !important;
+    transform: none !important;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn:hover {
+    background: #f8fafc !important;
+    border-color: #316ac5 !important;
+    box-shadow: 0 1px 3px rgb(49 106 197 / 18%) !important;
+    transform: none !important;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1rem !important;
+    height: 1rem !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    font-size: 0.68rem !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+    background: #e8f0fb !important;
+    color: #1e5a9e !important;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__label {
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    white-space: nowrap;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__label kbd {
+    padding: 0.02rem 0.22rem !important;
+    border-radius: 3px !important;
+    font-size: 0.62rem !important;
+    background: #eef4fb !important;
+    border: 1px solid #c7d5e8 !important;
+    color: #1e5a9e !important;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__icon--exit {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+}
+
+.erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__icon--save {
+    background: #dcfce7 !important;
+    color: #15803d !important;
 }
 
 .erp-lookup-modal__btn--disabled {
-    opacity: 0.72;
+    opacity: 0.55;
+    pointer-events: none;
 }
 
 .erp-duplicate-modal__body {
@@ -1758,23 +2632,45 @@
     }
 
     .erp-produtos-pcad__lower {
-        grid-template-columns: minmax(0, 1fr) 8.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem;
+        --erp-prod-params-col: 8.25rem;
     }
 
     .erp-produtos-pcad__foto-col {
-        right: calc(8.5rem + 0.55rem);
+        right: calc(var(--erp-prod-params-col) + 0.45rem);
     }
 
     .erp-produtos-form__grid--r1,
     .erp-produtos-form__grid--r2,
-    .erp-produtos-form__grid--r3,
+    .erp-produtos-form__grid--r3-loc,
     .erp-produtos-form__grid--r4,
     .erp-produtos-form__grid--r5 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .erp-produtos-impostos__grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .erp-produtos-form__section--precos {
+        width: 100%;
+    }
+
+    .erp-produtos-form__section--precos .erp-produtos-form__grid--r3 {
+        width: 100%;
+        grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+    }
+
+    .erp-produtos-form__grid--r1 .erp-produtos-form__cell,
+    .erp-produtos-form__grid--r2 .erp-produtos-form__cell,
+    .erp-produtos-form__grid--r3 .erp-produtos-form__cell,
+    .erp-produtos-form__grid--r3-loc .erp-produtos-form__cell,
+    .erp-produtos-form__grid--r5 .erp-produtos-form__cell {
+        grid-column: auto !important;
+    }
+
+    .erp-produtos-form__grid--r3-loc .erp-produtos-form__cell--localizacao {
+        grid-column: 1 / -1 !important;
+    }
+
+    .erp-produtos-impostos {
+        gap: 0.12rem;
     }
 
     .erp-produtos-pcad__footer {
@@ -1791,11 +2687,13 @@
 @media (max-width: 900px) {
     .fi-body:has(.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed)) .fi-main > * {
         max-width: 100%;
-        max-height: 100%;
+        max-height: none;
     }
 
     .fi-page.erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) {
-        max-height: 100%;
+        width: calc(100vw - 0.35rem) !important;
+        max-width: calc(100vw - 0.35rem) !important;
+        max-height: none !important;
     }
 
     .erp-produtos-pcad__lower {
@@ -1841,8 +2739,25 @@
         font-size: 1.35rem;
     }
 
+    .erp-produtos-pcad__fields {
+        max-height: none;
+    }
+
+    .erp-produtos-pcad__lower {
+        min-height: 10.5rem;
+        max-height: none;
+    }
+
+    .erp-produtos-pcad__bottom-panel {
+        min-height: 9rem;
+    }
+
+    .erp-produtos-pcad__tabs-col:has(.erp-produtos-impostos) .erp-produtos-pcad__bottom-panel {
+        min-height: 9.25rem;
+    }
+
     .erp-produtos-pcad__foto {
-        min-height: 7rem;
+        min-height: 4.5rem;
     }
 
     .erp-produtos-form-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) .erp-produtos-pcad__footer .erp-pcad-actions__btn {
@@ -1873,17 +2788,29 @@
     }
 
     .erp-produtos-pcad__fields {
-        max-height: min(28dvh, 210px);
+        max-height: none;
+    }
+
+    .erp-produtos-pcad__lower {
+        min-height: 10rem;
+        max-height: none;
+    }
+
+    .erp-produtos-pcad__bottom-panel {
+        min-height: 8.75rem;
+    }
+
+    .erp-produtos-pcad__tabs-col:has(.erp-produtos-impostos) .erp-produtos-pcad__bottom-panel {
+        min-height: 9rem;
     }
 }
 
 @media (max-width: 768px) {
     .erp-produtos-form__grid--r1,
     .erp-produtos-form__grid--r2,
-    .erp-produtos-form__grid--r3,
+    .erp-produtos-form__grid--r3-loc,
     .erp-produtos-form__grid--r4,
-    .erp-produtos-form__grid--r5,
-    .erp-produtos-impostos__grid {
+    .erp-produtos-form__grid--r5 {
         grid-template-columns: 1fr;
     }
 
@@ -1908,7 +2835,7 @@
     }
 }
 
-/* PDV embed (?pdv=1) — layout igual ao cadastro de clientes */
+/* PDV embed (?pdv=1) ? layout igual ao cadastro de clientes */
 .erp-produtos-pcad--pdv {
     overflow: hidden;
 }
@@ -1925,12 +2852,12 @@
 
 .erp-produtos-pcad--pdv .erp-pcad-form__label--required,
 .erp-produtos-pcad__preco-cell--venda .erp-pcad-form__label {
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .erp-produtos-pcad__row-precos {
     display: grid;
-    grid-template-columns: repeat(9, minmax(3.5rem, 1fr));
+    grid-template-columns: repeat(5, minmax(3.5rem, 1fr));
     gap: 0.18rem 0.38rem;
     align-items: end;
 }
@@ -1994,27 +2921,19 @@
     padding: 0.5rem;
 }
 
-.erp-produtos-form__grid--r6-compact {
-    margin-top: 0.05rem;
-}
-
-.erp-produtos-form__grid--r6-compact .erp-produtos-form__cell label {
-    font-size: 0.72rem;
-}
-
-/* Reservas do app — faixa compacta */
+/* Reservas do app ? faixa compacta */
 .erp-produtos-form__reservas {
     grid-column: 1 / -1;
-    margin: 0.05rem 0 0.08rem;
+    margin: 0.02rem 0 0;
 }
 
 .erp-produtos-form__reservas-summary {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.5rem;
-    padding: 0.28rem 0.45rem;
-    border-radius: 8px;
+    gap: 0.28rem 0.4rem;
+    padding: 0.18rem 0.35rem;
+    border-radius: 6px;
     border: 1px solid #dbe5f1;
     background: linear-gradient(180deg, #f8fbff 0%, #f1f6fc 100%);
 }
@@ -2096,3 +3015,727 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+
+/* Painel Estoque ? sub-abas (Estoques / Localizaï¿½ï¿½es / Trocas / Dados ANP) */
+.erp-produtos-estoque-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-produtos-estoque-panel__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    gap: 0.15rem;
+    padding: 0 0 0.2rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid #8fa8c8;
+}
+
+.erp-produtos-estoque-panel__tab {
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0.22rem 0.65rem !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    border: 1px solid #7f98b8 !important;
+    border-radius: 5px 5px 0 0 !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%) !important;
+    color: #0f3460 !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+}
+
+.erp-produtos-estoque-panel__tab:hover {
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+    border-color: #1d4ed8 !important;
+    color: #1d4ed8 !important;
+}
+
+.erp-produtos-estoque-panel__tab--active {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
+    border-color: #15803d !important;
+    color: #fff !important;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 25%) inset;
+}
+
+.erp-produtos-estoque-panel__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding-top: 0.15rem;
+}
+
+.erp-produtos-estoque-panel__localizacoes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.15rem 0.1rem;
+}
+
+.erp-produtos-estoque-panel__localizacoes .erp-produtos-loc {
+    max-width: 28rem;
+}
+
+.erp-produtos-anp {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.1rem;
+}
+
+.erp-produtos-anp__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 7.5rem));
+    gap: 0.35rem 0.55rem;
+    align-items: end;
+}
+
+.erp-produtos-anp__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    min-width: 0;
+}
+
+.erp-produtos-anp__field label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-produtos-anp__field--code {
+    grid-column: 1 / 3;
+}
+
+.erp-produtos-anp__field--wide {
+    grid-column: 3 / 5;
+}
+
+.erp-produtos-anp__note {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-produtos-tabs-col:has(.erp-produtos-estoque-panel) .erp-produtos-pcad__bottom-panel,
+.erp-produtos-pcad__tabs-col:has(.erp-produtos-estoque-panel) .erp-produtos-pcad__bottom-panel {
+    overflow-y: auto;
+}
+
+.erp-produtos-estoques {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-produtos-estoques__hint {
+    margin: 0;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
+}
+
+.erp-produtos-estoques__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+    border: 1px solid #6b8bb0;
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+}
+
+.erp-produtos-estoques__grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    color: #0f172a;
+}
+
+.erp-produtos-estoques__grid th,
+.erp-produtos-estoques__grid td {
+    padding: 0.1rem 0.28rem;
+    border: 1px solid #b8c9de;
+    vertical-align: middle;
+}
+
+.erp-produtos-estoques__grid thead th {
+    background: linear-gradient(180deg, #cfe0f4 0%, #aec9e6 100%);
+    color: #0a2a4d;
+    font-weight: 800;
+    font-size: 0.64rem;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-color: #7a97b8;
+    padding: 0.12rem 0.28rem;
+}
+
+.erp-produtos-estoques__grid tbody td {
+    color: #0f172a;
+    font-weight: 600;
+    background: #ffffff;
+}
+
+.erp-produtos-estoques__grid tbody tr:nth-child(odd) td {
+    background: #eef5fc;
+}
+
+.erp-produtos-estoques__grid tbody tr:nth-child(even) td {
+    background: #dceaf8;
+}
+
+.erp-produtos-estoques__grid tbody tr:hover td {
+    background: #c8dcf0;
+}
+
+.erp-produtos-estoques__grid tfoot td {
+    background: #b6d0ea;
+    color: #0a2a4d;
+    font-weight: 800;
+    border-color: #7a97b8;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 0.12rem 0.28rem;
+}
+
+.erp-produtos-estoques__col-nome {
+    text-align: left;
+    min-width: 8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 16rem;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.erp-produtos-estoques__col-num,
+.erp-produtos-estoques__grid thead th.erp-produtos-estoques__col-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    width: 4.4rem;
+    white-space: nowrap;
+    color: #0f172a;
+}
+
+.erp-produtos-estoques__num--reserved {
+    color: #b91c1c !important;
+    font-weight: 800;
+}
+
+.erp-produtos-estoques__num--available {
+    color: #15803d !important;
+    font-weight: 800;
+}
+
+.erp-produtos-estoques__empty {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    padding: 0.4rem !important;
+}
+
+.erp-produtos-estoques .erp-produtos-form__reservas {
+    grid-column: auto;
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.erp-produtos-form__cell--localizacao {
+    grid-column: 1 / 6;
+    min-width: 0;
+}
+
+.erp-produtos-loc {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.28rem 0.45rem;
+    min-width: 0;
+    width: 100%;
+    padding: 0.12rem 0.28rem 0.14rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+}
+
+.erp-produtos-loc__title {
+    flex: 0 0 100%;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #0f3460;
+    line-height: 1.1;
+}
+
+.erp-produtos-loc__fields {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(3.1rem, 4.2rem));
+    gap: 0.28rem;
+    flex: 0 0 auto;
+}
+
+.erp-produtos-loc__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.02rem;
+    min-width: 0;
+}
+
+.erp-produtos-loc__field > span {
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.05;
+}
+
+.erp-produtos-loc__input {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    padding-inline: 0.2rem !important;
+}
+
+.erp-produtos-loc__preview {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    color: #1e3a8a;
+    padding-bottom: 0.1rem;
+}
+
+.erp-produtos-loc__preview-label {
+    color: #475569;
+    font-weight: 600;
+}
+
+.erp-produtos-loc__legacy {
+    flex: 0 0 100%;
+    margin: 0;
+    font-size: 0.66rem;
+    color: #92400e;
+    line-height: 1.15;
+}
+
+.erp-pcad-form__row--localizacao {
+    align-items: flex-start;
+}
+
+/* Modal Precificaï¿½ï¿½o do Produto */
+.erp-prod-precificacao-modal__window {
+    width: min(1100px, 96vw) !important;
+    max-height: min(92vh, 820px);
+}
+
+.erp-prod-precificacao-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    overflow: auto;
+    max-height: calc(92vh - 7rem);
+}
+
+.erp-prod-precificacao__produto {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+    padding: 0.4rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
+}
+
+.erp-prod-precificacao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    min-width: 6.5rem;
+}
+
+.erp-prod-precificacao__field label {
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-prod-precificacao__field--grow {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+}
+
+.erp-prod-precificacao__field--empresa {
+    flex: 0 1 14rem;
+}
+
+.erp-prod-precificacao__layout {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+}
+
+.erp-prod-precificacao__box {
+    margin: 0;
+    padding: 0.35rem 0.4rem 0.4rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 6px;
+    background: #fff;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.erp-prod-precificacao__box legend {
+    padding: 0 0.2rem;
+    font-size: 0.64rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #0f3460;
+}
+
+.erp-prod-precificacao__box--custo {
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: #d6b86a;
+    padding: 0.28rem 0.4rem 0.35rem;
+    width: fit-content;
+    max-width: 100%;
+    justify-self: start;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.erp-prod-precificacao__box--custo legend {
+    color: #92400e;
+}
+
+.erp-prod-precificacao__box--varejo {
+    background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+    border-color: #16a34a;
+}
+
+.erp-prod-precificacao__box--varejo legend {
+    color: #14532d;
+}
+
+.erp-prod-precificacao__box--atacado {
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    border-color: #3b82f6;
+}
+
+.erp-prod-precificacao__box--atacado legend {
+    color: #1e3a8a;
+}
+
+.erp-prod-precificacao__box--especial {
+    background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+    border-color: #f97316;
+}
+
+.erp-prod-precificacao__box--especial legend {
+    color: #9a3412;
+}
+
+.erp-prod-precificacao__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 5.1rem);
+    gap: 0.18rem;
+    align-items: center;
+    margin-bottom: 0.16rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.erp-prod-precificacao__box--custo .erp-prod-precificacao__row--dual,
+.erp-prod-precificacao__box--custo .erp-prod-precificacao__row--compra {
+    /* label | % | R$ ? cabe atï¿½ 10.000,00 */
+    grid-template-columns: 6.6rem calc(1.05rem + 10.5ch) calc(1.05rem + 10.5ch);
+    justify-content: start;
+    column-gap: 0.18rem;
+}
+
+/* Varejo / Atacado / Especial: mesmas 2 colunas % | R$, cabendo no fieldset */
+.erp-prod-precificacao__niveis .erp-prod-precificacao__row--dual,
+.erp-prod-precificacao__niveis .erp-prod-precificacao__row--compra {
+    grid-template-columns: minmax(0, 3.55rem) minmax(0, 1fr) minmax(0, 1fr);
+    justify-content: stretch;
+    column-gap: 0.14rem;
+}
+
+.erp-prod-precificacao__niveis .erp-prod-precificacao__row label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 0.1rem;
+    font-size: 0.58rem;
+}
+
+.erp-prod-precificacao__niveis .erp-pcad-form__input {
+    min-height: 1.35rem;
+    font-size: 0.6rem;
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.06rem;
+    padding-bottom: 0.06rem;
+}
+
+.erp-prod-precificacao__span-rs {
+    grid-column: 3;
+}
+
+.erp-prod-precificacao__span-valores {
+    grid-column: 2 / -1;
+    min-width: 0;
+}
+
+.erp-prod-precificacao__cell {
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.erp-prod-precificacao__box--custo .erp-pcad-form__input {
+    min-height: 1.35rem;
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.06rem;
+    padding-bottom: 0.06rem;
+}
+
+.erp-prod-precificacao__cell .erp-pcad-form__input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-left: 1.05rem !important;
+    padding-right: 0.16rem !important;
+    text-align: right;
+}
+
+.erp-prod-precificacao__unit {
+    position: absolute;
+    left: 0.14rem;
+    right: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.5rem;
+    font-weight: 800;
+    color: #64748b;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.erp-prod-precificacao__row label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #334155;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-prod-precificacao__box--custo .erp-prod-precificacao__row label {
+    font-size: calc(0.6rem + 0.1mm);
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 0.2rem;
+    box-sizing: border-box;
+}
+
+.erp-prod-precificacao__row--destaque label,
+.erp-prod-precificacao__row--praticado label {
+    font-weight: 800;
+}
+
+.erp-prod-precificacao__input--custo {
+    font-weight: 400 !important;
+    border-color: #b45309 !important;
+    background: #fff7ed !important;
+}
+
+.erp-prod-precificacao__row--praticado .erp-pcad-form__input {
+    font-weight: 800 !important;
+}
+
+.erp-prod-precificacao__niveis {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.erp-prod-precificacao__niveis-head {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.erp-prod-precificacao__btn-padrao {
+    font-size: 0.68rem !important;
+}
+
+/* Rodapé da precificação — botão principal visível (vence o fundo branco do lookup) */
+.erp-prod-precificacao-modal .erp-prod-precificacao__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem 0.6rem;
+    background: #eef2f7;
+    border-top: 1px solid #c7d5e8;
+}
+
+.erp-prod-precificacao-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-prod-precificacao__btn,
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.4rem !important;
+    min-width: 9.25rem !important;
+    height: 2.45rem !important;
+    padding: 0 1rem !important;
+    border-radius: 8px !important;
+    border: 1px solid #86efac !important;
+    box-shadow: 0 1px 3px rgb(15 23 42 / 12%) !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    transform: none !important;
+    transition: filter 0.12s ease, box-shadow 0.12s ease !important;
+}
+
+.erp-prod-precificacao-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-prod-precificacao__btn--aplicar,
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn--aplicar {
+    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
+    border-color: #86efac !important;
+    color: #fff !important;
+}
+
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn .erp-pcad-actions__icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    margin: 0 !important;
+    border-radius: 6px !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: #fff !important;
+    font-size: 0.72rem !important;
+    line-height: 1 !important;
+}
+
+.erp-prod-precificacao-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-prod-precificacao__btn .erp-pcad-actions__label,
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn .erp-pcad-actions__label {
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    text-align: left !important;
+    color: #fff !important;
+    text-shadow: none;
+}
+
+.erp-prod-precificacao-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-prod-precificacao__btn:hover,
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn:hover {
+    filter: brightness(1.06);
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%) !important;
+    border-color: #86efac !important;
+    transform: none !important;
+}
+
+.erp-prod-precificacao-modal .erp-prod-precificacao__btn:active {
+    filter: brightness(0.96);
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 18%) !important;
+}
+
+.erp-prod-precificacao__niveis-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__toolbar {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__mini {
+    min-width: 0 !important;
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.78rem !important;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-height: 12.5rem;
+    overflow: auto;
+    padding: 0.4rem;
+    border: 1px solid #f0c36a;
+    border-radius: 10px;
+    background: #fffbeb;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.35rem 0.4rem;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__item:hover {
+    background: #fef3c7;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__item input {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+
+.erp-aviso-modal__extra .erp-prod-replica-precos__empty {
+    margin: 0.35rem;
+    font-size: 0.8rem;
+    color: #92400e;
+    text-align: center;
+}
+
+@media (max-width: 980px) {
+    .erp-prod-precificacao__layout {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-prod-precificacao__niveis-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Consulta CClassTrib: estilos em erp-cclass-trib-modal.css */

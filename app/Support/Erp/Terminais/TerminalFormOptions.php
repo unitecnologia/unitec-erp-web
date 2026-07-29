@@ -13,12 +13,65 @@ final class TerminalFormOptions
     }
 
     /**
+     * Portas fixas (como no Delphi) + impressoras Windows entram como RAW:Nome.
+     *
      * @return list<string>
      */
-    public static function portasImpressora(): array
+    public static function portasFisicas(): array
     {
-        return ['COM1', 'COM2', 'COM3', 'COM4', 'LPT1', 'USB', 'RAW:IMPRESSORA'];
+        return [
+            'COM1', 'COM2', 'COM3', 'COM4',
+            'LPT1', 'USB',
+            '/Dev/ttyS0', '/Dev/ttyS1',
+            '/Dev/USB0', '/Dev/USB1',
+        ];
     }
+
+    /**
+     * @param  list<string>  $windowsPrinters  Nomes das impressoras instaladas no Windows
+     * @return list<string>
+     */
+    public static function portasImpressora(array $windowsPrinters = []): array
+    {
+        $raw = [];
+
+        foreach ($windowsPrinters as $name) {
+            $name = trim((string) $name);
+            if ($name === '') {
+                continue;
+            }
+            $raw[] = 'RAW:'.$name;
+        }
+
+        $raw = array_values(array_unique($raw));
+        sort($raw, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return array_values(array_unique([...$raw, ...self::portasFisicas()]));
+    }
+
+    /** Portas + impressoras Windows detectadas neste PC (RAW:Nome). */
+    public static function portasComImpressorasWindows(): array
+    {
+        return self::portasImpressora(WindowsPrinterEnumerator::names());
+    }
+
+    /** Extrai o nome Windows de um caminho RAW:POS-80C → POS-80C */
+    public static function windowsPrinterFromPorta(?string $porta): ?string
+    {
+        $porta = trim((string) $porta);
+        if ($porta === '') {
+            return null;
+        }
+
+        if (preg_match('/^RAW:(.+)$/iu', $porta, $m) !== 1) {
+            return null;
+        }
+
+        $name = trim($m[1]);
+
+        return $name !== '' ? $name : null;
+    }
+
 
     /**
      * @return array<string, string>

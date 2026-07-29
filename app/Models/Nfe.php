@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'chave',
     'chave_nfe_referenciada',
     'protocolo',
+    'protocolo_cancelamento',
     'cnf',
     'xml',
     'xml_cancelamento',
@@ -154,7 +155,7 @@ class Nfe extends Model
     public static function nextNumero(?int $empresaId = null): string
     {
         if ($empresaId) {
-            return (string) VendasParametro::forEmpresa($empresaId)->peekNumero();
+            return (string) VendasParametro::forEmpresa($empresaId)->peekNumeroNfe();
         }
 
         $max = static::query()
@@ -180,6 +181,11 @@ class Nfe extends Model
         return $this->belongsTo(Person::class, 'cliente_id');
     }
 
+    public function transportadora(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'transportadora_id');
+    }
+
     public function venda(): BelongsTo
     {
         return $this->belongsTo(Venda::class);
@@ -198,6 +204,16 @@ class Nfe extends Model
     public function referencias(): HasMany
     {
         return $this->hasMany(NfeReferencia::class);
+    }
+
+    public function cartasCorrecao(): HasMany
+    {
+        return $this->hasMany(NfeCartaCorrecao::class)->orderBy('sequencia');
+    }
+
+    public function eventos(): HasMany
+    {
+        return $this->hasMany(NfeEvento::class)->orderBy('created_at');
     }
 
     protected function casts(): array

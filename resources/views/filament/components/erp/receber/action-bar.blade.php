@@ -1,9 +1,9 @@
 <div class="erp-receber-actions">
-    <button type="button" wire:click="createConta" class="erp-receber-actions__btn" data-erp-key="F2">
+    <button type="button" class="erp-receber-actions__btn" disabled title="Em breve">
         <span class="erp-receber-actions__icon erp-receber-actions__icon--new">+</span>
         <span class="erp-receber-actions__label"><kbd>F2</kbd> | Novo</span>
     </button>
-    <button type="button" wire:click="editConta" class="erp-receber-actions__btn" data-erp-key="F3">
+    <button type="button" class="erp-receber-actions__btn" disabled title="Em breve">
         <span class="erp-receber-actions__icon">✎</span>
         <span class="erp-receber-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
@@ -18,7 +18,13 @@
         <span class="erp-receber-actions__icon erp-receber-actions__icon--cancel">✕</span>
         <span class="erp-receber-actions__label"><kbd>Del</kbd> | Excluir</span>
     </button>
-    <button type="button" wire:click="modulePending('Imprimir')" class="erp-receber-actions__btn" data-erp-key="F4">
+    <button
+        type="button"
+        wire:click="printContasReceber"
+        class="erp-receber-actions__btn"
+        data-erp-key="F4"
+        title="Relatório de cartões"
+    >
         <span class="erp-receber-actions__icon">🖨</span>
         <span class="erp-receber-actions__label"><kbd>F4</kbd> | Imprimir</span>
     </button>

@@ -71,9 +71,7 @@ trait ManagesPdvAutorizacao
             return;
         }
 
-        $this->estornarVenda($vendaId);
-        $this->openPdvModal('consulta_venda');
-        $this->dispatch('erp-pdv-focus-consulta-venda');
+        $this->openEstornoVendaModal($vendaId);
     }
 
     public function cancelPdvAutorizacao(): void

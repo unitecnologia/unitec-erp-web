@@ -75,9 +75,19 @@ trait ManagesEmpresaLookup
             ...$mapped,
         ];
 
+        $razao = trim((string) ($this->data['razao_social'] ?? ''));
         $fantasia = trim((string) ($this->data['fantasia'] ?? ''));
+
+        // CNPJ costuma vir sem fantasia — espelha a razão para não falhar no gravar (*).
+        if ($fantasia === '' && $razao !== '') {
+            $this->data['fantasia'] = $razao;
+            $fantasia = $razao;
+        }
+
         if ($fantasia !== '') {
             $this->data['nome'] = $fantasia;
+        } elseif ($razao !== '') {
+            $this->data['nome'] = $razao;
         }
 
         $this->form->fill($this->data);

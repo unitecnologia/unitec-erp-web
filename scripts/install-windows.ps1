@@ -1,7 +1,7 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Instalador Unitec ERP Web — Windows + MySQL (runtime embutido).
+    Instalador Unitec ERP Web - Windows + MySQL (runtime embutido).
 
 .PARAMETER Unattended
     Modo silencioso (Setup.exe). Usa valores padrao sem perguntas.
@@ -75,7 +75,7 @@ Invoke-Step 'Verificando programas necessarios' {
 
     if ($missing.Count -gt 0) {
         Write-Err 'Faltam programas obrigatorios:'
-        $missing | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+        $missing | ForEach-Object { Write-Host " - $_" -ForegroundColor Red }
         Write-Host ''
         Write-Host 'Use o Instalador Sistema Facil.exe ou reinstale o Unitec ERP.'
         throw ('Faltam programas obrigatorios: {0}' -f ($missing -join '; '))
@@ -124,11 +124,11 @@ if (-not $Unattended) {
 
 if (Test-Path '.env') {
     if ($Unattended -and -not ($FromSetup -and $isServerInstall)) {
-        Write-Ok 'Arquivo .env existente — mantido (atualizacao).'
+        Write-Ok 'Arquivo .env existente - mantido (atualizacao).'
         $isFreshInstall = $false
         Sync-UnitecEnvDatabasePassword -AppPath $AppPath -Password $DbPassword | Out-Null
     } elseif ($Unattended -and $FromSetup -and $isServerInstall) {
-        Write-Ok 'Instalacao assistida no servidor — reconfigurando ambiente e banco.'
+        Write-Ok 'Instalacao assistida no servidor - reconfigurando ambiente e banco.'
         $isFreshInstall = $true
     } else {
         Write-Warn 'Ja existe um arquivo .env nesta pasta.'
@@ -207,7 +207,7 @@ Invoke-Step 'Criando/atualizando tabelas no banco (migrate)' {
     }
 
     if ($freshMigrate -and -not $isFreshInstall) {
-        Write-Warn 'Instalacao incompleta detectada — recriando tabelas do zero (migrate:fresh).'
+        Write-Warn 'Instalacao incompleta detectada - recriando tabelas do zero (migrate:fresh).'
     }
 
     if ($FromSetup -and $isServerInstall -and $freshMigrate) {
@@ -225,7 +225,7 @@ if (-not $runSeed) {
 
 if ($runSeed) {
     if (-not $isFreshInstall) {
-        Write-Warn 'Instalacao incompleta detectada — executando dados iniciais (seed).'
+        Write-Warn 'Instalacao incompleta detectada - executando dados iniciais (seed).'
     }
 
     Invoke-Step 'Dados iniciais (empresa e usuario)' {
@@ -233,7 +233,7 @@ if ($runSeed) {
         Write-Ok 'Seed concluido.'
     }
 } else {
-    Write-Ok 'Instalacao existente — seed ignorado.'
+    Write-Ok 'Instalacao existente - seed ignorado.'
 }
 
 if (-not $useOfflineBundle) {
@@ -277,7 +277,7 @@ Write-Host 'Acesse o sistema em:' -ForegroundColor Green
 Write-Host "  $AppUrl" -ForegroundColor White
 Write-Host ''
 Write-Host 'Login inicial:' -ForegroundColor Green
-Write-Host '  E-mail: usuario@unitecnologia.local'
+Write-Host '  Usuario: USUARIO'
 Write-Host '  Senha:  01'
 Write-Host ''
 Write-Warn 'Troque a senha apos o primeiro acesso.'

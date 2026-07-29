@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\NfceResource\Pages;
 use App\Models\PdvVendaNfce;
 use BackedEnum;
@@ -9,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
 
 class NfceResource extends Resource
@@ -27,10 +29,19 @@ class NfceResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('nfce.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
+                ViewColumn::make('transmitir_flag')
+                    ->label('')
+                    ->view('filament.components.erp.nfce.transmit-select-cell')
+                    ->alignCenter(),
                 TextColumn::make('serie')
                     ->label('>>Série')
                     ->alignCenter()
@@ -52,11 +63,13 @@ class NfceResource extends Resource
                     ->label('Chave')
                     ->placeholder('—')
                     ->wrap(false)
+                    ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('protocolo')
                     ->label('Protocolo')
                     ->placeholder('—')
                     ->alignCenter()
+                    ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.cpf_nota')
                     ->label('CPF')
@@ -91,11 +104,11 @@ class NfceResource extends Resource
                         ? (string) $state
                         : (string) ($record->pdvVenda?->vendedor_nome ?: '—'))
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('pdvVenda.total')
+                ViewColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
+                    ->view('filament.components.erp.nfce.columns.total')
                     ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
+                    ->disabledClick(),
                 TextColumn::make('pdvVenda.venda.numero')
                     ->label('Nº Pedido')
                     ->alignCenter()

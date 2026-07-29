@@ -4,7 +4,11 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Models\PdvVenda;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Pdv\PdvEstornoMotivo;
+use App\Support\Erp\Vendas\EstornarVendaService;
+use DomainException;
 use Filament\Notifications\Notification;
+use Unitec\FiscalEngine\Exception\FiscalEngineException;
 
 trait ManagesPdvConsultaVenda
 {
@@ -20,6 +24,10 @@ trait ManagesPdvConsultaVenda
 
     public ?int $consultaVendaEstornoId = null;
 
+    public ?string $consultaVendaEstornoNumero = null;
+
+    public string $consultaVendaMotivoEstorno = '';
+
     public function openConsultaVendaModal(): void
     {
         if (! $this->caixaAberto) {
@@ -29,8 +37,11 @@ trait ManagesPdvConsultaVenda
         }
 
         $this->consultaVendaSearch = '';
+        $this->selectedConsultaVendaIndex = null;
         $this->consultaVendaDetalhe = null;
         $this->consultaVendaEstornoId = null;
+        $this->consultaVendaEstornoNumero = null;
+        $this->consultaVendaMotivoEstorno = '';
         $this->refreshConsultaVendaResults();
         $this->openPdvModal('consulta_venda');
         $this->dispatch('erp-pdv-focus-consulta-venda');
@@ -76,6 +87,8 @@ trait ManagesPdvConsultaVenda
             });
         }
 
+        $previousVendaId = $this->resolveConsultaVendaMarkedId();
+
         $this->consultaVendaResults = $query
             ->limit(50)
             ->get()
@@ -89,16 +102,45 @@ trait ManagesPdvConsultaVenda
             ->values()
             ->all();
 
-        $this->selectedConsultaVendaIndex = $this->consultaVendaResults === [] ? null : 0;
+        $this->selectedConsultaVendaIndex = null;
+
+        if ($previousVendaId > 0) {
+            foreach ($this->consultaVendaResults as $idx => $row) {
+                if ((int) ($row['venda_id'] ?? 0) === $previousVendaId) {
+                    $this->selectedConsultaVendaIndex = $idx;
+                    break;
+                }
+            }
+        }
+
         $this->loadConsultaVendaDetalhe();
     }
 
     public function selectConsultaVendaRow(int $index): void
     {
-        if (isset($this->consultaVendaResults[$index])) {
-            $this->selectedConsultaVendaIndex = $index;
-            $this->loadConsultaVendaDetalhe();
+        $index = (int) $index;
+
+        if (! isset($this->consultaVendaResults[$index])) {
+            return;
         }
+
+        $this->selectedConsultaVendaIndex = $index;
+        $this->loadConsultaVendaDetalhe();
+    }
+
+    public function isConsultaVendaRowSelected(int $index): bool
+    {
+        return $this->selectedConsultaVendaIndex !== null
+            && (int) $this->selectedConsultaVendaIndex === $index;
+    }
+
+    public function toggleMarkCurrentConsultaVendaRow(): void
+    {
+        if ($this->selectedConsultaVendaIndex === null) {
+            return;
+        }
+
+        $this->selectConsultaVendaRow($this->selectedConsultaVendaIndex);
     }
 
     public function moveConsultaVendaSelection(int $delta): void
@@ -108,9 +150,19 @@ trait ManagesPdvConsultaVenda
         }
 
         $count = count($this->consultaVendaResults);
-        $index = ($this->selectedConsultaVendaIndex ?? 0) + $delta;
-        $this->selectedConsultaVendaIndex = max(0, min($count - 1, $index));
-        $this->loadConsultaVendaDetalhe();
+
+        if ($this->selectedConsultaVendaIndex === null) {
+            if ($delta > 0) {
+                $this->selectConsultaVendaRow(0);
+            } elseif ($delta < 0) {
+                $this->selectConsultaVendaRow($count - 1);
+            }
+
+            return;
+        }
+
+        $index = $this->selectedConsultaVendaIndex + $delta;
+        $this->selectConsultaVendaRow(max(0, min($count - 1, $index)));
     }
 
     protected function loadConsultaVendaDetalhe(): void
@@ -169,10 +221,10 @@ trait ManagesPdvConsultaVenda
 
     public function requestEstornarConsultaVenda(): void
     {
-        $vendaId = (int) ($this->consultaVendaDetalhe['venda_id'] ?? 0);
+        $vendaId = $this->resolveConsultaVendaMarkedId();
 
         if ($vendaId <= 0) {
-            $this->notifyPdvError('Selecione uma venda.');
+            $this->notifyPdvError('Selecione uma venda no grid para estornar.');
 
             return;
         }
@@ -187,17 +239,74 @@ trait ManagesPdvConsultaVenda
             return;
         }
 
-        $this->estornarVenda($vendaId);
+        $this->openEstornoVendaModal($vendaId);
     }
 
-    public function estornarVenda(int $vendaId): void
+    public function openEstornoVendaModal(int $vendaId): void
     {
+        $this->consultaVendaEstornoId = $vendaId;
+        $this->consultaVendaMotivoEstorno = $this->pdvConfig()->motivoEstornoAutomatico()
+            ? PdvEstornoMotivo::MOTIVO_AUTOMATICO
+            : '';
+        $this->consultaVendaEstornoNumero = null;
+
+        foreach ($this->consultaVendaResults as $row) {
+            if ((int) ($row['venda_id'] ?? 0) === $vendaId) {
+                $this->consultaVendaEstornoNumero = (string) ($row['numero'] ?? '');
+                break;
+            }
+        }
+
+        $this->openPdvModal('estorno_venda');
+        $this->dispatch('erp-pdv-focus-estorno-venda');
+    }
+
+    public function cancelEstornoVenda(): void
+    {
+        $this->consultaVendaMotivoEstorno = '';
+        $this->consultaVendaEstornoId = null;
+        $this->consultaVendaEstornoNumero = null;
+        $this->openPdvModal('consulta_venda');
+        $this->dispatch('erp-pdv-focus-consulta-venda');
+    }
+
+    public function confirmEstornarConsultaVenda(): void
+    {
+        $vendaId = (int) ($this->consultaVendaEstornoId ?? 0);
+        $motivo = PdvEstornoMotivo::normalize($this->consultaVendaMotivoEstorno);
+        $erro = PdvEstornoMotivo::validate($motivo);
+
+        if ($erro !== null) {
+            $this->notifyPdvError($erro);
+
+            return;
+        }
+
+        if ($vendaId <= 0) {
+            $this->notifyPdvError('Venda não selecionada para estorno.');
+
+            return;
+        }
+
+        $this->estornarVenda($vendaId, $motivo);
+    }
+
+    public function estornarVenda(int $vendaId, string $motivo): void
+    {
+        $motivo = PdvEstornoMotivo::normalize($motivo);
+        $erro = PdvEstornoMotivo::validate($motivo);
+
+        if ($erro !== null) {
+            $this->notifyPdvError($erro);
+
+            return;
+        }
         if (! $this->caixaAberto || ! $this->caixaSessaoId) {
             return;
         }
 
         $venda = PdvVenda::query()
-            ->with(['itens', 'pagamentos'])
+            ->with(['itens', 'pagamentos', 'nfce'])
             ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
             ->where('situacao', '!=', 'C')
             ->find($vendaId);
@@ -208,65 +317,45 @@ trait ManagesPdvConsultaVenda
             return;
         }
 
-        if ($venda->fiscal && $this->pdvConfig()->bloquearCancelamentoDocFiscal()) {
-            $this->notifyPdvError('Venda com documento fiscal não pode ser estornada pelo PDV web.');
+        try {
+            $result = (new EstornarVendaService())->fromPdvVenda(
+                $venda,
+                $motivo,
+                EstornarVendaService::ORIGEM_PDV,
+                $this->pdvConfig()->empresa(),
+                (int) $this->caixaSessaoId,
+                $this->pdvConfig()->bloquearCancelamentoDocFiscal(),
+            );
+        } catch (DomainException $exception) {
+            $this->notifyPdvError($exception->getMessage());
+
+            return;
+        } catch (FiscalEngineException $exception) {
+            $this->notifyPdvFiscalError($exception);
 
             return;
         }
 
-        $stockService = new \App\Support\Erp\Pdv\PdvStockService();
-        $financeiroService = new \App\Support\Erp\Pdv\PdvVendaFinanceiroService();
-        $caixaMovimentoService = new \App\Support\Erp\Pdv\PdvCaixaMovimentoService($this->pdvConfig());
-        $retaguardaMirrorService = new \App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService();
+        $this->clearPdvAutorizacao();
+        $this->refreshConsultaVendaResults();
 
-        try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($venda, $stockService, $financeiroService, $caixaMovimentoService, $retaguardaMirrorService): void {
-                $erroFinanceiro = $financeiroService->estornarContasReceber($venda);
+        $numeroVenda = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
 
-                if ($erroFinanceiro !== null) {
-                    throw new \DomainException($erroFinanceiro);
-                }
-
-                foreach ($venda->itens as $item) {
-                    if (! $item->product_id) {
-                        continue;
-                    }
-
-                    $product = \App\Models\Product::query()->find($item->product_id);
-
-                    if ($product) {
-                        $stockService->estornoItemVenda(
-                            $product,
-                            (float) $item->quantidade,
-                            $item->product_grade_id ? (int) $item->product_grade_id : null,
-                            $item->product_serial_id ? (int) $item->product_serial_id : null,
-                        );
-                    }
-                }
-
-                $caixaMovimentoService->registrarSaidasEstornoFromModel(
-                    $this->caixaSessaoId,
-                    $venda,
-                    $venda->pagamentos,
-                );
-
-                $retaguardaMirrorService->estornar($venda);
-
-                $venda->update(['situacao' => 'C']);
-            });
-        } catch (\DomainException $exception) {
-            $this->notifyPdvError($exception->getMessage());
+        if ($result->protocoloCancelamento !== null) {
+            $this->showPdvFiscalOverlaySucessoCancelamento($vendaId, $numeroVenda, $result->protocoloCancelamento);
 
             return;
         }
 
         $this->consultaVendaEstornoId = null;
-        $this->clearPdvAutorizacao();
-        $this->refreshConsultaVendaResults();
+        $this->consultaVendaEstornoNumero = null;
+        $this->consultaVendaMotivoEstorno = '';
+        $this->openPdvModal('consulta_venda');
+        $this->dispatch('erp-pdv-focus-consulta-venda');
 
         Notification::make()
             ->title('Venda estornada.')
-            ->body('Venda #' . str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT))
+            ->body('Venda #' . $numeroVenda)
             ->success()
             ->send();
     }
@@ -275,5 +364,16 @@ trait ManagesPdvConsultaVenda
     {
         $this->closePdvModal();
         $this->dispatch('erp-pdv-focus-search');
+    }
+
+    protected function resolveConsultaVendaMarkedId(): int
+    {
+        $index = $this->selectedConsultaVendaIndex;
+
+        if ($index === null || ! isset($this->consultaVendaResults[$index])) {
+            return 0;
+        }
+
+        return (int) ($this->consultaVendaResults[$index]['venda_id'] ?? 0);
     }
 }

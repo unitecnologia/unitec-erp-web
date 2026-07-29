@@ -152,8 +152,17 @@ trait ManagesPdvFinalizarTotais
         }
 
         $url = route('erp.reports.pdv-cupom', ['venda' => $vendaId, 'auto' => 1]);
-        $payload = json_encode(['url' => $url, 'copias' => max(1, $copias)], JSON_THROW_ON_ERROR);
-        $this->js('window.ErpPdvPrint?.openCupom(' . $payload . ')');
+        $payload = json_encode(
+            PdvNfceCupomPrinter::printPayload($url, $copias, $vendaId),
+            JSON_THROW_ON_ERROR,
+        );
+        $this->js('(function (payload) {
+            if (window.ErpPrint?.openCupom) {
+                window.ErpPrint.openCupom(payload);
+                return;
+            }
+            window.ErpPdvPrint?.openCupom(payload);
+        })(' . $payload . ')');
     }
 
     protected function imprimirNfceCupomPosVenda(int $vendaId, int $copias = 1): void

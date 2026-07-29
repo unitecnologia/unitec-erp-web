@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Monta o pacote offline e compila Instalador Sistema Facil.exe (Inno Setup).
@@ -71,7 +71,7 @@ function Install-InnoSetupCompiler {
         return $null
     }
 
-    Write-Host '>> Inno Setup 6 nao encontrado — instalando via winget...' -ForegroundColor Yellow
+    Write-Host '>> Inno Setup 6 nao encontrado - instalando via winget...' -ForegroundColor Yellow
     & winget install --id JRSoftware.InnoSetup --accept-package-agreements --accept-source-agreements --silent
     if ($LASTEXITCODE -ne 0) {
         return $null
@@ -206,9 +206,9 @@ if (-not (Test-Path $VcRedistAsset)) {
 
 if (-not (Test-Path $HeidiSqlAsset)) {
     if ($SkipRuntimeDownload) {
-        Write-Host '>> AVISO: HeidiSQL Setup ausente — coloque HeidiSQL_*_Setup.exe em installer\assets\ (opcional no ERP).' -ForegroundColor Yellow
+        Write-Host '>> AVISO: HeidiSQL Setup ausente - coloque HeidiSQL_*_Setup.exe em installer\assets\ (opcional no ERP).' -ForegroundColor Yellow
     } else {
-        Write-Host '>> AVISO: HeidiSQL Setup ausente — baixe em https://www.heidisql.com/download.php' -ForegroundColor Yellow
+        Write-Host '>> AVISO: HeidiSQL Setup ausente - baixe em https://www.heidisql.com/download.php' -ForegroundColor Yellow
         Write-Host '>>         Salve em installer\assets\HeidiSQL_12.18.0.7304_Setup.exe (opcional).' -ForegroundColor Yellow
     }
 } else {
@@ -252,7 +252,7 @@ if ($SkipCompile) {
     $stagingParent = Split-Path $StagingDir
     $innoReadme = Join-Path $stagingParent 'LEIA-ME-INNO.txt'
     $readme = @"
-Unitec ERP — staging pronto para Inno Setup
+Unitec ERP - staging pronto para Inno Setup
 Gerado em: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
 Pasta do staging (Source no .iss):
@@ -276,7 +276,7 @@ Requisitos em installer\assets\:
   mariadb-win.zip, php-8.4-win.zip, vc_redist.x64.exe, cacert.pem
 Opcionais: HeidiSQL_*_Setup.exe, unitec-erp.ico (icone da marca)
 
-O staging NAO inclui tools\ — MariaDB e PHP sao extraidos na instalacao do cliente.
+O staging NAO inclui tools\ - MariaDB e PHP sao extraidos na instalacao do cliente.
 "@
     Set-Content -Path $innoReadme -Value $readme -Encoding UTF8
     Write-Host ">> Instrucoes Inno: $innoReadme" -ForegroundColor Green

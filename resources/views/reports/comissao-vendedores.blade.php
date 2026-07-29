@@ -14,7 +14,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8">
-    <title>Visualizar — Comissão de Vendedores</title>
+            <title>Visualizar — Comissão de Operadores</title>
     <style>
         @page { margin: 10mm; size: A4 landscape; }
         * { box-sizing: border-box; }
@@ -69,7 +69,7 @@
                         <input id="ate" type="date" name="ate" value="{{ $filters['ate'] ?? '' }}">
                     </div>
                     <div class="viewer__field">
-                        <label for="vendedor">Vendedor</label>
+                        <label for="vendedor">Operador</label>
                         <select id="vendedor" name="vendedor">
                             @foreach ($filterOptions['vendedor'] as $value => $label)
                                 <option value="{{ $value }}" @selected((string) ($filters['vendedor'] ?? 'todos') === (string) $value)>{{ $label }}</option>

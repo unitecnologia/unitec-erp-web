@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Ajusta o .env para desenvolvimento nativo no Windows (PHP + MariaDB em tools\).

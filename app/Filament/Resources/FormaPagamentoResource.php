@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\FormaPagamentoResource\Pages;
 use App\Models\FormaPagamento;
 use BackedEnum;
@@ -26,6 +27,11 @@ class FormaPagamentoResource extends Resource
     protected static ?string $recordTitleAttribute = 'descricao';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('formas_pagamento.access');
+    }
 
     public static function table(Table $table): Table
     {

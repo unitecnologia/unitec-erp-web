@@ -103,6 +103,21 @@ class ErpUpdateService
         self::writeStatus('idle', 'Aguardando.', 0);
     }
 
+    public static function ensureFrameworkStorageDirectories(): void
+    {
+        foreach ([
+            'framework/sessions',
+            'framework/cache',
+            'framework/cache/data',
+            'framework/views',
+            'framework/testing',
+            'logs',
+            'app/private',
+        ] as $relative) {
+            File::ensureDirectoryExists(storage_path($relative));
+        }
+    }
+
     public static function resetStatus(): void
     {
         self::writeStatus(
@@ -129,6 +144,7 @@ class ErpUpdateService
         }
 
         File::put($lockPath, (string) time());
+        self::ensureFrameworkStorageDirectories();
 
         self::writeStatus(
             'starting',
@@ -183,7 +199,7 @@ class ErpUpdateService
                 'migrating',
                 'Atualizando banco de dados',
                 82,
-                'Executando migrations pendentes',
+                'Executando migrations pendentes — pode demorar vários minutos. Não feche.',
                 'php artisan migrate --force'
             );
             $this->runMigrations($appPath);
@@ -219,15 +235,30 @@ class ErpUpdateService
 
     private function resolveUpdateDownloadUrl(): string
     {
-        $url = trim((string) config('unitec.update_download_url', ''));
+        try {
+            // Mesma ordem da tela Empresa → parâmetros (DB → .env → GitHub).
+            $url = trim(ErpSystemConfig::updateDownloadUrl());
+        } catch (\Throwable) {
+            $url = trim((string) config('unitec.update_download_url', ''));
+        }
 
-        if ($url === '') {
-            $url = rtrim((string) config('unitec.pagamento_url'), '/')
-                .'/updates/'
-                .urlencode((string) config('unitec.update_zip_name', 'Unitec-ERP-Update.zip'));
+        $github = 'https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip';
+
+        if ($url === '' || $this->isDeadUpdateHost($url)) {
+            return $github;
         }
 
         return $url;
+    }
+
+    private function isDeadUpdateHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return in_array($host, [
+            'unitecnologiasistemas.com.br',
+            'www.unitecnologiasistemas.com.br',
+        ], true);
     }
 
     private function downloadPackage(string $destination, ?string $url = null): void
@@ -361,10 +392,18 @@ class ErpUpdateService
         }
 
         $content = (string) file_get_contents($iniPath);
+        $enabledPattern = '/^\s*extension\s*=\s*'.preg_quote($extension, '/').'\b/mi';
+        $anyPattern = '/^\s*;?\s*extension\s*=\s*'.preg_quote($extension, '/').'\b.*$/mi';
         $replacement = 'extension='.$extension;
 
-        if (preg_match('/^\s*'.preg_quote($extension, '/').'\s*=/m', $content)) {
-            $content = (string) preg_replace('/^\s*;?\s*extension\s*=\s*'.preg_quote($extension, '/').'.*$/m', $replacement, $content);
+        // Já ativo: não mexe (evita "Module zip is already loaded").
+        if (preg_match($enabledPattern, $content)) {
+            return;
+        }
+
+        if (preg_match($anyPattern, $content)) {
+            $content = (string) preg_replace($anyPattern, $replacement, $content, 1);
+            $content = (string) preg_replace($anyPattern, '', $content);
         } else {
             $content .= PHP_EOL.$replacement.PHP_EOL;
         }
@@ -625,7 +664,15 @@ class ErpUpdateService
         chdir($appPath);
 
         try {
+            $this->log($appPath, 'Iniciando php artisan migrate --force');
             Artisan::call('migrate', ['--force' => true]);
+            $output = trim((string) Artisan::output());
+            $this->log(
+                $appPath,
+                $output !== ''
+                    ? 'Migrate finalizado: '.$output
+                    : 'Migrate finalizado (sem pendencias ou sem saida).'
+            );
         } finally {
             if ($previous !== false) {
                 chdir($previous);

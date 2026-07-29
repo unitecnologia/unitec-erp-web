@@ -9,6 +9,9 @@ const ERP_PRODUCT_LOOKUP_FIELDS = {
     'pprod-ncm-desc': 'ncm',
 };
 
+/** Próximo campo a focar após morph do Livewire (Enter na precificação). */
+let erpPrecifPendingFocusId = null;
+
 document.addEventListener('livewire:init', () => {
     initErpProdutosForm();
 
@@ -32,6 +35,7 @@ document.addEventListener('livewire:init', () => {
         }, 50);
     });
 
+    // Foco da precificação: só erp-precif-enter-v5.js (evita double select).
     window.Livewire.hook('morph.updated', () => {
         const page = document.querySelector('.erp-produtos-form-page');
 
@@ -40,6 +44,16 @@ document.addEventListener('livewire:init', () => {
         }
     });
 });
+
+function focusPrecificacaoInputById(fieldId) {
+    if (! fieldId) {
+        return;
+    }
+
+    if (typeof window.__erpPrecifFocusById === 'function') {
+        window.__erpPrecifFocusById(fieldId, { select: true });
+    }
+}
 
 function initErpProdutosForm() {
     const page = document.querySelector('.erp-produtos-form-page');
@@ -51,6 +65,7 @@ function initErpProdutosForm() {
     initErpProdutosFormInputs(page);
     bindErpProdutosFormKeys();
     bindErpProdutosSaveButtons(page);
+    bindErpProdutosLocFields(page);
     bindSearchCodigoBarras(page);
     bindProductCadastroLookup(page);
 }
@@ -77,7 +92,11 @@ function commitErpProdutosFormInputs(page) {
                 input.value = window.ErpMasks.finalizeMaskValue(input);
             }
 
-            window.ErpMasks.apply(input, { allowEmptySync: true, live: true });
+            window.ErpMasks.apply(input, {
+                allowEmptySync: true,
+                live: true,
+                thousands: window.ErpMasks.isBrDecimalMask(input.dataset.mask),
+            });
         }
     });
 
@@ -99,6 +118,92 @@ function getErpProdutosComponent() {
     return wireId ? window.Livewire.find(wireId) : null;
 }
 
+function sanitizeErpProdutosLocInput(input) {
+    if (! input) {
+        return '';
+    }
+
+    const sanitized = String(input.value ?? '').replace(/\D/g, '').slice(0, 2);
+    input.value = sanitized;
+
+    return sanitized;
+}
+
+function formatErpProdutosLocalizacao(loc) {
+    const segments = [];
+
+    const add = (label, value) => {
+        const digits = String(value ?? '').replace(/\D/g, '').slice(0, 2);
+
+        if (digits && parseInt(digits, 10) > 0) {
+            segments.push(`${label}:${digits}`);
+        }
+    };
+
+    add('C', loc.corredor);
+    add('M', loc.modulo);
+    add('P', loc.prateleira);
+    add('G', loc.gaveta);
+
+    return segments.join('/');
+}
+
+function readErpProdutosLocValues() {
+    return {
+        corredor: sanitizeErpProdutosLocInput(document.getElementById('pprod-loc-corredor')),
+        modulo: sanitizeErpProdutosLocInput(document.getElementById('pprod-loc-modulo')),
+        prateleira: sanitizeErpProdutosLocInput(document.getElementById('pprod-loc-prateleira')),
+        gaveta: sanitizeErpProdutosLocInput(document.getElementById('pprod-loc-gaveta')),
+    };
+}
+
+window.pushErpProdutosLocToLivewire = async function pushErpProdutosLocToLivewire() {
+    // Só sincroniza se os campos estiverem na tela (aba Localizações).
+    if (! document.querySelector('[data-erp-loc-fields]')) {
+        return;
+    }
+
+    const component = getErpProdutosComponent();
+
+    if (! component) {
+        return;
+    }
+
+    const loc = readErpProdutosLocValues();
+
+    await component.call(
+        'applyLocalizacaoInputParts',
+        loc.corredor,
+        loc.modulo,
+        loc.prateleira,
+        loc.gaveta,
+    );
+};
+
+function bindErpProdutosLocFields(page) {
+    if (page.dataset.erpLocBound === '1') {
+        return;
+    }
+
+    page.dataset.erpLocBound = '1';
+
+    // Delegação no page: sobrevive à recriação do bloco wire:ignore nas abas.
+    page.addEventListener(
+        'focusout',
+        (event) => {
+            if (! event.target.matches('[data-erp-loc-fields] .erp-produtos-loc__input')) {
+                return;
+            }
+
+            sanitizeErpProdutosLocInput(event.target);
+            // Inclui troca de aba: o bloco some do DOM (wire:key), então o state
+            // Livewire precisa receber as partes antes do próximo save.
+            window.pushErpProdutosLocToLivewire();
+        },
+        true,
+    );
+}
+
 window.commitErpProdutosFormBeforeSave = function commitErpProdutosFormBeforeSave() {
     const page = document.querySelector('.erp-produtos-form-page');
 
@@ -107,7 +212,7 @@ window.commitErpProdutosFormBeforeSave = function commitErpProdutosFormBeforeSav
     }
 };
 
-window.saveErpProdutosForm = function saveErpProdutosForm() {
+window.saveErpProdutosForm = async function saveErpProdutosForm() {
     const page = document.querySelector('.erp-produtos-form-page');
 
     if (! page) {
@@ -116,9 +221,24 @@ window.saveErpProdutosForm = function saveErpProdutosForm() {
 
     commitErpProdutosFormInputs(page);
 
-    window.setTimeout(() => {
-        getErpProdutosComponent()?.call('saveForm');
-    }, 50);
+    const component = getErpProdutosComponent();
+
+    if (! component) {
+        return;
+    }
+
+    // Sem o bloco Localizações no DOM (outra subaba), não envia '' — isso apagava
+    // a localização gravada. O Livewire já mantém o valor em $data.
+    if (! document.querySelector('[data-erp-loc-fields]')) {
+        await component.call('saveForm');
+
+        return;
+    }
+
+    const loc = readErpProdutosLocValues();
+    const localizacao = formatErpProdutosLocalizacao(loc);
+
+    await component.call('saveForm', localizacao);
 };
 
 function bindProductCadastroLookup(page) {
@@ -176,7 +296,116 @@ function bindSearchCodigoBarras(page) {
 }
 
 function getLookupModal() {
-    return document.querySelector('.erp-lookup-modal');
+    // Exclui outros modais que reutilizam a classe visual erp-lookup-modal
+    // (precificação, confirmação de NCM, etc.).
+    return document.querySelector(
+        '.erp-lookup-modal:not(.erp-prod-precificacao-modal):not(.erp-ncm-confirm-modal):not(.erp-duplicate-modal)',
+    );
+}
+
+function getPrecificacaoModal() {
+    return document.querySelector('.erp-prod-precificacao-modal');
+}
+
+function getPrecificacaoEditableFields(modal) {
+    if (! modal) {
+        return [];
+    }
+
+    return Array.from(modal.querySelectorAll(
+        '.erp-prod-precificacao-modal__body input.erp-pcad-form__input:not([readonly]):not([disabled])'
+    )).filter((input) => Boolean(input.id));
+}
+
+function focusPrecificacaoFieldById(fieldId, clearPending = false) {
+    if (! fieldId) {
+        return false;
+    }
+
+    const root = getPrecificacaoModal();
+    const next = root?.querySelector(`#${CSS.escape(fieldId)}`);
+
+    if (! next || next.readOnly || next.disabled) {
+        return false;
+    }
+
+    next.focus({ preventScroll: true });
+    next.select();
+
+    const ok = document.activeElement === next;
+
+    if (ok && clearPending && erpPrecifPendingFocusId === fieldId) {
+        erpPrecifPendingFocusId = null;
+    }
+
+    return ok;
+}
+
+function focusNextPrecificacaoField(current) {
+    const modal = getPrecificacaoModal();
+    const fields = getPrecificacaoEditableFields(modal);
+    const currentId = current?.id || '';
+    const index = fields.findIndex((field) => field.id === currentId);
+    const nextId = index >= 0 ? (fields[index + 1]?.id || null) : null;
+
+    if (window.ErpMasks && current?.dataset?.mask) {
+        current.value = window.ErpMasks.finalizeMaskValue(current);
+        window.ErpMasks.apply(current, {
+            allowEmptySync: true,
+            live: true,
+            thousands: window.ErpMasks.isBrDecimalMask(current.dataset.mask),
+        });
+    }
+
+    if (! nextId) {
+        erpPrecifPendingFocusId = null;
+        current?.blur();
+
+        return;
+    }
+
+    erpPrecifPendingFocusId = nextId;
+
+    const tryFocus = (attempt = 0) => {
+        if (focusPrecificacaoFieldById(nextId, true) || attempt >= 12) {
+            return;
+        }
+
+        window.setTimeout(() => tryFocus(attempt + 1), 30 + (attempt * 25));
+    };
+
+    // Igual Tab: foca o próximo imediatamente e retenta se o Livewire remorphar.
+    tryFocus(0);
+}
+
+window.focusNextPrecificacaoField = focusNextPrecificacaoField;
+
+function handlePrecificacaoModalKeydown(event) {
+    if (event.key !== 'Enter' || event.isComposing) {
+        return;
+    }
+
+    const target = event.target;
+
+    if (! (target instanceof HTMLInputElement) || target.readOnly || target.disabled) {
+        return;
+    }
+
+    const modal = getPrecificacaoModal();
+
+    if (! modal || ! modal.contains(target)) {
+        return;
+    }
+
+    // Enter = Tab (avança campo), sem submeter nada.
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+    }
+
+    focusNextPrecificacaoField(target);
 }
 
 function getLookupRows() {
@@ -238,16 +467,34 @@ function bindErpProdutosSaveButtons(page) {
 }
 
 function bindErpProdutosFormKeys() {
-    if (window.__erpProdutosFormKeysBound) {
+    if (window.__erpProdutosFormKeysBoundV9) {
         return;
     }
 
-    window.__erpProdutosFormKeysBound = true;
+    window.__erpProdutosFormKeysBoundV9 = true;
 
     document.addEventListener('keydown', (event) => {
         const page = document.querySelector('.erp-produtos-form-page');
 
         if (! page) {
+            return;
+        }
+
+        // Precificação: Enter tratado por erp-precif-enter-v5.js (capture).
+        // Aqui só evitamos F5/ESC do formulário por baixo da modal.
+        if (document.querySelector('.erp-prod-precificacao-modal')) {
+            if (event.key === 'Enter') {
+                return;
+            }
+
+            const component = getErpProdutosComponent();
+
+            if (event.key === 'F5' && component) {
+                event.preventDefault();
+                event.stopPropagation();
+                component.call('aplicarProductPrecificacao');
+            }
+
             return;
         }
 
@@ -294,7 +541,7 @@ function bindErpProdutosFormKeys() {
         if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
             return;
         }
-    });
+    }, true);
 }
 
 function handleLookupModalKeydown(event, component, lookupModal) {

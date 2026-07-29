@@ -17,6 +17,10 @@
                     wire:model="form.senha_certificado"
                     class="erp-pcad-form__input erp-config-fiscais-form__password-input"
                     autocomplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    data-google-password-manager="ignore"
                     placeholder="Senha do certificado"
                 >
                 <button

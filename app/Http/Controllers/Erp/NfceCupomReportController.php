@@ -33,13 +33,18 @@ class NfceCupomReportController
 
         $operacao = (string) ($venda->nfce_operacao ?? PdvFinalizarOperacao::NFCE_TRANSMITIR);
 
-        return view('reports.nfce-cupom', $service->buildViewData(
-            venda: $venda,
-            empresa: $empresa,
-            usuario: (string) $user->name,
-            operacao: $operacao,
-            copias: max(1, min(3, (int) $request->query('copias', 1))),
-            autoPrint: $request->boolean('auto'),
+        return view('reports.nfce-cupom', array_merge(
+            $service->buildViewData(
+                venda: $venda,
+                empresa: $empresa,
+                usuario: (string) $user->name,
+                operacao: $operacao,
+                copias: max(1, min(3, (int) $request->query('copias', 1))),
+                autoPrint: $request->boolean('auto'),
+            ),
+            [
+                'embed' => $request->boolean('embed'),
+            ],
         ));
     }
 }

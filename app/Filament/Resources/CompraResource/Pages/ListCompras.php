@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\CompraResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\ManagesImportarXmlModal;
 use App\Filament\Resources\CompraResource;
 use App\Models\Compra;
 use App\Models\Empresa;
+use App\Support\Erp\Compra\CancelarCompraService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
-use Illuminate\Support\Facades\Auth;
+use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -21,6 +24,7 @@ use Livewire\Attributes\Url;
 class ListCompras extends ListRecords
 {
     use InteractsWithErpListPage;
+    use ManagesImportarXmlModal;
 
     protected static string $resource = CompraResource::class;
 
@@ -88,10 +92,24 @@ class ListCompras extends ListRecords
             'edit' => 'editCompra',
             'extraKeys' => [
                 'F4' => ['method' => 'cancelCompra'],
-                'F6' => ['method' => 'modulePending', 'params' => ['Ler XML']],
+                'F6' => ['method' => 'openLerXmlFromCompraSelecionada'],
                 'F9' => ['method' => 'modulePending', 'params' => ['Fechar Mês']],
             ],
         ];
+    }
+
+    protected function importarXmlScreenTitle(): string
+    {
+        return 'Compras';
+    }
+
+    protected function erpListSelectPrompt(string $action): string
+    {
+        return match ($action) {
+            'cancel' => 'uma compra para cancelar',
+            'ler o XML' => 'uma compra para ler o XML',
+            default => $this->defaultErpListSelectPrompt($action),
+        };
     }
 
     public function table(Table $table): Table
@@ -108,6 +126,16 @@ class ListCompras extends ListRecords
     {
         $query = parent::getTableQuery()
             ->with(['fornecedor']);
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($empresaId !== null) {
+            $query->where(function (Builder $empresaQuery) use ($empresaId): void {
+                $empresaQuery
+                    ->where('empresa_id', $empresaId)
+                    ->orWhereNull('empresa_id');
+            });
+        }
 
         if ($this->statusFilter !== 'todas') {
             $query->where('status', $this->statusFilter);
@@ -211,14 +239,32 @@ class ListCompras extends ListRecords
         return $query->getConnection()->getDriverName();
     }
 
+    /**
+     * Query de compras restrita à empresa da sessão (aceita legado sem empresa).
+     */
+    protected function scopedCompraQuery(): Builder
+    {
+        $query = Compra::query();
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($empresaId !== null) {
+            $query->where(function (Builder $inner) use ($empresaId): void {
+                $inner->where('empresa_id', $empresaId)
+                    ->orWhereNull('empresa_id');
+            });
+        }
+
+        return $query;
+    }
+
     #[Computed]
     public function empresaNome(): string
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        $empresaId = ErpContext::currentEmpresaId();
 
         $empresa = $empresaId
             ? Empresa::query()->whereKey($empresaId)->where('ativo', true)->first()
-            : Empresa::query()->where('ativo', true)->orderBy('id')->first();
+            : null;
 
         if (! $empresa) {
             return '—';
@@ -244,12 +290,14 @@ class ListCompras extends ListRecords
                 View::make('filament.components.erp.compras.footer-total'),
                 View::make('filament.components.erp.compras.action-bar'),
                 View::make('filament.components.erp.compras.lancamento-modal'),
+                View::make('filament.components.erp.notas-fornecedores.importar-xml-modal'),
+                View::make('filament.components.erp.notas-fornecedores.product-overlay'),
             ]);
     }
 
     public function openCompraLancamento(int $compraId): void
     {
-        $compra = Compra::query()
+        $compra = $this->scopedCompraQuery()
             ->with(['itens.product', 'fornecedor'])
             ->find($compraId);
 
@@ -543,7 +591,11 @@ class ListCompras extends ListRecords
 
     public function createCompra(): void
     {
-        $this->modulePending('Cadastro de compra (Fase 2)');
+        Notification::make()
+            ->title('Cadastro manual de compra ainda não disponível.')
+            ->body('Use Notas de Fornecedores → Ler XML (F6) → vincule os produtos → Finalizar para gerar a compra e a entrada de estoque.')
+            ->info()
+            ->send();
     }
 
     public function editCompra(): void
@@ -552,7 +604,11 @@ class ListCompras extends ListRecords
             return;
         }
 
-        $this->modulePending('Alteração de compra (Fase 2)');
+        Notification::make()
+            ->title('Alteração manual de compra ainda não disponível.')
+            ->body('Cancelar (F4) estorna estoque se a compra veio do XML. Para nova entrada, use Ler XML na nota aceita.')
+            ->info()
+            ->send();
     }
 
     public function cancelCompra(): void
@@ -563,37 +619,40 @@ class ListCompras extends ListRecords
             return;
         }
 
-        $compra = Compra::query()->find($recordId);
+        $compra = $this->scopedCompraQuery()->find($recordId);
 
         if (! $compra) {
             return;
         }
 
-        if ($compra->status === Compra::STATUS_CANCELADA) {
+        try {
+            (new CancelarCompraService())->cancelar($compra);
+        } catch (DomainException $exception) {
             Notification::make()
-                ->title('Compra já está cancelada.')
+                ->title($exception->getMessage())
                 ->warning()
                 ->send();
 
             return;
-        }
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        $compra->update(['status' => Compra::STATUS_CANCELADA]);
+            Notification::make()
+                ->title('Não foi possível cancelar a compra.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         $this->clearListSelection();
         $this->resetTable();
 
         Notification::make()
             ->title('Compra cancelada.')
+            ->body('Se havia entrada de estoque, o saldo foi estornado.')
             ->success()
             ->send();
-    }
-
-    protected function erpListSelectPrompt(string $action): string
-    {
-        return match ($action) {
-            'cancel' => 'uma compra para cancelar',
-            default => $this->defaultErpListSelectPrompt($action),
-        };
     }
 }

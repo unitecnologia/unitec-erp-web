@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Desenvolvimento nativo no Windows — PHP e MySQL na maquina (porta 8000).
+    Desenvolvimento nativo no Windows - PHP e MySQL na maquina (porta 8000).
 .PARAMETER Port
     Porta do artisan serve (padrao 8000).
 .PARAMETER BindHost
@@ -30,7 +30,7 @@ $AppPath = (Get-Location).Path
 . (Join-Path $PSScriptRoot 'unitec-install-lib.ps1')
 
 Write-Host ''
-Write-Host 'UNI SISTEMAS 3.0 — desenvolvimento Windows' -ForegroundColor Cyan
+Write-Host 'UNI SISTEMAS 3.0 - desenvolvimento Windows' -ForegroundColor Cyan
 Write-Host ''
 
 & (Join-Path $PSScriptRoot 'use-env-windows.ps1')
@@ -85,7 +85,10 @@ if (Test-UnitecNeedsInitialSeed -AppPath $AppPath -LaragonPath $laragonPath) {
 }
 
 Sync-UnitecEnvPerformanceSettings -AppPath $AppPath | Out-Null
-Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:clear') -AllowFailure | Out-Null
+Ensure-UnitecPhpIniForWindowsDev -AppPath $AppPath | Out-Null
+Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
+
+Write-Host 'Dev: OPcache + config:cache ativos (reinicie o servidor apos mudar .env).' -ForegroundColor DarkGray
 
 $appUrl = "http://127.0.0.1:$Port"
 

@@ -14,6 +14,8 @@ class WhatsAppSender
 
     public const TIPO_NFE = 'nfe';
 
+    public const TIPO_NFCE_CONTADOR = 'nfce_contador';
+
     public function __construct(
         protected WhatsAppClient $client,
         protected WhatsAppGatewayManager $gatewayManager,
@@ -52,6 +54,8 @@ class WhatsAppSender
         }
 
         $config = WhatsAppConfig::fromEmpresa($empresa);
+
+        $text = WhatsAppMessageHelper::withSystemFooter($text);
 
         $result = $this->client->sendText(
             $config,
@@ -115,6 +119,8 @@ class WhatsAppSender
         }
 
         $config = WhatsAppConfig::fromEmpresa($empresa);
+
+        $text = WhatsAppMessageHelper::withSystemFooter($text);
 
         $result = $this->client->sendDocument(
             $config,

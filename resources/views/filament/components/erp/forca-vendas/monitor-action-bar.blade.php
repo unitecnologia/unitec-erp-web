@@ -1,5 +1,5 @@
 <div class="erp-nfe-actions erp-fv-mon-actions">
-    <button type="button" wire:click="modulePending('Imprimir Pedido')" class="erp-nfe-actions__btn">
+    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M6 9V3h12v6"/>
@@ -9,7 +9,7 @@
         </span>
         <span class="erp-nfe-actions__label">Imprimir</span>
     </button>
-    <button type="button" wire:click="modulePending('Gerar Boleto')" class="erp-nfe-actions__btn">
+    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
                 <path d="M4 5v14M8 5v14M11 5v14M14 5v14M17 5v14M20 5v14"/>
@@ -27,7 +27,7 @@
         </span>
         <span class="erp-nfe-actions__label">Tela de Venda</span>
     </button>
-    <button type="button" wire:click="modulePending('Emitir NF-e')" class="erp-nfe-actions__btn">
+    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
@@ -37,7 +37,7 @@
         </span>
         <span class="erp-nfe-actions__label">Emitir NF-e</span>
     </button>
-    <button type="button" wire:click="modulePending('Emitir NFC-e')" class="erp-nfe-actions__btn">
+    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z"/>

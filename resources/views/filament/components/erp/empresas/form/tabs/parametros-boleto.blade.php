@@ -49,7 +49,11 @@
                 <input
                     id="param-{{ $field }}"
                     type="password"
-                    autocomplete="new-password"
+                    autocomplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    data-google-password-manager="ignore"
                     wire:model="data.{{ $field }}"
                     class="erp-pcad-form__input erp-pcad-form__input--grow"
                 >

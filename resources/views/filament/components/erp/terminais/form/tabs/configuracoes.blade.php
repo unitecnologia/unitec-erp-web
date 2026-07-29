@@ -7,17 +7,47 @@
 
 
 <div class="erp-pcad-form erp-terminais-form erp-terminais-form--config">
-
     <input type="hidden" wire:model="data.velocidade">
+    <input type="hidden" wire:model="data.empresa_id">
 
-    <input type="hidden" wire:model="data.nome">
-
-    <input type="hidden" wire:model="data.ip">
-
-
+    <fieldset class="erp-pcad__group erp-terminais-form__ativo-bar">
+        <legend class="erp-pcad__group-title">PDV Offline</legend>
+        <div class="erp-terminais-form__ativo-grid">
+            <div class="erp-terminais-form__ativo-field">
+                <label class="erp-pcad-form__label" for="term-nome-pdv">Nome no PDV</label>
+                <input
+                    id="term-nome-pdv"
+                    type="text"
+                    wire:model.live="data.nome"
+                    class="erp-pcad-form__input"
+                    placeholder="Ex.: pdv1"
+                    title="Mesmo valor do campo PDV/Terminal no caixa offline"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="erp-terminais-form__ativo-field erp-terminais-form__ativo-field--xs">
+                <label class="erp-pcad-form__label" for="term-num-logico">Nº lógico</label>
+                <input
+                    id="term-num-logico"
+                    type="text"
+                    wire:model="data.numero_logico_terminal"
+                    data-mask="integer"
+                    class="erp-pcad-form__input erp-pcad-form__input--xs"
+                    placeholder="1"
+                    title="Use este número no campo PDV/Terminal do caixa offline"
+                >
+            </div>
+        </div>
+        <p class="erp-terminais-form__hint" style="margin:0.35rem 0 0;">
+            Liberar/bloquear o caixa pela grade à esquerda (flag <strong>Ativo</strong>).
+            IP, ID e empresa: clique no <strong>olhinho</strong>. No PDV offline use o
+            <strong>Nome no PDV</strong> ou o <strong>nº lógico</strong>.
+        </p>
+        <input type="hidden" wire:model="data.ativo">
+        <input type="hidden" wire:model="data.ip">
+    </fieldset>
 
     <fieldset class="erp-pcad__group">
-
         <legend class="erp-pcad__group-title">Tipo de Impressora</legend>
 
         <div class="erp-terminais-form__printer-row">
@@ -80,9 +110,9 @@
 
                 <div class="erp-terminais-form__porta-wrap">
 
-                    <select id="term-porta" wire:model="data.porta" class="erp-pcad-form__select erp-pcad-form__select--sm">
+                    <select id="term-porta" wire:model.live="data.porta" class="erp-pcad-form__select erp-pcad-form__select--sm">
 
-                        @foreach (TerminalFormOptions::portasImpressora() as $porta)
+                        @foreach (($this->portasImpressoraLista ?: TerminalFormOptions::portasImpressora()) as $porta)
 
                             <option value="{{ $porta }}">{{ $porta }}</option>
 
@@ -90,31 +120,29 @@
 
                     </select>
 
-                    <button type="button" wire:click="moduleStubListaImpressoras" class="erp-terminais-form__porta-btn" title="Atualizar portas">🖨</button>
+                    <button type="button" wire:click="moduleStubListaImpressoras" class="erp-terminais-form__porta-btn" title="Listar impressoras do Windows (RAW)">🖨</button>
 
                 </div>
 
             </div>
 
+            <label class="erp-pcad__check" style="margin-top:0.55rem;display:inline-flex;">
+                <input type="checkbox" wire:model.live="data.usar_device_service">
+                Usar Unitecnologia Device Service (impressão silenciosa RAW)
+            </label>
+
+            <p class="erp-terminais-form__hint" style="margin:0.35rem 0 0;font-size:0.72rem;color:#475569;line-height:1.35;">
+                Clique em 🖨 para listar as impressoras deste Windows como <strong>RAW:Nome</strong> (ex.: RAW:POS-80C).
+                Ative o Device Service <strong>só neste terminal/caixa</strong> que usa impressora térmica — exige o agente instalado neste PC.
+                Desligado: imprime pelo diálogo do navegador.
+            </p>
+
+            {{-- Mantém o nome Windows sincronizado a partir de RAW:... --}}
+            <input type="hidden" wire:model="data.impressora_nome">
+
         </fieldset>
 
     @endif
-
-
-
-    <fieldset class="erp-pcad__group">
-
-        <legend class="erp-pcad__group-title">Caminho Impressora Gráfico</legend>
-
-        <div class="erp-pcad-form__row erp-terminais-form__path-row">
-
-            <input id="term-impressora" type="text" wire:model="data.impressora_nome" class="erp-pcad-form__input">
-
-            <button type="button" wire:click="moduleStubBrowseImpressora" class="erp-terminais-form__browse-btn" title="Localizar impressora">📁</button>
-
-        </div>
-
-    </fieldset>
 
 
 

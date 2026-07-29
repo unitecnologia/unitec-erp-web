@@ -59,7 +59,18 @@ class CompraDanfeReportService
             'horaEntrada' => '',
             'itens' => $this->buildItens($compra),
             'totais' => $this->buildTotais($subtotalProdutos, $totalNota),
+            'transportador' => [
+                'nome' => '', 'cnpj' => '', 'ie' => '', 'endereco' => '', 'municipio' => '', 'uf' => '',
+                'placa' => '', 'placa_uf' => '', 'antt' => '', 'mod_frete' => '', 'mod_frete_label' => '',
+            ],
+            'volumes' => [
+                'quantidade' => '', 'especie' => '', 'marca' => '', 'numeracao' => '',
+                'peso_bruto' => '', 'peso_liquido' => '',
+            ],
+            'duplicatas' => [],
+            'fatura' => ['numero' => '', 'valor_original' => '', 'valor_desconto' => '', 'valor_liquido' => ''],
             'informacoesComplementares' => $this->buildInformacoesComplementares($compra, $empresa),
+            'informacoesFisco' => '',
             'printedAt' => now(),
         ];
     }
@@ -181,6 +192,8 @@ class CompraDanfeReportService
             'desconto' => $zero,
             'outras' => $zero,
             'total_ipi' => $zero,
+            'total_pis' => $zero,
+            'total_cofins' => $zero,
             'total_nota' => number_format($totalNota, 2, ',', '.'),
         ];
     }

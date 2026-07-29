@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Erp;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Pdv\PdvDavCupomLayout;
 use App\Support\Erp\Pdv\PdvPedidoReportData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -49,13 +50,16 @@ class PdvCupomReportController
             ));
         }
 
+        $printedAt = now();
+
         return view('reports.pdv-cupom', [
             'venda' => $venda,
             'empresa' => $empresa,
             'usuario' => $user->name,
             'autoPrint' => $autoPrint,
             'copias' => $copias,
-            'printedAt' => now(),
+            'printedAt' => $printedAt,
+            'layout' => PdvDavCupomLayout::build($venda, $empresa, $printedAt),
         ]);
     }
 }

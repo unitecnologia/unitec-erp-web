@@ -9,6 +9,7 @@
         : null;
     $isAdminUser = $selectedUser?->is_admin ?? false;
 @endphp
+
 <div class="erp-permissoes" wire:ignore.self>
     <div class="erp-permissoes__toolbar">
         <div class="erp-permissoes__mode">
@@ -32,12 +33,14 @@
                 </select>
             </label>
 
-            <button type="button" wire:click="loadProfileTemplate" class="erp-permissoes__btn" @disabled(! $selectedProfileId || $editingProfile)>
-                Carregar perfil no usuário
-            </button>
-            <button type="button" wire:click="startEditProfile" class="erp-permissoes__btn erp-permissoes__btn--secondary">
-                {{ $editingProfile ? 'Editando perfil' : 'Editar perfil' }}
-            </button>
+            <div class="erp-permissoes__toolbar-actions">
+                <button type="button" wire:click="loadProfileTemplate" class="erp-permissoes__btn" @disabled(! $selectedProfileId || $editingProfile)>
+                    Carregar no usuário
+                </button>
+                <button type="button" wire:click="startEditProfile" class="erp-permissoes__btn erp-permissoes__btn--secondary {{ $editingProfile ? 'is-active' : '' }}">
+                    {{ $editingProfile ? 'Editando perfil' : 'Editar perfil' }}
+                </button>
+            </div>
         </div>
 
         @if ($editingProfile)
@@ -62,10 +65,10 @@
         @foreach ($groups as $groupKey => $group)
             <fieldset class="erp-permissoes__group">
                 <legend class="erp-permissoes__group-title">
-                    {{ $group['label'] }}
+                    <span class="erp-permissoes__group-label">{{ $group['label'] }}</span>
                     <span class="erp-permissoes__group-actions">
-                        <button type="button" wire:click="markGroup('{{ $groupKey }}', true)" class="erp-permissoes__link">Marcar</button>
-                        <button type="button" wire:click="markGroup('{{ $groupKey }}', false)" class="erp-permissoes__link">Desmarcar</button>
+                        <button type="button" wire:click="markGroup('{{ $groupKey }}', true)" class="erp-permissoes__chip" title="Marcar todas">Tudo</button>
+                        <button type="button" wire:click="markGroup('{{ $groupKey }}', false)" class="erp-permissoes__chip erp-permissoes__chip--muted" title="Desmarcar todas">Nada</button>
                     </span>
                 </legend>
 
@@ -73,10 +76,10 @@
                     @php $moduleKey = $module; @endphp
                     <div class="erp-permissoes__module">
                         <div class="erp-permissoes__module-title">
-                            {{ $meta['label'] }}
+                            <span>{{ $meta['label'] }}</span>
                             <span class="erp-permissoes__group-actions">
-                                <button type="button" wire:click="markModule('{{ $moduleKey }}', true)" class="erp-permissoes__link">Todos</button>
-                                <button type="button" wire:click="markModule('{{ $moduleKey }}', false)" class="erp-permissoes__link">Nenhum</button>
+                                <button type="button" wire:click="markModule('{{ $moduleKey }}', true)" class="erp-permissoes__chip erp-permissoes__chip--sm" title="Marcar módulo">Tudo</button>
+                                <button type="button" wire:click="markModule('{{ $moduleKey }}', false)" class="erp-permissoes__chip erp-permissoes__chip--sm erp-permissoes__chip--muted" title="Desmarcar módulo">Nada</button>
                             </span>
                         </div>
                         <div class="erp-permissoes__checks">
@@ -85,7 +88,7 @@
                                 <label class="erp-permissoes__check">
                                     <input
                                         type="checkbox"
-                                        wire:model.live="checked.{{ $permKey }}"
+                                        wire:model="checked.{{ $permKey }}"
                                         @disabled($isAdminUser && ! $editingProfile)
                                     >
                                     <span>{{ $label }}</span>

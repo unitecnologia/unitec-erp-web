@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\MarcaResource\Pages;
 use App\Models\Marca;
 use BackedEnum;
@@ -27,17 +28,22 @@ class MarcaResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('marcas.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('id')
-                    ->label('CÃ³digo')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('nome')
-                    ->label('DescriÃ§Ã£o')
+                    ->label('Descrição')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
             ])

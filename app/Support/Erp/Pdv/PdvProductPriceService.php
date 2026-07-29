@@ -5,6 +5,7 @@ namespace App\Support\Erp\Pdv;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductPriceTableItem;
+use App\Support\Erp\ProductEmpresaPrecoService;
 use Carbon\Carbon;
 
 final class PdvProductPriceService
@@ -82,15 +83,7 @@ final class PdvProductPriceService
 
     public function precoMinimoPermitido(Product $product, float $quantidade = 1): ?float
     {
-        $descontoPct = (float) ($product->desconto_pct ?? 0);
-
-        if ($descontoPct <= 0) {
-            return null;
-        }
-
-        $precoBase = $this->resolvePrecoVenda($product, $quantidade);
-
-        return round($precoBase - ($precoBase * $descontoPct / 100), 2);
+        return null;
     }
 
     public function validaPrecoInformado(Product $product, float $preco, float $quantidade = 1): ?string
@@ -122,11 +115,16 @@ final class PdvProductPriceService
     {
         $quantidade = max(0, $quantidade);
         $hoje = Carbon::today();
+        $empresaId = (int) (session('erp_empresa_id') ?? 0);
+        $precosEmpresa = app(ProductEmpresaPrecoService::class)->resolve(
+            $product,
+            $empresaId > 0 ? $empresaId : null
+        );
 
         if ($this->emPromocao($product, $hoje)) {
-            $preco = (float) ($product->promo_preco_venda ?? $product->preco_venda);
+            $preco = (float) ($product->promo_preco_venda ?? $precosEmpresa['preco_venda']);
 
-            if ($this->aplicaAtacado($product, $quantidade)) {
+            if ($this->aplicaAtacado($product, $quantidade, $precosEmpresa['preco_atacado'])) {
                 $precoAtacado = (float) ($product->promo_preco_atacado ?? 0);
 
                 if ($precoAtacado > 0) {
@@ -137,19 +135,19 @@ final class PdvProductPriceService
             return $preco;
         }
 
-        $preco = (float) $product->preco_venda;
+        $preco = (float) $precosEmpresa['preco_venda'];
 
-        if ($this->aplicaAtacado($product, $quantidade)) {
-            return (float) $product->preco_atacado;
+        if ($this->aplicaAtacado($product, $quantidade, $precosEmpresa['preco_atacado'])) {
+            return (float) $precosEmpresa['preco_atacado'];
         }
 
         return $preco;
     }
 
-    private function aplicaAtacado(Product $product, float $quantidade): bool
+    private function aplicaAtacado(Product $product, float $quantidade, ?float $precoAtacadoOverride = null): bool
     {
         $qtdAtacado = (float) ($product->qtd_atacado ?? 0);
-        $precoAtacado = (float) ($product->preco_atacado ?? 0);
+        $precoAtacado = $precoAtacadoOverride ?? (float) ($product->preco_atacado ?? 0);
 
         return $qtdAtacado > 0 && $precoAtacado > 0 && $quantidade >= $qtdAtacado;
     }

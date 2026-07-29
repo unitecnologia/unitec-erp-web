@@ -2,7 +2,7 @@
     use App\Models\Person;
 @endphp
 
-<div class="erp-pcad-form">
+<div class="erp-pcad-form erp-pessoas-panel">
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-codigo">Código</label>
         <input id="pcad-codigo" type="text" wire:model="data.codigo" class="erp-pcad-form__input erp-pcad-form__input--xs">
@@ -132,19 +132,5 @@
                 <option value="{{ $value }}">{{ $label }}</option>
             @endforeach
         </select>
-    </div>
-
-    <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label">Parâmetros</label>
-        <div class="erp-pcad-form__checks-inline">
-            <label class="erp-pcad__check">
-                <input type="checkbox" wire:model="data.is_atendente">
-                <span>Atendente</span>
-            </label>
-            <label class="erp-pcad__check">
-                <input type="checkbox" wire:model="data.is_tecnico">
-                <span>Técnico</span>
-            </label>
-        </div>
     </div>
 </div>

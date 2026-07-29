@@ -7,6 +7,7 @@ use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\Concerns\ManagesUserFormModal;
 use App\Models\User;
+use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -36,7 +37,12 @@ class ListUsers extends ListRecords
     {
         parent::mount();
 
-        ErpScreen::set('Usuários');
+        $onboardingTitle = ErpOnboarding::screenTitle();
+        ErpScreen::set($onboardingTitle ?? 'Usuários');
+
+        if (ErpOnboarding::step() === ErpOnboarding::STEP_USUARIO && ! $this->userModalOpen) {
+            $this->createUser();
+        }
     }
 
     protected static function erpListPageClass(): string
@@ -76,12 +82,8 @@ class ListUsers extends ListRecords
         $query = parent::getTableQuery();
 
         if (filled($this->localSearch)) {
-            $column = in_array($this->searchColumn, ['name', 'email'], true)
-                ? $this->searchColumn
-                : 'name';
-
             $term = mb_strtoupper(trim($this->localSearch), 'UTF-8');
-            $query->where($column, 'like', '%' . $term . '%');
+            $query->where('name', 'like', '%' . $term . '%');
         }
 
         return $query;

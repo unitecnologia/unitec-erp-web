@@ -15,11 +15,11 @@
         <span class="erp-compras-actions__icon">↻</span>
         <span class="erp-compras-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    <button type="button" wire:click="modulePending('Ler XML')" class="erp-compras-actions__btn" data-erp-key="F6">
+    <button type="button" wire:click="openLerXmlFromCompraSelecionada" class="erp-compras-actions__btn" data-erp-key="F6">
         <span class="erp-compras-actions__icon">📄</span>
         <span class="erp-compras-actions__label"><kbd>F6</kbd> | Ler XML</span>
     </button>
-    <button type="button" wire:click="modulePending('Fechar Mês')" class="erp-compras-actions__btn" data-erp-key="F9">
+    <button type="button" class="erp-compras-actions__btn" disabled title="Em breve">
         <span class="erp-compras-actions__icon">📅</span>
         <span class="erp-compras-actions__label"><kbd>F9</kbd> | Fechar Mês</span>
     </button>

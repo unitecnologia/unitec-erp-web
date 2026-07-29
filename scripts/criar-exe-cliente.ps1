@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Gera dist\output\Instalar Unitec ERP.exe via Inno Setup (MariaDB + PHP embutidos).
@@ -24,7 +24,7 @@ if ($SkipLaragonDownload -and -not $SkipRuntimeDownload) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($LaragonUrl)) {
-    Write-Host '[!] LaragonUrl foi ignorado — o instalador usa MariaDB embutido (mariadb-win.zip).' -ForegroundColor Yellow
+    Write-Host '[!] LaragonUrl foi ignorado - o instalador usa MariaDB embutido (mariadb-win.zip).' -ForegroundColor Yellow
 }
 
 $buildArgs = @{

@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Dashboard;
 
 use App\Models\Venda;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -10,6 +11,9 @@ use Throwable;
 class ErpDashboardSalesChart
 {
     /**
+     * Período padrão: 1º dia do mês corrente até hoje
+     * (ex.: 01/07 → 23/07; amanhã 01/07 → 24/07).
+     *
      * @return array{
      *     defaultFrom: string,
      *     defaultTo: string,
@@ -18,16 +22,18 @@ class ErpDashboardSalesChart
      */
     public static function data(?Carbon $from = null, ?Carbon $to = null): array
     {
-        $to ??= now()->startOfDay();
-        $from ??= $to->copy()->subDays(29);
+        $hoje = ErpFinanceiroMetricas::hoje()->startOfDay();
+        $to ??= $hoje->copy();
+        $from ??= $hoje->copy()->startOfMonth();
 
         if ($from->gt($to)) {
             [$from, $to] = [$to, $from];
         }
 
+        // Busca um pouco além do filtro padrão para o usuário poder ampliar o período.
         $dbPoints = static::pointsFromDatabase(
-            $from->copy()->subDays(60),
-            $to->copy()->addDays(7),
+            $from->copy()->startOfMonth()->subMonthNoOverflow(),
+            $to->copy()->endOfMonth(),
         );
 
         if ($dbPoints !== []) {

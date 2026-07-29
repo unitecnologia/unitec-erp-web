@@ -1,5 +1,20 @@
 <p class="erp-cardex-modal__product">{{ $this->cardexProdutoLabel }}</p>
 
+<div class="erp-cardex-modal__resumo">
+    <div class="erp-cardex-modal__resumo-field">
+        <label for="cardex-e-medio">Estoque Médio (R$)</label>
+        <input id="cardex-e-medio" type="text" value="{{ $this->cardexData['resumo']['e_medio'] ?? '0,000' }}" readonly class="erp-pcad-form__input erp-produtos-form__input--num erp-produtos-form__input--readonly">
+    </div>
+    <div class="erp-cardex-modal__resumo-field">
+        <label for="cardex-ult-compra">Última Compra (R$)</label>
+        <input id="cardex-ult-compra" type="text" value="{{ $this->cardexData['resumo']['ult_compra'] ?? '0,00' }}" readonly class="erp-pcad-form__input erp-produtos-form__input--num erp-produtos-form__input--readonly">
+    </div>
+    <div class="erp-cardex-modal__resumo-field">
+        <label for="cardex-ult-compra-ant">Últ. Compra Anterior (R$)</label>
+        <input id="cardex-ult-compra-ant" type="text" value="{{ $this->cardexData['resumo']['ult_compra_anterior'] ?? '0,00' }}" readonly class="erp-pcad-form__input erp-produtos-form__input--num erp-produtos-form__input--readonly">
+    </div>
+</div>
+
 <div class="erp-cardex-modal__layout">
     <section class="erp-cardex-modal__panel erp-cardex-modal__panel--entradas">
         <h3 class="erp-cardex-modal__section-title">Entradas</h3>

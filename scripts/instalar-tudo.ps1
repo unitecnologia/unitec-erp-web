@@ -1,10 +1,10 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 
 <#
 
 .SYNOPSIS
 
-    Instalador Unitec ERP — um clique, sem perguntas.
+    Instalador Unitec ERP - um clique, sem perguntas.
 
 #>
 
@@ -231,10 +231,10 @@ try {
     $setupScript = Join-Path $PSScriptRoot 'setup-prerequisites.ps1'
 
     if ($remoteDb) {
-        Write-InstallLog -AppPath $AppPath -Message ('Modo terminal — banco remoto em {0}' -f $DbHost)
+        Write-InstallLog -AppPath $AppPath -Message ('Modo terminal - banco remoto em {0}' -f $DbHost)
         & $setupScript -AppPath $AppPath -SourceRoot $AppPath -ServiceWaitSeconds 25 -SkipMysql
     } else {
-        Write-InstallLog -AppPath $AppPath -Message 'Modo servidor — banco local com acesso na rede (3306)'
+        Write-InstallLog -AppPath $AppPath -Message 'Modo servidor - banco local com acesso na rede (3306)'
         & $setupScript -AppPath $AppPath -SourceRoot $AppPath -ServiceWaitSeconds 25
     }
 
@@ -349,7 +349,7 @@ Para abrir amanha:
 
 Login:
 
-  E-mail: usuario@unitecnologia.local
+  Usuario: USUARIO
 
   Senha:  01
 
@@ -363,7 +363,7 @@ Leia tambem o arquivo "COMO USAR - Unitec ERP" na Area de Trabalho.
 
         Write-Title 'Pronto!'
 
-        Write-Host 'Login: usuario@unitecnologia.local / Senha: 01'
+        Write-Host 'Login: USUARIO / Senha: 01'
 
     }
 

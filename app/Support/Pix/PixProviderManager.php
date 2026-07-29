@@ -38,11 +38,11 @@ class PixProviderManager
 
     private function empresa(?int $empresaId): ?Empresa
     {
-        if ($empresaId !== null) {
-            return Empresa::query()->find($empresaId);
+        if ($empresaId === null || $empresaId <= 0) {
+            return null;
         }
 
-        return Empresa::query()->orderBy('id')->first();
+        return Empresa::query()->find($empresaId);
     }
 
     private function construir(?Empresa $empresa, ?string $forcarProvedor = null): PixProvider

@@ -16,7 +16,8 @@ class ProductCardexService
      *     vendas: array<int, array<string, string>>,
      *     nfe: array<int, array<string, string>>,
      *     nfce: array<int, array<string, string>>,
-     *     totais: array<string, string>
+     *     totais: array<string, string>,
+     *     resumo: array<string, string>
      * }
      */
     public function forProduct(Product $product): array
@@ -42,6 +43,11 @@ class ProductCardexService
                 'nfe' => $this->money($totalNfe),
                 'nfce' => $this->money($totalNfce),
                 'total_vendas' => $this->money($totalVendas + $totalNfe + $totalNfce),
+            ],
+            'resumo' => [
+                'e_medio' => number_format((float) ($product->e_medio ?? 0), 3, ',', '.'),
+                'ult_compra' => number_format((float) ($product->ult_compra ?? 0), 2, ',', '.'),
+                'ult_compra_anterior' => number_format((float) ($product->ult_compra_anterior ?? 0), 2, ',', '.'),
             ],
         ];
     }

@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Verifica o instalador e o runtime antes de gerar/publicar o EXE.
@@ -92,7 +92,7 @@ if (Test-Path (Join-Path $AppPath '.env')) {
         Add-Failure ("Sync-UnitecEnvPerformanceSettings: {0}" -f $_.Exception.Message)
     }
 } else {
-    Add-Warning '.env ausente — pulando teste de performance do .env.'
+    Add-Warning '.env ausente - pulando teste de performance do .env.'
 }
 
 Initialize-UnitecRuntimePath -AppPath $AppPath
@@ -155,7 +155,7 @@ if (-not (Test-Path $phpExe)) {
                 }
             }
         } else {
-            Add-Warning 'Banco indisponivel — migrate:status nao testado.'
+            Add-Warning 'Banco indisponivel - migrate:status nao testado.'
         }
 
         foreach ($command in @(

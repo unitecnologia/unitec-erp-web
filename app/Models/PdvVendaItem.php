@@ -21,6 +21,7 @@ class PdvVendaItem extends Model
         'quantidade',
         'preco_unitario',
         'desconto',
+        'acrescimo',
         'total',
     ];
 
@@ -30,6 +31,7 @@ class PdvVendaItem extends Model
             'quantidade' => 'decimal:3',
             'preco_unitario' => 'decimal:2',
             'desconto' => 'decimal:2',
+            'acrescimo' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }

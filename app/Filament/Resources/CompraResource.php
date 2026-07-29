@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
 use BackedEnum;
@@ -28,12 +29,17 @@ class CompraResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('compras.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('numero')
-                    ->label('» Número')
+                    ->label('Número')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold)

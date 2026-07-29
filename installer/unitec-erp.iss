@@ -1,8 +1,8 @@
-; Unitec ERP Web — instalador Windows (Inno Setup)
+; Unitec ERP Web - instalador Windows (Inno Setup)
 ; Compilar apos: .\scripts\build-setup.ps1
 
 #define MyAppName "UNI SISTEMAS 3.0"
-#define MyAppVersion "6.4.1.36"
+#define MyAppVersion "6.4.1.41"
 #define MyAppVerName "UNI SISTEMAS 3.0"
 #define MyAppPublisher "UNITECNOLOGIA"
 #define MyAppURL "https://unitecnologiasc.com.br/"
@@ -62,7 +62,7 @@ Type: filesandordirs; Name: "{app}"
 
 [Messages]
 brazilianportuguese.WelcomeLabel2=Este assistente instala o Unitec ERP ({#MyAppVerName}).%n%nVoce so precisa clicar em Avancar e Instalar.%n%nO sistema abrira sozinho ao terminar.%n%nRequisitos: Windows 10 ou superior, 64 bits, 2 GB livres em C:
-brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin:%n  E-mail: usuario@unitecnologia.local%n  Senha: 01
+brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin:%n  Usuario: USUARIO%n  Senha: 01
 
 [Code]
 var
@@ -113,7 +113,7 @@ begin
   DbServerRadio.Left := 0;
   DbServerRadio.Top := 0;
   DbServerRadio.Width := DbModePage.SurfaceWidth;
-  DbServerRadio.Caption := 'Servidor do banco (este PC) — MariaDB na rede local, porta 3306';
+  DbServerRadio.Caption := 'Servidor do banco (este PC) - MariaDB na rede local, porta 3306';
   DbServerRadio.Checked := True;
   DbServerRadio.OnClick := @DbModeChanged;
 
@@ -122,7 +122,7 @@ begin
   DbTerminalRadio.Left := 0;
   DbTerminalRadio.Top := 28;
   DbTerminalRadio.Width := DbModePage.SurfaceWidth;
-  DbTerminalRadio.Caption := 'Terminal (banco em outro PC da rede)';
+  DbTerminalRadio.Caption := 'Terminal (banco em outro PC da loja)';
   DbTerminalRadio.OnClick := @DbModeChanged;
 
   DbHostLabel := TNewStaticText.Create(DbModePage);

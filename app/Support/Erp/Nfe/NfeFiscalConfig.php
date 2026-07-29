@@ -2,10 +2,13 @@
 
 namespace App\Support\Erp\Nfe;
 
+use App\Mail\OrcamentoEmail;
 use App\Models\Empresa;
 use App\Models\VendasParametro;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 final class NfeFiscalConfig
 {
@@ -129,6 +132,7 @@ final class NfeFiscalConfig
     public static function ensureDefaults(VendasParametro $params, ?Empresa $empresa = null): void
     {
         $empresaId = (int) $params->empresa_id;
+        $respTecnico = self::defaultRespTecnico();
         $defaults = [
             'uf' => $params->uf ?: ($empresa?->uf ?: 'SC'),
             'ambiente' => $params->ambiente ?? VendasParametro::AMBIENTE_HOMOLOGACAO,
@@ -142,6 +146,11 @@ final class NfeFiscalConfig
             'numero' => $params->numero ?? 1,
             'serie' => $params->serie ?? '1',
             'serie_nfe' => $params->serie_nfe ?? 1,
+            'numero_nfe' => $params->numero_nfe ?? 1,
+            'resp_tecnico_cnpj' => $respTecnico['cnpj'],
+            'resp_tecnico_contato' => $respTecnico['contato'],
+            'resp_tecnico_email' => $respTecnico['email'],
+            'resp_tecnico_fone' => $respTecnico['fone'],
             ...self::defaultStoragePaths($empresaId),
         ];
 
@@ -155,12 +164,22 @@ final class NfeFiscalConfig
 
         $dirty = false;
         $pathFields = array_keys(self::defaultStoragePaths($empresaId));
+        $forcedRespFields = [
+            'resp_tecnico_cnpj',
+            'resp_tecnico_contato',
+            'resp_tecnico_email',
+            'resp_tecnico_fone',
+        ];
 
         foreach ($defaults as $field => $value) {
             $current = $params->{$field};
             $shouldUpdate = $current === null || $current === '';
 
             if (in_array($field, $pathFields, true) && self::isInvalidStoragePath($current)) {
+                $shouldUpdate = true;
+            }
+
+            if (in_array($field, $forcedRespFields, true) && (string) $current !== (string) $value) {
                 $shouldUpdate = true;
             }
 
@@ -259,6 +278,28 @@ final class NfeFiscalConfig
             6 => 'Contingência SVC-AN',
             7 => 'Contingência SVC-RS',
             9 => 'Contingência off-line NFC-e',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function tipoEmissaoNfceOptions(): array
+    {
+        return [
+            1 => 'Normal',
+            9 => 'Contingência off-line NFC-e',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function versaoQrcodeOptions(): array
+    {
+        return [
+            2 => '2.00',
+            3 => '3.00',
         ];
     }
 
@@ -496,6 +537,7 @@ final class NfeFiscalConfig
             'ssl_tipo' => (int) ($params->ssl_tipo ?? 5),
             'id_token' => $params->id_token ?? '',
             'token' => $params->token ?? '',
+            'versao_qrcode' => (int) ($params->versao_qrcode ?? 2),
             'path_salvar_nfe' => $params->path_salvar_nfe ?? '',
             'path_schemas_nfe' => $params->path_schemas_nfe ?? '',
             'path_enviada_nfe' => $params->path_enviada_nfe ?? '',
@@ -507,14 +549,180 @@ final class NfeFiscalConfig
             'numero' => (int) ($params->numero ?? 1),
             'serie' => (string) ($params->serie ?? '1'),
             'serie_nfe' => (int) ($params->serie_nfe ?? 1),
+            'numero_nfe' => (int) ($params->numero_nfe ?? 1),
             'email_host' => $params->email_host ?? '',
             'email_porta' => $params->email_porta ?? '',
             'email_user' => $params->email_user ?? '',
-            'email_senha' => '',
+            'email_senha' => (string) ($params->safeEncrypted('email_senha') ?? ''),
             'email_assunto' => $params->email_assunto ?? '',
             'email_ssl' => ($params->email_ssl ?? 'N') === 'S',
             'email_tls' => ($params->email_tls ?? 'N') === 'S',
+            'email_modo' => (string) ($params->email_modo ?: 'smtp'),
+            'email_api_provedor' => (string) ($params->email_api_provedor ?? 'brevo'),
+            'email_api_key' => (string) ($params->email_api_key ?? ''),
             'caminho_certificado' => $params->caminho_certificado ?? '',
+            'resp_tecnico_cnpj' => self::defaultRespTecnico()['cnpj'],
+            'resp_tecnico_contato' => self::defaultRespTecnico()['contato'],
+            'resp_tecnico_email' => self::defaultRespTecnico()['email'],
+            'resp_tecnico_fone' => self::defaultRespTecnico()['fone'],
+            'resp_tecnico_id_csrt' => $params->resp_tecnico_id_csrt ?? '',
+            'resp_tecnico_csrt' => $params->resp_tecnico_csrt ?? '',
         ];
+    }
+
+    /**
+     * Dados fixos do software (UniTecnologia) — não editáveis pelo cliente.
+     *
+     * @return array{cnpj: string, contato: string, email: string, fone: string}
+     */
+    public static function defaultRespTecnico(): array
+    {
+        return [
+            'cnpj' => '22469772000100',
+            'contato' => 'unitecnologia sistemas',
+            'email' => 'sac@unitecnologiasc.com',
+            'fone' => '47984002117',
+        ];
+    }
+
+    public static function respTecnicoFromParametros(VendasParametro $params): ?\Unitec\FiscalEngine\Dto\RespTecnicoDto
+    {
+        $fixed = self::defaultRespTecnico();
+
+        return new \Unitec\FiscalEngine\Dto\RespTecnicoDto(
+            cnpj: $fixed['cnpj'],
+            contato: $fixed['contato'],
+            email: $fixed['email'],
+            fone: $fixed['fone'],
+            idCsrt: filled($params->resp_tecnico_id_csrt) ? (string) $params->resp_tecnico_id_csrt : null,
+            hashCsrt: null,
+            csrtToken: filled($params->resp_tecnico_csrt) ? trim((string) $params->resp_tecnico_csrt) : null,
+        );
+    }
+
+    public static function respTecnicoConfigurado(VendasParametro $params): bool
+    {
+        $respTecnico = self::respTecnicoFromParametros($params);
+
+        return $respTecnico !== null && $respTecnico->isComplete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     */
+    public static function smtpEncryptionFromForm(array $form): ?string
+    {
+        $port = (int) ($form['email_porta'] ?? 0);
+
+        // Porta 465: SSL tem prioridade (mesmo se TLS também estiver marcado).
+        if (! empty($form['email_ssl']) || $port === 465) {
+            return 'ssl';
+        }
+
+        if (! empty($form['email_tls']) || $port === 587) {
+            return 'tls';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     */
+    public static function resolveEmailPassword(array $form, VendasParametro $params): ?string
+    {
+        if (filled($form['email_senha'] ?? '')) {
+            return (string) $form['email_senha'];
+        }
+
+        return $params->safeEncrypted('email_senha');
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     */
+    public static function applySmtpMailConfig(array $form, VendasParametro $params): void
+    {
+        $host = trim((string) ($form['email_host'] ?? ''));
+        $port = (int) ($form['email_porta'] ?? 587);
+        $user = trim((string) ($form['email_user'] ?? ''));
+        $password = self::resolveEmailPassword($form, $params);
+        $encryption = self::smtpEncryptionFromForm($form);
+        $port = $port > 0 ? $port : ($encryption === 'ssl' ? 465 : 587);
+
+        // Laravel 11+ / Symfony Mailer: scheme smtps = SSL; smtp = STARTTLS/plain.
+        $scheme = $encryption === 'ssl' ? 'smtps' : 'smtp';
+
+        $config = [
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.transport' => 'smtp',
+            'mail.mailers.smtp.scheme' => $scheme,
+            'mail.mailers.smtp.url' => null,
+            'mail.mailers.smtp.host' => $host,
+            'mail.mailers.smtp.port' => $port,
+            'mail.mailers.smtp.username' => $user,
+            'mail.mailers.smtp.password' => $password,
+            'mail.mailers.smtp.timeout' => 30,
+            'mail.from.address' => filter_var($user, FILTER_VALIDATE_EMAIL) ? $user : config('mail.from.address'),
+            'mail.from.name' => config('mail.from.name', 'Uni Sistemas'),
+        ];
+
+        if ($encryption !== null) {
+            $config['mail.mailers.smtp.encryption'] = $encryption;
+        }
+
+        config($config);
+        Mail::purge('smtp');
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array{ok: bool, message: string}
+     */
+    public static function testSmtpEmail(array $form, VendasParametro $params, string $to, ?string $fromName = null): array
+    {
+        $host = trim((string) ($form['email_host'] ?? ''));
+        $user = trim((string) ($form['email_user'] ?? ''));
+        $to = trim($to);
+
+        if ($host === '' || $user === '') {
+            return ['ok' => false, 'message' => 'Informe o host SMTP e o usuário.'];
+        }
+
+        if ($to === '' || ! filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'message' => 'Informe um e-mail de destino válido.'];
+        }
+
+        $password = self::resolveEmailPassword($form, $params);
+
+        if ($password === null || $password === '') {
+            return ['ok' => false, 'message' => 'Informe a senha SMTP ou salve uma senha nas configurações.'];
+        }
+
+        try {
+            self::applySmtpMailConfig($form, $params);
+
+            $subject = trim((string) ($form['email_assunto'] ?? ''));
+
+            if ($subject === '') {
+                $subject = 'Teste de e-mail — Uni Sistemas';
+            }
+
+            $body = "Este é um e-mail de teste enviado pelas Configurações Fiscais do Uni Sistemas.\n\n"
+                ."Host: {$host}\n"
+                ."Usuário: {$user}\n"
+                .'Data/hora: '.now()->format('d/m/Y H:i:s');
+
+            Mail::to($to)->send(new OrcamentoEmail(
+                messageBody: $body,
+                subjectLine: $subject,
+                fromAddress: $user,
+                fromName: $fromName ?: 'Uni Sistemas',
+            ));
+
+            return ['ok' => true, 'message' => "E-mail de teste enviado para {$to}."];
+        } catch (Throwable $exception) {
+            return ['ok' => false, 'message' => 'Falha ao enviar: '.$exception->getMessage()];
+        }
     }
 }

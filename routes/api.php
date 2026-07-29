@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\ForcaVendas\PixController;
 use App\Http\Controllers\Api\ForcaVendas\ProductEstoqueFiliaisController;
 use App\Http\Controllers\Api\ForcaVendas\ProductPhotoController;
 use App\Http\Controllers\Api\ForcaVendas\SyncController as FvSyncController;
+use App\Http\Controllers\Api\Pdv\CargaController as PdvCargaController;
+use App\Http\Controllers\Api\Pdv\RetornoController as PdvRetornoController;
 use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
 use App\Http\Controllers\Api\VendasInternas\InfoController as ViInfoController;
@@ -67,6 +69,25 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
             Route::get('pix/{cobranca}/status', [PixController::class, 'status']);
             Route::post('pix/{cobranca}/cancelar', [PixController::class, 'cancelar']);
         });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| API — Mini-PDV offline (carga do ERP central)
+|--------------------------------------------------------------------------
+| Cada caixa baixa a carga (produtos, clientes, formas de pagamento e config
+| fiscal) para operar localmente mesmo com o servidor indisponível. Auth pelo
+| terminal ativo (empresa_id + terminal = nº lógico ou nome em Terminais).
+*/
+
+Route::prefix('v1/pdv')->group(function (): void {
+    Route::get('ping', [PdvCargaController::class, 'ping'])->middleware('throttle:120,1');
+
+    Route::middleware('pdv.terminal.ativo')->group(function (): void {
+        Route::get('carga/pull', [PdvCargaController::class, 'pull']);
+        Route::get('carga/certificado', [PdvCargaController::class, 'certificado']);
+        Route::post('retorno', [PdvRetornoController::class, 'store']);
     });
 });
 

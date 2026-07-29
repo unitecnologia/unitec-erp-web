@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\AjusteEstoqueResource\Pages;
 use App\Models\AjusteEstoque;
 use BackedEnum;
@@ -24,6 +25,11 @@ class AjusteEstoqueResource extends Resource
     protected static ?string $pluralModelLabel = 'ajustes de estoque';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('ajuste_estoque.access');
+    }
 
     public static function table(Table $table): Table
     {

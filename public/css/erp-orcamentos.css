@@ -86,8 +86,17 @@
 }
 
 .erp-orcamentos-page .erp-orcamentos__period-input,
+.erp-orcamentos-page .erp-orcamentos__period-input.erp-date-input,
 .erp-orcamentos-page .erp-orcamentos__period-group .erp-date-field {
-    min-width: 7.5rem;
+    width: calc(11ch + 2.35rem);
+    min-width: calc(11ch + 2.35rem);
+    max-width: calc(11ch + 2.35rem);
+    box-sizing: border-box;
+}
+
+.erp-orcamentos-page .erp-orcamentos__period-input,
+.erp-orcamentos-page .erp-orcamentos__period-input.erp-date-input {
+    padding-inline: 0.35rem 2.25rem !important;
 }
 
 .erp-orcamentos-page .erp-orcamentos__page-size-group {
@@ -139,7 +148,7 @@
 }
 
 .erp-orcamentos-page .erp-orcamentos__tabs {
-    margin: 0 0 0.35rem;
+    margin: 0;
     gap: 0.25rem;
 }
 
@@ -150,6 +159,103 @@
     padding: 0.2rem 0.65rem;
     line-height: 1.1;
     min-height: 0;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--todos {
+    background: #111827;
+    color: #fff;
+    border-color: #030712;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--todos.erp-orcamentos__tab--active {
+    background: #030712;
+    color: #fff;
+    border-color: #000;
+    box-shadow: inset 0 -2px 0 #000;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--aberto {
+    background: #facc15;
+    color: #422006;
+    border-color: #ca8a04;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--aberto.erp-orcamentos__tab--active {
+    background: #eab308;
+    border-color: #a16207;
+    box-shadow: inset 0 -2px 0 #a16207;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--fechado {
+    background: #2563eb;
+    color: #fff;
+    border-color: #1d4ed8;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--fechado.erp-orcamentos__tab--active {
+    background: #1d4ed8;
+    border-color: #1e3a8a;
+    box-shadow: inset 0 -2px 0 #1e3a8a;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--cancelado {
+    background: #dc2626;
+    color: #fff;
+    border-color: #b91c1c;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--cancelado.erp-orcamentos__tab--active {
+    background: #b91c1c;
+    border-color: #7f1d1d;
+    box-shadow: inset 0 -2px 0 #7f1d1d;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--importado {
+    background: #16a34a;
+    color: #fff;
+    border-color: #15803d;
+}
+
+.erp-orcamentos-page .erp-orcamentos__tab--importado.erp-orcamentos__tab--active {
+    background: #15803d;
+    border-color: #14532d;
+    box-shadow: inset 0 -2px 0 #14532d;
+}
+
+.erp-orcamentos-page .erp-orc-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5rem;
+    padding: 0.04rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.erp-orcamentos-page .erp-orc-status--aberto {
+    background: #facc15;
+    color: #422006;
+}
+
+.erp-orcamentos-page .erp-orc-status--fechado {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-orcamentos-page .erp-orc-status--cancelado {
+    background: #dc2626;
+    color: #fff;
+}
+
+.erp-orcamentos-page .erp-orc-status--importado {
+    background: #16a34a;
+    color: #fff;
 }
 
 /* â”€â”€ Grade: visual moderno (erp-grid.css) + linhas compactas â”€â”€â”€â”€â”€ */
@@ -369,44 +475,147 @@
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(3),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(3),
-.erp-orcamentos-page .fi-ta-header-cell-cliente\.nome-razao,
-.erp-orcamentos-page .fi-ta-cell-cliente\.nome-razao {
-    width: auto !important;
-    min-width: 9rem;
-    max-width: 16rem;
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 3.35rem;
+    max-width: 3.35rem;
+    padding-inline: 0.12rem !important;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(4),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
-    width: 12.5rem;
-    max-width: 14rem;
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-orcamentos-page .fi-ta-header-cell-cliente\.nome-razao,
+.erp-orcamentos-page .fi-ta-cell-cliente\.nome-razao {
+    width: auto !important;
+    min-width: 8rem;
+    max-width: 13rem;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(5),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
-    width: 8.5rem;
-    max-width: 10rem;
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-orcamentos-page .fi-ta-header-cell-vendedor\.nome,
+.erp-orcamentos-page .fi-ta-cell-vendedor\.nome {
+    width: 5.25rem;
+    max-width: 5.75rem;
+    padding-inline: 0.12rem !important;
 }
 
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(6),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-orcamentos-page .fi-ta-header-cell-cliente\.cidade-nome,
+.erp-orcamentos-page .fi-ta-cell-cliente\.cidade-nome {
+    width: 12.5rem;
+    max-width: 14rem;
+    min-width: 11rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-text-item,
+.erp-orcamentos-page .fi-ta-cell-cliente\.cidade-nome .fi-ta-text-item {
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(7),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(7) {
     width: 1.85rem;
     max-width: 1.85rem;
     padding-inline: 0.08rem !important;
 }
 
-.erp-orcamentos-page .fi-ta-header-cell:nth-child(7),
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(7),
-.erp-orcamentos-page .fi-ta-header-cell-total,
-.erp-orcamentos-page .fi-ta-cell-total {
-    width: 4.5rem;
-    max-width: 4.5rem;
-    padding-inline: 0.15rem !important;
-}
-
 .erp-orcamentos-page .fi-ta-header-cell:nth-child(8),
 .erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-orcamentos-page .fi-ta-header-cell-plataforma,
+.erp-orcamentos-page .fi-ta-cell-plataforma {
+    width: 5.75rem;
+    max-width: 6rem;
+    min-width: 5.75rem;
+    padding-inline: 0.12rem !important;
+    overflow: visible !important;
+    white-space: nowrap;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(9),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-orcamentos-page .fi-ta-header-cell-status,
+.erp-orcamentos-page .fi-ta-cell-status {
+    width: 5.5rem;
+    max-width: 5.5rem;
+    padding-inline: 0.12rem !important;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(10),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-orcamentos-page .fi-ta-header-cell-total,
+.erp-orcamentos-page .fi-ta-cell-total {
+    width: 5.85rem !important;
+    min-width: 5.85rem !important;
+    max-width: 5.85rem !important;
+    padding-inline: 0.18rem 0.22rem !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-col,
+.erp-orcamentos-page .fi-ta-cell-total .fi-ta-col {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-col .fi-ta-text,
+.erp-orcamentos-page .fi-ta-cell-total .fi-ta-col .fi-ta-text {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-text-item,
+.erp-orcamentos-page .fi-ta-cell-total .fi-ta-text-item {
+    overflow: hidden !important;
+    width: 100%;
+    max-width: 100% !important;
+}
+
+.erp-orcamentos-page .erp-orc-total-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.2rem;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-orcamentos-page .erp-orc-total-cell__currency {
+    flex: 0 0 auto;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-orcamentos-page .erp-orc-total-cell__amount {
+    flex: 0 0 7ch;
+    width: 7ch;
+    min-width: 7ch;
+    max-width: 7ch;
+    text-align: right;
+    color: var(--erp-text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .erp-orc-total-cell__currency,
+.erp-orcamentos-page .fi-ta-row.erp-row-selected .erp-orc-total-cell__amount {
+    color: #fff;
+}
+
+.erp-orcamentos-page .fi-ta-header-cell:nth-child(11),
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(11),
 .erp-orcamentos-page .fi-ta-header-cell-ver-itens,
 .erp-orcamentos-page .fi-ta-cell-ver-itens {
     width: 1.35rem !important;
@@ -416,7 +625,7 @@
     overflow: hidden;
 }
 
-.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-orcamentos-page .fi-ta-row .fi-ta-cell:nth-child(11) .fi-ta-col,
 .erp-orcamentos-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -938,7 +1147,7 @@
     align-items: center;
     justify-content: center;
     min-width: 5.85rem;
-    height: 4rem;
+    height: 3rem;
     border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: var(--erp-radius-md, 8px);
     background: rgba(255, 255, 255, 0.95);

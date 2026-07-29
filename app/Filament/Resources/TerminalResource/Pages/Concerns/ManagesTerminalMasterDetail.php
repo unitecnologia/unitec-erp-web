@@ -19,11 +19,60 @@ trait ManagesTerminalMasterDetail
 
     public ?int $editingTerminalId = null;
 
+    public ?int $terminalInfoId = null;
+
+    /** @var list<string> */
+    public array $portasImpressoraLista = [];
+
     public function selectTerminalTab(string $tab): void
     {
         if (in_array($tab, $this->terminalTabKeys(), true)) {
             $this->activeTerminalTab = $tab;
         }
+
+        if ($tab === 'configuracoes') {
+            // Só portas estáticas no swap de aba — Get-Printer no mount travava o sistema.
+            $this->ensurePortasBasicas();
+        }
+    }
+
+    public function toggleTerminalAtivo(int $terminalId): void
+    {
+        $terminal = Terminal::query()->find($terminalId);
+
+        if (! $terminal) {
+            Notification::make()
+                ->title('Terminal não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $novo = ! (bool) ($terminal->ativo ?? true);
+        $terminal->forceFill(['ativo' => $novo])->saveQuietly();
+
+        if ((int) ($this->editingTerminalId ?? 0) === $terminalId) {
+            $this->data['ativo'] = $novo;
+        }
+
+        Notification::make()
+            ->title($novo ? 'Terminal liberado.' : 'Terminal bloqueado.')
+            ->body($terminal->nome)
+            ->success()
+            ->send();
+    }
+
+    public function toggleTerminalInfo(int $terminalId): void
+    {
+        $this->terminalInfoId = (int) ($this->terminalInfoId ?? 0) === $terminalId
+            ? null
+            : $terminalId;
+    }
+
+    public function closeTerminalInfo(): void
+    {
+        $this->terminalInfoId = null;
     }
 
     /**
@@ -105,10 +154,14 @@ trait ManagesTerminalMasterDetail
         }
 
         $resolver = TerminalResolver::make();
-        $clientIp = $resolver->resolveClientIp();
 
-        if ($clientIp !== null) {
-            $this->data['ip'] = $clientIp;
+        // IP do PDV vem da carga offline (DHCP). Não sobrescrever com o IP
+        // do navegador do ERP (muitas vezes 127.0.0.1).
+        if ($this->isNewTerminal && blank($this->data['ip'] ?? null)) {
+            $clientIp = $resolver->resolveClientIp();
+            if ($clientIp !== null && ! str_starts_with($clientIp, '127.')) {
+                $this->data['ip'] = $clientIp;
+            }
         }
 
         $payload = $this->mergeTerminalFormData($this->data);
@@ -189,23 +242,56 @@ trait ManagesTerminalMasterDetail
             ->info()
             ->send();
     }
-
     public function moduleStubBrowseImpressora(): void
     {
-        Notification::make()
-            ->title('Localizar impressora')
-            ->body('Seleção de impressora Windows disponível no PDV desktop. Em implementação no web.')
-            ->info()
-            ->send();
+        $this->refreshPortasComImpressorasWindows(true);
     }
 
     public function moduleStubListaImpressoras(): void
     {
+        $this->refreshPortasComImpressorasWindows(true);
+    }
+
+    protected function refreshPortasComImpressorasWindows(bool $notify = false): void
+    {
+        // Enumeração sob demanda (botão), com timeout/cache — nunca no mount da tela.
+        $this->portasImpressoraLista = TerminalFormOptions::portasComImpressorasWindows();
+        $this->ensurePortaInLista();
+        $this->syncImpressoraNomeFromPorta();
+
+        if (! $notify) {
+            return;
+        }
+
+        $rawCount = count(array_filter(
+            $this->portasImpressoraLista,
+            static fn (string $porta): bool => str_starts_with(strtoupper($porta), 'RAW:'),
+        ));
+
         Notification::make()
-            ->title('Portas de impressão')
-            ->body('Detecção automática de portas COM/USB disponível no PDV desktop. Em implementação no web.')
-            ->info()
+            ->title('Impressoras do Windows')
+            ->body($rawCount > 0
+                ? $rawCount.' impressora(s) listada(s) como RAW:... no Caminho Padrao. Selecione e grave.'
+                : 'Nenhuma impressora Windows encontrada neste PC (ou a consulta demorou demais). Confira em Configuracoes > Impressoras e tente de novo.')
+            ->success()
             ->send();
+    }
+
+    public function updatedDataPorta(?string $value): void
+    {
+        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($this->data['porta'] ?? null);
+        if ($fromRaw !== null) {
+            $this->data['impressora_nome'] = $fromRaw;
+            $this->data['usar_device_service'] = true;
+        }
+    }
+
+    protected function syncImpressoraNomeFromPorta(): void
+    {
+        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($this->data['porta'] ?? null);
+        if ($fromRaw !== null) {
+            $this->data['impressora_nome'] = $fromRaw;
+        }
     }
 
     protected function bootTerminalMasterDetail(): void
@@ -225,6 +311,7 @@ trait ManagesTerminalMasterDetail
     {
         $this->highlightedRecordId = $recordId;
         $this->isNewTerminal = false;
+        $this->terminalInfoId = null;
 
         $terminal = Terminal::query()->find($recordId);
 
@@ -241,6 +328,9 @@ trait ManagesTerminalMasterDetail
 
         $this->data = [
             ...$terminal->attributesToArray(),
+            'ativo' => (bool) ($terminal->ativo ?? true),
+            'usar_device_service' => (bool) ($terminal->usar_device_service ?? false),
+            'numero_logico_terminal' => $terminal->numero_logico_terminal,
             'tipo_operacao_padrao' => TerminalFormOptions::normalizeTipoOperacaoPadrao(
                 (string) ($extra['tipo_operacao_padrao'] ?? 'pedido_nao_fiscal'),
             ),
@@ -252,6 +342,30 @@ trait ManagesTerminalMasterDetail
             'tipo_impressora' => (string) ($terminal->tipo_impressora ?? '0'),
             'ip' => $terminal->ip ?: TerminalResolver::make()->resolveClientIp(),
         ];
+
+        $this->ensurePortasBasicas();
+    }
+
+    protected function ensurePortasBasicas(): void
+    {
+        if ($this->portasImpressoraLista === []) {
+            $this->portasImpressoraLista = TerminalFormOptions::portasImpressora();
+        }
+
+        $this->ensurePortaInLista();
+        $this->syncImpressoraNomeFromPorta();
+    }
+
+    protected function ensurePortaInLista(): void
+    {
+        if ($this->portasImpressoraLista === []) {
+            $this->portasImpressoraLista = TerminalFormOptions::portasImpressora();
+        }
+
+        $porta = trim((string) ($this->data['porta'] ?? ''));
+        if ($porta !== '' && ! in_array($porta, $this->portasImpressoraLista, true)) {
+            array_unshift($this->portasImpressoraLista, $porta);
+        }
     }
 
     protected function prepareNewTerminalForm(): void
@@ -259,6 +373,7 @@ trait ManagesTerminalMasterDetail
         $this->editingTerminalId = null;
         $this->isNewTerminal = true;
         $this->data = static::defaultTerminalFormData();
+        $this->ensurePortasBasicas();
     }
 
     protected function afterTerminalDeleted(): void
@@ -294,6 +409,17 @@ trait ManagesTerminalMasterDetail
     {
         $merged = ErpUppercase::normalizeFormData($data);
 
+        $merged['ativo'] = filter_var($merged['ativo'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $merged['usar_device_service'] = filter_var($merged['usar_device_service'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $merged['imprime'] = filter_var($merged['imprime'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $merged['usa_gaveta'] = filter_var($merged['usa_gaveta'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $merged['eh_caixa'] = filter_var($merged['eh_caixa'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $merged['pdv'] = filter_var($merged['pdv'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        if (isset($merged['numero_logico_terminal']) && $merged['numero_logico_terminal'] === '') {
+            $merged['numero_logico_terminal'] = null;
+        }
+
         if (blank($merged['empresa_id'] ?? null)) {
             $merged['empresa_id'] = TerminalResolver::make()->resolveEmpresaId();
         }
@@ -306,6 +432,15 @@ trait ManagesTerminalMasterDetail
             'tipo_operacao_padrao' => (string) ($merged['tipo_operacao_padrao'] ?? 'pedido_nao_fiscal'),
             'preview_impressao' => (bool) ($merged['preview_impressao'] ?? false),
         ];
+
+        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($merged['porta'] ?? null);
+        if ($fromRaw !== null) {
+            $merged['impressora_nome'] = $fromRaw;
+            // Porta RAW: com impressora Windows => impressão silenciosa (Device Service).
+            if (! array_key_exists('usar_device_service', $data)) {
+                $merged['usar_device_service'] = true;
+            }
+        }
 
         unset(
             $merged['id'],
@@ -347,8 +482,10 @@ trait ManagesTerminalMasterDetail
             'exibe_f5' => true,
             'exibe_f6' => true,
             'pdv' => true,
+            'ativo' => true,
             'eh_caixa' => true,
             'imprime' => true,
+            'usar_device_service' => false,
         ];
     }
 

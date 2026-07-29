@@ -4,7 +4,11 @@
     @endphp
 
     <div
-        class="erp-lookup-modal"
+        @class([
+            'erp-lookup-modal',
+            'erp-lookup-modal--'.$lookup['type'] => filled($lookup['type'] ?? null),
+            'erp-lookup-modal--compact' => in_array($lookup['type'] ?? null, ['grupo', 'marca', 'unidade'], true),
+        ])
         wire:keydown.escape="handleLookupEscape"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeProductLookup"></div>
@@ -29,24 +33,32 @@
                         >
                     </fieldset>
 
-                    <p class="erp-lookup-modal__hint">
-                        Você pode mudar a pesquisa clicando no título do campo a ser pesquisado.
-                    </p>
+                    @if (count($lookup['columns']) > 1)
+                        <p class="erp-lookup-modal__hint">
+                            Clique no título da coluna para mudar o campo da pesquisa.
+                        </p>
+                    @endif
 
                     <div class="erp-lookup-modal__grid-wrap">
                         <table class="erp-lookup-modal__grid">
                             <thead>
                                 <tr>
                                     @foreach ($lookup['columns'] as $columnKey => $columnLabel)
+                                        @php
+                                            $canSearchColumn = in_array($columnKey, $lookup['searchColumns'] ?? array_keys($lookup['columns']), true);
+                                        @endphp
                                         <th
                                             scope="col"
-                                            wire:click="setLookupSearchColumn('{{ $columnKey }}')"
+                                            @if ($canSearchColumn)
+                                                wire:click="setLookupSearchColumn('{{ $columnKey }}')"
+                                            @endif
                                             @class([
                                                 'erp-lookup-modal__grid-head',
-                                                'erp-lookup-modal__grid-head--active' => $lookup['searchColumn'] === $columnKey,
+                                                'erp-lookup-modal__grid-head--active' => $canSearchColumn && $lookup['searchColumn'] === $columnKey,
+                                                'erp-lookup-modal__grid-head--static' => ! $canSearchColumn,
                                             ])
                                         >
-                                            @if ($lookup['searchColumn'] === $columnKey)
+                                            @if ($canSearchColumn && $lookup['searchColumn'] === $columnKey)
                                                 &gt;&gt;{{ $columnLabel }}
                                             @else
                                                 {{ $columnLabel }}
@@ -68,13 +80,47 @@
                                         ])
                                     >
                                         @foreach ($lookup['columns'] as $columnKey => $columnLabel)
-                                            <td>{{ $record['values'][$columnKey] ?? '' }}</td>
+                                            @php
+                                                $isBoolean = in_array($columnKey, $lookup['booleanFields'] ?? [], true);
+                                                $flagOn = $isBoolean && ! empty($record['values'][$columnKey]);
+                                            @endphp
+                                            <td
+                                                @class([
+                                                    'erp-lookup-modal__cell--flag' => $isBoolean,
+                                                ])
+                                            >
+                                                @if ($isBoolean)
+                                                    <button
+                                                        type="button"
+                                                        class="erp-lookup-modal__flag @if ($flagOn) is-on @endif"
+                                                        wire:click.stop="toggleLookupBoolean({{ $record['id'] }}, '{{ $columnKey }}')"
+                                                        title="{{ $flagOn ? 'Visível no app força de vendas' : 'Oculto no app força de vendas' }}"
+                                                        aria-pressed="{{ $flagOn ? 'true' : 'false' }}"
+                                                        aria-label="{{ $columnLabel }}"
+                                                    ></button>
+                                                @else
+                                                    {{ $record['values'][$columnKey] ?? '' }}
+                                                @endif
+                                            </td>
                                         @endforeach
                                     </tr>
                                 @empty
                                     <tr>
                                         <td colspan="{{ count($lookup['columns']) }}" class="erp-lookup-modal__empty">
-                                            Nenhum registro encontrado.
+                                            @if ($lookup['type'] === 'ncm')
+                                                Nenhum NCM encontrado.
+                                                <div class="erp-lookup-modal__empty-actions">
+                                                    <button
+                                                        type="button"
+                                                        class="erp-pcad-form__btn"
+                                                        wire:click="startLookupCreate"
+                                                    >
+                                                        Cadastrar NCM
+                                                    </button>
+                                                </div>
+                                            @else
+                                                Nenhum registro encontrado.
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforelse
@@ -92,10 +138,12 @@
                         <span class="erp-pcad-actions__icon">✎</span>
                         <span class="erp-pcad-actions__label"><kbd>F3</kbd> | Alterar</span>
                     </button>
-                    <button type="button" wire:click="modulePending('Imprimir')" class="erp-pcad-actions__btn erp-lookup-modal__btn--disabled" title="Em implementação">
-                        <span class="erp-pcad-actions__icon">🖨</span>
-                        <span class="erp-pcad-actions__label"><kbd>F4</kbd> | Imprimir</span>
-                    </button>
+                    @if (($lookup['type'] ?? null) !== 'grupo')
+                        <button type="button" wire:click="modulePending('Imprimir')" class="erp-pcad-actions__btn erp-lookup-modal__btn--disabled" title="Em implementação">
+                            <span class="erp-pcad-actions__icon">🖨</span>
+                            <span class="erp-pcad-actions__label"><kbd>F4</kbd> | Imprimir</span>
+                        </button>
+                    @endif
                     <button type="button" wire:click="closeProductLookup" class="erp-pcad-actions__btn">
                         <span class="erp-pcad-actions__icon erp-pcad-actions__icon--exit">✕</span>
                         <span class="erp-pcad-actions__label"><kbd>ESC</kbd> | Sair</span>
@@ -109,15 +157,27 @@
                         </legend>
 
                         @foreach ($lookup['formFields'] as $fieldKey => $fieldLabel)
-                            <label class="erp-lookup-modal__form-field" for="erp-lookup-field-{{ $fieldKey }}">
-                                <span>{{ $fieldLabel }}</span>
-                                <input
-                                    id="erp-lookup-field-{{ $fieldKey }}"
-                                    type="text"
-                                    wire:model="lookupForm.{{ $fieldKey }}"
-                                    class="erp-pcad-form__input"
-                                >
-                            </label>
+                            @if (in_array($fieldKey, $lookup['booleanFields'] ?? [], true))
+                                <label class="erp-lookup-modal__form-check" for="erp-lookup-field-{{ $fieldKey }}">
+                                    <input
+                                        id="erp-lookup-field-{{ $fieldKey }}"
+                                        type="checkbox"
+                                        wire:model.boolean="lookupForm.{{ $fieldKey }}"
+                                        class="erp-lookup-modal__form-check-input"
+                                    >
+                                    <span>{{ $fieldLabel }} — mostrar no app força de vendas</span>
+                                </label>
+                            @else
+                                <label class="erp-lookup-modal__form-field" for="erp-lookup-field-{{ $fieldKey }}">
+                                    <span>{{ $fieldLabel }}</span>
+                                    <input
+                                        id="erp-lookup-field-{{ $fieldKey }}"
+                                        type="text"
+                                        wire:model="lookupForm.{{ $fieldKey }}"
+                                        class="erp-pcad-form__input"
+                                    >
+                                </label>
+                            @endif
                         @endforeach
                     </fieldset>
                 </div>

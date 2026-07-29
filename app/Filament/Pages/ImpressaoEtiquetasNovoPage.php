@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -20,6 +21,11 @@ class ImpressaoEtiquetasNovoPage extends Page
     protected static ?string $slug = 'impressao-etiquetas-novo';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('etiquetas.access');
+    }
 
     public string $tipoBusca = 'codigo_barras';
 

@@ -52,6 +52,7 @@ class AdminPanelProvider extends PanelProvider
                     ->relativePublicPath('css/erp-tokens.css'),
             ])
             ->renderHook(PanelsRenderHook::HEAD_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.sw-unregister'))
+            ->renderHook(PanelsRenderHook::HEAD_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.ui-density'))
             ->renderHook(PanelsRenderHook::STYLES_AFTER, function (): \Illuminate\Contracts\View\View {
                 if (! filament()->auth()->check()) {
                     return view('filament.components.erp.empty');
@@ -96,7 +97,6 @@ class AdminPanelProvider extends PanelProvider
                 return view('filament.components.erp.shell-scripts');
             })
             ->renderHook(PanelsRenderHook::LAYOUT_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.shell-header'))
-            ->renderHook(PanelsRenderHook::FOOTER, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.status-bar'))
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -110,6 +110,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                \App\Http\Middleware\EnsureEmpresaCadastrada::class,
+                \App\Http\Middleware\EnsureOnboardingCompleto::class,
+                \App\Http\Middleware\EnsureEmpresaSelecionada::class,
+                \App\Http\Middleware\EnsureLicencaAtiva::class,
             ]);
     }
 }

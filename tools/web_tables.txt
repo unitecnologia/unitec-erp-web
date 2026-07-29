@@ -1,0 +1,10 @@
+﻿
+Parse error: syntax error, unexpected token "\", expecting end of file in Command line code on line 1
+.\tools\php\php.exe : PHP Parse error:  syntax error, unexpected token "\", expecting end of file in Command line code 
+on line 1
+No C:\Users\Alencar\AppData\Local\Temp\ps-script-2876372a-3272-4b23-8e70-426835c3847c.ps1:146 caractere:1
++ .\tools\php\php.exe -r "require 'vendor/autoload.php'; \$a=require 'b ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PHP Parse error... code on line 1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

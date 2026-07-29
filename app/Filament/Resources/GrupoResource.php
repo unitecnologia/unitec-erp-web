@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\GrupoResource\Pages;
 use App\Models\Grupo;
 use BackedEnum;
@@ -27,18 +28,28 @@ class GrupoResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('grupos.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
                 TextColumn::make('id')
-                    ->label('CÃ³digo')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('nome')
-                    ->label('DescriÃ§Ã£o')
+                    ->label('Descrição')
                     ->wrap(false)
+                    ->weight(FontWeight::Bold),
+                TextColumn::make('mostrar_no_app')
+                    ->label('App')
+                    ->alignCenter()
+                    ->formatStateUsing(fn ($state): string => $state ? '�o"' : '')
                     ->weight(FontWeight::Bold),
             ])
             ->defaultSort('id', 'asc')

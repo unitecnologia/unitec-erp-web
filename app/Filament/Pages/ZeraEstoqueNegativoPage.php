@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ZeraEstoqueNegativoService;
 use BackedEnum;
@@ -21,6 +22,11 @@ class ZeraEstoqueNegativoPage extends Page
     protected static ?string $slug = 'zera-estoque-negativo';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('ajuste_estoque.access');
+    }
 
     public function mount(): void
     {

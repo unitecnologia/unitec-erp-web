@@ -51,6 +51,7 @@ class PdvVendaNfce extends Model
         'cnf',
         'chave',
         'protocolo',
+        'protocolo_cancelamento',
         'status',
         'ambiente',
         'tipo_emissao',

@@ -281,19 +281,28 @@ window.ErpMasks = {
         const intPart = padded.slice(0, -decimals).replace(/^0+(?=\d)/, '') || '0';
         const decPart = padded.slice(-decimals);
 
-        return `${intPart},${decPart}`;
+        return `${this.formatThousandsBr(intPart)},${decPart}`;
     },
 
     /** Valor monetário digitado normalmente (221 = R$ 221,00), não estilo caixa/PDV. */
-    formatMoneyBr(value, maxDecimals = 2) {
+    formatMoneyBr(value, maxDecimals = 2, options = {}) {
+        const withThousands = options.thousands === true;
         let raw = String(value ?? '').trim();
 
         if (raw === '') {
             return '';
         }
 
+        // Decimal BR é vírgula. Ponto só vira decimal em cola estilo 10.5 / 10.50.
+        // "1.000" / "10.000" / "1.0000" (digitação com milhar) → remove pontos.
         if (raw.includes('.') && ! raw.includes(',')) {
-            raw = raw.replace('.', ',');
+            if (/^\d+\.\d{1,2}$/.test(raw)) {
+                raw = raw.replace('.', ',');
+            } else {
+                raw = raw.replace(/\./g, '');
+            }
+        } else {
+            raw = raw.replace(/\./g, '');
         }
 
         raw = raw.replace(/[^\d,]/g, '');
@@ -311,29 +320,50 @@ window.ErpMasks = {
 
         intPart = intPart.replace(/^0+(?=\d)/, '');
 
+        const formatInt = (digits) => {
+            if (digits === '') {
+                return withThousands ? '0' : '';
+            }
+
+            return withThousands ? this.formatThousandsBr(digits) : digits;
+        };
+
         if (commaIndex === -1) {
-            return intPart === '' ? '' : intPart;
+            return intPart === '' ? '' : formatInt(intPart);
         }
 
         decPart = decPart.slice(0, maxDecimals);
 
-        return `${intPart === '' ? '0' : intPart},${decPart}`;
+        return `${intPart === '' ? '0' : formatInt(intPart)},${decPart}`;
+    },
+
+    formatThousandsBr(intPart) {
+        const digits = String(intPart ?? '').replace(/\D/g, '');
+
+        if (digits === '') {
+            return '0';
+        }
+
+        return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     },
 
     finalizeMoneyBr(value, maxDecimals = 2) {
-        const formatted = this.formatMoneyBr(value, maxDecimals);
+        const formatted = this.formatMoneyBr(value, maxDecimals, { thousands: false });
 
         if (formatted === '') {
             return `0,${'0'.repeat(maxDecimals)}`;
         }
 
         if (! formatted.includes(',')) {
-            return `${formatted},${'0'.repeat(maxDecimals)}`;
+            const intDigits = formatted.replace(/\D/g, '') || '0';
+
+            return `${this.formatThousandsBr(intDigits)},${'0'.repeat(maxDecimals)}`;
         }
 
         const [intPart, decPart = ''] = formatted.split(',');
+        const intDigits = (intPart || '0').replace(/\D/g, '') || '0';
 
-        return `${intPart || '0'},${decPart.padEnd(maxDecimals, '0').slice(0, maxDecimals)}`;
+        return `${this.formatThousandsBr(intDigits)},${decPart.padEnd(maxDecimals, '0').slice(0, maxDecimals)}`;
     },
 
     finalizeInteger(value) {
@@ -343,14 +373,18 @@ window.ErpMasks = {
     },
 
     isBrDecimalMask(type) {
-        return type === 'money-br' || type === 'percent-br';
+        return type === 'money-br' || type === 'percent-br' || type === 'percent-br-4';
+    },
+
+    maskDecimalPlaces(type) {
+        return type === 'percent-br-4' ? 4 : 2;
     },
 
     finalizeMaskValue(input) {
         const type = input.dataset.mask;
 
         if (this.isBrDecimalMask(type)) {
-            return this.finalizeMoneyBr(input.value);
+            return this.finalizeMoneyBr(input.value, this.maskDecimalPlaces(type));
         }
 
         if (type === 'integer') {
@@ -444,7 +478,7 @@ window.ErpMasks = {
         return this.digits(value).slice(0, max);
     },
 
-    formatByType(type, value, input = null) {
+    formatByType(type, value, input = null, options = {}) {
         switch (type) {
             case 'cpf-cnpj':
                 return this.formatCpfCnpj(value, input ? this.getPessoaTipo(input) : 'juridica');
@@ -457,11 +491,13 @@ window.ErpMasks = {
             case 'money':
                 return this.formatMoney(value);
             case 'money-br':
-                return this.formatMoneyBr(value);
+                return this.formatMoneyBr(value, 2, { thousands: options.thousands === true });
             case 'percent':
                 return this.formatPercent(value);
             case 'percent-br':
-                return this.formatMoneyBr(value);
+                return this.formatMoneyBr(value, 2, { thousands: options.thousands === true });
+            case 'percent-br-4':
+                return this.formatMoneyBr(value, 4, { thousands: options.thousands === true });
             case 'integer':
                 return this.formatInteger(value);
             case 'decimal3':
@@ -552,7 +588,11 @@ window.ErpMasks = {
             return;
         }
 
-        const formatted = this.formatByType(type, input.value, input);
+        // Digitacão: sem milhar. Blur/refresh/commit: com milhar (1.000,00).
+        const formatOptions = this.isBrDecimalMask(type)
+            ? { thousands: options.thousands === true }
+            : {};
+        const formatted = this.formatByType(type, input.value, input, formatOptions);
 
         if (input.value !== formatted) {
             input.value = formatted;
@@ -601,7 +641,11 @@ window.ErpMasks = {
                     input.value = this.finalizeMaskValue(input);
                 }
 
-                this.apply(input, { allowEmptySync: true, live: true });
+                this.apply(input, {
+                    allowEmptySync: true,
+                    live: true,
+                    thousands: this.isBrDecimalMask(input.dataset.mask),
+                });
 
                 if (input.dataset.mask === 'cpf-cnpj') {
                     this.validateDocumentoInput(input);
@@ -621,8 +665,18 @@ window.ErpMasks = {
         });
 
         if (this.isBrDecimalMask(input.dataset.mask) || input.dataset.mask === 'integer') {
+            // Preferir o valor já no Livewire (ex.: imposto padrão no produto novo).
+            // Sem isso, o bind em input vazio finaliza como 0,00 e sobrescreve o estado.
+            const field = this.getWireField(input);
+            const component = field ? this.getLivewireComponent(input) : null;
+            const wireValue = component ? this.readWireValue(component, field) : '';
+
+            if (wireValue !== '') {
+                input.value = wireValue;
+            }
+
             input.value = this.finalizeMaskValue(input);
-            this.apply(input);
+            this.apply(input, { thousands: this.isBrDecimalMask(input.dataset.mask) });
         } else if (input.value) {
             this.apply(input);
         }
@@ -693,7 +747,10 @@ window.ErpMasks = {
                     input.value = this.finalizeMaskValue(input);
                 }
 
-                this.apply(input, { sync: false });
+                this.apply(input, {
+                    sync: false,
+                    thousands: this.isBrDecimalMask(input.dataset.mask),
+                });
             }
         });
 

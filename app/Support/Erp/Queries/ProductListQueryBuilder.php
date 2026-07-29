@@ -18,6 +18,7 @@ class ProductListQueryBuilder
         public string $orderBy = 'codigo',
         public string $estoqueFilter = 'todos',
         public string $grupoFilter = '',
+        public bool $applyDefaultOrder = true,
     ) {}
 
     public static function fromRequest(Request $request, ?Empresa $empresa = null): self
@@ -81,6 +82,14 @@ class ProductListQueryBuilder
 
         $allowedOrder = ['codigo', 'descricao', 'grupo', 'preco_venda', 'estoque'];
         $orderBy = in_array($this->orderBy, $allowedOrder, true) ? $this->orderBy : 'codigo';
+
+        if (! $this->applyDefaultOrder) {
+            return $query;
+        }
+
+        if ($orderBy === 'codigo') {
+            return $query->orderByRaw('CAST(codigo AS UNSIGNED) asc');
+        }
 
         return $query->orderBy($orderBy);
     }

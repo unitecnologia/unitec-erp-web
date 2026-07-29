@@ -7,6 +7,7 @@ use App\Models\Marca;
 use App\Models\Ncm;
 use App\Models\Product;
 use App\Models\Unidade;
+use App\Support\Erp\Fiscal\NcmCatalogService;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -31,6 +32,14 @@ trait ManagesProductCadastroLookup
 
     /** @var array<string, string> */
     public array $lookupForm = [];
+
+    public bool $ncmConfirmOpen = false;
+
+    public string $ncmConfirmCodigo = '';
+
+    public string $ncmConfirmDescricao = '';
+
+    public bool $ncmConfirmApplyToProduct = true;
 
     public function openProductLookup(string $type): void
     {
@@ -74,6 +83,10 @@ trait ManagesProductCadastroLookup
 
     public function handleLookupEscape(): void
     {
+        if (! $this->lookupOpen || ! $this->lookupType) {
+            return;
+        }
+
         if ($this->lookupPanel === 'form') {
             $this->cancelLookupForm();
 
@@ -108,7 +121,7 @@ trait ManagesProductCadastroLookup
 
     public function confirmProductLookup(?int $recordId = null): void
     {
-        if ($this->lookupPanel !== 'list') {
+        if (! $this->lookupOpen || ! $this->lookupType || $this->lookupPanel !== 'list') {
             return;
         }
 
@@ -149,15 +162,39 @@ trait ManagesProductCadastroLookup
 
     public function startLookupCreate(): void
     {
+        if (! $this->lookupOpen || ! $this->lookupType) {
+            return;
+        }
+
         $this->lookupPanel = 'form';
         $this->lookupEditingId = null;
         $this->resetLookupForm();
+
+        if ($this->lookupType === 'ncm') {
+            $catalog = app(NcmCatalogService::class);
+            $codigo = $catalog->normalizeCodigo($this->lookupSearch)
+                ?? $catalog->normalizeCodigo((string) ($this->data['ncm'] ?? ''));
+
+            if ($codigo !== null) {
+                $this->lookupForm['codigo'] = $codigo;
+            }
+
+            // Se pesquisou por texto e não achou, sugere a descrição digitada.
+            $search = trim($this->lookupSearch);
+            if ($search !== '' && ! ctype_digit(preg_replace('/\D/', '', $search) ?: '') && blank($this->lookupForm['descricao'] ?? null)) {
+                $this->lookupForm['descricao'] = Str::upper($search);
+            }
+        }
 
         $this->dispatch('erp-lookup-form-opened');
     }
 
     public function startLookupEdit(): void
     {
+        if (! $this->lookupOpen || ! $this->lookupType) {
+            return;
+        }
+
         if (! $this->lookupHighlightedId) {
             Notification::make()
                 ->title('Selecione um registro para alterar.')
@@ -183,6 +220,12 @@ trait ManagesProductCadastroLookup
         $this->lookupEditingId = $record->getKey();
 
         foreach ($definition['formFields'] as $field) {
+            if ($this->lookupFieldIsBoolean($definition, $field)) {
+                $this->lookupForm[$field] = (bool) $record->{$field};
+
+                continue;
+            }
+
             $this->lookupForm[$field] = (string) $record->{$field};
         }
 
@@ -198,10 +241,22 @@ trait ManagesProductCadastroLookup
 
     public function saveLookupRecord(): void
     {
+        if (! $this->lookupOpen || ! $this->lookupType || $this->lookupPanel !== 'form') {
+            return;
+        }
+
         $definition = $this->currentLookupDefinition();
         $fields = $definition['formFields'];
+        $payload = [];
 
         foreach ($fields as $field) {
+            if ($this->lookupFieldIsBoolean($definition, $field)) {
+                $payload[$field] = filter_var($this->lookupForm[$field] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $this->lookupForm[$field] = $payload[$field];
+
+                continue;
+            }
+
             $value = trim((string) ($this->lookupForm[$field] ?? ''));
 
             if ($value === '') {
@@ -214,18 +269,20 @@ trait ManagesProductCadastroLookup
             }
 
             if ($this->lookupType === 'ncm' && $field === 'codigo') {
-                $this->lookupForm[$field] = str_pad(preg_replace('/\D/', '', $value), 8, '0', STR_PAD_LEFT);
+                $payload[$field] = str_pad(preg_replace('/\D/', '', $value), 8, '0', STR_PAD_LEFT);
+                $this->lookupForm[$field] = $payload[$field];
 
                 continue;
             }
 
-            $this->lookupForm[$field] = Str::upper($value);
+            $payload[$field] = Str::upper($value);
+            $this->lookupForm[$field] = $payload[$field];
         }
 
         /** @var class-string<Model> $modelClass */
         $modelClass = $definition['model'];
         $uniqueField = $definition['valueColumn'];
-        $uniqueValue = $this->lookupForm[$uniqueField] ?? '';
+        $uniqueValue = $payload[$uniqueField] ?? '';
 
         if ($this->lookupRecordExists($modelClass, $uniqueField, $uniqueValue, $this->lookupEditingId)) {
             Notification::make()
@@ -251,13 +308,13 @@ trait ManagesProductCadastroLookup
                     return;
                 }
 
-                $record->fill($this->lookupForm);
+                $record->fill($payload);
                 $record->save();
                 $this->lookupHighlightedId = $record->getKey();
             } else {
                 /** @var Model $record */
                 $record = $modelClass::query()->create([
-                    ...$this->lookupForm,
+                    ...$payload,
                     'ativo' => true,
                 ]);
                 $this->lookupHighlightedId = $record->getKey();
@@ -272,10 +329,23 @@ trait ManagesProductCadastroLookup
             return;
         }
 
+        $wasCreating = $this->lookupEditingId === null;
+        $applyNcmToProduct = $this->lookupType === 'ncm' && $wasCreating;
+        $ncmCodigo = $applyNcmToProduct ? (string) ($this->lookupForm['codigo'] ?? $uniqueValue) : '';
+        $ncmDescricao = $applyNcmToProduct ? (string) ($this->lookupForm['descricao'] ?? '') : '';
+
         $this->lookupSearch = $uniqueValue;
         $this->lookupPanel = 'list';
         $this->lookupEditingId = null;
         $this->resetLookupForm();
+        $this->ncmConfirmOpen = false;
+        $this->ncmConfirmCodigo = '';
+        $this->ncmConfirmDescricao = '';
+
+        if ($applyNcmToProduct && $ncmCodigo !== '') {
+            $this->applyNcmToProductForm($ncmCodigo, $ncmDescricao);
+            $this->closeProductLookup();
+        }
 
         Notification::make()
             ->title('Registro salvo.')
@@ -300,19 +370,44 @@ trait ManagesProductCadastroLookup
                 ? $this->lookupSearchColumn
                 : $definition['defaultSearchColumn'];
 
-            $query->where($column, 'like', '%' . $this->lookupSearch . '%');
+            $search = trim($this->lookupSearch);
+
+            if ($this->lookupType === 'ncm' && $column === 'codigo') {
+                $digits = preg_replace('/\D/', '', $search) ?? '';
+                if ($digits !== '') {
+                    $query->where('codigo', 'like', $digits.'%');
+                } else {
+                    $query->where($column, 'like', '%'.$search.'%');
+                }
+            } else {
+                $query->where($column, 'like', '%'.$search.'%');
+            }
         }
+
+        $limit = $this->lookupType === 'ncm' ? 300 : 200;
 
         return $query
             ->orderBy($definition['defaultSearchColumn'])
-            ->limit(200)
+            ->limit($limit)
             ->get()
-            ->map(fn (Model $record): array => [
-                'id' => $record->getKey(),
-                'values' => collect($definition['columns'])
-                    ->map(fn (string $label, string $key): string => (string) $record->{$key})
-                    ->all(),
-            ])
+            ->map(function (Model $record) use ($definition): array {
+                $values = [];
+
+                foreach ($definition['columns'] as $key => $label) {
+                    if ($this->lookupFieldIsBoolean($definition, $key)) {
+                        $values[$key] = (bool) $record->{$key};
+
+                        continue;
+                    }
+
+                    $values[$key] = (string) $record->{$key};
+                }
+
+                return [
+                    'id' => $record->getKey(),
+                    'values' => $values,
+                ];
+            })
             ->all();
     }
 
@@ -334,6 +429,8 @@ trait ManagesProductCadastroLookup
             'searchColumn' => $this->lookupSearchColumn,
             'searchLabel' => $definition['columns'][$this->lookupSearchColumn] ?? 'Campo',
             'columns' => $definition['columns'],
+            'booleanFields' => $definition['booleanFields'] ?? [],
+            'searchColumns' => $definition['searchColumns'] ?? [],
             'formFields' => collect($definition['formFields'])
                 ->mapWithKeys(fn (string $field): array => [
                     $field => $definition['columns'][$field] ?? Str::headline($field),
@@ -378,9 +475,45 @@ trait ManagesProductCadastroLookup
             return;
         }
 
-        foreach ($this->lookupDefinition($this->lookupType)['formFields'] as $field) {
-            $this->lookupForm[$field] = '';
+        $definition = $this->lookupDefinition($this->lookupType);
+
+        foreach ($definition['formFields'] as $field) {
+            $this->lookupForm[$field] = $this->lookupFieldIsBoolean($definition, $field) ? false : '';
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     */
+    protected function lookupFieldIsBoolean(array $definition, string $field): bool
+    {
+        return in_array($field, $definition['booleanFields'] ?? [], true);
+    }
+
+    public function toggleLookupBoolean(int $recordId, string $field): void
+    {
+        if (! $this->lookupOpen || ! $this->lookupType || $this->lookupPanel !== 'list') {
+            return;
+        }
+
+        $definition = $this->currentLookupDefinition();
+
+        if (! $this->lookupFieldIsBoolean($definition, $field)) {
+            return;
+        }
+
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $definition['model'];
+        /** @var Model|null $record */
+        $record = $modelClass::query()->find($recordId);
+
+        if (! $record) {
+            return;
+        }
+
+        $record->{$field} = ! (bool) $record->{$field};
+        $record->save();
+        $this->lookupHighlightedId = $record->getKey();
     }
 
     /**
@@ -388,7 +521,7 @@ trait ManagesProductCadastroLookup
      */
     protected function currentLookupDefinition(): array
     {
-        if (! $this->lookupType) {
+        if (! $this->lookupOpen || ! $this->lookupType) {
             throw new RuntimeException('Lookup type not set.');
         }
 
@@ -433,10 +566,12 @@ trait ManagesProductCadastroLookup
                 'model' => Grupo::class,
                 'columns' => [
                     'nome' => 'Grupo',
+                    'mostrar_no_app' => 'App',
                 ],
                 'searchColumns' => ['nome'],
                 'defaultSearchColumn' => 'nome',
-                'formFields' => ['nome'],
+                'formFields' => ['nome', 'mostrar_no_app'],
+                'booleanFields' => ['mostrar_no_app'],
             ],
             'ncm' => [
                 'title' => 'NCM',
@@ -460,21 +595,109 @@ trait ManagesProductCadastroLookup
 
     public function syncNcmDescricaoFromCodigo(): void
     {
-        $ncm = str_pad(preg_replace('/\D/', '', (string) ($this->data['ncm'] ?? '')), 8, '0', STR_PAD_LEFT);
+        $catalog = app(NcmCatalogService::class);
+        $ncm = $catalog->normalizeCodigo((string) ($this->data['ncm'] ?? ''));
 
-        if (strlen($ncm) !== 8) {
+        if ($ncm === null) {
             return;
         }
 
         $this->data['ncm'] = $ncm;
 
-        $descricao = Ncm::query()->where('codigo', $ncm)->value('descricao');
+        $record = $catalog->findByCodigo($ncm);
 
-        if ($descricao) {
-            $this->data['ncm_descricao'] = $descricao;
+        if ($record) {
+            $this->applyNcmToProductForm((string) $record->codigo, (string) $record->descricao);
+            $this->ncmConfirmOpen = false;
+
+            return;
         }
 
-        $this->form->fill($this->data);
+        // NCM digitado não existe na tabela única — pergunta se deseja cadastrar.
+        $this->ncmConfirmCodigo = $ncm;
+        $this->ncmConfirmDescricao = trim((string) ($this->data['ncm_descricao'] ?? ''));
+        $this->ncmConfirmApplyToProduct = true;
+        $this->ncmConfirmOpen = true;
+        $this->data['ncm_descricao'] = '';
+
+        if (isset($this->form) && method_exists($this->form, 'fill')) {
+            $this->form->fill($this->data);
+        }
+    }
+
+    /**
+     * Preenche a descrição do NCM a partir do catálogo (sem abrir modal de cadastro).
+     */
+    public function hydrateNcmDescricaoFromCatalog(bool $fillForm = true): void
+    {
+        $catalog = app(NcmCatalogService::class);
+        $ncm = $catalog->normalizeCodigo((string) ($this->data['ncm'] ?? ''));
+
+        if ($ncm === null) {
+            return;
+        }
+
+        $this->data['ncm'] = $ncm;
+
+        $record = $catalog->findByCodigo($ncm);
+
+        if (! $record) {
+            if (blank($this->data['ncm_descricao'] ?? null)) {
+                $this->data['ncm_descricao'] = '';
+            }
+
+            return;
+        }
+
+        $this->data['ncm_descricao'] = (string) $record->descricao;
+
+        if ($fillForm && isset($this->form) && method_exists($this->form, 'fill')) {
+            $this->form->fill($this->data);
+        }
+    }
+
+    public function confirmCadastrarNcm(): void
+    {
+        $codigo = app(NcmCatalogService::class)->normalizeCodigo($this->ncmConfirmCodigo);
+
+        if ($codigo === null) {
+            $this->cancelCadastrarNcm();
+
+            return;
+        }
+
+        $this->ncmConfirmOpen = false;
+        $this->ncmConfirmApplyToProduct = true;
+        $this->openProductLookup('ncm');
+        $this->lookupSearch = $codigo;
+        $this->startLookupCreate();
+        $this->lookupForm['codigo'] = $codigo;
+        $this->lookupForm['descricao'] = Str::upper(trim($this->ncmConfirmDescricao));
+    }
+
+    public function cancelCadastrarNcm(): void
+    {
+        $this->ncmConfirmOpen = false;
+        // Mantém o código digitado, mas sem descrição oficial.
+        $this->data['ncm'] = $this->ncmConfirmCodigo !== ''
+            ? $this->ncmConfirmCodigo
+            : ($this->data['ncm'] ?? '');
+        $this->ncmConfirmCodigo = '';
+        $this->ncmConfirmDescricao = '';
+
+        if (isset($this->form) && method_exists($this->form, 'fill')) {
+            $this->form->fill($this->data);
+        }
+    }
+
+    protected function applyNcmToProductForm(string $codigo, string $descricao): void
+    {
+        $this->data['ncm'] = $codigo;
+        $this->data['ncm_descricao'] = $descricao;
+
+        if (isset($this->form) && method_exists($this->form, 'fill')) {
+            $this->form->fill($this->data);
+        }
     }
 
     /**

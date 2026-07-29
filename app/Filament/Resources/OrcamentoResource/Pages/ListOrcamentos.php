@@ -221,14 +221,19 @@ class ListOrcamentos extends ListRecords
         $this->notifyPeriodFilterResult();
     }
 
+    public function applyPeriodFilterAuto(): void
+    {
+        $this->syncAppliedPeriodFilter();
+    }
+
     public function applyPeriodoFilter(string $de = '', string $ate = ''): void
     {
         if ($de !== '') {
-            $this->periodoDe = $this->normalizePeriodDate($de) ?? trim($de);
+            $this->periodoDe = $this->normalizePeriodDate($de) ?? '';
         }
 
         if ($ate !== '') {
-            $this->periodoAte = $this->normalizePeriodDate($ate) ?? trim($ate);
+            $this->periodoAte = $this->normalizePeriodDate($ate) ?? '';
         }
 
         $this->applyPeriodFilter();
@@ -236,11 +241,11 @@ class ListOrcamentos extends ListRecords
 
     protected function syncAppliedPeriodFilter(): void
     {
-        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? trim($this->periodoDe);
-        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? trim($this->periodoAte);
+        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? '';
+        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? '';
 
-        $this->periodoDeApplied = $this->periodoDe !== '' ? $this->periodoDe : '';
-        $this->periodoAteApplied = $this->periodoAte !== '' ? $this->periodoAte : '';
+        $this->periodoDeApplied = $this->periodoDe;
+        $this->periodoAteApplied = $this->periodoAte;
 
         if (
             filled($this->periodoDeApplied)
@@ -255,6 +260,12 @@ class ListOrcamentos extends ListRecords
         $this->clearListSelection();
         $this->resetPage();
         $this->resetTable();
+
+        $this->dispatch(
+            'erp-hydrate-orcamentos-dates',
+            de: $this->periodoDe,
+            ate: $this->periodoAte,
+        );
     }
 
     protected function notifyPeriodFilterResult(): void
@@ -290,18 +301,33 @@ class ListOrcamentos extends ListRecords
         }
 
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
-            return $value;
+            return $this->isValidPeriodIsoDate($value) ? $value : null;
         }
 
+        // dd/mm/yyyy (não usar Carbon::parse — interpreta m/d/Y estilo US)
         if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $matches) === 1) {
-            return sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
         }
 
-        try {
-            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
+        // ddmmyyyy (máscara sem barras / valor digitado)
+        if (preg_match('/^(\d{2})(\d{2})(\d{4})$/', $value, $matches) === 1) {
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
         }
+
+        return null;
+    }
+
+    protected function isValidPeriodIsoDate(string $iso): bool
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $matches) !== 1) {
+            return false;
+        }
+
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
     }
 
     public function clearSearch(): void

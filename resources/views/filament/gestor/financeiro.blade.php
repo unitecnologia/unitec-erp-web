@@ -23,7 +23,7 @@
                 'eyebrow' => $aberto
                     ? (in_array($this->detalheTipo, ['inadimplencia', 'acima_limite'], true)
                         ? ($this->detalheTipo === 'acima_limite' ? 'Clientes acima do limite' : 'Clientes inadimplentes')
-                        : 'Detalhe dos títulos')
+                        : ($this->detalheTipo === 'cartoes' ? 'Parcelas de cartão' : 'Detalhe dos títulos'))
                     : 'Caixa e títulos',
                 'refresh' => $aberto ? null : 'refreshFinanceiro',
                 'notify_url' => $aprovUrl,
@@ -37,7 +37,7 @@
                 @php
                     $listaClientes = in_array($this->detalheTipo, ['inadimplencia', 'acima_limite'], true);
                     $mostraPagar = in_array($this->detalheTipo, ['pagar_hoje', 'pagar_vencido'], true) && $this->podePagarTitulos();
-                    $mostraReceber = in_array($this->detalheTipo, ['receber_hoje', 'receber_vencido', 'proximos_receber'], true) && $this->podeReceberTitulos();
+                    $mostraReceber = in_array($this->detalheTipo, ['receber_hoje', 'receber_vencido', 'proximos_receber', 'cartoes'], true) && $this->podeReceberTitulos();
                     $mostraAcao = $mostraPagar || $mostraReceber;
                 @endphp
                 <div class="gestor-edit__card {{ $listaClientes ? 'gestor-edit__card--lista' : '' }}" wire:loading.class="is-loading">
@@ -195,11 +195,16 @@
                             @foreach ($serie as $ponto)
                                 @php
                                     $v = (float) ($ponto['valor'] ?? 0);
-                                    $h = max(8, (int) round((abs($v) / $maxAbs) * 100));
+                                    // Altura em px (não %): % colapsa quando o pai só tem min-height.
+                                    $hPx = max(6, (int) round((abs($v) / $maxAbs) * 72));
                                     $cls = $v < 0 ? 'is-neg' : 'is-pos';
                                 @endphp
                                 <div class="gestor-spark__col">
-                                    <div class="gestor-spark__bar {{ $cls }}" style="--h: {{ $h }}%" title="{{ $ponto['dia'] ?? '' }}: {{ $this->money($v) }}"></div>
+                                    <div
+                                        class="gestor-spark__bar {{ $cls }}"
+                                        style="--h: {{ $hPx }}px"
+                                        title="{{ $ponto['dia'] ?? '' }}: {{ $this->money($v) }}"
+                                    ></div>
                                     <span>{{ $ponto['label'] ?? '' }}</span>
                                 </div>
                             @endforeach
@@ -267,6 +272,64 @@
                             @include('filament.gestor.partials.fin-card', ['card' => $card])
                         @endforeach
                     </div>
+                </section>
+
+                {{-- Bloco Cartões --}}
+                @php
+                    $cartoes = $f['cartoes'] ?? [];
+                    $cartoesValor = (float) ($cartoes['valor'] ?? 0);
+                    $cartoesQtd = (int) ($cartoes['qtd'] ?? 0);
+                    $cartoesHoje = (float) ($cartoes['vendido_hoje'] ?? 0);
+                    $cartoesVenceHoje = (float) ($cartoes['vence_hoje'] ?? 0);
+                    $cartoes7d = (float) ($cartoes['proximos_7d'] ?? 0);
+                    $cartoesBandeiras = is_array($cartoes['bandeiras'] ?? null) ? $cartoes['bandeiras'] : [];
+                @endphp
+                <section class="gestor-fin-block" aria-label="Cartões a receber">
+                    <div class="gestor-section__head">
+                        <h2>Cartões</h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="gestor-fin-cardpay"
+                        wire:click.prevent="abrirDetalhe('cartoes')"
+                        wire:loading.attr="disabled"
+                    >
+                        <div class="gestor-fin-cardpay__face">
+                            <div class="gestor-fin-cardpay__chip" aria-hidden="true"></div>
+                            <div class="gestor-fin-cardpay__brand" aria-hidden="true">
+                                <span></span><span></span>
+                            </div>
+                            <p class="gestor-fin-cardpay__label">A receber · POS</p>
+                            <p class="gestor-fin-cardpay__value">{{ $this->money($cartoesValor) }}</p>
+                            <p class="gestor-fin-cardpay__meta">
+                                {{ $cartoesQtd }} {{ $cartoesQtd === 1 ? 'parcela' : 'parcelas' }}
+                                @if ($cartoesHoje > 0)
+                                    · vendido hoje {{ $this->money($cartoesHoje) }}
+                                @endif
+                            </p>
+                        </div>
+                        <div class="gestor-fin-cardpay__stats">
+                            <div>
+                                <span>Vence hoje</span>
+                                <strong>{{ $this->money($cartoesVenceHoje) }}</strong>
+                            </div>
+                            <div>
+                                <span>Próximos 7 dias</span>
+                                <strong>{{ $this->money($cartoes7d) }}</strong>
+                            </div>
+                        </div>
+                        @if ($cartoesBandeiras !== [])
+                            <div class="gestor-fin-cardpay__flags">
+                                @foreach ($cartoesBandeiras as $band)
+                                    <span class="gestor-fin-cardpay__flag">
+                                        <strong>{{ $band['nome'] ?? '—' }}</strong>
+                                        <small>{{ (int) ($band['qtd'] ?? 0) }} · {{ $this->money((float) ($band['valor'] ?? 0)) }}</small>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                        <span class="gestor-fin-cardpay__cta">Ver parcelas ›</span>
+                    </button>
                 </section>
 
                 {{-- Bloco 4: Pendências --}}

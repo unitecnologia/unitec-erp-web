@@ -53,7 +53,7 @@ trait ManagesPdvTabelaPreco
             : null;
 
         if (! $table) {
-            return 'PADRAO';
+            return 'VAREJO';
         }
 
         return mb_strtoupper(trim($table->codigo . ' - ' . $table->descricao), 'UTF-8');

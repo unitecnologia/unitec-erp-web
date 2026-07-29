@@ -1,0 +1,1859 @@
+/* Notas de Fornecedores — layout NF-e + abas e colunas específicas */
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__filtro-unificado {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__filtro-unificado .erp-nfe__locate-controls {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__filtro-unificado .erp-nfe__search-field {
+    min-width: 10.5rem;
+    max-width: 13rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__filtro-unificado .erp-nfe__search-text {
+    min-width: 12rem;
+    flex: 1 1 14rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__filtro-unificado .erp-nfe__locate-label kbd {
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__period-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--erp-text-muted, #475569);
+    text-transform: uppercase;
+}
+
+/* Abas por status */
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente {
+    background: #f59e0b;
+    color: #1f2937;
+    border-color: #d97706;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente.erp-nfe__tab--active {
+    background: #d97706;
+    color: #ffffff;
+    border-color: #b45309;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras.erp-nfe__tab--active {
+    background: #1d4ed8;
+    color: #ffffff;
+    border-color: #1e40af;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita {
+    background: #22c55e;
+    color: #ffffff;
+    border-color: #16a34a;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita.erp-nfe__tab--active {
+    background: #15803d;
+    color: #ffffff;
+    border-color: #166534;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida {
+    background: #94a3b8;
+    color: #1e293b;
+    border-color: #64748b;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida.erp-nfe__tab--active {
+    background: #64748b;
+    color: #ffffff;
+    border-color: #475569;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--todas {
+    background: #1e5a9e;
+    color: #ffffff;
+    border-color: #164a82;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--todas.erp-nfe__tab--active {
+    background: #164a82;
+    color: #ffffff;
+    border-color: #0f3a66;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+/* Chips de situação — mesmo padrão visual da NF-e */
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__status-chip--pendente {
+    background: #f59e0b;
+    color: #1f2937;
+    border-color: #d97706;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__status-chip--gerou_compras {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__status-chip--aceita {
+    background: #16a34a;
+    color: #ffffff;
+    border-color: #15803d;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__status-chip--desconhecida {
+    background: #525252;
+    color: #ffffff;
+    border-color: #404040;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores {
+    width: calc(100% - 1.3rem);
+    max-width: none;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+    flex-wrap: nowrap;
+    gap: 0.75rem 1rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__chave-group--footer {
+    flex: 0 1 52%;
+    min-width: 0;
+    max-width: 52%;
+    border-left: none;
+    padding-left: 0;
+    white-space: normal;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__chave-label {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__chave-label-text {
+    flex: 0 0 auto;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__chave-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 1.85rem;
+    min-height: 1.85rem;
+    padding: 0.25rem 0.55rem;
+    line-height: 1.2;
+    box-sizing: border-box;
+    font-size: 0.92rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    border: 1px solid var(--erp-border, #94a3b8);
+    border-radius: var(--erp-radius-sm, 6px);
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 7%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__total-summary {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__total--notas-fornecedores .erp-nfe__total-label::after {
+    content: none;
+}
+
+/* Grade — proporções refinadas */
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell {
+    overflow: hidden;
+}
+
+/* Larguras das 11 colunas (1ª = flag de seleção) */
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(1),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 2.1rem !important;
+    min-width: 2.1rem !important;
+    max-width: 2.25rem !important;
+    text-align: center;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(2),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 5.25rem;
+    max-width: 5.5rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(3),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 5.25rem;
+    max-width: 5.5rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(4),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-numero,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-numero {
+    width: 3.6rem !important;
+    min-width: 3.6rem !important;
+    max-width: 3.9rem !important;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(5),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-chave,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave {
+    width: calc(36ch + 1cm + 1.5mm) !important;
+    min-width: calc(36ch + 1cm + 1.5mm) !important;
+    max-width: calc(36ch + 1cm + 1.5mm) !important;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-chave,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave .fi-ta-col,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave .fi-ta-col .fi-ta-text,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave .fi-ta-text-item {
+    font-size: 0.68rem;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave .fi-ta-text-item {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(6),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-cnpj,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-cnpj {
+    /* Sobrescreve regra da NF-e (46ch no 5º filho) */
+    width: calc(7.75rem - 2cm + 3cm) !important;
+    min-width: calc(7.75rem - 2cm + 3cm) !important;
+    max-width: calc(7.75rem - 2cm + 3cm) !important;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-cnpj .fi-ta-text-item {
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(7),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-nome,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome {
+    width: auto !important;
+    min-width: 11rem;
+    max-width: none !important;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-col {
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-text-item {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(8),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-nsu,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nsu {
+    width: 4.75rem;
+    max-width: 5.25rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(9),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-situacao,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-situacao,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-status,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-status {
+    width: 6.25rem;
+    max-width: 6.75rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(10),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-total,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-total {
+    width: 6.75rem;
+    max-width: 7.25rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-total .fi-ta-col {
+    width: 100%;
+    justify-content: stretch !important;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-total .erp-list-total-cell {
+    width: 100%;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(11),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(11),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-visualizar,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-visualizar {
+    width: 2rem !important;
+    min-width: 2rem !important;
+    max-width: 2rem !important;
+    padding-inline: 0.15rem !important;
+}
+
+/* Linha selecionada — destaque azul (padrão Compras/Vendas) */
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+    background: transparent !important;
+}
+
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected:nth-child(even) .fi-ta-cell,
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected.fi-striped .fi-ta-cell,
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected:nth-child(odd) .fi-ta-cell {
+    background: #60a5fa !important;
+}
+
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-list-page.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: inherit !important;
+    color: inherit !important;
+}
+
+/* ── Modal Importar XML (Ler XML / tela 3) ───────────────────────── */
+
+.erp-nf-forn-import-xml-modal {
+    z-index: 370;
+    padding: 0.25rem;
+}
+
+.erp-nf-forn-import-xml-modal .erp-lookup-modal__backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgb(15 23 42 / 50%);
+}
+
+.erp-nf-forn-import-xml-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(calc(100vw - 0.5rem), calc(78rem + 8cm));
+    height: min(calc(100vh - 0.5rem), calc(52rem + 8cm));
+    max-height: calc(100vh - 0.5rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #8fa8c8;
+    border-radius: 10px;
+    background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%);
+    box-shadow:
+        0 24px 48px rgb(15 52 96 / 32%),
+        0 0 0 1px rgb(255 255 255 / 35%) inset;
+}
+
+.erp-nf-forn-import-xml-modal__titlebar {
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    border-bottom: 1px solid #0a2548;
+}
+
+.erp-nf-forn-import-xml-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.55rem 0.65rem 0.7rem;
+    overflow: hidden;
+}
+
+.erp-nf-forn-import-xml-modal__panel {
+    flex-shrink: 0;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+}
+
+.erp-nf-forn-import-xml-modal__panel--itens {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.4rem;
+}
+
+.erp-nf-forn-import-xml-modal__panel--rodape {
+    padding: 0.35rem 0.45rem 0.45rem;
+}
+
+.erp-nf-forn-import-xml-modal__toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.erp-nf-forn-import-xml-modal__tool-group {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    padding: 0.3rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 8px;
+    background: #d7e4f3;
+}
+
+.erp-nf-forn-import-xml-modal__tool-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.12rem;
+    min-width: 5.4rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #7f98b8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 700;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__tool-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-nf-forn-import-xml-modal__tool-btn--ok {
+    border-color: #15803d;
+    background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%);
+    color: #14532d;
+}
+
+.erp-nf-forn-import-xml-modal__tool-btn--file {
+    position: relative;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__tool-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.erp-nf-forn-import-xml-modal__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 8px;
+    background: #f4f8fc;
+}
+
+.erp-nf-forn-import-xml-modal__fields-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.5rem;
+    min-width: 0;
+}
+
+.erp-nf-forn-import-xml-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-nf-forn-import-xml-modal__field span {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.erp-nf-forn-import-xml-modal__field input {
+    height: 1.65rem;
+    width: 100%;
+    padding: 0 0.4rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 3px;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 8%);
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-nf-forn-import-xml-modal__field--chave {
+    flex: 1 1 22rem;
+    min-width: 16rem;
+}
+
+.erp-nf-forn-import-xml-modal__field--chave input {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: calc(1em + 1mm);
+    letter-spacing: 0.02em;
+}
+
+.erp-nf-forn-import-xml-modal__field--date {
+    flex: 0 0 7rem;
+}
+
+.erp-nf-forn-import-xml-modal__field--cfop {
+    flex: 0 0 4.25rem;
+}
+
+.erp-nf-forn-import-xml-modal__cfop-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+}
+
+.erp-nf-forn-import-xml-modal__cfop-apply {
+    flex: 0 0 auto;
+    height: 1.55rem;
+    padding: 0 0.45rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 4px;
+    background: #fff;
+    color: #0f3460;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.erp-nf-forn-import-xml-modal__cfop-apply:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+/* Combo CFOP (lista colada no campo) */
+.erp-nf-forn-import-xml-modal [x-cloak] {
+    display: none !important;
+}
+
+.erp-nf-cfop-combo {
+    position: relative;
+    width: 100%;
+}
+
+.erp-nf-cfop-combo__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.15rem;
+    width: 100%;
+    height: 1.55rem;
+    min-height: 1.55rem;
+    padding: 0 0.2rem 0 0.28rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 4px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-nf-cfop-combo--compact .erp-nf-cfop-combo__trigger {
+    height: auto;
+    min-height: 0;
+    border-radius: 3px;
+}
+
+.erp-nf-cfop-combo__trigger:hover {
+    border-color: #2563eb;
+    background: #f8fbff;
+}
+
+.erp-nf-cfop-combo__trigger:focus-visible {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+}
+
+.erp-nf-cfop-combo__value {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.erp-nf-cfop-combo__chevron {
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-left: 3.5px solid transparent;
+    border-right: 3.5px solid transparent;
+    border-top: 4.5px solid #64748b;
+}
+
+.erp-nf-cfop-combo__panel {
+    display: flex;
+    flex-direction: column;
+    width: 4.75rem !important;
+    max-height: 11.5rem;
+    border: 1px solid #94a3b8;
+    border-radius: 0 0 6px 6px;
+    background: #fff;
+    box-shadow:
+        0 1px 2px rgb(15 23 42 / 6%),
+        0 8px 18px rgb(15 23 42 / 14%);
+    overflow: hidden;
+}
+
+.erp-nf-cfop-combo__head {
+    flex: 0 0 auto;
+    padding: 0.22rem 0.3rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
+    color: #1d4ed8;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.erp-nf-cfop-combo__list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f8fafc;
+}
+
+.erp-nf-cfop-combo__list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.erp-nf-cfop-combo__list::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+    border: 2px solid #f8fafc;
+}
+
+.erp-nf-cfop-combo__list::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+
+.erp-nf-cfop-combo__option {
+    display: block;
+    width: 100%;
+    padding: 0.18rem 0.25rem;
+    border: 0;
+    border-bottom: 1px solid #eef2f7;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    text-align: center;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-nf-cfop-combo__option:last-child {
+    border-bottom: 0;
+}
+
+.erp-nf-cfop-combo__option:hover {
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.erp-nf-cfop-combo__option.is-selected {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-nf-cfop-combo__option.is-selected:hover {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.erp-nf-cfop-combo__empty {
+    padding: 0.45rem 0.3rem;
+    color: #64748b;
+    font-size: 0.62rem;
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-modal__field--grow {
+    flex: 1 1 14rem;
+    min-width: 10rem;
+}
+
+.erp-nf-forn-import-xml-modal__field-label-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.erp-nf-forn-import-xml-modal__fornecedor-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.erp-nf-forn-import-xml-modal__fornecedor-badge--existente {
+    color: #166534;
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.erp-nf-forn-import-xml-modal__fornecedor-badge--automatico {
+    color: #1e40af;
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.erp-nf-forn-import-xml-modal__fornecedor-badge--alerta {
+    color: #92400e;
+    background: #fef3c7;
+    border-color: #fcd34d;
+}
+
+.erp-nf-forn-import-xml-modal__field--cnpj {
+    flex: 0 0 10rem;
+}
+
+.erp-nf-forn-import-xml-modal__field--uf {
+    flex: 0 0 3rem;
+}
+
+.erp-nf-forn-import-xml-modal__field--uf input {
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-modal__field--nota {
+    flex: 0 0 6rem;
+}
+
+.erp-nf-forn-import-xml-modal__alert {
+    margin: 0;
+    flex-shrink: 0;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #d97706;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+    color: #b91c1c;
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 60%) inset;
+}
+
+.erp-nf-forn-import-xml-modal__main {
+    display: grid;
+    grid-template-columns: 1fr 7.6rem;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.erp-nf-forn-import-xml-modal__grid-wrap {
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #6b86a8;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: inset 0 1px 3px rgb(15 52 96 / 10%);
+}
+
+.erp-nf-forn-import-xml-modal__grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: calc(0.74rem + 0.5mm);
+}
+
+.erp-nf-forn-import-xml-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: calc(0.28rem - 0.75mm) 0.3rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid #0a2548;
+    border-right: 1px solid #2a6bb0;
+}
+
+.erp-nf-forn-import-xml-modal__grid th:last-child,
+.erp-nf-forn-import-xml-modal__grid td:last-child {
+    border-right: none;
+}
+
+.erp-nf-forn-import-xml-modal__grid th:nth-child(1),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(1) { width: 1.8cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(2),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(2) { width: auto; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(3),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(3) { width: calc(2.6cm + 2.2mm); }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(4),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(4) { width: 1.9cm; max-width: 1.9cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(5),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(5) { width: 2cm; max-width: 2cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(6),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(6) { width: 2cm; max-width: 2cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(7),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(7) { width: 1.2cm; max-width: 1.2cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(8),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(8) { width: 2.4cm; max-width: 2.4cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(9),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(9) { width: 2.1cm; max-width: 2.1cm; }
+.erp-nf-forn-import-xml-modal__grid th:nth-child(10),
+.erp-nf-forn-import-xml-modal__grid td:nth-child(10) { width: 1.55cm; max-width: 1.55cm; }
+
+.erp-nf-forn-import-xml-modal__grid td {
+    padding: calc(0.12rem - 0.8mm) 0.14rem;
+    border-bottom: 1px solid #c5d4e8;
+    border-right: 1px solid #c5d4e8;
+    vertical-align: middle;
+    background: #e8eef6;
+}
+
+.erp-nf-forn-import-xml-modal__grid tbody tr:not(.erp-nf-forn-import-xml-modal__row--selected) td {
+    background: #e8eef6;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: calc(0.16rem - 0.8mm) 0.28rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 2px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    line-height: 1.25;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 8%);
+}
+
+.erp-nf-forn-import-xml-modal__cell-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+    background: #fff;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input--codigo {
+    text-align: left;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input--desc {
+    text-align: left;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input--readonly {
+    cursor: pointer;
+    background: #f1f5f9;
+    color: inherit;
+    box-shadow: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input--num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nf-forn-import-xml-modal__cell-input--center {
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-modal__cell-select {
+    appearance: auto;
+    cursor: pointer;
+    text-align: left;
+    padding-left: 0.2rem;
+    padding-right: 1.45rem;
+}
+
+.erp-nf-forn-import-xml-modal__row {
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__row td,
+.erp-nf-forn-import-xml-modal__row .erp-nf-forn-import-xml-modal__cell-input,
+.erp-nf-forn-import-xml-modal__row .erp-nf-forn-import-xml-modal__cell-select {
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__row:hover:not(.erp-nf-forn-import-xml-modal__row--selected) td {
+    background: #dce6f2;
+}
+
+.erp-nf-forn-import-xml-modal__row--unlinked td {
+    color: inherit;
+    font-weight: inherit;
+}
+
+.erp-nf-forn-import-xml-modal__row--unlinked .erp-nf-forn-import-xml-modal__desc {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected td {
+    background: #1d4ed8 !important;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-input,
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-select {
+    border-color: transparent;
+    background: transparent;
+    color: #fff;
+    box-shadow: none;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-input:focus,
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-select:focus {
+    border-color: #93c5fd;
+    background: rgb(255 255 255 / 18%);
+    box-shadow: none;
+    color: #fff;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-input--readonly {
+    background: transparent;
+    color: #fff;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected.erp-nf-forn-import-xml-modal__row--unlinked .erp-nf-forn-import-xml-modal__desc {
+    color: #fecaca;
+    font-weight: 700;
+}
+
+.erp-nf-forn-import-xml-modal__row--selected .erp-nf-forn-import-xml-modal__cell-select option {
+    color: #0f172a;
+    background: #fff;
+}
+
+.erp-nf-forn-import-xml-modal__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nf-forn-import-xml-modal__center {
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-modal__side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    padding: 0.3rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 6px;
+    background: #d7e4f3;
+}
+
+.erp-nf-forn-import-xml-modal__side button {
+    padding: 0.38rem 0.25rem;
+    border: 1px solid #7f98b8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    color: #0f3460;
+    font-size: 0.66rem;
+    font-weight: 700;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__side button:disabled {
+    color: #334155;
+    cursor: not-allowed;
+    opacity: 0.72;
+}
+
+.erp-nf-forn-import-xml-modal__side button:not(:disabled):hover {
+    background: linear-gradient(180deg, #ffffff 0%, #dbe7f5 100%);
+    border-color: #1e5a9e;
+}
+
+.erp-nf-forn-import-xml-modal__panel--vinculo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.erp-nf-forn-import-xml-modal__vinculo-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-nf-forn-import-xml-modal__vinculo-box {
+    min-height: 2.1rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 8%);
+    font-size: 0.78rem;
+    color: #475569;
+}
+
+.erp-nf-forn-import-xml-modal__tabs {
+    display: flex;
+    gap: 0.2rem;
+    margin-bottom: -1px;
+}
+
+.erp-nf-forn-import-xml-modal__tab {
+    padding: 0.28rem 0.75rem;
+    border: 1px solid #8fa8c8;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #c5d5e8;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-modal__tab--active {
+    background: #f4f8fc;
+    color: #0f3460;
+    position: relative;
+    z-index: 1;
+}
+
+.erp-nf-forn-import-xml-modal__tab-body {
+    min-height: 5.2rem;
+    max-height: 9.5rem;
+    overflow: auto;
+    border: 1px solid #8fa8c8;
+    border-radius: 0 6px 6px 6px;
+    background: #f4f8fc;
+    padding: 0.4rem;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 6%);
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-wrap {
+    overflow: auto;
+    border: 1px solid #6b86a8;
+    border-radius: 4px;
+    background: #e8eef6;
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: calc(0.74rem + 0.5mm);
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: calc(0.28rem - 0.5mm) 0.3rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid #0a2548;
+    border-right: 1px solid #2a6bb0;
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-grid th:last-child,
+.erp-nf-forn-import-xml-modal__detalhe-grid td:last-child {
+    border-right: none;
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-grid td {
+    padding: 0.12rem 0.14rem;
+    border-bottom: 1px solid #c5d4e8;
+    border-right: 1px solid #c5d4e8;
+    vertical-align: middle;
+    background: #e8eef6;
+}
+
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(1),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(1) { width: 1.8cm; } /* Código */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(2),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(2) { width: auto; } /* Descrição */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(3),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(3) { width: 2.4cm; } /* NCM */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(4),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(4) { width: 1.6cm; } /* CFOP */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(5),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(5) { width: 1.3cm; } /* CST */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(6),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(6) { width: 1.6cm; } /* Qtd */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(7),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(7) { width: 1.4cm; } /* Und */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(8),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(8) { width: 2.4cm; } /* Prc. Unitário */
+.erp-nf-forn-import-xml-modal__detalhe-grid th:nth-child(9),
+.erp-nf-forn-import-xml-modal__detalhe-grid td:nth-child(9) { width: 2.2cm; } /* Total */
+
+.erp-nf-forn-import-xml-modal__detalhe-empty {
+    margin: 0.55rem 0.35rem;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-nf-forn-import-xml-modal__totais {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.3rem 0.4rem;
+}
+
+.erp-nf-forn-import-xml-modal__total-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    min-width: 0;
+}
+
+.erp-nf-forn-import-xml-modal__total-field span {
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.erp-nf-forn-import-xml-modal__total-field input {
+    height: 1.55rem;
+    width: 100%;
+    padding: 0 0.3rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 3px;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 8%);
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+    .erp-nf-forn-import-xml-modal__totais {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+
+/* ── Overlay cadastro de produto (Cadastrar XML) ─────────────────── */
+
+.erp-compras-page .erp-form-overlay,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-form-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 480;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0.25rem 0.35rem 0.15rem;
+}
+
+.erp-compras-page .erp-form-overlay__backdrop,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.erp-compras-page .erp-form-overlay__panel,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-form-overlay__panel {
+    --erp-prod-overlay-extra: 6cm;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(calc(1280px + 4cm), 98vw);
+    height: min(
+        calc(100dvh - 4rem + var(--erp-prod-overlay-extra)),
+        calc(100dvh - 0.4rem)
+    ) !important;
+    max-height: min(
+        calc(100dvh - 4rem + var(--erp-prod-overlay-extra)),
+        calc(100dvh - 0.4rem)
+    ) !important;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 10px;
+    background: transparent;
+    box-shadow: 0 24px 60px rgb(15 52 96 / 40%);
+}
+
+.erp-compras-page .erp-form-overlay__iframe,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-form-overlay__iframe {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    background: #e3ecf7;
+}
+
+@supports not (height: 100dvh) {
+    .erp-compras-page .erp-form-overlay__panel,
+    .erp-nfe-page.erp-notas-fornecedores-page .erp-form-overlay__panel {
+        height: min(
+            calc(100vh - 4rem + var(--erp-prod-overlay-extra)),
+            calc(100vh - 0.4rem)
+        ) !important;
+        max-height: min(
+            calc(100vh - 4rem + var(--erp-prod-overlay-extra)),
+            calc(100vh - 0.4rem)
+        ) !important;
+    }
+}
+
+/* ── Pesquisar produto (Importar XML) ───────────────────────────── */
+
+.erp-nf-forn-import-xml-pesquisar {
+    z-index: 500;
+}
+
+.erp-nf-forn-import-xml-pesquisar .erp-lookup-modal__backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgb(15 23 42 / 55%);
+}
+
+.erp-nf-forn-import-xml-pesquisar__window {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 52rem);
+    height: min(80vh, 36rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #8fa8c8;
+    border-radius: 10px;
+    background: #e8f0fa;
+    box-shadow: 0 18px 48px rgb(15 52 96 / 40%);
+}
+
+.erp-nf-forn-import-xml-pesquisar__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+    flex: 1;
+    padding: 0.65rem;
+    background: #f4f8fc;
+}
+
+.erp-nf-forn-import-xml-pesquisar__search {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0f3460;
+}
+
+.erp-nf-forn-import-xml-pesquisar__search input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 4px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
+.erp-nf-forn-import-xml-pesquisar__search input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+}
+
+.erp-nf-forn-import-xml-pesquisar__grid-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #6b86a8;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.erp-nf-forn-import-xml-pesquisar__grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+}
+
+.erp-nf-forn-import-xml-pesquisar__grid th {
+    position: sticky;
+    top: 0;
+    padding: 0.28rem 0.35rem;
+    background: #0f3460;
+    color: #fff;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.erp-nf-forn-import-xml-pesquisar__grid td {
+    padding: 0.22rem 0.35rem;
+    border-bottom: 1px solid #d5e0ee;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-pesquisar__grid tbody tr:hover td {
+    background: #eef4fb;
+}
+
+.erp-nf-forn-import-xml-pesquisar__row--selected td {
+    background: #1d4ed8 !important;
+    color: #fff;
+}
+
+.erp-nf-forn-import-xml-pesquisar__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}
+
+.erp-nf-forn-import-xml-pesquisar__actions button {
+    padding: 0.35rem 0.85rem;
+    border: 1px solid #7f98b8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    color: #0f3460;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-pesquisar__actions button:first-child {
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+    border-color: #15803d;
+    color: #fff;
+}
+
+/* ── Progresso Cadastrar Todos ──────────────────────────────────── */
+
+.erp-nf-forn-import-xml-progress {
+    position: fixed;
+    inset: 0;
+    z-index: 480;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-nf-forn-import-xml-progress.is-visible,
+.erp-nf-forn-import-xml-progress[wire\:loading],
+.erp-nf-forn-import-xml-progress[style*="display: flex"] {
+    display: flex;
+}
+
+.erp-nf-forn-import-xml-progress__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 55%);
+}
+
+.erp-nf-forn-import-xml-progress__panel {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 26rem);
+    padding: 1.15rem 1.25rem 1rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 12px;
+    background: linear-gradient(165deg, #f8fbff 0%, #e8f0fa 100%);
+    box-shadow: 0 18px 48px rgb(15 52 96 / 35%);
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-progress__spinner {
+    width: 2.1rem;
+    height: 2.1rem;
+    margin: 0 auto 0.75rem;
+    border: 3px solid #bfdbfe;
+    border-top-color: #1d4ed8;
+    border-radius: 50%;
+    animation: erp-nf-forn-spin 0.75s linear infinite;
+}
+
+.erp-nf-forn-import-xml-progress__status {
+    margin: 0 0 0.35rem;
+    color: #0f3460;
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.erp-nf-forn-import-xml-progress__detail {
+    margin: 0 0 0.85rem;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+    max-height: 2.7em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nf-forn-import-xml-progress__track {
+    height: 0.7rem;
+    margin-bottom: 0.45rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e2e8f0;
+}
+
+.erp-nf-forn-import-xml-progress__bar {
+    height: 100%;
+    min-width: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #1d4ed8 0%, #2563eb 45%, #22c55e 100%);
+    background-size: 200% 100%;
+    box-shadow: 0 0 10px rgb(37 99 235 / 35%);
+    transition: width 0.25s ease;
+    animation: erp-nf-forn-progress-shine 1.4s linear infinite;
+}
+
+.erp-nf-forn-import-xml-progress__meta {
+    margin: 0 0 0.35rem;
+    color: #1e40af;
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nf-forn-import-xml-progress__hint {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+@keyframes erp-nf-forn-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes erp-nf-forn-progress-shine {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+.erp-nf-forn-import-xml-progress__bar--indeterminate {
+    width: 35% !important;
+    animation: erp-nf-forn-progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes erp-nf-forn-progress-indeterminate {
+    0% { margin-left: 0; width: 25%; }
+    50% { margin-left: 40%; width: 45%; }
+    100% { margin-left: 0; width: 25%; }
+}
+
+/* ── Aviso overlay (Cadastrar Todos / mensagens) ────────────────── */
+
+.erp-nf-forn-import-xml-aviso {
+    position: fixed;
+    inset: 0;
+    z-index: 490;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-nf-forn-import-xml-aviso.is-visible {
+    display: flex;
+}
+
+.erp-nf-forn-import-xml-aviso__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 55%);
+}
+
+.erp-nf-forn-import-xml-aviso__panel {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 26rem);
+    padding: 1.25rem 1.35rem 1.1rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 12px;
+    background: linear-gradient(165deg, #f8fbff 0%, #e8f0fa 100%);
+    box-shadow: 0 18px 48px rgb(15 52 96 / 35%);
+    text-align: center;
+}
+
+.erp-nf-forn-import-xml-aviso__icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin: 0 auto 0.7rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.erp-nf-forn-import-xml-aviso--warning .erp-nf-forn-import-xml-aviso__icon {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.erp-nf-forn-import-xml-aviso--success .erp-nf-forn-import-xml-aviso__icon {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.erp-nf-forn-import-xml-aviso--error .erp-nf-forn-import-xml-aviso__icon {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.erp-nf-forn-import-xml-aviso__title {
+    margin: 0 0 0.55rem;
+    color: #0f3460;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.erp-nf-forn-import-xml-aviso__text {
+    margin: 0 0 1rem;
+    color: #334155;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.45;
+    text-align: left;
+    white-space: pre-line;
+}
+
+.erp-nf-forn-import-xml-aviso__btn {
+    min-width: 8rem;
+    padding: 0.45rem 1.1rem;
+    border: 1px solid #1d4ed8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-nf-forn-import-xml-aviso__btn:hover {
+    filter: brightness(1.05);
+}
+
+.erp-nf-forn-import-xml-aviso__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    width: 100%;
+}
+
+.erp-nf-forn-import-xml-aviso__btn--ghost {
+    border-color: #94a3b8;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-nf-forn-import-xml-aviso__btn--ghost:hover {
+    border-color: #64748b;
+    background: #f8fafc;
+    filter: none;
+}
+
+.erp-nf-forn-import-xml-aviso--warning .erp-nf-forn-import-xml-aviso__icon {
+    background: #fef3c7;
+    color: #b45309;
+    border-color: #f59e0b;
+}
+
+/* Seleção só pela flag — cursor padrão nas células; pointer no checkbox */
+.erp-notas-fornecedores-page .fi-ta-row,
+.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell,
+.erp-notas-fornecedores-page .fi-ta-row .fi-ta-col,
+.erp-notas-fornecedores-page .fi-ta-row button.fi-ta-col {
+    cursor: default !important;
+}
+
+.erp-notas-fornecedores-page .erp-nf-forn__check {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: #1d4ed8;
+    cursor: pointer !important;
+    vertical-align: middle;
+}
+
+/* ── Barra de ações 3D (Notas de Fornecedores) ─────────────────────────── */
+
+.erp-nf-forn-actions {
+    gap: 0.45rem !important;
+    padding: 0.5rem 0.7rem !important;
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn {
+    position: relative;
+    gap: 0.15rem;
+    min-width: 6rem;
+    height: 3.35rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 1px 2px rgba(15, 52, 96, 0.14),
+        0 3px 8px rgba(15, 52, 96, 0.12);
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease,
+        filter 0.12s ease;
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        0 2px 4px rgba(15, 52, 96, 0.16),
+        0 6px 14px rgba(15, 52, 96, 0.16);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow:
+        inset 0 2px 4px rgba(15, 52, 96, 0.18),
+        0 1px 2px rgba(15, 52, 96, 0.1);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn:disabled {
+    box-shadow: none;
+    transform: none;
+}
+
+/* Ícone em pastilha com relevo */
+.erp-nf-forn-actions .erp-nfe-actions__icon {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin-bottom: 0.16rem;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #ffffff 0%, #dce8f7 100%);
+    color: #1d4ed8;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 1px 2px rgba(15, 52, 96, 0.18);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    display: block;
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__label {
+    font-size: 0.63rem;
+    letter-spacing: 0.01em;
+}
+
+/* F2 — primário azul */
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F2"] {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #5b9cf8 0%, #2563eb 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 1px 2px rgba(23, 51, 122, 0.28),
+        0 3px 8px rgba(23, 51, 122, 0.28);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F2"] .erp-nfe-actions__label {
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(9, 25, 62, 0.4);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F2"] .erp-nfe-actions__icon {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.14) 100%);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        0 1px 2px rgba(9, 25, 62, 0.3);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F2"]:hover:not(:disabled) {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #6faaff 0%, #2f6ff0 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 2px 4px rgba(23, 51, 122, 0.3),
+        0 6px 14px rgba(23, 51, 122, 0.32);
+}
+
+/* F4 — confirmar (verde) */
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F4"] {
+    border-color: #86c9a4;
+    background: linear-gradient(180deg, #ffffff 0%, #e8f7ef 100%);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__icon--new {
+    background: linear-gradient(180deg, #34d399 0%, #16a34a 100%);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        0 1px 2px rgba(6, 78, 46, 0.3);
+}
+
+/* F5 — desconhecer (vermelho) */
+.erp-nf-forn-actions .erp-nfe-actions__btn[data-erp-key="F5"] {
+    border-color: #f0a8a8;
+    background: linear-gradient(180deg, #ffffff 0%, #fdeeee 100%);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__icon--cancel {
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 1px 2px rgba(120, 20, 20, 0.3);
+}
+
+/* F6 — XML (âmbar) */
+.erp-nf-forn-actions .erp-nfe-actions__icon--xml {
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        0 1px 2px rgba(120, 66, 6, 0.3);
+}
+
+/* Fechar */
+.erp-nf-forn-actions .erp-nfe-actions__btn--close {
+    border-color: #dc2626;
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 1px 2px rgba(141, 20, 20, 0.28),
+        0 3px 8px rgba(141, 20, 20, 0.28);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn--close .erp-nfe-actions__label {
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(80, 10, 10, 0.4);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__icon--close {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.14) 100%);
+    color: #fff;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        0 1px 2px rgba(80, 10, 10, 0.25);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__btn--close:hover:not(:disabled) {
+    border-color: #dc2626;
+    background: linear-gradient(180deg, #fb8686 0%, #e02b2b 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 2px 4px rgba(141, 20, 20, 0.3),
+        0 6px 14px rgba(141, 20, 20, 0.32);
+}
+
+.erp-nf-forn-actions .erp-nfe-actions__label kbd {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 1px 1px rgba(15, 52, 96, 0.18);
+}

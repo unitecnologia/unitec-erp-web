@@ -39,7 +39,14 @@
 
     <div
         class="erp-lookup-modal erp-nfe-lancamento-modal"
-        wire:keydown.escape.window="closeNfeModal"
+        wire:keydown.escape.window="handleNfeModalEscape"
+        wire:keydown.f6.prevent="importNfeModal"
+        x-on:erp-nfe-focus-item-produto.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-produto'); el?.focus(); el?.select?.(); })"
+        x-on:erp-nfe-focus-item-codigo.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-produto'); el?.focus(); el?.select?.(); })"
+        x-on:erp-nfe-focus-item-quantidade.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-qtd'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
+        x-on:erp-nfe-focus-item-preco.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-preco'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
+        x-on:erp-nfe-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-nfe-desconto-preco'); el?.focus(); el?.select?.(); })"
+        x-on:keydown.ctrl.d.window.prevent="if (!$wire.nfeDescontoModalOpen) $wire.abrirNfeModalDescontoItem()"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeNfeModal"></div>
 
@@ -50,7 +57,15 @@
             aria-labelledby="erp-nfe-lancamento-title"
         >
             <div class="erp-lookup-modal__titlebar erp-nfe-lancamento-modal__titlebar">
-                <span id="erp-nfe-lancamento-title">Emissão de NFe</span>
+                <span id="erp-nfe-lancamento-title">Emissão de NF-e</span>
+                <div @class([
+                    'erp-nfe-lancamento-modal__status-box',
+                    'erp-nfe-lancamento-modal__status-box--titlebar',
+                    'erp-nfe-lancamento-modal__status-box--transmitida' => in_array($this->nfeModalStatus, ['TRANSMITIDA', 'AUTORIZADA'], true),
+                    'erp-nfe-lancamento-modal__status-box--cancelada' => $this->nfeModalStatus === 'CANCELADA',
+                ])>
+                    {{ $this->nfeModalStatus }}
+                </div>
                 <button
                     type="button"
                     class="erp-lookup-modal__close"
@@ -61,104 +76,9 @@
 
             <div class="erp-lookup-modal__body erp-nfe-lancamento-modal__body">
                 <div class="erp-nfe-lancamento-modal__header">
-                    <div class="erp-nfe-lancamento-modal__header-top">
-                        <div class="erp-nfe-lancamento-modal__form-row">
-                            <div class="erp-nfe-lancamento-modal__form-group">
-                                <label class="erp-nfe-lancamento-modal__form-label">Nº Nota</label>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.numero"
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--xs"
-                                    readonly
-                                >
-                            </div>
+                    @include('filament.components.erp.nfe.lancamento-cliente')
 
-                            <div class="erp-nfe-lancamento-modal__form-group">
-                                <label class="erp-nfe-lancamento-modal__form-label">Empresa</label>
-                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--empresa">{{ $this->nfeForm['empresa'] ?? '—' }}</span>
-                            </div>
-
-                            <div class="erp-nfe-lancamento-modal__form-group erp-nfe-lancamento-modal__form-group--grow">
-                                <label class="erp-nfe-lancamento-modal__form-label">Cliente/Fornecedor</label>
-                                <select wire:model.live="nfeForm.cliente_id" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--fornecedor">
-                                    <option value="">Selecione...</option>
-                                    @foreach ($this->clientesOptions as $id => $nome)
-                                        <option value="{{ $id }}">{{ $nome }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="erp-nfe-lancamento-modal__form-group">
-                                <label class="erp-nfe-lancamento-modal__form-label">UF</label>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.uf"
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--uf"
-                                    maxlength="2"
-                                    readonly
-                                >
-                            </div>
-
-                            <div class="erp-nfe-lancamento-modal__form-group">
-                                <label class="erp-nfe-lancamento-modal__form-label">CNPJ</label>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.cnpj"
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--doc"
-                                    readonly
-                                >
-                            </div>
-                        </div>
-
-                        <div class="erp-nfe-lancamento-modal__status-box">
-                            {{ $this->nfeModalStatus }}
-                        </div>
-                    </div>
-
-                    <div class="erp-nfe-lancamento-modal__form-row">
-                        <div class="erp-nfe-lancamento-modal__form-group erp-nfe-lancamento-modal__form-group--grow">
-                            <label class="erp-nfe-lancamento-modal__form-label">Natureza da Operação</label>
-                            <select wire:model="nfeForm.natureza_operacao" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--natureza">
-                                <option value="5102 - VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS">5102 - VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS</option>
-                                <option value="5101 - VENDA DE PRODUCAO DO ESTABELECIMENTO">5101 - VENDA DE PRODUCAO DO ESTABELECIMENTO</option>
-                                <option value="5405 - VENDA DE MERCADORIA SUJEITA A ST">5405 - VENDA DE MERCADORIA SUJEITA A ST</option>
-                            </select>
-                        </div>
-
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <label class="erp-nfe-lancamento-modal__form-label">Nº Pedido</label>
-                            <input
-                                type="text"
-                                wire:model="nfeForm.numero_pedido"
-                                class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--sm"
-                            >
-                        </div>
-
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <label class="erp-nfe-lancamento-modal__form-label">Data Emissão</label>
-                            <input
-                                type="date"
-                                wire:model="nfeForm.data_emissao"
-                                class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--date"
-                            >
-                        </div>
-
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <label class="erp-nfe-lancamento-modal__form-label">Data Saída</label>
-                            <input
-                                type="date"
-                                wire:model="nfeForm.data_saida"
-                                class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--date"
-                            >
-                        </div>
-
-                        <label class="erp-nfe-lancamento-modal__check">
-                            <input type="checkbox" wire:model="nfeForm.consumidor_final">
-                            <span>Consumidor Final</span>
-                        </label>
-                    </div>
-
-                    <div class="erp-nfe-lancamento-modal__form-row">
+                    <div class="erp-nfe-lancamento-modal__form-row erp-nfe-lancamento-modal__form-row--ops">
                         <div class="erp-nfe-lancamento-modal__form-group">
                             <label class="erp-nfe-lancamento-modal__form-label">Finalidade</label>
                             <select wire:model="nfeForm.finalidade" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
@@ -171,7 +91,7 @@
 
                         <div class="erp-nfe-lancamento-modal__form-group">
                             <label class="erp-nfe-lancamento-modal__form-label">Movimento</label>
-                            <select wire:model="nfeForm.movimento" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
+                            <select wire:model.live="nfeForm.movimento" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
                                 <option value="saida">SAÍDA</option>
                                 <option value="entrada">ENTRADA</option>
                             </select>
@@ -195,10 +115,77 @@
                                 <option value="pix">PIX</option>
                             </select>
                         </div>
+
+                        <div
+                            class="erp-nfe-lancamento-modal__form-group erp-nfe-lancamento-modal__form-group--natureza erp-nfe-lancamento-modal__form-group--suggest"
+                            @if ($this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== []) data-cfop-open @endif
+                        >
+                            <label class="erp-nfe-lancamento-modal__form-label">Natureza da Operação</label>
+                            <input
+                                id="nfe-natureza-busca"
+                                type="text"
+                                wire:model.live.debounce.200ms="nfeForm.natureza_operacao"
+                                wire:focus="abrirNfeSugestoesNatureza"
+                                wire:keydown.enter.prevent="confirmarNfeNaturezaBusca($event.target.value)"
+                                wire:keydown.escape.prevent="fecharNfeSugestoesNatureza"
+                                wire:keydown.arrow-up.prevent="moverNfeSugestaoNatureza(-1)"
+                                wire:keydown.arrow-down.prevent="moverNfeSugestaoNatureza(1)"
+                                class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--natureza"
+                                autocomplete="off"
+                                placeholder="Digite o CFOP ou a descrição"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded="{{ $this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== [] ? 'true' : 'false' }}"
+                                aria-controls="nfe-natureza-sugestoes"
+                            >
+                            @if ($this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== [])
+                                <ul id="nfe-natureza-sugestoes" class="erp-nfe-natureza__suggest" role="listbox" aria-label="CFOPs encontrados">
+                                    @foreach ($this->nfeNaturezaSugestoes as $index => $sug)
+                                        <li wire:key="nfe-nat-sug-{{ $sug['codigo'] }}-{{ $index }}" role="presentation">
+                                            <button
+                                                type="button"
+                                                role="option"
+                                                aria-selected="{{ (int) $this->nfeSelectedNaturezaIndex === (int) $index ? 'true' : 'false' }}"
+                                                wire:mousedown.prevent="selecionarNfeNatureza({{ \Illuminate\Support\Js::from($sug['label']) }})"
+                                                @class(['is-selected' => (int) $this->nfeSelectedNaturezaIndex === (int) $index])
+                                            >
+                                                <span class="erp-nfe-natureza__suggest-code">{{ $sug['codigo'] }}</span>
+                                                <span class="erp-nfe-natureza__suggest-nome">{{ $sug['descricao'] ?? $sug['label'] }}</span>
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+
+                        @php
+                            $nfePedidoInfo = trim((string) ($this->nfeForm['numero_pedido'] ?? ''));
+                            $nfeDataEmissaoInfo = filled($this->nfeForm['data_emissao'] ?? null)
+                                ? \Illuminate\Support\Carbon::parse($this->nfeForm['data_emissao'])->format('d/m/Y')
+                                : '—';
+                            $nfeDataSaidaInfo = filled($this->nfeForm['data_saida'] ?? null)
+                                ? \Illuminate\Support\Carbon::parse($this->nfeForm['data_saida'])->format('d/m/Y')
+                                : '—';
+                        @endphp
+
+                        <div class="erp-nfe-lancamento-modal__form-group">
+                            <label class="erp-nfe-lancamento-modal__form-label">Nº Pedido</label>
+                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--sm erp-nfe-lancamento-modal__form-input--info">{{ $nfePedidoInfo !== '' ? $nfePedidoInfo : '—' }}</span>
+                        </div>
+
+                        <div class="erp-nfe-lancamento-modal__form-group">
+                            <label class="erp-nfe-lancamento-modal__form-label">Data Emissão</label>
+                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--date erp-nfe-lancamento-modal__form-input--info">{{ $nfeDataEmissaoInfo }}</span>
+                        </div>
+
+                        <div class="erp-nfe-lancamento-modal__form-group">
+                            <label class="erp-nfe-lancamento-modal__form-label">Data Saída</label>
+                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--date erp-nfe-lancamento-modal__form-input--info">{{ $nfeDataSaidaInfo }}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="erp-nfe-lancamento-modal__section-tabs">
+                <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--main">
                     @foreach ($mainTabs as $value => $label)
                         <button
                             type="button"
@@ -209,7 +196,10 @@
                 </div>
 
                 @if ($this->nfeModalMainTab === 'itens')
-                    @include('filament.components.erp.nfe.lancamento-itens-grid')
+                    <div class="erp-nfe-lancamento-modal__itens-area">
+                        @include('filament.components.erp.nfe.lancamento-produto-inclusao')
+                        @include('filament.components.erp.nfe.lancamento-itens-grid')
+                    </div>
                 @elseif ($this->nfeModalMainTab === 'impostos')
                     @include('filament.components.erp.nfe.lancamento-impostos-grid')
                 @else
@@ -272,14 +262,14 @@
                         </div>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'fisco')
-                    <div class="erp-nfe-lancamento-modal__detail-panel">
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs">
                         <label class="erp-nfe-lancamento-modal__form-label">Informações adicionais de interesse do Fisco</label>
-                        <textarea wire:model="nfeForm.obs_fisco" class="erp-nfe-lancamento-modal__textarea" rows="4"></textarea>
+                        <textarea wire:model="nfeForm.obs_fisco" class="erp-nfe-lancamento-modal__textarea" rows="3"></textarea>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'contribuinte')
-                    <div class="erp-nfe-lancamento-modal__detail-panel">
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs">
                         <label class="erp-nfe-lancamento-modal__form-label">Informações complementares de interesse do contribuinte</label>
-                        <textarea wire:model="nfeForm.obs_contribuinte" class="erp-nfe-lancamento-modal__textarea" rows="4"></textarea>
+                        <textarea wire:model="nfeForm.obs_contribuinte" class="erp-nfe-lancamento-modal__textarea" rows="3"></textarea>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'referencia')
                     <div class="erp-nfe-lancamento-modal__detail-panel">
@@ -320,95 +310,109 @@
                 @endif
 
                 <div class="erp-nfe-lancamento-modal__toolbar erp-nfe-lancamento-modal__toolbar--bottom">
-                    <div class="erp-nfe-lancamento-modal__toolbar-actions">
+                    <div class="erp-nfe-actions erp-nfe-lancamento-modal__toolbar-actions">
                         <button
                             type="button"
                             wire:click="saveNfe"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--save"
+                            class="erp-nfe-actions__btn erp-nfe-lancamento-modal__tool-btn--save"
                             title="Gravar"
+                            data-erp-key="F2"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--save">+</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F2</kbd> | Gravar</span>
+                            <span class="erp-nfe-actions__icon erp-nfe-actions__icon--new">+</span>
+                            <span class="erp-nfe-actions__label"><kbd>F2</kbd> | Gravar</span>
                         </button>
 
                         <button
                             type="button"
                             wire:click="transmitNfe"
-                            class="erp-nfe-lancamento-modal__tool-btn"
-                            disabled
+                            wire:loading.attr="disabled"
+                            wire:target="transmitNfe"
+                            class="erp-nfe-actions__btn"
+                            @disabled(! $this->nfeModalRecordId || $this->nfeModalStatus !== 'ABERTA')
                             title="Transmitir"
+                            data-erp-key="F3"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon">📡</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F3</kbd> | Transmitir</span>
+                            <span class="erp-nfe-actions__icon">📡</span>
+                            <span wire:loading.remove wire:target="transmitNfe" class="erp-nfe-actions__label"><kbd>F3</kbd> | Transmitir</span>
+                            <span wire:loading wire:target="transmitNfe" class="erp-nfe-actions__label">Transmitindo…</span>
                         </button>
 
                         <button
                             type="button"
-                            class="erp-nfe-lancamento-modal__tool-btn"
+                            class="erp-nfe-actions__btn"
                             disabled
                             title="Imprimir"
+                            data-erp-key="F4"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon">🖨</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F4</kbd> | Imprimir</span>
+                            <span class="erp-nfe-actions__icon">🖨</span>
+                            <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Imprimir</span>
                         </button>
 
                         <button
                             type="button"
                             wire:click="importNfeModal"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--import"
+                            class="erp-nfe-actions__btn"
                             title="Importar"
+                            data-erp-key="F6"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--import">↓</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F6</kbd> | Importar</span>
+                            <span class="erp-nfe-actions__icon">↓</span>
+                            <span class="erp-nfe-actions__label"><kbd>F6</kbd> | Importar</span>
                         </button>
 
                         <button
                             type="button"
                             wire:click="openNfeProdutos"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--products"
+                            class="erp-nfe-actions__btn"
                             title="Produtos"
+                            data-erp-key="F8"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--products">📦</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F8</kbd> | Produtos</span>
+                            <span class="erp-nfe-actions__icon">📦</span>
+                            <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Produtos</span>
                         </button>
 
                         <button
                             type="button"
-                            wire:click="openNfePessoas"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--people"
-                            title="Pessoas"
+                            class="erp-nfe-actions__btn"
+                            disabled
+                            title="Em breve — selecione o cliente no Destinatário"
+                            data-erp-key="F9"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--people">👤</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F9</kbd> | Pessoas</span>
+                            <span class="erp-nfe-actions__icon">👤</span>
+                            <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Pessoas</span>
                         </button>
 
                         <button
                             type="button"
-                            wire:click="openNfeTransportadora"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--transp"
-                            title="Transportadora"
+                            class="erp-nfe-actions__btn"
+                            disabled
+                            title="Em breve"
+                            data-erp-key="F10"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--transp">🚚</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>F10</kbd> | Transp.</span>
+                            <span class="erp-nfe-actions__icon">🚚</span>
+                            <span class="erp-nfe-actions__label"><kbd>F10</kbd> | Transp.</span>
                         </button>
 
                         <button
                             type="button"
-                            class="erp-nfe-lancamento-modal__tool-btn erp-nfe-lancamento-modal__tool-btn--exit"
+                            class="erp-nfe-actions__btn erp-nfe-actions__btn--close"
                             wire:click="closeNfeModal"
                             title="Sair"
+                            data-erp-key="Escape"
                         >
-                            <span class="erp-nfe-lancamento-modal__tool-icon erp-nfe-lancamento-modal__tool-icon--exit">✕</span>
-                            <span class="erp-nfe-lancamento-modal__tool-label"><kbd>ESC</kbd> | Sair</span>
+                            <span class="erp-nfe-actions__icon erp-nfe-actions__icon--close">✕</span>
+                            <span class="erp-nfe-actions__label"><kbd>ESC</kbd> | Sair</span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-@endif
 
-@once
-    @php($nfeLancamentoJsVersion = @filemtime(public_path('js/erp-nfe-lancamento.js')) ?: time())
-    <script src="{{ asset('js/erp-nfe-lancamento.js') }}?v={{ $nfeLancamentoJsVersion }}" defer></script>
-@endonce
+    @include('filament.components.erp.nfe.lancamento-desconto-item')
+    @include('filament.components.erp.nfe.fiscal-progress')
+    @include('filament.components.erp.nfe.fiscal-erro-overlay')
+    @include('filament.components.erp.nfe.fiscal-sucesso-overlay')
+    @include('filament.components.erp.nfe.fiscal-info-overlay')
+    @include('filament.components.erp.nfe.import-menu-modal')
+    @include('filament.components.erp.nfe.import-list-modal')
+@endif

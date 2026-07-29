@@ -20,6 +20,8 @@ trait ManagesAjusteEstoqueForm
     /** @var array<int, array<string, mixed>> */
     public array $produtoSugestoes = [];
 
+    public int $selectedProdutoSugestaoIndex = 0;
+
     public function createAjuste(): void
     {
         if ($this->showAjusteForm) {
@@ -63,7 +65,7 @@ trait ManagesAjusteEstoqueForm
             'estoque_atual' => $this->formatEstoqueBr((float) $product->estoque - (float) $ajuste->qtd_ajust),
             'quantidade' => $this->formatQtdAjustBr((float) $ajuste->qtd_ajust),
         ];
-        $this->produtoSugestoes = [];
+        $this->fecharSugestoesProduto();
         $this->showAjusteForm = true;
     }
 
@@ -71,8 +73,19 @@ trait ManagesAjusteEstoqueForm
     {
         $this->showAjusteForm = false;
         $this->ajusteFormId = null;
-        $this->produtoSugestoes = [];
+        $this->fecharSugestoesProduto();
         $this->resetAjusteForm();
+    }
+
+    public function handleAjusteEscape(): void
+    {
+        if ($this->produtoSugestoes !== []) {
+            $this->fecharSugestoesProduto();
+
+            return;
+        }
+
+        $this->closeAjusteForm();
     }
 
     public function saveAjusteForm(): void
@@ -158,7 +171,7 @@ trait ManagesAjusteEstoqueForm
         $term = mb_strtoupper(trim((string) ($this->ajusteForm['descricao_busca'] ?? '')), 'UTF-8');
 
         if (mb_strlen($term) < 2) {
-            $this->produtoSugestoes = [];
+            $this->fecharSugestoesProduto();
 
             return;
         }
@@ -190,6 +203,41 @@ trait ManagesAjusteEstoqueForm
                 'referencia' => $product->referencia,
             ])
             ->all();
+
+        $this->selectedProdutoSugestaoIndex = 0;
+    }
+
+    public function moverSugestaoProduto(int $delta): void
+    {
+        if ($this->produtoSugestoes === []) {
+            return;
+        }
+
+        $count = count($this->produtoSugestoes);
+        $index = $this->selectedProdutoSugestaoIndex + $delta;
+        $this->selectedProdutoSugestaoIndex = max(0, min($count - 1, $index));
+        $this->dispatch('erp-ajuste-scroll-produto-sugestao', index: $this->selectedProdutoSugestaoIndex);
+    }
+
+    public function confirmarProdutoSugestao(): void
+    {
+        if ($this->produtoSugestoes === []) {
+            return;
+        }
+
+        $index = $this->selectedProdutoSugestaoIndex;
+
+        if (! isset($this->produtoSugestoes[$index])) {
+            $index = 0;
+        }
+
+        $this->selecionarProdutoSugestao((int) $this->produtoSugestoes[$index]['id']);
+    }
+
+    public function fecharSugestoesProduto(): void
+    {
+        $this->produtoSugestoes = [];
+        $this->selectedProdutoSugestaoIndex = 0;
     }
 
     public function resolveProdutoCodigoInterno(): void
@@ -283,7 +331,7 @@ trait ManagesAjusteEstoqueForm
         $this->ajusteForm['referencia'] = (string) ($product->referencia ?? '');
         $this->ajusteForm['descricao_busca'] = $product->descricao;
         $this->ajusteForm['estoque_atual'] = $this->formatEstoqueBr((float) $product->estoque);
-        $this->produtoSugestoes = [];
+        $this->fecharSugestoesProduto();
     }
 
     protected function findProductByCodigo(string $codigo): ?Product

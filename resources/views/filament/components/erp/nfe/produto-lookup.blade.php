@@ -9,7 +9,7 @@
         @foreach ($this->nfeProdutoResults as $index => $row)
             <tr
                 wire:key="nfe-produto-row-{{ $index }}-{{ $row['id'] }}"
-                wire:click="selectNfeProdutoResult({{ $index }}, true)"
+                wire:click="selectNfeProdutoResult({{ $index }})"
                 id="nfe-produto-row-{{ $index }}"
                 data-nfe-produto-index="{{ $index }}"
                 @class([

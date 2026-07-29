@@ -71,6 +71,35 @@ trait InteractsWithErpSimpleListPage
         $this->resetTable();
     }
 
+    public function updatedTableRecordsPerPage(): void
+    {
+        $this->clearListSelection();
+        $this->resetPage();
+    }
+
+    public function search(): void
+    {
+        if (filled($this->localSearch) && $this->searchColumn === 'nome') {
+            $this->localSearch = mb_strtoupper(trim($this->localSearch), 'UTF-8');
+        }
+
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
+    protected function erpSimpleListDefaultSearchColumn(): string
+    {
+        return 'codigo';
+    }
+
+    public function clearSearch(): void
+    {
+        $this->localSearch = '';
+        $this->searchColumn = $this->erpSimpleListDefaultSearchColumn();
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
     protected function deleteSimpleRecord(string $modelClass, string $notificationTitle): void
     {
         $recordId = $this->highlightedRecordIdOrNotify('delete');

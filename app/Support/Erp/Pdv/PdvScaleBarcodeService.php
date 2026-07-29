@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Models\Product;
+use App\Support\Erp\Balanca\BalancaEtiquetaLayout;
 
 final class PdvScaleBarcodeService
 {
@@ -39,11 +40,36 @@ final class PdvScaleBarcodeService
         }
 
         $modelo = $this->config->modeloBalanca();
-        $segmento = substr($barcode, 7, 5);
+        $digitos = $this->config->digitosBalanca();
+        $prefixoBarra = $this->config->prefixoCodBarraBalanca();
+        $filler = BalancaEtiquetaLayout::fillerLength($modelo);
+        $valorLen = BalancaEtiquetaLayout::valorLength($modelo);
+
+        // Preferência: layout configurado (prefixo EAN + dígitos + filler).
+        $valorStart = strlen($prefixoBarra) + $digitos + $filler;
+
+        // Fallback: se o prefixo do produto for maior (ex.: já inclui o "2"), usa o comprimento dele.
+        if (strlen($prefixoProduto) > $valorStart) {
+            $valorStart = strlen($prefixoProduto);
+        }
+
+        // Compat Delphi/legado: muitos cadastros usam 7 chars (2 + 6 dígitos).
+        if ($valorStart < 7 && strlen($barcode) >= 12 && $digitos === 6 && $filler === 0) {
+            $valorStart = 7;
+        }
+
+        $segmento = substr($barcode, $valorStart, $valorLen);
+
+        if ($segmento === '' || ! ctype_digit($segmento)) {
+            // Último fallback do comportamento anterior.
+            $segmento = substr($barcode, 7, 5);
+        }
+
         $segmentoValor = (float) $segmento;
 
-        if ($modelo === 3) {
-            $total = round($segmentoValor / 100, 2);
+        if (BalancaEtiquetaLayout::isTotalPrice($modelo)) {
+            $divisor = $valorLen >= 6 ? 100 : 100;
+            $total = round($segmentoValor / $divisor, 2);
             $quantidade = $total > 0 ? round($total / $preco, 3) : 1;
 
             return [

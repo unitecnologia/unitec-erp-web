@@ -71,6 +71,30 @@ class Person extends Model
 
     public const PESSOA_JURIDICA = 'juridica';
 
+    /** Código canônico do cliente "Consumidor Final" (PDV / NFC-e). */
+    public const CODIGO_CONSUMIDOR_FINAL = 'CF';
+
+    /** Código legado ainda encontrado em bases antigas — tratar como CF. */
+    public const CODIGO_CONSUMIDOR_FINAL_LEGADO = '000001';
+
+    /**
+     * @return list<string>
+     */
+    public static function codigosConsumidorFinal(): array
+    {
+        return [
+            self::CODIGO_CONSUMIDOR_FINAL,
+            self::CODIGO_CONSUMIDOR_FINAL_LEGADO,
+        ];
+    }
+
+    public static function isCodigoConsumidorFinal(?string $codigo): bool
+    {
+        $codigo = strtoupper(trim((string) $codigo));
+
+        return $codigo !== '' && in_array($codigo, self::codigosConsumidorFinal(), true);
+    }
+
     /**
      * @return array<string, string>
      */

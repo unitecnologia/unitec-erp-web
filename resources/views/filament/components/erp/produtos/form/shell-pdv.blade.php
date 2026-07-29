@@ -21,6 +21,7 @@
         ['field' => 'usa_imei', 'label' => 'Usa IMEI', 'disabled' => false],
         ['field' => 'contr_est_grade', 'label' => 'Contr. Est. Grade', 'disabled' => false],
         ['field' => 'mostrar_no_app', 'label' => 'Mostrar no App', 'disabled' => false],
+        ['field' => 'produto_pesado', 'label' => 'Produto Pesado', 'disabled' => false],
     ];
 @endphp
 
@@ -73,5 +74,16 @@
     </div>
 
     @include('filament.components.erp.produtos.form.lookup-modal')
+    @include('filament.components.erp.produtos.form.ncm-confirm-modal')
     @include('filament.components.erp.produtos.form.duplicate-confirm-modal')
+    @include('filament.components.erp.produtos.form.exit-confirm-modal')
+    @include('filament.components.erp.produtos.form.precificacao-modal')
+    @include('filament.components.erp.produtos.form.replica-precos-modal')
+    @include('filament.components.erp.fiscal.cclass-trib-modal')
 </div>
+
+@php
+    $cclassImportJsPath = public_path('js/erp-cclass-trib-import.js');
+    $cclassImportJsVersion = file_exists($cclassImportJsPath) ? filemtime($cclassImportJsPath) : time();
+@endphp
+<script src="{{ asset('js/erp-cclass-trib-import.js') }}?v={{ $cclassImportJsVersion }}" defer></script>

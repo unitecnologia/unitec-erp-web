@@ -20,13 +20,16 @@ class EditPerson extends EditRecord
         ErpScreen::set('Cadastro de Pessoas');
 
         $this->loadPersonContacts($this->record);
+        $this->loadPersonVisitaDias($this->record);
         $this->mountPersonPhoto();
     }
 
     protected function afterSave(): void
     {
         $this->syncPersonContacts($this->record);
+        $this->syncPersonVisitaDias($this->record);
         $this->loadPersonContacts($this->record);
+        $this->loadPersonVisitaDias($this->record);
         $this->flashOrcamentoReturnContextAfterPersonSave();
     }
 

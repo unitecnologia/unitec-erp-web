@@ -3,7 +3,7 @@
     $webcamJsVersion = file_exists($webcamJsPath) ? filemtime($webcamJsPath) : time();
 @endphp
 
-<div class="erp-pessoas-foto" wire:ignore.self x-data="erpPersonWebcam()">
+<div class="erp-pessoas-foto erp-pessoas-panel erp-pessoas-panel--foto" wire:ignore.self x-data="erpPersonWebcam()">
     <div class="erp-pessoas-foto__preview-wrap">
         @if ($this->fotoPreviewUrl)
             <img

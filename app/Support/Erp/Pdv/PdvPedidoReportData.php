@@ -82,7 +82,9 @@ final class PdvPedidoReportData
     {
         if ($venda->relationLoaded('pagamentos') && $venda->pagamentos->isNotEmpty()) {
             return $venda->pagamentos
-                ->map(fn ($pagamento) => trim((string) $pagamento->forma))
+                ->map(fn ($pagamento) => $pagamento instanceof \App\Models\PdvVendaPagamento
+                    ? $pagamento->descricaoComCanhoto()
+                    : trim((string) ($pagamento->forma ?? '')))
                 ->filter()
                 ->unique()
                 ->implode(' / ');

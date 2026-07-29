@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\ImpressaoEtiquetaResource\Pages;
 use App\Models\Product;
 use BackedEnum;
@@ -21,17 +22,22 @@ class ImpressaoEtiquetaResource extends Resource
 
     protected static ?string $modelLabel = 'produto';
 
-    protected static ?string $pluralModelLabel = 'impressÃ£o de etiquetas';
+    protected static ?string $pluralModelLabel = 'impressão de etiquetas';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('etiquetas.access');
+    }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('codigo')->label('CÃ³digo')->alignCenter()->weight(FontWeight::SemiBold),
-                TextColumn::make('codigo_barras')->label('CÃ³d.Barra')->placeholder('â€”')->weight(FontWeight::SemiBold),
-                TextColumn::make('descricao')->label('DescriÃ§Ã£o')->wrap(false)->weight(FontWeight::Bold),
+                TextColumn::make('codigo')->label('Código')->alignCenter()->weight(FontWeight::SemiBold),
+                TextColumn::make('codigo_barras')->label('Cód.Barra')->placeholder('—')->weight(FontWeight::SemiBold),
+                TextColumn::make('descricao')->label('Descrição')->wrap(false)->weight(FontWeight::Bold),
                 TextColumn::make('grupo')->label('Grupo')->alignCenter()->weight(FontWeight::SemiBold),
             ])
             ->defaultSort('codigo')

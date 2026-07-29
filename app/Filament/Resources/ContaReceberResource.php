@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\ContaReceberResource\Pages;
 use App\Models\ContaReceber;
 use BackedEnum;
@@ -28,6 +29,11 @@ class ContaReceberResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('contas_receber.access');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -53,6 +59,16 @@ class ContaReceberResource extends Resource
                     ->weight(FontWeight::Bold),
                 TextColumn::make('documento')
                     ->label('Doc.')
+                    ->placeholder('—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('cartao_maquininha')
+                    ->label('Maquininha')
+                    ->placeholder('—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('cartao_bandeira')
+                    ->label('Bandeira')
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),

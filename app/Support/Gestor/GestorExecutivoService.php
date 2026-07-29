@@ -5,8 +5,12 @@ namespace App\Support\Gestor;
 use App\Models\Entrega;
 use App\Models\ForcaVendasOrder;
 use App\Models\Product;
+use App\Support\Erp\Dashboard\ErpDashboardFiscalDocsChart;
 use App\Support\Erp\Dashboard\ErpDashboardGauges;
+use App\Support\Erp\Dashboard\ErpDashboardPaymentMethodsChart;
+use App\Support\Erp\Dashboard\ErpDashboardSalesChart;
 use App\Support\Erp\Dashboard\ErpDashboardSalesMetrics;
+use App\Support\Erp\Dashboard\ErpDashboardSalesMixChart;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Gestor\GestorAprovacaoService;
@@ -107,6 +111,52 @@ final class GestorExecutivoService
             'saude' => $saude,
             'metas_vendedores' => array_slice($metas, 0, 6),
             'pulso' => $pulso,
+        ];
+    }
+
+    /**
+     * Indicadores da tela Vendas (mesmos do dashboard ERP).
+     *
+     * @return array{
+     *     sales: array<string, mixed>,
+     *     mix: array<string, mixed>,
+     *     fiscal: array<string, mixed>,
+     *     payments: array<string, mixed>
+     * }
+     */
+    public function vendasCharts(?int $empresaId = null): array
+    {
+        $empresaId = $empresaId ?: $this->empresaId();
+
+        try {
+            $sales = ErpDashboardSalesChart::data();
+        } catch (Throwable) {
+            $sales = ['defaultFrom' => '', 'defaultTo' => '', 'points' => []];
+        }
+
+        try {
+            $mix = ErpDashboardSalesMixChart::data();
+        } catch (Throwable) {
+            $mix = ['labels' => [], 'values' => [], 'colors' => []];
+        }
+
+        try {
+            $fiscal = ErpDashboardFiscalDocsChart::data($empresaId > 0 ? $empresaId : null);
+        } catch (Throwable) {
+            $fiscal = ['labels' => [], 'values' => [], 'colors' => [], 'unit' => 'count'];
+        }
+
+        try {
+            $payments = ErpDashboardPaymentMethodsChart::data();
+        } catch (Throwable) {
+            $payments = ['labels' => [], 'values' => [], 'colors' => [], 'unit' => 'money'];
+        }
+
+        return [
+            'sales' => $sales,
+            'mix' => $mix,
+            'fiscal' => $fiscal,
+            'payments' => $payments,
         ];
     }
 

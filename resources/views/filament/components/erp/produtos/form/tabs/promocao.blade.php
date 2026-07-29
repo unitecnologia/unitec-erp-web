@@ -1,8 +1,9 @@
 <div class="erp-produtos-promocao">
-    <fieldset class="erp-produtos-promocao__group">
-        <div class="erp-produtos-promocao__fields">
-            <div class="erp-produtos-promocao__field">
-                <label for="pprod-promo-inicio">Data de inicio</label>
+    <fieldset class="erp-produtos-tab-group">
+        <legend class="erp-produtos-tab-group__legend">Promoção</legend>
+        <div class="erp-produtos-tab-group__fields">
+            <div class="erp-produtos-tab-group__field">
+                <label for="pprod-promo-inicio">Data início</label>
                 <input
                     id="pprod-promo-inicio"
                     type="text"
@@ -12,9 +13,8 @@
                     class="erp-pcad-form__input erp-produtos-promocao__input--date"
                 >
             </div>
-
-            <div class="erp-produtos-promocao__field">
-                <label for="pprod-promo-fim">Data do Fim</label>
+            <div class="erp-produtos-tab-group__field">
+                <label for="pprod-promo-fim">Data fim</label>
                 <input
                     id="pprod-promo-fim"
                     type="text"
@@ -24,9 +24,8 @@
                     class="erp-pcad-form__input erp-produtos-promocao__input--date"
                 >
             </div>
-
-            <div class="erp-produtos-promocao__field">
-                <label for="pprod-promo-varejo">Preço Venda Varejo</label>
+            <div class="erp-produtos-tab-group__field">
+                <label for="pprod-promo-varejo">Pr. Varejo</label>
                 <input
                     id="pprod-promo-varejo"
                     type="text"
@@ -35,9 +34,8 @@
                     class="erp-pcad-form__input erp-produtos-promocao__input--money"
                 >
             </div>
-
-            <div class="erp-produtos-promocao__field">
-                <label for="pprod-promo-atacado">Preço Venda Atacado</label>
+            <div class="erp-produtos-tab-group__field">
+                <label for="pprod-promo-atacado">Pr. Atacado</label>
                 <input
                     id="pprod-promo-atacado"
                     type="text"

@@ -1,18 +1,13 @@
 <?php
 
-
-
 namespace App\Support\Erp\Nfe;
-
-
 
 use App\Models\Empresa;
 
 use App\Models\Product;
 
 use App\Support\Erp\ErpMoney;
-
-
+use App\Support\Erp\Fiscal\IbptLookupService;
 
 final class NfeCalculoService
 
@@ -44,23 +39,17 @@ final class NfeCalculoService
 
         $interestadual = $clienteUf !== '' && $empresaUf !== '' && $clienteUf !== $empresaUf;
 
-
-
         $totais = $this->emptyTotais();
 
         $cfopCounts = [];
 
         $calculatedRows = [];
 
-
-
         foreach ($rows as $index => $row) {
 
             $productId = (int) ($row['product_id'] ?? 0);
 
             $product = $productId > 0 ? Product::query()->find($productId) : null;
-
-
 
             $qtd = $this->parseQuantity($row['quantidade'] ?? 1);
 
@@ -76,7 +65,12 @@ final class NfeCalculoService
 
             $total = round(max(0, ($qtd * $preco) - $desconto), 2);
 
-
+            $ncmIbpt = (string) ($product?->ncm ?: ($row['ncm'] ?? ''));
+            $ibpt = (new IbptLookupService)->calcularParaBase(
+                $ncmIbpt,
+                $total,
+                (int) ($product?->origem ?? ($row['origem'] ?? 0)),
+            );
 
             $cfop = filled($row['cfop'] ?? null)
 
@@ -96,8 +90,6 @@ final class NfeCalculoService
 
                 : $this->resolveCsosn($product, $interestadual);
 
-
-
             $defaultAliqIcms = $this->resolveAliqIcms($product, $interestadual);
 
             $defaultAliqPis = (float) ($product?->aliq_pis ?? 0);
@@ -106,15 +98,11 @@ final class NfeCalculoService
 
             $defaultAliqIpi = (float) ($product?->aliq_ipi ?? 0);
 
-
-
             $baseIcms = $this->rowMoney($row, 'base_icms', $total);
 
             $aliqIcms = $this->rowMoney($row, 'aliq_icms', $defaultAliqIcms);
 
             $valorIcms = $this->rowMoney($row, 'valor_icms', round($baseIcms * $aliqIcms / 100, 2));
-
-
 
             $basePisCof = $this->rowMoney($row, 'base_pis_icms', $total);
 
@@ -126,35 +114,33 @@ final class NfeCalculoService
 
             $valorCof = $this->rowMoney($row, 'valor_cofins_icms', round($basePisCof * $aliqCof / 100, 2));
 
-
-
             $baseIpi = $this->rowMoney($row, 'base_ipi', $total);
 
             $aliqIpi = $this->rowMoney($row, 'aliq_ipi', $defaultAliqIpi);
 
             $valorIpi = $this->rowMoney($row, 'valor_ipi', round($baseIpi * $aliqIpi / 100, 2));
 
-
-
             $valorDesoneracao = $this->rowMoney($row, 'valor_desoneracao', 0.0);
-
-
 
             $bcIbs = $this->rowMoney($row, 'bc_ibs', $total);
 
-            $alqCbs = $this->rowMoney($row, 'alq_cbs', 0.0);
+            $alqCbs = $this->rowMoney($row, 'alq_cbs', (float) ($product?->aliq_cbs ?? 0));
 
-            $alqIbsMun = $this->rowMoney($row, 'alq_ibs_mun', 0.0);
+            $alqIbsMun = $this->rowMoney($row, 'alq_ibs_mun', (float) ($product?->aliq_ibs_mun ?? 0));
 
-            $alqIbsUf = $this->rowMoney($row, 'alq_ibs_uf', 0.0);
+            $alqIbsUf = $this->rowMoney($row, 'alq_ibs_uf', (float) ($product?->aliq_ibs_uf ?? 0));
 
-            $vCbs = $this->rowMoney($row, 'v_cbs', round($bcIbs * $alqCbs / 100, 2));
+            $redIbs = (float) ($product?->reducao_ibs ?? 0);
+            $redCbs = (float) ($product?->reducao_cbs ?? 0);
+            $alqCbsEfet = $redCbs > 0 ? $alqCbs * (1 - ($redCbs / 100)) : $alqCbs;
+            $alqIbsMunEfet = $redIbs > 0 ? $alqIbsMun * (1 - ($redIbs / 100)) : $alqIbsMun;
+            $alqIbsUfEfet = $redIbs > 0 ? $alqIbsUf * (1 - ($redIbs / 100)) : $alqIbsUf;
 
-            $vIbsMun = $this->rowMoney($row, 'v_ibs_mun', round($bcIbs * $alqIbsMun / 100, 2));
+            $vCbs = $this->rowMoney($row, 'v_cbs', round($bcIbs * $alqCbsEfet / 100, 2));
 
-            $vIbsUf = $this->rowMoney($row, 'v_ibs_uf', round($bcIbs * $alqIbsUf / 100, 2));
+            $vIbsMun = $this->rowMoney($row, 'v_ibs_mun', round($bcIbs * $alqIbsMunEfet / 100, 2));
 
-
+            $vIbsUf = $this->rowMoney($row, 'v_ibs_uf', round($bcIbs * $alqIbsUfEfet / 100, 2));
 
             $calculatedRows[] = [
 
@@ -199,7 +185,13 @@ final class NfeCalculoService
                 'outros' => $outros,
 
                 'total' => $total,
-
+                'trib_fed' => $ibpt['trib_fed'],
+                'trib_est' => $ibpt['trib_est'],
+                'trib_mun' => $ibpt['trib_mun'],
+                'trib_imp' => $ibpt['trib_imp'],
+                'ibpt_fonte' => $ibpt['fonte'],
+                'ibpt_chave' => $ibpt['chave'],
+                'ibpt_versao' => $ibpt['versao'],
                 'base_icms' => $baseIcms,
 
                 'aliq_icms' => $aliqIcms,
@@ -230,7 +222,7 @@ final class NfeCalculoService
 
                 'valor_pis_icms' => $valorPis,
 
-                'cst_cofins' => $product?->cst_saida ?? '01',
+                'cst_cofins' => $product?->cst_cofins ?? $product?->cst_saida ?? '01',
 
                 'base_cofins_icms' => $basePisCof,
 
@@ -238,9 +230,9 @@ final class NfeCalculoService
 
                 'valor_cofins_icms' => $valorCof,
 
-                'class_trib' => (string) ($row['class_trib'] ?? ''),
+                'class_trib' => (string) ($row['class_trib'] ?? $product?->cclass_trib ?? ''),
 
-                'cst_ibs_cbs' => (string) ($row['cst_ibs_cbs'] ?? ''),
+                'cst_ibs_cbs' => (string) ($row['cst_ibs_cbs'] ?? $product?->iva_cst ?? ''),
 
                 'v_ibs_mun' => $vIbsMun,
 
@@ -257,8 +249,6 @@ final class NfeCalculoService
                 'alq_ibs_uf' => $alqIbsUf,
 
             ];
-
-
 
             $totais['subtotal'] += $total;
 
@@ -288,21 +278,39 @@ final class NfeCalculoService
 
             $totais['valor_cofins'] += $valorCof;
 
-
+            $totais['trib_fed'] += $ibpt['trib_fed'];
+            $totais['trib_est'] += $ibpt['trib_est'];
+            $totais['trib_mun'] += $ibpt['trib_mun'];
+            $totais['trib_imp'] += $ibpt['trib_imp'];
+            if (($totais['ibpt_fonte'] ?? '') === '' && filled($ibpt['fonte'] ?? null)) {
+                $totais['ibpt_fonte'] = (string) $ibpt['fonte'];
+                $totais['ibpt_chave'] = (string) ($ibpt['chave'] ?? '');
+                $totais['ibpt_versao'] = (string) ($ibpt['versao'] ?? '');
+            }
 
             $cfopCounts[$cfop] = ($cfopCounts[$cfop] ?? 0) + 1;
 
         }
 
-
-
         $totais['total'] = round($totais['subtotal'] + $totais['frete'] + $totais['seguro'] + $totais['outras'], 2);
+        $totais['trib_fed'] = round((float) $totais['trib_fed'], 2);
+        $totais['trib_est'] = round((float) $totais['trib_est'], 2);
+        $totais['trib_mun'] = round((float) $totais['trib_mun'], 2);
+        $totais['trib_imp'] = round((float) $totais['trib_imp'], 2);
+        $totais['v_tot_trib'] = round((float) $totais['trib_fed'] + (float) $totais['trib_est'] + (float) $totais['trib_mun'], 2);
+        $totais['ibpt_texto'] = (new IbptLookupService)->formatarTextoLei12741([
+            'trib_fed' => $totais['trib_fed'],
+            'trib_est' => $totais['trib_est'],
+            'trib_mun' => $totais['trib_mun'],
+            'v_tot_trib' => $totais['v_tot_trib'],
+            'fonte' => (string) ($totais['ibpt_fonte'] ?? ''),
+            'chave' => (string) ($totais['ibpt_chave'] ?? ''),
+            'versao' => (string) ($totais['ibpt_versao'] ?? ''),
+        ]);
 
         arsort($cfopCounts);
 
         $cfopDominante = $cfopCounts !== [] ? (int) array_key_first($cfopCounts) : null;
-
-
 
         return [
 
@@ -315,8 +323,6 @@ final class NfeCalculoService
         ];
 
     }
-
-
 
     /**
 
@@ -364,11 +370,27 @@ final class NfeCalculoService
 
             'total' => 0.0,
 
+            'trib_fed' => 0.0,
+
+            'trib_est' => 0.0,
+
+            'trib_mun' => 0.0,
+
+            'trib_imp' => 0.0,
+
+            'v_tot_trib' => 0.0,
+
+            'ibpt_fonte' => '',
+
+            'ibpt_chave' => '',
+
+            'ibpt_versao' => '',
+
+            'ibpt_texto' => '',
+
         ];
 
     }
-
-
 
     protected function resolveCfop(?Product $product, bool $interestadual, ?Empresa $empresa): string
 
@@ -380,13 +402,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return (string) ($product?->cfop_interno ?: $empresa?->param_imp_cfop_venda ?? '5102');
 
     }
-
-
 
     protected function resolveCst(?Product $product, bool $interestadual): string
 
@@ -398,13 +416,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return (string) ($product?->cst_icms ?: '00');
 
     }
-
-
 
     protected function resolveCsosn(?Product $product, bool $interestadual): ?string
 
@@ -416,13 +430,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return $product?->csosn;
 
     }
-
-
 
     protected function resolveAliqIcms(?Product $product, bool $interestadual): float
 
@@ -434,13 +444,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return (float) ($product?->aliq_icms ?? 0);
 
     }
-
-
 
     /**
 
@@ -458,13 +464,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return $default;
 
     }
-
-
 
     private function parseQuantity(mixed $value): float
 
@@ -476,13 +478,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return max(0.0001, (float) ($value ?? 1));
 
     }
-
-
 
     private function parseMoney(mixed $value): float
 
@@ -494,12 +492,9 @@ final class NfeCalculoService
 
         }
 
-
-
         return max(0, (float) ($value ?? 0));
 
     }
 
 }
-
 

@@ -1,0 +1,577 @@
+/* Consulta CClassTrib — modal compartilhado (produto + empresa) */
+.erp-cclass-trib-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 260;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem;
+}
+
+.erp-cclass-trib-modal .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 48%);
+    backdrop-filter: blur(2px);
+}
+
+.erp-cclass-trib-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(880px, 96vw);
+    height: min(560px, 90dvh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid #9eb4cf;
+    background: #e8eef6 !important;
+    box-shadow: 0 18px 40px rgb(15 23 42 / 26%);
+    pointer-events: auto;
+}
+
+.erp-cclass-trib-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid #b7c9de;
+    background: linear-gradient(180deg, #d9e6f5 0%, #c8d9ec 100%);
+}
+
+.erp-cclass-trib-modal__title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #0f2744;
+    letter-spacing: -0.01em;
+}
+
+.erp-cclass-trib-modal__subtitle {
+    margin: 0.08rem 0 0;
+    font-size: 0.7rem;
+    color: #4b647f;
+}
+
+.erp-cclass-trib-modal__close {
+    flex: 0 0 auto;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 1px solid #9eb4cf;
+    border-radius: 6px;
+    background: #f3f7fc;
+    color: #334155;
+    font-size: 0.82rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-cclass-trib-modal__close:hover {
+    border-color: #64748b;
+    color: #0f172a;
+    background: #fff;
+}
+
+.erp-cclass-trib-modal__toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem 0.4rem;
+    background: #dfe8f3;
+    border-bottom: 1px solid #c5d4e6;
+}
+
+.erp-cclass-trib-modal__search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.4rem;
+}
+
+.erp-cclass-trib-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+    flex: 1 1 11rem;
+}
+
+.erp-cclass-trib-modal__field--cst {
+    flex: 0 0 4.6rem;
+}
+
+.erp-cclass-trib-modal__field label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #3d5570;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-cclass-trib-modal__input {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.22rem 0.5rem;
+    border: 1px solid #9eb4cf;
+    border-radius: 6px;
+    background: #f7fafc;
+    color: #0f172a;
+    font-size: 0.78rem;
+    box-sizing: border-box;
+}
+
+.erp-cclass-trib-modal__input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 18%);
+}
+
+.erp-cclass-trib-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28rem;
+    min-height: 1.85rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
+}
+
+.erp-cclass-trib-modal__btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.erp-cclass-trib-modal__btn--filter {
+    flex: 0 0 auto;
+    background: #1e3a5f;
+    color: #fff;
+    border-color: #16304f;
+}
+
+.erp-cclass-trib-modal__btn--filter:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.erp-cclass-trib-modal__btn--filter kbd {
+    padding: 0.05rem 0.22rem;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 16%);
+    font-size: 0.6rem;
+    font-weight: 700;
+}
+
+.erp-cclass-trib-modal__btn--secondary {
+    background: #f3f7fc;
+    border-color: #9eb4cf;
+    color: #334155;
+}
+
+.erp-cclass-trib-modal__btn--secondary:hover:not(:disabled) {
+    border-color: #64748b;
+    background: #fff;
+}
+
+.erp-cclass-trib-modal__btn--primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-color: #1e40af;
+    color: #fff;
+    min-width: 6.2rem;
+}
+
+.erp-cclass-trib-modal__btn--primary:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.erp-cclass-trib-modal__btn--ghost {
+    position: relative;
+    overflow: hidden;
+    background: #f3f7fc;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+
+.erp-cclass-trib-modal__file {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.erp-cclass-trib-modal__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.erp-cclass-trib-modal__chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0.08rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #9eb4cf;
+    background: #f3f7fc;
+    color: #3d5570;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+}
+
+.erp-cclass-trib-modal__chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.erp-cclass-trib-modal__chip.is-active {
+    border-color: #2563eb;
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.erp-cclass-trib-modal__table-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.55rem;
+    padding: 0.35rem 0.75rem 0.25rem;
+    background: #e8eef6;
+}
+
+.erp-cclass-trib-modal__table-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #0f2744;
+}
+
+.erp-cclass-trib-modal__count {
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: #4b647f;
+}
+
+.erp-cclass-trib-modal__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 0.75rem;
+    overflow: auto;
+    border: 1px solid #9eb4cf;
+    border-radius: 7px;
+    background: #f7fafc;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+.erp-cclass-trib-modal__grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+.erp-cclass-trib-modal__grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.32rem 0.45rem;
+    background: #cfdceb;
+    border-bottom: 1px solid #9eb4cf;
+    color: #1e3a5f;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    text-align: left;
+}
+
+.erp-cclass-trib-modal__grid tbody td {
+    padding: 0.28rem 0.45rem;
+    border-bottom: 1px solid #d7e2ef;
+    color: #0f172a;
+    font-size: 0.74rem;
+    vertical-align: middle;
+    line-height: 1.25;
+}
+
+.erp-cclass-trib-modal__col-cst { width: 3.8rem; text-align: center; }
+.erp-cclass-trib-modal__col-grupo { width: 8.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erp-cclass-trib-modal__col-codigo { width: 5.2rem; text-align: center; font-variant-numeric: tabular-nums; font-weight: 800; color: #0f2744; }
+.erp-cclass-trib-modal__col-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
+
+.erp-cclass-trib-modal__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    padding: 0.05rem 0.28rem;
+    border-radius: 4px;
+    border: 1px solid #b7c9de;
+    background: #e8eef6;
+    color: #1e3a5f;
+    font-size: 0.66rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-cclass-trib-modal__row {
+    cursor: pointer;
+}
+
+.erp-cclass-trib-modal__row:nth-child(odd) td {
+    background: #f7fafc;
+}
+
+.erp-cclass-trib-modal__row:nth-child(even) td {
+    background: #e4edf7;
+}
+
+.erp-cclass-trib-modal__row:hover td {
+    background: #d7e8fb !important;
+}
+
+.erp-cclass-trib-modal__row.is-selected td {
+    background: #bfdbfe !important;
+}
+
+.erp-cclass-trib-modal__row.is-selected .erp-cclass-trib-modal__badge {
+    border-color: #60a5fa;
+    background: #93c5fd;
+    color: #1e3a8a;
+}
+
+.erp-cclass-trib-modal__empty {
+    padding: 1.4rem 0.75rem !important;
+    text-align: center;
+    color: #4b647f;
+    font-size: 0.78rem;
+    background: #f7fafc !important;
+}
+
+.erp-cclass-trib-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 0.75rem 0.55rem;
+    border-top: 1px solid #b7c9de;
+    background: linear-gradient(180deg, #d9e6f5 0%, #cfdceb 100%);
+}
+
+.erp-cclass-trib-modal__selection {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    flex: 1 1 14rem;
+    font-size: 0.72rem;
+    color: #3d5570;
+}
+
+.erp-cclass-trib-modal__selection-label {
+    flex: 0 0 auto;
+    padding: 0.08rem 0.32rem;
+    border-radius: 999px;
+    background: #bbf7d0;
+    color: #166534;
+    font-size: 0.58rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.erp-cclass-trib-modal__selection strong {
+    color: #0f2744;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-cclass-trib-modal__selection-desc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-cclass-trib-modal__selection-hint {
+    color: #64748b;
+    font-size: 0.68rem;
+}
+
+.erp-cclass-trib-modal__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+    .erp-cclass-trib-modal__field--cst {
+        flex: 1 1 5rem;
+    }
+
+    .erp-cclass-trib-modal__footer {
+        align-items: stretch;
+    }
+
+    .erp-cclass-trib-modal__actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .erp-cclass-trib-modal__actions .erp-cclass-trib-modal__btn {
+        flex: 1 1 auto;
+    }
+}
+
+/* Overlay de progresso — padrão NF-e */
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress.is-visible {
+    display: flex;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 48%);
+    backdrop-filter: blur(2px);
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__panel {
+    position: relative;
+    width: min(22rem, 96%);
+    padding: 1rem 1.1rem 0.9rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 18px 36px rgb(15 52 96 / 24%);
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__spinner {
+    width: 2rem;
+    height: 2rem;
+    margin: 0 auto 0.55rem;
+    border: 3px solid #dbeafe;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: erp-cclass-spin 0.85s linear infinite;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__title {
+    margin: 0 0 0.3rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-align: center;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__status {
+    margin: 0 0 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #1d4ed8;
+    text-align: center;
+    min-height: 1rem;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__track {
+    height: 0.65rem;
+    margin-bottom: 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e2e8f0;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__bar {
+    width: 0;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+    transition: width 0.45s ease;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li {
+    position: relative;
+    padding-left: 1.2rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #94a3b8;
+    line-height: 1.3;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.24rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #cbd5e1;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li.is-active {
+    color: #1d4ed8;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li.is-active::before {
+    background: #2563eb;
+    box-shadow: 0 0 0 2px #dbeafe;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li.is-done {
+    color: #16a34a;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__steps li.is-done::before {
+    background: #16a34a;
+}
+
+.erp-cclass-trib-modal .erp-cclass-trib-import-progress__hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+}
+
+.erp-cclass-trib-modal__spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid #93c5fd;
+    border-top-color: #1d4ed8;
+    border-radius: 999px;
+    animation: erp-cclass-spin 0.7s linear infinite;
+}
+
+@keyframes erp-cclass-spin {
+    to { transform: rotate(360deg); }
+}
+

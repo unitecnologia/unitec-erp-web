@@ -52,6 +52,11 @@ class ListUnidades extends ListRecords
         return '.erp-unidades__input';
     }
 
+    protected function erpSimpleListDefaultSearchColumn(): string
+    {
+        return 'sigla';
+    }
+
     protected function erpSimpleListCreateMethod(): string
     {
         return 'createUnidade';

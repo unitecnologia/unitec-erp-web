@@ -2,6 +2,7 @@
     <fieldset class="erp-terminais-form__checks">
         <label class="erp-pcad__check"><input type="checkbox" wire:model="data.eh_caixa"> É caixa</label>
         <label class="erp-pcad__check"><input type="checkbox" wire:model="data.pdv"> Usa PDV</label>
+        <label class="erp-pcad__check"><input type="checkbox" wire:model="data.ativo"> Terminal ativo (PDV offline)</label>
         <label class="erp-pcad__check"><input type="checkbox" wire:model="data.pesquisa_rapida"> Caixa rápido (sem enter)</label>
     </fieldset>
 

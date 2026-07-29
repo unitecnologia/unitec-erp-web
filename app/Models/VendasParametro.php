@@ -40,6 +40,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'numero',
     'serie',
     'serie_nfe',
+    'numero_nfe',
+    'dfe_ultimo_nsu',
+    'dfe_bloqueado_ate',
     'id_token',
     'token',
     'versao_qrcode',
@@ -50,6 +53,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'email_assunto',
     'email_ssl',
     'email_tls',
+    'email_modo',
+    'email_api_provedor',
+    'email_api_key',
+    'resp_tecnico_cnpj',
+    'resp_tecnico_contato',
+    'resp_tecnico_email',
+    'resp_tecnico_fone',
+    'resp_tecnico_id_csrt',
+    'resp_tecnico_csrt',
 ])]
 class VendasParametro extends Model
 {
@@ -77,6 +89,7 @@ class VendasParametro extends Model
                 'numero' => 1,
                 'serie' => '1',
                 'serie_nfe' => 1,
+                'numero_nfe' => 1,
             ],
         );
     }
@@ -88,10 +101,108 @@ class VendasParametro extends Model
 
     public function consumeNumero(): int
     {
-        $numero = $this->peekNumero();
-        $this->update(['numero' => $numero + 1]);
+        return $this->consumeSequencia('numero');
+    }
+
+    public function peekNumeroNfe(): int
+    {
+        return (int) ($this->numero_nfe ?? 1);
+    }
+
+    public function consumeNumeroNfe(): int
+    {
+        return $this->consumeSequencia('numero_nfe');
+    }
+
+    /**
+     * Garante que o próximo número NFC-e seja pelo menos $minimo (ex.: após rejeição 539).
+     */
+    public function ensureNumeroPeloMenos(int $minimo): void
+    {
+        $this->ensureSequenciaPeloMenos('numero', $minimo);
+    }
+
+    /**
+     * Consome o sequencial em conexão separada para o incremento sobreviver ao rollback
+     * da venda quando a SEFAZ rejeita (ex.: duplicidade 539).
+     */
+    private function consumeSequencia(string $column): int
+    {
+        $connection = $this->sequenciaConnectionName();
+
+        $numero = \Illuminate\Support\Facades\DB::connection($connection)->transaction(function () use ($connection, $column): int {
+            $row = static::on($connection)
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if ($row === null) {
+                throw new \RuntimeException('Parâmetros fiscais não encontrados para sequencial.');
+            }
+
+            $atual = max(1, (int) ($row->{$column} ?? 1));
+            $row->newQuery()
+                ->whereKey($row->getKey())
+                ->update([$column => $atual + 1]);
+
+            return $atual;
+        });
+
+        $this->setAttribute($column, $numero + 1);
 
         return $numero;
+    }
+
+    private function ensureSequenciaPeloMenos(string $column, int $minimo): void
+    {
+        $minimo = max(1, $minimo);
+        $connection = $this->sequenciaConnectionName();
+
+        \Illuminate\Support\Facades\DB::connection($connection)->transaction(function () use ($connection, $column, $minimo): void {
+            $row = static::on($connection)
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if ($row === null) {
+                return;
+            }
+
+            $atual = max(1, (int) ($row->{$column} ?? 1));
+            if ($atual >= $minimo) {
+                return;
+            }
+
+            $row->newQuery()
+                ->whereKey($row->getKey())
+                ->update([$column => $minimo]);
+        });
+
+        if ((int) ($this->{$column} ?? 1) < $minimo) {
+            $this->setAttribute($column, $minimo);
+        }
+    }
+
+    private function sequenciaConnectionName(): string
+    {
+        $default = (string) config('database.default');
+        $driver = (string) config("database.connections.{$default}.driver");
+
+        // SQLite :memory: não compartilha estado entre conexões — usa a mesma.
+        if ($driver === 'sqlite') {
+            $database = (string) config("database.connections.{$default}.database");
+            if ($database === ':memory:' || str_contains($database, 'mode=memory')) {
+                return $default;
+            }
+        }
+
+        $seq = $default.'_fiscal_seq';
+
+        if (! config()->has("database.connections.{$seq}")) {
+            config(["database.connections.{$seq}" => config("database.connections.{$default}")]);
+        }
+
+        return $seq;
     }
 
     public function hasStoredSenhaCertificado(): bool
@@ -125,6 +236,7 @@ class VendasParametro extends Model
             'senha_certificado' => 'encrypted',
             'proxy_senha' => 'encrypted',
             'email_senha' => 'encrypted',
+            'dfe_bloqueado_ate' => 'datetime',
         ];
     }
 }

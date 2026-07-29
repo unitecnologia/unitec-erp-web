@@ -32,7 +32,13 @@ class PdvVenda extends Model
         'troco',
         'dinheiro',
         'situacao',
+        'motivo_estorno',
         'fechado_em',
+        'uuid',
+        'origem',
+        'terminal_offline',
+        'numero_offline',
+        'serie_offline',
     ];
 
     protected function casts(): array

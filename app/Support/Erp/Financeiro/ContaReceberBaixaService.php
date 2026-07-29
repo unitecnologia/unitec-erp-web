@@ -10,6 +10,18 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
+/**
+ * Baixa de Contas a Receber + lançamento no Livro Caixa.
+ *
+ * Regra operacional de caixa (PDV vs Força de Vendas):
+ * - PDV: dinheiro/cartão à vista entram em `pdv_caixa_movimentos` da sessão
+ *   aberta; o Livro Caixa (`caixa_lancamentos`) recebe o consolidado no
+ *   fechamento da sessão (`PdvCaixaFechamentoService`).
+ * - Contas a Receber / Força de Vendas: baixa ou faturamento à vista
+ *   (dinheiro/PIX) registram entrada direto no Livro Caixa neste serviço.
+ * - PIX de título (`PixCobrancaService`): baixa o CR e também gera entrada
+ *   no Livro Caixa (mesmo caminho deste serviço).
+ */
 final class ContaReceberBaixaService
 {
     /**
@@ -128,25 +140,21 @@ final class ContaReceberBaixaService
         string $historico,
         ?int $caixaContaId,
     ): void {
-        try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
-                return;
-            }
-
-            CaixaLancamento::query()->create([
-                'codigo' => CaixaLancamento::nextCodigo(),
-                'emissao' => $data,
-                'documento' => mb_substr($documento, 0, 40),
-                'historico' => mb_substr($historico, 0, 180),
-                'plano_contas' => null,
-                'plano_conta_id' => null,
-                'caixa_conta_id' => $caixaContaId,
-                'entrada' => $valor,
-                'saida' => 0,
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
+        if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
+            return;
         }
+
+        CaixaLancamento::query()->create([
+            'codigo' => CaixaLancamento::nextCodigo(),
+            'emissao' => $data,
+            'documento' => mb_substr($documento, 0, 40),
+            'historico' => mb_substr($historico, 0, 180),
+            'plano_contas' => null,
+            'plano_conta_id' => null,
+            'caixa_conta_id' => $caixaContaId,
+            'entrada' => $valor,
+            'saida' => 0,
+        ]);
     }
 
     /**

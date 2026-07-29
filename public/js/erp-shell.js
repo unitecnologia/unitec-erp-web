@@ -40,11 +40,30 @@
                 return;
             }
 
-            const moduleButton = event.target.closest('[data-erp-module]');
-            if (moduleButton) {
+            const alterarSenhaButton = event.target.closest('[data-erp-action="alterar-senha"]');
+            if (alterarSenhaButton) {
                 event.preventDefault();
                 event.stopPropagation();
-                notifyErp('Em implementação.', 'info', `Módulo: ${moduleButton.getAttribute('data-erp-module') ?? ''}`);
+                closeAllTopMenus();
+                window.Livewire?.dispatch('erp-open-alterar-senha');
+                return;
+            }
+
+            const trocarUsuarioButton = event.target.closest('[data-erp-action="trocar-usuario"]');
+            if (trocarUsuarioButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeAllTopMenus();
+                window.Livewire?.dispatch('erp-open-trocar-usuario');
+                return;
+            }
+
+            const moduleButton = event.target.closest('[data-erp-module]');
+            if (moduleButton) {
+                // Stubs do menu agora usam badge "Em breve" (sem toast).
+                // Mantém o handler só por compatibilidade com markup legado.
+                event.preventDefault();
+                event.stopPropagation();
             }
         },
         true
@@ -78,6 +97,14 @@
         }
     });
 
+    function closeAllTopMenus(except = null) {
+        document.querySelectorAll('.erp-menu-bar__details[open]').forEach((other) => {
+            if (other !== except) {
+                other.removeAttribute('open');
+            }
+        });
+    }
+
     function bindMenuUi() {
         document.querySelectorAll('.erp-menu-bar__details').forEach((details) => {
             if (details.dataset.erpMenuBound === '1') {
@@ -85,16 +112,34 @@
             }
 
             details.dataset.erpMenuBound = '1';
+
+            const summary = details.querySelector(':scope > summary');
+
+            summary?.addEventListener('click', (event) => {
+                // Em desktop o hover controla o menu; no toque o clique continua abrindo.
+                if (window.matchMedia('(hover: hover)').matches) {
+                    event.preventDefault();
+                }
+            });
+
             details.addEventListener('toggle', () => {
                 if (! details.open) {
                     return;
                 }
 
-                document.querySelectorAll('.erp-menu-bar__details[open]').forEach((other) => {
-                    if (other !== details) {
-                        other.removeAttribute('open');
-                    }
-                });
+                closeAllTopMenus(details);
+            });
+
+            details.addEventListener('mouseenter', () => {
+                if (details.open) {
+                    return;
+                }
+
+                details.setAttribute('open', '');
+            });
+
+            details.addEventListener('mouseleave', () => {
+                details.removeAttribute('open');
             });
         });
 
@@ -117,6 +162,18 @@
                     }
                 });
             });
+
+            submenu.addEventListener('mouseenter', () => {
+                if (submenu.open) {
+                    return;
+                }
+
+                submenu.setAttribute('open', '');
+            });
+
+            submenu.addEventListener('mouseleave', () => {
+                submenu.removeAttribute('open');
+            });
         });
     }
 
@@ -126,9 +183,7 @@
         }
 
         if (! event.target.closest('.erp-menu-bar__details')) {
-            document.querySelectorAll('.erp-menu-bar__details[open]').forEach((details) => {
-                details.removeAttribute('open');
-            });
+            closeAllTopMenus();
         }
     });
 
@@ -486,12 +541,9 @@
 
         fetch(resetUrl, {
             method: 'POST',
-            headers: {
-                Accept: 'application/json',
+            headers: updateRequestHeaders({
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            }),
             credentials: 'same-origin',
             body: '{}',
         })
@@ -499,7 +551,7 @@
                 const payload = await response.json().catch(() => ({}));
 
                 if (! response.ok) {
-                    throw new Error(payload.message ?? 'Não foi possível limpar o estado.');
+                    throw new Error(resolveUpdateHttpError(response, payload));
                 }
 
                 updateStuck = false;
@@ -534,6 +586,14 @@
             return Number(config.applyingStallSeconds ?? 600);
         }
 
+        if (state === 'migrating') {
+            return Number(config.migratingStallSeconds ?? 1200);
+        }
+
+        if (state === 'finalizing') {
+            return Number(config.finalizingStallSeconds ?? 300);
+        }
+
         return Number(config.stallSeconds ?? 180);
     }
 
@@ -553,12 +613,57 @@
         ].join('|');
     }
 
+    function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
     function getCsrfToken() {
         return (
             document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ??
             document.querySelector('input[name="_token"]')?.value ??
+            getCookie('XSRF-TOKEN') ??
             ''
         );
+    }
+
+    function updateRequestHeaders(extra = {}) {
+        const csrf = getCsrfToken();
+        const headers = {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...extra,
+        };
+
+        if (csrf) {
+            headers['X-CSRF-TOKEN'] = csrf;
+            headers['X-XSRF-TOKEN'] = csrf;
+        }
+
+        return headers;
+    }
+
+    function resolveUpdateHttpError(response, payload) {
+        const fallback = payload?.message || payload?.error || '';
+
+        if (response.status === 401 || /unauthenticated/i.test(String(fallback))) {
+            return 'Sessão expirada ou inválida. Faça login novamente e tente atualizar.';
+        }
+
+        if (response.status === 419) {
+            return 'Token de segurança expirado. Recarregue a página (F5) e tente novamente.';
+        }
+
+        if (response.status === 403) {
+            return 'Sem permissão para atualizar o sistema.';
+        }
+
+        if (response.status === 409) {
+            return fallback || 'Já existe uma atualização em andamento.';
+        }
+
+        return fallback || ('Erro HTTP ' + response.status + ' ao comunicar com o servidor.');
     }
 
     function startSystemUpdate() {
@@ -598,12 +703,9 @@
 
         fetch(launchUrl, {
             method: 'POST',
-            headers: {
-                Accept: 'application/json',
+            headers: updateRequestHeaders({
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            }),
             credentials: 'same-origin',
             body: '{}',
         })
@@ -611,7 +713,7 @@
                 const payload = await response.json().catch(() => ({}));
 
                 if (! response.ok) {
-                    throw new Error(payload.message ?? 'Não foi possível iniciar a atualização.');
+                    throw new Error(resolveUpdateHttpError(response, payload));
                 }
 
                 setUpdateInfo(
@@ -632,7 +734,12 @@
 
                 const hint = updateModal?.querySelector('[data-erp-update-hint]');
                 if (hint) {
-                    hint.textContent = 'Verifique storage/logs/erp-update-spawn.log, instalacao.log e UNITEC_UPDATE_DOWNLOAD_URL no .env.';
+                    const msg = String(error.message ?? '');
+                    if (/sessão|login|419|token/i.test(msg)) {
+                        hint.textContent = 'Saia e entre de novo no ERP. Confira se o APP_URL do .env é o mesmo endereço da barra do navegador.';
+                    } else {
+                        hint.textContent = 'Verifique storage/logs/erp-update-spawn.log, instalacao.log e UNITEC_UPDATE_DOWNLOAD_URL no .env.';
+                    }
                 }
             });
     }
@@ -666,14 +773,30 @@
         }
 
         fetch(statusUrl, {
-            headers: {
-                Accept: 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers: updateRequestHeaders(),
             credentials: 'same-origin',
         })
             .then(async (response) => {
                 const payload = await response.json().catch(() => ({}));
+
+                if (! response.ok) {
+                    const errorText = resolveUpdateHttpError(response, payload);
+                    // Erro de pasta/sessão no poll não aborta o processo em segundo plano.
+                    if (/failed to open stream|no such file or directory|sessions/i.test(errorText)) {
+                        const hint = updateModal?.querySelector('[data-erp-update-hint]');
+                        if (hint) {
+                            hint.textContent =
+                                'Servidor temporariamente indisponível durante a atualização. Continuando a monitorar...';
+                        }
+
+                        return;
+                    }
+
+                    markUpdateFailed(errorText);
+
+                    return;
+                }
+
                 const state = payload.state ?? 'idle';
                 const message = payload.message ?? 'Atualizando...';
                 const signature = buildStatusSignature(payload);
@@ -710,6 +833,14 @@
                         if (hint) {
                             hint.textContent =
                                 'Download em andamento (pacote grande). Aguarde — o progresso atualiza a cada poucos segundos.';
+                        }
+                    }
+
+                    if (stalledFor >= Math.min(stallLimit, 90) && state === 'migrating') {
+                        const hint = updateModal?.querySelector('[data-erp-update-hint]');
+                        if (hint) {
+                            hint.textContent =
+                                'Migrations em andamento. Esta etapa não mostra % intermediário — aguarde até concluir (pode levar vários minutos).';
                         }
                     }
                 }
@@ -829,4 +960,41 @@ function notifyErp(body, type, title = 'Unitec ERP') {
 
     document.addEventListener('DOMContentLoaded', () => syncPlainPasswordMasks());
     document.addEventListener('livewire:navigated', () => syncPlainPasswordMasks());
+})();
+
+(function bindErpStatusBarClock() {
+    function formatSaoPauloNow() {
+        const parts = new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        }).formatToParts(new Date());
+
+        const get = (type) => parts.find((part) => part.type === type)?.value ?? '';
+
+        return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`;
+    }
+
+    function tickErpStatusBarClock() {
+        const clockEl = document.getElementById('erp-status-updated-at');
+
+        if (! clockEl) {
+            return;
+        }
+
+        clockEl.textContent = formatSaoPauloNow();
+    }
+
+    if (! window.__erpStatusBarClockTimer) {
+        window.__erpStatusBarClockTimer = window.setInterval(tickErpStatusBarClock, 1000);
+    }
+
+    document.addEventListener('DOMContentLoaded', tickErpStatusBarClock);
+    document.addEventListener('livewire:navigated', tickErpStatusBarClock);
+    tickErpStatusBarClock();
 })();

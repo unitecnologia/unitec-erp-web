@@ -1,193 +1,269 @@
-/* ERP — Tela de login (visual v2 — contraste forte) */
+/* ERP — Tela de login (v4 — fundo azul sólido, sem artefato claro) */
 
+html:has(.unitec-login-root),
+body:has(.unitec-login-root),
+.fi-body:has(.unitec-login-root),
+.fi-simple-layout:has(.unitec-login-root),
+.fi-simple-layout:has(.unitec-login-root) .fi-simple-main-ctn,
+.fi-simple-layout:has(.unitec-login-root) .fi-simple-main {
+    background: #0f3460 !important;
+    background-image: none !important;
+}
+
+html:has(.unitec-login-root),
+body:has(.unitec-login-root) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.fi-body:has(.unitec-login-root),
 .fi-simple-layout:has(.unitec-login-root) {
-    background: linear-gradient(145deg, #0a2847 0%, #1e5a9e 40%, #2563eb 100%) !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
 }
 
 .fi-simple-layout:has(.unitec-login-root) .fi-simple-main-ctn {
+    box-sizing: border-box;
     align-items: center;
     justify-content: center;
+    width: 100% !important;
+    max-width: 100% !important;
     min-height: 100vh;
-    padding: 1.5rem;
+    min-height: 100dvh;
+    margin: 0 !important;
+    padding: clamp(0.75rem, 2.5vw, 1.5rem) !important;
+    overflow-x: hidden !important;
 }
 
 .fi-simple-layout:has(.unitec-login-root) .fi-simple-main {
-    max-width: none !important;
-    width: 100%;
-    background: transparent !important;
+    box-sizing: border-box;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
     box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    outline: none !important;
+    border: none !important;
     padding: 0 !important;
+    overflow: visible !important;
 }
 
 .unitec-login-root {
-    --unitec-login-primary: #2563eb;
-    --unitec-login-primary-dark: #1d4ed8;
-}
-
-.unitec-login {
-    display: flex;
-    justify-content: center;
+    --unitec-login-primary: #1e5a9e;
+    --unitec-login-primary-dark: #0f3460;
+    --unitec-login-accent: #84cc16;
+    --unitec-login-ink: #0f172a;
+    --unitec-login-muted: #64748b;
+    box-sizing: border-box;
     width: 100%;
-}
-
-.unitec-login__modal {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: min(880px, 100%);
-    min-height: 520px;
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    border-radius: 12px;
-    box-shadow:
-        0 24px 48px rgba(0, 0, 0, 0.35),
-        0 0 0 1px rgba(255, 255, 255, 0.08);
-    font-family: var(--erp-font, 'Segoe UI', system-ui, sans-serif);
+    max-width: 100%;
     overflow: hidden;
 }
 
-/* ── Painel esquerdo — faixa de marca azul ─────────────────────── */
+.unitec-login {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.unitec-login__ambient {
+    display: none !important;
+}
+
+.unitec-login__modal {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    box-sizing: border-box;
+    width: min(820px, 100%);
+    max-width: 100%;
+    min-height: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    background: #0a2748;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.38);
+    font-family: var(--erp-font, 'Segoe UI', system-ui, sans-serif);
+    overflow: hidden;
+    backdrop-filter: none;
+}
+
+/* ── Painel de marca (logo fixa Unitecnologia) ───────────────── */
 
 .unitec-login__left {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
-    padding: 1.75rem 1.5rem 1.35rem;
-    background: linear-gradient(165deg, #1e5a9e 0%, #0f3460 55%, #0a2847 100%);
-    text-align: center;
-    border-right: none;
+    gap: 0.75rem;
+    padding: 1.35rem 1.25rem 1.1rem;
+    background:
+        linear-gradient(165deg, rgba(15, 52, 96, 0.92) 0%, rgba(10, 40, 71, 0.98) 100%);
+    text-align: left;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.unitec-login__eyebrow {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(163, 230, 53, 0.95);
 }
 
 .unitec-login__welcome {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 800;
+    margin: 0.2rem 0 0;
+    font-size: 1.35rem;
+    font-weight: 750;
     color: #ffffff;
-    letter-spacing: 0.02em;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }
 
-.unitec-login__logo {
+.unitec-login__tagline {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: rgba(226, 232, 240, 0.78);
+}
+
+.unitec-login__brand {
     display: flex;
     align-items: center;
     justify-content: center;
     flex: 1;
     width: 100%;
-    max-width: 320px;
-    min-height: 260px;
-    margin: 1rem 0;
-    padding: 1rem;
-    background: #ffffff;
+    margin: 0.15rem 0;
+    padding: 0.25rem 0;
+    background: transparent;
     border: none;
-    border-radius: 10px;
-    box-shadow:
-        0 12px 32px rgba(0, 0, 0, 0.25),
-        0 0 0 1px rgba(255, 255, 255, 0.5);
-    overflow: hidden;
+    box-shadow: none;
 }
 
-.unitec-login__logo-img {
+.unitec-login__brand-img {
+    display: block;
     width: 100%;
-    height: 100%;
-    max-width: 100%;
-    max-height: 100%;
+    max-width: calc(320px + 8cm);
+    height: auto;
+    max-height: calc(120px + 8cm);
     object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
 }
 
 .unitec-login__meta {
     margin-top: auto;
-    text-align: center;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .unitec-login__version {
-    margin: 0 0 0.35rem;
-    font-size: 0.82rem;
+    margin: 0 0 0.15rem;
+    font-size: 0.74rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     color: #fff;
 }
 
 .unitec-login__copyright {
     margin: 0;
-    font-size: 0.72rem;
-    line-height: 1.45;
-    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: rgba(226, 232, 240, 0.62);
 }
 
-/* ── Painel direito (formulário) ───────────────────────────────── */
+/* ── Painel do formulário ────────────────────────────────────── */
 
 .unitec-login__right {
     display: flex;
     flex-direction: column;
     padding: 0;
-    background: #ffffff;
+    background: #f8fafc;
     color-scheme: light;
 }
 
 .unitec-login__right-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 0;
-    padding: 1rem 1.75rem;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
-    border-bottom: 3px solid #1e5a9e;
+    padding: 0.85rem 1.25rem 0.75rem;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .unitec-login__instruction {
     margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #0f3460;
+    font-size: 1.05rem;
+    font-weight: 750;
+    color: var(--unitec-login-primary-dark);
+    letter-spacing: -0.01em;
+}
+
+.unitec-login__instruction-hint {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--unitec-login-muted);
 }
 
 .unitec-login__close {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.1rem;
-    height: 2.1rem;
+    width: 1.85rem;
+    height: 1.85rem;
     border: 1px solid #cbd5e1;
-    border-radius: 50%;
+    border-radius: 8px;
     background: #ffffff;
     color: #64748b;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     line-height: 1;
     cursor: pointer;
     padding: 0;
-    box-shadow: 0 1px 3px rgba(15, 52, 96, 0.12);
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .unitec-login__close:hover {
-    background: #fee2e2;
-    border-color: #f87171;
+    background: #fef2f2;
+    border-color: #fca5a5;
     color: #dc2626;
 }
 
 .unitec-login__form {
-    padding: 1.5rem 1.75rem 1.75rem;
+    padding: 0.9rem 1.25rem 1.1rem;
     flex: 1;
 }
 
-/* ── Campos Filament ───────────────────────────────────────────── */
+/* ── Campos Filament ─────────────────────────────────────────── */
 
 .unitec-login__form .fi-fo-field {
-    margin-bottom: 1.1rem;
+    margin-bottom: 0.65rem;
 }
 
 .unitec-login__form .fi-fo-field-label-col {
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.2rem;
 }
 
 .unitec-login__form .fi-fo-field-label,
 .unitec-login__form .fi-fo-field-label-content {
     display: block !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.05em;
+    font-weight: 750 !important;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: #1e5a9e !important;
-    font-size: 0.8125rem !important;
+    font-size: 0.72rem !important;
     opacity: 1 !important;
 }
 
@@ -196,19 +272,28 @@
     font-weight: 800 !important;
 }
 
+.unitec-login__form .fi-fo-checkbox .fi-fo-field-label,
+.unitec-login__form .fi-fo-checkbox .fi-fo-field-label-content,
+.unitec-login__form label:has(input[type="checkbox"]) {
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+}
+
 .unitec-login__form .fi-input-wrp,
 .unitec-login__form .fi-select-input,
 .unitec-login__form .fi-input {
     background: #ffffff !important;
     color: #0f172a !important;
-    border: 2px solid #94a3b8 !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 8px !important;
-    min-height: 2.6rem;
-    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.06);
+    min-height: 2.35rem;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Texto dos campos — preto (Filament v4: fi-select-input-value-label) */
 .unitec-login__form .fi-input-wrp input,
 .unitec-login__form .fi-input-wrp textarea,
 .unitec-login__form .fi-select-input-value-label,
@@ -216,9 +301,9 @@
 .unitec-login__form .fi-select-input-value-ctn,
 .unitec-login__form .fi-select-input-value-ctn *:not(.fi-select-input-value-remove-btn),
 .unitec-login__form .choices__list--single .choices__item {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
-    font-weight: 700 !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    font-weight: 650 !important;
     opacity: 1 !important;
 }
 
@@ -228,19 +313,25 @@
 
 .unitec-login__form .fi-select-input-placeholder {
     color: #64748b !important;
-    font-weight: 600 !important;
+    font-weight: 550 !important;
+    text-transform: uppercase !important;
+}
+
+.unitec-login__form .fi-select-input input {
+    text-transform: uppercase !important;
 }
 
 .unitec-login__form .fi-input-wrp input::placeholder {
     color: #64748b !important;
-    font-weight: 600 !important;
+    font-weight: 550 !important;
     opacity: 1 !important;
+    text-transform: uppercase !important;
 }
 
 .unitec-login__form .fi-input-wrp:focus-within,
 .unitec-login__form .fi-select-input:focus-within {
-    border-color: #2563eb !important;
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22) !important;
+    border-color: #1e5a9e !important;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18) !important;
 }
 
 .unitec-login__form .fi-select-input-btn,
@@ -253,99 +344,233 @@
 
 .unitec-login__form .fi-input-wrp-suffix .fi-icon-btn:hover,
 .unitec-login__form .fi-input-wrp-suffix .fi-ac-btn-action:hover {
-    color: #2563eb !important;
-    background: rgba(37, 99, 235, 0.08) !important;
+    color: #0f3460 !important;
+    background: rgba(30, 90, 158, 0.08) !important;
 }
 
-/* ── Botões Filament v4 (.fi-ac + .fi-ac-btn-action) ─────────── */
+/* ── Select nativo (usuário / empresa) — sem painel flutuante ─── */
+
+.unitec-login__form .fi-fo-select-native .fi-select-input,
+.unitec-login__form select.fi-select-input {
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 100%;
+    padding: 0.4rem 2.2rem 0.4rem 0.7rem !important;
+    background-color: #ffffff !important;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #1e5a9e 50%),
+        linear-gradient(135deg, #1e5a9e 50%, transparent 50%) !important;
+    background-position:
+        calc(100% - 14px) calc(50% - 2px),
+        calc(100% - 9px) calc(50% - 2px) !important;
+    background-size: 5px 5px, 5px 5px !important;
+    background-repeat: no-repeat !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+
+.unitec-login__form .fi-fo-select-native .fi-select-input:hover,
+.unitec-login__form select.fi-select-input:hover {
+    border-color: #1e5a9e !important;
+    background-color: #ffffff !important;
+}
+
+.unitec-login__form .fi-fo-select-native .fi-select-input:focus,
+.unitec-login__form select.fi-select-input:focus {
+    outline: none !important;
+    border-color: #1e5a9e !important;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18) !important;
+    background-color: #ffffff !important;
+}
+
+/* Lista do SO: fundo branco, texto escuro — não forçar azul nas opções */
+.unitec-login__form .fi-fo-select-native .fi-select-input option,
+.unitec-login__form select.fi-select-input option {
+    cursor: pointer;
+    font-weight: 650;
+    color: #0f172a;
+    background-color: #ffffff;
+}
+
+/* Fallback: painel Filament (portal) — fundo branco, hover azul suave */
+html:has(.unitec-login-root) .fi-dropdown-panel {
+    margin-top: 2px !important;
+    border: 1px solid #94a3b8 !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    box-shadow: 0 10px 24px rgba(15, 52, 96, 0.16) !important;
+    overflow: hidden !important;
+}
+
+html:has(.unitec-login-root) .fi-dropdown-list {
+    background: #ffffff !important;
+}
+
+html:has(.unitec-login-root) .fi-dropdown-list-item,
+html:has(.unitec-login-root) .fi-select-input-option {
+    cursor: pointer !important;
+    padding: 0.55rem 0.85rem !important;
+    font-weight: 650 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border-radius: 0 !important;
+}
+
+html:has(.unitec-login-root) .fi-dropdown-list-item:hover,
+html:has(.unitec-login-root) .fi-select-input-option:hover {
+    background: #dbeafe !important;
+    color: #0f3460 !important;
+}
+
+html:has(.unitec-login-root) .fi-dropdown-list-item.fi-selected,
+html:has(.unitec-login-root) .fi-select-input-option.fi-selected,
+html:has(.unitec-login-root) .fi-dropdown-list-item[aria-selected="true"],
+html:has(.unitec-login-root) .fi-select-input-option[aria-selected="true"] {
+    background: #1e5a9e !important;
+    color: #ffffff !important;
+}
+
+html:has(.unitec-login-root) .fi-dropdown-list-item.fi-selected:hover,
+html:has(.unitec-login-root) .fi-select-input-option.fi-selected:hover {
+    background: #164a82 !important;
+    color: #ffffff !important;
+}
+
+html:has(.unitec-login-root) .fi-select-input-btn {
+    cursor: pointer !important;
+}
+
+/* ── Botões ──────────────────────────────────────────────────── */
 
 .unitec-login__form .fi-ac {
     display: flex;
-    gap: 0.75rem;
-    margin-top: 1.75rem;
+    gap: 0.55rem;
+    margin-top: 0.85rem;
 }
 
 .unitec-login__form .fi-ac .fi-btn,
 .unitec-login__form .fi-ac .fi-ac-btn-action {
     flex: 1;
     justify-content: center;
-    min-height: 2.85rem;
-    font-weight: 800 !important;
-    font-size: 0.875rem !important;
+    min-height: 2.45rem;
+    font-weight: 750 !important;
+    font-size: 0.84rem !important;
     border-radius: 8px !important;
-    border-width: 2px !important;
+    border-width: 1px !important;
     border-style: solid !important;
-    box-shadow: 0 4px 12px rgba(15, 52, 96, 0.15) !important;
+    box-shadow: 0 4px 10px rgba(15, 52, 96, 0.12) !important;
 }
 
-/* Confirma — azul */
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="submit"],
 .unitec-login__form .fi-ac .fi-color-primary.fi-ac-btn-action {
-    background: #2563eb !important;
-    background-image: none !important;
-    border-color: #1d4ed8 !important;
-    color: #000000 !important;
+    background: linear-gradient(180deg, #2f6fbf 0%, #1e5a9e 100%) !important;
+    background-image: linear-gradient(180deg, #2f6fbf 0%, #1e5a9e 100%) !important;
+    border-color: #164a82 !important;
+    color: #ffffff !important;
 }
 
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="submit"]:hover,
 .unitec-login__form .fi-ac .fi-color-primary.fi-ac-btn-action:hover {
-    background: #3b82f6 !important;
-    border-color: #2563eb !important;
-    color: #000000 !important;
+    background: linear-gradient(180deg, #3b7fd0 0%, #2563af 100%) !important;
+    border-color: #1e5a9e !important;
+    color: #ffffff !important;
 }
 
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="submit"],
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="submit"] *,
 .unitec-login__form .fi-ac .fi-color-primary.fi-ac-btn-action,
 .unitec-login__form .fi-ac .fi-color-primary.fi-ac-btn-action * {
-    color: #000000 !important;
+    color: #ffffff !important;
     opacity: 1 !important;
-    -webkit-text-fill-color: #000000 !important;
+    -webkit-text-fill-color: #ffffff !important;
 }
 
-/* Cancelar — cinza, texto PRETO (Filament v4 não aplica fi-color-gray aqui) */
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="button"],
 .unitec-login__form .fi-ac .unitec-login__btn-cancel {
-    background: #cbd5e1 !important;
+    background: #e2e8f0 !important;
     background-image: none !important;
-    border-color: #334155 !important;
-    color: #000000 !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
 }
 
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="button"]:hover,
 .unitec-login__form .fi-ac .unitec-login__btn-cancel:hover {
-    background: #94a3b8 !important;
-    border-color: #1e293b !important;
-    color: #000000 !important;
+    background: #cbd5e1 !important;
+    border-color: #64748b !important;
+    color: #0f172a !important;
 }
 
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="button"],
 .unitec-login__form .fi-ac .fi-ac-btn-action[type="button"] *,
 .unitec-login__form .fi-ac .unitec-login__btn-cancel,
 .unitec-login__form .fi-ac .unitec-login__btn-cancel * {
-    color: #000000 !important;
+    color: #0f172a !important;
     opacity: 1 !important;
-    -webkit-text-fill-color: #000000 !important;
+    -webkit-text-fill-color: #0f172a !important;
 }
 
-/* ── Responsivo ────────────────────────────────────────────────── */
+/* ── Responsivo ──────────────────────────────────────────────── */
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+    .unitec-login__modal {
+        width: min(760px, 100%);
+    }
+}
+
+@media (max-width: 800px) {
+    .fi-simple-layout:has(.unitec-login-root) .fi-simple-main-ctn {
+        padding: 0.75rem !important;
+        align-items: flex-start;
+    }
+
     .unitec-login__modal {
         grid-template-columns: 1fr;
+        width: 100%;
+        max-width: 480px;
+        min-height: 0;
     }
 
     .unitec-login__left {
-        padding: 1.25rem 1rem;
+        padding: 1rem 1rem 0.85rem;
+        gap: 0.55rem;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .unitec-login__logo {
-        max-width: 100%;
-        min-height: 180px;
-        margin: 0.75rem 0;
+    .unitec-login__welcome {
+        font-size: 1.2rem;
+    }
+
+    .unitec-login__brand {
+        padding: 0.2rem 0;
+        min-height: 0;
+        flex: 0 0 auto;
+    }
+
+    .unitec-login__brand-img {
+        max-width: calc(260px + 5cm);
+        max-height: calc(96px + 5cm);
     }
 
     .unitec-login__form .fi-ac {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .fi-simple-layout:has(.unitec-login-root) .fi-simple-main-ctn {
+        padding: 0.5rem !important;
+    }
+
+    .unitec-login__right-header,
+    .unitec-login__form {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+
+    .unitec-login__modal {
+        border-radius: 12px;
     }
 }

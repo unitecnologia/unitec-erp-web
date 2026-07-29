@@ -33,7 +33,7 @@ class ErpPermissionCatalog
         'actions' => static::crudPrintActions(),
       ],
       'vendedores' => [
-        'label' => 'Vendedores',
+        'label' => 'Operadores',
         'group' => 'Pessoas',
         'actions' => static::crudPrintActions(),
       ],
@@ -88,7 +88,7 @@ class ErpPermissionCatalog
         ],
       ],
       'ajusta_preco' => [
-        'label' => 'Ajusta Preço',
+        'label' => 'Ajuste de Preço em Lote',
         'group' => 'Estoque',
         'actions' => [
           'access' => 'Acessar',
@@ -116,6 +116,16 @@ class ErpPermissionCatalog
       'orcamentos' => [
         'label' => 'Orçamentos',
         'group' => 'Vendas',
+        'actions' => static::crudPrintActions(),
+      ],
+      'devolucoes_venda' => [
+        'label' => 'Devolução de Venda',
+        'group' => 'Vendas',
+        'actions' => static::crudPrintActions(),
+      ],
+      'ordens_servico' => [
+        'label' => 'Ordem de Serviço',
+        'group' => 'OS',
         'actions' => static::crudPrintActions(),
       ],
       'pdv' => [
@@ -147,6 +157,11 @@ class ErpPermissionCatalog
         'group' => 'Financeiro',
         'actions' => static::crudPrintActions(),
       ],
+      'planos_contas' => [
+        'label' => 'Plano de Contas',
+        'group' => 'Financeiro',
+        'actions' => static::crudPrintActions(),
+      ],
       'contas_pagar' => [
         'label' => 'Contas a Pagar',
         'group' => 'Financeiro',
@@ -174,6 +189,28 @@ class ErpPermissionCatalog
           'print' => 'Imprimir (F4)',
         ],
       ],
+      'recibos' => [
+        'label' => 'Impressão de Recibos',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Incluir (F2)',
+          'update' => 'Alterar (F3)',
+          'delete' => 'Excluir',
+          'print' => 'Imprimir (F6)',
+        ],
+      ],
+      'boletos' => [
+        'label' => 'Boletos',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Gerar / Importar',
+          'update' => 'Alterar configuração',
+          'delete' => 'Excluir',
+          'print' => 'Imprimir',
+        ],
+      ],
       'nfce' => [
         'label' => 'NFC-e',
         'group' => 'Fiscal',
@@ -182,6 +219,19 @@ class ErpPermissionCatalog
           'emit' => 'Emitir',
           'cancel' => 'Cancelar',
           'print' => 'Imprimir',
+        ],
+      ],
+      'cfops' => [
+        'label' => 'CFOP',
+        'group' => 'Fiscal',
+        'actions' => static::crudPrintActions(),
+      ],
+      'tabela_icms' => [
+        'label' => 'Tabela ICMS',
+        'group' => 'Fiscal',
+        'actions' => [
+          'access' => 'Acessar',
+          'update' => 'Alterar alíquotas',
         ],
       ],
       'nfe' => [
@@ -215,6 +265,31 @@ class ErpPermissionCatalog
           'update' => 'Alterar',
         ],
       ],
+      'balanca' => [
+        'label' => 'Balança',
+        'group' => 'Configurações',
+        'actions' => [
+          'access' => 'Acessar',
+          'generate' => 'Gerar arquivo',
+          'update' => 'Alterar configuração',
+        ],
+      ],
+      'migra_firebird' => [
+        'label' => 'Migra dados FB',
+        'group' => 'Configurações',
+        'actions' => [
+          'access' => 'Acessar',
+        ],
+      ],
+      'backup' => [
+        'label' => 'Backup',
+        'group' => 'Configurações',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Gerar backup',
+          'update' => 'Alterar configuração',
+        ],
+      ],
       'forca_vendas' => [
         'label' => 'Força de Venda',
         'group' => 'Força de Venda',
@@ -232,6 +307,62 @@ class ErpPermissionCatalog
           'config' => 'Autorizar aparelhos',
           'delete' => 'Excluir / Revogar',
         ],
+      ],
+      'logistica' => [
+        'label' => 'Logística',
+        'group' => 'Logística',
+        'actions' => [
+          'access' => 'Acessar',
+          'update' => 'Alterar status / operar',
+          'print' => 'Imprimir',
+        ],
+      ],
+      'transportadoras' => [
+        'label' => 'Motorista / Transportador',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
+      ],
+      'veiculos' => [
+        'label' => 'Veículos',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.dashboard' => [
+        'label' => 'Painel RH',
+        'group' => 'RH',
+        'actions' => [
+          'access' => 'Acessar',
+        ],
+      ],
+      'rh.funcionarios' => [
+        'label' => 'Funcionários',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.cargos' => [
+        'label' => 'Cargos',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'rh.departamentos' => [
+        'label' => 'Departamentos',
+        'group' => 'RH',
+        'actions' => static::crudPrintActions(),
+      ],
+      'tomadores_servico' => [
+        'label' => 'Tomador de Serviço',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
+      ],
+      'logistica_destinatarios' => [
+        'label' => 'Destinatário',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
+      ],
+      'logistica_remetentes' => [
+        'label' => 'Remetente',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
       ],
     ];
   }

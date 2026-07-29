@@ -1,0 +1,335 @@
+/* ERP — Ajuste de Preço em Lote: janela modal sobre fundo esmaecido (padrão CFOP/Recibos) */
+
+.fi-body:has(.erp-ajusta-precos-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.48) !important;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .erp-menu-bar,
+.fi-body:has(.erp-ajusta-precos-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .erp-title-bar {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .fi-layout,
+.fi-body:has(.erp-ajusta-precos-page) .fi-main-ctn {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .fi-main,
+.fi-main:has(.erp-ajusta-precos-page) {
+    display: flex !important;
+    flex: 1 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.45rem 0.65rem !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-ajusta-precos-page) .fi-main > *,
+.fi-main:has(.erp-ajusta-precos-page) > :has(.erp-ajusta-precos-page) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: min(72rem, 97vw) !important;
+    max-width: min(72rem, 97vw) !important;
+    height: min(46rem, calc(100dvh - 3.5rem)) !important;
+    max-height: calc(100dvh - 3.5rem) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.fi-page.erp-ajusta-precos-page.erp-list-page,
+.fi-page.erp-ajusta-precos-page {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 72rem !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #7f96b3 !important;
+    border-radius: 8px !important;
+    background: #e8eef6 !important;
+    box-shadow: 0 18px 48px rgba(15, 40, 71, 0.35) !important;
+}
+
+.erp-ajusta-precos-page .fi-page-main,
+.erp-ajusta-precos-page .fi-page-content,
+.erp-ajusta-precos-page .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #e8eef6 !important;
+}
+
+.erp-ajusta-precos-page .fi-header,
+.erp-ajusta-precos-page .fi-ta-actions {
+    display: none !important;
+}
+
+.erp-ajusta-precos-page .fi-sc > div:not(.fi-hidden) {
+    flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-ajusta-precos-page .fi-sc > div:has(.fi-ta-ctn) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    margin: 0 0.35rem !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    border: 1px solid #9eb4cf !important;
+    border-top: none !important;
+    border-radius: 0 0 6px 6px !important;
+}
+
+.erp-ajusta-precos-page .fi-ta-ctn {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    margin: 0 !important;
+    overflow: auto !important;
+    background: #fff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.erp-ajusta-precos-page .fi-pagination {
+    padding: 0.12rem 0.35rem !important;
+    min-height: 0 !important;
+}
+
+.erp-ajusta-precos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-ajusta-precos-page .fi-pagination .fi-btn,
+.erp-ajusta-precos-page .fi-pagination button {
+    min-height: 1.5rem !important;
+    padding: 0.08rem 0.4rem !important;
+    font-size: 0.66rem !important;
+}
+
+/* Titlebar */
+.erp-ajusta-precos-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 0.32rem 0.5rem 0.32rem 0.7rem;
+    background: linear-gradient(180deg, #2a6bb5 0%, #1e5a9e 100%);
+    color: #fff;
+    border-radius: 7px 7px 0 0;
+}
+
+.erp-ajusta-precos-window__title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.erp-ajusta-precos-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-ajusta-precos-window__close:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* Densificar filtros dentro da janela modal */
+.erp-ajusta-precos-page .erp-ajusta-precos {
+    padding: 0.14rem 0.35rem 0 !important;
+}
+
+.erp-ajusta-precos-page .erp-ajusta-precos__filters {
+    gap: 0.16rem !important;
+    padding: 0.22rem 0.35rem !important;
+    margin: 0 0 0.14rem !important;
+    border-radius: 6px !important;
+}
+
+.erp-ajusta-precos-page .erp-ajusta-precos__filters-row {
+    gap: 0.14rem 0.28rem !important;
+}
+
+.erp-ajusta-precos-page .erp-ajusta-precos__section-bar,
+.erp-ajusta-precos-page .erp-ajusta-precos__section-label {
+    margin: 0 0.35rem !important;
+    border-radius: 6px 6px 0 0 !important;
+}
+
+.erp-ajusta-precos-page .fi-sc > div:has(.erp-ajusta-precos__prices) {
+    flex-shrink: 0 !important;
+    margin: 0.14rem 0.35rem 0 !important;
+}
+
+.erp-ajusta-precos-page .erp-ajusta-precos__prices {
+    margin: 0 !important;
+    border-radius: 6px !important;
+}
+
+.erp-ajusta-precos-page .fi-sc > div:has(.erp-ajusta-precos-actions) {
+    flex-shrink: 0 !important;
+    margin-top: auto !important;
+}
+
+.erp-ajusta-precos-page .erp-ajusta-precos-actions {
+    border-radius: 0 0 7px 7px;
+}
+
+/* Campo / controle “Implementando” — badge discreto */
+.erp-ajusta-precos__field--impl .erp-ajusta-precos__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.18rem;
+    flex-wrap: wrap;
+    max-width: 100%;
+    line-height: 1.15;
+}
+
+.erp-ajusta-precos__impl-badge {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 0.78rem;
+    padding: 0 0.22rem;
+    border-radius: 3px;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    font-size: 0.46rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+
+.erp-ajusta-precos__input--impl,
+.erp-ajusta-precos__select--impl {
+    background: #f8fafc !important;
+    color: #94a3b8 !important;
+    border-color: #d8e0ea !important;
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+.erp-ajusta-precos__field--impl-check {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.28rem;
+    padding-top: 0.78rem;
+    min-height: 1.58rem;
+    align-self: flex-end;
+}
+
+.erp-ajusta-precos__field--impl-check .erp-ajusta-precos__check-impl {
+    width: 0.85rem;
+    height: 0.85rem;
+    accent-color: #94a3b8;
+    cursor: not-allowed;
+}
+
+.erp-ajusta-precos__field--narrow {
+    flex: 0 1 5.4rem;
+    min-width: 4.6rem;
+    max-width: 6rem;
+}
+
+.erp-ajusta-precos__field--mid {
+    flex: 1 1 6.5rem;
+    min-width: 6rem;
+    max-width: 8.2rem;
+}
+
+.erp-ajusta-precos__field--wide {
+    flex: 1 1 7.5rem;
+    min-width: 7rem;
+    max-width: 10.5rem;
+}
+
+.erp-ajusta-precos__discount-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-end !important;
+    gap: 0.14rem 0.28rem;
+    width: 100%;
+    padding-top: 0.12rem;
+    border-top: 1px dashed #c5d4e6;
+}
+
+.erp-ajusta-precos__discount-title {
+    flex: 0 0 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+    .fi-body:has(.erp-ajusta-precos-page) .fi-main > *,
+    .fi-main:has(.erp-ajusta-precos-page) > :has(.erp-ajusta-precos-page) {
+        width: min(97vw, 100%) !important;
+        max-width: 97vw !important;
+        height: min(96dvh, calc(100dvh - 1.5rem)) !important;
+        max-height: calc(100dvh - 1.5rem) !important;
+    }
+}

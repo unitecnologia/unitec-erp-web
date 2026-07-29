@@ -1,9 +1,9 @@
 <div class="erp-caixa-actions">
-    <button type="button" wire:click="createLancamento" class="erp-caixa-actions__btn" data-erp-key="F2">
+    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
         <span class="erp-caixa-actions__icon erp-caixa-actions__icon--new">+</span>
         <span class="erp-caixa-actions__label"><kbd>F2</kbd> | Novo</span>
     </button>
-    <button type="button" wire:click="editLancamento" class="erp-caixa-actions__btn" data-erp-key="F3">
+    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
         <span class="erp-caixa-actions__icon">✎</span>
         <span class="erp-caixa-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
@@ -15,7 +15,7 @@
         <span class="erp-caixa-actions__icon">↻</span>
         <span class="erp-caixa-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    <button type="button" wire:click="modulePending('Imprimir')" class="erp-caixa-actions__btn" data-erp-key="F6">
+    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
         <span class="erp-caixa-actions__icon">🖨</span>
         <span class="erp-caixa-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PersonResource\Pages;
 use App\Models\Person;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpTableSort;
 use BackedEnum;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
@@ -14,6 +15,7 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class PersonResource extends Resource
 {
@@ -97,23 +99,15 @@ class PersonResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('_marker')
-                    ->label('')
-                    ->alignCenter()
-                    ->sortable(false)
-                    ->getStateUsing(function (Person $record, $livewire): string {
-                        $selectedId = $livewire->highlightedRecordId ?? null;
-
-                        return $selectedId !== null && (int) $selectedId === (int) $record->getKey() ? '›' : '';
-                    }),
                 TextColumn::make('codigo')
-                    ->label('» Código')
-                    ->sortable()
+                    ->label('Código')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => ErpTableSort::orderByCodigoNumerico($query, $direction))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('nome_razao')
                     ->label('Nome/Razão')
                     ->wrap(false)
+                    ->sortable()
                     ->weight(FontWeight::Bold),
                 TextColumn::make('apelido_fantasia')
                     ->label('Apelido/Fantasia')
@@ -134,7 +128,7 @@ class PersonResource extends Resource
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
             ])
-            ->defaultSort('codigo')
+            ->defaultSort(fn (Builder $query, string $direction, $livewire): Builder => ErpTableSort::applyDefaultCodigoNumerico($query, $direction, $livewire))
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

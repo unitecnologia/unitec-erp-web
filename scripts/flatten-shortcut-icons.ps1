@@ -1,4 +1,4 @@
-# Flatten shortcut PNGs onto solid white (#FFFFFF).
+﻿# Flatten shortcut PNGs onto solid white (#FFFFFF).
 param(
     [string]$Directory = (Join-Path $PSScriptRoot '..\public\img\erp\shortcuts')
 )

@@ -12,8 +12,29 @@
         "filament/filament": "^4.0",
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "mike42/escpos-php": "^5.0",
+        "minishlink/web-push": "^9.0",
+        "robrichards/xmlseclibs": "^3.1",
+        "unitec/fiscal-engine": "@dev",
+        "unitec/pdv-ui": "@dev"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/unitec-fiscal-engine",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/unitec-pdv-ui",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require-dev": {
         "fakerphp/faker": "^1.23",
         "laravel/pail": "^1.2.5",
@@ -26,6 +47,8 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
+            "Unitec\\FiscalEngine\\": "packages/unitec-fiscal-engine/src/",
+            "Unitec\\PdvUi\\": "packages/unitec-pdv-ui/src/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\EmpresaResource\Pages;
 use App\Models\Empresa;
 use App\Support\Erp\EmpresaParametros;
@@ -29,6 +30,11 @@ class EmpresaResource extends Resource
     protected static ?string $recordTitleAttribute = 'fantasia';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ErpAccess::currentCan('empresa.access');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -149,6 +155,18 @@ class EmpresaResource extends Resource
                 ->dehydratedWhenHidden();
         }
 
+        foreach (EmpresaParametros::expedicaoFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::expedicaoBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
         $fields[] = Checkbox::make('ativo')
             ->hidden()
             ->dehydratedWhenHidden();
@@ -161,7 +179,7 @@ class EmpresaResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('CÃ³digo')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
@@ -170,20 +188,20 @@ class EmpresaResource extends Resource
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
                 TextColumn::make('razao_social')
-                    ->label('RazÃ£o')
+                    ->label('Razão')
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cidade')
                     ->label('Cidade')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cnpj')
                     ->label('CNPJ')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('ie')
                     ->label('IE')
-                    ->placeholder('â€”')
+                    ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
             ])

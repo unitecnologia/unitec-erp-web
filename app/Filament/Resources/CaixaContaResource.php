@@ -38,24 +38,23 @@ class CaixaContaResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('» Código')
+                    ->label('Código')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('nome')
                     ->label('Descrição')
                     ->wrap(false)
-                    ->weight(FontWeight::Bold),
+                    ->weight(FontWeight::Bold)
+                    ->formatStateUsing(function (?string $state, CaixaConta $record): string {
+                        $nome = mb_strtoupper((string) $state, 'UTF-8');
+
+                        return $record->isSistema() ? $nome.' (SISTEMA)' : $nome;
+                    }),
                 TextColumn::make('tipo')
                     ->label('Tipo')
                     ->alignCenter()
                     ->formatStateUsing(fn (?string $state, CaixaConta $record): string => $record->tipoLabel())
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('situacao')
-                    ->label('Situação')
-                    ->alignCenter()
-                    ->formatStateUsing(fn (?string $state, CaixaConta $record): string => $record->situacaoLabel())
-                    ->color(fn (CaixaConta $record): string => $record->situacao === CaixaConta::SITUACAO_ABERTO ? 'success' : 'gray')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('ultimoUsuario.name')
                     ->label('Último Usuário')

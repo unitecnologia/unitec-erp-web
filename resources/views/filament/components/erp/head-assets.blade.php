@@ -11,20 +11,34 @@
 
 <script>
     window.__erpUpdateConfig = {
-        launchUrl: @json(route('erp.update.launch')),
-        statusUrl: @json(route('erp.update.status')),
-        resetUrl: @json(route('erp.update.reset')),
+        launchUrl: '/admin/erp-update/launch',
+        statusUrl: '/admin/erp-update/status',
+        resetUrl: '/admin/erp-update/reset',
         assetVersion: @json($version),
         appVersion: @json(config('unitec.versao')),
         zipName: @json(config('unitec.update_zip_name', 'Unitec-ERP-Update.zip')),
         stallSeconds: 180,
         downloadStallSeconds: 900,
         applyingStallSeconds: 600,
+        migratingStallSeconds: 1200,
+        finalizingStallSeconds: 300,
         maxMinutes: 45,
     };
 </script>
 <meta name="erp-asset-version" content="{{ $version }}-{{ config('unitec.versao') }}">
+@include('filament.components.erp.no-browser-hints')
 <script src="{{ asset('js/erp-compras.js') }}?v={{ $version }}" defer></script>
+@if (ErpPageAssets::resourceSegment() === 'nfe')
+    <script src="{{ asset('js/erp-nfe-lancamento.js') }}?v={{ $version }}" defer></script>
+@endif
+
+@if (ErpPageAssets::resourceSegment() === 'notas-fornecedores')
+    <script src="{{ asset('js/erp-notas-fornecedores.js') }}?v={{ $version }}" defer></script>
+@endif
+
+@if (ErpPageAssets::resourceSegment() === 'products')
+    <script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $version }}"></script>
+@endif
 
 @if (ErpPageAssets::routeKind() === 'dashboard')
     <script src="{{ asset('js/vendor/chart.umd.min.js') }}?v={{ $version }}"></script>

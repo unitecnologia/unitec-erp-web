@@ -1,0 +1,533 @@
+﻿/* ERP — Tabela ICMS (painel modal; layout independente do erp-grid/list) */
+
+.fi-body:has(.erp-tabela-icms-page) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    background: rgba(15, 23, 42, 0.42) !important;
+}
+
+.fi-body:has(.erp-tabela-icms-page) .erp-menu-bar,
+.fi-body:has(.erp-tabela-icms-page) .erp-shortcut-bar,
+.fi-body:has(.erp-tabela-icms-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-tabela-icms-page) .erp-title-bar {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-tabela-icms-page) .fi-layout,
+.fi-body:has(.erp-tabela-icms-page) .fi-main-ctn {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: transparent !important;
+}
+
+.fi-body:has(.erp-tabela-icms-page) .fi-main,
+.fi-main:has(.erp-tabela-icms-page) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0.45rem 0.65rem !important;
+    background: transparent !important;
+}
+
+/* Modal shell: fixed size so content cannot collapse to height 0 */
+.fi-body:has(.erp-tabela-icms-page) .fi-main > *,
+.fi-main:has(.erp-tabela-icms-page) > :has(.erp-tabela-icms-page) {
+    position: relative !important;
+    display: block !important;
+    flex: 0 0 auto !important;
+    width: min(72rem, 98vw) !important;
+    max-width: min(72rem, 98vw) !important;
+    height: min(42rem, calc(100dvh - 4rem)) !important;
+    min-height: min(42rem, calc(100dvh - 4rem)) !important;
+    max-height: calc(100dvh - 4rem) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.fi-page.erp-tabela-icms-page {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #7f96b3 !important;
+    border-radius: 7px !important;
+    background: #e8eef6 !important;
+    box-shadow: 0 14px 36px rgba(15, 40, 71, 0.3) !important;
+}
+
+.erp-tabela-icms-page .fi-page-header-main-ctn,
+.erp-tabela-icms-page .fi-header,
+.erp-tabela-icms-page .fi-form-actions {
+    display: none !important;
+}
+
+/* Flatten Filament Schema wrappers so they cannot steal/collapse height */
+.erp-tabela-icms-page .fi-page-main,
+.erp-tabela-icms-page .fi-page-content,
+.erp-tabela-icms-page .fi-sc,
+.erp-tabela-icms-page .fi-sc > div,
+.erp-tabela-icms-page .fi-grid-col,
+.erp-tabela-icms-page .fi-sc-component {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    row-gap: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Window fills the modal via absolute inset — immune to flex/grid collapse */
+.erp-tabela-icms-window {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #e8eef6 !important;
+    border: none !important;
+    border-radius: 7px !important;
+    box-shadow: none !important;
+}
+
+.erp-tabela-icms-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    padding: 0.22rem 0.5rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    border-bottom: 1px solid #0a2548;
+    color: #fff;
+}
+
+.erp-tabela-icms-window__title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.erp-tabela-icms-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: #fff;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-tabela-icms-window__close:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.erp-tabela-icms-locate {
+    flex: 0 0 auto;
+    padding: 0.28rem 0.4rem 0.2rem;
+}
+
+.erp-tabela-icms-locate__bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.22rem 0.35rem;
+    background: #fff;
+    border: 1px solid #b8c8d8;
+    border-left: 3px solid #1e5a9e;
+    border-radius: 4px;
+}
+
+.erp-tabela-icms-locate__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #164a82;
+    white-space: nowrap;
+}
+
+.erp-tabela-icms-locate__label kbd {
+    display: inline-block;
+    padding: 0.02rem 0.22rem;
+    border-radius: 2px;
+    background: #e8eef6;
+    border: 1px solid #b8c8d8;
+    font-size: 0.6rem;
+    font-family: inherit;
+    font-weight: 700;
+}
+
+.erp-tabela-icms-locate__controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+}
+
+.erp-tabela-icms-locate__input {
+    width: 2.6rem;
+    height: 1.45rem;
+    padding: 0 0.3rem;
+    border: 1px solid #94a3b8;
+    border-radius: 3px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.erp-tabela-icms-locate__input:focus {
+    outline: 2px solid #93c5fd;
+    outline-offset: 0;
+    border-color: #1e5a9e;
+}
+
+.erp-tabela-icms-locate__btn {
+    height: 1.45rem;
+    padding: 0 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 3px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 0.68rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.erp-tabela-icms-locate__btn:hover {
+    background: #e8eef6;
+    border-color: #1e5a9e;
+}
+
+.erp-tabela-icms-locate__hint {
+    margin-left: auto;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.erp-tabela-icms-window__legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem 0.9rem;
+    flex: 0 0 auto;
+    padding: 0.15rem 0.55rem 0.28rem;
+    font-size: 0.64rem;
+    color: #64748b;
+}
+
+.erp-tabela-icms-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.erp-tabela-icms-legend__swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 2px;
+    border: 1px solid #94a3b8;
+}
+
+.erp-tabela-icms-legend--interna .erp-tabela-icms-legend__swatch {
+    background: #dbeafe;
+    border-color: #3b82f6;
+}
+
+.erp-tabela-icms-legend--interestadual .erp-tabela-icms-legend__swatch {
+    background: #fff;
+    border-color: #cbd5e1;
+}
+
+.erp-tabela-icms-window__axis-hint strong {
+    color: #1e5a9e;
+    font-weight: 700;
+}
+
+.erp-tabela-icms-window__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 12rem;
+    margin: 0 0.4rem 0.25rem;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #b8c8d8;
+    border-radius: 4px;
+}
+
+.erp-tabela-icms-scroll {
+    width: 100%;
+    height: 100%;
+    min-height: 12rem;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.erp-tabela-icms {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    color: #0f172a;
+}
+
+.erp-tabela-icms th,
+.erp-tabela-icms td {
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-tabela-icms__corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    min-width: 3.4rem;
+    width: 3.4rem;
+    height: 2.1rem;
+    padding: 0.12rem 0.2rem !important;
+    background: #1e3a5f;
+    color: #fff;
+    vertical-align: middle;
+    box-shadow: 2px 2px 0 rgba(15, 23, 42, 0.06);
+}
+
+.erp-tabela-icms__corner-origem {
+    display: block;
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    opacity: 0.9;
+}
+
+.erp-tabela-icms__corner-destino {
+    display: block;
+    font-size: 0.56rem;
+    font-weight: 600;
+    margin-top: 0.08rem;
+    opacity: 0.8;
+}
+
+.erp-tabela-icms__col-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    min-width: 2.25rem;
+    width: 2.25rem;
+    height: 2.1rem;
+    padding: 0.15rem 0.08rem !important;
+    background: #334155;
+    color: #f8fafc;
+    font-weight: 700;
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+    box-shadow: 0 2px 0 rgba(15, 23, 42, 0.08);
+}
+
+.erp-tabela-icms__col-head--hl {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.erp-tabela-icms__row-head {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 3.4rem;
+    width: 3.4rem;
+    padding: 0.12rem 0.25rem !important;
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 750;
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    box-shadow: 2px 0 0 rgba(15, 23, 42, 0.05);
+}
+
+.erp-tabela-icms__row--hl .erp-tabela-icms__row-head {
+    background: #bfdbfe;
+    color: #1e3a8a;
+}
+
+.erp-tabela-icms__row--hl td {
+    background: #eff6ff;
+}
+
+.erp-tabela-icms__cell {
+    position: relative;
+    min-width: 2.25rem;
+    width: 2.25rem;
+    height: 1.4rem;
+    background: #fff;
+}
+
+.erp-tabela-icms__cell:hover {
+    background: #e0f2fe;
+}
+
+.erp-tabela-icms__cell--interna {
+    background: #dbeafe;
+    font-weight: 700;
+    color: #1e40af;
+}
+
+.erp-tabela-icms__cell--interna:hover {
+    background: #bfdbfe;
+}
+
+.erp-tabela-icms__row--hl .erp-tabela-icms__cell--interna {
+    background: #93c5fd;
+}
+
+.erp-tabela-icms__cell--editing {
+    background: #fffbeb !important;
+}
+
+.erp-tabela-icms__cell-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 1.4rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.erp-tabela-icms__cell-input {
+    display: block;
+    width: 100%;
+    height: 1.4rem;
+    margin: 0;
+    padding: 0 0.1rem;
+    border: 2px solid #2563eb;
+    border-radius: 0;
+    background: #fffbeb;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.erp-tabela-icms__cell-input:focus {
+    outline: none;
+}
+
+.erp-tabela-icms-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.3rem 0.45rem 0.35rem;
+    background: #d7e2ef;
+    border-top: 1px solid #b8c8d8;
+}
+
+.erp-tabela-icms-actions__hint {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.erp-tabela-icms-actions__btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    height: 1.85rem;
+    max-height: 1.85rem;
+    padding: 0 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.7rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.erp-tabela-icms-actions__btn--close {
+    background: #1e5a9e;
+    border-color: #0f3460;
+    color: #fff;
+}
+
+.erp-tabela-icms-actions__btn--close:hover {
+    background: #164a82;
+}
+
+.erp-tabela-icms-actions__icon {
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.erp-tabela-icms-actions__label {
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .erp-tabela-icms-locate__hint,
+    .erp-tabela-icms-actions__hint {
+        display: none;
+    }
+}
