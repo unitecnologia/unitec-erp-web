@@ -10,6 +10,7 @@ use App\Models\NotaFornecedor;
 use App\Models\VendasParametro;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Fiscal\DistribuicaoDfeConfig;
 use App\Support\Fiscal\DistribuicaoDfeMensagens;
 use App\Support\Fiscal\DistribuicaoDfeService;
@@ -83,13 +84,18 @@ class ListNotasFornecedores extends ListRecords
 
         ErpScreen::set('Notas de Fornecedores');
 
+        $hoje = ErpTimezone::toLocal();
+
         if ($this->periodoDe === '') {
-            $this->periodoDe = now()->subMonth()->format('Y-m-d');
+            $this->periodoDe = $hoje->copy()->startOfMonth()->toDateString();
         }
 
         if ($this->periodoAte === '') {
-            $this->periodoAte = now()->format('Y-m-d');
+            $this->periodoAte = $hoje->copy()->endOfMonth()->toDateString();
         }
+
+        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? $this->periodoDe;
+        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? $this->periodoAte;
 
         if ($this->periodoDeApplied === '') {
             $this->periodoDeApplied = $this->periodoDe;
@@ -99,8 +105,19 @@ class ListNotasFornecedores extends ListRecords
             $this->periodoAteApplied = $this->periodoAte;
         }
 
+        $this->periodoDeApplied = $this->normalizePeriodDate($this->periodoDeApplied) ?? $this->periodoDeApplied;
+        $this->periodoAteApplied = $this->normalizePeriodDate($this->periodoAteApplied) ?? $this->periodoAteApplied;
+
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->searchColumn = $this->normalizeSearchColumn($this->searchColumn);
+
+        $this->dispatch(
+            'erp-hydrate-nf-forn-dates',
+            de: $this->periodoDe,
+            ate: $this->periodoAte,
+            deEmissao: $this->localSearchDe,
+            ateEmissao: $this->localSearchAte,
+        );
     }
 
     protected function normalizeSearchColumn(string $column): string
@@ -241,12 +258,12 @@ class ListNotasFornecedores extends ListRecords
         }
 
         if ($this->isPeriodoEntradaFilter()) {
-            if (filled($this->periodoDeApplied)) {
-                $query->whereDate('data_entrada', '>=', $this->periodoDeApplied);
+            if ($de = $this->normalizePeriodDate($this->periodoDeApplied)) {
+                $query->whereDate('data_entrada', '>=', $de);
             }
 
-            if (filled($this->periodoAteApplied)) {
-                $query->whereDate('data_entrada', '<=', $this->periodoAteApplied);
+            if ($ate = $this->normalizePeriodDate($this->periodoAteApplied)) {
+                $query->whereDate('data_entrada', '<=', $ate);
             }
         } elseif ($this->isDateSearchColumn()) {
             $this->applyLocalSearchByDateRange($query);
@@ -269,19 +286,60 @@ class ListNotasFornecedores extends ListRecords
 
     protected function applyLocalSearchByDateRange(Builder $query): void
     {
-        if (! filled($this->localSearchDe) && ! filled($this->localSearchAte)) {
+        $de = $this->normalizePeriodDate($this->localSearchDe);
+        $ate = $this->normalizePeriodDate($this->localSearchAte);
+
+        if ($de === null && $ate === null) {
             return;
         }
 
         $column = 'data_emissao';
 
-        if (filled($this->localSearchDe)) {
-            $query->whereDate($column, '>=', $this->localSearchDe);
+        if ($de !== null) {
+            $query->whereDate($column, '>=', $de);
         }
 
-        if (filled($this->localSearchAte)) {
-            $query->whereDate($column, '<=', $this->localSearchAte);
+        if ($ate !== null) {
+            $query->whereDate($column, '<=', $ate);
         }
+    }
+
+    protected function normalizePeriodDate(?string $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            return $this->isValidPeriodIsoDate($value) ? $value : null;
+        }
+
+        // dd/mm/yyyy (não usar Carbon::parse — interpreta m/d/Y estilo US)
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $matches) === 1) {
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
+        }
+
+        // ddmmyyyy (máscara sem barras / valor digitado)
+        if (preg_match('/^(\d{2})(\d{2})(\d{4})$/', $value, $matches) === 1) {
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
+        }
+
+        return null;
+    }
+
+    protected function isValidPeriodIsoDate(string $iso): bool
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $matches) !== 1) {
+            return false;
+        }
+
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
     }
 
     /**
@@ -380,16 +438,74 @@ class ListNotasFornecedores extends ListRecords
             return;
         }
 
+        if ($this->isDateSearchColumn()) {
+            $this->localSearchDe = $this->normalizePeriodDate($this->localSearchDe) ?? '';
+            $this->localSearchAte = $this->normalizePeriodDate($this->localSearchAte) ?? '';
+
+            if (
+                filled($this->localSearchDe)
+                && filled($this->localSearchAte)
+                && $this->localSearchDe > $this->localSearchAte
+            ) {
+                [$this->localSearchDe, $this->localSearchAte] = [$this->localSearchAte, $this->localSearchDe];
+            }
+        }
+
         $this->clearListSelection();
+        $this->resetPage();
         $this->resetTable();
     }
 
     public function applyPeriodFilter(): void
     {
+        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? '';
+        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? '';
+
         $this->periodoDeApplied = $this->periodoDe;
         $this->periodoAteApplied = $this->periodoAte;
+
+        if (
+            filled($this->periodoDeApplied)
+            && filled($this->periodoAteApplied)
+            && $this->periodoDeApplied > $this->periodoAteApplied
+        ) {
+            [$this->periodoDeApplied, $this->periodoAteApplied] = [$this->periodoAteApplied, $this->periodoDeApplied];
+            $this->periodoDe = $this->periodoDeApplied;
+            $this->periodoAte = $this->periodoAteApplied;
+        }
+
         $this->clearListSelection();
+        $this->resetPage();
         $this->resetTable();
+
+        $this->dispatch(
+            'erp-hydrate-nf-forn-dates',
+            de: $this->periodoDe,
+            ate: $this->periodoAte,
+            deEmissao: $this->localSearchDe,
+            ateEmissao: $this->localSearchAte,
+        );
+    }
+
+    public function updatedSearchColumn(): void
+    {
+        $this->searchColumn = $this->normalizeSearchColumn($this->searchColumn);
+        $this->localSearch = '';
+        $this->localSearchDe = '';
+        $this->localSearchAte = '';
+        $this->clearListSelection();
+        $this->resetPage();
+        $this->resetTable();
+
+        if ($this->isPeriodoEntradaFilter()) {
+            $this->dispatch(
+                'erp-hydrate-nf-forn-dates',
+                de: $this->periodoDe,
+                ate: $this->periodoAte,
+                deEmissao: '',
+                ateEmissao: '',
+            );
+        }
     }
 
     public function openNotaFornecedorVisualizar(int $notaId): void

@@ -859,6 +859,44 @@ final class EmpresaParametros
     }
 
     /**
+     * @return array<string, array{label: string, default: int|float|string|null, type: string}>
+     */
+    public static function mercadoLivreFields(): array
+    {
+        return [
+            'param_meli_modo' => ['label' => 'Modo de conexão', 'default' => 'hub', 'type' => 'string'],
+            'param_meli_client_id' => ['label' => 'Client ID', 'default' => '', 'type' => 'string'],
+            'param_meli_client_secret' => ['label' => 'Client Secret', 'default' => '', 'type' => 'string'],
+            'param_meli_redirect_uri' => ['label' => 'URI de redirect', 'default' => '', 'type' => 'string'],
+            'param_meli_user_id' => ['label' => 'ID do usuário ML', 'default' => '', 'type' => 'string'],
+            'param_meli_nickname' => ['label' => 'Apelido ML', 'default' => '', 'type' => 'string'],
+            'param_meli_access_token' => ['label' => 'Access Token', 'default' => '', 'type' => 'string'],
+            'param_meli_refresh_token' => ['label' => 'Refresh Token', 'default' => '', 'type' => 'string'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function mercadoLivreModoOptions(): array
+    {
+        return [
+            'hub' => 'Servidor Unitec (sem site próprio)',
+            'proprio' => 'Domínio próprio do cliente',
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function mercadoLivreBooleanFields(): array
+    {
+        return [
+            'param_meli_habilitar' => ['label' => 'Habilitar integração Mercado Livre', 'default' => false],
+        ];
+    }
+
+    /**
      * Campos da aba "Atualização e Backup" (parâmetros de sistema).
      *
      * @return array<string, array{label: string, default: int|float|string|null, type: string}>
@@ -1116,6 +1154,14 @@ final class EmpresaParametros
             $defaults[$field] = $meta['default'];
         }
 
+        foreach (self::mercadoLivreFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::mercadoLivreBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
         foreach (self::sistemaFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
@@ -1233,6 +1279,7 @@ final class EmpresaParametros
             'api_servicos' => 'API de Serviços',
             'whatsapp' => 'WhatsApp',
             'portal_contador' => 'Portal do Contador',
+            'mercado_livre' => 'Mercado Livre',
             'estoques' => 'Cadastro de Estoque',
             'sistema' => 'Atualização e Backup',
         ];

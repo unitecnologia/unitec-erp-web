@@ -41,6 +41,8 @@ class Orcamento extends Model
 
     public const PLATAFORMA_VI = 'vi';
 
+    public const PLATAFORMA_MELI = 'meli';
+
     /**
      * @return array<string, string>
      */
@@ -63,6 +65,7 @@ class Orcamento extends Model
             self::PLATAFORMA_ERP => 'ERP',
             self::PLATAFORMA_FV => 'FV',
             self::PLATAFORMA_VI => 'VI',
+            self::PLATAFORMA_MELI => 'ML',
         ];
     }
 

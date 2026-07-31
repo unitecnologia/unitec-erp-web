@@ -18,7 +18,7 @@
                         wire:keydown.arrow-down.prevent="moveNfeProdutoSelection(1)"
                         data-erp-uppercase
                         autocomplete="off"
-                        placeholder="Código, barras ou nome do produto — Enter"
+                        placeholder="Código exato, barras ou nome — Enter"
                         role="combobox"
                         aria-autocomplete="list"
                         aria-expanded="{{ $this->nfeProdutoLookupOpen && $this->nfeProdutoResults !== [] ? 'true' : 'false' }}"
@@ -55,23 +55,14 @@
                                     </li>
                                 @endforeach
                             </ul>
-
-                            <div class="erp-nfe-inclusao__suggest-photo" aria-label="Foto do produto">
-                                @if ($this->nfeProdutoPreviewFotoUrl)
-                                    <img
-                                        src="{{ $this->nfeProdutoPreviewFotoUrl }}"
-                                        alt="Foto do produto"
-                                        class="erp-nfe-inclusao__suggest-photo-img"
-                                        wire:key="nfe-produto-foto-{{ md5($this->nfeProdutoPreviewFotoUrl) }}"
-                                    >
-                                @else
-                                    <span class="erp-nfe-inclusao__suggest-photo-empty">Foto do produto</span>
-                                @endif
-                            </div>
                         </div>
                     @elseif ($this->nfeProdutoLookupOpen && filled($this->nfeItemProdutoSearch) && $this->nfeItemPendingProductId === null)
                         <div class="erp-nfe-inclusao__suggest erp-nfe-inclusao__suggest--empty">
-                            Nenhum produto encontrado.
+                            @if (ctype_digit(trim((string) $this->nfeItemProdutoSearch)))
+                                Nenhum produto com o código "{{ trim((string) $this->nfeItemProdutoSearch) }}". Digite o nome para buscar por descrição.
+                            @else
+                                Nenhum produto encontrado.
+                            @endif
                         </div>
                     @endif
                 </div>

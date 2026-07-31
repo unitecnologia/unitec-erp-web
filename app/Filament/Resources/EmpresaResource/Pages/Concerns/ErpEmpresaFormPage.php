@@ -32,6 +32,7 @@ trait ErpEmpresaFormPage
     use ManagesEmpresaLookup;
     use ManagesEmpresaPortalContadorLog;
     use ManagesEmpresaPortalContadorVinculo;
+    use ManagesEmpresaMercadoLivreVinculo;
     use NormalizesErpUppercaseFormData;
 
     public function getHeading(): string | Htmlable | null
@@ -236,6 +237,13 @@ trait ErpEmpresaFormPage
 
         $merged = $this->normalizeEmpresaParametrosFormData($merged);
         $merged = $this->normalizeEmpresaDocumentFormData($merged);
+
+        // Campos só de UI / .env — não gravar na tabela empresas.
+        unset(
+            $merged['meli_env_is_hub'],
+            $merged['meli_env_app_url'],
+            $merged['meli_env_hub_url'],
+        );
 
         if (array_key_exists('param_ui_density', $merged)) {
             $raw = strtolower(trim((string) ($merged['param_ui_density'] ?? '14')));
@@ -564,6 +572,7 @@ trait ErpEmpresaFormPage
             'obs_fisco' => '',
             'obs_carne' => '',
             'obs_nfce' => '',
+            'obs_contribuinte' => '',
             'msg_cobranca_whatsapp' => '',
             'nome' => '',
             'logo_path' => '',

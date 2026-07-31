@@ -216,13 +216,22 @@ class ListForcaVendasMonitor extends ListRecords
             $query->where(function (Builder $q): void {
                 $q->whereNull('payload')
                     ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) IS NULL")
-                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) != 'vendas_internas'");
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) NOT IN ('vendas_internas', 'mercado_livre')");
             });
 
             return;
         }
 
-        // Marketplaces ainda não geram pedidos no monitor.
+        if ($plataforma === 'meli') {
+            $query->where(function (Builder $q): void {
+                $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.origem')) = 'mercado_livre'")
+                    ->orWhereNotNull('meli_order_id');
+            });
+
+            return;
+        }
+
+        // Demais marketplaces ainda não geram pedidos no monitor.
         $query->whereRaw('0 = 1');
     }
 

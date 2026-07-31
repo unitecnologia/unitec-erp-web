@@ -49,7 +49,7 @@ final class ErpDashboardData
 
         return [
             'important' => $important,
-            'boletos' => ErpDashboardSidebarData::boletosVencidos(),
+            'a_pagar_vencidos' => ErpDashboardSidebarData::contasPagarVencidas(),
             'estoque' => ErpDashboardSidebarData::estoqueMinimo(),
         ];
     }

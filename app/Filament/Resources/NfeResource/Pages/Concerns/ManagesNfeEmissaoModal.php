@@ -149,6 +149,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalReferencias = [];
         $this->nfeModalTotais = $this->defaultNfeModalTotais();
         $this->nfeModalOpen = true;
+        $this->dispatch('erp-nfe-focus-cliente');
     }
 
     public function editNfe(): void
@@ -158,7 +159,7 @@ trait ManagesNfeEmissaoModal
         }
 
         $nfe = Nfe::query()
-            ->with(['cliente', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda'])
+            ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda'])
             ->find($this->highlightedRecordId);
 
         if (! $nfe) {
@@ -277,6 +278,22 @@ trait ManagesNfeEmissaoModal
 
     public function saveNfe(): void
     {
+        $clienteId = (int) ($this->nfeForm['cliente_id'] ?? 0);
+
+        if ($clienteId <= 0) {
+            Notification::make()->title('Informe o Cliente!')->warning()->send();
+            $this->dispatch('erp-nfe-focus-cliente');
+
+            return;
+        }
+
+        if ($this->nfeModalRows === []) {
+            Notification::make()->title('Informe os Itens da NF-e!')->warning()->send();
+            $this->dispatch('erp-nfe-focus-item-produto');
+
+            return;
+        }
+
         $this->validate(
             [
                 'nfeForm.cliente_id' => ['required', 'integer', 'exists:people,id'],
@@ -290,12 +307,6 @@ trait ManagesNfeEmissaoModal
                 'nfeForm.data_saida' => 'data de saída',
             ],
         );
-
-        if ($this->nfeModalRows === []) {
-            Notification::make()->title('Informe ao menos um item.')->warning()->send();
-
-            return;
-        }
 
         $empresaId = $this->resolveEmpresaId();
         $this->recalculateNfeTotais();
@@ -352,6 +363,23 @@ trait ManagesNfeEmissaoModal
                     (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
                     (string) ($totais['ibpt_texto'] ?? ''),
                 ),
+                'tipo_frete' => (string) ($this->nfeForm['tipo_frete'] ?? '9'),
+                'transportadora_id' => ((int) ($this->nfeForm['transportadora_id'] ?? 0)) ?: null,
+                'placa' => filled($this->nfeForm['placa'] ?? null)
+                    ? mb_strtoupper(trim((string) $this->nfeForm['placa']), 'UTF-8')
+                    : null,
+                'uf_placa' => filled($this->nfeForm['uf_placa'] ?? null)
+                    ? mb_strtoupper(trim((string) $this->nfeForm['uf_placa']), 'UTF-8')
+                    : null,
+                'especie' => filled($this->nfeForm['especie'] ?? null)
+                    ? mb_strtoupper(trim((string) $this->nfeForm['especie']), 'UTF-8')
+                    : null,
+                'marca' => filled($this->nfeForm['marca'] ?? null)
+                    ? mb_strtoupper(trim((string) $this->nfeForm['marca']), 'UTF-8')
+                    : null,
+                'qvol' => max(0, (int) preg_replace('/\D/', '', (string) ($this->nfeForm['qvol'] ?? '0'))),
+                'peso_l' => ErpMoney::parseBr((string) ($this->nfeForm['peso_l'] ?? '0'), 3),
+                'peso_b' => ErpMoney::parseBr((string) ($this->nfeForm['peso_b'] ?? '0'), 3),
                 'subtotal' => $totais['subtotal'],
                 'desconto' => $totais['desconto'],
                 'total' => $totais['total'],
@@ -561,7 +589,112 @@ trait ManagesNfeEmissaoModal
 
     public function openNfeTransportadora(): void
     {
-        // Lookup dedicado em breve.
+        $this->nfeModalDetailTab = 'transportadora';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function nfeFretePorContaOptions(): array
+    {
+        return [
+            '9' => 'SEM FRETE',
+            '0' => '0 - EMITENTE',
+            '1' => '1 - DESTINATÁRIO',
+            '2' => '2 - TERCEIROS',
+            '3' => '3 - PRÓPRIO REMETENTE',
+            '4' => '4 - PRÓPRIO DESTINATÁRIO',
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nome: string}>
+     */
+    #[Computed]
+    public function nfeTransportadorasOptions(): array
+    {
+        return Person::query()
+            ->where('ativo', true)
+            ->where('is_transportadora', true)
+            ->orderBy('nome_razao')
+            ->limit(300)
+            ->get(['id', 'codigo', 'nome_razao', 'apelido_fantasia'])
+            ->map(fn (Person $person): array => [
+                'id' => (int) $person->id,
+                'codigo' => (string) ($person->codigo ?: '0'),
+                'nome' => mb_strtoupper(trim((string) ($person->nome_razao ?: $person->apelido_fantasia ?: '—')), 'UTF-8'),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function updatedNfeFormTransportadoraId(): void
+    {
+        $id = (int) ($this->nfeForm['transportadora_id'] ?? 0);
+
+        if ($id <= 0) {
+            $this->nfeForm['transportadora_id'] = '';
+            $this->nfeForm['transportadora_codigo'] = '0';
+
+            return;
+        }
+
+        $person = Person::query()
+            ->where('ativo', true)
+            ->where('is_transportadora', true)
+            ->find($id);
+
+        if (! $person) {
+            $this->nfeForm['transportadora_id'] = '';
+            $this->nfeForm['transportadora_codigo'] = '0';
+
+            return;
+        }
+
+        $this->nfeForm['transportadora_codigo'] = (string) ($person->codigo ?: '0');
+    }
+
+    public function updatedNfeFormTransportadoraCodigo(): void
+    {
+        $codigo = trim((string) ($this->nfeForm['transportadora_codigo'] ?? ''));
+
+        if ($codigo === '' || $codigo === '0') {
+            $this->nfeForm['transportadora_codigo'] = '0';
+            $this->nfeForm['transportadora_id'] = '';
+
+            return;
+        }
+
+        $this->resolverNfeTransportadoraPorCodigo();
+    }
+
+    public function resolverNfeTransportadoraPorCodigo(): void
+    {
+        $codigo = trim((string) ($this->nfeForm['transportadora_codigo'] ?? ''));
+
+        if ($codigo === '' || $codigo === '0') {
+            $this->nfeForm['transportadora_codigo'] = '0';
+            $this->nfeForm['transportadora_id'] = '';
+
+            return;
+        }
+
+        $person = Person::query()
+            ->where('ativo', true)
+            ->where('is_transportadora', true)
+            ->where('codigo', $codigo)
+            ->first();
+
+        if (! $person) {
+            Notification::make()->title('Transportador não encontrado.')->warning()->send();
+            $this->nfeForm['transportadora_id'] = '';
+
+            return;
+        }
+
+        $this->nfeForm['transportadora_id'] = (string) $person->id;
+        $this->nfeForm['transportadora_codigo'] = (string) ($person->codigo ?: $codigo);
     }
 
     public function updatedNfeFormClienteId(): void
@@ -652,6 +785,8 @@ trait ManagesNfeEmissaoModal
 
         if ($this->nfeClienteJaSelecionadoCorresponde($term)) {
             $this->fecharNfeSugestoesCliente();
+            $this->nfeModalMainTab = 'itens';
+            $this->dispatch('erp-nfe-focus-item-produto');
 
             return;
         }
@@ -750,6 +885,8 @@ trait ManagesNfeEmissaoModal
         $this->aplicarNfeCliente($person, syncBusca: true);
         $this->fecharNfeSugestoesCliente();
         $this->recalculateNfeTotais();
+        $this->nfeModalMainTab = 'itens';
+        $this->dispatch('erp-nfe-focus-item-produto');
     }
 
     public function moverNfeSugestaoCliente(int $delta): void
@@ -1098,12 +1235,26 @@ trait ManagesNfeEmissaoModal
             'meio_pgto' => $nfe->meio_pgto ?? 'dinheiro',
             'obs_fisco' => $nfe->obs_fisco ?? '',
             'obs_contribuinte' => $nfe->obs_contribuinte ?? '',
+            'tipo_frete' => (string) ($nfe->tipo_frete ?: '9'),
+            'transportadora_id' => (string) ($nfe->transportadora_id ?? ''),
+            'transportadora_codigo' => (string) ($nfe->transportadora?->codigo ?: '0'),
+            'placa' => (string) ($nfe->placa ?? ''),
+            'uf_placa' => (string) ($nfe->uf_placa ?? ''),
+            'especie' => (string) ($nfe->especie ?? ''),
+            'marca' => (string) ($nfe->marca ?? ''),
+            'qvol' => (string) ($nfe->qvol ?? 1),
+            'peso_l' => ErpMoney::formatBr((float) ($nfe->peso_l ?? 0), 3),
+            'peso_b' => ErpMoney::formatBr((float) ($nfe->peso_b ?? 0), 3),
         ];
 
         if ($nfe->cliente) {
             $this->aplicarNfeCliente($nfe->cliente, syncBusca: true);
         } else {
             $this->clearNfeClienteDisplay();
+        }
+
+        if (! $nfe->transportadora_id) {
+            $this->nfeForm['transportadora_codigo'] = '0';
         }
 
         $this->nfeModalRows = $nfe->itens->map(fn (NfeItem $item): array => [
@@ -1189,7 +1340,72 @@ trait ManagesNfeEmissaoModal
             'base_st' => ErpMoney::formatBr($totais['base_st']),
             'valor_st' => ErpMoney::formatBr($totais['valor_st']),
             'total' => ErpMoney::formatBr($totais['total']),
+            'trib_fed' => ErpMoney::formatBr((float) ($totais['trib_fed'] ?? 0)),
+            'trib_est' => ErpMoney::formatBr((float) ($totais['trib_est'] ?? 0)),
+            'trib_mun' => ErpMoney::formatBr((float) ($totais['trib_mun'] ?? 0)),
+            'v_tot_trib' => ErpMoney::formatBr((float) ($totais['v_tot_trib'] ?? 0)),
+            'ibpt_texto' => (string) ($totais['ibpt_texto'] ?? ''),
         ];
+
+        $this->syncNfeObsContribuinteComIbpt(
+            $this->formatNfeIbptLinhaComplementar($totais),
+        );
+    }
+
+    /**
+     * Linha única do IBPT para o campo informações complementares.
+     *
+     * @param  array<string, mixed>  $totais
+     */
+    protected function formatNfeIbptLinhaComplementar(array $totais): string
+    {
+        $fed = (float) ($totais['trib_fed'] ?? 0);
+        $est = (float) ($totais['trib_est'] ?? 0);
+        $mun = (float) ($totais['trib_mun'] ?? 0);
+        $tot = (float) ($totais['v_tot_trib'] ?? ($fed + $est + $mun));
+
+        if ($tot <= 0) {
+            return '';
+        }
+
+        $oficial = trim((string) ($totais['ibpt_texto'] ?? ''));
+
+        if ($oficial !== '') {
+            return $oficial;
+        }
+
+        return sprintf(
+            'Trib. aprox. Federal: R$ %s | Estadual: R$ %s | Municipal: R$ %s | Total: R$ %s. Fonte: IBPT. Lei 12.741/2012.',
+            number_format($fed, 2, ',', '.'),
+            number_format($est, 2, ',', '.'),
+            number_format($mun, 2, ',', '.'),
+            number_format($tot, 2, ',', '.'),
+        );
+    }
+
+    protected function syncNfeObsContribuinteComIbpt(string $ibptTexto): void
+    {
+        $obs = trim((string) ($this->nfeForm['obs_contribuinte'] ?? ''));
+
+        // Remove linha IBPT anterior (formatos antigos e atuais).
+        $obs = trim((string) preg_replace(
+            '/\s*(?:Trib\. aprox\.|Federal:\s*R\$).*?(?:Lei 12\.741\/2012\.?|$)/uis',
+            '',
+            $obs,
+        ));
+        $obs = trim((string) preg_replace('/\s{2,}/u', ' ', $obs));
+
+        $ibptTexto = trim(preg_replace('/\s+/u', ' ', $ibptTexto) ?? $ibptTexto);
+
+        if ($ibptTexto === '') {
+            $this->nfeForm['obs_contribuinte'] = $obs;
+
+            return;
+        }
+
+        $this->nfeForm['obs_contribuinte'] = $obs === ''
+            ? $ibptTexto
+            : rtrim($obs, " .\n").' '.$ibptTexto;
     }
 
     /**
@@ -1199,6 +1415,7 @@ trait ManagesNfeEmissaoModal
     {
         $today = now()->format('Y-m-d');
         $empresaId = $this->resolveEmpresaId();
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
 
         return [
             'numero' => Nfe::nextNumero($empresaId),
@@ -1216,8 +1433,18 @@ trait ManagesNfeEmissaoModal
             'movimento' => 'saida',
             'forma_pgto' => 'a_vista',
             'meio_pgto' => 'dinheiro',
-            'obs_fisco' => '',
-            'obs_contribuinte' => '',
+            'obs_fisco' => trim((string) ($empresa?->obs_fisco ?? '')),
+            'obs_contribuinte' => trim((string) ($empresa?->obs_contribuinte ?? '')),
+            'tipo_frete' => '9',
+            'transportadora_id' => '',
+            'transportadora_codigo' => '0',
+            'placa' => '',
+            'uf_placa' => '',
+            'especie' => 'ESPECIE',
+            'marca' => 'MARCA',
+            'qvol' => '1',
+            'peso_l' => '0,000',
+            'peso_b' => '0,000',
         ];
     }
 
@@ -1244,6 +1471,11 @@ trait ManagesNfeEmissaoModal
             'base_st' => '0,00',
             'valor_st' => '0,00',
             'total' => '0,00',
+            'trib_fed' => '0,00',
+            'trib_est' => '0,00',
+            'trib_mun' => '0,00',
+            'v_tot_trib' => '0,00',
+            'ibpt_texto' => '',
         ];
     }
 

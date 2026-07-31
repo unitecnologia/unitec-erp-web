@@ -6,22 +6,24 @@
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--nota">
                 <span>Nº Nota</span>
                 <input
-                    class="erp-nfe-cliente__input"
+                    class="erp-nfe-cliente__input erp-nfe-cliente__input--info"
                     type="text"
                     value="{{ $this->nfeForm['numero'] ?? '' }}"
                     readonly
                     tabindex="-1"
+                    aria-readonly="true"
                 >
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--empresa">
                 <span>Empresa</span>
                 <input
-                    class="erp-nfe-cliente__input"
+                    class="erp-nfe-cliente__input erp-nfe-cliente__input--info"
                     type="text"
                     value="{{ $this->nfeForm['empresa'] ?? '—' }}"
                     readonly
                     tabindex="-1"
+                    aria-readonly="true"
                 >
             </label>
 
@@ -29,7 +31,7 @@
                 <span>Razão social ou CNPJ</span>
                 <input
                     id="nfe-cliente-busca"
-                    class="erp-nfe-cliente__input"
+                    class="erp-nfe-cliente__input erp-nfe-cliente__input--editable"
                     type="text"
                     wire:model.live.debounce.250ms="nfeClienteBusca"
                     wire:keydown.enter.prevent="confirmarNfeClienteBusca"
@@ -69,49 +71,49 @@
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--doc">
                 <span>CPF/CNPJ</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeForm['cnpj'] ?? '' }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeForm['cnpj'] ?? '' }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--fone">
                 <span>Fone</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteFone }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteFone }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--fone">
                 <span>WhatsApp</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteWhatsapp }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteWhatsapp }}" readonly tabindex="-1" aria-readonly="true">
             </label>
         </div>
 
         <div class="erp-nfe-cliente__row erp-nfe-cliente__row--secondary">
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--end">
                 <span>Endereço</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteEndereco }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteEndereco }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--num">
                 <span>Nº</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteNumeroEnd }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteNumeroEnd }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--bairro">
                 <span>Bairro</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteBairro }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteBairro }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--cep">
                 <span>CEP</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteCep }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteCep }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--cidade">
                 <span>Cidade</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeClienteCidade }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeClienteCidade }}" readonly tabindex="-1" aria-readonly="true">
             </label>
 
             <label class="erp-nfe-cliente__field erp-nfe-cliente__field--uf">
                 <span>UF</span>
-                <input class="erp-nfe-cliente__input" type="text" value="{{ $this->nfeForm['uf'] ?? '' }}" readonly tabindex="-1">
+                <input class="erp-nfe-cliente__input erp-nfe-cliente__input--info" type="text" value="{{ $this->nfeForm['uf'] ?? '' }}" readonly tabindex="-1" aria-readonly="true">
             </label>
         </div>
     </div>

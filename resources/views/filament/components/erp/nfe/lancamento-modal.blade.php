@@ -41,8 +41,9 @@
         class="erp-lookup-modal erp-nfe-lancamento-modal"
         wire:keydown.escape.window="handleNfeModalEscape"
         wire:keydown.f6.prevent="importNfeModal"
-        x-on:erp-nfe-focus-item-produto.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-produto'); el?.focus(); el?.select?.(); })"
-        x-on:erp-nfe-focus-item-codigo.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-produto'); el?.focus(); el?.select?.(); })"
+        x-on:erp-nfe-focus-cliente.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-cliente-busca'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
+        x-on:erp-nfe-focus-item-produto.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-inclusao-produto'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
+        x-on:erp-nfe-focus-item-codigo.window="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfe-inclusao-produto'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
         x-on:erp-nfe-focus-item-quantidade.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-qtd'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
         x-on:erp-nfe-focus-item-preco.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-preco'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
         x-on:erp-nfe-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-nfe-desconto-preco'); el?.focus(); el?.select?.(); })"
@@ -193,12 +194,44 @@
                             @class(['erp-nfe-lancamento-modal__section-tab', 'erp-nfe-lancamento-modal__section-tab--active' => $this->nfeModalMainTab === $value])
                         >{{ $label }}</button>
                     @endforeach
+
+                    @if ($this->nfeModalMainTab === 'impostos')
+                        @php
+                            $nfeImpostoProduto = $this->nfeModalRows[$this->nfeSelectedRowIndex] ?? null;
+                            $nfeImpostoProdutoNome = trim((string) ($nfeImpostoProduto['descricao'] ?? ''));
+                            $nfeImpostoProdutoCod = ltrim((string) ($nfeImpostoProduto['codigo'] ?? ''), '0') ?: (string) ($nfeImpostoProduto['codigo'] ?? '');
+                        @endphp
+                        @if ($nfeImpostoProdutoNome !== '')
+                            <div class="erp-nfe-lancamento-modal__imposto-produto" title="{{ $nfeImpostoProdutoCod !== '' ? $nfeImpostoProdutoCod.' — ' : '' }}{{ $nfeImpostoProdutoNome }}">
+                                @if ($nfeImpostoProdutoCod !== '')
+                                    <span class="erp-nfe-lancamento-modal__imposto-produto-cod">{{ $nfeImpostoProdutoCod }}</span>
+                                @endif
+                                <span class="erp-nfe-lancamento-modal__imposto-produto-nome">{{ $nfeImpostoProdutoNome }}</span>
+                            </div>
+                        @endif
+                    @endif
                 </div>
 
                 @if ($this->nfeModalMainTab === 'itens')
                     <div class="erp-nfe-lancamento-modal__itens-area">
                         @include('filament.components.erp.nfe.lancamento-produto-inclusao')
                         @include('filament.components.erp.nfe.lancamento-itens-grid')
+
+                        {{-- Foto só enquanto a busca/lista está aberta; some ao confirmar e ir para Qtde. --}}
+                        @if ($this->nfeProdutoLookupOpen || filled($this->nfeProdutoPreviewFotoUrl))
+                            <div class="erp-nfe-produto-foto-fixa" aria-label="Foto do produto">
+                                @if ($this->nfeProdutoPreviewFotoUrl)
+                                    <img
+                                        src="{{ $this->nfeProdutoPreviewFotoUrl }}"
+                                        alt="Foto do produto"
+                                        class="erp-nfe-produto-foto-fixa__img"
+                                        wire:key="nfe-produto-foto-fixa-{{ md5($this->nfeProdutoPreviewFotoUrl) }}"
+                                    >
+                                @else
+                                    <span class="erp-nfe-produto-foto-fixa__empty">Foto do produto</span>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 @elseif ($this->nfeModalMainTab === 'impostos')
                     @include('filament.components.erp.nfe.lancamento-impostos-grid')
@@ -267,9 +300,13 @@
                         <textarea wire:model="nfeForm.obs_fisco" class="erp-nfe-lancamento-modal__textarea" rows="3"></textarea>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'contribuinte')
-                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs">
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs erp-nfe-contribuinte">
                         <label class="erp-nfe-lancamento-modal__form-label">Informações complementares de interesse do contribuinte</label>
-                        <textarea wire:model="nfeForm.obs_contribuinte" class="erp-nfe-lancamento-modal__textarea" rows="3"></textarea>
+                        <textarea
+                            wire:model.live="nfeForm.obs_contribuinte"
+                            class="erp-nfe-lancamento-modal__textarea"
+                            rows="4"
+                        ></textarea>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'referencia')
                     <div class="erp-nfe-lancamento-modal__detail-panel">
@@ -301,6 +338,129 @@
                                     @endforelse
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                @elseif ($this->nfeModalDetailTab === 'volumes')
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-volumes">
+                        <div class="erp-nfe-volumes__row">
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--especie">
+                                <span class="erp-nfe-lancamento-modal__form-label">Espécie</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.especie"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--marca">
+                                <span class="erp-nfe-lancamento-modal__form-label">Marca</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.marca"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--qtd">
+                                <span class="erp-nfe-lancamento-modal__form-label">Quantidade</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.qvol"
+                                    inputmode="decimal"
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--peso">
+                                <span class="erp-nfe-lancamento-modal__form-label">Peso Líquido</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.peso_l"
+                                    inputmode="decimal"
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--peso">
+                                <span class="erp-nfe-lancamento-modal__form-label">Peso Bruto</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.peso_b"
+                                    inputmode="decimal"
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
+                                    autocomplete="off"
+                                >
+                            </label>
+                        </div>
+                    </div>
+                @elseif ($this->nfeModalDetailTab === 'transportadora')
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-transportadora">
+                        <div class="erp-nfe-transportadora__row">
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--frete">
+                                <span class="erp-nfe-lancamento-modal__form-label">Frete por Conta</span>
+                                <select
+                                    wire:model="nfeForm.tipo_frete"
+                                    class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__select"
+                                >
+                                    @foreach ($this->nfeFretePorContaOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            <div class="erp-nfe-transportadora__field erp-nfe-transportadora__field--transportador">
+                                <span class="erp-nfe-lancamento-modal__form-label">Transportador</span>
+                                <div class="erp-nfe-transportadora__transportador">
+                                    <input
+                                        type="text"
+                                        wire:model.live.debounce.250ms="nfeForm.transportadora_codigo"
+                                        wire:keydown.enter.prevent="resolverNfeTransportadoraPorCodigo"
+                                        class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__codigo"
+                                        inputmode="numeric"
+                                        autocomplete="off"
+                                        title="Código do transportador"
+                                    >
+                                    <select
+                                        wire:model.live="nfeForm.transportadora_id"
+                                        class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__nome"
+                                    >
+                                        <option value="">—</option>
+                                        @foreach ($this->nfeTransportadorasOptions as $option)
+                                            <option value="{{ $option['id'] }}">{{ $option['nome'] }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--placa">
+                                <span class="erp-nfe-lancamento-modal__form-label">Placa</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.placa"
+                                    maxlength="8"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__placa"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--uf">
+                                <span class="erp-nfe-lancamento-modal__form-label">UF</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.uf_placa"
+                                    maxlength="2"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__uf"
+                                    autocomplete="off"
+                                >
+                            </label>
                         </div>
                     </div>
                 @else
@@ -383,9 +543,9 @@
 
                         <button
                             type="button"
+                            wire:click="openNfeTransportadora"
                             class="erp-nfe-actions__btn"
-                            disabled
-                            title="Em breve"
+                            title="Transportadora"
                             data-erp-key="F10"
                         >
                             <span class="erp-nfe-actions__icon">🚚</span>

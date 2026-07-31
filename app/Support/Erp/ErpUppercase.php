@@ -32,6 +32,11 @@ final class ErpUppercase
         'token',
         'param_pix_mp_access_token',
         'param_pix_mp_client_secret',
+        'param_meli_access_token',
+        'param_meli_refresh_token',
+        'param_meli_client_id',
+        'param_meli_client_secret',
+        'param_meli_redirect_uri',
     ];
 
     /**

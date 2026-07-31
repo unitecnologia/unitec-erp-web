@@ -190,12 +190,31 @@ class ForcaVendasMonitorResource extends Resource
 
     public static function plataformaLabel(ForcaVendasOrder $record): string
     {
+        if (self::isMercadoLivre($record)) {
+            return 'Mercado Livre';
+        }
+
         return self::isVendasInternas($record) ? 'Vendas Internas' : 'Força de Vendas';
     }
 
     public static function plataformaColor(ForcaVendasOrder $record): string
     {
+        if (self::isMercadoLivre($record)) {
+            return 'warning';
+        }
+
         return self::isVendasInternas($record) ? 'info' : 'gray';
+    }
+
+    public static function isMercadoLivre(ForcaVendasOrder $record): bool
+    {
+        if (filled($record->meli_order_id)) {
+            return true;
+        }
+
+        $payload = is_array($record->payload) ? $record->payload : [];
+
+        return ($payload['origem'] ?? '') === 'mercado_livre';
     }
 
     public static function isVendasInternas(ForcaVendasOrder $record): bool

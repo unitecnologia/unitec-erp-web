@@ -39,9 +39,8 @@
                 @endif
 
                 <p class="erp-balanca-etq__intro">
-                    Padrões EAN de etiqueta de balança — sempre iniciam com o prefixo
-                    <strong>{{ $this->etiquetaPrefixo }}</strong>.
-                    Selecione o modelo ou ajuste prefixo e dígitos conforme a balança.
+                    EAN de balança (prefixo <strong>{{ $this->etiquetaPrefixo }}</strong>) —
+                    selecione o modelo ou ajuste prefixo e dígitos.
                 </p>
 
                 <div class="erp-balanca-etq__diagrams" role="list">

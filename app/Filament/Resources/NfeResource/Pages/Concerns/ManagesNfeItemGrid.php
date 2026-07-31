@@ -119,6 +119,21 @@ trait ManagesNfeItemGrid
             return;
         }
 
+        // Código numérico sem match exato: não confirma sugestão "parecida" (ex.: 13 → 133).
+        if ($this->nfeTermLooksLikeProductCode($term)) {
+            $this->nfeProdutoLookupOpen = true;
+            $this->refreshNfeProdutoResults();
+
+            Notification::make()
+                ->title('Código não encontrado.')
+                ->body('Nenhum produto com o código "'.$term.'". Digite o nome para buscar por descrição.')
+                ->warning()
+                ->send();
+            $this->dispatch('erp-nfe-focus-item-produto');
+
+            return;
+        }
+
         // Lista aberta por nome: confirma a sugestão selecionada (↑ ↓ + Enter).
         if ($this->nfeProdutoLookupOpen && $this->nfeProdutoResults !== []) {
             $index = $this->nfeSelectedProdutoIndex;
@@ -506,7 +521,9 @@ trait ManagesNfeItemGrid
 
     public function updatedNfeItemProdutoSearch(string $value): void
     {
-        $upper = mb_strtoupper(trim($value), 'UTF-8');
+        // Não usa trim() aqui: remove espaços enquanto digita ("HOT " → "HOT") e o cursor volta.
+        $upper = mb_strtoupper($value, 'UTF-8');
+        $term = trim($upper);
 
         if ($this->nfeItemProdutoSearch !== $upper) {
             $this->nfeItemProdutoSearch = $upper;
@@ -516,7 +533,7 @@ trait ManagesNfeItemGrid
         if ($this->nfeItemPendingProductId !== null) {
             $pendingNome = $this->nfePendingProductNome();
 
-            if ($upper === '' || ($pendingNome !== '' && $upper === $pendingNome)) {
+            if ($term === '' || ($pendingNome !== '' && $term === $pendingNome)) {
                 $this->closeNfeProdutoLookup();
 
                 return;
@@ -526,7 +543,7 @@ trait ManagesNfeItemGrid
             $this->clearNfePendingKeepSearchTerm();
         }
 
-        if ($upper === '') {
+        if ($term === '') {
             $this->closeNfeProdutoLookup();
             $this->nfeProdutoResults = [];
             $this->nfeSelectedProdutoIndex = null;
@@ -585,7 +602,7 @@ trait ManagesNfeItemGrid
 
     public function refreshNfeProdutoResults(): void
     {
-        $term = trim($this->nfeItemProdutoSearch);
+        $term = mb_strtoupper(trim($this->nfeItemProdutoSearch), 'UTF-8');
 
         if ($term === '') {
             $this->nfeProdutoResults = [];
@@ -595,23 +612,42 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $like = '%'.$term.'%';
+        $buscaPorCodigo = $this->nfeTermLooksLikeProductCode($term);
+        $tokens = $buscaPorCodigo
+            ? [$term]
+            : $this->nfeProdutoSearchTokens($term);
+        $firstToken = $tokens[0] ?? $term;
         $reservas = app(EstoqueReservaService::class)->totaisReservadosAtivos(null);
 
         $produtos = Product::query()
             ->where('ativo', true)
-            ->where(function ($query) use ($like, $term): void {
-                $query->where('codigo', 'like', $like)
-                    ->orWhere('descricao', 'like', $like)
-                    ->orWhere('referencia', 'like', $like)
-                    ->orWhere('codigo_barras', 'like', $like)
-                    ->orWhere('codigo_barras_caixa', 'like', $like);
+            ->where(function ($query) use ($term, $buscaPorCodigo, $tokens): void {
+                if ($buscaPorCodigo) {
+                    // Digita só número/código: busca o código em si (não "contém" 13 em 133).
+                    $query->where('codigo', $term)
+                        ->orWhere('referencia', $term)
+                        ->orWhere('codigo_barras', $term)
+                        ->orWhere('codigo_barras_caixa', $term);
 
-                if (ctype_digit($term)) {
-                    $query->orWhere('codigo', $term);
+                    return;
+                }
+
+                // Busca inteligente: "HOT PETRO" casa cada palavra (AND), em qualquer ordem.
+                foreach ($tokens as $token) {
+                    $like = '%'.$this->escapeNfeProdutoLike($token).'%';
+                    $query->where(function ($tokenQuery) use ($like): void {
+                        $tokenQuery->where('codigo', 'like', $like)
+                            ->orWhere('descricao', 'like', $like)
+                            ->orWhere('referencia', 'like', $like)
+                            ->orWhere('codigo_barras', 'like', $like)
+                            ->orWhere('codigo_barras_caixa', 'like', $like);
+                    });
                 }
             })
-            ->orderByRaw('CASE WHEN codigo = ? THEN 0 WHEN descricao LIKE ? THEN 1 ELSE 2 END', [$term, $term.'%'])
+            ->orderByRaw(
+                'CASE WHEN codigo = ? THEN 0 WHEN codigo_barras = ? OR codigo_barras_caixa = ? OR referencia = ? THEN 1 WHEN descricao LIKE ? THEN 2 WHEN descricao LIKE ? THEN 3 ELSE 4 END',
+                [$term, $term, $term, $term, $term.'%', $firstToken.'%'],
+            )
             ->orderBy('descricao')
             ->limit(12)
             ->get(['id', 'codigo', 'descricao', 'preco_venda', 'estoque']);
@@ -639,6 +675,43 @@ trait ManagesNfeItemGrid
 
         $this->nfeSelectedProdutoIndex = $this->nfeProdutoResults === [] ? null : 0;
         $this->syncNfeProdutoPreviewFotoFromSelection();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function nfeProdutoSearchTokens(string $term): array
+    {
+        $parts = preg_split('/\s+/u', trim($term), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $tokens = [];
+        foreach ($parts as $part) {
+            $part = trim((string) $part);
+            if ($part !== '') {
+                $tokens[] = $part;
+            }
+        }
+
+        return $tokens !== [] ? $tokens : [$term];
+    }
+
+    protected function escapeNfeProdutoLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    /**
+     * Termo que parece código/barras (só dígitos): busca exata, sem LIKE %código%.
+     */
+    protected function nfeTermLooksLikeProductCode(string $term): bool
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return false;
+        }
+
+        return ctype_digit($term);
     }
 
     public function selecionarNfeProdutoInclusao(int $id): void
@@ -780,15 +853,43 @@ trait ManagesNfeItemGrid
             return;
         }
 
+        $cfop = trim($this->nfeItemEntryCfop);
+        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+        $existingIndex = $this->findNfeModalRowIndexToUnify((int) $product->id, $cfop, $preco);
+
+        if ($existingIndex !== null) {
+            $existingQtd = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['quantidade'] ?? '0', 4);
+            $this->nfeModalRows[$existingIndex]['quantidade'] = ErpMoney::formatBr($existingQtd + $qtd, 4);
+
+            $existingDesconto = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['desconto'] ?? '0', 2);
+            $entryDesconto = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
+            if ($entryDesconto > 0) {
+                $this->nfeModalRows[$existingIndex]['desconto'] = ErpMoney::formatBr($existingDesconto + $entryDesconto, 2);
+            }
+
+            $existingOutros = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['outros'] ?? '0', 2);
+            $entryOutros = ErpMoney::parseBr($this->nfeItemEntryOutros, 2);
+            if ($entryOutros > 0) {
+                $this->nfeModalRows[$existingIndex]['outros'] = ErpMoney::formatBr($existingOutros + $entryOutros, 2);
+            }
+
+            $this->nfeSelectedRowIndex = $existingIndex;
+            $this->clearNfeItemEntryRow();
+            $this->recalculateNfeTotais();
+            $this->dispatch('erp-nfe-focus-item-codigo');
+
+            return;
+        }
+
         $this->nfeModalRows[] = [
             'key' => 'new-' . Str::uuid()->toString(),
             'product_id' => $product->id,
             'codigo' => (string) $product->codigo,
             'descricao' => mb_strtoupper(trim($this->nfeItemProdutoSearch), 'UTF-8'),
-            'cfop' => trim($this->nfeItemEntryCfop),
+            'cfop' => $cfop,
             'cst' => trim($this->nfeItemEntryCst),
             'quantidade' => ErpMoney::formatBr($qtd, 4),
-            'valor_unitario' => ErpMoney::formatBr(ErpMoney::parseBr($this->nfeItemEntryPreco, 4), 4),
+            'valor_unitario' => ErpMoney::formatBr($preco, 4),
             'unidade' => mb_strtoupper(trim($this->nfeItemEntryUnidade) ?: 'UN', 'UTF-8'),
             'desconto' => ErpMoney::parseBr($this->nfeItemEntryDesconto, 2),
             'outros' => ErpMoney::parseBr($this->nfeItemEntryOutros, 2),
@@ -798,6 +899,39 @@ trait ManagesNfeItemGrid
         $this->clearNfeItemEntryRow();
         $this->recalculateNfeTotais();
         $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    /**
+     * Mesmo produto + CFOP + preço unitário → soma quantidade na linha existente.
+     */
+    protected function findNfeModalRowIndexToUnify(int $productId, string $cfop, float $preco): ?int
+    {
+        if ($productId <= 0) {
+            return null;
+        }
+
+        $cfopNorm = preg_replace('/\D/', '', $cfop) ?: '';
+        $precoNorm = round($preco, 4);
+
+        foreach ($this->nfeModalRows as $index => $row) {
+            if ((int) ($row['product_id'] ?? 0) !== $productId) {
+                continue;
+            }
+
+            $rowCfop = preg_replace('/\D/', '', (string) ($row['cfop'] ?? '')) ?: '';
+            if ($cfopNorm !== '' && $rowCfop !== '' && $cfopNorm !== $rowCfop) {
+                continue;
+            }
+
+            $rowPreco = round(ErpMoney::parseBr($row['valor_unitario'] ?? '0', 4), 4);
+            if (abs($rowPreco - $precoNorm) > 0.00005) {
+                continue;
+            }
+
+            return (int) $index;
+        }
+
+        return null;
     }
 
     public function resolveNfeItemProductFromCodigo(int $index): void
@@ -1042,6 +1176,12 @@ trait ManagesNfeItemGrid
 
     protected function findNfeProductByCodigo(string $codigo): ?Product
     {
+        $codigo = trim($codigo);
+
+        if ($codigo === '') {
+            return null;
+        }
+
         return Product::query()
             ->where('ativo', true)
             ->where(function ($query) use ($codigo): void {
@@ -1049,6 +1189,11 @@ trait ManagesNfeItemGrid
                     ->orWhere('referencia', $codigo)
                     ->orWhere('codigo_barras', $codigo)
                     ->orWhere('codigo_barras_caixa', $codigo);
+
+                // Alguns cadastros gravam código numérico sem zero à esquerda / tipagem mista.
+                if (ctype_digit($codigo)) {
+                    $query->orWhereRaw('CAST(codigo AS CHAR) = ?', [$codigo]);
+                }
             })
             ->first();
     }

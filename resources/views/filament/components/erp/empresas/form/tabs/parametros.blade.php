@@ -6,7 +6,7 @@
     $subTabs = EmpresaParametros::parametrosSubTabs();
     $densityOptions = EmpresaParametros::sistemaUiDensityOptions();
 
-    $subTabsSemNumericos = ['imposto', 'difal', 'pix', 'boleto', 'api_servicos', 'whatsapp', 'portal_contador', 'expedicao', 'estoques', 'sistema'];
+    $subTabsSemNumericos = ['imposto', 'difal', 'pix', 'boleto', 'api_servicos', 'whatsapp', 'portal_contador', 'mercado_livre', 'expedicao', 'estoques', 'sistema'];
     $mostrarNumericos = ! in_array($this->activeParametrosSubTab, $subTabsSemNumericos, true);
 @endphp
 
@@ -90,6 +90,8 @@
             @include('filament.components.erp.empresas.form.tabs.parametros-whatsapp')
         @elseif ($this->activeParametrosSubTab === 'portal_contador')
             @include('filament.components.erp.empresas.form.tabs.parametros-portal-contador')
+        @elseif ($this->activeParametrosSubTab === 'mercado_livre')
+            @include('filament.components.erp.empresas.form.tabs.parametros-mercado-livre')
         @elseif ($this->activeParametrosSubTab === 'estoques')
             @include('filament.components.erp.empresas.form.tabs.parametros-estoques')
         @elseif ($this->activeParametrosSubTab === 'sistema')

@@ -301,6 +301,14 @@
                         <span>NF-e (modelo 55)</span>
                     </label>
                     <label class="erp-migra-fb__check">
+                        <input type="checkbox" wire:model="optCompras" :disabled="running || $wire.progressActive">
+                        <span>Compras</span>
+                    </label>
+                    <label class="erp-migra-fb__check">
+                        <input type="checkbox" wire:model="optNotasFornecedor" :disabled="running || $wire.progressActive">
+                        <span>Notas de compra (DF-e)</span>
+                    </label>
+                    <label class="erp-migra-fb__check">
                         <input type="checkbox" wire:model="optPdvCaixaMovimentos" :disabled="running || $wire.progressActive">
                         <span>Movimentos caixa PDV</span>
                     </label>

@@ -30,6 +30,8 @@ final class FirebirdMigraService
         private readonly FirebirdContaPagarPagamentoImportService $contaPagarPagamentos,
         private readonly FirebirdProdUltimosPrecosImportService $prodUltimosPrecos,
         private readonly FirebirdVendasParametroImportService $vendasParametros,
+        private readonly FirebirdCompraImportService $compras,
+        private readonly FirebirdNotaFornecedorImportService $notasFornecedor,
     ) {
     }
 
@@ -215,6 +217,12 @@ final class FirebirdMigraService
             'nfes', 'nfe' => [
                 'nfes' => $this->importNfes($updateExisting, $dryRun),
             ],
+            'compras', 'compra' => [
+                'compras' => $this->importCompras($updateExisting, $dryRun),
+            ],
+            'notas_fornecedor', 'notas_fornecedores', 'xml_master', 'xml_entrada', 'nfe_manifesto', 'manifesto' => [
+                'notas_fornecedor' => $this->importNotasFornecedor($updateExisting, $dryRun),
+            ],
             'pdv_caixa_movimentos', 'contas_movimento', 'movimentos_pdv' => [
                 'pdv_caixa_movimentos' => $this->importPdvCaixaMovimentos($updateExisting, $dryRun),
             ],
@@ -279,17 +287,25 @@ final class FirebirdMigraService
                 'formas', 'vendedores', 'usuarios', 'contador', 'terminais',
                 'planos_contas', 'contas_pagar', 'conta_pagar_pagamentos', 'contas_receber',
                 'caixa', 'ultimos_precos', 'vendas_parametros',
-                'pdv_vendas', 'pdv_nfce', 'nfes', 'pdv_caixa_movimentos',
+                'pdv_vendas', 'pdv_nfce', 'nfes', 'compras', 'notas_fornecedor', 'pdv_caixa_movimentos',
             ];
         }
 
-        // Contas a pagar/receber e NF-e precisam de pessoas (clientes/fornecedores).
+        // Contas a pagar/receber, NF-e e compras precisam de pessoas (clientes/fornecedores).
         $precisaPessoas = array_intersect($only, [
             'contas_pagar',
             'conta_pagar_pagamentos',
             'contas_receber',
             'nfes',
             'nfe',
+            'compras',
+            'compra',
+            'notas_fornecedor',
+            'notas_fornecedores',
+            'xml_master',
+            'xml_entrada',
+            'nfe_manifesto',
+            'manifesto',
         ]) !== [];
 
         if ($precisaPessoas) {
@@ -301,8 +317,8 @@ final class FirebirdMigraService
             }
         }
 
-        if (array_intersect($only, ['nfes', 'nfe']) !== [] && ! in_array('produtos', $only, true)) {
-            // Itens da NF-e referenciam produtos pelo código legado.
+        if (array_intersect($only, ['nfes', 'nfe', 'compras', 'compra']) !== [] && ! in_array('produtos', $only, true)) {
+            // Itens da NF-e / compra referenciam produtos pelo código legado.
             array_unshift($only, 'produtos');
         }
 
@@ -311,7 +327,7 @@ final class FirebirdMigraService
             'formas', 'vendedores', 'usuarios', 'contador', 'terminais',
             'planos_contas', 'contas_pagar', 'conta_pagar_pagamentos', 'contas_receber',
             'caixa', 'ultimos_precos', 'vendas_parametros',
-            'pdv_vendas', 'pdv_nfce', 'nfes', 'pdv_caixa_movimentos',
+            'pdv_vendas', 'pdv_nfce', 'nfes', 'compras', 'notas_fornecedor', 'pdv_caixa_movimentos',
         ];
 
         $expanded = [];
@@ -715,6 +731,148 @@ final class FirebirdMigraService
     /**
      * @return array{created: int, updated: int, skipped: int}
      */
+    protected function importCompras(bool $updateExisting, bool $dryRun): array
+    {
+        $masters = $this->client->query(
+            'SELECT ID, EMPRESA, DTENTRADA, DTEMISSAO, FORNECEDOR, MODELO, SERIE, CHAVE, '
+            .'NR_NOTA, SUBTOTAL, FRETE, DESPESAS, SEGURO, DESCONTO, TOTAL, STATUS, NOME '
+            .'FROM COMPRA ORDER BY ID'
+        );
+        $masters = $this->coalesceIsqlRowsByKey($masters, 'ID');
+
+        $ids = [];
+        foreach ($masters as $row) {
+            $id = (int) ($row['ID'] ?? $row['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        $items = [];
+        if ($ids !== []) {
+            $inList = implode(',', $ids);
+            $items = $this->client->query(
+                'SELECT ID, FK_COMPRA, ITEM, FK_PRODUTO, QTD, VL_UNITARIO, VL_ITEM, TOTAL, DESCRICAO '
+                .'FROM COMPRA_ITENS WHERE FK_COMPRA IN ('.$inList.') ORDER BY FK_COMPRA, ITEM'
+            );
+        }
+
+        return $this->compras->importRows($masters, $items, $updateExisting, $dryRun);
+    }
+
+    /**
+     * Notas de compra / DF-e: NFE_MANIFESTO (lista do legado).
+     * XML via CAST; fallback XML_MASTER / COMPRA pela chave quando necessário.
+     *
+     * @return array{created: int, updated: int, skipped: int}
+     */
+    protected function importNotasFornecedor(bool $updateExisting, bool $dryRun): array
+    {
+        $masters = $this->client->query(
+            'SELECT CODIGO, NUMERO, CHAVE, SERIE, NOME, CNPJ, NSU, VALOR, '
+            .'DT_ENTRADA, DT_EMISSAO, SITUACAO, FK_EMPRESA, GEROU '
+            .'FROM NFE_MANIFESTO ORDER BY CODIGO'
+        );
+        $masters = $this->coalesceIsqlRowsByKey($masters, 'CODIGO');
+
+        foreach ($masters as $i => $row) {
+            $codigo = (int) ($row['CODIGO'] ?? $row['codigo'] ?? 0);
+            if ($codigo < 1) {
+                continue;
+            }
+
+            $chave = preg_replace('/\D/', '', (string) ($row['CHAVE'] ?? $row['chave'] ?? '')) ?: '';
+            $xmlTxt = $this->fetchXmlBlob(
+                'SELECT CAST(XML AS VARCHAR(32000)) AS XML_TXT FROM NFE_MANIFESTO WHERE CODIGO = '.$codigo
+            );
+
+            // Preferência: manifesto → XML_MASTER → COMPRA (todas têm XML no legado).
+            if ($xmlTxt === null && $chave !== '') {
+                $chaveSql = str_replace("'", "''", $chave);
+                $xmlTxt = $this->fetchXmlBlob(
+                    "SELECT CAST(XML AS VARCHAR(32000)) AS XML_TXT FROM XML_MASTER WHERE REPLACE(CHAVE, ' ', '') = '{$chaveSql}'"
+                );
+            }
+            if ($xmlTxt === null && $chave !== '') {
+                $chaveSql = str_replace("'", "''", $chave);
+                $xmlTxt = $this->fetchXmlBlob(
+                    "SELECT CAST(XML AS VARCHAR(32000)) AS XML_TXT FROM COMPRA WHERE REPLACE(CHAVE, ' ', '') = '{$chaveSql}'"
+                );
+            }
+
+            if ($xmlTxt !== null) {
+                $masters[$i]['XML_TXT'] = $xmlTxt;
+            }
+        }
+
+        return $this->notasFornecedor->importRows($masters, $updateExisting, $dryRun);
+    }
+
+    protected function fetchXmlBlob(string $sql): ?string
+    {
+        try {
+            $xmlRows = $this->client->query($sql);
+            $merged = [];
+            foreach ($xmlRows as $part) {
+                if (is_array($part)) {
+                    $merged = array_merge($merged, $part);
+                }
+            }
+
+            $raw = $merged['XML_TXT'] ?? $merged['xml_txt'] ?? null;
+            if ($raw === null) {
+                return null;
+            }
+
+            $txt = trim((string) $raw);
+
+            return ($txt !== '' && strtoupper($txt) !== '<NULL>') ? $txt : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function coalesceIsqlRowsByKey(array $rows, string $key): array
+    {
+        $keyUpper = strtoupper($key);
+        $keyLower = strtolower($key);
+        $out = [];
+        $current = null;
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $hasKey = isset($row[$keyUpper]) || isset($row[$keyLower]) || isset($row[$key]);
+            if ($hasKey) {
+                if ($current !== null) {
+                    $out[] = $current;
+                }
+                $current = $row;
+
+                continue;
+            }
+
+            if ($current !== null) {
+                $current = array_merge($current, $row);
+            }
+        }
+
+        if ($current !== null) {
+            $out[] = $current;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{created: int, updated: int, skipped: int}
+     */
     protected function importPdvCaixaMovimentos(bool $updateExisting, bool $dryRun): array
     {
         $svc = $this->pdvCaixaMovimentos;
@@ -811,6 +969,12 @@ final class FirebirdMigraService
             'vendas' => 'pdv_vendas',
             'nfce' => 'pdv_nfce',
             'nfe' => 'nfes',
+            'compra' => 'compras',
+            'notas_fornecedores' => 'notas_fornecedor',
+            'xml_master' => 'notas_fornecedor',
+            'xml_entrada' => 'notas_fornecedor',
+            'nfe_manifesto' => 'notas_fornecedor',
+            'manifesto' => 'notas_fornecedor',
             'contas_movimento' => 'pdv_caixa_movimentos',
             'movimentos_pdv' => 'pdv_caixa_movimentos',
         ];

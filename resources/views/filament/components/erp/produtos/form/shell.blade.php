@@ -109,8 +109,6 @@
                             @include('filament.components.erp.produtos.form.tabs.adicionais')
                         @elseif ($this->activeFormTab === 'combustivel')
                             @include('filament.components.erp.produtos.form.tabs.combustivel')
-                        @elseif ($this->activeFormTab === 'balanca')
-                            @include('filament.components.erp.produtos.form.tabs.balanca')
                         @elseif ($this->activeFormTab === 'grade')
                             @include('filament.components.erp.produtos.form.tabs.grade')
                         @elseif ($this->activeFormTab === 'imei')
@@ -147,6 +145,18 @@
                                 >
                                 <span>{{ $param['label'] }}</span>
                             </label>
+                            @if ($param['field'] === 'produto_pesado' && ($this->data['produto_pesado'] ?? false))
+                                <div class="erp-produtos-pcad__params-prefixo">
+                                    <label for="pprod-prefixo-balanca">Prefixo</label>
+                                    <input
+                                        id="pprod-prefixo-balanca"
+                                        type="text"
+                                        wire:model="data.prefixo_balanca"
+                                        maxlength="10"
+                                        class="erp-pcad-form__input"
+                                    >
+                                </div>
+                            @endif
                         @endforeach
                     </div>
                 </fieldset>

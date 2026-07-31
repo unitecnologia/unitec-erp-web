@@ -21,7 +21,13 @@
             <span class="erp-pagar-actions__icon">✎</span>
             <span class="erp-pagar-actions__label"><kbd>F3</kbd> | Alterar</span>
         </button>
-        <button type="button" class="erp-pagar-actions__btn" disabled title="Em breve">
+        <button
+            type="button"
+            wire:click="printContasPagar"
+            class="erp-pagar-actions__btn"
+            data-erp-key="F4"
+            title="Relatório de contas a pagar"
+        >
             <span class="erp-pagar-actions__icon">🖨</span>
             <span class="erp-pagar-actions__label"><kbd>F4</kbd> | Imprimir</span>
         </button>

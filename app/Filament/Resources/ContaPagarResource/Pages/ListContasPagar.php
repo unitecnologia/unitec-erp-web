@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ContaPagarResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\InteractsWithLocalFornecedorSearchLookup;
 use App\Filament\Resources\ContaPagarResource;
 use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarBaixaModal;
@@ -26,6 +27,7 @@ use Livewire\Attributes\Url;
 class ListContasPagar extends ListRecords
 {
     use InteractsWithErpListPage;
+    use InteractsWithErpPermissions;
     use InteractsWithLocalFornecedorSearchLookup;
     use ManagesContaPagarBaixaModal;
     use ManagesContaPagarDesdobramentos;
@@ -85,6 +87,7 @@ class ListContasPagar extends ListRecords
     protected function customErpListKeyboardConfig(): array
     {
         $extra = [
+            'F4' => ['method' => 'printContasPagar'],
             'F7' => ['method' => 'baixarConta'],
             'F8' => ['method' => 'verHistoricoPagamentos'],
         ];
@@ -689,5 +692,30 @@ class ListContasPagar extends ListRecords
             'desdobramentos' => 'um título pago para ver desdobramentos',
             default => $this->defaultErpListSelectPrompt($action),
         };
+    }
+
+    public function printContasPagar(): void
+    {
+        if (! $this->erpAuthorizeOrNotify('contas_pagar.print')) {
+            return;
+        }
+
+        $situacao = match ($this->situacaoFilter) {
+            'a_pagar' => 'abertos',
+            'atrasadas' => 'vencidos',
+            'pagas' => 'baixados',
+            default => 'todos',
+        };
+
+        $params = array_filter([
+            'situacao' => $situacao,
+            'de' => filled($this->localSearchDe) ? $this->localSearchDe : null,
+            'ate' => filled($this->localSearchAte) ? $this->localSearchAte : null,
+        ], fn ($value): bool => filled($value));
+
+        $this->redirect(route('erp.reports.tabular', [
+            'slug' => 'contas-pagar',
+            ...$params,
+        ]), navigate: false);
     }
 }

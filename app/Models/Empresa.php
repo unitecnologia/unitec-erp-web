@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'obs_fisco',
     'obs_carne',
     'obs_nfce',
+    'obs_contribuinte',
     'msg_cobranca_whatsapp',
     'logo_path',
     'ativo',
@@ -96,6 +97,7 @@ class Empresa extends Model
             ...EmpresaParametros::apiServicosBooleanFields(),
             ...EmpresaParametros::whatsAppBooleanFields(),
             ...EmpresaParametros::portalContadorBooleanFields(),
+            ...EmpresaParametros::mercadoLivreBooleanFields(),
             ...EmpresaParametros::sistemaBooleanFields(),
             ...EmpresaParametros::expedicaoBooleanFields(),
         ] as $field => $meta) {
@@ -111,6 +113,8 @@ class Empresa extends Model
         $casts['param_portal_contador_timeout'] = 'integer';
         $casts['param_portal_contador_contador_id'] = 'integer';
         $casts['param_portal_contador_vinculado_em'] = 'datetime';
+        $casts['param_meli_token_expires_at'] = 'datetime';
+        $casts['param_meli_vinculado_em'] = 'datetime';
         $casts['param_backup_intervalo_horas'] = 'integer';
         $casts['param_balanca_etiqueta_modelo'] = 'integer';
         $casts['param_balanca_digitos'] = 'integer';

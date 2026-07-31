@@ -1371,6 +1371,29 @@
     min-width: 0;
 }
 
+.erp-produtos-pcad__params-prefixo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.02rem 0 0.08rem 1.15rem;
+}
+
+.erp-produtos-pcad__params-prefixo label {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+}
+
+.erp-produtos-pcad__params-prefixo .erp-pcad-form__input {
+    width: 5rem;
+    max-width: 100%;
+    min-height: 1.25rem !important;
+    padding: 0.02rem 0.2rem !important;
+    font-size: 0.72rem !important;
+}
+
 .erp-pcad__check--disabled {
     color: #777;
 }
@@ -1769,9 +1792,8 @@
     max-width: var(--erp-impostos-input-col) !important;
 }
 
-/* Abas auxiliares ? mesmo visual compacto dos impostos */
+/* Abas auxiliares — mesmo visual compacto dos impostos */
 .erp-produtos-promocao,
-.erp-produtos-balanca,
 .erp-produtos-combustivel,
 .erp-produtos-adicionais {
     display: flex;
@@ -1933,11 +1955,6 @@
 .erp-produtos-combustivel .erp-produtos-tab-group {
     --erp-tab-label-col: 4.4rem;
     --erp-tab-input-col: 3.6rem;
-}
-
-.erp-produtos-balanca .erp-produtos-tab-group {
-    --erp-tab-label-col: 3.6rem;
-    --erp-tab-input-col: 5rem;
 }
 
 .erp-produtos-adicionais .erp-produtos-tab-group {

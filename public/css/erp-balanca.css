@@ -576,7 +576,17 @@
     }
 }
 
-/* ── Nested modal: Config. Etiquetas ──────────────────────────── */
+/* ── Nested modal: Config. Etiquetas (fit viewport, no scroll) ─ */
+
+/* Overlay inherits parent height; expand shell so 2×2 + form fit. */
+.erp-balanca:has(.erp-balanca-etq) {
+    min-height: min(26.5rem, calc(100dvh - 1.75rem));
+}
+
+.fi-body:has(.erp-balanca-page:has(.erp-balanca-etq)) .fi-main > *,
+.fi-main:has(.erp-balanca-page:has(.erp-balanca-etq)) > :has(.erp-balanca-page) {
+    width: min(34rem, 96vw) !important;
+}
 
 .erp-balanca-etq {
     position: absolute;
@@ -600,34 +610,36 @@
     flex-direction: column;
     width: 100%;
     min-height: 0;
+    height: 100%;
     background: #e4ebf5;
     box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28);
+    overflow: hidden;
 }
 
 .erp-balanca-etq__titlebar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-shrink: 0;
-    padding: 0.45rem 0.7rem;
+    padding: 0.35rem 0.6rem;
     background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
 }
 
 .erp-balanca-etq__title {
     margin: 0;
-    font-size: 0.88rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--erp-text-inverse, #fff);
-    line-height: 1.25;
+    line-height: 1.2;
 }
 
 .erp-balanca-etq__body {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
-    padding: 0.65rem 0.75rem;
-    overflow: auto;
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem 0.35rem;
+    overflow: hidden;
     flex: 1;
     min-height: 0;
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -635,28 +647,32 @@
 
 .erp-balanca-etq__intro {
     margin: 0;
-    font-size: 0.72rem;
-    line-height: 1.4;
+    font-size: 0.65rem;
+    line-height: 1.3;
     color: #475569;
 }
 
 .erp-balanca-etq__diagrams {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.45rem;
+    gap: 0.3rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-content: start;
 }
 
 .erp-balanca-etq__card {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    padding: 0.45rem 0.5rem;
+    gap: 0.18rem;
+    padding: 0.28rem 0.35rem;
     border: 1px solid #c7d5e8;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #fff;
     text-align: left;
     cursor: pointer;
     font-family: inherit;
+    min-width: 0;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -672,44 +688,53 @@
 }
 
 .erp-balanca-etq__card-num {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     font-weight: 800;
     color: var(--erp-brand-primary, #1e5a9e);
     letter-spacing: 0.04em;
+    line-height: 1.1;
 }
 
 .erp-balanca-etq__barcode {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.15rem;
+    flex-wrap: nowrap;
+    gap: 0.1rem;
     align-items: stretch;
+    overflow: hidden;
 }
 
 .erp-balanca-etq__seg {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 1.4rem;
-    padding: 0.15rem 0.22rem;
-    border-radius: 4px;
+    justify-content: center;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.1rem 0.12rem;
+    border-radius: 3px;
     background: #f1f5f9;
 }
 
 .erp-balanca-etq__seg-val {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.68rem;
+    font-size: 0.58rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     color: #0f172a;
-    line-height: 1.2;
+    line-height: 1.15;
+    white-space: nowrap;
 }
 
 .erp-balanca-etq__seg-cap {
-    font-size: 0.52rem;
+    font-size: 0.48rem;
     font-weight: 600;
     color: #64748b;
-    line-height: 1.1;
-    margin-top: 0.08rem;
+    line-height: 1;
+    margin-top: 0.04rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .erp-balanca-etq__seg--prefix {
@@ -754,34 +779,65 @@
 }
 
 .erp-balanca-etq__card-meta {
-    font-size: 0.62rem;
+    font-size: 0.55rem;
     font-weight: 600;
     color: #64748b;
+    line-height: 1.1;
 }
 
 .erp-balanca-etq__form {
     display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 0.7fr);
-    gap: 0.5rem;
+    gap: 0.35rem;
     align-items: end;
-    padding-top: 0.15rem;
+    flex-shrink: 0;
+    padding-top: 0;
+}
+
+.erp-balanca-etq__form .erp-balanca__field {
+    gap: 0.15rem;
+}
+
+.erp-balanca-etq__form .erp-balanca__label {
+    font-size: 0.62rem;
+}
+
+.erp-balanca-etq__form .erp-balanca__select,
+.erp-balanca-etq__form .erp-balanca__input {
+    min-height: 1.7rem;
+    padding: 0.18rem 0.4rem;
+    font-size: 0.75rem;
+    border-radius: 5px;
 }
 
 .erp-balanca-etq__input--narrow {
-    max-width: 5.5rem;
+    max-width: 4.75rem;
 }
 
 .erp-balanca-etq .erp-balanca__footer {
     flex-shrink: 0;
+    padding: 0.4rem 0.55rem !important;
 }
 
-@media (max-width: 560px) {
-    .erp-balanca-etq__diagrams {
-        grid-template-columns: 1fr;
+.erp-balanca-etq .erp-balanca__footer .erp-pcad-actions__btn {
+    min-width: 4.8rem !important;
+    height: 2.65rem !important;
+    padding: 0.2rem 0.5rem !important;
+}
+
+.erp-balanca-etq .erp-balanca__feedback {
+    margin: 0;
+    padding: 0.3rem 0.45rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 420px) {
+    .erp-balanca-etq__form {
+        grid-template-columns: 1fr 1fr;
     }
 
-    .erp-balanca-etq__form {
-        grid-template-columns: 1fr;
+    .erp-balanca-etq__form .erp-balanca__field:first-child {
+        grid-column: 1 / -1;
     }
 
     .erp-balanca-etq__input--narrow {

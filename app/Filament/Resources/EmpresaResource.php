@@ -50,7 +50,7 @@ class EmpresaResource extends Resource
             'codigo', 'nome', 'fantasia', 'razao_social', 'pessoa_tipo', 'cidade', 'cnpj', 'ie', 'im', 'cnae',
             'regime_tributario', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade_codigo', 'uf',
             'pais_codigo', 'pais', 'email', 'site', 'telefone', 'responsavel', 'cnpj_representante', 'tipo_atividade',
-            'obs_fisco', 'obs_carne', 'obs_nfce', 'msg_cobranca_whatsapp', 'logo_path',
+            'obs_fisco', 'obs_carne', 'obs_nfce', 'obs_contribuinte', 'msg_cobranca_whatsapp', 'logo_path',
         ];
 
         $fields = [];

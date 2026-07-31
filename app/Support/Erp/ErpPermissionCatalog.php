@@ -299,6 +299,14 @@ class ErpPermissionCatalog
           'delete' => 'Excluir / Revogar',
         ],
       ],
+      'mercado_livre' => [
+        'label' => 'Mercado Livre',
+        'group' => 'Integrações',
+        'actions' => [
+          'access' => 'Acessar',
+          'config' => 'Conectar conta / config',
+        ],
+      ],
       'vendas_internas' => [
         'label' => 'Vendas Internas',
         'group' => 'Vendas Internas',

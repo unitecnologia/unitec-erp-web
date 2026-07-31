@@ -187,17 +187,17 @@ final class IbptLookupService
         }
 
         $fonte = trim((string) ($totais['fonte'] ?? 'IBPT'));
-        $chave = trim((string) ($totais['chave'] ?? ''));
-        $versao = trim((string) ($totais['versao'] ?? ''));
-
-        $meta = array_filter([$fonte !== '' ? $fonte : null, $chave !== '' ? 'chave '.$chave : null, $versao !== '' ? 'v'.$versao : null]);
+        if ($fonte === '') {
+            $fonte = 'IBPT';
+        }
 
         return sprintf(
-            'Trib. aprox. R$ %s Federal, R$ %s Estadual e R$ %s Municipal. Fonte: %s. Lei 12.741/2012.',
+            'Trib. aprox. Federal: R$ %s | Estadual: R$ %s | Municipal: R$ %s | Total: R$ %s. Fonte: %s. Lei 12.741/2012.',
             number_format($fed, 2, ',', '.'),
             number_format($est, 2, ',', '.'),
             number_format($mun, 2, ',', '.'),
-            $meta !== [] ? implode(' · ', $meta) : 'IBPT',
+            number_format($tot, 2, ',', '.'),
+            $fonte,
         );
     }
 

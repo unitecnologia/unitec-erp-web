@@ -17,8 +17,18 @@ use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
 use App\Http\Controllers\Api\VendasInternas\InfoController as ViInfoController;
 use App\Http\Controllers\Api\VendasInternas\SyncController as ViSyncController;
+use App\Http\Controllers\Api\MeliHubPairController;
+use App\Http\Controllers\Webhooks\MercadoLivreWebhookController;
 use App\Http\Controllers\Webhooks\MercadoPagoWebhookController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('webhooks/mercadolivre', [MercadoLivreWebhookController::class, 'handle'])
+    ->name('webhooks.mercadolivre');
+
+Route::prefix('meli/hub')->middleware('throttle:60,1')->group(function (): void {
+    Route::post('pair', [MeliHubPairController::class, 'store'])->name('meli.hub.pair.store');
+    Route::get('pair/{uuid}', [MeliHubPairController::class, 'show'])->name('meli.hub.pair.show');
+});
 
 /*
 |--------------------------------------------------------------------------

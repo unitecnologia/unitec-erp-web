@@ -26,10 +26,19 @@ use App\Http\Controllers\Erp\ReciboReportController;
 use App\Http\Controllers\Erp\TabularReportController;
 use App\Http\Controllers\Erp\VendaListagemReportController;
 use App\Http\Controllers\Erp\PublicStorageFileController;
+use App\Http\Controllers\OAuth\MeliHubOAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+// Hub Mercado Livre (público) — OAuth central Unitec para clientes sem domínio.
+Route::middleware('web')->group(function (): void {
+    Route::get('/meli/hub/connect', [MeliHubOAuthController::class, 'connect'])
+        ->name('meli.hub.connect');
+    Route::get('/meli/hub/oauth/callback', [MeliHubOAuthController::class, 'callback'])
+        ->name('meli.hub.oauth.callback');
 });
 
 Route::middleware(['web', 'auth'])->group(function (): void {

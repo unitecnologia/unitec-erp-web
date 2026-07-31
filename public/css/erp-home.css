@@ -1377,6 +1377,13 @@
     padding: 0;
 }
 
+.erp-dash-mini-list--scroll {
+    max-height: 9.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .erp-dash-alert {
     padding: 0.4rem 0.55rem;
     border-left: 3px solid #94a3b8;

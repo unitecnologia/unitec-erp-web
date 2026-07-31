@@ -5,6 +5,7 @@ namespace App\Filament\Resources\EmpresaResource\Pages;
 use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
 use App\Support\Erp\ErpScreen;
+use App\Support\MercadoLivre\MeliEnvCredentials;
 use Filament\Resources\Pages\EditRecord;
 
 class EditEmpresa extends EditRecord
@@ -33,10 +34,34 @@ class EditEmpresa extends EditRecord
         }
 
         $this->mountEmpresaLogo();
+
+        if (filled(request()->query('tab'))) {
+            $this->setActiveFormTab((string) request()->query('tab'));
+        }
+
+        if (filled(request()->query('subtab'))) {
+            $this->setActiveParametrosSubTab((string) request()->query('subtab'));
+        }
+
+        $this->notifyMercadoLivreOAuthFlash();
+        $this->hydrateMercadoLivreCredentialsFromEnv();
+        $this->sanitizeMercadoLivreLocalRedirectUri();
     }
 
     protected function getRedirectUrl(): string
     {
         return $this->getEmpresaListRedirectUrl();
+    }
+
+    protected function afterSave(): void
+    {
+        MeliEnvCredentials::writeToEnv([
+            'client_id' => trim((string) ($this->data['param_meli_client_id'] ?? '')),
+            'client_secret' => trim((string) ($this->data['param_meli_client_secret'] ?? '')),
+            'redirect_uri' => trim((string) ($this->data['param_meli_redirect_uri'] ?? '')),
+            'is_hub' => filter_var($this->data['meli_env_is_hub'] ?? config('meli.is_hub'), FILTER_VALIDATE_BOOL),
+            'app_url' => rtrim(trim((string) ($this->data['meli_env_app_url'] ?? config('app.url'))), '/'),
+            'hub_url' => rtrim(trim((string) ($this->data['meli_env_hub_url'] ?? config('meli.hub_url'))), '/'),
+        ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\ContaPagar;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
 
@@ -68,9 +69,20 @@ class ContasPagarReport extends AbstractTabularReport
 
     public function build(Request $request): array
     {
-        [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
         $situacao = (string) $request->query('situacao', 'todos');
+
+        // Vencidos: janela ampla (até ontem) para alinhar ao KPI "Pagar vencido".
+        if ($situacao === 'vencidos') {
+            $hoje = ErpTimezone::toLocal();
+            [$de, $ate] = $this->periodFromRequest(
+                $request,
+                $hoje->copy()->subDays(static::MAX_PERIOD_DAYS),
+                $hoje->copy()->subDay(),
+            );
+        } else {
+            [$de, $ate] = $this->periodFromRequest($request);
+        }
 
         $query = ContaPagar::query()
             ->with('fornecedor')
@@ -83,7 +95,7 @@ class ContasPagarReport extends AbstractTabularReport
         } elseif ($situacao === 'baixados') {
             $query->where('saldo', '<=', 0);
         } elseif ($situacao === 'vencidos') {
-            $query->where('saldo', '>', 0)->whereDate('vencimento', '<', now()->toDateString());
+            $query->where('saldo', '>', 0)->whereDate('vencimento', '<', ErpTimezone::toLocal()->toDateString());
         }
 
         $rows = $query->limit(5000)->get()->map(fn (ContaPagar $conta): array => [

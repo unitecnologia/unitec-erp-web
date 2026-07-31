@@ -67,6 +67,10 @@ class MigraFirebirdPage extends Page
 
     public bool $optNfes = true;
 
+    public bool $optCompras = true;
+
+    public bool $optNotasFornecedor = true;
+
     public bool $optPdvCaixaMovimentos = true;
 
     public bool $optPlanosContas = true;
@@ -481,6 +485,8 @@ class MigraFirebirdPage extends Page
             'pdv_vendas' => 'Vendas PDV',
             'pdv_nfce' => 'NFC-e PDV',
             'nfes' => 'NF-e (modelo 55)',
+            'compras' => 'Compras',
+            'notas_fornecedor' => 'Notas de compra (DF-e)',
             'pdv_caixa_movimentos' => 'Movimentos caixa PDV',
         ];
     }
@@ -593,6 +599,14 @@ class MigraFirebirdPage extends Page
             $only[] = 'nfes';
         }
 
+        if ($this->optCompras) {
+            $only[] = 'compras';
+        }
+
+        if ($this->optNotasFornecedor) {
+            $only[] = 'notas_fornecedor';
+        }
+
         if ($this->optPdvCaixaMovimentos) {
             $only[] = 'pdv_caixa_movimentos';
         }
@@ -635,6 +649,8 @@ class MigraFirebirdPage extends Page
             app(\App\Support\Erp\Import\FirebirdContaPagarPagamentoImportService::class),
             app(\App\Support\Erp\Import\FirebirdProdUltimosPrecosImportService::class),
             app(\App\Support\Erp\Import\FirebirdVendasParametroImportService::class),
+            app(\App\Support\Erp\Import\FirebirdCompraImportService::class),
+            app(\App\Support\Erp\Import\FirebirdNotaFornecedorImportService::class),
         );
     }
 

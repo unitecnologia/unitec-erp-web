@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'empresa_id',
+    'codigo_legado',
     'numero',
     'data_emissao',
     'data_entrada',
@@ -66,6 +67,7 @@ class Compra extends Model
     protected function casts(): array
     {
         return [
+            'codigo_legado' => 'integer',
             'data_emissao' => 'date',
             'data_entrada' => 'date',
             'total' => 'decimal:2',

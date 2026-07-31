@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'empresa_id',
+    'codigo_legado',
     'data_entrada',
     'data_emissao',
     'numero',
@@ -71,6 +72,7 @@ class NotaFornecedor extends Model
     protected function casts(): array
     {
         return [
+            'codigo_legado' => 'integer',
             'data_entrada' => 'date',
             'data_emissao' => 'date',
             'total' => 'decimal:2',

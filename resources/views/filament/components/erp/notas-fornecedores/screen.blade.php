@@ -47,6 +47,130 @@
     @include('filament.components.erp.form-scripts')
 
     <script>
+        (function () {
+            function getNfFornListComponent() {
+                const page = document.querySelector('.erp-notas-fornecedores-page');
+
+                if (! page) {
+                    return null;
+                }
+
+                const root = page.closest('[wire\\:id]');
+
+                if (! root || ! window.Livewire?.find) {
+                    return null;
+                }
+
+                return window.Livewire.find(root.getAttribute('wire:id'));
+            }
+
+            function hydrateNfFornPeriodFilters(payload = {}) {
+                const page = document.querySelector('.erp-notas-fornecedores-page');
+
+                if (! page || ! window.ErpDatepicker) {
+                    return;
+                }
+
+                const component = getNfFornListComponent();
+                const fields = {
+                    periodoDe: String(payload.de ?? component?.get?.('periodoDe') ?? '').trim(),
+                    periodoAte: String(payload.ate ?? component?.get?.('periodoAte') ?? '').trim(),
+                    localSearchDe: String(payload.deEmissao ?? component?.get?.('localSearchDe') ?? '').trim(),
+                    localSearchAte: String(payload.ateEmissao ?? component?.get?.('localSearchAte') ?? '').trim(),
+                };
+
+                Object.entries(fields).forEach(([field, isoValue]) => {
+                    const input = page.querySelector(`input[data-wire-field="${field}"]`);
+
+                    if (! input) {
+                        return;
+                    }
+
+                    if (isoValue) {
+                        input.dataset.erpDateInitial = isoValue;
+                    } else {
+                        delete input.dataset.erpDateInitial;
+                    }
+
+                    if (input.dataset.erpDateBound === '1' && input._flatpickr) {
+                        if (isoValue && window.ErpDatepicker.isIsoDateString(isoValue)) {
+                            const parsed = window.ErpDatepicker.parseValue(isoValue, 'iso');
+
+                            if (parsed) {
+                                window.ErpDatepicker.applyLocalDate(input, input._flatpickr, parsed);
+                                input.dataset.erpDateSynced = isoValue;
+                            }
+                        } else if (! isoValue) {
+                            window.ErpDatepicker.clearLocal?.(input, input._flatpickr);
+                        }
+
+                        window.ErpDatepicker.normalizeDisplay?.(
+                            input,
+                            input._flatpickr,
+                            window.ErpDatepicker.getWireFormat(input),
+                        );
+
+                        return;
+                    }
+
+                    if (window.ErpDatepicker.destroy) {
+                        window.ErpDatepicker.destroy(input);
+                    }
+                });
+
+                if (typeof initErpDatepickers === 'function') {
+                    if (window.__erpDatepickerRetryCounts) {
+                        delete window.__erpDatepickerRetryCounts.document;
+                        delete window.__erpDatepickerRetryCounts[page];
+                    }
+
+                    initErpDatepickers(page);
+                }
+            }
+
+            function scheduleNfFornPeriodHydration(payload) {
+                requestAnimationFrame(() => {
+                    hydrateNfFornPeriodFilters(payload);
+                    window.setTimeout(() => hydrateNfFornPeriodFilters(payload), 120);
+                });
+            }
+
+            if (! window.__erpNfFornPeriodHydrationBound) {
+                window.__erpNfFornPeriodHydrationBound = true;
+
+                const registerLivewireHooks = () => {
+                    window.Livewire.on('erp-hydrate-nf-forn-dates', (payload) => {
+                        scheduleNfFornPeriodHydration(payload ?? {});
+                    });
+                };
+
+                const boot = () => {
+                    if (! window.ErpDatepicker) {
+                        window.setTimeout(boot, 30);
+
+                        return;
+                    }
+
+                    scheduleNfFornPeriodHydration();
+                };
+
+                document.addEventListener('DOMContentLoaded', boot);
+                document.addEventListener('livewire:navigated', boot);
+
+                if (document.readyState !== 'loading') {
+                    boot();
+                }
+
+                if (window.Livewire) {
+                    registerLivewireHooks();
+                } else {
+                    document.addEventListener('livewire:init', registerLivewireHooks);
+                }
+            }
+        })();
+    </script>
+
+    <script>
         window.ErpNfFornPrint = {
             openDanfe(url) {
                 if (!url) {

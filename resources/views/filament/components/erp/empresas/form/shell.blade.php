@@ -12,6 +12,7 @@
         'obs_fisco' => 'Observação Fisco',
         'obs_carne' => 'Observação Carne',
         'obs_nfce' => 'Observações NFC-e',
+        'obs_contribuinte' => 'Obs. Contribuinte',
         'msg_cobranca' => 'Mensagem de Cobrança (WhatsApp)',
     ];
 @endphp
@@ -45,6 +46,8 @@
                 @include('filament.components.erp.empresas.form.tabs.obs-carne')
             @elseif ($this->activeFormTab === 'obs_nfce')
                 @include('filament.components.erp.empresas.form.tabs.obs-nfce')
+            @elseif ($this->activeFormTab === 'obs_contribuinte')
+                @include('filament.components.erp.empresas.form.tabs.obs-contribuinte')
             @elseif ($this->activeFormTab === 'msg_cobranca')
                 @include('filament.components.erp.empresas.form.tabs.msg-cobranca')
             @endif

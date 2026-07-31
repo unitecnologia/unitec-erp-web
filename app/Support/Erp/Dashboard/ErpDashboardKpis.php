@@ -135,6 +135,11 @@ final class ErpDashboardKpis
                 : "{$titulos} títulos vencidos",
             'tone' => 'orange',
             'icon' => 'heroicon-o-arrow-up-circle',
+            'report_url' => route('erp.reports.tabular', [
+                'slug' => 'contas-pagar',
+                'situacao' => 'vencidos',
+            ]),
+            'report_title' => 'Relatório de contas a pagar vencidas',
         ];
     }
 

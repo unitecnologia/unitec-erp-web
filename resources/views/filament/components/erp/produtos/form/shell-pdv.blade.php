@@ -62,11 +62,23 @@
                         <label @class(['erp-pcad__check', 'erp-pcad__check--disabled' => $param['disabled']])>
                             <input
                                 type="checkbox"
-                                wire:model="data.{{ $param['field'] }}"
+                                wire:model.live="data.{{ $param['field'] }}"
                                 @disabled($param['disabled'])
                             >
                             <span>{{ $param['label'] }}</span>
                         </label>
+                        @if ($param['field'] === 'produto_pesado' && ($this->data['produto_pesado'] ?? false))
+                            <div class="erp-produtos-pcad__params-prefixo">
+                                <label for="pprod-prefixo-balanca-pdv">Prefixo</label>
+                                <input
+                                    id="pprod-prefixo-balanca-pdv"
+                                    type="text"
+                                    wire:model="data.prefixo_balanca"
+                                    maxlength="10"
+                                    class="erp-pcad-form__input"
+                                >
+                            </div>
+                        @endif
                     @endforeach
                 </div>
             </fieldset>

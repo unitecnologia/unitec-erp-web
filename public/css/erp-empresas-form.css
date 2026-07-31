@@ -889,16 +889,16 @@
 .erp-empresas-parametros__form-grid--wide {
     grid-template-columns: 1fr;
     gap: 0.45rem 0;
-    max-width: 36rem;
+    max-width: 42rem;
 }
 
 .erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field {
-    grid-template-columns: 10.5rem minmax(0, 1fr);
+    grid-template-columns: 11.5rem minmax(0, 1fr);
     min-height: 1.85rem;
 }
 
 .erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field--compact {
-    grid-template-columns: 10.5rem 5.5rem;
+    grid-template-columns: 11.5rem 5.5rem;
 }
 
 .erp-empresas-parametros__form-grid--wide .erp-empresas-parametros__field .erp-pcad-form__label {
@@ -914,6 +914,95 @@
     padding: 0.28rem 0.5rem;
     font-size: 0.82rem;
     min-height: 1.75rem;
+}
+
+.erp-empresas-parametros__password {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-empresas-parametros__password .erp-pcad-form__input {
+    padding-right: 2.1rem !important;
+}
+
+.erp-empresas-parametros__password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.2rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.55rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.erp-empresas-parametros__password-toggle:hover {
+    color: #1e3a5f;
+    background: rgba(30, 58, 95, 0.08);
+}
+
+.erp-empresas-parametros__password-icon {
+    display: block;
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.erp-empresas-parametros__password-icon--hide {
+    display: none;
+}
+
+.erp-empresas-parametros__password-toggle.is-visible .erp-empresas-parametros__password-icon--show {
+    display: none;
+}
+
+.erp-empresas-parametros__password-toggle.is-visible .erp-empresas-parametros__password-icon--hide {
+    display: block;
+}
+
+.erp-meli-tab__modos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.35rem 0 0.75rem;
+}
+
+.erp-meli-tab__modo-btn {
+    appearance: none;
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #1e3a5f;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.erp-meli-tab__modo-btn:hover {
+    border-color: #1e3a5f;
+    background: #f8fafc;
+}
+
+.erp-meli-tab__modo-btn--active {
+    border-color: #1d4ed8;
+    background: #dbeafe;
+    color: #1e3a8a;
+    box-shadow: inset 0 0 0 1px #93c5fd;
+}
+
+.erp-meli-tab__modo-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
 }
 
 .erp-empresas-parametros__obs-block {

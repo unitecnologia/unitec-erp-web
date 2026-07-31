@@ -22,7 +22,7 @@ trait ManagesEmpresaFormUi
 
     public function setActiveFormTab(string $tab): void
     {
-        $allowed = ['dados', 'parametros', 'obs_fisco', 'obs_carne', 'obs_nfce', 'msg_cobranca'];
+        $allowed = ['dados', 'parametros', 'obs_fisco', 'obs_carne', 'obs_nfce', 'obs_contribuinte', 'msg_cobranca'];
 
         if (! in_array($tab, $allowed, true)) {
             return;

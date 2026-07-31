@@ -2,6 +2,8 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
+
 class ErpDashboardDemoData
 {
     /**
@@ -111,29 +113,35 @@ class ErpDashboardDemoData
     }
 
     /**
-     * Pontos demo completos (com data ISO) para fallback do gráfico de vendas.
+     * Pontos demo do mês corrente (com data ISO) para fallback do gráfico de vendas.
      *
      * @return list<array{date: string, label: string, value: float}>
      */
     public static function salesChartPoints(): array
     {
-        return [
-            ['date' => '2026-05-17', 'label' => '17/05', 'value' => 8200],
-            ['date' => '2026-05-19', 'label' => '19/05', 'value' => 9100],
-            ['date' => '2026-05-21', 'label' => '21/05', 'value' => 7600],
-            ['date' => '2026-05-23', 'label' => '23/05', 'value' => 11200],
-            ['date' => '2026-05-25', 'label' => '25/05', 'value' => 9800],
-            ['date' => '2026-05-27', 'label' => '27/05', 'value' => 12400],
-            ['date' => '2026-05-29', 'label' => '29/05', 'value' => 10100],
-            ['date' => '2026-05-31', 'label' => '31/05', 'value' => 11800],
-            ['date' => '2026-06-02', 'label' => '02/06', 'value' => 13200],
-            ['date' => '2026-06-04', 'label' => '04/06', 'value' => 10900],
-            ['date' => '2026-06-06', 'label' => '06/06', 'value' => 14300],
-            ['date' => '2026-06-08', 'label' => '08/06', 'value' => 12800],
-            ['date' => '2026-06-10', 'label' => '10/06', 'value' => 15100],
-            ['date' => '2026-06-12', 'label' => '12/06', 'value' => 13800],
-            ['date' => '2026-06-14', 'label' => '14/06', 'value' => 12480],
-        ];
+        $values = [8200, 9100, 7600, 11200, 9800, 12400, 10100, 11800, 13200, 10900, 14300, 12800, 15100, 13800, 12480];
+        $inicio = ErpFinanceiroMetricas::hoje()->copy()->startOfMonth();
+        $fim = $inicio->copy()->endOfMonth();
+        $daysInMonth = (int) $inicio->daysInMonth;
+        $step = max(1, (int) floor(($daysInMonth - 1) / (count($values) - 1)));
+        $points = [];
+
+        foreach ($values as $index => $value) {
+            $dayOffset = min($daysInMonth - 1, $index * $step);
+            $date = $inicio->copy()->addDays($dayOffset);
+
+            if ($date->gt($fim)) {
+                $date = $fim->copy();
+            }
+
+            $points[] = [
+                'date' => $date->toDateString(),
+                'label' => $date->format('d/m'),
+                'value' => (float) $value,
+            ];
+        }
+
+        return $points;
     }
 
     /**
@@ -259,16 +267,27 @@ class ErpDashboardDemoData
 
         return [
             'important' => $important,
-            'boletos' => [
-                ['cliente' => 'Loja Central', 'valor' => 'R$ 1.850,00', 'vencimento' => '12/06/2026'],
-                ['cliente' => 'Mercado Sul', 'valor' => 'R$ 920,00', 'vencimento' => '10/06/2026'],
-                ['cliente' => 'Atacado Oeste', 'valor' => 'R$ 2.100,00', 'vencimento' => '08/06/2026'],
+            'a_pagar_vencidos' => [
+                'total' => 8,
+                'items' => [
+                    ['fornecedor' => 'Distribuidora Norte', 'valor' => 'R$ 1.850,00', 'vencimento' => '12/06/2026'],
+                    ['fornecedor' => 'Fornecedor Sul', 'valor' => 'R$ 920,00', 'vencimento' => '10/06/2026'],
+                    ['fornecedor' => 'Atacado Oeste', 'valor' => 'R$ 2.100,00', 'vencimento' => '08/06/2026'],
+                    ['fornecedor' => 'Embalagens BR', 'valor' => 'R$ 430,00', 'vencimento' => '05/06/2026'],
+                    ['fornecedor' => 'Transportadora Leste', 'valor' => 'R$ 1.240,00', 'vencimento' => '03/06/2026'],
+                    ['fornecedor' => 'Insumos Centro', 'valor' => 'R$ 675,50', 'vencimento' => '01/06/2026'],
+                    ['fornecedor' => 'Tech Parts Ltda', 'valor' => 'R$ 3.420,00', 'vencimento' => '28/05/2026'],
+                    ['fornecedor' => 'Serviços Gerais SA', 'valor' => 'R$ 890,00', 'vencimento' => '25/05/2026'],
+                ],
             ],
             'estoque' => [
-                ['produto' => 'Coca-Cola 2L', 'atual' => '4', 'minimo' => '12'],
-                ['produto' => 'Arroz Tipo 1 5kg', 'atual' => '2', 'minimo' => '10'],
-                ['produto' => 'Detergente Neutro', 'atual' => '6', 'minimo' => '15'],
-                ['produto' => 'Papel A4 500fl', 'atual' => '1', 'minimo' => '8'],
+                'total' => 4,
+                'items' => [
+                    ['produto' => 'Coca-Cola 2L', 'atual' => '4', 'minimo' => '12'],
+                    ['produto' => 'Arroz Tipo 1 5kg', 'atual' => '2', 'minimo' => '10'],
+                    ['produto' => 'Detergente Neutro', 'atual' => '6', 'minimo' => '15'],
+                    ['produto' => 'Papel A4 500fl', 'atual' => '1', 'minimo' => '8'],
+                ],
             ],
         ];
     }

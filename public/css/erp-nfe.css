@@ -1807,16 +1807,29 @@
     box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
 }
 
-.erp-nfe-page .erp-nfe-cliente__input:focus {
+.erp-nfe-page .erp-nfe-cliente__input--editable:focus {
     outline: none;
     border-color: #1d4ed8;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    background: #fff;
 }
 
-.erp-nfe-page .erp-nfe-cliente__input[readonly] {
-    background: #dce6f2;
+.erp-nfe-page .erp-nfe-cliente__input[readonly],
+.erp-nfe-page .erp-nfe-cliente__input--info {
+    background: #dce6f2 !important;
     border-color: #9eb6d4;
     color: #1e293b;
+    cursor: default;
+    pointer-events: none;
+    box-shadow: none;
+    user-select: text;
+}
+
+.erp-nfe-page .erp-nfe-cliente__input[readonly]:focus,
+.erp-nfe-page .erp-nfe-cliente__input--info:focus {
+    outline: none;
+    border-color: #9eb6d4;
+    box-shadow: none;
 }
 
 .erp-nfe-page .erp-nfe-cliente__suggest {
@@ -1940,7 +1953,7 @@
     width: 100%;
     min-height: 1.55rem;
     padding: 0.15rem 0.4rem;
-    border: 1px solid #9eb4cc;
+    border: 1px solid #7f9bb8;
     border-radius: 6px;
     background: #ffffff;
     color: #0f172a;
@@ -1967,7 +1980,7 @@
 .erp-nfe-page .erp-nfe-lancamento-modal__form-input--info {
     background: #f8fafc;
     color: #334155;
-    border-color: #e2e8f0;
+    border: 1px solid #7f9bb8;
     cursor: default;
     user-select: text;
 }
@@ -2033,7 +2046,7 @@
     width: 100%;
     min-height: 1.55rem;
     padding: 0.15rem 1.5rem 0.15rem 0.4rem;
-    border: 1px solid #9eb4cc;
+    border: 1px solid #7f9bb8;
     border-radius: 6px;
     background: #ffffff;
     color: #0f172a;
@@ -2088,6 +2101,8 @@
     width: 100%;
     max-width: 28rem;
     min-width: 0;
+    border: 1px solid #7f9bb8;
+    background: #fff;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__form-input--combo {
@@ -2107,8 +2122,45 @@
     box-shadow: 0 1px 2px rgb(15 52 96 / 5%);
 }
 
-.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--detail {
-    margin-top: 0;
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__imposto-produto {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.35rem;
+    padding: 0.22rem 0.65rem;
+    border: 1px solid #b8c9de;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__imposto-produto-cod {
+    flex: 0 0 auto;
+    color: #1e5a9e;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__imposto-produto-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-lancamento-modal__section-tab {
+    flex: 0 0 auto;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tab {
@@ -2181,6 +2233,151 @@
 .erp-nfe-page .erp-nfe-lancamento-modal__detail-panel--obs {
     max-height: min(8rem, 20vh);
     overflow: hidden;
+}
+
+.erp-nfe-page .erp-nfe-transportadora {
+    justify-content: center;
+    overflow: visible;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.45rem 0.65rem;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__field--frete {
+    flex: 0 0 10.5rem;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__field--transportador {
+    flex: 1 1 18rem;
+    min-width: 14rem;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__field--placa {
+    flex: 0 0 6.5rem;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__field--uf {
+    flex: 0 0 3.2rem;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__transportador {
+    display: flex;
+    align-items: stretch;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__codigo {
+    flex: 0 0 3.4rem;
+    width: 3.4rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__nome,
+.erp-nfe-page .erp-nfe-transportadora__select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__placa {
+    width: 100%;
+    text-transform: uppercase;
+}
+
+.erp-nfe-page .erp-nfe-transportadora__uf {
+    width: 100%;
+    text-align: center;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+
+.erp-nfe-page .erp-nfe-contribuinte {
+    gap: 0.35rem;
+}
+
+.erp-nfe-page .erp-nfe-contribuinte__ibpt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+}
+
+.erp-nfe-page .erp-nfe-contribuinte__ibpt-title {
+    font-size: 0.66rem;
+    font-weight: 800;
+    color: #0f3460;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.erp-nfe-page .erp-nfe-contribuinte__ibpt-vals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.85rem;
+    font-size: 0.7rem;
+    color: #334155;
+}
+
+.erp-nfe-page .erp-nfe-contribuinte__ibpt-vals strong {
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+.erp-nfe-page .erp-nfe-contribuinte__hint {
+    margin: 0;
+    font-size: 0.66rem;
+    color: #64748b;
+    line-height: 1.3;
+}
+.erp-nfe-page .erp-nfe-volumes {
+    justify-content: center;
+    overflow: visible;
+}
+
+.erp-nfe-page .erp-nfe-volumes__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.45rem 0.65rem;
+}
+
+.erp-nfe-page .erp-nfe-volumes__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.erp-nfe-page .erp-nfe-volumes__field--especie,
+.erp-nfe-page .erp-nfe-volumes__field--marca {
+    flex: 1 1 10rem;
+    min-width: 8rem;
+}
+
+.erp-nfe-page .erp-nfe-volumes__field--qtd,
+.erp-nfe-page .erp-nfe-volumes__field--peso {
+    flex: 0 0 6.5rem;
+}
+
+.erp-nfe-page .erp-nfe-volumes__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__panel-text {
@@ -2328,12 +2525,56 @@
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__itens-area {
+    position: relative;
     flex: 1 1 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
     overflow: visible;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__body:has(.erp-nfe-inclusao[data-lookup-open="1"]) {
+    overflow: visible;
+}
+
+/* Quadrado fixo sob CFOP — fora da lista de sugestões. */
+.erp-nfe-page .erp-nfe-produto-foto-fixa {
+    position: absolute;
+    z-index: 55;
+    /* Abaixo do cabeçalho da grade, alinhado à coluna CFOP. */
+    top: 6.35rem;
+    left: auto;
+    right: 34.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 9.75rem;
+    height: 9.75rem;
+    padding: 0.35rem;
+    border: 1px solid #9eb6d4;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.erp-nfe-page .erp-nfe-produto-foto-fixa__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.erp-nfe-page .erp-nfe-produto-foto-fixa__empty {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.4rem;
+    line-height: 1.3;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__itens-area > .erp-nfe-lancamento-modal__grid-wrap--itens,
@@ -2385,9 +2626,9 @@
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__grid .erp-lookup-modal__row--selected td {
-    background: var(--erp-row-selected, #bfdbfe) !important;
+    background: #60a5fa !important;
     color: var(--erp-text, #0f172a);
-    box-shadow: inset 3px 0 0 var(--erp-row-selected-border, #1d4ed8);
+    box-shadow: none;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__num {
@@ -2675,6 +2916,7 @@
 .erp-nfe-page .erp-nfe-inclusao__field--barcode {
     flex: 1 1 14rem;
     min-width: 12rem;
+    overflow: visible;
 }
 
 .erp-nfe-page .erp-nfe-inclusao__field--qtd {
@@ -2700,6 +2942,7 @@
 
 .erp-nfe-page .erp-nfe-inclusao__barcode-wrap {
     display: block;
+    overflow: visible;
 }
 
 .erp-nfe-page .erp-nfe-inclusao__input {
@@ -2762,11 +3005,7 @@
     z-index: 90;
     top: calc(100% + 2px);
     left: 0;
-    display: grid;
-    grid-template-columns: minmax(28rem, 1fr) 8.5rem;
-    gap: 0.35rem;
-    width: min(52rem, 94vw);
-    align-items: stretch;
+    width: min(42rem, 92vw);
 }
 
 .erp-nfe-page .erp-nfe-inclusao__suggest {
@@ -2779,6 +3018,7 @@
     box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
     max-height: min(320px, 45vh);
     overflow: auto;
+    width: 100%;
 }
 
 .erp-nfe-page .erp-nfe-inclusao__suggest--empty {
@@ -2799,8 +3039,8 @@
 .erp-nfe-page .erp-nfe-inclusao__suggest button {
     width: 100%;
     display: grid;
-    grid-template-columns: 3.2rem minmax(0, 1fr) 15.6rem 5.5rem;
-    gap: 0.4rem;
+    grid-template-columns: 3.2rem minmax(0, 1fr) minmax(9rem, 14rem) 5.2rem;
+    gap: 0.35rem;
     align-items: center;
     border: 0;
     background: transparent;
@@ -2899,33 +3139,6 @@
     color: #fff;
 }
 
-.erp-nfe-page .erp-nfe-inclusao__suggest-photo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 8.5rem;
-    padding: 0.35rem;
-    border: 1px solid #c5d4e8;
-    border-radius: 7px;
-    background: #f8fafc;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
-    overflow: hidden;
-}
-
-.erp-nfe-page .erp-nfe-inclusao__suggest-photo-img {
-    max-width: 100%;
-    max-height: 8rem;
-    object-fit: contain;
-}
-
-.erp-nfe-page .erp-nfe-inclusao__suggest-photo-empty {
-    color: #94a3b8;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-align: center;
-}
-
-
 /* ── NF-e lançamento — grid de itens (estilo orçamento) ─────────── */
 
 .erp-nfe-page .erp-nfe-lancamento-modal__grid-wrap--itens {
@@ -2955,12 +3168,20 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border-right: 1px solid #000;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__grid--itens th:last-child,
+.erp-nfe-page .erp-nfe-lancamento-modal__grid--itens td:last-child {
+    border-right: none;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__grid--itens td {
     padding: 0.05rem 0.1rem;
     vertical-align: middle;
     overflow: hidden;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__grid--itens td.erp-nfe-lancamento-modal__cell-produto {
@@ -3230,9 +3451,9 @@
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__impostos-section {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     min-height: 0;
-    overflow: auto;
+    overflow: visible;
     margin-bottom: 0.65rem;
 }
 
@@ -3269,6 +3490,161 @@
 
 .erp-nfe-page .erp-nfe-lancamento-modal__grid--impostos td:first-child {
     min-width: 3rem;
+}
+
+/* ── Aba Impostos / Outros (grid única — padrão Delphi, UI web) ── */
+
+.erp-nfe-page .erp-nfe-impostos {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-nfe-page .erp-nfe-impostos__empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 8rem;
+    padding: 1.25rem 1.35rem;
+    border: 1px dashed #b8c9de;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.erp-nfe-page .erp-nfe-impostos__empty strong {
+    color: #0f3460;
+    font-size: 0.84rem;
+}
+
+.erp-nfe-page .erp-nfe-impostos__empty span {
+    font-size: 0.75rem;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: #fff;
+    background: #1e5a9e;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    white-space: nowrap;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid td {
+    padding: 0.1rem 0.2rem;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    background: #fff;
+    vertical-align: middle;
+    min-width: 4.6rem;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid th:last-child,
+.erp-nfe-page .erp-nfe-impostos__grid td:last-child {
+    border-right: none;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid tbody tr:nth-child(even):not(.erp-lookup-modal__row--selected) td {
+    background: #f8fafc;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid tbody tr:hover:not(.erp-lookup-modal__row--selected) td {
+    background: #eef5ff;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid .erp-lookup-modal__row--selected td {
+    background: #60a5fa !important;
+    box-shadow: none;
+}
+
+.erp-nfe-page .erp-nfe-impostos__col-cod,
+.erp-nfe-page .erp-nfe-impostos__cod {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 3.2rem;
+    min-width: 3.2rem !important;
+    max-width: 3.2rem;
+    text-align: center;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    background: #fff;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid th.erp-nfe-impostos__col-cod {
+    z-index: 3;
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid tbody tr:nth-child(even):not(.erp-lookup-modal__row--selected) .erp-nfe-impostos__cod {
+    background: #f8fafc;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid tbody tr:hover:not(.erp-lookup-modal__row--selected) .erp-nfe-impostos__cod {
+    background: #eef5ff;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid .erp-lookup-modal__row--selected .erp-nfe-impostos__cod {
+    background: #60a5fa !important;
+}
+
+.erp-nfe-page .erp-nfe-impostos__col-info,
+.erp-nfe-page .erp-nfe-impostos__cell-info {
+    width: 16rem;
+    min-width: 16rem !important;
+}
+
+.erp-nfe-page .erp-nfe-impostos__readonly {
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    min-width: 5rem !important;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid .erp-nfe-lancamento-modal__cell-input {
+    width: 100%;
+    min-height: 1.45rem;
+    padding: 0.12rem 0.25rem;
+    border: 1px solid #7f9bb8;
+    border-radius: 3px;
+    background: #fff;
+    font-size: 0.72rem;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid .erp-nfe-lancamento-modal__cell-input:hover {
+    border-color: #2563eb;
+}
+
+.erp-nfe-page .erp-nfe-impostos__grid .erp-nfe-lancamento-modal__cell-input:focus {
+    border-color: #2563eb;
+    background: #fffef8;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 14%);
+    outline: none;
 }
 
 /* Overlay de progresso — F5 transmitir contingência/pendentes */

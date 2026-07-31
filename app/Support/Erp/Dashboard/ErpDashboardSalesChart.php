@@ -11,8 +11,8 @@ use Throwable;
 class ErpDashboardSalesChart
 {
     /**
-     * Período padrão: 1º dia do mês corrente até hoje
-     * (ex.: 01/07 → 23/07; amanhã 01/07 → 24/07).
+     * Período padrão: mês civil corrente (1º dia → último dia).
+     * Ex.: em julho/2026 → 01/07/2026 a 31/07/2026.
      *
      * @return array{
      *     defaultFrom: string,
@@ -23,8 +23,8 @@ class ErpDashboardSalesChart
     public static function data(?Carbon $from = null, ?Carbon $to = null): array
     {
         $hoje = ErpFinanceiroMetricas::hoje()->startOfDay();
-        $to ??= $hoje->copy();
         $from ??= $hoje->copy()->startOfMonth();
+        $to ??= $hoje->copy()->endOfMonth();
 
         if ($from->gt($to)) {
             [$from, $to] = [$to, $from];
@@ -44,22 +44,10 @@ class ErpDashboardSalesChart
             ];
         }
 
-        $allDemo = ErpDashboardDemoData::salesChartPoints();
-        $demoFrom = Carbon::parse($allDemo[0]['date'])->startOfDay();
-        $demoTo = Carbon::parse($allDemo[array_key_last($allDemo)]['date'])->startOfDay();
-
-        $defaultFrom = $from->lt($demoFrom) ? $demoFrom : $from;
-        $defaultTo = $to->gt($demoTo) ? $demoTo : $to;
-
-        if ($defaultFrom->gt($defaultTo)) {
-            $defaultFrom = $demoFrom;
-            $defaultTo = $demoTo;
-        }
-
         return [
-            'defaultFrom' => $defaultFrom->toDateString(),
-            'defaultTo' => $defaultTo->toDateString(),
-            'points' => $allDemo,
+            'defaultFrom' => $from->toDateString(),
+            'defaultTo' => $to->toDateString(),
+            'points' => ErpDashboardDemoData::salesChartPoints(),
         ];
     }
 

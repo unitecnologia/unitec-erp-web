@@ -22,7 +22,6 @@ trait ManagesProductFormUi
             ['key' => 'impostos', 'label' => 'Impostos', 'visible' => true],
             ['key' => 'promocao', 'label' => 'Promoção', 'visible' => true],
             ['key' => 'adicionais', 'label' => 'Adicionais', 'visible' => true],
-            ['key' => 'balanca', 'label' => 'Balança', 'visible' => true],
             ['key' => 'combustivel', 'label' => 'Combustível', 'visible' => (bool) ($data['is_combustivel'] ?? false)],
             ['key' => 'composicao', 'label' => 'Composição', 'visible' => (bool) ($data['is_composicao'] ?? false)],
             ['key' => 'grade', 'label' => 'Grade', 'visible' => (bool) ($data['is_grade'] ?? false)],
