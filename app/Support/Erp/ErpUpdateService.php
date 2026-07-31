@@ -194,6 +194,7 @@ class ErpUpdateService
             );
             $this->applyPackage($sourceRoot, $appPath);
             $this->ensureEmbeddedPhpConfiguration($appPath);
+            self::ensureFrameworkStorageDirectories();
 
             self::writeStatus(
                 'migrating',

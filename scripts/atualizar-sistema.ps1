@@ -241,6 +241,7 @@ try {
         -Message 'Aplicando arquivos (preservando .env, storage/ e tools/)...' -Percent 58
     Copy-UnitecProjectTree -SourceRoot $sourceRoot -TargetRoot $AppPath -UpdateMode -Quiet:$LeigoMode
     Write-InstallLog -AppPath $AppPath -Message 'Arquivos aplicados.'
+    Ensure-UnitecStorageStructure -AppPath $AppPath
 
     Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
         -Message 'Atualizando banco de dados...' -Percent 76

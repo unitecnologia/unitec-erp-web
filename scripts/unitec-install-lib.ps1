@@ -1272,6 +1272,34 @@ function Test-UnitecApplicationServerRunning {
     return (Wait-UnitecApplicationReady -AppUrl $AppUrl -MaxAttempts 1 -DelaySeconds 0 -Quiet)
 }
 
+function Ensure-UnitecStorageStructure {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    $dirs = @(
+        'storage\framework\sessions',
+        'storage\framework\views',
+        'storage\framework\cache',
+        'storage\framework\cache\data',
+        'storage\framework\testing',
+        'storage\logs',
+        'storage\app\private',
+        'storage\app\public',
+        'bootstrap\cache'
+    )
+
+    foreach ($relative in $dirs) {
+        Ensure-Directory (Join-Path $AppPath $relative)
+    }
+
+    foreach ($relative in @('storage\framework\sessions', 'storage\framework\views', 'storage\logs', 'bootstrap\cache')) {
+        $ignore = Join-Path $AppPath (Join-Path $relative '.gitignore')
+        if (-not (Test-Path $ignore)) {
+            Set-Content -Path $ignore -Value "*`r`n!.gitignore`r`n" -Encoding ASCII
+        }
+    }
+}
+
 function Start-UnitecApplicationServer {
     param(
         [string]$AppPath,
@@ -1293,6 +1321,7 @@ function Start-UnitecApplicationServer {
         throw 'Sistema incompleto: pasta vendor/ ausente. Reinstale o Unitec ERP.'
     }
 
+    Ensure-UnitecStorageStructure -AppPath $AppPath
     Initialize-UnitecRuntimePath -AppPath $AppPath
 
     Push-Location $AppPath

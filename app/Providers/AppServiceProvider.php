@@ -29,6 +29,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Após update incompleto/disco cheio, sessions/views podem sumir e o ERP quebra no boot.
+        \App\Support\Erp\ErpUpdateService::ensureFrameworkStorageDirectories();
+
         Event::listen(Logout::class, function (): void {
             ErpAccess::forgetSession();
         });
