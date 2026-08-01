@@ -11,6 +11,13 @@
     let lastProgressAt = 0;
     let packageReady = false;
     let installFromLocal = false;
+    let displayedPercent = 0;
+    let targetPercent = 0;
+    let displayedStepProgress = {};
+    let targetStepProgress = {};
+    let progressAnimRaf = 0;
+    let softTickTimer = 0;
+    let currentUpdateState = 'idle';
 
     const UPDATE_STEP_ORDER = [
         'starting',
@@ -42,6 +49,28 @@
                 event.preventDefault();
                 event.stopPropagation();
                 openSystemUpdateModal();
+                return;
+            }
+
+            const installAppButton = event.target.closest('[data-erp-action="install-app"]');
+            if (installAppButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeAllTopMenus();
+                if (window.UnitecErpPwa) {
+                    if (typeof window.UnitecErpPwa.show === 'function') {
+                        window.UnitecErpPwa.show();
+                    }
+                    if (typeof window.UnitecErpPwa.install === 'function') {
+                        void window.UnitecErpPwa.install();
+                    }
+                } else {
+                    alert(
+                        'Para instalar o Unitec ERP no Windows:\n' +
+                        '1. Use Chrome ou Edge em http://127.0.0.1:8765/admin\n' +
+                        '2. Clique no ícone Instalar na barra de endereço'
+                    );
+                }
                 return;
             }
 
@@ -389,9 +418,170 @@
             return;
         }
 
-        bar.classList.toggle('is-animating', animate);
+        bar.classList.toggle('is-animating', !!animate);
         bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
         bar.style.marginLeft = '0';
+    }
+
+    function setUpdatePercent(percent) {
+        const label = updateModal?.querySelector('[data-erp-update-percent]');
+        if (label) {
+            label.textContent = `${Math.round(Math.max(0, Math.min(100, percent)))}%`;
+        }
+    }
+
+    function paintDisplayedProgress() {
+        setUpdateProgress(displayedPercent, false);
+        setUpdatePercent(displayedPercent);
+        renderUpdateStepBars(currentUpdateState, displayedStepProgress);
+    }
+
+    function ensureStepProgressMaps() {
+        UPDATE_STEP_ORDER.forEach((step) => {
+            if (typeof displayedStepProgress[step] !== 'number') {
+                displayedStepProgress[step] = 0;
+            }
+            if (typeof targetStepProgress[step] !== 'number') {
+                targetStepProgress[step] = 0;
+            }
+        });
+    }
+
+    function tickProgressAnimation() {
+        ensureStepProgressMaps();
+        let changed = false;
+
+        if (displayedPercent < targetPercent) {
+            displayedPercent = Math.min(targetPercent, displayedPercent + 1);
+            changed = true;
+        } else if (displayedPercent > targetPercent) {
+            displayedPercent = targetPercent;
+            changed = true;
+        }
+
+        UPDATE_STEP_ORDER.forEach((step) => {
+            const target = Math.max(0, Math.min(100, Number(targetStepProgress[step] ?? 0)));
+            let shown = Math.max(0, Math.min(100, Number(displayedStepProgress[step] ?? 0)));
+
+            if (shown < target) {
+                shown = Math.min(target, shown + 1);
+                changed = true;
+            } else if (shown > target) {
+                shown = target;
+                changed = true;
+            }
+
+            displayedStepProgress[step] = shown;
+        });
+
+        paintDisplayedProgress();
+
+        if (changed) {
+            progressAnimRaf = window.requestAnimationFrame(tickProgressAnimation);
+            return;
+        }
+
+        progressAnimRaf = 0;
+    }
+
+    function startProgressAnimation() {
+        if (progressAnimRaf) {
+            return;
+        }
+
+        progressAnimRaf = window.requestAnimationFrame(tickProgressAnimation);
+    }
+
+    function setProgressTargets(percent, stepProgress, state) {
+        const previousState = currentUpdateState;
+        currentUpdateState = state || currentUpdateState;
+        ensureStepProgressMaps();
+
+        const incoming = { ...(stepProgress || {}) };
+        UPDATE_STEP_ORDER.forEach((step) => {
+            const serverValue = Math.max(0, Math.min(100, Number(incoming[step] ?? 0)));
+            const shown = Number(displayedStepProgress[step] ?? 0);
+            const previousTarget = Number(targetStepProgress[step] ?? 0);
+
+            if (currentUpdateState === previousState && step === currentUpdateState) {
+                // Na mesma etapa, a barra só sobe (evita “voltar” depois do tick suave).
+                targetStepProgress[step] = Math.max(serverValue, shown, previousTarget);
+            } else if (step === currentUpdateState) {
+                targetStepProgress[step] = Math.max(1, serverValue);
+            } else {
+                targetStepProgress[step] = serverValue;
+            }
+        });
+
+        const nextPercent = Math.max(0, Math.min(100, Number(percent) || 0));
+        if (currentUpdateState === previousState) {
+            targetPercent = Math.max(nextPercent, displayedPercent, targetPercent);
+        } else {
+            targetPercent = Math.max(nextPercent, displayedPercent);
+        }
+
+        if (
+            currentUpdateState &&
+            UPDATE_STEP_ORDER.includes(currentUpdateState) &&
+            Number(targetStepProgress[currentUpdateState] ?? 0) <= 0 &&
+            ! ['completed', 'failed', 'idle'].includes(currentUpdateState)
+        ) {
+            targetStepProgress[currentUpdateState] = 1;
+        }
+
+        startProgressAnimation();
+    }
+
+    function resetProgressCounters() {
+        window.cancelAnimationFrame(progressAnimRaf);
+        progressAnimRaf = 0;
+        window.clearInterval(softTickTimer);
+        softTickTimer = 0;
+        displayedPercent = 0;
+        targetPercent = 0;
+        displayedStepProgress = {};
+        targetStepProgress = {};
+        currentUpdateState = 'idle';
+        UPDATE_STEP_ORDER.forEach((step) => {
+            displayedStepProgress[step] = 0;
+            targetStepProgress[step] = 0;
+        });
+        paintDisplayedProgress();
+    }
+
+    function startSoftProgressTick() {
+        window.clearInterval(softTickTimer);
+        softTickTimer = window.setInterval(function () {
+            if (! updateRunning || updateStuck || updateFailed) {
+                return;
+            }
+
+            const state = currentUpdateState;
+            if (! state || ['completed', 'failed', 'idle'].includes(state)) {
+                return;
+            }
+
+            ensureStepProgressMaps();
+            const shown = Number(displayedStepProgress[state] ?? 0);
+            const target = Number(targetStepProgress[state] ?? 0);
+            const ceiling = 95;
+
+            if (Math.max(shown, target) < ceiling) {
+                targetStepProgress[state] = Math.min(ceiling, Math.max(shown, target) + 1);
+
+                const range = UPDATE_STEP_RANGES[state] ?? [0, 100];
+                const span = range[1] - range[0];
+                if (span > 0) {
+                    const stepPct = targetStepProgress[state];
+                    targetPercent = Math.max(
+                        targetPercent,
+                        Math.min(range[1] - 1, range[0] + Math.floor((stepPct / 100) * span))
+                    );
+                }
+
+                startProgressAnimation();
+            }
+        }, 350);
     }
 
     function resetUpdateSteps() {
@@ -481,23 +671,14 @@
                 value = 0;
             }
 
-            const isActive = state === stepName;
-            const isIndeterminate = isActive && value <= 0 && ['starting', 'downloading', 'extracting', 'backing_up'].includes(state);
+            bar.classList.toggle('is-indeterminate', false);
 
-            bar.classList.toggle('is-indeterminate', isIndeterminate);
-
-            if (pctLabel) {
-                if (isIndeterminate) {
-                    pctLabel.textContent = '…';
-                } else {
-                    pctLabel.textContent = `${Math.round(value)}%`;
-                }
+            if (state === stepName && value <= 0) {
+                value = 1;
             }
 
-            if (isIndeterminate) {
-                bar.style.width = '40%';
-
-                return;
+            if (pctLabel) {
+                pctLabel.textContent = `${Math.round(value)}%`;
             }
 
             bar.style.width = `${value}%`;
@@ -602,22 +783,13 @@
                 : computeStepProgressFromPercent(state, percent);
 
         setUpdateStatus(message, isError || state === 'failed');
-        setUpdateProgress(percent, ! ['completed', 'failed'].includes(state) && percent <= 0);
-        setUpdatePercent(percent);
         renderUpdateSteps(state);
-        renderUpdateStepBars(state, stepProgress);
+        setProgressTargets(percent, stepProgress, state);
         setUpdateInfo(
             detail,
             command,
             updateRunning ? formatElapsed(launchStartedAt) : ''
         );
-    }
-
-    function setUpdatePercent(percent) {
-        const label = updateModal?.querySelector('[data-erp-update-percent]');
-        if (label) {
-            label.textContent = `${Math.round(Math.max(0, Math.min(100, percent)))}%`;
-        }
     }
 
     function showResetButton(visible) {
@@ -630,8 +802,9 @@
     function markUpdateStuck(message) {
         updateStuck = true;
         updateRunning = false;
+        window.clearInterval(softTickTimer);
+        softTickTimer = 0;
         stopPolling();
-        setUpdateProgress(0, false);
         setUpdateStatus(message, true);
         showResetButton(true);
 
@@ -644,8 +817,9 @@
     function markUpdateFailed(message) {
         updateFailed = true;
         updateRunning = false;
+        window.clearInterval(softTickTimer);
+        softTickTimer = 0;
         stopPolling();
-        setUpdateProgress(0, false);
         setUpdateStatus(message, true);
         showResetButton(true);
 
@@ -705,27 +879,38 @@
     }
 
     function resolveStallLimit(state, config) {
+        // 10 minutos de tolerância SEM progresso em CADA etapa.
+        const tenMinutes = 600;
+
+        if (state === 'starting') {
+            return Number(config.startingStallSeconds ?? tenMinutes);
+        }
+
         if (state === 'downloading') {
-            return Number(config.downloadStallSeconds ?? 900);
+            return Number(config.downloadStallSeconds ?? tenMinutes);
+        }
+
+        if (state === 'extracting') {
+            return Number(config.extractingStallSeconds ?? tenMinutes);
         }
 
         if (state === 'backing_up') {
-            return Number(config.backingUpStallSeconds ?? 600);
+            return Number(config.backingUpStallSeconds ?? tenMinutes);
         }
 
         if (state === 'applying') {
-            return Number(config.applyingStallSeconds ?? 600);
+            return Number(config.applyingStallSeconds ?? tenMinutes);
         }
 
         if (state === 'migrating') {
-            return Number(config.migratingStallSeconds ?? 1200);
+            return Number(config.migratingStallSeconds ?? tenMinutes);
         }
 
         if (state === 'finalizing') {
-            return Number(config.finalizingStallSeconds ?? 300);
+            return Number(config.finalizingStallSeconds ?? tenMinutes);
         }
 
-        return Number(config.stallSeconds ?? 180);
+        return Number(config.stallSeconds ?? tenMinutes);
     }
 
     function buildStatusSignature(payload) {
@@ -892,6 +1077,7 @@
         showResetButton(false);
         resetUpdateSteps();
         resetUpdateInfo();
+        resetProgressCounters();
 
         showUpdatePanel('progress');
         renderUpdateSteps('starting');
@@ -901,8 +1087,8 @@
             'php artisan unitec:apply-update',
             ''
         );
-        setUpdateProgress(8, true);
-        setUpdatePercent(0);
+        setProgressTargets(8, computeStepProgressFromPercent('starting', 8), 'starting');
+        startSoftProgressTick();
 
         // Marca "Baixar pacote" como concluído — já está no disco.
         const downloadStep = updateModal?.querySelector('[data-step="downloading"]');
@@ -1033,11 +1219,7 @@
 
                     if (stalledFor >= stallLimit) {
                         const stallLabel =
-                            state === 'downloading'
-                                ? 'Sem progresso no download há mais de 15 minutos.'
-                                : state === 'applying'
-                                  ? 'Sem progresso ao copiar arquivos há mais de 10 minutos.'
-                                  : 'Sem progresso há mais de 3 minutos.';
+                            'Sem progresso nesta etapa há mais de 10 minutos.';
 
                         markUpdateStuck(`${stallLabel} A atualização pode estar travada.`);
 
@@ -1049,6 +1231,14 @@
                         if (hint) {
                             hint.textContent =
                                 'Download em andamento (pacote grande). Aguarde — o progresso atualiza a cada poucos segundos.';
+                        }
+                    }
+
+                    if (stalledFor >= Math.min(stallLimit, 90) && (state === 'extracting' || state === 'applying')) {
+                        const hint = updateModal?.querySelector('[data-erp-update-hint]');
+                        if (hint) {
+                            hint.textContent =
+                                'Etapa demorada em andamento (ZIP grande / muitos arquivos). Aguarde — cada etapa pode levar até 10 minutos.';
                         }
                     }
 
@@ -1065,9 +1255,10 @@
 
                 if (state === 'completed') {
                     updateRunning = false;
+                    window.clearInterval(softTickTimer);
+                    softTickTimer = 0;
                     stopPolling();
-                    setUpdateProgress(100, false);
-                    setUpdatePercent(100);
+                    setProgressTargets(100, computeStepProgressFromPercent('completed', 100), 'completed');
 
                     window.setTimeout(() => {
                         window.location.reload();

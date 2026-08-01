@@ -479,6 +479,7 @@ class ErpMenu
             static::stub('Lista de Updates'),
             static::link('Licença do Sistema', LicencaSistemaPage::getUrl()),
             static::sep(),
+            static::action('Instalar no Windows', 'install-app'),
             static::action('Atualizar Sistema', 'system-update'),
         ];
     }

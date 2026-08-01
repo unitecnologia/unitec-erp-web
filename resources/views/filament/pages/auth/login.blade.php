@@ -1,10 +1,10 @@
-<div class="unitec-login-root">
+﻿<div class="unitec-login-root">
     <div class="unitec-login" aria-label="Tela de acesso">
         <div class="unitec-login__modal">
             <div class="unitec-login__left">
                 <p class="unitec-login__eyebrow">Acesso ao ERP</p>
                 <h1 class="unitec-login__welcome">Bem-vindo ao Sistema</h1>
-                <p class="unitec-login__tagline">Gestão completa para o seu negócio</p>
+                <p class="unitec-login__tagline">GestÃ£o completa para o seu negÃ³cio</p>
 
                 <div class="unitec-login__brand" aria-label="Unitecnologia Sistemas">
                     <img
@@ -18,11 +18,11 @@
                 </div>
 
                 <div class="unitec-login__meta">
-                    <p class="unitec-login__version" aria-label="Versão do sistema">
-                        Versão {{ config('unitec.versao') }}
+                    <p class="unitec-login__version" aria-label="VersÃ£o do sistema">
+                        VersÃ£o {{ config('unitec.versao') }}
                     </p>
                     <p class="unitec-login__copyright">
-                        © Unitecnologia Sistemas LTDA
+                        Â© Unitecnologia Sistemas LTDA
                     </p>
                 </div>
             </div>
@@ -31,7 +31,7 @@
                 <div class="unitec-login__right-header">
                     <div>
                         <p class="unitec-login__instruction">Entrar</p>
-                        <p class="unitec-login__instruction-hint">Informe empresa, usuário e senha</p>
+                        <p class="unitec-login__instruction-hint">Informe empresa, usuÃ¡rio e senha</p>
                     </div>
                     <button
                         type="button"
@@ -45,6 +45,13 @@
 
                 <div class="unitec-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
                     {{ $this->content }}
+                </div>
+
+                <div class="unitec-login__pwa">
+                    <button type="button" class="unitec-login__pwa-btn" data-unitec-login-install-app>
+                        Instalar no Windows
+                    </button>
+                    <p class="unitec-login__pwa-hint">Abre como aplicativo no computador (Chrome / Edge).</p>
                 </div>
             </div>
         </div>
@@ -106,15 +113,16 @@
 
             const logoUrl = @json(asset('img/erp/brand/unitecnologia-logo.png'));
             const messages = [
-                'Validando acesso…',
-                'Preparando ambiente…',
-                'Carregando módulos…',
-                'Abrindo o sistema…',
+                'Validando acessoâ€¦',
+                'Preparando ambienteâ€¦',
+                'Carregando mÃ³dulosâ€¦',
+                'Abrindo o sistemaâ€¦',
             ];
 
             let progress = 0;
             let raf = 0;
             let messageTimer = 0;
+            let stuckTimer = 0;
             let messageIndex = 0;
             let finishing = false;
             let active = false;
@@ -125,7 +133,6 @@
                     return overlay;
                 }
 
-                // Fora do Livewire: morph do login não pode apagar o splash.
                 overlay = document.createElement('div');
                 overlay.id = 'unitec-login-boot';
                 overlay.className = 'unitec-login-boot';
@@ -139,7 +146,7 @@
                     '<img src="' + logoUrl + '" alt="" class="unitec-login-boot__logo" width="280" height="94" decoding="async">' +
                     '<p class="unitec-login-boot__eyebrow">Unitec ERP</p>' +
                     '<h2 class="unitec-login-boot__title">Abrindo o sistema</h2>' +
-                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acesso…</p>' +
+                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acessoâ€¦</p>' +
                     '<div class="unitec-login-boot__track" aria-hidden="true">' +
                     '<div class="unitec-login-boot__bar" data-unitec-boot-bar></div>' +
                     '</div>' +
@@ -191,6 +198,15 @@
                 }, 1500);
             }
 
+            function armStuckWatchdog() {
+                window.clearTimeout(stuckTimer);
+                stuckTimer = window.setTimeout(function () {
+                    if (active && !finishing) {
+                        hide(true);
+                    }
+                }, 20000);
+            }
+
             function show() {
                 const el = ensureOverlay();
 
@@ -201,6 +217,7 @@
                     startMessages();
                     window.cancelAnimationFrame(raf);
                     raf = window.requestAnimationFrame(tick);
+                    armStuckWatchdog();
                 }
 
                 paint();
@@ -211,8 +228,8 @@
                 document.documentElement.classList.add('unitec-login-booting');
             }
 
-            function hide() {
-                if (finishing) {
+            function hide(force) {
+                if (finishing && !force) {
                     return;
                 }
 
@@ -220,6 +237,7 @@
                 finishing = false;
                 window.cancelAnimationFrame(raf);
                 window.clearInterval(messageTimer);
+                window.clearTimeout(stuckTimer);
 
                 const el = ensureOverlay();
                 el.classList.remove('is-visible');
@@ -242,11 +260,49 @@
                 );
             }
 
+            function formReadyForLogin() {
+                const root = document.querySelector('.unitec-login__form');
+                if (!root) {
+                    return true;
+                }
+
+                const fields = root.querySelectorAll('select[required], input[required], textarea[required]');
+                for (let i = 0; i < fields.length; i++) {
+                    const field = fields[i];
+                    if (!field.checkValidity()) {
+                        try {
+                            field.reportValidity();
+                        } catch (e) {}
+                        return false;
+                    }
+                }
+
+                const form = root.closest('form') || root.querySelector('form');
+                if (form && typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                    try {
+                        form.reportValidity();
+                    } catch (e) {}
+                    return false;
+                }
+
+                return true;
+            }
+
+            function tryShowBoot() {
+                if (!formReadyForLogin()) {
+                    hide(true);
+                    return;
+                }
+
+                show();
+            }
+
             function succeed(url) {
                 show();
                 finishing = true;
                 window.clearInterval(messageTimer);
-                setMessage('Quase lá…');
+                window.clearTimeout(stuckTimer);
+                setMessage('Quase lÃ¡â€¦');
 
                 const target = typeof url === 'string' && url !== '' ? url : '/admin';
                 const start = performance.now();
@@ -288,7 +344,7 @@
 
             document.addEventListener('click', function (event) {
                 if (isAuthenticateTrigger(event.target)) {
-                    show();
+                    tryShowBoot();
                 }
             }, true);
 
@@ -297,7 +353,13 @@
                 if (!event.target || !(event.target instanceof Element)) return;
                 if (!event.target.closest('.unitec-login__form')) return;
                 if (event.target.closest('.unitec-login__btn-cancel, .unitec-login__close')) return;
-                show();
+                tryShowBoot();
+            }, true);
+
+            document.addEventListener('invalid', function (event) {
+                if (!event.target || !(event.target instanceof Element)) return;
+                if (!event.target.closest('.unitec-login__form')) return;
+                hide(true);
             }, true);
 
             function bindLivewire() {
@@ -308,24 +370,23 @@
                 Livewire.hook('request', function ({ fail }) {
                     fail(function () {
                         if (active && !finishing) {
-                            hide();
+                            hide(true);
                         }
                     });
                 });
 
                 Livewire.hook('commit', function ({ succeed, fail }) {
                     succeed(function () {
-                        // Só fecha se houver erro de validação — nunca no login ok.
                         window.setTimeout(function () {
                             if (active && !finishing && hasLoginErrors()) {
-                                hide();
+                                hide(true);
                             }
                         }, 80);
                     });
 
                     fail(function () {
                         if (active && !finishing) {
-                            hide();
+                            hide(true);
                         }
                     });
                 });
@@ -335,12 +396,9 @@
                         return;
                     }
 
-                    // Reafirma o overlay no body após morph do formulário.
-                    show();
-
                     window.setTimeout(function () {
                         if (active && !finishing && hasLoginErrors()) {
-                            hide();
+                            hide(true);
                         }
                     }, 40);
                 });
@@ -358,6 +416,27 @@
                 hide: hide,
                 succeed: succeed,
             };
+
+            document.addEventListener('click', function (event) {
+                const btn = event.target && event.target.closest
+                    ? event.target.closest('[data-unitec-login-install-app]')
+                    : null;
+                if (! btn) {
+                    return;
+                }
+
+                event.preventDefault();
+                if (window.UnitecErpPwa) {
+                    if (typeof window.UnitecErpPwa.show === 'function') {
+                        window.UnitecErpPwa.show();
+                    }
+                    if (typeof window.UnitecErpPwa.install === 'function') {
+                        void window.UnitecErpPwa.install();
+                    }
+                } else {
+                    alert('Abra em Chrome/Edge (http://127.0.0.1:8000/admin) e use Instalar na barra de endereço.');
+                }
+            });
         })();
     </script>
 </div>

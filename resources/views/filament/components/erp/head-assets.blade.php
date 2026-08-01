@@ -18,12 +18,15 @@
         assetVersion: @json($version),
         appVersion: @json(config('unitec.versao')),
         zipName: @json(config('unitec.update_zip_name', 'Unitec-ERP-Update.zip')),
-        stallSeconds: 180,
-        downloadStallSeconds: 900,
+        stallSeconds: 600,
+        downloadStallSeconds: 600,
+        extractingStallSeconds: 600,
+        backingUpStallSeconds: 600,
         applyingStallSeconds: 600,
-        migratingStallSeconds: 1200,
-        finalizingStallSeconds: 300,
-        maxMinutes: 45,
+        migratingStallSeconds: 600,
+        finalizingStallSeconds: 600,
+        startingStallSeconds: 600,
+        maxMinutes: 90,
     };
 </script>
 <meta name="erp-asset-version" content="{{ $version }}-{{ config('unitec.versao') }}">

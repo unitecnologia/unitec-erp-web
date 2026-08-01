@@ -174,7 +174,7 @@ class ErpUpdateService
         $status = self::readStatus();
         $state = (string) ($status['state'] ?? 'idle');
 
-        if (! in_array($state, ['starting', 'downloading', 'extracting', 'applying', 'migrating', 'finalizing'], true)) {
+        if (! in_array($state, ['starting', 'downloading', 'extracting', 'backing_up', 'applying', 'migrating', 'finalizing'], true)) {
             return false;
         }
 
@@ -203,7 +203,7 @@ class ErpUpdateService
         }
 
         $state = (string) ($data['state'] ?? 'idle');
-        if (! in_array($state, ['starting', 'downloading', 'extracting', 'applying', 'migrating', 'finalizing'], true)) {
+        if (! in_array($state, ['starting', 'downloading', 'extracting', 'backing_up', 'applying', 'migrating', 'finalizing'], true)) {
             return;
         }
 
@@ -621,12 +621,13 @@ class ErpUpdateService
         $path = parse_url($url, PHP_URL_PATH);
         $command = 'HTTP GET → '.basename(is_string($path) && $path !== '' ? $path : 'Unitec-ERP-Update.zip');
         $lastWrite = 0;
+        $lastStepPercent = -1;
 
         $response = Http::timeout(900)
             ->withOptions([
                 'sink' => $destination,
                 'verify' => $this->resolveSslVerifyPath(),
-                'progress' => function ($downloadTotal, $downloadedBytes) use ($destination, $sourceDetail, $command, &$lastWrite): void {
+                'progress' => function ($downloadTotal, $downloadedBytes) use ($destination, $sourceDetail, $command, &$lastWrite, &$lastStepPercent): void {
                     $now = time();
                     $downloaded = max(0, (int) $downloadedBytes);
 
@@ -634,11 +635,6 @@ class ErpUpdateService
                         $downloaded = (int) filesize($destination);
                     }
 
-                    if ($now - $lastWrite < 2 && $downloaded > 0) {
-                        return;
-                    }
-
-                    $lastWrite = $now;
                     $total = max(0, (int) $downloadTotal);
                     $stepPercent = 0;
 
@@ -649,6 +645,13 @@ class ErpUpdateService
                         $stepPercent = min(95, (int) floor(($downloaded / $estimatedTotal) * 100));
                     }
 
+                    // Atualiza a cada 1% (ou no máximo a cada 2s se o %).
+                    if ($stepPercent === $lastStepPercent && ($now - $lastWrite) < 2 && $downloaded > 0) {
+                        return;
+                    }
+
+                    $lastWrite = $now;
+                    $lastStepPercent = $stepPercent;
                     $globalPercent = max(9, 8 + (int) floor($stepPercent * 30 / 100));
 
                     self::writeStatus(
@@ -845,9 +848,44 @@ class ErpUpdateService
             throw new RuntimeException('Não foi possível abrir o ZIP de atualização.');
         }
 
-        if (! $zip->extractTo($extractRoot)) {
-            $zip->close();
-            throw new RuntimeException('Falha ao extrair o pacote de atualização.');
+        File::ensureDirectoryExists($extractRoot);
+
+        $total = max(1, (int) $zip->numFiles);
+        $extracted = 0;
+        $lastStepPercent = -1;
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            if ($name === false) {
+                continue;
+            }
+
+            if (! $zip->extractTo($extractRoot, $name)) {
+                $zip->close();
+                throw new RuntimeException('Falha ao extrair o pacote de atualização.');
+            }
+
+            $extracted++;
+            $stepPercent = (int) floor(($extracted / $total) * 100);
+
+            // Atualiza a cada 1% (e no primeiro/último arquivo).
+            if ($stepPercent !== $lastStepPercent || $extracted === 1 || $extracted === $total) {
+                $lastStepPercent = $stepPercent;
+                $globalPercent = 38 + (int) floor($stepPercent * 10 / 100);
+
+                self::writeStatus(
+                    'extracting',
+                    'Extraindo arquivos do pacote',
+                    min(48, max(38, $globalPercent)),
+                    sprintf(
+                        '%s%% · arquivo %s de %s',
+                        $stepPercent,
+                        number_format($extracted, 0, ',', '.'),
+                        number_format($total, 0, ',', '.')
+                    ),
+                    'ZipArchive::extractTo'
+                );
+            }
         }
 
         $zip->close();
@@ -903,6 +941,22 @@ class ErpUpdateService
     {
         $this->log($appPath, 'Iniciando backup pre-update (banco + .env).');
 
+        self::writeStatus(
+            'backing_up',
+            'Gerando backup de segurança',
+            48,
+            '1% · preparando pasta e mysqldump',
+            'php artisan erp:backup (pré-update)'
+        );
+
+        self::writeStatus(
+            'backing_up',
+            'Gerando backup de segurança',
+            51,
+            '30% · exportando banco de dados',
+            'php artisan erp:backup (pré-update)'
+        );
+
         try {
             $result = app(DatabaseBackupService::class)->runPreUpdate();
         } catch (\Throwable $e) {
@@ -926,8 +980,8 @@ class ErpUpdateService
         self::writeStatus(
             'backing_up',
             'Backup de segurança concluído',
-            55,
-            $detail,
+            57,
+            '100% · '.$detail,
             'php artisan erp:backup (pré-update)'
         );
     }
@@ -955,13 +1009,48 @@ class ErpUpdateService
 
         $excludeFiles = ['.env', '.env.backup', '.env.production'];
 
-        $this->copyDirectory($sourceRoot, $targetRoot, $excludeDirs, $excludeFiles);
+        $appTotal = $this->countCopyableFiles($sourceRoot, $excludeDirs, $excludeFiles);
+        $vendorRoot = $sourceRoot.DIRECTORY_SEPARATOR.'vendor';
+        $vendorTotal = is_dir($vendorRoot)
+            ? $this->countCopyableFiles($vendorRoot, [], [])
+            : 0;
+        $totalFiles = max(1, $appTotal + $vendorTotal);
+        $copied = 0;
+        $lastStepPercent = -1;
+
+        $onProgress = function () use (&$copied, &$lastStepPercent, $totalFiles): void {
+            $copied++;
+            $stepPercent = (int) floor(($copied / $totalFiles) * 100);
+
+            if ($stepPercent === $lastStepPercent && $copied !== 1 && $copied !== $totalFiles) {
+                return;
+            }
+
+            $lastStepPercent = $stepPercent;
+            $globalPercent = 58 + (int) floor($stepPercent * 24 / 100);
+
+            ErpUpdateService::writeStatus(
+                'applying',
+                'Copiando arquivos do pacote',
+                min(82, max(58, $globalPercent)),
+                sprintf(
+                    '%s%% · %s de %s arquivos',
+                    $stepPercent,
+                    number_format($copied, 0, ',', '.'),
+                    number_format($totalFiles, 0, ',', '.')
+                ),
+                'Atualização de app/ e vendor/'
+            );
+        };
+
+        $this->copyDirectory($sourceRoot, $targetRoot, $excludeDirs, $excludeFiles, $onProgress);
 
         $this->copyDirectory(
-            $sourceRoot.DIRECTORY_SEPARATOR.'vendor',
+            $vendorRoot,
             $targetRoot.DIRECTORY_SEPARATOR.'vendor',
             [],
-            []
+            [],
+            $onProgress
         );
     }
 
@@ -969,8 +1058,49 @@ class ErpUpdateService
      * @param  list<string>  $excludeDirs
      * @param  list<string>  $excludeFiles
      */
-    private function copyDirectory(string $source, string $target, array $excludeDirs, array $excludeFiles): void
+    private function countCopyableFiles(string $source, array $excludeDirs, array $excludeFiles): int
     {
+        if (! is_dir($source)) {
+            return 0;
+        }
+
+        $count = 0;
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
+            if (! $item->isFile()) {
+                continue;
+            }
+
+            $relative = substr($item->getPathname(), strlen($source) + 1);
+            $relative = str_replace('\\', '/', (string) $relative);
+
+            if ($relative === '' || $this->shouldExcludeRelativePath($relative, $excludeDirs, $excludeFiles)) {
+                continue;
+            }
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  list<string>  $excludeDirs
+     * @param  list<string>  $excludeFiles
+     * @param  (callable(): void)|null  $onFileCopied
+     */
+    private function copyDirectory(
+        string $source,
+        string $target,
+        array $excludeDirs,
+        array $excludeFiles,
+        ?callable $onFileCopied = null
+    ): void {
         if (! is_dir($source)) {
             return;
         }
@@ -981,9 +1111,6 @@ class ErpUpdateService
             new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST
         );
-
-        $copied = 0;
-        $lastHeartbeat = time();
 
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
@@ -1008,18 +1135,9 @@ class ErpUpdateService
 
             File::ensureDirectoryExists(dirname($destination));
             File::copy($item->getPathname(), $destination);
-            $copied++;
 
-            if ((time() - $lastHeartbeat) >= 4) {
-                $percent = min(78, 58 + (int) floor($copied / 250));
-                ErpUpdateService::writeStatus(
-                    'applying',
-                    'Copiando arquivos do pacote',
-                    $percent,
-                    number_format($copied, 0, ',', '.').' arquivos copiados',
-                    'Atualização de app/ e vendor/'
-                );
-                $lastHeartbeat = time();
+            if ($onFileCopied !== null) {
+                $onFileCopied();
             }
         }
     }
@@ -1189,10 +1307,11 @@ class ErpUpdateService
             'starting' => ['step' => 1, 'label' => 'Preparar'],
             'downloading' => ['step' => 2, 'label' => 'Baixar pacote'],
             'extracting' => ['step' => 3, 'label' => 'Extrair ZIP'],
-            'applying' => ['step' => 4, 'label' => 'Aplicar arquivos'],
-            'migrating' => ['step' => 5, 'label' => 'Banco de dados'],
-            'finalizing' => ['step' => 6, 'label' => 'Finalizar'],
-            'completed' => ['step' => 7, 'label' => 'Concluído'],
+            'backing_up' => ['step' => 4, 'label' => 'Backup banco + .env'],
+            'applying' => ['step' => 5, 'label' => 'Aplicar arquivos'],
+            'migrating' => ['step' => 6, 'label' => 'Banco de dados'],
+            'finalizing' => ['step' => 7, 'label' => 'Finalizar'],
+            'completed' => ['step' => 8, 'label' => 'Concluído'],
             'failed' => ['step' => 0, 'label' => 'Erro'],
             default => ['step' => 0, 'label' => 'Aguardando'],
         };
@@ -1220,7 +1339,8 @@ class ErpUpdateService
         return [
             'starting' => [0, 8],
             'downloading' => [8, 38],
-            'extracting' => [38, 58],
+            'extracting' => [38, 48],
+            'backing_up' => [48, 58],
             'applying' => [58, 82],
             'migrating' => [82, 92],
             'finalizing' => [92, 100],
@@ -1237,6 +1357,7 @@ class ErpUpdateService
             'starting',
             'downloading',
             'extracting',
+            'backing_up',
             'applying',
             'migrating',
             'finalizing',

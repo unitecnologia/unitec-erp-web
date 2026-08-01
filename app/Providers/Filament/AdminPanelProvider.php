@@ -53,7 +53,7 @@ class AdminPanelProvider extends PanelProvider
                 Css::make('erp-tokens', public_path('css/erp-tokens.css'))
                     ->relativePublicPath('css/erp-tokens.css'),
             ])
-            ->renderHook(PanelsRenderHook::HEAD_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.sw-unregister'))
+            ->renderHook(PanelsRenderHook::HEAD_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.pwa-head'))
             ->renderHook(PanelsRenderHook::HEAD_START, fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.ui-density'))
             ->renderHook(PanelsRenderHook::STYLES_AFTER, function (): \Illuminate\Contracts\View\View {
                 if (! filament()->auth()->check()) {
