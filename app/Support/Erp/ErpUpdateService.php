@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp;
 
+use App\Support\Erp\Backup\DatabaseBackupService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -496,6 +497,15 @@ class ErpUpdateService
             $sourceRoot = $this->extractPackage($zipPath, $extractRoot);
 
             self::writeStatus(
+                'backing_up',
+                'Gerando backup de segurança',
+                48,
+                'Dump do banco + cópia do .env antes de alterar arquivos',
+                'php artisan erp:backup (pré-update)'
+            );
+            $this->runPreUpdateBackup($appPath);
+
+            self::writeStatus(
                 'applying',
                 'Aplicando arquivos no sistema',
                 58,
@@ -883,6 +893,43 @@ class ErpUpdateService
         }
 
         throw new RuntimeException('Pacote inválido: artisan não encontrado no ZIP.');
+    }
+
+    /**
+     * Backup obrigatório antes de aplicar arquivos (banco + .env).
+     * Sem backup bem-sucedido, a atualização NÃO segue.
+     */
+    private function runPreUpdateBackup(string $appPath): void
+    {
+        $this->log($appPath, 'Iniciando backup pre-update (banco + .env).');
+
+        try {
+            $result = app(DatabaseBackupService::class)->runPreUpdate();
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                'Atualização abortada: falha no backup de segurança. Detalhe: '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
+
+        if (! ($result['ok'] ?? false)) {
+            throw new RuntimeException(
+                'Atualização abortada: backup de segurança falhou. '
+                .($result['message'] ?? 'Não foi possível gerar dump do banco / .env.')
+            );
+        }
+
+        $detail = (string) ($result['message'] ?? 'Backup OK');
+        $this->log($appPath, 'Backup pre-update OK: '.$detail);
+
+        self::writeStatus(
+            'backing_up',
+            'Backup de segurança concluído',
+            55,
+            $detail,
+            'php artisan erp:backup (pré-update)'
+        );
     }
 
     private function applyPackage(string $sourceRoot, string $targetRoot): void

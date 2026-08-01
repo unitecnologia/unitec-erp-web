@@ -9,6 +9,7 @@ class ErpBackupCommand extends Command
 {
     protected $signature = 'erp:backup
                             {--scheduled : Respeita habilitação e intervalo da empresa}
+                            {--pre-update : Backup forçado antes de atualizar (banco + .env)}
                             {--empresa= : ID da empresa (opcional)}';
 
     protected $description = 'Gera backup MySQL (mysqldump) do ERP';
@@ -17,10 +18,15 @@ class ErpBackupCommand extends Command
     {
         $empresaId = filled($this->option('empresa')) ? (int) $this->option('empresa') : null;
         $scheduled = (bool) $this->option('scheduled');
+        $preUpdate = (bool) $this->option('pre-update');
 
-        $this->info($scheduled ? 'Backup agendado…' : 'Gerando backup…');
-
-        $result = $backup->run($empresaId, scheduled: $scheduled);
+        if ($preUpdate) {
+            $this->info('Gerando backup pré-update (banco + .env)…');
+            $result = $backup->runPreUpdate($empresaId);
+        } else {
+            $this->info($scheduled ? 'Backup agendado…' : 'Gerando backup…');
+            $result = $backup->run($empresaId, scheduled: $scheduled);
+        }
 
         if (! ($result['ok'] ?? false)) {
             $this->error($result['message'] ?? 'Falha no backup.');

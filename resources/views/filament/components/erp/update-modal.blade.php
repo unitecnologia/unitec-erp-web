@@ -33,8 +33,9 @@
                 </p>
             </div>
             <ul class="erp-update-modal__list">
-                <li>Dados (.env, storage e banco) são preservados.</li>
-                <li>Download pode demorar — rode em horário livre.</li>
+                <li>Antes de instalar: backup automático do banco + .env.</li>
+                <li>Sem backup ok, a atualização não segue.</li>
+                <li>Dados (.env, storage e tools) são preservados.</li>
                 <li>Instalar só depois do pacote pronto (bem mais rápido).</li>
             </ul>
             <div class="erp-update-modal__actions">
@@ -64,6 +65,7 @@
                     'starting' => 'Preparar processo',
                     'downloading' => 'Baixar pacote',
                     'extracting' => 'Extrair ZIP',
+                    'backing_up' => 'Backup banco + .env',
                     'applying' => 'Aplicar arquivos',
                     'migrating' => 'Atualizar banco',
                     'finalizing' => 'Finalizar caches',

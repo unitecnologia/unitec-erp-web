@@ -16,6 +16,7 @@
         'starting',
         'downloading',
         'extracting',
+        'backing_up',
         'applying',
         'migrating',
         'finalizing',
@@ -25,7 +26,8 @@
     const UPDATE_STEP_RANGES = {
         starting: [0, 8],
         downloading: [8, 38],
-        extracting: [38, 58],
+        extracting: [38, 48],
+        backing_up: [48, 58],
         applying: [58, 82],
         migrating: [82, 92],
         finalizing: [92, 100],
@@ -480,7 +482,7 @@
             }
 
             const isActive = state === stepName;
-            const isIndeterminate = isActive && value <= 0 && ['starting', 'downloading', 'extracting'].includes(state);
+            const isIndeterminate = isActive && value <= 0 && ['starting', 'downloading', 'extracting', 'backing_up'].includes(state);
 
             bar.classList.toggle('is-indeterminate', isIndeterminate);
 
@@ -705,6 +707,10 @@
     function resolveStallLimit(state, config) {
         if (state === 'downloading') {
             return Number(config.downloadStallSeconds ?? 900);
+        }
+
+        if (state === 'backing_up') {
+            return Number(config.backingUpStallSeconds ?? 600);
         }
 
         if (state === 'applying') {

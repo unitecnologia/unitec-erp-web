@@ -15,10 +15,22 @@ final class DatabaseBackupService
 
     public const FILE_PREFIX = 'unitec_erp_';
 
+    public const PRE_UPDATE_PREFIX = 'unitec_erp_preupdate_';
+
+    /**
+     * Backup forçado antes de atualizar o sistema (ignora intervalo / flag automática).
+     *
+     * @return array{ok: bool, path?: string, env_path?: string, size?: int, message: string, files_removed?: int}
+     */
+    public function runPreUpdate(?int $empresaId = null): array
+    {
+        return $this->run($empresaId, scheduled: false, preUpdate: true);
+    }
+
     /**
      * @return array{ok: bool, path?: string, size?: int, message: string, files_removed?: int}
      */
-    public function run(?int $empresaId = null, bool $scheduled = false): array
+    public function run(?int $empresaId = null, bool $scheduled = false, bool $preUpdate = false): array
     {
         $empresa = ErpSystemConfig::empresa($empresaId);
 
@@ -67,7 +79,8 @@ final class DatabaseBackupService
         }
 
         $stamp = ErpTimezone::toLocal()->format('Y-m-d_H-i-s');
-        $filename = self::FILE_PREFIX.$stamp.'.sql';
+        $prefix = $preUpdate ? self::PRE_UPDATE_PREFIX : self::FILE_PREFIX;
+        $filename = $prefix.$stamp.'.sql';
         $targetPath = rtrim($destination, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$filename;
 
         $this->markStatus($empresaId, 'running');
@@ -94,12 +107,36 @@ final class DatabaseBackupService
                 ];
             }
 
-            $envPath = $this->copyEnvBackup($destination, $stamp);
+            $envPath = $this->copyEnvBackup($destination, $stamp, $prefix);
+
+            if ($preUpdate) {
+                if (! is_file(base_path('.env'))) {
+                    @unlink($targetPath);
+                    $this->markStatus($empresaId, 'failed', '.env ausente');
+
+                    return [
+                        'ok' => false,
+                        'message' => 'Backup pré-update abortado: arquivo .env não encontrado.',
+                    ];
+                }
+
+                if ($envPath === null) {
+                    @unlink($targetPath);
+                    $this->markStatus($empresaId, 'failed', 'Falha ao copiar .env');
+
+                    return [
+                        'ok' => false,
+                        'message' => 'Backup pré-update abortado: não foi possível copiar o .env.',
+                    ];
+                }
+            }
+
             $removed = $this->purgeOldBackups($destination);
             $size = (int) filesize($targetPath);
             $this->markStatus($empresaId, 'ok');
 
-            $message = 'Backup gerado: '.$filename.' ('.$this->formatBytes($size).').';
+            $label = $preUpdate ? 'Backup pré-update' : 'Backup';
+            $message = $label.' gerado: '.$filename.' ('.$this->formatBytes($size).').';
             if ($envPath !== null) {
                 $message .= ' Inclui cópia do .env.';
             } else {
@@ -129,7 +166,7 @@ final class DatabaseBackupService
     /**
      * Copia o .env da instalação para a pasta de backup (mesmo carimbo do dump).
      */
-    protected function copyEnvBackup(string $destination, string $stamp): ?string
+    protected function copyEnvBackup(string $destination, string $stamp, string $prefix = self::FILE_PREFIX): ?string
     {
         $source = base_path('.env');
 
@@ -137,7 +174,7 @@ final class DatabaseBackupService
             return null;
         }
 
-        $filename = self::FILE_PREFIX.$stamp.'.env';
+        $filename = $prefix.$stamp.'.env';
         $targetPath = rtrim($destination, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$filename;
 
         try {
@@ -340,8 +377,10 @@ final class DatabaseBackupService
                 $name = $file->getFilename();
                 $lower = mb_strtolower($name);
 
-                return str_starts_with($name, self::FILE_PREFIX)
-                    && (str_ends_with($lower, '.sql') || str_ends_with($lower, '.env'));
+                $isBackup = str_starts_with($name, self::FILE_PREFIX)
+                    || str_starts_with($name, self::PRE_UPDATE_PREFIX);
+
+                return $isBackup && (str_ends_with($lower, '.sql') || str_ends_with($lower, '.env'));
             })
             ->sortByDesc(fn ($file): int => $file->getMTime())
             ->take($limit)
@@ -378,7 +417,7 @@ final class DatabaseBackupService
             $name = $file->getFilename();
             $lower = mb_strtolower($name);
 
-            if (! str_starts_with($name, self::FILE_PREFIX)) {
+            if (! str_starts_with($name, self::FILE_PREFIX) && ! str_starts_with($name, self::PRE_UPDATE_PREFIX)) {
                 continue;
             }
 

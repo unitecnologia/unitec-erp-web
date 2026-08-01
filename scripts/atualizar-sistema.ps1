@@ -233,6 +233,10 @@ try {
     Write-InstallLog -AppPath $AppPath -Message ("Origem do pacote: {0}" -f $sourceRoot)
 
     Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
+        -Message 'Gerando backup de seguranca (banco + .env)...' -Percent 42
+    Invoke-UnitecPreUpdateBackup -AppPath $AppPath
+
+    Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
         -Message 'Encerrando o sistema para aplicar arquivos...' -Percent 46
     Stop-UnitecApplicationServer -AppPath $AppPath
     Write-InstallLog -AppPath $AppPath -Message 'Servidor web encerrado.'

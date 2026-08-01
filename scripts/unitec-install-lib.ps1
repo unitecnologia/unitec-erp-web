@@ -3674,6 +3674,88 @@ function Test-UnitecErpDataPresent {
     return ($tableFiles.Count -gt 5)
 }
 
+function Invoke-UnitecPreUpdateBackup {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    Write-InstallLog -AppPath $AppPath -Message 'Backup pre-update: iniciando (banco + .env).'
+
+    # Preferir o mesmo caminho PHP do ERP (mysqldump + copia .env).
+    try {
+        Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('erp:backup', '--pre-update') | Out-Null
+        Write-InstallLog -AppPath $AppPath -Message 'Backup pre-update OK (artisan erp:backup --pre-update).'
+        Write-Ok 'Backup de seguranca (banco + .env) gerado antes da atualizacao.'
+        return
+    } catch {
+        Write-InstallLog -AppPath $AppPath -Message ("Backup pre-update via artisan falhou: {0}" -f $_.Exception.Message)
+    }
+
+    # Fallback nativo: mysqldump + copia .env
+    $db = Get-UnitecDatabaseSettingsFromEnv -AppPath $AppPath
+    $mysqlBin = Join-Path (Get-UnitecMysqlRoot -AppPath $AppPath) 'bin'
+    $dumpExe = $null
+    foreach ($name in @('mariadb-dump.exe', 'mysqldump.exe')) {
+        $candidate = Join-Path $mysqlBin $name
+        if (Test-Path $candidate) {
+            $dumpExe = $candidate
+            break
+        }
+    }
+
+    if (-not $dumpExe) {
+        throw 'Atualizacao abortada: backup de seguranca falhou (mysqldump nao encontrado).'
+    }
+
+    $backupDir = Join-Path $AppPath 'storage\app\backups'
+    Ensure-Directory $backupDir
+    $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
+    $sqlPath = Join-Path $backupDir ("unitec_erp_preupdate_{0}.sql" -f $stamp)
+    $envSrc = Join-Path $AppPath '.env'
+    $envDst = Join-Path $backupDir ("unitec_erp_preupdate_{0}.env" -f $stamp)
+
+    $host = $db.DbHost
+    if ($host -eq 'localhost' -or $host -eq '::1' -or [string]::IsNullOrWhiteSpace($host)) {
+        $host = '127.0.0.1'
+    }
+
+    $args = @(
+        ("--host={0}" -f $host),
+        ("--port={0}" -f $db.DbPort),
+        ("--user={0}" -f $db.DbUser),
+        ("--password={0}" -f $db.DbPassword),
+        '--protocol=TCP',
+        '--single-transaction',
+        '--routines',
+        '--triggers',
+        '--events',
+        '--hex-blob',
+        '--default-character-set=utf8mb4',
+        ("--result-file={0}" -f $sqlPath),
+        $db.DbName
+    )
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $dumpExe @args 2>&1 | Out-Null
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+
+    if ($exitCode -ne 0 -or -not (Test-Path $sqlPath) -or ((Get-Item $sqlPath).Length -lt 32)) {
+        Remove-Item $sqlPath -Force -ErrorAction SilentlyContinue
+        throw 'Atualizacao abortada: falha ao gerar dump do banco antes da atualizacao.'
+    }
+
+    if (Test-Path $envSrc) {
+        Copy-Item $envSrc $envDst -Force
+    }
+
+    Write-InstallLog -AppPath $AppPath -Message ("Backup pre-update OK: {0}" -f $sqlPath)
+    Write-Ok 'Backup de seguranca (banco + .env) gerado antes da atualizacao.'
+}
+
 function Repair-UnitecMysqlDataIfCorrupt {
     param([string]$DataDir)
 
@@ -3687,9 +3769,21 @@ function Repair-UnitecMysqlDataIfCorrupt {
         return
     }
 
-    if ((Test-Path (Join-Path $DataDir 'ibdata1')) -and -not (Test-UnitecMysqlSystemTablesReady -DataDir $DataDir)) {
-        Write-Warn 'Pasta data do MariaDB incompleta (init anterior falhou). Recriando...'
-        Remove-Item $DataDir -Recurse -Force -ErrorAction Stop
+    # Protecao absoluta: se ja existe ibdata1 / arquivos InnoDB, NUNCA apagar automaticamente.
+    # Antes o script recriava a pasta e zera o banco do cliente. Isso nao pode voltar a acontecer.
+    $ibdata = Join-Path $DataDir 'ibdata1'
+    if (Test-Path $ibdata) {
+        Write-Warn 'MariaDB: pasta data incompleta, mas ibdata1 existe. NAO sera apagada automaticamente (protecao de dados).'
+        Write-Warn 'Se o MySQL nao subir, restaure um backup (sql/.env) ou contate o suporte. Nunca delete tools\mysql\data manualmente sem backup.'
+        return
+    }
+
+    $anyTableFiles = @(Get-ChildItem -Path $DataDir -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '\.(frm|ibd|MAD|MAI)$' } |
+        Select-Object -First 1)
+    if ($anyTableFiles.Count -gt 0) {
+        Write-Warn 'MariaDB: arquivos de tabela detectados em data\. NAO sera apagada automaticamente.'
+        return
     }
 }
 
