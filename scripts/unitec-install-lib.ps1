@@ -2110,7 +2110,15 @@ function Copy-UnitecProjectTree {
     }
 
     if ($UpdateMode) {
-        $excludeDirs += 'storage'
+        # Pacote de atualizacao: cliente ja tem runtime (tools/) e instalador.
+        # Nao embutir dezenas/centenas de MB desnecessarios no ZIP.
+        $excludeDirs += @(
+            'storage',
+            'installer',
+            'tests',
+            'docs',
+            'suporte'
+        )
     }
 
     $projectArgs = @(
@@ -2128,10 +2136,21 @@ function Copy-UnitecProjectTree {
         }
     }
 
+    # Exclui QUALQUER pasta node_modules (inclui services/.../node_modules).
+    $projectArgs += '/XD'
+    $projectArgs += 'node_modules'
+
     $projectArgs += '/XF'
     $projectArgs += '.env'
     $projectArgs += '.env.backup'
     $projectArgs += '.env.production'
+
+    if ($UpdateMode) {
+        $projectArgs += '/XF'
+        $projectArgs += 'composer.phar'
+        $projectArgs += 'vc_redist.x64.exe'
+        $projectArgs += 'vc_redist.x64.exe.bak'
+    }
 
     if (-not $Quiet) {
         Write-Host ">> Copiando projeto para $targetFull" -ForegroundColor White
@@ -2157,9 +2176,32 @@ function Copy-UnitecProjectTree {
         '/NFL', '/NDL', '/NJH', '/NJS', '/NC', '/NS'
     )
 
+    if ($UpdateMode) {
+        # Dev-only: nao precisa no cliente.
+        $pintDir = Join-Path $sourceFull 'vendor\laravel\pint'
+        if (Test-Path $pintDir) {
+            $vendorArgs += '/XD'
+            $vendorArgs += $pintDir
+        }
+    }
+
     & robocopy @vendorArgs | Out-Null
     if ($LASTEXITCODE -ge 8) {
         throw "robocopy vendor falhou (codigo $LASTEXITCODE)."
+    }
+
+    if ($UpdateMode) {
+        foreach ($extra in @(
+            (Join-Path $targetFull 'vendor\laravel\pint'),
+            (Join-Path $targetFull 'vendor\bin\pint'),
+            (Join-Path $targetFull 'vendor\bin\pint.bat'),
+            (Join-Path $targetFull 'composer.phar'),
+            (Join-Path $targetFull 'vc_redist.x64.exe')
+        )) {
+            if (Test-Path $extra) {
+                Remove-Item $extra -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 
     Remove-PublicStorageLink -Root $targetFull

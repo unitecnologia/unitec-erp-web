@@ -136,7 +136,9 @@ Publicacao:
   3. Configure no .env do cliente:
        UNITEC_UPDATE_DOWNLOAD_URL=https://...link-direto.../Unitec-ERP-Update.zip
 
-O pacote NAO inclui .env, storage/ nem tools/ (preservados na instalacao do cliente).
+O pacote NAO inclui .env, storage/, tools/, installer/ (MariaDB/PHP/HeidiSQL),
+node_modules aninhados, tests/docs nem ferramentas de desenvolvimento (pint).
+Esses itens sao preservados ou desnecessarios na atualizacao do cliente.
 "@
 
 Set-Content -Path $ReadmePath -Value $readme -Encoding UTF8

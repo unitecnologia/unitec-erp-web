@@ -1137,6 +1137,7 @@ class ErpUpdateService
         $excludeDirs = [
             'storage',
             'tools',
+            'installer',
             'node_modules',
             '.git',
             'dist',
@@ -1147,9 +1148,17 @@ class ErpUpdateService
             '.phpunit.cache',
             'vendor',
             'public'.DIRECTORY_SEPARATOR.'storage',
+            'tests',
+            'docs',
         ];
 
-        $excludeFiles = ['.env', '.env.backup', '.env.production'];
+        $excludeFiles = [
+            '.env',
+            '.env.backup',
+            '.env.production',
+            'composer.phar',
+            'vc_redist.x64.exe',
+        ];
 
         $appTotal = $this->countCopyableFiles($sourceRoot, $excludeDirs, $excludeFiles);
         $vendorRoot = $sourceRoot.DIRECTORY_SEPARATOR.'vendor';
@@ -1193,7 +1202,7 @@ class ErpUpdateService
         $this->copyDirectory(
             $vendorRoot,
             $targetRoot.DIRECTORY_SEPARATOR.'vendor',
-            [],
+            ['laravel'.DIRECTORY_SEPARATOR.'pint'],
             [],
             $onProgress
         );
@@ -1299,6 +1308,11 @@ class ErpUpdateService
             if (basename($normalized) === $fileName) {
                 return true;
             }
+        }
+
+        // Qualquer pasta node_modules no caminho (ex.: services/.../node_modules).
+        if (preg_match('#(?:^|/)node_modules(?:/|$)#', $normalized) === 1) {
+            return true;
         }
 
         foreach ($excludeDirs as $dir) {
