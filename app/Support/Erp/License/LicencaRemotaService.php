@@ -148,11 +148,11 @@ class LicencaRemotaService
             config('unitec.licenca_api.base_url')
             ?: env('UNITEC_LICENCA_API_URL', '')
         )), '/');
-        $timeout = max(3, min(10, (int) config('unitec.licenca_api.timeout', 8)));
+        $timeout = max(2, min(5, (int) config('unitec.licenca_api.timeout', 5)));
         $url = $baseUrl.'/api/licenca/'.$cnpj;
 
         $response = Http::timeout($timeout)
-            ->connectTimeout(min(5, $timeout))
+            ->connectTimeout(min(3, $timeout))
             ->acceptJson()
             ->get($url);
 

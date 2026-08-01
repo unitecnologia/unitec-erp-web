@@ -5396,7 +5396,9 @@ function Configure-LaragonPhpIni {
     $opcacheSettings = if ($DisableOpcache) {
         @(
             'opcache.enable=0',
-            'opcache.enable_cli=0'
+            'opcache.enable_cli=0',
+            'max_execution_time=300',
+            'memory_limit=256M'
         )
     } else {
         @(
@@ -5406,14 +5408,17 @@ function Configure-LaragonPhpIni {
             'opcache.interned_strings_buffer=16',
             'opcache.max_accelerated_files=10000',
             'opcache.validate_timestamps=1',
-            'opcache.revalidate_freq=2'
+            'opcache.revalidate_freq=2',
+            'max_execution_time=300',
+            'memory_limit=256M'
         )
     }
 
     $devTuning = @(
         'realpath_cache_size=4096k',
         'realpath_cache_ttl=600',
-        'memory_limit=256M'
+        'memory_limit=256M',
+        'max_execution_time=300'
     )
 
     if ($DisableOpcache) {

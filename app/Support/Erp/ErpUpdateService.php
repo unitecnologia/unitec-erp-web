@@ -1082,6 +1082,7 @@ class ErpUpdateService
                 'opcache.validate_timestamps' => '1',
                 'opcache.revalidate_freq' => '2',
                 'memory_limit' => '256M',
+                'max_execution_time' => '300',
                 'realpath_cache_size' => '4096k',
                 'realpath_cache_ttl' => '600',
             ];
