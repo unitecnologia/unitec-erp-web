@@ -1167,13 +1167,20 @@ class ErpUpdateService
             : 0;
         $totalFiles = max(1, $appTotal + $vendorTotal);
         $copied = 0;
+        $skipped = 0;
         $lastStepPercent = -1;
 
-        $onProgress = function () use (&$copied, &$lastStepPercent, $totalFiles): void {
-            $copied++;
-            $stepPercent = (int) floor(($copied / $totalFiles) * 100);
+        $onProgress = function (bool $wasSkipped = false) use (&$copied, &$skipped, &$lastStepPercent, $totalFiles): void {
+            if ($wasSkipped) {
+                $skipped++;
+            } else {
+                $copied++;
+            }
 
-            if ($stepPercent === $lastStepPercent && $copied !== 1 && $copied !== $totalFiles) {
+            $done = $copied + $skipped;
+            $stepPercent = (int) floor(($done / $totalFiles) * 100);
+
+            if ($stepPercent === $lastStepPercent && $done !== 1 && $done !== $totalFiles) {
                 return;
             }
 
@@ -1185,10 +1192,12 @@ class ErpUpdateService
                 'Copiando arquivos do pacote',
                 min(82, max(58, $globalPercent)),
                 sprintf(
-                    '%s%% · %s de %s arquivos',
+                    '%s%% · %s de %s · %s novos · %s iguais (mantidos)',
                     $stepPercent,
+                    number_format($done, 0, ',', '.'),
+                    number_format($totalFiles, 0, ',', '.'),
                     number_format($copied, 0, ',', '.'),
-                    number_format($totalFiles, 0, ',', '.')
+                    number_format($skipped, 0, ',', '.')
                 ),
                 'Atualização de app/ e vendor/',
                 null,
@@ -1246,7 +1255,7 @@ class ErpUpdateService
     /**
      * @param  list<string>  $excludeDirs
      * @param  list<string>  $excludeFiles
-     * @param  (callable(): void)|null  $onFileCopied
+     * @param  (callable(bool $skipped): void)|null  $onFileCopied
      */
     private function copyDirectory(
         string $source,
@@ -1288,12 +1297,52 @@ class ErpUpdateService
             }
 
             File::ensureDirectoryExists(dirname($destination));
+
+            // Já igual no destino: não reescreve (bem mais rápido no Windows/antivírus).
+            if ($this->filesAreIdentical($item->getPathname(), $destination)) {
+                if ($onFileCopied !== null) {
+                    $onFileCopied(true);
+                }
+
+                continue;
+            }
+
             File::copy($item->getPathname(), $destination);
 
             if ($onFileCopied !== null) {
-                $onFileCopied();
+                $onFileCopied(false);
             }
         }
+    }
+
+    /**
+     * Compara tamanho + conteúdo/hash. Evita sobrescrever o que não mudou.
+     */
+    private function filesAreIdentical(string $sourcePath, string $destinationPath): bool
+    {
+        if (! is_file($destinationPath) || ! is_file($sourcePath)) {
+            return false;
+        }
+
+        $sourceSize = filesize($sourcePath);
+        $destinationSize = filesize($destinationPath);
+
+        if ($sourceSize === false || $destinationSize === false || $sourceSize !== $destinationSize) {
+            return false;
+        }
+
+        if ($sourceSize === 0) {
+            return true;
+        }
+
+        // Arquivos pequenos: comparação direta é barata.
+        if ($sourceSize <= 65536) {
+            return file_get_contents($sourcePath) === file_get_contents($destinationPath);
+        }
+
+        $algo = in_array('xxh3', hash_algos(), true) ? 'xxh3' : 'md5';
+
+        return hash_file($algo, $sourcePath) === hash_file($algo, $destinationPath);
     }
 
     /**
