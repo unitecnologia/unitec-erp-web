@@ -34,6 +34,7 @@ use App\Filament\Resources\TerminalResource;
 use App\Filament\Resources\FormaPagamentoResource;
 use App\Filament\Pages\RhDashboardPage;
 use App\Filament\Pages\BackupPage;
+use App\Filament\Pages\LicencaSistemaPage;
 use App\Filament\Pages\BalancaConfigPage;
 use App\Filament\Resources\RhCargoResource;
 use App\Filament\Resources\RhDepartamentoResource;
@@ -59,6 +60,7 @@ use App\Filament\Resources\TransportadoraResource;
 use App\Filament\Resources\UnidadeResource;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\VeiculoResource;
+use App\Filament\Resources\DevolucaoCompraResource;
 use App\Filament\Resources\DevolucaoVendaResource;
 use App\Filament\Resources\VendaResource;
 use App\Filament\Resources\VendasInternasDeviceResource;
@@ -231,7 +233,7 @@ class ErpMenu
         return [
             static::link('Lista Compras', CompraResource::getUrl('index'), permission: 'compras.access'),
             static::link('Notas de Fornecedores', NotaFornecedorResource::getUrl('index'), permission: 'compras.access'),
-            static::stub('Devolução de Compra'),
+            static::link('Devolução de Compra', DevolucaoCompraResource::getUrl('index'), permission: 'devolucoes_compra.access'),
         ];
     }
 
@@ -475,7 +477,7 @@ class ErpMenu
         return [
             static::stub('Vídeos de Treinamento'),
             static::stub('Lista de Updates'),
-            static::stub('Licença do Sistema'),
+            static::link('Licença do Sistema', LicencaSistemaPage::getUrl()),
             static::sep(),
             static::action('Atualizar Sistema', 'system-update'),
         ];

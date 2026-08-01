@@ -9,7 +9,7 @@ class ApplyUnitecUpdateCommand extends Command
 {
     protected $signature = 'unitec:apply-update {--app-path=}';
 
-    protected $description = 'Baixa e aplica o pacote Unitec-ERP-Update.zip em segundo plano';
+    protected $description = 'Aplica o pacote Unitec-ERP-Update.zip (preferindo o ZIP local em storage/app/private/updates)';
 
     public function handle(ErpUpdateService $service): int
     {

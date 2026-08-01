@@ -243,10 +243,55 @@ try {
     Write-InstallLog -AppPath $AppPath -Message 'Arquivos aplicados.'
     Ensure-UnitecStorageStructure -AppPath $AppPath
 
+    # Cache antigo do bootstrap quebra com 500 apos update parcial.
+    $bootstrapCache = Join-Path $AppPath 'bootstrap\cache'
+    if (Test-Path $bootstrapCache) {
+        Get-ChildItem $bootstrapCache -Filter '*.php' -File -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('optimize:clear') -AllowFailure | Out-Null
+
+    # Garante VC++ no tools\ para proximos updates (mesmo sem internet).
+    try {
+        $vcSrc = Resolve-VcRedistributablePath -SourceRoot $sourceRoot
+        $vcDst = Join-Path $AppPath 'tools\vc_redist.x64.exe'
+        Ensure-Directory (Split-Path $vcDst -Parent)
+        if ((Test-Path $vcSrc) -and ($vcSrc -ne $vcDst)) {
+            Copy-Item $vcSrc $vcDst -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        # ignore - download sob demanda no Ensure-UnitecPhpExtensionsReady
+    }
+
+    Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
+        -Message 'Preparando PHP / Visual C++...' -Percent 70
+
+    $phpReady = Ensure-UnitecPhpExtensionsReady -AppPath $AppPath -AllowVcFix
+    if (-not $phpReady.Ok) {
+        Write-UnitecUpdatePendingFinish -AppPath $AppPath -Reason 'php_extensions'
+        Write-InstallLog -AppPath $AppPath -Message ('Update parcial - pendente finalizacao: {0}' -f $phpReady.Message)
+
+        if ($phpReady.NeedsReboot) {
+            throw @"
+Arquivos ja atualizados.
+
+$($phpReady.Message)
+
+1) Reinicie o Windows
+2) Abra o Unitec ERP.bat
+A atualizacao termina sozinha.
+"@
+        }
+
+        throw $phpReady.Message
+    }
+
     Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
         -Message 'Atualizando banco de dados...' -Percent 76
+
     Invoke-UnitecDatabaseMigrate -AppPath $AppPath
     Write-InstallLog -AppPath $AppPath -Message 'Migrate concluido.'
+    Clear-UnitecUpdatePendingFinish -AppPath $AppPath
 
     Write-UpdateStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath `
         -Message 'Finalizando configuracao...' -Percent 86

@@ -1284,6 +1284,7 @@ function Ensure-UnitecStorageStructure {
         'storage\framework\testing',
         'storage\logs',
         'storage\app\private',
+        'storage\app\private\updates',
         'storage\app\public',
         'bootstrap\cache'
     )
@@ -1421,6 +1422,12 @@ function Start-UnitecStack {
     $AppPath = Resolve-UnitecAppPath -Path $AppPath
     if (Sync-UnitecEnvPerformanceSettings -AppPath $AppPath) {
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
+    }
+
+    # Sempre tenta deixar PHP/pdo_mysql ok ao abrir (igual instalacao: php.ini + VC++).
+    $phpReady = Ensure-UnitecPhpExtensionsReady -AppPath $AppPath -AllowVcFix
+    if (-not $phpReady.Ok) {
+        throw $phpReady.Message
     }
 
     if (Test-UnitecApplicationServerRunning -AppPath $AppPath) {
@@ -2441,27 +2448,34 @@ function Resolve-VcRedistributablePath {
     $candidates = @()
     if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
         $candidates += (Join-Path $SourceRoot 'installer\assets\vc_redist.x64.exe')
+        $candidates += (Join-Path $SourceRoot 'tools\vc_redist.x64.exe')
+        $candidates += (Join-Path $SourceRoot 'vc_redist.x64.exe')
     }
     $candidates += (Join-Path $PSScriptRoot '..\installer\assets\vc_redist.x64.exe')
+    $candidates += (Join-Path $PSScriptRoot '..\vc_redist.x64.exe')
+    $candidates += (Join-Path $env:TEMP 'unitec-vc-redist-x64.exe')
+    $candidates += (Join-Path $env:TEMP 'vc_redist.x64.exe')
 
     foreach ($path in $candidates) {
         if ([string]::IsNullOrWhiteSpace($path)) {
             continue
         }
 
-        $full = [System.IO.Path]::GetFullPath($path)
+        try {
+            $full = [System.IO.Path]::GetFullPath($path)
+        } catch {
+            continue
+        }
+
         if (Test-UnitecPathExists $full) {
             return $full
         }
     }
 
     $downloaded = Join-Path $env:TEMP 'unitec-vc-redist-x64.exe'
-    if (Test-Path $downloaded) {
-        return $downloaded
-    }
-
     Write-Host 'Baixando Visual C++ Redistributable x64 (~25 MB)...' -ForegroundColor Yellow
     try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri $script:UnitecVcRedistDownloadUrl -OutFile $downloaded -UseBasicParsing
         return $downloaded
     } catch {
@@ -2957,25 +2971,211 @@ function Test-PhpExtensionEnabled {
         $PhpExe = if ($cmd) { $cmd.Source } else { 'php' }
     }
 
-    $pattern = '^\s*' + [regex]::Escape($ExtensionName) + '\s*$'
-    return [bool](& $PhpExe -m 2>$null | Select-String -Pattern $pattern -Quiet)
+    if (-not (Test-Path -LiteralPath $PhpExe)) {
+        return $false
+    }
+
+    # Evita falha silenciosa: em alguns PCs o stderr do PHP vira ErrorRecord no PowerShell.
+    # Testa com cwd = pasta do php.exe para extension_dir="ext" relativo funcionar.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $phpDir = Split-Path -Parent $PhpExe
+    $pushOk = $false
+    try {
+        if (Test-Path -LiteralPath $phpDir) {
+            Push-Location $phpDir
+            $pushOk = $true
+        }
+        $output = & $PhpExe -m 2>&1
+    } catch {
+        $output = @()
+    } finally {
+        if ($pushOk) {
+            Pop-Location
+        }
+        $ErrorActionPreference = $prevEap
+    }
+
+    $text = ($output | ForEach-Object { "$_" }) -join [Environment]::NewLine
+    return [bool]([regex]::IsMatch($text, ('(?im)^\s*{0}\s*$' -f [regex]::Escape($ExtensionName))))
+}
+
+function Get-UnitecUpdatePendingFinishPath {
+    param([string]$AppPath)
+
+    return Join-Path (Resolve-UnitecAppPath -Path $AppPath) 'storage\app\private\erp-update-pending-finish.json'
+}
+
+function Write-UnitecUpdatePendingFinish {
+    param(
+        [string]$AppPath,
+        [string]$Reason = 'pdo_mysql'
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    Ensure-UnitecStorageStructure -AppPath $AppPath
+    $path = Get-UnitecUpdatePendingFinishPath -AppPath $AppPath
+    $payload = @{
+        pending     = $true
+        reason      = $Reason
+        created_at  = (Get-Date).ToString('o')
+        message     = 'Arquivos da atualizacao ja aplicados. Falta migrate/cache apos PHP/VC++ ok.'
+    } | ConvertTo-Json -Compress
+
+    Set-Content -Path $path -Value $payload -Encoding ASCII
+    Write-InstallLog -AppPath $AppPath -Message ('Update pendente de finalizacao: {0}' -f $Reason)
+}
+
+function Clear-UnitecUpdatePendingFinish {
+    param([string]$AppPath)
+
+    $path = Get-UnitecUpdatePendingFinishPath -AppPath $AppPath
+    if (Test-Path $path) {
+        Remove-Item $path -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-UnitecUpdatePendingFinish {
+    param([string]$AppPath)
+
+    return (Test-Path (Get-UnitecUpdatePendingFinishPath -AppPath $AppPath))
+}
+
+function Complete-UnitecPendingUpdate {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    if (-not (Test-UnitecUpdatePendingFinish -AppPath $AppPath)) {
+        return $false
+    }
+
+    Write-Host 'Finalizando atualizacao pendente...' -ForegroundColor Cyan
+    Write-InstallLog -AppPath $AppPath -Message 'Finalizando update pendente apos reboot/reparo PHP.'
+
+    $ready = Ensure-UnitecPhpExtensionsReady -AppPath $AppPath -AllowVcFix
+    if (-not $ready.Ok) {
+        throw $ready.Message
+    }
+
+    # Limpa caches velhos do update interrompido.
+    $bootstrapCache = Join-Path $AppPath 'bootstrap\cache'
+    if (Test-Path $bootstrapCache) {
+        Get-ChildItem $bootstrapCache -Filter '*.php' -File -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+
+    Invoke-UnitecDatabaseMigrate -AppPath $AppPath
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('view:clear') -AllowFailure | Out-Null
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
+    Clear-UnitecUpdatePendingFinish -AppPath $AppPath
+    Write-InstallLog -AppPath $AppPath -Message 'Update pendente finalizado com sucesso.'
+    Write-Ok 'Atualizacao pendente concluida.'
+
+    return $true
+}
+
+<#
+.SYNOPSIS
+    Garante php.ini + pdo_mysql/intl. Se falhar, instala VC++ (como a instalacao faz).
+#>
+function Ensure-UnitecPhpExtensionsReady {
+    param(
+        [string]$AppPath,
+        [switch]$AllowVcFix
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    $phpDir = Get-UnitecPhpDirectory -AppPath $AppPath
+    if (-not $phpDir) {
+        return @{
+            Ok          = $false
+            NeedsReboot = $false
+            Message     = 'PHP embutido ausente em tools\php. Reinstale o Unitec ERP.'
+        }
+    }
+
+    $phpExe = Join-Path $phpDir 'php.exe'
+    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+    $null = Repair-PhpExecutableRuntime -SourceRoot $AppPath -PhpExe $phpExe -AllowFix:$AllowVcFix
+
+    $pdoOk = Test-PhpExtensionEnabled -ExtensionName 'pdo_mysql' -PhpExe $phpExe
+    $intlOk = Test-PhpExtensionEnabled -ExtensionName 'intl' -PhpExe $phpExe
+
+    if ($pdoOk -and $intlOk) {
+        return @{ Ok = $true; NeedsReboot = $false; Message = 'PHP OK (pdo_mysql + intl).' }
+    }
+
+    if (-not $AllowVcFix) {
+        return @{
+            Ok          = $false
+            NeedsReboot = $false
+            Message     = 'Extensoes PHP ausentes (pdo_mysql/intl).'
+        }
+    }
+
+    Write-Host 'PHP sem pdo_mysql/intl - instalando Visual C++ (mesmo da instalacao)...' -ForegroundColor Yellow
+    Write-InstallLog -AppPath $AppPath -Message 'Auto-reparo: instalando VC++ por falta de pdo_mysql/intl.'
+
+    $vcExit = 0
+    try {
+        $vcExit = Install-VcRedistributable -SourceRoot $AppPath -Mode 'install'
+        Start-Sleep -Seconds 3
+        try {
+            $null = Install-VcRedistributable -SourceRoot $AppPath -Mode 'repair'
+            Start-Sleep -Seconds 2
+        } catch {
+            # repair opcional
+        }
+    } catch {
+        return @{
+            Ok          = $false
+            NeedsReboot = $false
+            Message     = ('Falha ao instalar Visual C++: {0}' -f $_.Exception.Message)
+        }
+    }
+
+    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+    $pdoOk = Test-PhpExtensionEnabled -ExtensionName 'pdo_mysql' -PhpExe $phpExe
+    $intlOk = Test-PhpExtensionEnabled -ExtensionName 'intl' -PhpExe $phpExe
+
+    if ($pdoOk -and $intlOk) {
+        Write-Ok 'Extensoes PHP OK apos Visual C++.'
+        return @{ Ok = $true; NeedsReboot = $false; Message = 'PHP OK apos VC++.' }
+    }
+
+    $needsReboot = ($vcExit -eq 3010) -or (-not $pdoOk)
+    return @{
+        Ok          = $false
+        NeedsReboot = $needsReboot
+        Message     = 'Visual C++ instalado, mas o PHP ainda nao carrega pdo_mysql. Reinicie o Windows e abra o Unitec ERP de novo (a atualizacao continua sozinha).'
+    }
 }
 
 function Assert-UnitecPhpDatabaseReady {
     param([string]$AppPath = '')
 
-    $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
-    if (-not (Test-PhpExtensionEnabled -ExtensionName 'pdo_mysql' -PhpExe $phpExe)) {
-        throw 'Extensao PHP pdo_mysql nao esta ativa. Reinstale o Unitec ERP ou execute o instalador como administrador.'
+    $ready = Ensure-UnitecPhpExtensionsReady -AppPath $AppPath -AllowVcFix
+    if ($ready.Ok) {
+        return
     }
+
+    if ($ready.NeedsReboot -and -not [string]::IsNullOrWhiteSpace($AppPath)) {
+        Write-UnitecUpdatePendingFinish -AppPath $AppPath -Reason 'vc_reboot_pdo_mysql'
+    }
+
+    throw $ready.Message
 }
 
 function Assert-UnitecPhpIntlReady {
     param([string]$AppPath = '')
 
+    # intl ja e validado em Ensure-UnitecPhpExtensionsReady / Assert-UnitecPhpDatabaseReady.
     $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
     if (-not (Test-PhpExtensionEnabled -ExtensionName 'intl' -PhpExe $phpExe)) {
-        throw 'Extensao PHP intl nao esta ativa (obrigatoria para listagens paginadas). Reinstale o Unitec ERP ou execute o instalador como administrador.'
+        $ready = Ensure-UnitecPhpExtensionsReady -AppPath $AppPath -AllowVcFix
+        if (-not $ready.Ok) {
+            throw $ready.Message
+        }
     }
 }
 
@@ -5184,9 +5384,14 @@ function Configure-LaragonPhpIni {
     }
     $content = ($dedupedLines -join [Environment]::NewLine)
 
-    if ($content -notmatch '(?m)^extension_dir\s*=') {
-        $content += [Environment]::NewLine + 'extension_dir="ext"' + [Environment]::NewLine
-    }
+    # Caminho absoluto: extension_dir="ext" relativo falha quando o PHP roda
+    # com cwd != tools\php (ex.: artisan migrate / atualizar-sistema).
+    $extDir = Join-Path $PhpDirectory 'ext'
+    $extDirIni = ($extDir -replace '\\', '/')
+    $extDirLine = 'extension_dir="{0}"' -f $extDirIni
+    # Remove todas as linhas extension_dir (comentadas ou nao) e grava uma so.
+    $content = [regex]::Replace($content, '(?m)^\s*;?\s*extension_dir\s*=.*\r?\n?', '')
+    $content = $content.TrimEnd() + [Environment]::NewLine + $extDirLine + [Environment]::NewLine
 
     $opcacheSettings = if ($DisableOpcache) {
         @(
@@ -5248,7 +5453,9 @@ function Configure-LaragonPhpIni {
         Write-Warn ("Nao foi possivel configurar SSL CA do PHP: {0}" -f $_.Exception.Message)
     }
 
-    Set-Content -Path $iniPath -Value $content -Encoding UTF8 -NoNewline
+    # UTF-8 sem BOM (BOM quebra parse do php.ini em alguns PCs Windows).
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($iniPath, $content, $utf8NoBom)
 }
 
 function Set-LaragonPhpVersion {

@@ -121,6 +121,8 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.reports.expedicao-retirada');
     Route::post('/admin/erp-update/launch', [ErpUpdateController::class, 'launch'])
         ->name('erp.update.launch');
+    Route::post('/admin/erp-update/download', [ErpUpdateController::class, 'download'])
+        ->name('erp.update.download');
 });
 
 // Status/reset sem sessão e sem CSRF: durante o update a pasta sessions pode sumir

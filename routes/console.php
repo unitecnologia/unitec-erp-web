@@ -13,6 +13,11 @@ Schedule::command('erp:backup --scheduled')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/erp-backup-schedule.log'));
 
+Schedule::command('unitec:download-update')
+    ->dailyAt('03:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/erp-update-download-schedule.log'));
+
 Schedule::command('gestor:push-alertas')
     ->dailyAt('08:05')
     ->withoutOverlapping()

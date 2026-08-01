@@ -148,6 +148,15 @@ final class FirebirdIsqlClient
             mkdir($tmpDir, 0777, true);
         }
 
+        $processTmp = $tmpDir.DIRECTORY_SEPARATOR.'tmp';
+        if (! is_dir($processTmp)) {
+            mkdir($processTmp, 0777, true);
+        }
+
+        // PHP/Symfony Process usam sys_get_temp_dir() — se TEMP/TMP vierem vazios
+        // (comum no artisan serve / Livewire no Windows), cai em C:\Windows e dá Permission denied.
+        $this->forceProcessTempDir($processTmp);
+
         $id = bin2hex(random_bytes(8));
         $scriptPath = $tmpDir.DIRECTORY_SEPARATOR.'q_'.$id.'.sql';
         $outPath = $tmpDir.DIRECTORY_SEPARATOR.'q_'.$id.'.out';
@@ -164,7 +173,7 @@ final class FirebirdIsqlClient
 
             $process->setTimeout(600);
             $process->setWorkingDirectory($this->firebirdHome());
-            $process->setEnv($this->cleanProcessEnv());
+            $process->setEnv($this->cleanProcessEnv($processTmp));
 
             $process->run();
 
@@ -210,16 +219,17 @@ final class FirebirdIsqlClient
     }
 
     /**
-     * Ambiente para o isql: herda o processo e só ajusta PATH.
+     * Ambiente para o isql: herda o processo e só ajusta PATH + TEMP gravável.
      * Não força FIREBIRD=pasta do isql — isso gera "Wrong file for memory mapping"
      * quando o serviço já usa C:\ProgramData\firebird.
      *
      * @return array<string, string|false>
      */
-    protected function cleanProcessEnv(): array
+    protected function cleanProcessEnv(?string $tempDir = null): array
     {
         $home = $this->firebirdHome();
         $path = getenv('PATH') ?: ($_SERVER['PATH'] ?? '');
+        $tempDir = $tempDir ?: $this->writableTempDir();
 
         $env = [];
 
@@ -229,7 +239,7 @@ final class FirebirdIsqlClient
             }
         }
 
-        foreach (['PATH', 'SystemRoot', 'TEMP', 'TMP', 'USERNAME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA'] as $key) {
+        foreach (['PATH', 'SystemRoot', 'USERNAME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ComSpec', 'PATHEXT'] as $key) {
             $val = getenv($key);
             if (is_string($val) && $val !== '') {
                 $env[$key] = $val;
@@ -237,12 +247,49 @@ final class FirebirdIsqlClient
         }
 
         $env['PATH'] = $home.';'.($env['PATH'] ?? $path);
-        $env['FIREBIRD_TMP'] = sys_get_temp_dir();
+        $env['TEMP'] = $tempDir;
+        $env['TMP'] = $tempDir;
+        $env['TMPDIR'] = $tempDir;
+        $env['FIREBIRD_TMP'] = $tempDir;
 
         // Remove FIREBIRD herdado de tools/php ou de tentativa anterior.
         $env['FIREBIRD'] = false;
 
         return $env;
+    }
+
+    protected function writableTempDir(): string
+    {
+        $dir = storage_path('app/firebird-migra/tmp');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        return $dir;
+    }
+
+    /**
+     * Garante que tempnam()/Symfony Process não caiam em C:\Windows.
+     */
+    protected function forceProcessTempDir(string $tempDir): void
+    {
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+
+        putenv('TEMP='.$tempDir);
+        putenv('TMP='.$tempDir);
+        putenv('TMPDIR='.$tempDir);
+        $_ENV['TEMP'] = $tempDir;
+        $_ENV['TMP'] = $tempDir;
+        $_ENV['TMPDIR'] = $tempDir;
+        $_SERVER['TEMP'] = $tempDir;
+        $_SERVER['TMP'] = $tempDir;
+        $_SERVER['TMPDIR'] = $tempDir;
+
+        if (function_exists('ini_set')) {
+            @ini_set('sys.temp_dir', $tempDir);
+        }
     }
 
     protected function normalizePath(string $path): string

@@ -138,7 +138,8 @@ class LicencaRemotaService
 
     public function pagamentoUrl(): string
     {
-        return trim((string) config('unitec.pagamento_url', ''));
+        // Portal Unitec — fixo no código (não depende de .env do cliente).
+        return 'https://unitecnologiasc.digital';
     }
 
     private function fetchFromApi(string $cnpj): LicencaSnapshot

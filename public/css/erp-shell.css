@@ -684,6 +684,49 @@ body,
     text-align: center;
 }
 
+.erp-update-modal__package {
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #f8fbff;
+    text-align: left;
+}
+
+.erp-update-modal__package-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0 0 0.35rem;
+    font-size: 0.82rem;
+    color: #475569;
+}
+
+.erp-update-modal__package-line strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.erp-update-modal__package-status {
+    margin: 0.45rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1d4ed8;
+    line-height: 1.4;
+}
+
+.erp-update-modal__package-status.is-ready {
+    color: #15803d;
+}
+
+.erp-update-modal__package-status.is-warn {
+    color: #b45309;
+}
+
+.erp-update-modal__package-status.is-error {
+    color: #b91c1c;
+}
+
 .erp-update-modal__list {
     margin: 0 0 1.25rem;
     padding-left: 1.2rem;

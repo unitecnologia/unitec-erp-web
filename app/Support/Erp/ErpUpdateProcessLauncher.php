@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Process;
 
 class ErpUpdateProcessLauncher
 {
-    public static function launch(string $appPath): bool
+    public static function launch(string $appPath, string $artisanCommand = 'unitec:apply-update'): bool
     {
         $appPath = rtrim($appPath, '\\/');
         $phpBinary = self::resolvePhpBinary($appPath);
@@ -27,17 +27,27 @@ class ErpUpdateProcessLauncher
         }
 
         File::ensureDirectoryExists(dirname($logFile));
-        self::log($logFile, 'Disparando unitec:apply-update');
+        self::log($logFile, 'Disparando '.$artisanCommand);
         self::log($logFile, 'PHP: '.$phpBinary);
         self::log($logFile, 'AppPath: '.$appPath);
 
         if (PHP_OS_FAMILY === 'Windows') {
-            return self::launchViaWindowsBatch($appPath, $phpBinary, $artisan, $logFile)
-                || self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile);
+            return self::launchViaWindowsBatch($appPath, $phpBinary, $artisan, $logFile, $artisanCommand)
+                || self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile, $artisanCommand);
         }
 
-        return self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile)
-            || self::launchViaUnixShell($appPath, $phpBinary, $artisan, $logFile);
+        return self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile, $artisanCommand)
+            || self::launchViaUnixShell($appPath, $phpBinary, $artisan, $logFile, $artisanCommand);
+    }
+
+    public static function launchDownload(string $appPath, bool $force = false): bool
+    {
+        $command = 'unitec:download-update';
+        if ($force) {
+            $command .= ' --force';
+        }
+
+        return self::launch($appPath, $command);
     }
 
     public static function resolvePhpBinary(string $appPath): string
@@ -67,23 +77,22 @@ class ErpUpdateProcessLauncher
         string $appPath,
         string $phpBinary,
         string $artisan,
-        string $logFile
+        string $logFile,
+        string $artisanCommand = 'unitec:apply-update'
     ): bool {
         try {
+            $parts = preg_split('/\s+/', trim($artisanCommand)) ?: ['unitec:apply-update'];
+            $args = array_merge([$phpBinary, $artisan], $parts, ['--app-path='.$appPath]);
+
             $process = Process::path($appPath)
                 ->timeout(null)
                 ->env(self::inheritEnvironment())
-                ->start([
-                    $phpBinary,
-                    $artisan,
-                    'unitec:apply-update',
-                    '--app-path='.$appPath,
-                ]);
+                ->start($args);
 
             usleep(1_000_000);
 
             if ($process->running()) {
-                self::log($logFile, 'Processo em execucao via Process::start.');
+                self::log($logFile, 'Processo em execucao via Process::start ('.$artisanCommand.').');
 
                 return true;
             }
@@ -93,7 +102,7 @@ class ErpUpdateProcessLauncher
                 'Process::start encerrou cedo (codigo '.($process->exitCode() ?? 'null').').'
             );
 
-            return self::waitForUpdateStart($logFile, 4);
+            return self::waitForUpdateStart($logFile, 4, $artisanCommand);
         } catch (\Throwable $exception) {
             self::log($logFile, 'Process::start falhou: '.$exception->getMessage());
         }
@@ -105,7 +114,8 @@ class ErpUpdateProcessLauncher
         string $appPath,
         string $phpBinary,
         string $artisan,
-        string $logFile
+        string $logFile,
+        string $artisanCommand = 'unitec:apply-update'
     ): bool {
         if (self::isShellFunctionDisabled('popen')) {
             self::log($logFile, 'ERRO: popen desabilitado no PHP.');
@@ -113,14 +123,15 @@ class ErpUpdateProcessLauncher
             return false;
         }
 
-        $batchPath = storage_path('app/private/erp-update-run.bat');
+        $isDownload = str_contains($artisanCommand, 'download-update');
+        $batchPath = storage_path('app/private/'.($isDownload ? 'erp-update-download-run.bat' : 'erp-update-run.bat'));
         File::ensureDirectoryExists(dirname($batchPath));
 
         $batch = implode("\r\n", [
             '@echo off',
             'chcp 65001 >nul',
             'cd /d "'.str_replace('"', '""', $appPath).'"',
-            '"'.str_replace('"', '""', $phpBinary).'" "'.str_replace('"', '""', $artisan).'" unitec:apply-update --app-path="'.str_replace('"', '""', $appPath).'" >> "'.str_replace('"', '""', $logFile).'" 2>&1',
+            '"'.str_replace('"', '""', $phpBinary).'" "'.str_replace('"', '""', $artisan).'" '.$artisanCommand.' --app-path="'.str_replace('"', '""', $appPath).'" >> "'.str_replace('"', '""', $logFile).'" 2>&1',
         ])."\r\n";
 
         File::put($batchPath, $batch);
@@ -135,14 +146,15 @@ class ErpUpdateProcessLauncher
 
         pclose($handle);
 
-        return self::waitForUpdateStart($logFile, 8);
+        return self::waitForUpdateStart($logFile, 8, $artisanCommand);
     }
 
     private static function launchViaUnixShell(
         string $appPath,
         string $phpBinary,
         string $artisan,
-        string $logFile
+        string $logFile,
+        string $artisanCommand = 'unitec:apply-update'
     ): bool {
         if (self::isShellFunctionDisabled('exec')) {
             self::log($logFile, 'ERRO: exec desabilitado no PHP.');
@@ -151,9 +163,10 @@ class ErpUpdateProcessLauncher
         }
 
         $command = sprintf(
-            '%s %s unitec:apply-update --app-path=%s >> %s 2>&1 &',
+            '%s %s %s --app-path=%s >> %s 2>&1 &',
             escapeshellarg($phpBinary),
             escapeshellarg($artisan),
+            $artisanCommand,
             escapeshellarg($appPath),
             escapeshellarg($logFile)
         );
@@ -162,7 +175,7 @@ class ErpUpdateProcessLauncher
         exec($command, $output, $exitCode);
         self::log($logFile, 'Fallback exec exit='.$exitCode);
 
-        return self::waitForUpdateStart($logFile, 8);
+        return self::waitForUpdateStart($logFile, 8, $artisanCommand);
     }
 
     private static function findEmbeddedPhpExecutable(string $appPath): ?string
@@ -228,10 +241,20 @@ class ErpUpdateProcessLauncher
         return $env;
     }
 
-    private static function waitForUpdateStart(string $logFile, int $attempts = 6): bool
+    private static function waitForUpdateStart(string $logFile, int $attempts = 6, string $artisanCommand = 'unitec:apply-update'): bool
     {
+        $isDownload = str_contains($artisanCommand, 'download-update');
+
         for ($i = 0; $i < $attempts; $i++) {
-            if (self::looksLikeUpdateStarted($logFile)) {
+            if ($isDownload) {
+                if (ErpUpdateService::isDownloadRunning() || ErpUpdateService::isLocalPackageReady()) {
+                    return true;
+                }
+                $meta = ErpUpdateService::readPackageMeta();
+                if (in_array((string) ($meta['download_state'] ?? ''), ['checking', 'downloading', 'ready', 'failed'], true)) {
+                    return true;
+                }
+            } elseif (self::looksLikeUpdateStarted($logFile)) {
                 return true;
             }
 

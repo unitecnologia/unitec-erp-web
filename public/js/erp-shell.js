@@ -1,6 +1,7 @@
 (function () {
     const updateModal = document.getElementById('erp-system-update-modal');
     let pollTimer = null;
+    let packagePollTimer = null;
     let updateRunning = false;
     let updateStuck = false;
     let updateFailed = false;
@@ -8,6 +9,8 @@
     let launchStartedAt = 0;
     let lastStatusSignature = '';
     let lastProgressAt = 0;
+    let packageReady = false;
+    let installFromLocal = false;
 
     const UPDATE_STEP_ORDER = [
         'starting',
@@ -78,6 +81,12 @@
 
             if (event.target.closest('[data-erp-update-dismiss]')) {
                 closeSystemUpdateModal();
+                return;
+            }
+
+            if (event.target.closest('[data-erp-update-download]')) {
+                startPackageDownload();
+                return;
             }
 
             if (event.target.closest('[data-erp-update-start]')) {
@@ -197,6 +206,118 @@
         return ! updateRunning || updateStuck || updateFailed;
     }
 
+    function formatBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (value < 1024) {
+            return `${value} B`;
+        }
+        if (value < 1024 * 1024) {
+            return `${(value / 1024).toFixed(1)} KB`;
+        }
+
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function stopPackagePolling() {
+        if (packagePollTimer) {
+            clearInterval(packagePollTimer);
+            packagePollTimer = null;
+        }
+    }
+
+    function applyPackageStatus(payload) {
+        const localEl = updateModal?.querySelector('[data-erp-update-local-version]');
+        const remoteEl = updateModal?.querySelector('[data-erp-update-remote-version]');
+        const statusEl = updateModal?.querySelector('[data-erp-update-package-status]');
+        const installBtn = updateModal?.querySelector('[data-erp-update-start]');
+        const downloadBtn = updateModal?.querySelector('[data-erp-update-download]');
+
+        const localVersion = payload.local_version || window.__erpUpdateConfig?.appVersion || '—';
+        const remoteVersion = payload.remote_version || '—';
+        packageReady = Boolean(payload.package_ready);
+        const downloadState = String(payload.download_state || 'idle');
+        const downloading = Boolean(payload.download_running) || ['checking', 'downloading'].includes(downloadState);
+
+        if (localEl) {
+            localEl.textContent = localVersion;
+        }
+        if (remoteEl) {
+            remoteEl.textContent = remoteVersion;
+        }
+
+        let message = payload.check_message || 'Nenhum pacote baixado ainda.';
+        let tone = '';
+
+        if (packageReady) {
+            message = payload.check_message
+                || `Pacote pronto${remoteVersion !== '—' ? ' (' + remoteVersion + ')' : ''}${payload.package_bytes ? ' · ' + formatBytes(payload.package_bytes) : ''}. Pode instalar.`;
+            tone = 'is-ready';
+        } else if (downloadState === 'failed') {
+            message = payload.check_message || 'Falha ao baixar o pacote.';
+            tone = 'is-error';
+        } else if (downloading) {
+            message = payload.check_message || 'Baixando pacote em segundo plano...';
+            tone = 'is-warn';
+        } else if (! payload.update_available && remoteVersion !== '—' && remoteVersion === localVersion) {
+            message = payload.check_message || 'Sistema já está na versão mais recente.';
+        }
+
+        if (statusEl) {
+            statusEl.textContent = message;
+            statusEl.classList.remove('is-ready', 'is-warn', 'is-error');
+            if (tone) {
+                statusEl.classList.add(tone);
+            }
+        }
+
+        if (installBtn) {
+            installBtn.hidden = ! packageReady;
+            installBtn.disabled = downloading;
+        }
+
+        if (downloadBtn) {
+            downloadBtn.hidden = packageReady && ! downloading;
+            downloadBtn.disabled = downloading;
+            downloadBtn.textContent = downloading ? 'Baixando...' : (packageReady ? 'Baixar de novo' : 'Baixar agora');
+            if (packageReady && ! downloading) {
+                downloadBtn.hidden = true;
+            }
+        }
+    }
+
+    function refreshPackageStatus() {
+        const config = window.__erpUpdateConfig ?? {};
+        const statusUrl = config.statusUrl;
+        if (! statusUrl) {
+            return Promise.resolve();
+        }
+
+        return fetch(statusUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+        })
+            .then(async (response) => {
+                const payload = await response.json().catch(() => ({}));
+                applyPackageStatus(payload);
+
+                return payload;
+            })
+            .catch(() => null);
+    }
+
+    function startPackagePolling() {
+        stopPackagePolling();
+        refreshPackageStatus();
+        packagePollTimer = setInterval(() => {
+            if (updateRunning || updateModal?.hidden) {
+                return;
+            }
+            refreshPackageStatus();
+        }, 4000);
+    }
+
     function openSystemUpdateModal() {
         if (! updateModal) {
             return;
@@ -204,6 +325,7 @@
 
         updateStuck = false;
         updateFailed = false;
+        installFromLocal = false;
         pollCount = 0;
         launchStartedAt = 0;
         lastStatusSignature = '';
@@ -219,7 +341,8 @@
         resetUpdateHint();
         updateModal.hidden = false;
         updateModal.setAttribute('aria-hidden', 'false');
-        updateModal.querySelector('[data-erp-update-start]')?.focus();
+        startPackagePolling();
+        updateModal.querySelector('[data-erp-update-download]')?.focus();
     }
 
     function closeSystemUpdateModal() {
@@ -228,9 +351,11 @@
         }
 
         stopPolling();
+        stopPackagePolling();
         updateRunning = false;
         updateStuck = false;
         updateFailed = false;
+        installFromLocal = false;
         showResetButton(false);
         resetUpdateSteps();
         resetUpdateInfo();
@@ -245,7 +370,7 @@
     function resetUpdateHint() {
         const hint = updateModal?.querySelector('[data-erp-update-hint]');
         if (hint) {
-            hint.textContent = 'Não feche o navegador até a atualização terminar.';
+            hint.textContent = 'Não feche o navegador até a instalação terminar.';
         }
     }
 
@@ -666,6 +791,66 @@
         return fallback || ('Erro HTTP ' + response.status + ' ao comunicar com o servidor.');
     }
 
+    function startPackageDownload() {
+        const config = window.__erpUpdateConfig ?? {};
+        const downloadUrl = config.downloadUrl;
+        const statusEl = updateModal?.querySelector('[data-erp-update-package-status]');
+
+        if (! downloadUrl) {
+            if (statusEl) {
+                statusEl.textContent = 'Endpoint de download indisponível.';
+                statusEl.classList.add('is-error');
+            }
+            return;
+        }
+
+        if (statusEl) {
+            statusEl.textContent = 'Iniciando download em segundo plano...';
+            statusEl.classList.remove('is-ready', 'is-error');
+            statusEl.classList.add('is-warn');
+        }
+
+        const downloadBtn = updateModal?.querySelector('[data-erp-update-download]');
+        if (downloadBtn) {
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Baixando...';
+        }
+
+        fetch(downloadUrl, {
+            method: 'POST',
+            headers: updateRequestHeaders({
+                'Content-Type': 'application/json',
+            }),
+            credentials: 'same-origin',
+            body: JSON.stringify({ force: false }),
+        })
+            .then(async (response) => {
+                const payload = await response.json().catch(() => ({}));
+
+                if (! response.ok) {
+                    throw new Error(resolveUpdateHttpError(response, payload));
+                }
+
+                if (payload.package) {
+                    applyPackageStatus(payload.package);
+                } else {
+                    refreshPackageStatus();
+                }
+                startPackagePolling();
+            })
+            .catch((error) => {
+                if (statusEl) {
+                    statusEl.textContent = error.message ?? 'Erro ao iniciar download.';
+                    statusEl.classList.remove('is-ready', 'is-warn');
+                    statusEl.classList.add('is-error');
+                }
+                if (downloadBtn) {
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = 'Baixar agora';
+                }
+            });
+    }
+
     function startSystemUpdate() {
         const config = window.__erpUpdateConfig ?? {};
         const launchUrl = config.launchUrl;
@@ -679,9 +864,21 @@
             return;
         }
 
+        if (! packageReady) {
+            const statusEl = updateModal?.querySelector('[data-erp-update-package-status]');
+            if (statusEl) {
+                statusEl.textContent = 'Baixe o pacote primeiro. A instalação só começa com o ZIP local pronto.';
+                statusEl.classList.remove('is-ready');
+                statusEl.classList.add('is-warn');
+            }
+            return;
+        }
+
+        stopPackagePolling();
         updateRunning = true;
         updateStuck = false;
         updateFailed = false;
+        installFromLocal = true;
         pollCount = 0;
         launchStartedAt = Date.now();
         lastStatusSignature = '';
@@ -692,14 +889,27 @@
 
         showUpdatePanel('progress');
         renderUpdateSteps('starting');
-        setUpdateStatus('Iniciando atualização...');
+        setUpdateStatus('Instalando pacote já baixado...');
         setUpdateInfo(
-            'Enviando solicitação ao servidor...',
+            'Usando ZIP em storage/app/private/updates (sem baixar de novo)',
             'php artisan unitec:apply-update',
             ''
         );
         setUpdateProgress(8, true);
         setUpdatePercent(0);
+
+        // Marca "Baixar pacote" como concluído — já está no disco.
+        const downloadStep = updateModal?.querySelector('[data-step="downloading"]');
+        downloadStep?.classList.add('is-done');
+        const downloadPct = updateModal?.querySelector('[data-step-pct="downloading"]');
+        if (downloadPct) {
+            downloadPct.textContent = '100%';
+        }
+        const downloadBar = updateModal?.querySelector('[data-step-bar="downloading"]');
+        if (downloadBar) {
+            downloadBar.style.width = '100%';
+            downloadBar.classList.remove('is-indeterminate');
+        }
 
         fetch(launchUrl, {
             method: 'POST',
@@ -713,11 +923,24 @@
                 const payload = await response.json().catch(() => ({}));
 
                 if (! response.ok) {
+                    if (response.status === 422 && payload.needs_download) {
+                        updateRunning = false;
+                        showUpdatePanel('confirm');
+                        applyPackageStatus(payload.package || {});
+                        startPackagePolling();
+                        const statusEl = updateModal?.querySelector('[data-erp-update-package-status]');
+                        if (statusEl) {
+                            statusEl.textContent = payload.message || 'Pacote ainda não está pronto.';
+                            statusEl.classList.add('is-warn');
+                        }
+                        return;
+                    }
+
                     throw new Error(resolveUpdateHttpError(response, payload));
                 }
 
                 setUpdateInfo(
-                    'Processo aceito. Aguardando início do download...',
+                    'Processo aceito. Extraindo e aplicando arquivos...',
                     'php artisan unitec:apply-update',
                     formatElapsed(launchStartedAt)
                 );
@@ -727,20 +950,7 @@
             .catch((error) => {
                 updateRunning = false;
                 updateFailed = true;
-                setUpdateProgress(0, false);
-                setUpdatePercent(0);
-                setUpdateStatus(error.message ?? 'Erro ao iniciar a atualização.', true);
-                showResetButton(true);
-
-                const hint = updateModal?.querySelector('[data-erp-update-hint]');
-                if (hint) {
-                    const msg = String(error.message ?? '');
-                    if (/sessão|login|419|token/i.test(msg)) {
-                        hint.textContent = 'Saia e entre de novo no ERP. Confira se o APP_URL do .env é o mesmo endereço da barra do navegador.';
-                    } else {
-                        hint.textContent = 'Verifique storage/logs/erp-update-spawn.log, instalacao.log e UNITEC_UPDATE_DOWNLOAD_URL no .env.';
-                    }
-                }
+                markUpdateFailed(error.message ?? 'Erro ao iniciar instalação.');
             });
     }
 

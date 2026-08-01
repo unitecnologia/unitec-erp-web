@@ -146,6 +146,31 @@ class Login extends BaseLogin
 
     protected function getLoginFormComponent(): Component
     {
+        $userCount = User::query()->where('ativo', true)->count();
+
+        // Select nativo com poucos usuários: mais confiável após update
+        // (searchable do Filament às vezes mostra "sem opções" mesmo com dados).
+        if ($userCount > 0 && $userCount <= 100) {
+            return Select::make('user_id')
+                ->label('USUÁRIO')
+                ->placeholder('SELECIONE O USUÁRIO')
+                ->options(fn (): array => $this->userOptionsForEmpresa((int) ($this->data['empresa_id'] ?? 0)))
+                ->native()
+                ->live()
+                ->selectablePlaceholder(true)
+                ->required()
+                ->extraInputAttributes([
+                    'tabindex' => 2,
+                    'autocomplete' => 'off',
+                    'autocapitalize' => 'characters',
+                    'style' => 'text-transform: uppercase;',
+                    'data-lpignore' => 'true',
+                    'data-1p-ignore' => 'true',
+                    'data-bwignore' => 'true',
+                    'data-form-type' => 'other',
+                ]);
+        }
+
         return Select::make('user_id')
             ->label('USUÁRIO')
             ->placeholder('DIGITE O NOME DO USUÁRIO')
@@ -155,6 +180,8 @@ class Login extends BaseLogin
             ->live()
             ->selectablePlaceholder(true)
             ->required()
+            ->noOptionsMessage('Nenhum usuário cadastrado.')
+            ->noSearchResultsMessage('Nenhum usuário encontrado.')
             ->extraInputAttributes([
                 'tabindex' => 2,
                 'autocomplete' => 'off',

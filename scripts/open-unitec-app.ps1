@@ -79,6 +79,20 @@ try {
     }
 
     Sync-UnitecEnvAppUrl -AppPath $AppPath -AppUrl $AppUrl | Out-Null
+
+    # Se um update anterior parou no PHP/VC++, termina agora (apos reboot).
+    try {
+        if (Test-UnitecUpdatePendingFinish -AppPath $AppPath) {
+            if (-not $LeigoMode) {
+                Write-Host 'Detectada atualizacao pendente - finalizando...' -ForegroundColor Cyan
+            }
+            Complete-UnitecPendingUpdate -AppPath $AppPath | Out-Null
+        }
+    } catch {
+        Write-InstallLog -AppPath $AppPath -Message ('Falha ao finalizar update pendente: {0}' -f $_.Exception.Message)
+        throw ('Atualizacao pendente nao concluida: {0}' -f $_.Exception.Message)
+    }
+
     Start-UnitecStack -AppPath $AppPath -WaitSeconds 15
 
     if (-not $SkipBrowser) {

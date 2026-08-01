@@ -113,6 +113,11 @@ class ErpPermissionCatalog
           'close_month' => 'Fechar Mês (F9)',
         ],
       ],
+      'devolucoes_compra' => [
+        'label' => 'Devolução de Compra',
+        'group' => 'Compras',
+        'actions' => static::crudPrintActions(),
+      ],
       'orcamentos' => [
         'label' => 'Orçamentos',
         'group' => 'Vendas',

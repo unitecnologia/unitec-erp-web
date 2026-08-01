@@ -15,22 +15,37 @@
 
         <div class="erp-update-modal__panel" data-erp-update-panel="confirm">
             <div class="erp-update-modal__icon" aria-hidden="true">⬇</div>
-            <p class="erp-update-modal__lead">
-                O Unitec ERP será atualizado com o pacote
-                <strong>{{ config('unitec.update_zip_name', 'Unitec-ERP-Update.zip') }}</strong>
-                disponível na nuvem.
+            <p class="erp-update-modal__lead" data-erp-update-lead>
+                O sistema verifica atualizações 1× por dia e baixa o pacote em segundo plano.
+                Quando o ZIP estiver pronto, a instalação fica rápida e não trava o uso.
             </p>
+            <div class="erp-update-modal__package" data-erp-update-package-box>
+                <p class="erp-update-modal__package-line">
+                    <span>Versão instalada</span>
+                    <strong data-erp-update-local-version>{{ config('unitec.versao') }}</strong>
+                </p>
+                <p class="erp-update-modal__package-line">
+                    <span>Pacote disponível</span>
+                    <strong data-erp-update-remote-version>—</strong>
+                </p>
+                <p class="erp-update-modal__package-status" data-erp-update-package-status>
+                    Verificando status do pacote...
+                </p>
+            </div>
             <ul class="erp-update-modal__list">
-                <li>Seus dados (.env, storage e banco) serão preservados.</li>
-                <li>O download e a instalação rodam em segundo plano.</li>
-                <li>A página recarrega sozinha ao concluir.</li>
+                <li>Dados (.env, storage e banco) são preservados.</li>
+                <li>Download pode demorar — rode em horário livre.</li>
+                <li>Instalar só depois do pacote pronto (bem mais rápido).</li>
             </ul>
             <div class="erp-update-modal__actions">
-                <button type="button" class="erp-update-modal__btn erp-update-modal__btn--primary" data-erp-update-start>
-                    Atualizar agora
+                <button type="button" class="erp-update-modal__btn erp-update-modal__btn--primary" data-erp-update-start hidden>
+                    Instalar agora
+                </button>
+                <button type="button" class="erp-update-modal__btn erp-update-modal__btn--primary" data-erp-update-download>
+                    Baixar agora
                 </button>
                 <button type="button" class="erp-update-modal__btn" data-erp-update-dismiss>
-                    Cancelar
+                    Fechar
                 </button>
             </div>
         </div>
@@ -76,7 +91,7 @@
             </div>
 
             <p class="erp-update-modal__hint" data-erp-update-hint>
-                Não feche o navegador até a atualização terminar.
+                Não feche o navegador até a instalação terminar.
             </p>
             <div class="erp-update-modal__actions erp-update-modal__actions--progress">
                 <button type="button" class="erp-update-modal__btn" data-erp-update-reset hidden>

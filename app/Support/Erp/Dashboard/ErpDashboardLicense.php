@@ -82,7 +82,7 @@ class ErpDashboardLicense
             'hint' => $hint,
             'tone' => $tone,
             'icon' => 'heroicon-o-shield-exclamation',
-            'action_url' => $service->pagamentoUrl() ?: config('unitec.pagamento_url'),
+            'action_url' => $service->pagamentoUrl(),
             'action_label' => 'Clique aqui para renovar',
         ];
     }

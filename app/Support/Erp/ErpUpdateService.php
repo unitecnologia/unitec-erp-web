@@ -14,6 +14,14 @@ class ErpUpdateService
 
     private const LOCK_FILE = 'app/private/erp-update.lock';
 
+    private const DOWNLOAD_LOCK_FILE = 'app/private/erp-update-download.lock';
+
+    private const UPDATES_DIR = 'app/private/updates';
+
+    private const PACKAGE_ZIP = 'Unitec-ERP-Update.zip';
+
+    private const PACKAGE_META = 'package.json';
+
     /**
      * @return array<string, mixed>
      */
@@ -22,24 +30,140 @@ class ErpUpdateService
         $path = storage_path(self::STATUS_FILE);
 
         if (! is_file($path)) {
-            return [
-                'state' => 'idle',
-                'message' => 'Aguardando.',
-                'percent' => 0,
-            ];
+            return array_merge(self::defaultStatus(), self::packageStatusPayload());
         }
 
         $data = json_decode((string) file_get_contents($path), true);
 
         if (! is_array($data)) {
-            return [
-                'state' => 'idle',
-                'message' => 'Aguardando.',
-                'percent' => 0,
-            ];
+            return array_merge(self::defaultStatus(), self::packageStatusPayload());
         }
 
-        return $data;
+        // Pacote local (download em background) deve prevalecer sobre o status de instalação.
+        return array_merge(self::defaultStatus(), $data, self::packageStatusPayload());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function defaultStatus(): array
+    {
+        return [
+            'state' => 'idle',
+            'message' => 'Aguardando.',
+            'percent' => 0,
+        ];
+    }
+
+    public static function localPackagePath(): string
+    {
+        return storage_path(self::UPDATES_DIR.'/'.self::PACKAGE_ZIP);
+    }
+
+    public static function localPackageMetaPath(): string
+    {
+        return storage_path(self::UPDATES_DIR.'/'.self::PACKAGE_META);
+    }
+
+    public static function isLocalPackageReady(): bool
+    {
+        $path = self::localPackagePath();
+        if (! is_file($path) || filesize($path) < 1_000_000) {
+            return false;
+        }
+
+        $meta = self::readPackageMeta();
+
+        return (bool) ($meta['package_ready'] ?? false);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function readPackageMeta(): array
+    {
+        $path = self::localPackageMetaPath();
+        if (! is_file($path)) {
+            return [];
+        }
+
+        $data = json_decode((string) file_get_contents($path), true);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    public static function writePackageMeta(array $meta): void
+    {
+        File::ensureDirectoryExists(dirname(self::localPackageMetaPath()));
+        $current = self::readPackageMeta();
+        $payload = array_merge($current, $meta, [
+            'updated_at' => now()->toIso8601String(),
+        ]);
+        File::put(
+            self::localPackageMetaPath(),
+            json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function packageStatusPayload(): array
+    {
+        $meta = self::readPackageMeta();
+        $path = self::localPackagePath();
+        $ready = is_file($path) && filesize($path) >= 1_000_000 && (bool) ($meta['package_ready'] ?? false);
+        $localVersion = (string) config('unitec.versao', '');
+        $packageVersion = (string) ($meta['package_version'] ?? $meta['remote_version'] ?? '');
+        $remoteVersion = (string) ($meta['remote_version'] ?? '');
+        $effectiveRemote = $packageVersion !== '' ? $packageVersion : $remoteVersion;
+
+        return [
+            'local_version' => $localVersion,
+            'remote_version' => $effectiveRemote !== '' ? $effectiveRemote : null,
+            'update_available' => $ready && $effectiveRemote !== '' && version_compare($effectiveRemote, $localVersion, '>'),
+            'package_ready' => $ready,
+            'package_path' => $ready ? $path : null,
+            'package_bytes' => $ready ? (int) filesize($path) : (int) ($meta['package_bytes'] ?? 0),
+            'package_downloaded_at' => $meta['downloaded_at'] ?? null,
+            'last_check_at' => $meta['last_check_at'] ?? null,
+            'download_state' => (string) ($meta['download_state'] ?? 'idle'),
+            'download_running' => self::isDownloadRunning(),
+            'check_message' => (string) ($meta['check_message'] ?? ''),
+        ];
+    }
+
+    public static function shouldAutoCheckForUpdates(int $maxAgeHours = 24): bool
+    {
+        $meta = self::readPackageMeta();
+        $last = strtotime((string) ($meta['last_check_at'] ?? ''));
+        if ($last === false) {
+            return true;
+        }
+
+        return (time() - $last) >= ($maxAgeHours * 3600);
+    }
+
+    public static function isDownloadRunning(): bool
+    {
+        $lock = storage_path(self::DOWNLOAD_LOCK_FILE);
+        if (! is_file($lock)) {
+            $meta = self::readPackageMeta();
+
+            return (($meta['download_state'] ?? '') === 'downloading');
+        }
+
+        $age = time() - (int) filemtime($lock);
+        if ($age > 3600) {
+            File::delete($lock);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function isRunning(): bool
@@ -113,6 +237,7 @@ class ErpUpdateService
             'framework/testing',
             'logs',
             'app/private',
+            self::UPDATES_DIR,
         ] as $relative) {
             File::ensureDirectoryExists(storage_path($relative));
         }
@@ -124,9 +249,177 @@ class ErpUpdateService
             'starting',
             'Preparando atualização',
             5,
-            'Enviando comando para o servidor iniciar o processo',
+            self::isLocalPackageReady()
+                ? 'Usando pacote já baixado em storage/app/private/updates'
+                : 'Enviando comando para o servidor iniciar o processo',
             'php artisan unitec:apply-update'
         );
+    }
+
+    /**
+     * Verifica a nuvem 1x e baixa o ZIP para storage/app/private/updates (sem aplicar).
+     *
+     * @return array{downloaded: bool, message: string, remote_version: ?string}
+     */
+    public function downloadPendingUpdate(string $appPath, bool $force = false): array
+    {
+        $lockPath = storage_path(self::DOWNLOAD_LOCK_FILE);
+        File::ensureDirectoryExists(dirname($lockPath));
+
+        if (is_file($lockPath)) {
+            $age = time() - (int) filemtime($lockPath);
+            if ($age < 3600) {
+                return [
+                    'downloaded' => false,
+                    'message' => 'Download de atualização já em andamento.',
+                    'remote_version' => self::readPackageMeta()['remote_version'] ?? null,
+                ];
+            }
+            File::delete($lockPath);
+        }
+
+        File::put($lockPath, (string) time());
+        self::ensureFrameworkStorageDirectories();
+
+        try {
+            $localVersion = (string) config('unitec.versao', '0');
+            $downloadUrl = $this->resolveUpdateDownloadUrl();
+            $remoteVersion = $this->resolveRemoteVersion($downloadUrl);
+
+            self::writePackageMeta([
+                'download_state' => 'checking',
+                'last_check_at' => now()->toIso8601String(),
+                'local_version' => $localVersion,
+                'remote_version' => $remoteVersion,
+                'check_message' => 'Verificando atualizações...',
+                'package_ready' => self::isLocalPackageReady(),
+            ]);
+
+            if ($remoteVersion !== null && version_compare($remoteVersion, $localVersion, '<=')) {
+                if (! $force && self::isLocalPackageReady()) {
+                    // Pacote antigo pode sobrar — limpa se versão remota já instalada.
+                    $this->clearLocalPackage(keepMeta: true);
+                }
+
+                self::writePackageMeta([
+                    'download_state' => 'idle',
+                    'package_ready' => false,
+                    'check_message' => 'Sistema já está na versão '.$localVersion.'.',
+                    'remote_version' => $remoteVersion,
+                    'last_check_at' => now()->toIso8601String(),
+                ]);
+
+                return [
+                    'downloaded' => false,
+                    'message' => 'Nenhuma atualização pendente (versão '.$localVersion.').',
+                    'remote_version' => $remoteVersion,
+                ];
+            }
+
+            if (! $force && self::isLocalPackageReady()) {
+                $meta = self::readPackageMeta();
+                $readyVersion = (string) ($meta['package_version'] ?? '');
+                if ($remoteVersion !== null && $readyVersion !== '' && $readyVersion === $remoteVersion) {
+                    self::writePackageMeta([
+                        'download_state' => 'ready',
+                        'check_message' => 'Pacote '.$remoteVersion.' já baixado. Pode instalar.',
+                        'remote_version' => $remoteVersion,
+                        'last_check_at' => now()->toIso8601String(),
+                    ]);
+
+                    return [
+                        'downloaded' => false,
+                        'message' => 'Pacote já está pronto para instalar ('.$remoteVersion.').',
+                        'remote_version' => $remoteVersion,
+                    ];
+                }
+            }
+
+            $target = self::localPackagePath();
+            $partial = $target.'.partial';
+            File::ensureDirectoryExists(dirname($target));
+            if (is_file($partial)) {
+                File::delete($partial);
+            }
+
+            self::writePackageMeta([
+                'download_state' => 'downloading',
+                'package_ready' => false,
+                'package_version' => null,
+                'check_message' => 'Baixando pacote'.($remoteVersion ? ' '.$remoteVersion : '').'...',
+                'remote_version' => $remoteVersion,
+                'last_check_at' => now()->toIso8601String(),
+            ]);
+
+            $this->downloadPackage($partial, $downloadUrl);
+
+            if (! is_file($partial) || filesize($partial) < 1_000_000) {
+                throw new RuntimeException('Download incompleto do pacote de atualização.');
+            }
+
+            if (is_file($target)) {
+                File::delete($target);
+            }
+            File::move($partial, $target);
+
+            $bytes = (int) filesize($target);
+            self::writePackageMeta([
+                'download_state' => 'ready',
+                'package_ready' => true,
+                'package_bytes' => $bytes,
+                'package_version' => $remoteVersion,
+                'downloaded_at' => now()->toIso8601String(),
+                'remote_version' => $remoteVersion,
+                'local_version' => $localVersion,
+                'check_message' => 'Pacote pronto para instalar'.($remoteVersion ? ' ('.$remoteVersion.')' : '').'.',
+                'last_check_at' => now()->toIso8601String(),
+            ]);
+
+            $this->log($appPath, 'Pacote de atualizacao baixado: '.$target.' ('.$bytes.' bytes)');
+
+            return [
+                'downloaded' => true,
+                'message' => 'Pacote baixado com sucesso'.($remoteVersion ? ' ('.$remoteVersion.')' : '').'.',
+                'remote_version' => $remoteVersion,
+            ];
+        } catch (\Throwable $exception) {
+            self::writePackageMeta([
+                'download_state' => 'failed',
+                'package_ready' => self::isLocalPackageReady(),
+                'check_message' => $exception->getMessage(),
+                'last_check_at' => now()->toIso8601String(),
+            ]);
+            $this->log($appPath, 'ERRO download update: '.$exception->getMessage());
+
+            throw $exception;
+        } finally {
+            File::delete($lockPath);
+            $partial = self::localPackagePath().'.partial';
+            if (is_file($partial)) {
+                File::delete($partial);
+            }
+        }
+    }
+
+    public function clearLocalPackage(bool $keepMeta = false): void
+    {
+        $path = self::localPackagePath();
+        if (is_file($path)) {
+            File::delete($path);
+        }
+        $partial = $path.'.partial';
+        if (is_file($partial)) {
+            File::delete($partial);
+        }
+
+        if ($keepMeta) {
+            self::writePackageMeta([
+                'package_ready' => false,
+                'package_bytes' => 0,
+                'package_version' => null,
+                'download_state' => 'idle',
+            ]);
+        }
     }
 
     public function run(string $appPath): void
@@ -146,11 +439,15 @@ class ErpUpdateService
         File::put($lockPath, (string) time());
         self::ensureFrameworkStorageDirectories();
 
+        $useLocal = self::isLocalPackageReady();
+
         self::writeStatus(
             'starting',
             'Processo de atualização iniciado',
             8,
-            'Conectando ao servidor de download...',
+            $useLocal
+                ? 'Instalando pacote local (sem baixar novamente)'
+                : 'Pacote local ausente — baixando da nuvem...',
             'php artisan unitec:apply-update'
         );
 
@@ -165,24 +462,37 @@ class ErpUpdateService
             $this->log($appPath, 'Iniciando atualizacao via PHP.');
             $this->ensureEmbeddedPhpConfiguration($appPath);
 
-            $downloadUrl = $this->resolveUpdateDownloadUrl();
+            if ($useLocal) {
+                $localZip = self::localPackagePath();
+                File::copy($localZip, $zipPath);
+                self::writeStatus(
+                    'extracting',
+                    'Extraindo pacote já baixado',
+                    40,
+                    'ZIP local em storage/app/private/updates',
+                    class_exists(ZipArchive::class) ? 'ZipArchive::extractTo' : 'Expand-Archive (PowerShell)'
+                );
+            } else {
+                $downloadUrl = $this->resolveUpdateDownloadUrl();
 
-            self::writeStatus(
-                'downloading',
-                'Baixando pacote de atualização',
-                15,
-                $this->describeDownloadSource($downloadUrl),
-                'HTTP GET → '.basename($downloadUrl)
-            );
-            $this->downloadPackage($zipPath, $downloadUrl);
+                self::writeStatus(
+                    'downloading',
+                    'Baixando pacote de atualização',
+                    15,
+                    $this->describeDownloadSource($downloadUrl),
+                    'HTTP GET → '.basename($downloadUrl)
+                );
+                $this->downloadPackage($zipPath, $downloadUrl);
 
-            self::writeStatus(
-                'extracting',
-                'Extraindo arquivos do pacote',
-                38,
-                'Descompactando ZIP e validando estrutura (artisan, vendor/)',
-                class_exists(ZipArchive::class) ? 'ZipArchive::extractTo' : 'Expand-Archive (PowerShell)'
-            );
+                self::writeStatus(
+                    'extracting',
+                    'Extraindo arquivos do pacote',
+                    38,
+                    'Descompactando ZIP e validando estrutura (artisan, vendor/)',
+                    class_exists(ZipArchive::class) ? 'ZipArchive::extractTo' : 'Expand-Archive (PowerShell)'
+                );
+            }
+
             $sourceRoot = $this->extractPackage($zipPath, $extractRoot);
 
             self::writeStatus(
@@ -214,6 +524,15 @@ class ErpUpdateService
             );
             $this->finalizeCaches($appPath);
 
+            $this->clearLocalPackage(keepMeta: true);
+            self::writePackageMeta([
+                'download_state' => 'idle',
+                'package_ready' => false,
+                'check_message' => 'Atualização aplicada. Sistema em '.config('unitec.versao'),
+                'local_version' => (string) config('unitec.versao'),
+                'last_check_at' => now()->toIso8601String(),
+            ]);
+
             $this->log($appPath, 'Atualizacao concluida com sucesso.');
 
             self::writeStatus(
@@ -232,6 +551,29 @@ class ErpUpdateService
             File::delete($lockPath);
             File::deleteDirectory($tempRoot);
         }
+    }
+
+    private function resolveRemoteVersion(string $downloadUrl): ?string
+    {
+        $host = strtolower((string) parse_url($downloadUrl, PHP_URL_HOST));
+        if (str_contains($host, 'github.com')) {
+            try {
+                $response = Http::timeout(20)
+                    ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'Unitec-ERP-Update'])
+                    ->get('https://api.github.com/repos/unitecnologia/unitec-erp-web/releases/tags/update');
+
+                if ($response->successful()) {
+                    $name = (string) ($response->json('name') ?? $response->json('tag_name') ?? '');
+                    if (preg_match('/(\d+\.\d+\.\d+\.\d+)/', $name, $m)) {
+                        return $m[1];
+                    }
+                }
+            } catch (\Throwable) {
+                // ignore — download ainda pode seguir
+            }
+        }
+
+        return null;
     }
 
     private function resolveUpdateDownloadUrl(): string

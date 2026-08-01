@@ -12,6 +12,7 @@
 <script>
     window.__erpUpdateConfig = {
         launchUrl: '/admin/erp-update/launch',
+        downloadUrl: '/admin/erp-update/download',
         statusUrl: '/admin/erp-update/status',
         resetUrl: '/admin/erp-update/reset',
         assetVersion: @json($version),
