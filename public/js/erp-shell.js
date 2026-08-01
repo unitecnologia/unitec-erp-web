@@ -16,8 +16,10 @@
     let displayedStepProgress = {};
     let targetStepProgress = {};
     let progressAnimRaf = 0;
+    let progressAnimTimer = 0;
     let softTickTimer = 0;
     let currentUpdateState = 'idle';
+    let hasServerStepPercent = false;
 
     const UPDATE_STEP_ORDER = [
         'starting',
@@ -33,8 +35,8 @@
     const UPDATE_STEP_RANGES = {
         starting: [0, 8],
         downloading: [8, 38],
-        extracting: [38, 48],
-        backing_up: [48, 58],
+        extracting: [38, 55],
+        backing_up: [55, 58],
         applying: [58, 82],
         migrating: [82, 92],
         finalizing: [92, 100],
@@ -44,6 +46,23 @@
     document.addEventListener(
         'click',
         (event) => {
+            // PWA: clique no atalho PDV pede tela cheia no mesmo gesto (esconde taskbar).
+            const pdvLink = event.target.closest?.('a[href*="/pdv"]');
+            if (
+                pdvLink
+                && ! document.fullscreenElement
+                && (window.matchMedia('(display-mode: standalone)').matches
+                    || window.matchMedia('(display-mode: fullscreen)').matches
+                    || window.navigator.standalone === true)
+            ) {
+                const target = document.documentElement;
+                if (typeof target.requestFullscreen === 'function') {
+                    target.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+                        target.requestFullscreen().catch(() => {});
+                    });
+                }
+            }
+
             const updateButton = event.target.closest('[data-erp-action="system-update"]');
             if (updateButton) {
                 event.preventDefault();
@@ -57,13 +76,10 @@
                 event.preventDefault();
                 event.stopPropagation();
                 closeAllTopMenus();
-                if (window.UnitecErpPwa) {
-                    if (typeof window.UnitecErpPwa.show === 'function') {
-                        window.UnitecErpPwa.show();
-                    }
-                    if (typeof window.UnitecErpPwa.install === 'function') {
-                        void window.UnitecErpPwa.install();
-                    }
+                if (window.UnitecErpPwa && typeof window.UnitecErpPwa.install === 'function') {
+                    void window.UnitecErpPwa.install();
+                } else if (window.UnitecErpPwa && typeof window.UnitecErpPwa.show === 'function') {
+                    window.UnitecErpPwa.show();
                 } else {
                     alert(
                         'Para instalar o Unitec ERP no Windows:\n' +
@@ -451,6 +467,7 @@
         ensureStepProgressMaps();
         let changed = false;
 
+        // 1% por ciclo (~120ms) — lento o bastante para o usuário ver a contagem.
         if (displayedPercent < targetPercent) {
             displayedPercent = Math.min(targetPercent, displayedPercent + 1);
             changed = true;
@@ -476,46 +493,71 @@
 
         paintDisplayedProgress();
 
-        if (changed) {
-            progressAnimRaf = window.requestAnimationFrame(tickProgressAnimation);
+        if (! changed) {
+            progressAnimTimer = 0;
             return;
         }
 
-        progressAnimRaf = 0;
+        progressAnimTimer = window.setTimeout(tickProgressAnimation, 120);
     }
 
     function startProgressAnimation() {
-        if (progressAnimRaf) {
+        if (progressAnimTimer) {
             return;
         }
 
-        progressAnimRaf = window.requestAnimationFrame(tickProgressAnimation);
+        progressAnimTimer = window.setTimeout(tickProgressAnimation, 30);
     }
 
-    function setProgressTargets(percent, stepProgress, state) {
+    function setProgressTargets(percent, stepProgress, state, serverActiveStepPercent) {
         const previousState = currentUpdateState;
         currentUpdateState = state || currentUpdateState;
         ensureStepProgressMaps();
 
+        const hasExplicit =
+            typeof serverActiveStepPercent === 'number' && ! Number.isNaN(serverActiveStepPercent);
+
+        if (previousState !== currentUpdateState) {
+            hasServerStepPercent = hasExplicit;
+        } else if (hasExplicit) {
+            hasServerStepPercent = true;
+        }
+
         const incoming = { ...(stepProgress || {}) };
+
+        // Preferência: % real da etapa vindo do servidor (1 em 1).
+        if (currentUpdateState && hasExplicit) {
+            incoming[currentUpdateState] = Math.max(0, Math.min(100, serverActiveStepPercent));
+        }
+
+        const activeIndex = UPDATE_STEP_ORDER.indexOf(currentUpdateState);
+
         UPDATE_STEP_ORDER.forEach((step) => {
             const serverValue = Math.max(0, Math.min(100, Number(incoming[step] ?? 0)));
             const shown = Number(displayedStepProgress[step] ?? 0);
-            const previousTarget = Number(targetStepProgress[step] ?? 0);
+            const stepIndex = UPDATE_STEP_ORDER.indexOf(step);
 
-            if (currentUpdateState === previousState && step === currentUpdateState) {
-                // Na mesma etapa, a barra só sobe (evita “voltar” depois do tick suave).
-                targetStepProgress[step] = Math.max(serverValue, shown, previousTarget);
-            } else if (step === currentUpdateState) {
-                targetStepProgress[step] = Math.max(1, serverValue);
+            if (step === currentUpdateState) {
+                if (currentUpdateState === previousState) {
+                    targetStepProgress[step] = Math.max(serverValue, shown);
+                } else {
+                    displayedStepProgress[step] = Math.max(0, Math.min(shown, Math.max(1, serverValue)));
+                    targetStepProgress[step] = Math.max(1, serverValue);
+                }
+            } else if (activeIndex !== -1 && stepIndex < activeIndex) {
+                targetStepProgress[step] = 100;
+                displayedStepProgress[step] = 100;
             } else {
-                targetStepProgress[step] = serverValue;
+                targetStepProgress[step] = 0;
+                if (previousState !== currentUpdateState) {
+                    displayedStepProgress[step] = 0;
+                }
             }
         });
 
         const nextPercent = Math.max(0, Math.min(100, Number(percent) || 0));
         if (currentUpdateState === previousState) {
-            targetPercent = Math.max(nextPercent, displayedPercent, targetPercent);
+            targetPercent = Math.max(nextPercent, displayedPercent);
         } else {
             targetPercent = Math.max(nextPercent, displayedPercent);
         }
@@ -533,6 +575,8 @@
     }
 
     function resetProgressCounters() {
+        window.clearTimeout(progressAnimTimer);
+        progressAnimTimer = 0;
         window.cancelAnimationFrame(progressAnimRaf);
         progressAnimRaf = 0;
         window.clearInterval(softTickTimer);
@@ -542,6 +586,7 @@
         displayedStepProgress = {};
         targetStepProgress = {};
         currentUpdateState = 'idle';
+        hasServerStepPercent = false;
         UPDATE_STEP_ORDER.forEach((step) => {
             displayedStepProgress[step] = 0;
             targetStepProgress[step] = 0;
@@ -556,6 +601,11 @@
                 return;
             }
 
+            // Com progresso real do servidor, não inventa %.
+            if (hasServerStepPercent) {
+                return;
+            }
+
             const state = currentUpdateState;
             if (! state || ['completed', 'failed', 'idle'].includes(state)) {
                 return;
@@ -564,24 +614,13 @@
             ensureStepProgressMaps();
             const shown = Number(displayedStepProgress[state] ?? 0);
             const target = Number(targetStepProgress[state] ?? 0);
-            const ceiling = 95;
+            const ceiling = 90;
 
-            if (Math.max(shown, target) < ceiling) {
-                targetStepProgress[state] = Math.min(ceiling, Math.max(shown, target) + 1);
-
-                const range = UPDATE_STEP_RANGES[state] ?? [0, 100];
-                const span = range[1] - range[0];
-                if (span > 0) {
-                    const stepPct = targetStepProgress[state];
-                    targetPercent = Math.max(
-                        targetPercent,
-                        Math.min(range[1] - 1, range[0] + Math.floor((stepPct / 100) * span))
-                    );
-                }
-
+            if (Math.max(shown, target) < ceiling && shown >= target) {
+                targetStepProgress[state] = Math.min(ceiling, target + 1);
                 startProgressAnimation();
             }
-        }, 350);
+        }, 900);
     }
 
     function resetUpdateSteps() {
@@ -781,10 +820,14 @@
             payload.step_progress && typeof payload.step_progress === 'object'
                 ? payload.step_progress
                 : computeStepProgressFromPercent(state, percent);
+        const activeStepPercent =
+            payload.active_step_percent === null || payload.active_step_percent === undefined
+                ? null
+                : Number(payload.active_step_percent);
 
         setUpdateStatus(message, isError || state === 'failed');
         renderUpdateSteps(state);
-        setProgressTargets(percent, stepProgress, state);
+        setProgressTargets(percent, stepProgress, state, activeStepPercent);
         setUpdateInfo(
             detail,
             command,

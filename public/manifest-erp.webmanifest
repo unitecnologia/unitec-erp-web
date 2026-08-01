@@ -6,12 +6,19 @@
   "start_url": "/admin/login",
   "scope": "/admin",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#0f3460",
   "theme_color": "#0f3460",
   "lang": "pt-BR",
   "dir": "ltr",
   "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest-erp.webmanifest"
+    }
+  ],
   "icons": [
     {
       "src": "/images/pwa/icon-192.png",

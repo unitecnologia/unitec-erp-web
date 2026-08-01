@@ -16,7 +16,11 @@
                     </button>
                 </form>
             @elseif (filled($shortcut['url'] ?? null) && ! ($shortcut['disabled'] ?? false))
-                <a href="{{ $shortcut['url'] }}" wire:navigate="false" class="erp-shortcut erp-shortcut--{{ $shortcut['color'] }}">
+                <a
+                    href="{{ $shortcut['url'] }}"
+                    wire:navigate
+                    class="erp-shortcut erp-shortcut--{{ $shortcut['color'] }}"
+                >
                     @include('filament.components.erp.shortcut-icon', ['shortcut' => $shortcut])
                     <span class="erp-shortcut__label">{{ $shortcut['label'] }}</span>
                 </a>

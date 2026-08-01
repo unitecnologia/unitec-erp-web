@@ -7,6 +7,7 @@ use App\Support\Erp\ErpContext;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -31,7 +32,7 @@ class EnsureEmpresaSelecionada
         }
 
         // Sem empresa cadastrada ainda: primeiro acesso é tratado por outro middleware.
-        if (! Empresa::query()->exists()) {
+        if (! Cache::remember('erp.empresa.exists', 120, static fn (): bool => Empresa::query()->exists())) {
             return $next($request);
         }
 

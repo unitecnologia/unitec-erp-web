@@ -83,6 +83,12 @@ class ErpAccess
   public static function forgetSession(): void
   {
     session()->forget(static::SESSION_KEY);
+
+    try {
+      app(\App\Support\Erp\License\LicencaRemotaService::class)->forgetLoginGate();
+    } catch (\Throwable) {
+      // ignore
+    }
   }
 
   public static function currentCan(string $permission): bool

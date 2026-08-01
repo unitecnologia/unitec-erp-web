@@ -19,7 +19,9 @@
 <script src="{{ asset('js/erp-device-service.js') }}?v={{ $version }}"></script>
 <script src="{{ asset('js/erp-silent-print.js') }}?v={{ $version }}"></script>
 @include('filament.components.erp.form-scripts')
-<script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $version }}"></script>
+@if (request()->is('admin/products*', 'admin/produtos*'))
+    <script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $version }}"></script>
+@endif
 @if (request()->is('admin/orcamentos*'))
     <script src="{{ asset('js/erp-orcamentos.js') }}?v={{ $version }}"></script>
 @endif

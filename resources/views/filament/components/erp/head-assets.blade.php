@@ -20,7 +20,7 @@
         zipName: @json(config('unitec.update_zip_name', 'Unitec-ERP-Update.zip')),
         stallSeconds: 600,
         downloadStallSeconds: 600,
-        extractingStallSeconds: 600,
+        extractingStallSeconds: 900,
         backingUpStallSeconds: 600,
         applyingStallSeconds: 600,
         migratingStallSeconds: 600,

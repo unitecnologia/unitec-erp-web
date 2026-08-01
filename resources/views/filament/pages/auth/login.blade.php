@@ -1,10 +1,10 @@
-﻿<div class="unitec-login-root">
+<div class="unitec-login-root">
     <div class="unitec-login" aria-label="Tela de acesso">
         <div class="unitec-login__modal">
             <div class="unitec-login__left">
                 <p class="unitec-login__eyebrow">Acesso ao ERP</p>
                 <h1 class="unitec-login__welcome">Bem-vindo ao Sistema</h1>
-                <p class="unitec-login__tagline">GestÃ£o completa para o seu negÃ³cio</p>
+                <p class="unitec-login__tagline">Gestão completa para o seu negócio</p>
 
                 <div class="unitec-login__brand" aria-label="Unitecnologia Sistemas">
                     <img
@@ -18,11 +18,11 @@
                 </div>
 
                 <div class="unitec-login__meta">
-                    <p class="unitec-login__version" aria-label="VersÃ£o do sistema">
-                        VersÃ£o {{ config('unitec.versao') }}
+                    <p class="unitec-login__version" aria-label="Versão do sistema">
+                        Versão {{ config('unitec.versao') }}
                     </p>
                     <p class="unitec-login__copyright">
-                        Â© Unitecnologia Sistemas LTDA
+                        © Unitecnologia Sistemas LTDA
                     </p>
                 </div>
             </div>
@@ -31,7 +31,7 @@
                 <div class="unitec-login__right-header">
                     <div>
                         <p class="unitec-login__instruction">Entrar</p>
-                        <p class="unitec-login__instruction-hint">Informe empresa, usuÃ¡rio e senha</p>
+                        <p class="unitec-login__instruction-hint">Informe empresa, usuário e senha</p>
                     </div>
                     <button
                         type="button"
@@ -45,13 +45,6 @@
 
                 <div class="unitec-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
                     {{ $this->content }}
-                </div>
-
-                <div class="unitec-login__pwa">
-                    <button type="button" class="unitec-login__pwa-btn" data-unitec-login-install-app>
-                        Instalar no Windows
-                    </button>
-                    <p class="unitec-login__pwa-hint">Abre como aplicativo no computador (Chrome / Edge).</p>
                 </div>
             </div>
         </div>
@@ -113,10 +106,10 @@
 
             const logoUrl = @json(asset('img/erp/brand/unitecnologia-logo.png'));
             const messages = [
-                'Validando acessoâ€¦',
-                'Preparando ambienteâ€¦',
-                'Carregando mÃ³dulosâ€¦',
-                'Abrindo o sistemaâ€¦',
+                'Validando acesso...',
+                'Conferindo licença...',
+                'Preparando ambiente...',
+                'Abrindo o sistema...',
             ];
 
             let progress = 0;
@@ -146,7 +139,7 @@
                     '<img src="' + logoUrl + '" alt="" class="unitec-login-boot__logo" width="280" height="94" decoding="async">' +
                     '<p class="unitec-login-boot__eyebrow">Unitec ERP</p>' +
                     '<h2 class="unitec-login-boot__title">Abrindo o sistema</h2>' +
-                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acessoâ€¦</p>' +
+                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acesso...</p>' +
                     '<div class="unitec-login-boot__track" aria-hidden="true">' +
                     '<div class="unitec-login-boot__bar" data-unitec-boot-bar></div>' +
                     '</div>' +
@@ -302,7 +295,7 @@
                 finishing = true;
                 window.clearInterval(messageTimer);
                 window.clearTimeout(stuckTimer);
-                setMessage('Quase lÃ¡â€¦');
+                setMessage('Quase lá...');
 
                 const target = typeof url === 'string' && url !== '' ? url : '/admin';
                 const start = performance.now();
@@ -416,27 +409,6 @@
                 hide: hide,
                 succeed: succeed,
             };
-
-            document.addEventListener('click', function (event) {
-                const btn = event.target && event.target.closest
-                    ? event.target.closest('[data-unitec-login-install-app]')
-                    : null;
-                if (! btn) {
-                    return;
-                }
-
-                event.preventDefault();
-                if (window.UnitecErpPwa) {
-                    if (typeof window.UnitecErpPwa.show === 'function') {
-                        window.UnitecErpPwa.show();
-                    }
-                    if (typeof window.UnitecErpPwa.install === 'function') {
-                        void window.UnitecErpPwa.install();
-                    }
-                } else {
-                    alert('Abra em Chrome/Edge (http://127.0.0.1:8000/admin) e use Instalar na barra de endereço.');
-                }
-            });
         })();
     </script>
 </div>

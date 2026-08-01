@@ -159,6 +159,7 @@ class LicencaBloqueadaPage extends Page
 
         // GET leve no status da licença (sem cache) para liberar assim que o portal ativar.
         $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
+        $licencas->rememberLoginGate($snapshot);
         $this->applySnapshot($snapshot);
 
         if ($snapshot->isAllowed()) {
@@ -181,6 +182,7 @@ class LicencaBloqueadaPage extends Page
         }
 
         $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
+        $licencas->rememberLoginGate($snapshot);
         $this->applySnapshot($snapshot);
 
         if ($snapshot->isAllowed()) {

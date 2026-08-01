@@ -59,6 +59,8 @@ class CreateEmpresa extends CreateRecord
         $empresa = $this->record;
         $user = Auth::user();
 
+        \Illuminate\Support\Facades\Cache::forget('erp.empresa.exists');
+
         if ($user instanceof User) {
             $user->forceFill(['empresa_id' => $empresa->id])->save();
 

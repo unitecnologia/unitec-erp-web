@@ -58,7 +58,7 @@ class VendaListQueryBuilder
 
     public function build(): Builder
     {
-        $query = Venda::query()->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder']);
+        $query = Venda::query()->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'entrega']);
 
         if ($this->statusFilter !== 'todos') {
             $query->where('status', $this->statusFilter);

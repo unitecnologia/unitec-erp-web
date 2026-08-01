@@ -1,7 +1,7 @@
 {{-- PWA do ERP: manifesto + SW + instalar no Windows --}}
 @php
     use App\Support\Erp\ErpAssetVersion;
-    $pwaVersion = ErpAssetVersion::bundle().'-pwa2';
+    $pwaVersion = ErpAssetVersion::bundle().'-pwa5';
 @endphp
 
 <link rel="manifest" href="{{ asset('manifest-erp.webmanifest') }}?v={{ $pwaVersion }}">
@@ -23,6 +23,7 @@
         var swUrl = @json(asset('sw-erp.js'));
         swUrl += (swUrl.indexOf('?') >= 0 ? '&' : '?') + 'v={{ $pwaVersion }}';
 
+        // Não atrasa a abertura da tela: registra depois do load.
         window.addEventListener('load', function () {
             navigator.serviceWorker.getRegistrations().then(function (regs) {
                 return Promise.all(regs.map(function (reg) {
@@ -39,10 +40,6 @@
                 }));
             }).then(function () {
                 return navigator.serviceWorker.register(swUrl, { scope: '/admin/' });
-            }).then(function (reg) {
-                if (reg && reg.update) {
-                    reg.update().catch(function () {});
-                }
             }).catch(function () {});
         });
     })();

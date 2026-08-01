@@ -15,7 +15,8 @@ class ErpDashboardLicense
     public static function kpi(): array
     {
         $service = app(LicencaRemotaService::class);
-        $snapshot = $service->checkCurrentEmpresa();
+        // Só lê o resultado do login / botão Verificar — sem nova chamada à API.
+        $snapshot = $service->loginGateSnapshot() ?? $service->checkCurrentEmpresa(forceRefresh: false);
         $expiresAt = $snapshot->expiresAt() ?? static::localExpiresAt();
         $daysRemaining = static::daysRemaining($expiresAt);
         $status = $snapshot->status;

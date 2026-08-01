@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Bloqueia o painel quando o gerenciador remoto marca a licença como bloqueada
- * (ou CNPJ inexistente / sem CNPJ cadastrado).
+ * Usa o resultado da licença gravado no login.
+ * Não consulta a API ao abrir telas — só no login ou no botão "Verificar".
  */
 class EnsureLicencaAtiva
 {
@@ -28,7 +28,19 @@ class EnsureLicencaAtiva
             return $next($request);
         }
 
-        $snapshot = $this->licencas->checkCurrentEmpresa();
+        $allowed = $this->licencas->loginGateIsAllowed();
+
+        // Já validou no login nesta sessão.
+        if ($allowed === true) {
+            return $next($request);
+        }
+
+        if ($allowed === false) {
+            return redirect()->to(LicencaBloqueadaPage::getUrl());
+        }
+
+        // Sessão antiga / sem gate: valida uma vez e grava (equivale ao login).
+        $snapshot = $this->licencas->validateAtLogin();
 
         if ($snapshot->isAllowed()) {
             return $next($request);
@@ -46,6 +58,8 @@ class EnsureLicencaAtiva
         $path = trim($request->path(), '/');
 
         return $path === 'admin/licenca-bloqueada'
+            || $path === 'admin/licenca-sistema'
+            || str_starts_with($path, 'admin/licenca-sistema')
             || str_starts_with($path, 'livewire/')
             || str_starts_with($path, 'admin/livewire');
     }

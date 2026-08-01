@@ -6,6 +6,7 @@ use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,7 +20,7 @@ class EnsureEmpresaCadastrada
             return $next($request);
         }
 
-        if (Empresa::query()->exists()) {
+        if ($this->empresaExists()) {
             return $next($request);
         }
 
@@ -28,6 +29,11 @@ class EnsureEmpresaCadastrada
         }
 
         return redirect()->to(EmpresaResource::getUrl('create'));
+    }
+
+    private function empresaExists(): bool
+    {
+        return (bool) Cache::remember('erp.empresa.exists', 120, static fn (): bool => Empresa::query()->exists());
     }
 
     private function isAllowedWithoutEmpresa(Request $request): bool

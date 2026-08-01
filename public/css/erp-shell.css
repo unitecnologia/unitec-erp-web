@@ -526,9 +526,18 @@ body,
 }
 
 /* PWA standalone — janela de aplicativo */
-@media (display-mode: standalone) {
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: window-controls-overlay) {
     .fi-body {
         overscroll-behavior: none;
+    }
+
+    /* PDV: usa toda a área da janela do app (sem folga visual embaixo) */
+    .fi-body:has(.erp-pdv-page) {
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        overflow: hidden;
     }
 }
 

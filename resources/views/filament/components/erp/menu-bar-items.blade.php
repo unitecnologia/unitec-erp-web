@@ -9,7 +9,7 @@
             </div>
         </div>
     @elseif (filled($item['url'] ?? null))
-        <a href="{{ $item['url'] }}" wire:navigate="false" class="erp-menu-bar__link">{{ $item['label'] }}</a>
+        <a href="{{ $item['url'] }}" wire:navigate class="erp-menu-bar__link">{{ $item['label'] }}</a>
     @elseif (filled($item['action'] ?? null))
         <button type="button" class="erp-menu-bar__link" data-erp-action="{{ $item['action'] }}">
             {{ $item['label'] }}

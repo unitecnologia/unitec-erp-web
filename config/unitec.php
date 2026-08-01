@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.55',
+    'versao' => '6.4.1.56',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
     // Portal de renovação — nativo (não usa .env).
     'pagamento_url' => 'https://unitecnologiasc.digital',

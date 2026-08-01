@@ -140,6 +140,7 @@ class LicencaSistemaPage extends Page
 
         try {
             $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
+            $licencas->rememberLoginGate($snapshot);
             $this->applySnapshot($snapshot);
             $this->jaConsultado = true;
 

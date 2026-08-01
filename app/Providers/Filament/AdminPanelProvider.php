@@ -40,7 +40,7 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(false)
             ->navigation(false)
             ->topbar(false)
-            ->spa(false)
+            ->spa()
             ->maxContentWidth(Width::Full)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

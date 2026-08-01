@@ -329,7 +329,20 @@ class Login extends BaseLogin
             $target = \App\Filament\Resources\EmpresaResource::getUrl('create');
         } else {
             session(['erp_empresa_id' => $empresaId]);
-            $target = session()->pull('url.intended', filament()->getUrl());
+
+            // Conferência de licença só no login (barra "Abrindo o sistema").
+            // Depois disso o middleware não chama a API ao abrir telas.
+            try {
+                $licencas = app(\App\Support\Erp\License\LicencaRemotaService::class);
+                $snapshot = $licencas->validateAtLogin();
+                if ($licencas->isEnabled() && ! $snapshot->isAllowed()) {
+                    $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
+                } else {
+                    $target = session()->pull('url.intended', filament()->getUrl());
+                }
+            } catch (\Throwable) {
+                $target = session()->pull('url.intended', filament()->getUrl());
+            }
         }
 
         $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.succeed('.Js::from($target).')');

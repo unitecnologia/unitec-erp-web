@@ -61,6 +61,7 @@ function bindErpPdvLivewireEvents() {
     erpPdvLivewireBound = true;
 
     window.Livewire.on('erp-pdv-modal-opened', (payload) => {
+        ensurePdvFullscreenFromUserGesture();
         window.setTimeout(() => {
             if (payload?.modal === 'sair') {
                 document.getElementById('erp-pdv-sair-sim')?.focus();
@@ -468,16 +469,35 @@ function initErpPdv() {
 }
 
 /**
- * Tela cheia "quiosque" ao abrir o PDV pela retaguarda (esconde a barra do Windows).
+ * Tela cheia "quiosque" ao abrir o PDV (esconde a barra do Windows).
  *
- * O navegador só permite entrar em tela cheia a partir de um gesto do usuário,
- * então armamos a entrada no primeiro toque/tecla dentro do PDV. Usamos o
- * Keyboard Lock (quando disponível, Chrome/Edge) para que o Esc continue
- * funcionando no PDV — para sair da tela cheia o operador segura o Esc ou usa
- * Alt+F4.
+ * O navegador só permite fullscreen com gesto do usuário. Em PWA standalone
+ * o clique no atalho PDV já é o gesto — tentamos na hora e, se falhar,
+ * armamos de novo no próximo clique/tecla dentro do PDV.
  */
+function isErpPwaStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: window-controls-overlay)').matches
+        || window.navigator.standalone === true;
+}
+
 function armPdvKioskFullscreen() {
-    if (window.__erpPdvKioskArmed || document.fullscreenElement) {
+    if (document.fullscreenElement) {
+        lockPdvEscapeKey();
+
+        return;
+    }
+
+    // Em PWA, tenta entrar já (pode falhar se não houver gesto nesta carga).
+    if (isErpPwaStandalone()) {
+        enterPdvFullscreen();
+        if (document.fullscreenElement) {
+            return;
+        }
+    }
+
+    if (window.__erpPdvKioskArmed) {
         return;
     }
 
@@ -489,6 +509,7 @@ function armPdvKioskFullscreen() {
     };
 
     window.__erpPdvKioskArmed = true;
+    window.__erpPdvKioskEnterOnce = enterOnce;
     document.addEventListener('pointerdown', enterOnce, true);
     document.addEventListener('keydown', enterOnce, true);
 }
@@ -497,22 +518,27 @@ function enterPdvFullscreen() {
     if (document.fullscreenElement) {
         lockPdvEscapeKey();
 
-        return;
+        return Promise.resolve();
     }
 
     const target = document.documentElement;
-    const request = target.requestFullscreen
-        ? target.requestFullscreen({ navigationUI: 'hide' })
-        : null;
+    const request = typeof target.requestFullscreen === 'function'
+        ? target.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+            // Alguns Chromium/PWA rejeitam navigationUI — tenta sem opções.
+            return target.requestFullscreen();
+        })
+        : (typeof target.webkitRequestFullscreen === 'function'
+            ? Promise.resolve(target.webkitRequestFullscreen())
+            : null);
 
     if (! request || typeof request.then !== 'function') {
         lockPdvEscapeKey();
 
-        return;
+        return Promise.resolve();
     }
 
-    request.then(lockPdvEscapeKey).catch(() => {
-        // Bloqueado pelo navegador: mantém o comportamento normal, sem tela cheia.
+    return request.then(lockPdvEscapeKey).catch(() => {
+        // Bloqueado pelo navegador: mantém janela normal do PWA.
     });
 }
 
@@ -527,6 +553,14 @@ function lockPdvEscapeKey() {
 }
 
 function exitPdvFullscreen() {
+    window.__erpPdvKioskArmed = false;
+
+    if (typeof window.__erpPdvKioskEnterOnce === 'function') {
+        document.removeEventListener('pointerdown', window.__erpPdvKioskEnterOnce, true);
+        document.removeEventListener('keydown', window.__erpPdvKioskEnterOnce, true);
+        window.__erpPdvKioskEnterOnce = null;
+    }
+
     try {
         if (navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
             navigator.keyboard.unlock();
@@ -538,6 +572,15 @@ function exitPdvFullscreen() {
     if (document.fullscreenElement && document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
     }
+}
+
+/** Garante fullscreen no gesto do operador (F2 / clique em Abrir caixa). */
+function ensurePdvFullscreenFromUserGesture() {
+    if (! document.querySelector('.erp-pdv-page')) {
+        return;
+    }
+
+    void enterPdvFullscreen();
 }
 
 let pdvFiscalProgressTimer = null;
@@ -1237,6 +1280,9 @@ function handlePdvKeydown(event) {
     if (! pdvRoot) {
         return;
     }
+
+    // Qualquer tecla no PDV (ex.: F2 Abrir caixa) é gesto válido para esconder a taskbar.
+    ensurePdvFullscreenFromUserGesture();
 
     const overlayOpen = pdvRoot.querySelector('.erp-pdv-overlay') !== null;
     const modalOpen = pdvRoot.querySelector('.erp-pdv-modal') !== null;

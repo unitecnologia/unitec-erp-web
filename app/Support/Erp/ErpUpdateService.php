@@ -230,6 +230,14 @@ class ErpUpdateService
 
     public static function ensureFrameworkStorageDirectories(): void
     {
+        static $ensured = false;
+
+        if ($ensured) {
+            return;
+        }
+
+        $ensured = true;
+
         foreach ([
             'framework/sessions',
             'framework/cache',
@@ -469,9 +477,12 @@ class ErpUpdateService
                 self::writeStatus(
                     'extracting',
                     'Extraindo pacote já baixado',
-                    40,
-                    'ZIP local em storage/app/private/updates',
-                    class_exists(ZipArchive::class) ? 'ZipArchive::extractTo' : 'Expand-Archive (PowerShell)'
+                    38,
+                    '0% · ZIP local em storage/app/private/updates',
+                    class_exists(ZipArchive::class) ? 'ZipArchive (lotes)' : 'Expand-Archive (PowerShell)',
+                    null,
+                    null,
+                    0
                 );
             } else {
                 $downloadUrl = $this->resolveUpdateDownloadUrl();
@@ -489,8 +500,11 @@ class ErpUpdateService
                     'extracting',
                     'Extraindo arquivos do pacote',
                     38,
-                    'Descompactando ZIP e validando estrutura (artisan, vendor/)',
-                    class_exists(ZipArchive::class) ? 'ZipArchive::extractTo' : 'Expand-Archive (PowerShell)'
+                    '0% · abrindo ZIP e preparando pastas',
+                    class_exists(ZipArchive::class) ? 'ZipArchive (lotes)' : 'Expand-Archive (PowerShell)',
+                    null,
+                    null,
+                    0
                 );
             }
 
@@ -499,7 +513,7 @@ class ErpUpdateService
             self::writeStatus(
                 'backing_up',
                 'Gerando backup de segurança',
-                48,
+                56,
                 'Dump do banco + cópia do .env antes de alterar arquivos',
                 'php artisan erp:backup (pré-update)'
             );
@@ -661,7 +675,8 @@ class ErpUpdateService
                         self::formatDownloadDetail($downloaded, $total, $sourceDetail),
                         $command,
                         $downloaded,
-                        $total > 0 ? $total : null
+                        $total > 0 ? $total : null,
+                        $stepPercent
                     );
                 },
             ])
@@ -853,6 +868,70 @@ class ErpUpdateService
         $total = max(1, (int) $zip->numFiles);
         $extracted = 0;
         $lastStepPercent = -1;
+        $lastWriteAt = 0;
+        // Lotes: bem mais rápido que 1 arquivo por vez (que travava a barra em ~10%).
+        $batchSize = 250;
+        $batch = [];
+
+        self::writeStatus(
+            'extracting',
+            'Extraindo arquivos do pacote',
+            38,
+            sprintf('0%% · %s arquivos no ZIP', number_format($total, 0, ',', '.')),
+            'ZipArchive (lotes de '.$batchSize.')',
+            null,
+            null,
+            0
+        );
+
+        $flushBatch = function () use (
+            $zip,
+            $extractRoot,
+            $total,
+            &$batch,
+            &$extracted,
+            &$lastStepPercent,
+            &$lastWriteAt
+        ): void {
+            if ($batch === []) {
+                return;
+            }
+
+            $this->extractZipEntriesWithRetry($zip, $extractRoot, $batch);
+            $extracted += count($batch);
+            $batch = [];
+
+            $stepPercent = (int) floor(($extracted / $total) * 100);
+            $now = time();
+            $shouldWrite = $stepPercent !== $lastStepPercent
+                || $extracted >= $total
+                || ($now - $lastWriteAt) >= 2;
+
+            if (! $shouldWrite) {
+                return;
+            }
+
+            $lastStepPercent = $stepPercent;
+            $lastWriteAt = $now;
+            // Extrair ocupa 38→55 da barra global (antes era só 38→48 e parecia parado).
+            $globalPercent = 38 + (int) floor($stepPercent * 17 / 100);
+
+            self::writeStatus(
+                'extracting',
+                'Extraindo arquivos do pacote',
+                min(55, max(38, $globalPercent)),
+                sprintf(
+                    '%s%% · arquivo %s de %s',
+                    $stepPercent,
+                    number_format($extracted, 0, ',', '.'),
+                    number_format($total, 0, ',', '.')
+                ),
+                'ZipArchive (lotes)',
+                null,
+                null,
+                $stepPercent
+            );
+        };
 
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $name = $zip->getNameIndex($i);
@@ -860,42 +939,85 @@ class ErpUpdateService
                 continue;
             }
 
-            if (! $zip->extractTo($extractRoot, $name)) {
-                $zip->close();
-                throw new RuntimeException('Falha ao extrair o pacote de atualização.');
-            }
+            $batch[] = $name;
 
-            $extracted++;
-            $stepPercent = (int) floor(($extracted / $total) * 100);
-
-            // Atualiza a cada 1% (e no primeiro/último arquivo).
-            if ($stepPercent !== $lastStepPercent || $extracted === 1 || $extracted === $total) {
-                $lastStepPercent = $stepPercent;
-                $globalPercent = 38 + (int) floor($stepPercent * 10 / 100);
-
-                self::writeStatus(
-                    'extracting',
-                    'Extraindo arquivos do pacote',
-                    min(48, max(38, $globalPercent)),
-                    sprintf(
-                        '%s%% · arquivo %s de %s',
-                        $stepPercent,
-                        number_format($extracted, 0, ',', '.'),
-                        number_format($total, 0, ',', '.')
-                    ),
-                    'ZipArchive::extractTo'
-                );
+            if (count($batch) >= $batchSize) {
+                $flushBatch();
             }
         }
 
+        $flushBatch();
         $zip->close();
 
+        self::writeStatus(
+            'extracting',
+            'Extração do ZIP concluída',
+            55,
+            sprintf('100%% · %s arquivos', number_format($extracted, 0, ',', '.')),
+            'ZipArchive (lotes)',
+            null,
+            null,
+            100
+        );
+
         return $this->resolveSourceRoot($extractRoot);
+    }
+
+    /**
+     * Extrai um lote com retry (Windows/antivírus costuma falhar com errno=5 em extractTo 1-a-1).
+     *
+     * @param  list<string>  $names
+     */
+    private function extractZipEntriesWithRetry(ZipArchive $zip, string $extractRoot, array $names): void
+    {
+        $attempts = 0;
+        $lastError = null;
+
+        while ($attempts < 3) {
+            $attempts++;
+
+            if (@$zip->extractTo($extractRoot, $names)) {
+                return;
+            }
+
+            $lastError = error_get_last()['message'] ?? 'extractTo falhou';
+            usleep(250_000 * $attempts);
+        }
+
+        // Fallback: tenta arquivo a arquivo (isola entrada problemática).
+        foreach ($names as $name) {
+            $ok = false;
+            for ($try = 1; $try <= 3; $try++) {
+                if (@$zip->extractTo($extractRoot, $name)) {
+                    $ok = true;
+                    break;
+                }
+                usleep(200_000 * $try);
+            }
+
+            if (! $ok) {
+                throw new RuntimeException(
+                    'Falha ao extrair o pacote de atualização ('.$name.'). '
+                    .($lastError ?: 'Erro de I/O — feche antivírus temporariamente e tente de novo.')
+                );
+            }
+        }
     }
 
     private function extractPackageViaPowerShell(string $zipPath, string $extractRoot): string
     {
         File::ensureDirectoryExists($extractRoot);
+
+        self::writeStatus(
+            'extracting',
+            'Extraindo arquivos do pacote',
+            40,
+            'Expand-Archive em andamento (pode levar vários minutos — aguarde)',
+            'PowerShell Expand-Archive',
+            null,
+            null,
+            15
+        );
 
         $escapedZip = str_replace("'", "''", $zipPath);
         $escapedDest = str_replace("'", "''", $extractRoot);
@@ -914,6 +1036,17 @@ class ErpUpdateService
                 'Falha ao extrair o pacote (PowerShell Expand-Archive). Habilite extension=zip em tools/php/php.ini e tente novamente.'
             );
         }
+
+        self::writeStatus(
+            'extracting',
+            'Extração do ZIP concluída',
+            55,
+            '100% · Expand-Archive OK',
+            'PowerShell Expand-Archive',
+            null,
+            null,
+            100
+        );
 
         return $this->resolveSourceRoot($extractRoot);
     }
@@ -944,17 +1077,23 @@ class ErpUpdateService
         self::writeStatus(
             'backing_up',
             'Gerando backup de segurança',
-            48,
+            55,
             '1% · preparando pasta e mysqldump',
-            'php artisan erp:backup (pré-update)'
+            'php artisan erp:backup (pré-update)',
+            null,
+            null,
+            1
         );
 
         self::writeStatus(
             'backing_up',
             'Gerando backup de segurança',
-            51,
+            56,
             '30% · exportando banco de dados',
-            'php artisan erp:backup (pré-update)'
+            'php artisan erp:backup (pré-update)',
+            null,
+            null,
+            30
         );
 
         try {
@@ -982,7 +1121,10 @@ class ErpUpdateService
             'Backup de segurança concluído',
             57,
             '100% · '.$detail,
-            'php artisan erp:backup (pré-update)'
+            'php artisan erp:backup (pré-update)',
+            null,
+            null,
+            100
         );
     }
 
@@ -1039,7 +1181,10 @@ class ErpUpdateService
                     number_format($copied, 0, ',', '.'),
                     number_format($totalFiles, 0, ',', '.')
                 ),
-                'Atualização de app/ e vendor/'
+                'Atualização de app/ e vendor/',
+                null,
+                null,
+                $stepPercent
             );
         };
 
@@ -1194,8 +1339,14 @@ class ErpUpdateService
         chdir($appPath);
 
         try {
-            Artisan::call('view:clear');
             Artisan::call('config:cache');
+
+            try {
+                Artisan::call('view:cache');
+            } catch (\Throwable $e) {
+                $this->log($appPath, 'view:cache ignorado: '.$e->getMessage());
+                Artisan::call('view:clear');
+            }
 
             try {
                 Artisan::call('route:cache');
@@ -1339,8 +1490,8 @@ class ErpUpdateService
         return [
             'starting' => [0, 8],
             'downloading' => [8, 38],
-            'extracting' => [38, 48],
-            'backing_up' => [48, 58],
+            'extracting' => [38, 55],
+            'backing_up' => [55, 58],
             'applying' => [58, 82],
             'migrating' => [82, 92],
             'finalizing' => [92, 100],
@@ -1368,7 +1519,7 @@ class ErpUpdateService
     /**
      * @return array<string, int>
      */
-    public static function computeStepProgress(string $state, int $globalPercent): array
+    public static function computeStepProgress(string $state, int $globalPercent, ?int $activeStepPercent = null): array
     {
         $ranges = self::stepPercentRanges();
         $order = self::stepOrder();
@@ -1404,6 +1555,12 @@ class ErpUpdateService
                 continue;
             }
 
+            if ($activeStepPercent !== null) {
+                $progress[$step] = max(0, min(100, $activeStepPercent));
+
+                continue;
+            }
+
             [$min, $max] = $ranges[$step] ?? [0, 100];
             $span = $max - $min;
 
@@ -1420,7 +1577,7 @@ class ErpUpdateService
     }
 
     /**
-     * @param  'starting'|'downloading'|'extracting'|'applying'|'migrating'|'finalizing'|'completed'|'failed'|'idle'  $state
+     * @param  'starting'|'downloading'|'extracting'|'backing_up'|'applying'|'migrating'|'finalizing'|'completed'|'failed'|'idle'  $state
      */
     public static function writeStatus(
         string $state,
@@ -1429,13 +1586,17 @@ class ErpUpdateService
         ?string $detail = null,
         ?string $command = null,
         ?int $downloadBytes = null,
-        ?int $downloadTotal = null
+        ?int $downloadTotal = null,
+        ?int $activeStepPercent = null
     ): void {
         $path = storage_path(self::STATUS_FILE);
         File::ensureDirectoryExists(dirname($path));
 
         $step = self::stepInfo($state);
         $normalizedPercent = max(0, min(100, $percent));
+        $normalizedStepPercent = $activeStepPercent !== null
+            ? max(0, min(100, $activeStepPercent))
+            : null;
 
         $payload = [
             'state' => $state,
@@ -1445,7 +1606,8 @@ class ErpUpdateService
             'step' => $step['step'],
             'step_label' => $step['label'],
             'percent' => $normalizedPercent,
-            'step_progress' => self::computeStepProgress($state, $normalizedPercent),
+            'active_step_percent' => $normalizedStepPercent,
+            'step_progress' => self::computeStepProgress($state, $normalizedPercent, $normalizedStepPercent),
             'updated_at' => now()->toIso8601String(),
         ];
 
