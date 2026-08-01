@@ -62,29 +62,39 @@ class Login extends BaseLogin
      */
     protected function getDefaultFormState(): array
     {
-        $remembered = $this->readRememberedLogin();
+        try {
+            $remembered = $this->readRememberedLogin();
 
-        $empresaId = (int) ($remembered['empresa_id'] ?? 0);
-        $userId = (int) ($remembered['user_id'] ?? 0);
-        $remember = $remembered !== null;
+            $empresaId = (int) ($remembered['empresa_id'] ?? 0);
+            $userId = (int) ($remembered['user_id'] ?? 0);
+            $remember = $remembered !== null;
 
-        if ($empresaId <= 0 || ! Empresa::query()->whereKey($empresaId)->where('ativo', true)->exists()) {
-            $empresaId = (int) (Empresa::query()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
-        }
-
-        if ($userId > 0) {
-            $user = User::query()->find($userId);
-            if (! $user || ! $user->ativo || ($empresaId > 0 && ! $user->canAccessEmpresa($empresaId))) {
-                $userId = 0;
+            if ($empresaId <= 0 || ! Empresa::query()->whereKey($empresaId)->where('ativo', true)->exists()) {
+                $empresaId = (int) (Empresa::query()->where('ativo', true)->orderBy('nome')->value('id') ?? 0);
             }
-        }
 
-        return [
-            'empresa_id' => $empresaId > 0 ? $empresaId : null,
-            'user_id' => $userId > 0 ? $userId : null,
-            'login_senha' => null,
-            'remember_user' => $remember,
-        ];
+            if ($userId > 0) {
+                $user = User::query()->find($userId);
+                if (! $user || ! $user->ativo || ($empresaId > 0 && ! $user->canAccessEmpresa($empresaId))) {
+                    $userId = 0;
+                }
+            }
+
+            return [
+                'empresa_id' => $empresaId > 0 ? $empresaId : null,
+                'user_id' => $userId > 0 ? $userId : null,
+                'login_senha' => null,
+                'remember_user' => $remember,
+            ];
+        } catch (\Throwable) {
+            // Banco inacessível / tabelas ausentes: não derrubar a tela de login com 500.
+            return [
+                'empresa_id' => null,
+                'user_id' => null,
+                'login_senha' => null,
+                'remember_user' => false,
+            ];
+        }
     }
 
     public function getEmpresaLogoUrl(): ?string
