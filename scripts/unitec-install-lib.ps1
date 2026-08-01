@@ -3660,10 +3660,30 @@ function Test-MysqlDataInitialized {
     return (Test-UnitecMysqlSystemTablesReady -DataDir $DataDir)
 }
 
+function Test-UnitecErpDataPresent {
+    param([string]$DataDir)
+
+    $erpDir = Join-Path $DataDir 'unitec_erp'
+    if (-not (Test-Path $erpDir)) {
+        return $false
+    }
+
+    $tableFiles = @(Get-ChildItem -Path $erpDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '\.(frm|ibd|MAD|MAI)$' -and $_.Name -ne 'db.opt' })
+
+    return ($tableFiles.Count -gt 5)
+}
+
 function Repair-UnitecMysqlDataIfCorrupt {
     param([string]$DataDir)
 
     if (-not (Test-Path $DataDir)) {
+        return
+    }
+
+    # NUNCA apagar datadir se ja existem tabelas do ERP (perda total de dados do cliente).
+    if (Test-UnitecErpDataPresent -DataDir $DataDir) {
+        Write-Host 'MariaDB: dados do ERP detectados — nao sera reinicializado.' -ForegroundColor Gray
         return
     }
 
@@ -3935,12 +3955,15 @@ function Initialize-LaragonMysqlDataIfNeeded {
     $useEmbeddedMariaDb = -not [string]::IsNullOrWhiteSpace($AppPath)
     if ($useEmbeddedMariaDb) {
         Repair-UnitecMysqlDataIfCorrupt -DataDir $dataDir
-        if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
-            Write-InstallLog -AppPath $AppPath -Message 'Inicializando MariaDB (mariadb-install-db)...'
-        }
     }
 
     if (Test-MysqlDataInitialized -DataDir $dataDir) {
+        return
+    }
+
+    # Se o ERP ja tem tabelas, nao rodar install-db (evita banco vazio).
+    if (Test-UnitecErpDataPresent -DataDir $dataDir) {
+        Write-Warn 'MariaDB sem marcadores de sistema, mas dados do ERP existem. Mantendo pasta data.'
         return
     }
 
@@ -3948,6 +3971,9 @@ function Initialize-LaragonMysqlDataIfNeeded {
     Write-Host 'Inicializando dados do MariaDB (primeira execucao)...' -ForegroundColor White
 
     if ($useEmbeddedMariaDb) {
+        if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+            Write-InstallLog -AppPath $AppPath -Message 'Inicializando MariaDB (mariadb-install-db)...'
+        }
         Invoke-UnitecMariaDbInstallDb -MysqlBin $mysqlBin -DataDir $dataDir -AppPath $AppPath
         return
     }
