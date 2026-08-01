@@ -5,6 +5,7 @@
     let updateRunning = false;
     let updateStuck = false;
     let updateFailed = false;
+    let updateCompletedHandled = false;
     let pollCount = 0;
     let launchStartedAt = 0;
     let lastStatusSignature = '';
@@ -250,6 +251,10 @@
     }
 
     function canCloseUpdateModal() {
+        if (updateCompletedHandled) {
+            return false;
+        }
+
         return ! updateRunning || updateStuck || updateFailed;
     }
 
@@ -372,6 +377,7 @@
 
         updateStuck = false;
         updateFailed = false;
+        updateCompletedHandled = false;
         installFromLocal = false;
         pollCount = 0;
         launchStartedAt = 0;
@@ -402,6 +408,7 @@
         updateRunning = false;
         updateStuck = false;
         updateFailed = false;
+        updateCompletedHandled = false;
         installFromLocal = false;
         showResetButton(false);
         resetUpdateSteps();
@@ -1112,6 +1119,7 @@
         updateRunning = true;
         updateStuck = false;
         updateFailed = false;
+        updateCompletedHandled = false;
         installFromLocal = true;
         pollCount = 0;
         launchStartedAt = Date.now();
@@ -1121,6 +1129,7 @@
         resetUpdateSteps();
         resetUpdateInfo();
         resetProgressCounters();
+        resetUpdateHint();
 
         showUpdatePanel('progress');
         renderUpdateSteps('starting');
@@ -1206,6 +1215,10 @@
     }
 
     function pollUpdateStatus(statusUrl, config, maxMinutes) {
+        if (updateCompletedHandled) {
+            return;
+        }
+
         pollCount += 1;
 
         if (launchStartedAt > 0) {
@@ -1222,6 +1235,10 @@
             credentials: 'same-origin',
         })
             .then(async (response) => {
+                if (updateCompletedHandled) {
+                    return;
+                }
+
                 const payload = await response.json().catch(() => ({}));
 
                 if (! response.ok) {
@@ -1297,15 +1314,7 @@
                 applyUpdatePayload(payload, state === 'failed');
 
                 if (state === 'completed') {
-                    updateRunning = false;
-                    window.clearInterval(softTickTimer);
-                    softTickTimer = 0;
-                    stopPolling();
-                    setProgressTargets(100, computeStepProgressFromPercent('completed', 100), 'completed');
-
-                    window.setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
+                    finishUpdateSuccessfully(payload);
                 }
 
                 if (state === 'failed') {
@@ -1315,6 +1324,96 @@
             .catch(() => {
                 // Durante migrate o servidor pode demorar a responder; mantém polling.
             });
+    }
+
+    /**
+     * Após update: limpa PWA/cache, faz logout e abre o login (sessão limpa).
+     * location.reload() no PWA costuma demorar ou “travar” com assets/sessão velhos.
+     */
+    function finishUpdateSuccessfully(payload) {
+        if (updateCompletedHandled) {
+            return;
+        }
+
+        updateCompletedHandled = true;
+        updateRunning = false;
+        updateStuck = false;
+        updateFailed = false;
+        window.clearInterval(softTickTimer);
+        softTickTimer = 0;
+        stopPolling();
+        showResetButton(false);
+        setProgressTargets(100, computeStepProgressFromPercent('completed', 100), 'completed', 100);
+
+        const hint = updateModal?.querySelector('[data-erp-update-hint]');
+        if (hint) {
+            hint.textContent = 'Atualização ok. Encerrando sessão e abrindo o login…';
+        }
+
+        setUpdateStatus('Atualização concluída', false);
+        setUpdateInfo(
+            (payload && payload.detail) || 'Reiniciando o acesso ao sistema…',
+            '',
+            formatElapsed(launchStartedAt)
+        );
+
+        window.setTimeout(() => {
+            void restartAfterUpdate();
+        }, 700);
+    }
+
+    async function restartAfterUpdate() {
+        const config = window.__erpUpdateConfig ?? {};
+        const logoutUrl = config.logoutUrl || '/admin/logout';
+        const loginUrl = (config.loginUrl || '/admin/login') + '?updated=1&_=' + Date.now();
+
+        // PWA: remove SW/cache para não segurar JS/CSS antigo.
+        try {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((reg) => reg.unregister().catch(() => false)));
+            }
+        } catch (e) {}
+
+        try {
+            if (window.caches && typeof caches.keys === 'function') {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((key) => caches.delete(key).catch(() => false)));
+            }
+        } catch (e) {}
+
+        const goLogin = () => {
+            window.location.replace(loginUrl);
+        };
+
+        // Timeout duro: se o logout/rede travar, ainda assim vai pro login.
+        const hardTimeout = window.setTimeout(goLogin, 4000);
+
+        try {
+            const csrf = getCsrfToken();
+            const body = new URLSearchParams();
+            if (csrf) {
+                body.set('_token', csrf);
+            }
+
+            await Promise.race([
+                fetch(logoutUrl, {
+                    method: 'POST',
+                    headers: updateRequestHeaders({
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }),
+                    credentials: 'same-origin',
+                    body: body.toString(),
+                    redirect: 'manual',
+                }),
+                new Promise((resolve) => window.setTimeout(resolve, 2500)),
+            ]);
+        } catch (e) {
+            // segue para o login mesmo se o POST falhar
+        }
+
+        window.clearTimeout(hardTimeout);
+        goLogin();
     }
 })();
 

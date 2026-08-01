@@ -15,6 +15,8 @@
         downloadUrl: '/admin/erp-update/download',
         statusUrl: '/admin/erp-update/status',
         resetUrl: '/admin/erp-update/reset',
+        logoutUrl: @json(filament()->getLogoutUrl()),
+        loginUrl: @json(filament()->getLoginUrl()),
         assetVersion: @json($version),
         appVersion: @json(config('unitec.versao')),
         zipName: @json(config('unitec.update_zip_name', 'Unitec-ERP-Update.zip')),

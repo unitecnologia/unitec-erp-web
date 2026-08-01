@@ -563,7 +563,7 @@ class ErpUpdateService
                 'completed',
                 'Atualização concluída',
                 100,
-                'Recarregando a página em instantes...',
+                'Encerrando sessão e abrindo o login…',
                 null
             );
         } catch (\Throwable $exception) {
