@@ -332,7 +332,7 @@ class Login extends BaseLogin
             $target = session()->pull('url.intended', filament()->getUrl());
         }
 
-        $this->js('window.location.replace('.Js::from($target).')');
+        $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.succeed('.Js::from($target).')');
 
         return null;
     }

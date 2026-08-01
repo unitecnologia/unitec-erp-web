@@ -97,4 +97,267 @@
             -webkit-text-fill-color: #ffffff !important;
         }
     </style>
+
+    <script>
+        (function () {
+            if (window.UnitecLoginBoot && window.UnitecLoginBoot.__ready) {
+                return;
+            }
+
+            const logoUrl = @json(asset('img/erp/brand/unitecnologia-logo.png'));
+            const messages = [
+                'Validando acesso…',
+                'Preparando ambiente…',
+                'Carregando módulos…',
+                'Abrindo o sistema…',
+            ];
+
+            let progress = 0;
+            let raf = 0;
+            let messageTimer = 0;
+            let messageIndex = 0;
+            let finishing = false;
+            let active = false;
+            let overlay = null;
+
+            function ensureOverlay() {
+                if (overlay && document.body.contains(overlay)) {
+                    return overlay;
+                }
+
+                // Fora do Livewire: morph do login não pode apagar o splash.
+                overlay = document.createElement('div');
+                overlay.id = 'unitec-login-boot';
+                overlay.className = 'unitec-login-boot';
+                overlay.setAttribute('role', 'status');
+                overlay.setAttribute('aria-live', 'polite');
+                overlay.setAttribute('aria-busy', 'false');
+                overlay.setAttribute('aria-hidden', 'true');
+                overlay.innerHTML =
+                    '<div class="unitec-login-boot__glow" aria-hidden="true"></div>' +
+                    '<div class="unitec-login-boot__card">' +
+                    '<img src="' + logoUrl + '" alt="" class="unitec-login-boot__logo" width="280" height="94" decoding="async">' +
+                    '<p class="unitec-login-boot__eyebrow">Unitec ERP</p>' +
+                    '<h2 class="unitec-login-boot__title">Abrindo o sistema</h2>' +
+                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acesso…</p>' +
+                    '<div class="unitec-login-boot__track" aria-hidden="true">' +
+                    '<div class="unitec-login-boot__bar" data-unitec-boot-bar></div>' +
+                    '</div>' +
+                    '<p class="unitec-login-boot__percent"><span data-unitec-boot-pct>0</span>%</p>' +
+                    '</div>';
+
+                document.body.appendChild(overlay);
+                return overlay;
+            }
+
+            function qs(sel) {
+                return ensureOverlay().querySelector(sel);
+            }
+
+            function paint() {
+                const b = qs('[data-unitec-boot-bar]');
+                const p = qs('[data-unitec-boot-pct]');
+                if (b) b.style.width = Math.max(0, Math.min(100, progress)) + '%';
+                if (p) p.textContent = String(Math.round(Math.max(0, Math.min(100, progress))));
+            }
+
+            function setMessage(text) {
+                const s = qs('[data-unitec-boot-status]');
+                if (s) s.textContent = text;
+            }
+
+            function tick() {
+                if (!active || finishing) return;
+
+                const ceiling = 88;
+                if (progress < ceiling) {
+                    const remaining = ceiling - progress;
+                    const step = Math.max(0.08, remaining * 0.028);
+                    progress = Math.min(ceiling, progress + step);
+                    paint();
+                }
+
+                raf = window.requestAnimationFrame(tick);
+            }
+
+            function startMessages() {
+                messageIndex = 0;
+                setMessage(messages[0]);
+                window.clearInterval(messageTimer);
+                messageTimer = window.setInterval(function () {
+                    if (!active || finishing) return;
+                    messageIndex = Math.min(messages.length - 1, messageIndex + 1);
+                    setMessage(messages[messageIndex]);
+                }, 1500);
+            }
+
+            function show() {
+                const el = ensureOverlay();
+
+                if (!active) {
+                    active = true;
+                    finishing = false;
+                    progress = 6;
+                    startMessages();
+                    window.cancelAnimationFrame(raf);
+                    raf = window.requestAnimationFrame(tick);
+                }
+
+                paint();
+                el.hidden = false;
+                el.setAttribute('aria-hidden', 'false');
+                el.setAttribute('aria-busy', 'true');
+                el.classList.add('is-visible');
+                document.documentElement.classList.add('unitec-login-booting');
+            }
+
+            function hide() {
+                if (finishing) {
+                    return;
+                }
+
+                active = false;
+                finishing = false;
+                window.cancelAnimationFrame(raf);
+                window.clearInterval(messageTimer);
+
+                const el = ensureOverlay();
+                el.classList.remove('is-visible');
+                el.hidden = true;
+                el.setAttribute('aria-hidden', 'true');
+                el.setAttribute('aria-busy', 'false');
+                document.documentElement.classList.remove('unitec-login-booting');
+                progress = 0;
+                paint();
+            }
+
+            function hasLoginErrors() {
+                return !!document.querySelector(
+                    '.unitec-login__form .fi-fo-field-wrp-error-message, ' +
+                    '.unitec-login__form .fi-fo-field-wrp-error, ' +
+                    '.unitec-login__form .fi-fo-field-wrp-error-list, ' +
+                    '.unitec-login__form [data-validation-error], ' +
+                    '.unitec-login__form .fi-fo-field-wrp-label .text-danger-600, ' +
+                    '.unitec-login__form .fi-fo-field-wrp [role="alert"]'
+                );
+            }
+
+            function succeed(url) {
+                show();
+                finishing = true;
+                window.clearInterval(messageTimer);
+                setMessage('Quase lá…');
+
+                const target = typeof url === 'string' && url !== '' ? url : '/admin';
+                const start = performance.now();
+                const from = Math.max(progress, 40);
+                progress = from;
+                paint();
+                const duration = 900;
+
+                function finishFrame(now) {
+                    const t = Math.min(1, (now - start) / duration);
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    progress = from + (100 - from) * eased;
+                    paint();
+
+                    if (t < 1) {
+                        raf = window.requestAnimationFrame(finishFrame);
+                        return;
+                    }
+
+                    setMessage('Sistema pronto');
+                    window.setTimeout(function () {
+                        window.location.replace(target);
+                    }, 220);
+                }
+
+                window.cancelAnimationFrame(raf);
+                raf = window.requestAnimationFrame(finishFrame);
+            }
+
+            function isAuthenticateTrigger(target) {
+                if (!(target instanceof Element)) return false;
+
+                return !!target.closest(
+                    '.unitec-login__form button[type="submit"], ' +
+                    '.unitec-login__form .fi-ac-btn-action[type="submit"], ' +
+                    '.unitec-login__form .fi-color-primary.fi-ac-btn-action'
+                );
+            }
+
+            document.addEventListener('click', function (event) {
+                if (isAuthenticateTrigger(event.target)) {
+                    show();
+                }
+            }, true);
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter') return;
+                if (!event.target || !(event.target instanceof Element)) return;
+                if (!event.target.closest('.unitec-login__form')) return;
+                if (event.target.closest('.unitec-login__btn-cancel, .unitec-login__close')) return;
+                show();
+            }, true);
+
+            function bindLivewire() {
+                if (!window.Livewire || typeof Livewire.hook !== 'function') {
+                    return;
+                }
+
+                Livewire.hook('request', function ({ fail }) {
+                    fail(function () {
+                        if (active && !finishing) {
+                            hide();
+                        }
+                    });
+                });
+
+                Livewire.hook('commit', function ({ succeed, fail }) {
+                    succeed(function () {
+                        // Só fecha se houver erro de validação — nunca no login ok.
+                        window.setTimeout(function () {
+                            if (active && !finishing && hasLoginErrors()) {
+                                hide();
+                            }
+                        }, 80);
+                    });
+
+                    fail(function () {
+                        if (active && !finishing) {
+                            hide();
+                        }
+                    });
+                });
+
+                Livewire.hook('morph.updated', function () {
+                    if (!active || finishing) {
+                        return;
+                    }
+
+                    // Reafirma o overlay no body após morph do formulário.
+                    show();
+
+                    window.setTimeout(function () {
+                        if (active && !finishing && hasLoginErrors()) {
+                            hide();
+                        }
+                    }, 40);
+                });
+            }
+
+            if (window.Livewire) {
+                bindLivewire();
+            } else {
+                document.addEventListener('livewire:init', bindLivewire);
+            }
+
+            window.UnitecLoginBoot = {
+                __ready: true,
+                show: show,
+                hide: hide,
+                succeed: succeed,
+            };
+        })();
+    </script>
 </div>

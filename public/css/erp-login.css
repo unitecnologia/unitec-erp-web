@@ -574,3 +574,175 @@ html:has(.unitec-login-root) .fi-select-input-btn {
         border-radius: 12px;
     }
 }
+
+/* ── Splash “Abrindo o sistema” ───────────────────────────────── */
+
+.unitec-login-boot {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background:
+        radial-gradient(1200px 700px at 50% -10%, rgba(47, 111, 191, 0.42), transparent 58%),
+        radial-gradient(900px 500px at 85% 110%, rgba(132, 204, 22, 0.12), transparent 55%),
+        linear-gradient(165deg, #071a33 0%, #0f3460 48%, #0a2748 100%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.unitec-login-boot.is-visible {
+    display: grid !important;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+html.unitec-login-booting,
+html.unitec-login-booting body {
+    overflow: hidden !important;
+}
+
+.unitec-login-boot__glow {
+    position: absolute;
+    width: min(520px, 80vw);
+    height: min(520px, 80vw);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(47, 111, 191, 0.28) 0%, transparent 70%);
+    filter: blur(8px);
+    animation: unitec-login-boot-pulse 2.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.unitec-login-boot__card {
+    position: relative;
+    z-index: 1;
+    width: min(420px, 100%);
+    padding: 2rem 1.75rem 1.65rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(8, 28, 54, 0.72);
+    box-shadow:
+        0 28px 60px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(14px);
+    text-align: center;
+    animation: unitec-login-boot-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.unitec-login-boot__logo {
+    display: block;
+    width: auto;
+    max-width: min(240px, 70vw);
+    max-height: 72px;
+    margin: 0 auto 1.1rem;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+
+.unitec-login-boot__eyebrow {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(186, 230, 253, 0.78);
+}
+
+.unitec-login-boot__title {
+    margin: 0 0 0.45rem;
+    font-size: clamp(1.35rem, 3.2vw, 1.7rem);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    line-height: 1.15;
+}
+
+.unitec-login-boot__status {
+    margin: 0 0 1.35rem;
+    min-height: 1.35em;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(226, 232, 240, 0.88);
+    transition: opacity 0.2s ease;
+}
+
+.unitec-login-boot__track {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.unitec-login-boot__bar {
+    position: relative;
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1e5a9e 0%, #2f6fbf 45%, #84cc16 100%);
+    box-shadow: 0 0 18px rgba(47, 111, 191, 0.45);
+    transition: width 0.08s linear;
+    overflow: hidden;
+}
+
+.unitec-login-boot__bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        110deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.35) 45%,
+        transparent 70%
+    );
+    transform: translateX(-120%);
+    animation: unitec-login-boot-shimmer 1.35s ease-in-out infinite;
+}
+
+.unitec-login-boot__percent {
+    margin: 0.75rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: rgba(186, 230, 253, 0.9);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes unitec-login-boot-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes unitec-login-boot-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes unitec-login-boot-shimmer {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(160%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .unitec-login-boot,
+    .unitec-login-boot__card,
+    .unitec-login-boot__glow,
+    .unitec-login-boot__bar,
+    .unitec-login-boot__bar::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
