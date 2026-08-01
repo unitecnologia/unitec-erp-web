@@ -1031,10 +1031,80 @@ class ErpUpdateService
         try {
             Artisan::call('view:clear');
             Artisan::call('config:cache');
+
+            try {
+                Artisan::call('route:cache');
+            } catch (\Throwable $e) {
+                $this->log($appPath, 'route:cache ignorado: '.$e->getMessage());
+            }
+
+            try {
+                Artisan::call('event:cache');
+            } catch (\Throwable $e) {
+                $this->log($appPath, 'event:cache ignorado: '.$e->getMessage());
+            }
+
+            $this->ensurePhpOpcacheEnabled($appPath);
         } finally {
             if ($previous !== false) {
                 chdir($previous);
             }
+        }
+    }
+
+    /**
+     * Garante OPcache ligado no PHP embutido (telas Filament ficam lentas sem isso).
+     */
+    private function ensurePhpOpcacheEnabled(string $appPath): void
+    {
+        $iniPath = $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'php.ini';
+
+        if (! is_file($iniPath) || ! is_writable($iniPath)) {
+            return;
+        }
+
+        try {
+            $content = (string) File::get($iniPath);
+            $original = $content;
+
+            $content = preg_replace('/(?m)^\s*;\s*zend_extension\s*=\s*opcache\s*$/', 'zend_extension=opcache', $content) ?? $content;
+
+            if (! preg_match('/(?m)^\s*zend_extension\s*=\s*opcache\s*$/', $content)) {
+                $content = rtrim($content)."\nzend_extension=opcache\n";
+            }
+
+            $settings = [
+                'opcache.enable' => '1',
+                'opcache.enable_cli' => '0',
+                'opcache.memory_consumption' => '128',
+                'opcache.interned_strings_buffer' => '16',
+                'opcache.max_accelerated_files' => '10000',
+                'opcache.validate_timestamps' => '1',
+                'opcache.revalidate_freq' => '2',
+                'memory_limit' => '256M',
+                'realpath_cache_size' => '4096k',
+                'realpath_cache_ttl' => '600',
+            ];
+
+            foreach ($settings as $key => $value) {
+                $line = $key.'='.$value;
+                if (preg_match('/(?m)^\s*'.preg_quote($key, '/').'\s*=.*$/', $content) === 1) {
+                    $content = preg_replace(
+                        '/(?m)^\s*'.preg_quote($key, '/').'\s*=.*$/',
+                        $line,
+                        $content
+                    ) ?? $content;
+                } else {
+                    $content = rtrim($content)."\n{$line}\n";
+                }
+            }
+
+            if ($content !== $original) {
+                File::put($iniPath, $content);
+                $this->log($appPath, 'OPcache habilitado no tools/php/php.ini (performance).');
+            }
+        } catch (\Throwable $e) {
+            $this->log($appPath, 'Nao foi possivel ajustar OPcache: '.$e->getMessage());
         }
     }
 

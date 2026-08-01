@@ -390,7 +390,7 @@ function Install-UnitecPhpFromZip {
             Get-ChildItem $extracted.FullName -Force | Move-Item -Destination $phpRoot -Force
         }
 
-        Configure-LaragonPhpIni -PhpDirectory $phpRoot -SourceRoot $AppPath -DisableOpcache
+        Configure-LaragonPhpIni -PhpDirectory $phpRoot -SourceRoot $AppPath
         Write-Ok 'PHP instalado em tools\php.'
         return $phpRoot
     } finally {
@@ -411,7 +411,7 @@ function Ensure-UnitecPhp84 {
 
     $phpDir = Get-UnitecPhpDirectory -AppPath $AppPath
     if ($phpDir) {
-        Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $SourceRoot -DisableOpcache
+        Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $SourceRoot
         $phpExe = Join-Path $phpDir 'php.exe'
         if (Test-Path $phpExe) {
             $phpTest = Repair-PhpExecutableRuntime -SourceRoot $SourceRoot -PhpExe $phpExe -AllowFix
@@ -3095,7 +3095,7 @@ function Ensure-UnitecPhpExtensionsReady {
     }
 
     $phpExe = Join-Path $phpDir 'php.exe'
-    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath
     $null = Repair-PhpExecutableRuntime -SourceRoot $AppPath -PhpExe $phpExe -AllowFix:$AllowVcFix
 
     $pdoOk = Test-PhpExtensionEnabled -ExtensionName 'pdo_mysql' -PhpExe $phpExe
@@ -3134,7 +3134,7 @@ function Ensure-UnitecPhpExtensionsReady {
         }
     }
 
-    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+    Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath
     $pdoOk = Test-PhpExtensionEnabled -ExtensionName 'pdo_mysql' -PhpExe $phpExe
     $intlOk = Test-PhpExtensionEnabled -ExtensionName 'intl' -PhpExe $phpExe
 

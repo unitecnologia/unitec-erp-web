@@ -29,8 +29,8 @@ if (-not $phpDir) {
 $phpExe = Join-Path $phpDir 'php.exe'
 Write-Host ("PHP: {0}" -f $phpExe) -ForegroundColor White
 
-Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
-Write-Ok 'php.ini atualizado (extensoes + extension_dir absoluto).'
+Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath
+Write-Ok 'php.ini atualizado (extensoes + extension_dir absoluto + OPcache).'
 
 $repair = Repair-PhpExecutableRuntime -SourceRoot $AppPath -PhpExe $phpExe -AllowFix
 if (-not $repair.Ok) {

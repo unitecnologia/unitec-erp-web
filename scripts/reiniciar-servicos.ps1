@@ -28,7 +28,7 @@ try {
     try {
         $phpDir = Get-UnitecPhpDirectory -AppPath $AppPath
         if ($phpDir) {
-            Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath -DisableOpcache
+            Configure-LaragonPhpIni -PhpDirectory $phpDir -SourceRoot $AppPath
             $null = Repair-PhpExecutableRuntime -SourceRoot $AppPath -PhpExe (Join-Path $phpDir 'php.exe') -AllowFix
         }
     } catch {
@@ -47,7 +47,10 @@ try {
     try {
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('view:clear') -AllowFailure | Out-Null
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:clear') -AllowFailure | Out-Null
+        Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('route:clear') -AllowFailure | Out-Null
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
+        Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('route:cache') -AllowFailure | Out-Null
+        Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('event:cache') -AllowFailure | Out-Null
     } catch {
         Write-Warn ("Cache: {0}" -f $_.Exception.Message)
     }
