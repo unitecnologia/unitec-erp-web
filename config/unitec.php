@@ -1,25 +1,22 @@
-﻿<?php
+<?php
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.59',
+    'versao' => '6.4.1.89',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
     // Portal de renovação — nativo (não usa .env).
     'pagamento_url' => 'https://unitecnologiasc.digital',
 
     /*
-    | LicenÃ§a remota (gerenciador Unitec / Replit).
-    | GET {base_url}/api/licenca/{cnpj}  â€” sem autenticaÃ§Ã£o
-    | CNPJ na URL: com ou sem mÃ¡scara (o ERP envia sÃ³ dÃ­gitos).
-    | Resposta: { "status": "ativo"|"bloqueado", "valido_ate": "AAAA-MM-DD"|null, "nome": "..." }
-    | Sem UNITEC_LICENCA_API_URL a validaÃ§Ã£o remota fica desligada (dev/local).
+    | Licença remota (portal Unitec) — URL nativa abaixo.
+    | Na empresa: só habilitar + timeout (sem coluna de URL — evita row size no MySQL).
     */
     'licenca_api' => [
-        'enabled' => filter_var(env('UNITEC_LICENCA_API_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'base_url' => rtrim((string) env('UNITEC_LICENCA_API_URL', ''), '/'),
-        'timeout' => (int) env('UNITEC_LICENCA_API_TIMEOUT', 5),
-        'cache_seconds' => (int) env('UNITEC_LICENCA_API_CACHE_SECONDS', 600),
-        'grace_hours' => (int) env('UNITEC_LICENCA_API_GRACE_HOURS', 24),
+        'enabled' => true,
+        'base_url' => 'https://unitecnologiasc.digital',
+        'timeout' => 8,
+        'cache_seconds' => 600,
+        'grace_hours' => 24,
     ],
 
     /*

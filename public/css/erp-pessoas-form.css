@@ -390,9 +390,80 @@
     flex: 0 0 auto;
 }
 
+.erp-pcad-form__city-wrap {
+    position: relative;
+    flex: 1 1 14rem;
+    min-width: 12rem;
+    max-width: 22rem;
+}
+
 .erp-pcad-form__input--city {
-    width: 14rem;
+    width: 100%;
+    flex: 1 1 auto;
+}
+
+.erp-pcad-form__city-suggest {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 80;
+    margin: 0;
+    padding: 0.2rem 0;
+    list-style: none;
+    max-height: 14rem;
+    overflow: auto;
+    background: #ffffff;
+    border: 1px solid #b8c9de;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgb(15 52 96 / 14%);
+}
+
+.erp-pcad-form__city-suggest li {
+    margin: 0;
+}
+
+.erp-pcad-form__city-suggest button {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.32rem 0.55rem;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: #0f172a;
+}
+
+.erp-pcad-form__city-suggest button:hover,
+.erp-pcad-form__city-suggest button.is-selected {
+    background: #e8f1fb;
+}
+
+.erp-pcad-form__city-suggest-code {
+    flex: 0 0 4.2rem;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+}
+
+.erp-pcad-form__city-suggest-nome {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-pcad-form__city-suggest-uf {
     flex: 0 0 auto;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #334155;
 }
 
 .erp-pcad-form__input--grow {
@@ -418,7 +489,10 @@
 }
 
 .erp-pcad-form__select--uf {
-    width: 3rem;
+    width: 5.5rem;
+    min-width: 5.5rem;
+    flex: 0 0 5.5rem;
+    padding-inline: 0.35rem 1.4rem;
 }
 
 .erp-pcad-form__textarea {
@@ -799,6 +873,11 @@
     color: #0f172a !important;
     box-shadow: none !important;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erp-pessoas-form-page .erp-pcad-form__input[data-erp-pessoa-enter],
+.erp-pessoas-form-page .erp-pcad-form__select[data-erp-pessoa-enter] {
+    cursor: pointer !important;
 }
 
 .erp-pessoas-form-page .erp-pcad-form__input:focus,

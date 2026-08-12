@@ -42,7 +42,7 @@ class CreatePerson extends CreateRecord
             ...($this->data ?? []),
             'codigo' => Person::nextCodigo(),
             'pessoa_tipo' => Person::PESSOA_JURIDICA,
-            'uf' => 'SC',
+            'uf' => '',
             'regime_tributario' => 'simples',
             'tipo_contribuinte' => 'nao_contribuinte',
             'limite_credito' => 0,

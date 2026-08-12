@@ -42,8 +42,14 @@ function bindErpNfeLancamentoLivewireEvents() {
         positionNfeProdutoLookup();
     });
 
+    window.Livewire.on('erp-nfe-scroll-item-selection', () => {
+        scrollNfeItemSelectionIntoView();
+        focusNfeItemGridWrap();
+    });
+
     window.Livewire.hook('morph.updated', () => {
         requestAnimationFrame(positionNfeProdutoLookup);
+        refocusNfeTotaisAfterMorph();
     });
 
     window.Livewire.on('erp-nfe-focus-fiscal-overlay', () => {
@@ -83,6 +89,18 @@ function bindErpNfeLancamentoLivewireEvents() {
         });
     });
 
+    window.Livewire.on('erp-nfe-focus-cancel-aberta', () => {
+        requestAnimationFrame(() => {
+            document.getElementById('erp-nfe-cancel-aberta-sim')?.focus();
+        });
+    });
+
+    window.Livewire.on('erp-nfe-item-delete-opened', () => {
+        requestAnimationFrame(() => {
+            document.getElementById('erp-nfe-item-delete-sim')?.focus();
+        });
+    });
+
     window.Livewire.on('erp-nfe-focus-whatsapp-modal', () => {
         requestAnimationFrame(() => {
             document.getElementById('erp-nfe-whatsapp-to')?.focus();
@@ -91,6 +109,18 @@ function bindErpNfeLancamentoLivewireEvents() {
 
     window.Livewire.on('erp-nfe-focus-danfe-email-modal', () => {
         requestAnimationFrame(() => {
+            const modal = document.querySelector('.erp-nfe-danfe-email-modal');
+
+            if (modal && window.ErpMasks) {
+                window.ErpMasks.init(modal);
+            }
+
+            const whatsapp = document.getElementById('erp-nfe-danfe-whatsapp-to');
+
+            if (whatsapp && window.ErpMasks) {
+                window.ErpMasks.apply(whatsapp, { allowEmptySync: true, live: true });
+            }
+
             document.getElementById('erp-nfe-danfe-email-to')?.focus();
         });
     });
@@ -159,9 +189,142 @@ if (window.Livewire) {
 
 function initErpNfeLancamento() {
     bindErpNfeLancamentoKeys();
+    bindErpNfeTotaisEnter();
     bindNfeProdutoLookupFloating();
     bindNfeFiscalTransmitTriggers();
     requestAnimationFrame(positionNfeProdutoLookup);
+}
+
+const ERP_NFE_TOTAIS_ORDER = ['frete', 'seguro', 'outras', 'desconto'];
+
+function findNfeTotaisInput(modal, key) {
+    return modal.querySelector('input[data-erp-nfe-totais="' + key + '"]');
+}
+
+function finalizeNfeTotaisMask(el) {
+    if (! (window.ErpMasks && el.dataset && el.dataset.mask)) {
+        return;
+    }
+
+    try {
+        el.value = window.ErpMasks.finalizeMaskValue(el);
+        window.ErpMasks.apply(el, {
+            sync: false,
+            allowEmptySync: true,
+            thousands: window.ErpMasks.isBrDecimalMask(el.dataset.mask),
+        });
+    } catch (error) {
+        // ignore
+    }
+}
+
+function focarNfeTotais(modal, key) {
+    const input = findNfeTotaisInput(modal, key);
+
+    if (! input || input.disabled) {
+        return false;
+    }
+
+    input.removeAttribute('readonly');
+
+    try {
+        input.focus({ preventScroll: true });
+        input.select();
+    } catch (error) {
+        try {
+            input.focus();
+            input.select();
+        } catch (ignored) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function scheduleNfeTotaisFocus(modal, key) {
+    if (! key) {
+        return;
+    }
+
+    window.__erpNfeTotaisFocusKey = key;
+    window.__erpNfeFocusUntil = Date.now() + 2000;
+
+    focarNfeTotais(modal, key);
+    window.setTimeout(() => focarNfeTotais(modal, key), 0);
+    window.setTimeout(() => focarNfeTotais(modal, key), 60);
+    window.setTimeout(() => focarNfeTotais(modal, key), 160);
+    window.setTimeout(() => focarNfeTotais(modal, key), 320);
+}
+
+function refocusNfeTotaisAfterMorph() {
+    if (Date.now() >= (window.__erpNfeFocusUntil || 0)) {
+        return;
+    }
+
+    const key = window.__erpNfeTotaisFocusKey;
+
+    if (! key) {
+        return;
+    }
+
+    const modal = document.querySelector('.erp-nfe-lancamento-modal');
+
+    if (! modal) {
+        return;
+    }
+
+    focarNfeTotais(modal, key);
+}
+
+function bindErpNfeTotaisEnter() {
+    if (window.__erpNfeTotaisEnterBound) {
+        return;
+    }
+
+    window.__erpNfeTotaisEnterBound = true;
+    window.__erpNfeFocusUntil = 0;
+    window.__erpNfeTotaisFocusKey = null;
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== 'NumpadEnter') {
+            return;
+        }
+
+        const el = event.target;
+
+        if (! (el instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (! el.hasAttribute('data-erp-nfe-totais')) {
+            return;
+        }
+
+        const modal = el.closest('.erp-nfe-lancamento-modal');
+
+        if (! modal || el.disabled) {
+            return;
+        }
+
+        el.removeAttribute('readonly');
+        event.preventDefault();
+
+        const key = el.getAttribute('data-erp-nfe-totais');
+        const idx = ERP_NFE_TOTAIS_ORDER.indexOf(key);
+
+        if (idx < 0) {
+            return;
+        }
+
+        finalizeNfeTotaisMask(el);
+
+        const nextKey = ERP_NFE_TOTAIS_ORDER[idx + 1];
+
+        if (nextKey) {
+            scheduleNfeTotaisFocus(modal, nextKey);
+        }
+    }, true);
 }
 
 let nfeFiscalProgressTimer = null;
@@ -494,11 +657,75 @@ function getErpNfeLancamentoComponent() {
         return null;
     }
 
-    const componentEl = modal.closest('[wire\\:id]');
+    let componentEl = modal.closest('[wire\\:id]');
+
+    if (! componentEl) {
+        componentEl = document.querySelector('.erp-nfe-page [wire\\:id]');
+    }
+
+    if (! componentEl) {
+        let node = modal.parentElement;
+
+        while (node) {
+            if (node.hasAttribute?.('wire:id')) {
+                componentEl = node;
+                break;
+            }
+
+            node = node.parentElement;
+        }
+    }
 
     return componentEl
         ? window.Livewire?.find(componentEl.getAttribute('wire:id'))
         : null;
+}
+
+function focusNfeItemGridWrap() {
+    window.requestAnimationFrame(() => {
+        const impostos = document.querySelector('.erp-nfe-impostos__grid-wrap');
+        const itens = document.querySelector('.erp-nfe-lancamento-modal__grid-wrap--itens');
+        const target = impostos?.offsetParent !== null ? impostos : itens;
+
+        target?.focus({ preventScroll: true });
+    });
+}
+
+function shouldNfeNavigateItemRows(event) {
+    if (document.querySelector('.erp-nfe-item-delete-modal')) {
+        return false;
+    }
+
+    const produtoInput = document.getElementById('nfe-inclusao-produto');
+    const produtoSuggest = document.querySelector('.erp-nfe-inclusao__suggest-wrap');
+
+    if (
+        produtoInput
+        && (document.activeElement === produtoInput || event.target === produtoInput)
+        && produtoSuggest
+        && produtoSuggest.offsetParent !== null
+    ) {
+        return false;
+    }
+
+    const active = document.activeElement;
+    const target = event.target;
+    const gridSelectors = [
+        '.erp-nfe-lancamento-modal__grid-wrap--itens',
+        '.erp-nfe-impostos__grid-wrap',
+    ];
+
+    for (const selector of gridSelectors) {
+        if (active?.closest?.(selector) || target?.closest?.(selector)) {
+            return true;
+        }
+
+        if (active?.matches?.(selector)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function bindErpNfeLancamentoKeys() {
@@ -508,7 +735,8 @@ function bindErpNfeLancamentoKeys() {
 
     window.__erpNfeLancamentoKeysBound = true;
 
-    document.addEventListener('keydown', handleErpNfeLancamentoKeydown);
+    // Capture: roda antes do erp-list.js e evita Delete chamar deleteRecord da listagem.
+    document.addEventListener('keydown', handleErpNfeLancamentoKeydown, true);
 }
 
 function handleErpNfeLancamentoKeydown(event) {
@@ -532,6 +760,7 @@ function handleErpNfeLancamentoKeydown(event) {
         }
 
         event.preventDefault();
+        event.stopImmediatePropagation();
 
         const delta = event.key === 'ArrowDown' ? 1 : -1;
 
@@ -540,16 +769,57 @@ function handleErpNfeLancamentoKeydown(event) {
         return;
     }
 
-    if (event.key !== 'Delete' || ! event.ctrlKey) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (! shouldNfeNavigateItemRows(event)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        component.call('moveNfeSelectedRow', delta);
+
         return;
     }
 
-    if (isNfeEditableTarget(event.target)) {
+    if (document.querySelector('.erp-nfe-item-delete-modal')) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            component.call('confirmDeleteNfeItem');
+        } else if (event.key === 'Escape' || event.key === 'Delete') {
+            event.stopImmediatePropagation();
+        }
+
+        return;
+    }
+
+    if (event.key !== 'Delete') {
+        return;
+    }
+
+    const inItensGrid = Boolean(event.target?.closest?.('.erp-nfe-lancamento-modal__grid-wrap--itens'));
+    const inImpostosGrid = Boolean(event.target?.closest?.('.erp-nfe-impostos'));
+
+    // Na grade, Delete remove o item (com confirmação). Fora dela, só se não estiver digitando.
+    if (! inItensGrid && ! inImpostosGrid && isNfeEditableTarget(event.target)) {
         return;
     }
 
     event.preventDefault();
-    component.call('deleteNfeSelectedItem');
+    event.stopImmediatePropagation();
+
+    const row = event.target?.closest?.('[data-erp-nfe-item-index]');
+    const indexAttr = row?.getAttribute?.('data-erp-nfe-item-index');
+
+    if (indexAttr !== null && indexAttr !== undefined && indexAttr !== '') {
+        component.call('requestDeleteNfeItem', Number.parseInt(indexAttr, 10));
+
+        return;
+    }
+
+    component.call('requestDeleteNfeSelectedItem');
 }
 
 function isNfeEditableTarget(target) {
@@ -588,6 +858,17 @@ function scrollNfeProdutoSelectionIntoView() {
     window.requestAnimationFrame(() => {
         document.querySelector('.erp-nfe-produto-lookup-panel__list .erp-nfe-produto-lookup__row--active')
             ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+}
+
+function scrollNfeItemSelectionIntoView() {
+    window.requestAnimationFrame(() => {
+        const selected = document.querySelector(
+            '.erp-nfe-lancamento-modal__grid-wrap--itens tr.erp-nfe-lancamento-modal__row--selected, '
+            + '.erp-nfe-impostos__grid-wrap tr.erp-lookup-modal__row--selected',
+        );
+
+        selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
 }
 

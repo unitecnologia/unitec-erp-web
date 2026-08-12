@@ -16,6 +16,9 @@ final class ItemDto
         public readonly float $valorTotal,
         public readonly ItemImpostoDto $imposto,
         public readonly float $desconto = 0.0,
+        public readonly float $frete = 0.0,
+        public readonly float $seguro = 0.0,
         public readonly float $acrescimo = 0.0,
+        public readonly ?string $infoAdicionais = null,
     ) {}
 }

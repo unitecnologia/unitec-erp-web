@@ -9,9 +9,11 @@ use App\Filament\Resources\PersonResource;
 use App\Models\Person;
 use App\Rules\CelularBrasileiroValido;
 use App\Rules\DocumentoBrasileiroValido;
+use App\Support\Erp\CepLookupService;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -107,29 +109,62 @@ trait ErpPersonFormPage
 
     public function saveForm(): void
     {
-        $pessoaTipo = (string) ($this->data['pessoa_tipo'] ?? Person::PESSOA_JURIDICA);
+        try {
+            $pessoaTipo = (string) ($this->data['pessoa_tipo'] ?? Person::PESSOA_JURIDICA);
 
-        $this->validate(
-            [
+            $rules = [
                 'data.cpf_cnpj' => ['nullable', 'string', 'max:20', new DocumentoBrasileiroValido($pessoaTipo)],
                 'data.celular1' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
                 'data.celular2' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
                 'data.whatsapp' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
-            ],
-            [],
-            [
-                'data.cpf_cnpj' => 'CPF/CNPJ',
-                'data.celular1' => 'Celular 1',
-                'data.celular2' => 'Celular 2',
-                'data.whatsapp' => 'WhatsApp',
-            ],
-        );
+            ];
 
-        if ($this instanceof EditRecord) {
-            $this->save();
-        } else {
-            /** @var CreateRecord $this */
-            $this->create();
+            if ($this->personHasRelevantAddress()) {
+                $rules['data.cidade_codigo'] = [
+                    'required',
+                    'string',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if (! CepLookupService::isValidIbgeCode(is_string($value) ? $value : null)) {
+                            $fail('Informe o CEP e clique em Pesquisar CEP para obter o código IBGE da cidade.');
+                        }
+                    },
+                ];
+            }
+
+            $this->validate(
+                $rules,
+                [],
+                [
+                    'data.cpf_cnpj' => 'CPF/CNPJ',
+                    'data.celular1' => 'Celular 1',
+                    'data.celular2' => 'Celular 2',
+                    'data.whatsapp' => 'WhatsApp',
+                    'data.cidade_codigo' => 'código IBGE da cidade',
+                ],
+            );
+
+            if ($this instanceof EditRecord) {
+                $this->save();
+            } else {
+                /** @var CreateRecord $this */
+                $this->create();
+            }
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $body = collect($exception->errors())->flatten()->unique()->filter()->implode(' ');
+
+            Notification::make()
+                ->title('Não foi possível gravar a pessoa.')
+                ->body($body !== '' ? $body : 'Verifique os campos destacados.')
+                ->danger()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível gravar a pessoa.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
         }
     }
 

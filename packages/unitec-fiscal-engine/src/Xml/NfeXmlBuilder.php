@@ -8,6 +8,7 @@ use Unitec\FiscalEngine\Dto\EmitirNfeRequest;
 use Unitec\FiscalEngine\Dto\FaturaParcelaDto;
 use Unitec\FiscalEngine\Dto\ItemDto;
 use Unitec\FiscalEngine\Dto\NfeDestinatarioDto;
+use Unitec\FiscalEngine\Dto\NfeTransporteDto;
 use Unitec\FiscalEngine\Dto\PagamentoDto;
 use Unitec\FiscalEngine\Dto\RespTecnicoDto;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
@@ -62,15 +63,22 @@ final class NfeXmlBuilder
         $this->appendEmitente($infNFe, $emitente);
         $this->appendDestinatario($infNFe, $request->destinatario, $request->homologacao);
 
-        $valorIcms = 0.0;
+        $totaisImposto = [
+            'vBc' => 0.0,
+            'vIcms' => 0.0,
+            'vIcmsDeson' => 0.0,
+            'vIpi' => 0.0,
+            'vPis' => 0.0,
+            'vCofins' => 0.0,
+        ];
 
         foreach ($request->itens as $item) {
-            $valorIcms += $item->imposto->vIcms;
+            $totaisImposto = NfeImpostoXmlBuilder::somarTotais($item->imposto, $totaisImposto);
             $this->appendItem($infNFe, $item, $request->homologacao && $item->numero === 1);
         }
 
-        $this->appendTotais($infNFe, $request, $valorIcms);
-        $this->appendTransporte($infNFe, $request->modFrete);
+        $this->appendTotais($infNFe, $request, $totaisImposto);
+        $this->appendTransporte($infNFe, $request);
         $this->appendCobranca($infNFe, $request);
         $this->appendPagamentos($infNFe, $request->pagamentos);
         $this->appendInformacoes($infNFe, $request->informacoesComplementares, $request->informacoesFisco);
@@ -80,7 +88,7 @@ final class NfeXmlBuilder
             'dom' => $dom,
             'chave' => $chave,
             'dhEmiIso' => $dhEmiIso,
-            'valorIcms' => $valorIcms,
+            'valorIcms' => $totaisImposto['vIcms'],
         ];
     }
 
@@ -135,6 +143,8 @@ final class NfeXmlBuilder
         XmlHelper::append($ideEl, 'procEmi', '0');
         XmlHelper::append($ideEl, 'verProc', 'UnitecERP-1.0');
 
+        $this->appendReferencias($ideEl, $request->chavesReferenciadas);
+
         if ($ide->tpEmis !== 1) {
             $justificativa = XmlHelper::sanitizeText($ide->justificativaContingencia ?? '', 256);
 
@@ -145,6 +155,24 @@ final class NfeXmlBuilder
             $dataContingencia = $ide->dataContingencia ?? $ide->dataEmissao;
             XmlHelper::append($ideEl, 'dhCont', $dataContingencia->format('Y-m-d\TH:i:sP'));
             XmlHelper::append($ideEl, 'xJust', $justificativa);
+        }
+    }
+
+    /**
+     * @param  list<string>  $chavesReferenciadas
+     */
+    private function appendReferencias(DOMElement $ideEl, array $chavesReferenciadas): void
+    {
+        foreach ($chavesReferenciadas as $chave) {
+            $digits = NumberFormatter::onlyDigits((string) $chave);
+
+            if (strlen($digits) !== 44) {
+                continue;
+            }
+
+            $nfRef = $ideEl->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'NFref');
+            $ideEl->appendChild($nfRef);
+            XmlHelper::append($nfRef, 'refNFe', $digits);
         }
     }
 
@@ -249,15 +277,28 @@ final class NfeXmlBuilder
         XmlHelper::append($prod, 'qTrib', NumberFormatter::decimal($item->quantidade, 4));
         XmlHelper::append($prod, 'vUnTrib', NumberFormatter::decimal($item->valorUnitario, 4));
 
+        if ($item->frete > 0) {
+            XmlHelper::append($prod, 'vFrete', NumberFormatter::decimal($item->frete));
+        }
+
+        if ($item->seguro > 0) {
+            XmlHelper::append($prod, 'vSeg', NumberFormatter::decimal($item->seguro));
+        }
+
         if ($item->desconto > 0) {
             XmlHelper::append($prod, 'vDesc', NumberFormatter::decimal($item->desconto));
         }
 
-        if (($item->acrescimo ?? 0) > 0) {
+        if ($item->acrescimo > 0) {
             XmlHelper::append($prod, 'vOutro', NumberFormatter::decimal($item->acrescimo));
         }
 
         XmlHelper::append($prod, 'indTot', '1');
+
+        $infoAdicionais = XmlHelper::sanitizeInfAdProd((string) ($item->infoAdicionais ?? ''));
+        if ($infoAdicionais !== '') {
+            XmlHelper::append($prod, 'infAdProd', $infoAdicionais);
+        }
 
         $imposto = $det->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'imposto');
         $det->appendChild($imposto);
@@ -266,31 +307,18 @@ final class NfeXmlBuilder
             XmlHelper::append($imposto, 'vTotTrib', NumberFormatter::decimal($item->imposto->vTotTrib));
         }
 
-        $icms = $imposto->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'ICMS');
-        $imposto->appendChild($icms);
-
-        $tag = 'ICMSSN' . $item->imposto->csosn;
-        $icmsSn = $icms->ownerDocument->createElementNS(XmlHelper::NFE_NS, $tag);
-        $icms->appendChild($icmsSn);
-        XmlHelper::append($icmsSn, 'orig', (string) $item->imposto->origem);
-        XmlHelper::append($icmsSn, 'CSOSN', $item->imposto->csosn);
-
-        $pis = $imposto->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'PIS');
-        $imposto->appendChild($pis);
-        $pisNt = $pis->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'PISNT');
-        $pis->appendChild($pisNt);
-        XmlHelper::append($pisNt, 'CST', '07');
-
-        $cofins = $imposto->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'COFINS');
-        $imposto->appendChild($cofins);
-        $cofinsNt = $cofins->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'COFINSNT');
-        $cofins->appendChild($cofinsNt);
-        XmlHelper::append($cofinsNt, 'CST', '07');
+        NfeImpostoXmlBuilder::appendIcms($imposto, $item->imposto);
+        NfeImpostoXmlBuilder::appendIpi($imposto, $item->imposto);
+        NfeImpostoXmlBuilder::appendPis($imposto, $item->imposto);
+        NfeImpostoXmlBuilder::appendCofins($imposto, $item->imposto);
 
         IbscbsXmlBuilder::appendItem($imposto, $item->imposto);
     }
 
-    private function appendTotais(DOMElement $infNFe, EmitirNfeRequest $request, float $valorIcms): void
+    /**
+     * @param  array{vBc: float, vIcms: float, vIcmsDeson: float, vIpi: float, vPis: float, vCofins: float}  $totaisImposto
+     */
+    private function appendTotais(DOMElement $infNFe, EmitirNfeRequest $request, array $totaisImposto): void
     {
         $total = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'total');
         $infNFe->appendChild($total);
@@ -298,9 +326,9 @@ final class NfeXmlBuilder
         $icmsTot = $total->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'ICMSTot');
         $total->appendChild($icmsTot);
 
-        XmlHelper::append($icmsTot, 'vBC', '0.00');
-        XmlHelper::append($icmsTot, 'vICMS', NumberFormatter::decimal($valorIcms));
-        XmlHelper::append($icmsTot, 'vICMSDeson', '0.00');
+        XmlHelper::append($icmsTot, 'vBC', NumberFormatter::decimal($totaisImposto['vBc']));
+        XmlHelper::append($icmsTot, 'vICMS', NumberFormatter::decimal($totaisImposto['vIcms']));
+        XmlHelper::append($icmsTot, 'vICMSDeson', NumberFormatter::decimal($totaisImposto['vIcmsDeson']));
         XmlHelper::append($icmsTot, 'vFCP', '0.00');
         XmlHelper::append($icmsTot, 'vBCST', '0.00');
         XmlHelper::append($icmsTot, 'vST', '0.00');
@@ -311,10 +339,10 @@ final class NfeXmlBuilder
         XmlHelper::append($icmsTot, 'vSeg', NumberFormatter::decimal($request->valorSeguro));
         XmlHelper::append($icmsTot, 'vDesc', NumberFormatter::decimal($request->valorDesconto));
         XmlHelper::append($icmsTot, 'vII', '0.00');
-        XmlHelper::append($icmsTot, 'vIPI', '0.00');
+        XmlHelper::append($icmsTot, 'vIPI', NumberFormatter::decimal($totaisImposto['vIpi']));
         XmlHelper::append($icmsTot, 'vIPIDevol', '0.00');
-        XmlHelper::append($icmsTot, 'vPIS', '0.00');
-        XmlHelper::append($icmsTot, 'vCOFINS', '0.00');
+        XmlHelper::append($icmsTot, 'vPIS', NumberFormatter::decimal($totaisImposto['vPis']));
+        XmlHelper::append($icmsTot, 'vCOFINS', NumberFormatter::decimal($totaisImposto['vCofins']));
         XmlHelper::append($icmsTot, 'vOutro', NumberFormatter::decimal($request->valorOutros));
         XmlHelper::append($icmsTot, 'vNF', NumberFormatter::decimal($request->valorNota));
         XmlHelper::append($icmsTot, 'vTotTrib', NumberFormatter::decimal($request->valorTotTrib));
@@ -322,11 +350,119 @@ final class NfeXmlBuilder
         IbscbsXmlBuilder::appendTotais($total, $request->itens);
     }
 
-    private function appendTransporte(DOMElement $infNFe, int $modFrete): void
+    private function appendTransporte(DOMElement $infNFe, EmitirNfeRequest $request): void
     {
         $transp = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'transp');
         $infNFe->appendChild($transp);
-        XmlHelper::append($transp, 'modFrete', (string) $modFrete);
+        XmlHelper::append($transp, 'modFrete', (string) $request->modFrete);
+
+        $detalhe = $request->transporte;
+        if (! $detalhe instanceof NfeTransporteDto) {
+            return;
+        }
+
+        $semFrete = $request->modFrete === 9;
+
+        if (! $semFrete && $detalhe->hasTransportadora()) {
+            $transporta = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'transporta');
+            $transp->appendChild($transporta);
+
+            $doc = NumberFormatter::onlyDigits((string) ($detalhe->transportadoraDocumento ?? ''));
+            if (strlen($doc) === 14) {
+                XmlHelper::append($transporta, 'CNPJ', $doc);
+            } elseif (strlen($doc) === 11) {
+                XmlHelper::append($transporta, 'CPF', $doc);
+            }
+
+            if ($this->filledText($detalhe->transportadoraNome)) {
+                XmlHelper::append(
+                    $transporta,
+                    'xNome',
+                    XmlHelper::sanitizeText((string) $detalhe->transportadoraNome, 60),
+                );
+            }
+
+            $ieRaw = trim((string) ($detalhe->transportadoraIe ?? ''));
+            $ie = NumberFormatter::onlyDigits($ieRaw);
+            if (strtoupper($ieRaw) === 'ISENTO') {
+                XmlHelper::append($transporta, 'IE', 'ISENTO');
+            } elseif ($ie !== '') {
+                XmlHelper::append($transporta, 'IE', $ie);
+            }
+
+            if ($this->filledText($detalhe->transportadoraEndereco)) {
+                XmlHelper::append(
+                    $transporta,
+                    'xEnder',
+                    XmlHelper::sanitizeText((string) $detalhe->transportadoraEndereco, 60),
+                );
+            }
+
+            if ($this->filledText($detalhe->transportadoraMunicipio)) {
+                XmlHelper::append(
+                    $transporta,
+                    'xMun',
+                    XmlHelper::sanitizeText((string) $detalhe->transportadoraMunicipio, 60),
+                );
+            }
+
+            if ($this->filledText($detalhe->transportadoraUf)) {
+                XmlHelper::append(
+                    $transporta,
+                    'UF',
+                    strtoupper(substr((string) $detalhe->transportadoraUf, 0, 2)),
+                );
+            }
+        }
+
+        if (! $semFrete && $detalhe->hasVeiculo()) {
+            $veiculo = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'veicTransp');
+            $transp->appendChild($veiculo);
+            XmlHelper::append(
+                $veiculo,
+                'placa',
+                strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $detalhe->placa) ?? ''),
+            );
+            XmlHelper::append(
+                $veiculo,
+                'UF',
+                strtoupper(substr((string) $detalhe->ufPlaca, 0, 2)),
+            );
+        }
+
+        if ($detalhe->hasVolume()) {
+            $vol = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'vol');
+            $transp->appendChild($vol);
+
+            if ($detalhe->qVol !== null && $detalhe->qVol > 0) {
+                XmlHelper::append($vol, 'qVol', (string) $detalhe->qVol);
+            }
+
+            if ($this->filledText($detalhe->esp)) {
+                XmlHelper::append($vol, 'esp', XmlHelper::sanitizeText((string) $detalhe->esp, 60));
+            }
+
+            if ($this->filledText($detalhe->marca)) {
+                XmlHelper::append($vol, 'marca', XmlHelper::sanitizeText((string) $detalhe->marca, 60));
+            }
+
+            if ($this->filledText($detalhe->nVol)) {
+                XmlHelper::append($vol, 'nVol', XmlHelper::sanitizeText((string) $detalhe->nVol, 60));
+            }
+
+            if ($detalhe->pesoL !== null && $detalhe->pesoL > 0) {
+                XmlHelper::append($vol, 'pesoL', NumberFormatter::decimal($detalhe->pesoL, 3));
+            }
+
+            if ($detalhe->pesoB !== null && $detalhe->pesoB > 0) {
+                XmlHelper::append($vol, 'pesoB', NumberFormatter::decimal($detalhe->pesoB, 3));
+            }
+        }
+    }
+
+    private function filledText(?string $value): bool
+    {
+        return $value !== null && trim($value) !== '';
     }
 
     private function appendCobranca(DOMElement $infNFe, EmitirNfeRequest $request): void
