@@ -32,6 +32,18 @@ class AppServiceProvider extends ServiceProvider
         // Após update incompleto/disco cheio, sessions/views podem sumir e o ERP quebra no boot.
         \App\Support\Erp\ErpUpdateService::ensureFrameworkStorageDirectories();
 
+        // PFX A1 antigos (RC2-40): OpenSSL 3 precisa do provider legacy.
+        \App\Support\Erp\OpenSslLegacy::ensure();
+
+        // Cookie de sessão amarrado à APP_KEY: reinstalar gera chave nova e o navegador
+        // deixa de reutilizar cookie antigo (causa clássica de ERR_TOO_MANY_REDIRECTS).
+        $appKey = (string) config('app.key');
+        if ($appKey !== '') {
+            config([
+                'session.cookie' => 'unitec_'.substr(hash('sha256', $appKey), 0, 12),
+            ]);
+        }
+
         Event::listen(Logout::class, function (): void {
             ErpAccess::forgetSession();
         });
@@ -59,18 +71,25 @@ class AppServiceProvider extends ServiceProvider
             return null;
         }
 
-        if (! $port || in_array($port, [80, 443], true)) {
-            $configuredPort = (int) parse_url((string) config('app.url'), PHP_URL_PORT);
+        // Só herda a porta do APP_URL (ex.: :8000) quando o host também é o do APP_URL.
+        // Em Cloudflare Tunnel / proxy, injetar :8000 quebra CSS/JS/login no celular.
+        $configured = parse_url((string) config('app.url')) ?: [];
+        $configuredHost = strtolower((string) ($configured['host'] ?? ''));
+        $configuredPort = (int) ($configured['port'] ?? 0);
 
-            if ($configuredPort > 0) {
-                $port = $configuredPort;
-            }
+        if (
+            $configuredPort > 0
+            && $configuredHost !== ''
+            && strtolower($host) === $configuredHost
+            && (! $port || in_array((int) $port, [80, 443], true))
+        ) {
+            $port = $configuredPort;
         }
 
-        $origin = $scheme . '://' . $host;
+        $origin = $scheme.'://'.$host;
 
-        if ($port && ! in_array($port, [80, 443], true)) {
-            $origin .= ':' . $port;
+        if ($port && ! in_array((int) $port, [80, 443], true)) {
+            $origin .= ':'.$port;
         }
 
         return $origin;

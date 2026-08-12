@@ -9,9 +9,35 @@ final class CertificateLoader
 {
     public static function fromPkcs12(string $content, string $password, ?string $cnpjFallback = null): Certificate
     {
+        if (class_exists(\App\Support\Erp\OpenSslLegacy::class)) {
+            \App\Support\Erp\OpenSslLegacy::ensure();
+        }
+
         $certs = [];
 
-        if (! openssl_pkcs12_read($content, $certs, $password)) {
+        while (function_exists('openssl_error_string') && openssl_error_string() !== false) {
+        }
+
+        $ok = @openssl_pkcs12_read($content, $certs, $password);
+
+        if (! $ok && class_exists(\App\Support\Erp\OpenSslLegacy::class)) {
+            $err = \App\Support\Erp\OpenSslLegacy::lastError();
+            $needsLegacy = $err !== '' && (
+                str_contains(mb_strtolower($err), 'unsupported')
+                || str_contains(mb_strtolower($err), 'legacy')
+                || str_contains(mb_strtolower($err), 'digital envelope')
+            );
+
+            if ($needsLegacy) {
+                $viaSub = \App\Support\Erp\OpenSslLegacy::readPkcs12ViaSubprocess($content, $password);
+                if ($viaSub['ok'] ?? false) {
+                    $certs = $viaSub['certs'] ?? [];
+                    $ok = true;
+                }
+            }
+        }
+
+        if (! $ok) {
             throw new FiscalEngineException('Não foi possível ler o certificado digital (.pfx). Verifique a senha.');
         }
 

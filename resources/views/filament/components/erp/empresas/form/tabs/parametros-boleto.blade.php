@@ -50,12 +50,13 @@
                     id="param-{{ $field }}"
                     type="password"
                     autocomplete="off"
+                    data-erp-preserve-case
                     data-lpignore="true"
                     data-1p-ignore="true"
                     data-bwignore="true"
                     data-google-password-manager="ignore"
                     wire:model="data.{{ $field }}"
-                    class="erp-pcad-form__input erp-pcad-form__input--grow"
+                    class="erp-pcad-form__input erp-pcad-form__input--password erp-pcad-form__input--grow"
                 >
             @else
                 <input

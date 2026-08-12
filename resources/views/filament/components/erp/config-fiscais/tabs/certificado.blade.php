@@ -15,8 +15,9 @@
                     id="cfg-import-senha"
                     type="password"
                     wire:model="form.senha_certificado"
-                    class="erp-pcad-form__input erp-config-fiscais-form__password-input"
+                    class="erp-pcad-form__input erp-pcad-form__input--password erp-config-fiscais-form__password-input"
                     autocomplete="off"
+                    data-erp-preserve-case
                     data-lpignore="true"
                     data-1p-ignore="true"
                     data-bwignore="true"

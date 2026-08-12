@@ -26,7 +26,6 @@
         'starting',
         'downloading',
         'extracting',
-        'backing_up',
         'applying',
         'migrating',
         'finalizing',
@@ -36,9 +35,8 @@
     const UPDATE_STEP_RANGES = {
         starting: [0, 8],
         downloading: [8, 38],
-        extracting: [38, 55],
-        backing_up: [55, 58],
-        applying: [58, 82],
+        extracting: [38, 52],
+        applying: [52, 82],
         migrating: [82, 92],
         finalizing: [92, 100],
         completed: [100, 100],
@@ -69,25 +67,6 @@
                 event.preventDefault();
                 event.stopPropagation();
                 openSystemUpdateModal();
-                return;
-            }
-
-            const installAppButton = event.target.closest('[data-erp-action="install-app"]');
-            if (installAppButton) {
-                event.preventDefault();
-                event.stopPropagation();
-                closeAllTopMenus();
-                if (window.UnitecErpPwa && typeof window.UnitecErpPwa.install === 'function') {
-                    void window.UnitecErpPwa.install();
-                } else if (window.UnitecErpPwa && typeof window.UnitecErpPwa.show === 'function') {
-                    window.UnitecErpPwa.show();
-                } else {
-                    alert(
-                        'Para instalar o Unitec ERP no Windows:\n' +
-                        '1. Use Chrome ou Edge em http://127.0.0.1:8765/admin\n' +
-                        '2. Clique no ícone Instalar na barra de endereço'
-                    );
-                }
                 return;
             }
 
@@ -944,10 +923,6 @@
             return Number(config.extractingStallSeconds ?? tenMinutes);
         }
 
-        if (state === 'backing_up') {
-            return Number(config.backingUpStallSeconds ?? tenMinutes);
-        }
-
         if (state === 'applying') {
             return Number(config.applyingStallSeconds ?? tenMinutes);
         }
@@ -1243,13 +1218,21 @@
 
                 if (! response.ok) {
                     const errorText = resolveUpdateHttpError(response, payload);
-                    // Erro de pasta/sessão no poll não aborta o processo em segundo plano.
-                    if (/failed to open stream|no such file or directory|sessions/i.test(errorText)) {
+                    // Durante apply/migrate o PHP pode responder 500/503 (manutenção ou
+                    // arquivos no meio da troca). Não aborta — o processo segue em background.
+                    const transientHttp =
+                        [500, 502, 503, 504].includes(response.status) ||
+                        /failed to open stream|no such file or directory|sessions|service unavailable|server error/i.test(
+                            errorText
+                        );
+
+                    if (transientHttp) {
                         const hint = updateModal?.querySelector('[data-erp-update-hint]');
                         if (hint) {
                             hint.textContent =
                                 'Servidor temporariamente indisponível durante a atualização. Continuando a monitorar...';
                         }
+                        setUpdateStatus('Aguardando o servidor voltar…', false);
 
                         return;
                     }
@@ -1347,27 +1330,27 @@
 
         const hint = updateModal?.querySelector('[data-erp-update-hint]');
         if (hint) {
-            hint.textContent = 'Atualização ok. Encerrando sessão e abrindo o login…';
+            hint.textContent = 'Atualização ok. Abrindo o login…';
         }
 
         setUpdateStatus('Atualização concluída', false);
         setUpdateInfo(
-            (payload && payload.detail) || 'Reiniciando o acesso ao sistema…',
+            (payload && payload.detail) || 'Atualização aplicada. Abrindo o login…',
             '',
             formatElapsed(launchStartedAt)
         );
 
+        // Fluxo simples: não reinicia PHP. Só limpa sessão e abre o login.
         window.setTimeout(() => {
-            void restartAfterUpdate();
-        }, 700);
+            void goToLoginAfterUpdate();
+        }, 1500);
     }
 
-    async function restartAfterUpdate() {
+    async function goToLoginAfterUpdate() {
         const config = window.__erpUpdateConfig ?? {};
         const logoutUrl = config.logoutUrl || '/admin/logout';
         const loginUrl = (config.loginUrl || '/admin/login') + '?updated=1&_=' + Date.now();
 
-        // PWA: remove SW/cache para não segurar JS/CSS antigo.
         try {
             if ('serviceWorker' in navigator) {
                 const regs = await navigator.serviceWorker.getRegistrations();
@@ -1386,8 +1369,7 @@
             window.location.replace(loginUrl);
         };
 
-        // Timeout duro: se o logout/rede travar, ainda assim vai pro login.
-        const hardTimeout = window.setTimeout(goLogin, 4000);
+        const hardTimeout = window.setTimeout(goLogin, 3000);
 
         try {
             const csrf = getCsrfToken();
@@ -1406,7 +1388,7 @@
                     body: body.toString(),
                     redirect: 'manual',
                 }),
-                new Promise((resolve) => window.setTimeout(resolve, 2500)),
+                new Promise((resolve) => window.setTimeout(resolve, 2000)),
             ]);
         } catch (e) {
             // segue para o login mesmo se o POST falhar

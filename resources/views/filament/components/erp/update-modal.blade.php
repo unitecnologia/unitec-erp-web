@@ -22,7 +22,7 @@
             <div class="erp-update-modal__package" data-erp-update-package-box>
                 <p class="erp-update-modal__package-line">
                     <span>Versão instalada</span>
-                    <strong data-erp-update-local-version>{{ config('unitec.versao') }}</strong>
+                    <strong data-erp-update-local-version>{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}</strong>
                 </p>
                 <p class="erp-update-modal__package-line">
                     <span>Pacote disponível</span>
@@ -33,10 +33,9 @@
                 </p>
             </div>
             <ul class="erp-update-modal__list">
-                <li>Antes de instalar: backup automático do banco + .env.</li>
-                <li>Sem backup ok, a atualização não segue.</li>
-                <li>Dados (.env, storage e tools) são preservados.</li>
-                <li>Instalar só depois do pacote pronto (bem mais rápido).</li>
+                <li>Download com verificação de tamanho e SHA256 (retomável se a rede cair).</li>
+                <li>Instalação rápida: troca arquivos sem backup; preserva banco, .env, storage e tools.</li>
+                <li>Modo manutenção só durante a troca. Se falhar, tente atualizar de novo.</li>
             </ul>
             <div class="erp-update-modal__actions">
                 <button type="button" class="erp-update-modal__btn erp-update-modal__btn--primary" data-erp-update-start hidden>
@@ -64,12 +63,11 @@
                 @foreach ([
                     'starting' => 'Preparar processo',
                     'downloading' => 'Baixar pacote',
-                    'extracting' => 'Extrair ZIP',
-                    'backing_up' => 'Backup banco + .env',
-                    'applying' => 'Aplicar arquivos',
-                    'migrating' => 'Atualizar banco',
-                    'finalizing' => 'Finalizar caches',
-                    'completed' => 'Concluir',
+                    'extracting' => 'Verificar / extrair',
+                    'applying' => 'Copiar arquivos',
+                    'migrating' => 'Migrations',
+                    'finalizing' => 'Limpeza de cache',
+                    'completed' => 'Atualização concluída',
                 ] as $stepKey => $stepLabel)
                     <li data-step="{{ $stepKey }}">
                         <span class="erp-update-step__index">{{ $loop->iteration }}</span>

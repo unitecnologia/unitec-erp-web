@@ -13,6 +13,11 @@ final class ErpUppercase
         'foto_path',
         'param_pix_ambiente',
         'param_whatsapp_status',
+        'param_cf_subdomain',
+        'param_cf_base_domain',
+        'param_cf_hostname',
+        'param_erp_public_url',
+        'param_gestor_public_url',
     ];
 
     /** @var list<string> */
@@ -24,6 +29,10 @@ final class ErpUppercase
         'senha_atual',
         'senha_nova',
         'senha_confirmacao',
+        'senha_certificado',
+        'email_senha',
+        'proxy_senha',
+        'param_boleto_certificado_senha',
         'access_token',
         'refresh_token',
         'client_secret',
@@ -37,6 +46,10 @@ final class ErpUppercase
         'param_meli_client_id',
         'param_meli_client_secret',
         'param_meli_redirect_uri',
+        'param_cf_api_token',
+        'param_cf_account_id',
+        'param_cf_zone_id',
+        'param_cf_tunnel_id',
     ];
 
     /**

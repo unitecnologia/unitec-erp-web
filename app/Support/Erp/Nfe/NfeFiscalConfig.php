@@ -356,10 +356,49 @@ final class NfeFiscalConfig
      */
     public static function readPkcs12(string $content, string $senha): array
     {
+        \App\Support\Erp\OpenSslLegacy::ensure();
+
         $certs = [];
 
-        if (! openssl_pkcs12_read($content, $certs, $senha)) {
-            return ['ok' => false, 'message' => 'Senha inválida ou .pfx inválido.'];
+        while (openssl_error_string() !== false) {
+        }
+
+        $ok = @openssl_pkcs12_read($content, $certs, $senha);
+        $opensslError = '';
+
+        if (! $ok) {
+            $opensslError = \App\Support\Erp\OpenSslLegacy::lastError();
+            $needsLegacy = $opensslError !== '' && (
+                str_contains(mb_strtolower($opensslError), 'unsupported')
+                || str_contains(mb_strtolower($opensslError), 'legacy')
+                || str_contains(mb_strtolower($opensslError), 'digital envelope')
+            );
+
+            if ($needsLegacy) {
+                $viaSub = \App\Support\Erp\OpenSslLegacy::readPkcs12ViaSubprocess($content, $senha);
+                if ($viaSub['ok'] ?? false) {
+                    $certs = $viaSub['certs'] ?? [];
+                    $ok = true;
+                } else {
+                    $opensslError = (string) ($viaSub['error'] ?? $opensslError);
+                }
+            }
+        }
+
+        if (! $ok) {
+            $hint = ' Senha diferencia maiúsculas/minúsculas. Confira a senha usada no Windows.';
+
+            if ($opensslError !== '' && (str_contains(mb_strtolower($opensslError), 'unsupported')
+                || str_contains(mb_strtolower($opensslError), 'legacy')
+                || str_contains(mb_strtolower($opensslError), 'digital envelope'))) {
+                $hint = ' Certificado com criptografia antiga (RC2). Atualize o sistema ou reexporte o .pfx.';
+            }
+
+            return [
+                'ok' => false,
+                'message' => 'Senha inválida ou .pfx inválido.'.$hint
+                    .($opensslError !== '' ? ' ('.$opensslError.')' : ''),
+            ];
         }
 
         $parsed = openssl_x509_parse($certs['cert'] ?? '');
@@ -708,7 +747,7 @@ final class NfeFiscalConfig
                 $subject = 'Teste de e-mail — Uni Sistemas';
             }
 
-            $body = "Este é um e-mail de teste enviado pelas Configurações Fiscais do Uni Sistemas.\n\n"
+            $body = "Este é um e-mail de teste enviado pelas configurações de E-mail da Empresa no Uni Sistemas.\n\n"
                 ."Host: {$host}\n"
                 ."Usuário: {$user}\n"
                 .'Data/hora: '.now()->format('d/m/Y H:i:s');

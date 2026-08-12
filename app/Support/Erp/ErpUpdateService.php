@@ -2,10 +2,10 @@
 
 namespace App\Support\Erp;
 
-use App\Support\Erp\Backup\DatabaseBackupService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use ZipArchive;
 
@@ -69,13 +69,39 @@ class ErpUpdateService
     public static function isLocalPackageReady(): bool
     {
         $path = self::localPackagePath();
-        if (! is_file($path) || filesize($path) < 1_000_000) {
+        if (! self::isValidUpdatePackageFile($path)) {
             return false;
         }
 
         $meta = self::readPackageMeta();
 
         return (bool) ($meta['package_ready'] ?? false);
+    }
+
+    /**
+     * Aceita pacote FULL único (~dezenas de MB) com assinatura ZIP (PK).
+     */
+    public static function isValidUpdatePackageFile(?string $path): bool
+    {
+        if ($path === null || $path === '' || ! is_file($path)) {
+            return false;
+        }
+
+        $size = filesize($path);
+        if ($size === false || $size < 1024) {
+            return false;
+        }
+
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            return false;
+        }
+
+        $magic = fread($handle, 4);
+        fclose($handle);
+
+        // ZIP local file header / empty archive / spanned
+        return is_string($magic) && str_starts_with($magic, 'PK');
     }
 
     /**
@@ -116,8 +142,8 @@ class ErpUpdateService
     {
         $meta = self::readPackageMeta();
         $path = self::localPackagePath();
-        $ready = is_file($path) && filesize($path) >= 1_000_000 && (bool) ($meta['package_ready'] ?? false);
-        $localVersion = (string) config('unitec.versao', '');
+        $ready = self::isValidUpdatePackageFile($path) && (bool) ($meta['package_ready'] ?? false);
+        $localVersion = self::readInstalledVersion();
         $packageVersion = (string) ($meta['package_version'] ?? $meta['remote_version'] ?? '');
         $remoteVersion = (string) ($meta['remote_version'] ?? '');
         $effectiveRemote = $packageVersion !== '' ? $packageVersion : $remoteVersion;
@@ -150,35 +176,20 @@ class ErpUpdateService
 
     public static function isDownloadRunning(): bool
     {
-        $lock = storage_path(self::DOWNLOAD_LOCK_FILE);
-        if (! is_file($lock)) {
-            $meta = self::readPackageMeta();
-
-            return (($meta['download_state'] ?? '') === 'downloading');
+        if (self::isExclusiveLockHeld(storage_path(self::DOWNLOAD_LOCK_FILE))) {
+            return true;
         }
 
-        $age = time() - (int) filemtime($lock);
-        if ($age > 3600) {
-            File::delete($lock);
+        $meta = self::readPackageMeta();
 
-            return false;
-        }
-
-        return true;
+        return (($meta['download_state'] ?? '') === 'downloading');
     }
 
     public static function isRunning(): bool
     {
         self::clearStaleLock();
 
-        $status = self::readStatus();
-        $state = (string) ($status['state'] ?? 'idle');
-
-        if (! in_array($state, ['starting', 'downloading', 'extracting', 'backing_up', 'applying', 'migrating', 'finalizing'], true)) {
-            return false;
-        }
-
-        return is_file(storage_path(self::LOCK_FILE));
+        return self::isExclusiveLockHeld(storage_path(self::LOCK_FILE));
     }
 
     public static function clearStaleLock(int $maxAgeSeconds = 1800): void
@@ -186,11 +197,9 @@ class ErpUpdateService
         $lockPath = storage_path(self::LOCK_FILE);
         $statusPath = storage_path(self::STATUS_FILE);
 
-        if (is_file($lockPath)) {
-            $age = time() - (int) filemtime($lockPath);
-            if ($age > $maxAgeSeconds) {
-                File::delete($lockPath);
-            }
+        // Se outro processo ainda segura o flock, não mexe no lock.
+        if (self::isExclusiveLockHeld($lockPath)) {
+            return;
         }
 
         if (! is_file($statusPath)) {
@@ -203,7 +212,7 @@ class ErpUpdateService
         }
 
         $state = (string) ($data['state'] ?? 'idle');
-        if (! in_array($state, ['starting', 'downloading', 'extracting', 'backing_up', 'applying', 'migrating', 'finalizing'], true)) {
+        if (! in_array($state, ['starting', 'downloading', 'extracting', 'applying', 'migrating', 'finalizing'], true)) {
             return;
         }
 
@@ -218,14 +227,169 @@ class ErpUpdateService
                 'Atualização interrompida ou travada. Remova o lock e tente novamente.',
                 0
             );
-            File::delete($lockPath);
+            self::writeLockStatusInfo($lockPath, [
+                'state' => 'stale_cleared',
+                'cleared_at' => date('c'),
+            ]);
+            self::clearMaintenanceFlag();
         }
     }
 
     public static function forceReset(): void
     {
-        File::delete(storage_path(self::LOCK_FILE));
+        $lockPath = storage_path(self::LOCK_FILE);
+
+        // Só reescreve info de status se ninguém estiver com flock.
+        if (! self::isExclusiveLockHeld($lockPath)) {
+            self::writeLockStatusInfo($lockPath, [
+                'state' => 'force_reset',
+                'reset_at' => date('c'),
+            ]);
+        }
+
+        self::clearMaintenanceFlag();
         self::writeStatus('idle', 'Aguardando.', 0);
+    }
+
+    /**
+     * Probe: tenta LOCK_EX|LOCK_NB. Se conseguir, ninguém segura — libera na hora.
+     * Compatível Windows (LockFileEx) e Linux (flock).
+     */
+    public static function isExclusiveLockHeld(string $lockPath): bool
+    {
+        File::ensureDirectoryExists(dirname($lockPath));
+
+        $handle = @fopen($lockPath, 'c+');
+        if ($handle === false) {
+            // Sem acesso ao arquivo: assume ocupado por segurança.
+            return true;
+        }
+
+        $acquired = @flock($handle, LOCK_EX | LOCK_NB);
+        if ($acquired) {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+
+            return false;
+        }
+
+        fclose($handle);
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private static function writeLockStatusInfo(string $lockPath, array $payload): void
+    {
+        File::ensureDirectoryExists(dirname($lockPath));
+
+        $handle = @fopen($lockPath, 'c+');
+        if ($handle === false) {
+            return;
+        }
+
+        if (! @flock($handle, LOCK_EX | LOCK_NB)) {
+            fclose($handle);
+
+            return;
+        }
+
+        try {
+            ftruncate($handle, 0);
+            rewind($handle);
+            fwrite($handle, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
+            fflush($handle);
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+    }
+
+    /**
+     * Adquire flock exclusivo não-bloqueante. O arquivo permanece como info de status.
+     *
+     * @return resource
+     */
+    private function acquireExclusiveLock(string $lockPath, string $busyMessage, string $kind = 'apply')
+    {
+        File::ensureDirectoryExists(dirname($lockPath));
+
+        $handle = fopen($lockPath, 'c+');
+        if ($handle === false) {
+            throw new RuntimeException('Não foi possível abrir o arquivo de lock de atualização.');
+        }
+
+        if (! flock($handle, LOCK_EX | LOCK_NB)) {
+            fclose($handle);
+            throw new RuntimeException($busyMessage);
+        }
+
+        $payload = [
+            'kind' => $kind,
+            'state' => 'locked',
+            'pid' => getmypid(),
+            'started_at' => date('c'),
+            'host' => gethostname() ?: null,
+            'php' => PHP_VERSION,
+            'os' => PHP_OS_FAMILY,
+        ];
+
+        ftruncate($handle, 0);
+        rewind($handle);
+        fwrite($handle, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
+        fflush($handle);
+
+        return $handle;
+    }
+
+    /**
+     * @param  resource|null  $handle
+     */
+    private function releaseExclusiveLock(mixed $handle, string $lockPath, string $finalState = 'released'): void
+    {
+        if (! is_resource($handle)) {
+            return;
+        }
+
+        try {
+            $payload = [
+                'state' => $finalState,
+                'pid' => getmypid(),
+                'released_at' => date('c'),
+            ];
+            ftruncate($handle, 0);
+            rewind($handle);
+            fwrite($handle, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
+            fflush($handle);
+        } catch (\Throwable) {
+            // ignore — libera o flock de qualquer forma
+        }
+
+        flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+
+    /**
+     * Remove flag de manutenção se o processo de update morreu sem artisan up.
+     */
+    public static function clearMaintenanceFlag(): void
+    {
+        foreach ([
+            storage_path('framework/down'),
+            storage_path('framework/maintenance.php'),
+            base_path('storage/framework/down'),
+            base_path('storage/framework/maintenance.php'),
+        ] as $path) {
+            if (is_file($path)) {
+                try {
+                    File::delete($path);
+                } catch (\Throwable) {
+                    @unlink($path);
+                }
+            }
+        }
     }
 
     public static function ensureFrameworkStorageDirectories(): void
@@ -273,27 +437,32 @@ class ErpUpdateService
     public function downloadPendingUpdate(string $appPath, bool $force = false): array
     {
         $lockPath = storage_path(self::DOWNLOAD_LOCK_FILE);
-        File::ensureDirectoryExists(dirname($lockPath));
+        $lockHandle = null;
 
-        if (is_file($lockPath)) {
-            $age = time() - (int) filemtime($lockPath);
-            if ($age < 3600) {
-                return [
-                    'downloaded' => false,
-                    'message' => 'Download de atualização já em andamento.',
-                    'remote_version' => self::readPackageMeta()['remote_version'] ?? null,
-                ];
-            }
-            File::delete($lockPath);
+        try {
+            $lockHandle = $this->acquireExclusiveLock(
+                $lockPath,
+                'Download de atualização já em andamento.',
+                'download'
+            );
+        } catch (RuntimeException $e) {
+            return [
+                'downloaded' => false,
+                'message' => $e->getMessage(),
+                'remote_version' => self::readPackageMeta()['remote_version'] ?? null,
+            ];
         }
 
-        File::put($lockPath, (string) time());
         self::ensureFrameworkStorageDirectories();
 
         try {
-            $localVersion = (string) config('unitec.versao', '0');
+            $this->log($appPath, 'Início da verificação de atualizações.');
+            $localVersion = self::readInstalledVersion() ?: '0';
             $downloadUrl = $this->resolveUpdateDownloadUrl();
             $remoteVersion = $this->resolveRemoteVersion($downloadUrl);
+            $this->log($appPath, 'Versão local: '.$localVersion);
+            $this->log($appPath, 'Versão remota: '.($remoteVersion ?? '(não determinada)'));
+            $this->log($appPath, 'URL de download: '.$downloadUrl);
 
             self::writePackageMeta([
                 'download_state' => 'checking',
@@ -328,18 +497,33 @@ class ErpUpdateService
             if (! $force && self::isLocalPackageReady()) {
                 $meta = self::readPackageMeta();
                 $readyVersion = (string) ($meta['package_version'] ?? '');
+                $keepReady = false;
+                $keepLabel = $readyVersion;
+
                 if ($remoteVersion !== null && $readyVersion !== '' && $readyVersion === $remoteVersion) {
+                    $keepReady = true;
+                    $keepLabel = $remoteVersion;
+                } elseif (
+                    $remoteVersion === null
+                    && $readyVersion !== ''
+                    && version_compare($readyVersion, $localVersion, '>')
+                ) {
+                    // API do GitHub indisponível: não rebaixa o FULL se já há pacote mais novo.
+                    $keepReady = true;
+                }
+
+                if ($keepReady) {
                     self::writePackageMeta([
                         'download_state' => 'ready',
-                        'check_message' => 'Pacote '.$remoteVersion.' já baixado. Pode instalar.',
-                        'remote_version' => $remoteVersion,
+                        'check_message' => 'Pacote '.$keepLabel.' já baixado. Pode instalar.',
+                        'remote_version' => $remoteVersion ?? $readyVersion,
                         'last_check_at' => now()->toIso8601String(),
                     ]);
 
                     return [
                         'downloaded' => false,
-                        'message' => 'Pacote já está pronto para instalar ('.$remoteVersion.').',
-                        'remote_version' => $remoteVersion,
+                        'message' => 'Pacote já está pronto para instalar ('.$keepLabel.').',
+                        'remote_version' => $remoteVersion ?? $readyVersion,
                     ];
                 }
             }
@@ -347,9 +531,6 @@ class ErpUpdateService
             $target = self::localPackagePath();
             $partial = $target.'.partial';
             File::ensureDirectoryExists(dirname($target));
-            if (is_file($partial)) {
-                File::delete($partial);
-            }
 
             self::writePackageMeta([
                 'download_state' => 'downloading',
@@ -360,9 +541,17 @@ class ErpUpdateService
                 'last_check_at' => now()->toIso8601String(),
             ]);
 
-            $this->downloadPackage($partial, $downloadUrl);
+            $this->log($appPath, 'Download iniciado'.($remoteVersion ? ' ('.$remoteVersion.')' : '').'.');
+            $expected = $this->fetchPackageIntegrityMeta($downloadUrl);
+            $this->assertEnoughDiskSpace($appPath, $expected['size']);
+            $this->assertUpdateConnection($downloadUrl);
+            $this->downloadPackageResumable($partial, $downloadUrl, $expected, $appPath);
+            $this->assertDownloadedPackageIntegrity($partial, $expected);
+            $this->log($appPath, 'SHA256 validado: '.$expected['sha256'].' (size='.$expected['size'].')');
+            $this->log($appPath, 'Download concluído.');
 
-            if (! is_file($partial) || filesize($partial) < 1_000_000) {
+            if (! self::isValidUpdatePackageFile($partial)) {
+                File::delete($partial);
                 throw new RuntimeException('Download incompleto do pacote de atualização.');
             }
 
@@ -376,6 +565,7 @@ class ErpUpdateService
                 'download_state' => 'ready',
                 'package_ready' => true,
                 'package_bytes' => $bytes,
+                'package_sha256' => $expected['sha256'],
                 'package_version' => $remoteVersion,
                 'downloaded_at' => now()->toIso8601String(),
                 'remote_version' => $remoteVersion,
@@ -384,7 +574,7 @@ class ErpUpdateService
                 'last_check_at' => now()->toIso8601String(),
             ]);
 
-            $this->log($appPath, 'Pacote de atualizacao baixado: '.$target.' ('.$bytes.' bytes)');
+            $this->log($appPath, 'Pacote de atualizacao baixado: '.$target.' ('.$bytes.' bytes, sha256='.$expected['sha256'].')');
 
             return [
                 'downloaded' => true,
@@ -398,15 +588,12 @@ class ErpUpdateService
                 'check_message' => $exception->getMessage(),
                 'last_check_at' => now()->toIso8601String(),
             ]);
-            $this->log($appPath, 'ERRO download update: '.$exception->getMessage());
+            $this->logException($appPath, 'download-update', $exception);
 
             throw $exception;
         } finally {
-            File::delete($lockPath);
-            $partial = self::localPackagePath().'.partial';
-            if (is_file($partial)) {
-                File::delete($partial);
-            }
+            $this->releaseExclusiveLock($lockHandle, $lockPath, 'download_released');
+            // Mantém .partial em falha de rede para retomar o download depois.
         }
     }
 
@@ -434,58 +621,99 @@ class ErpUpdateService
     public function run(string $appPath): void
     {
         $lockPath = storage_path(self::LOCK_FILE);
-        File::ensureDirectoryExists(dirname($lockPath));
-
-        if (is_file($lockPath)) {
-            $age = time() - (int) filemtime($lockPath);
-            if ($age < 1800) {
-                throw new RuntimeException('Já existe uma atualização em andamento.');
-            }
-
-            File::delete($lockPath);
-        }
-
-        File::put($lockPath, (string) time());
-        self::ensureFrameworkStorageDirectories();
-
-        $useLocal = self::isLocalPackageReady();
-
-        self::writeStatus(
-            'starting',
-            'Processo de atualização iniciado',
-            8,
-            $useLocal
-                ? 'Instalando pacote local (sem baixar novamente)'
-                : 'Pacote local ausente — baixando da nuvem...',
-            'php artisan unitec:apply-update'
-        );
-
-        $tempRoot = storage_path('app/private/erp-update-'.uniqid('', true));
-        $zipPath = $tempRoot.DIRECTORY_SEPARATOR.'package.zip';
-        $extractRoot = $tempRoot.DIRECTORY_SEPARATOR.'extract';
+        $lockHandle = null;
+        $tempRoot = null;
+        $maintenanceOn = false;
 
         try {
+            $lockHandle = $this->acquireExclusiveLock(
+                $lockPath,
+                'Já existe uma atualização em andamento.',
+                'apply'
+            );
+
+            self::ensureFrameworkStorageDirectories();
+
+            // Aceita ZIP válido em updates/ mesmo sem package.json (Unitec Atualizador.exe).
+            $useLocal = self::isLocalPackageReady()
+                || self::isValidUpdatePackageFile(self::localPackagePath());
+
+            self::writeStatus(
+                'starting',
+                'Processo de atualização iniciado',
+                8,
+                $useLocal
+                    ? 'Instalando pacote local (sem baixar novamente)'
+                    : 'Pacote local ausente — baixando da nuvem...',
+                'php artisan unitec:apply-update'
+            );
+
+            $tempRoot = storage_path('app/private/erp-update-'.uniqid('', true));
+            $zipPath = $tempRoot.DIRECTORY_SEPARATOR.'package.zip';
+            $extractRoot = $tempRoot.DIRECTORY_SEPARATOR.'extract';
+
             File::ensureDirectoryExists($tempRoot);
             File::ensureDirectoryExists($extractRoot);
 
             $this->log($appPath, 'Iniciando atualizacao via PHP.');
+            $this->log($appPath, 'Versão local: '.(self::readInstalledVersion() ?: '(desconhecida)'));
+            $this->purgeStalePhpCaches($appPath);
             $this->ensureEmbeddedPhpConfiguration($appPath);
 
+            $downloadUrl = $this->resolveUpdateDownloadUrl();
+
             if ($useLocal) {
+                $this->log($appPath, 'Usando pacote local já baixado.');
                 $localZip = self::localPackagePath();
+                $meta = self::readPackageMeta();
+                $expectedSize = (int) ($meta['package_bytes'] ?? filesize($localZip) ?: 0);
+                $expectedSha = strtolower(trim((string) ($meta['package_sha256'] ?? '')));
+
+                if ($expectedSha === '') {
+                    // Pacote antigo sem hash gravado: busca sidecar remoto para validar.
+                    try {
+                        $integrity = $this->fetchPackageIntegrityMeta($downloadUrl);
+                        $expectedSha = $integrity['sha256'];
+                        $expectedSize = $integrity['size'] > 0 ? $integrity['size'] : $expectedSize;
+                    } catch (\Throwable $e) {
+                        $this->log($appPath, 'Aviso: sem SHA256 local/remoto — seguindo com validação PK: '.$e->getMessage());
+                    }
+                }
+
+                if ($expectedSha !== '') {
+                    $this->assertDownloadedPackageIntegrity($localZip, [
+                        'sha256' => $expectedSha,
+                        'size' => $expectedSize,
+                    ]);
+                    $this->log($appPath, 'SHA256 validado: '.$expectedSha.' (size='.$expectedSize.')');
+                } elseif (! self::isValidUpdatePackageFile($localZip)) {
+                    throw new RuntimeException('Pacote local inválido. Baixe novamente a atualização.');
+                }
+
                 File::copy($localZip, $zipPath);
                 self::writeStatus(
                     'extracting',
-                    'Extraindo pacote já baixado',
+                    'Verificando pacote',
                     38,
-                    '0% · ZIP local em storage/app/private/updates',
+                    'ZIP local validado — extraindo…',
                     class_exists(ZipArchive::class) ? 'ZipArchive (lotes)' : 'Expand-Archive (PowerShell)',
                     null,
                     null,
                     0
                 );
             } else {
-                $downloadUrl = $this->resolveUpdateDownloadUrl();
+                self::writeStatus(
+                    'downloading',
+                    'Download iniciado',
+                    12,
+                    'Validando conexão e espaço em disco…',
+                    'HTTP → Unitec-ERP-Update.zip'
+                );
+
+                $this->log($appPath, 'Download iniciado (pacote local ausente).');
+                $this->assertUpdateConnection($downloadUrl);
+                $expected = $this->fetchPackageIntegrityMeta($downloadUrl);
+                $this->assertEnoughDiskSpace($appPath, $expected['size']);
 
                 self::writeStatus(
                     'downloading',
@@ -494,11 +722,24 @@ class ErpUpdateService
                     $this->describeDownloadSource($downloadUrl),
                     'HTTP GET → '.basename($downloadUrl)
                 );
-                $this->downloadPackage($zipPath, $downloadUrl);
+
+                $this->downloadPackageResumable($zipPath.'.partial', $downloadUrl, $expected, $appPath);
+                $this->assertDownloadedPackageIntegrity($zipPath.'.partial', $expected);
+                $this->log($appPath, 'SHA256 validado: '.$expected['sha256'].' (size='.$expected['size'].')');
+                $this->log($appPath, 'Download concluído.');
+                File::move($zipPath.'.partial', $zipPath);
+
+                self::writeStatus(
+                    'downloading',
+                    'Download concluído',
+                    36,
+                    'Pacote verificado (tamanho + SHA256)',
+                    'HTTP GET → Unitec-ERP-Update.zip'
+                );
 
                 self::writeStatus(
                     'extracting',
-                    'Extraindo arquivos do pacote',
+                    'Verificando pacote',
                     38,
                     '0% · abrindo ZIP e preparando pastas',
                     class_exists(ZipArchive::class) ? 'ZipArchive (lotes)' : 'Expand-Archive (PowerShell)',
@@ -508,72 +749,144 @@ class ErpUpdateService
                 );
             }
 
+            $this->log($appPath, 'Extração iniciada.');
             $sourceRoot = $this->extractPackage($zipPath, $extractRoot);
+            $this->assertPackageStructure($sourceRoot);
+            $manifest = $this->readUpdateManifest($extractRoot, $sourceRoot);
+            $this->log($appPath, 'Extração concluída (root='.$sourceRoot.').');
+            $remoteFromManifest = trim((string) ($manifest['to_version'] ?? ''));
+            if ($remoteFromManifest !== '') {
+                $this->log($appPath, 'Versão remota (manifest): '.$remoteFromManifest);
+            }
 
-            self::writeStatus(
-                'backing_up',
-                'Gerando backup de segurança',
-                56,
-                'Dump do banco + cópia do .env antes de alterar arquivos',
-                'php artisan erp:backup (pré-update)'
-            );
-            $this->runPreUpdateBackup($appPath);
+            // Update rápido: sem backup. Preserva banco, .env, storage/ e tools/.
+            // Se falhar, o usuário retoma a atualização (fluxo idempotente).
 
             self::writeStatus(
                 'applying',
-                'Aplicando arquivos no sistema',
-                58,
-                'Preservando .env, storage/ e tools/ do cliente',
-                'Cópia de arquivos + vendor/'
+                'Entrando em modo de manutenção',
+                52,
+                'php artisan down — usuários não acessam durante a troca de arquivos',
+                'php artisan down'
             );
-            $this->applyPackage($sourceRoot, $appPath);
+            $this->log($appPath, 'artisan down');
+            $this->runArtisanWithoutOpcache($appPath, ['down', '--retry=60']);
+            $maintenanceOn = true;
+
+            self::writeStatus(
+                'applying',
+                'Copiando arquivos',
+                53,
+                'Preservando banco, .env, storage/ e tools/ do cliente',
+                'Cópia de app/ + vendor/'
+            );
+            $this->log($appPath, 'Cópia de arquivos iniciada.');
+            $this->applyPackage($sourceRoot, $appPath, $manifest);
+            $this->forceInstallVersionFile($sourceRoot, $appPath);
+            $this->purgeStalePhpCaches($appPath);
             $this->ensureEmbeddedPhpConfiguration($appPath);
             self::ensureFrameworkStorageDirectories();
+            $this->log($appPath, 'Cópia de arquivos concluída.');
+
+            $expectedVersion = trim((string) ($manifest['to_version'] ?? ''));
+            if ($expectedVersion === '') {
+                $expectedVersion = $this->readVersionFromDisk($sourceRoot);
+            }
+
+            $installedVersion = $this->readVersionFromDisk($appPath);
+            if ($expectedVersion !== '' && $installedVersion !== $expectedVersion) {
+                throw new RuntimeException(
+                    "Falha ao gravar arquivos: versão no disco ficou {$installedVersion} (esperado {$expectedVersion})."
+                );
+            }
 
             self::writeStatus(
                 'migrating',
-                'Atualizando banco de dados',
+                'Migrations',
                 82,
-                'Executando migrations pendentes — pode demorar vários minutos. Não feche.',
+                'Executando migrations pendentes — pode demorar. Não feche.',
                 'php artisan migrate --force'
             );
+            $this->log($appPath, 'Migrate iniciado.');
             $this->runMigrations($appPath);
+            $this->log($appPath, 'Migrate concluído.');
 
             self::writeStatus(
                 'finalizing',
-                'Finalizando configuração',
+                'Limpeza de cache',
                 92,
-                'Limpando views e recriando cache de configuração',
-                'php artisan view:clear && config:cache'
+                'optimize:clear e config:cache',
+                'php artisan optimize:clear && config:cache'
             );
+            $this->log($appPath, 'Optimize iniciado.');
             $this->finalizeCaches($appPath);
+            $this->log($appPath, 'Optimize concluído.');
+
+            $installedVersion = $this->readVersionFromDisk($appPath);
+            if ($expectedVersion !== '' && $installedVersion !== $expectedVersion) {
+                throw new RuntimeException(
+                    "Arquivos aplicados, mas a versão no disco ficou {$installedVersion} (esperado {$expectedVersion})."
+                );
+            }
+            if ($installedVersion === '') {
+                $installedVersion = $expectedVersion !== '' ? $expectedVersion : (string) config('unitec.versao', '');
+            }
+
+            $cachedVersion = $this->readVersionFromCachedConfig($appPath);
+            if ($installedVersion !== '' && $cachedVersion !== '' && $cachedVersion !== $installedVersion) {
+                $this->log($appPath, "Aviso: cache config={$cachedVersion} disco={$installedVersion}; limpando.");
+                $this->purgeStalePhpCaches($appPath);
+            }
+
+            $this->log($appPath, 'artisan up');
+            $this->runArtisanWithoutOpcache($appPath, ['up']);
+            $maintenanceOn = false;
 
             $this->clearLocalPackage(keepMeta: true);
             self::writePackageMeta([
                 'download_state' => 'idle',
                 'package_ready' => false,
-                'check_message' => 'Atualização aplicada. Sistema em '.config('unitec.versao'),
-                'local_version' => (string) config('unitec.versao'),
+                'check_message' => 'Atualização aplicada. Sistema em '.$installedVersion,
+                'local_version' => $installedVersion,
+                'remote_version' => $installedVersion,
                 'last_check_at' => now()->toIso8601String(),
             ]);
 
-            $this->log($appPath, 'Atualizacao concluida com sucesso.');
+            $this->log($appPath, 'Atualização concluída (versão '.$installedVersion.').');
 
             self::writeStatus(
                 'completed',
                 'Atualização concluída',
                 100,
-                'Encerrando sessão e abrindo o login…',
+                'Abrindo o login…',
                 null
             );
         } catch (\Throwable $exception) {
-            $this->log($appPath, 'ERRO: '.$exception->getMessage());
-            self::writeStatus('failed', $exception->getMessage(), 0);
+            $this->logException($appPath, 'apply-update', $exception);
+            $this->log(
+                $appPath,
+                'Atualização falhou sem restore automático. Banco/.env/storage/tools preservados — retome a atualização.'
+            );
 
-            throw $exception;
+            if ($maintenanceOn) {
+                try {
+                    $this->log($appPath, 'artisan up (recuperação após falha)');
+                    $this->runArtisanWithoutOpcache($appPath, ['up']);
+                } catch (\Throwable $upError) {
+                    $this->logException($appPath, 'artisan-up-recovery', $upError);
+                    self::clearMaintenanceFlag();
+                }
+            }
+
+            $friendly = $this->friendlyUpdateErrorMessage($exception);
+            self::writeStatus('failed', $friendly, 0);
+
+            throw new RuntimeException($friendly, 0, $exception);
         } finally {
-            File::delete($lockPath);
-            File::deleteDirectory($tempRoot);
+            $this->releaseExclusiveLock($lockHandle, $lockPath, 'apply_released');
+            if (is_string($tempRoot) && is_dir($tempRoot)) {
+                File::deleteDirectory($tempRoot);
+            }
         }
     }
 
@@ -631,59 +944,301 @@ class ErpUpdateService
     private function downloadPackage(string $destination, ?string $url = null): void
     {
         $url ??= $this->resolveUpdateDownloadUrl();
-        $sourceDetail = $this->describeDownloadSource($url);
-        $path = parse_url($url, PHP_URL_PATH);
-        $command = 'HTTP GET → '.basename(is_string($path) && $path !== '' ? $path : 'Unitec-ERP-Update.zip');
-        $lastWrite = 0;
-        $lastStepPercent = -1;
+        $expected = $this->fetchPackageIntegrityMeta($url);
+        $this->downloadPackageResumable($destination.'.partial', $url, $expected, base_path());
+        $this->assertDownloadedPackageIntegrity($destination.'.partial', $expected);
+        if (is_file($destination)) {
+            File::delete($destination);
+        }
+        File::move($destination.'.partial', $destination);
+    }
 
-        $response = Http::timeout(900)
-            ->withOptions([
-                'sink' => $destination,
-                'verify' => $this->resolveSslVerifyPath(),
-                'progress' => function ($downloadTotal, $downloadedBytes) use ($destination, $sourceDetail, $command, &$lastWrite, &$lastStepPercent): void {
-                    $now = time();
-                    $downloaded = max(0, (int) $downloadedBytes);
+    /**
+     * @return array{sha256: string, size: int}
+     */
+    private function fetchPackageIntegrityMeta(string $zipUrl): array
+    {
+        $shaUrl = $this->resolvePackageSha256Url($zipUrl);
 
-                    if ($downloaded <= 0 && is_file($destination)) {
-                        $downloaded = (int) filesize($destination);
-                    }
-
-                    $total = max(0, (int) $downloadTotal);
-                    $stepPercent = 0;
-
-                    if ($total > 0 && $downloaded > 0) {
-                        $stepPercent = min(99, (int) floor(($downloaded / $total) * 100));
-                    } elseif ($downloaded > 0) {
-                        $estimatedTotal = 250 * 1024 * 1024;
-                        $stepPercent = min(95, (int) floor(($downloaded / $estimatedTotal) * 100));
-                    }
-
-                    // Atualiza a cada 1% (ou no máximo a cada 2s se o %).
-                    if ($stepPercent === $lastStepPercent && ($now - $lastWrite) < 2 && $downloaded > 0) {
-                        return;
-                    }
-
-                    $lastWrite = $now;
-                    $lastStepPercent = $stepPercent;
-                    $globalPercent = max(9, 8 + (int) floor($stepPercent * 30 / 100));
-
-                    self::writeStatus(
-                        'downloading',
-                        'Baixando pacote de atualização',
-                        $globalPercent,
-                        self::formatDownloadDetail($downloaded, $total, $sourceDetail),
-                        $command,
-                        $downloaded,
-                        $total > 0 ? $total : null,
-                        $stepPercent
-                    );
-                },
-            ])
-            ->get($url);
+        try {
+            $response = Http::timeout(30)
+                ->withOptions(['verify' => $this->resolveSslVerifyPath()])
+                ->withHeaders(['User-Agent' => 'Unitec-ERP-Update'])
+                ->get($shaUrl);
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                'Não foi possível baixar a assinatura do pacote (.sha256). Verifique a internet e tente novamente. Detalhe: '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
 
         if (! $response->successful()) {
-            throw new RuntimeException('Falha ao baixar o pacote (HTTP '.$response->status().').');
+            throw new RuntimeException(
+                'Assinatura do pacote indisponível (HTTP '.$response->status().'). '
+                .'Publique Unitec-ERP-Update.zip.sha256 no canal update.'
+            );
+        }
+
+        $body = trim((string) $response->body());
+        if ($body === '') {
+            throw new RuntimeException('Arquivo .sha256 vazio.');
+        }
+
+        $sha256 = '';
+        $size = 0;
+
+        foreach (preg_split('/\R/', $body) ?: [] as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+            if (preg_match('/^size\s*=\s*(\d+)$/i', $line, $m)) {
+                $size = (int) $m[1];
+                continue;
+            }
+            if (preg_match('/^([a-f0-9]{64})\s+/i', $line, $m)) {
+                $sha256 = strtolower($m[1]);
+            }
+        }
+
+        if ($sha256 === '' || ! preg_match('/^[a-f0-9]{64}$/', $sha256)) {
+            throw new RuntimeException('Hash SHA256 inválido no arquivo de assinatura.');
+        }
+
+        if ($size <= 0) {
+            // Fallback: HEAD no ZIP.
+            try {
+                $head = Http::timeout(20)
+                    ->withOptions(['verify' => $this->resolveSslVerifyPath()])
+                    ->withHeaders(['User-Agent' => 'Unitec-ERP-Update'])
+                    ->head($zipUrl);
+                $size = (int) ($head->header('Content-Length') ?: 0);
+            } catch (\Throwable) {
+                $size = 0;
+            }
+        }
+
+        return [
+            'sha256' => $sha256,
+            'size' => $size,
+        ];
+    }
+
+    private function resolvePackageSha256Url(string $zipUrl): string
+    {
+        if (str_ends_with(strtolower($zipUrl), '.zip')) {
+            return $zipUrl.'.sha256';
+        }
+
+        return rtrim($zipUrl, '/').'.sha256';
+    }
+
+    private function assertUpdateConnection(string $url): void
+    {
+        try {
+            $response = Http::timeout(20)
+                ->withOptions(['verify' => $this->resolveSslVerifyPath()])
+                ->withHeaders(['User-Agent' => 'Unitec-ERP-Update'])
+                ->head($url);
+
+            if ($response->successful() || in_array($response->status(), [200, 301, 302, 307, 308], true)) {
+                return;
+            }
+
+            // Alguns hosts não aceitam HEAD — tenta GET parcial.
+            $get = Http::timeout(20)
+                ->withOptions(['verify' => $this->resolveSslVerifyPath()])
+                ->withHeaders([
+                    'User-Agent' => 'Unitec-ERP-Update',
+                    'Range' => 'bytes=0-0',
+                ])
+                ->get($url);
+
+            if ($get->successful() || in_array($get->status(), [200, 206], true)) {
+                return;
+            }
+
+            throw new RuntimeException('HTTP '.$response->status());
+        } catch (RuntimeException $e) {
+            throw new RuntimeException(
+                'Sem conexão com o servidor de atualização. Verifique a internet e tente novamente. ('.$e->getMessage().')',
+                0,
+                $e
+            );
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                'Sem conexão com o servidor de atualização. Verifique a internet e tente novamente. Detalhe: '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
+    }
+
+    private function assertEnoughDiskSpace(string $appPath, int $packageSize): void
+    {
+        $needed = $packageSize > 0
+            ? (int) max(200 * 1024 * 1024, (int) ceil($packageSize * 2.5))
+            : 500 * 1024 * 1024;
+
+        $paths = [
+            storage_path('app/private'),
+            $appPath,
+            sys_get_temp_dir(),
+        ];
+
+        foreach ($paths as $path) {
+            if (! is_dir($path)) {
+                continue;
+            }
+            $free = @disk_free_space($path);
+            if ($free === false) {
+                continue;
+            }
+            if ($free < $needed) {
+                $freeMb = number_format($free / 1024 / 1024, 0, ',', '.');
+                $needMb = number_format($needed / 1024 / 1024, 0, ',', '.');
+                throw new RuntimeException(
+                    "Espaço em disco insuficiente em {$path}. Livre: {$freeMb} MB. Necessário: cerca de {$needMb} MB."
+                );
+            }
+
+            return;
+        }
+    }
+
+    /**
+     * @param  array{sha256: string, size: int}  $expected
+     */
+    private function downloadPackageResumable(
+        string $destination,
+        string $url,
+        array $expected,
+        ?string $appPath = null
+    ): void {
+        $appPath ??= base_path();
+        $sourceDetail = $this->describeDownloadSource($url);
+        $command = 'HTTP GET → Unitec-ERP-Update.zip';
+        $expectedSize = max(0, (int) ($expected['size'] ?? 0));
+        $existing = is_file($destination) ? (int) filesize($destination) : 0;
+
+        if ($expectedSize > 0 && $existing > $expectedSize) {
+            File::delete($destination);
+            $existing = 0;
+        }
+
+        if ($expectedSize > 0 && $existing === $expectedSize && is_file($destination)) {
+            $this->log($appPath, 'Download concluído (arquivo partial já completo).');
+            self::writeStatus(
+                'downloading',
+                'Download concluído',
+                38,
+                self::formatDownloadDetail($existing, $expectedSize, $sourceDetail),
+                $command,
+                $existing,
+                $expectedSize,
+                100
+            );
+
+            return;
+        }
+
+        $headers = ['User-Agent' => 'Unitec-ERP-Update'];
+        $append = false;
+        if ($existing > 0 && $expectedSize > 0 && $existing < $expectedSize) {
+            $headers['Range'] = 'bytes='.$existing.'-';
+            $append = true;
+            $this->log($appPath, 'Download retomado a partir do byte '.$existing.' de '.$expectedSize.'.');
+        }
+
+        File::ensureDirectoryExists(dirname($destination));
+        $mode = $append ? 'ab' : 'wb';
+        $handle = fopen($destination, $mode);
+        if ($handle === false) {
+            throw new RuntimeException('Não foi possível gravar o pacote em disco.');
+        }
+
+        $lastWrite = 0;
+        $lastStepPercent = -1;
+        $baseOffset = $append ? $existing : 0;
+
+        try {
+            $response = Http::timeout(900)
+                ->withHeaders($headers)
+                ->withOptions([
+                    'sink' => $handle,
+                    'verify' => $this->resolveSslVerifyPath(),
+                    'progress' => function ($downloadTotal, $downloadedBytes) use (
+                        $destination,
+                        $sourceDetail,
+                        $command,
+                        $expectedSize,
+                        $baseOffset,
+                        &$lastWrite,
+                        &$lastStepPercent
+                    ): void {
+                        $now = time();
+                        $chunk = max(0, (int) $downloadedBytes);
+                        $downloaded = $baseOffset + $chunk;
+
+                        if ($downloaded <= 0 && is_file($destination)) {
+                            $downloaded = (int) filesize($destination);
+                        }
+
+                        $total = $expectedSize > 0 ? $expectedSize : max(0, (int) $downloadTotal);
+                        if ($total > 0 && $baseOffset > 0 && (int) $downloadTotal > 0) {
+                            // downloadTotal no Range costuma ser o restante.
+                            $total = max($total, $baseOffset + (int) $downloadTotal);
+                        }
+
+                        $stepPercent = 0;
+                        if ($total > 0 && $downloaded > 0) {
+                            $stepPercent = min(99, (int) floor(($downloaded / $total) * 100));
+                        } elseif ($downloaded > 0) {
+                            $estimatedTotal = 80 * 1024 * 1024;
+                            $stepPercent = min(95, (int) floor(($downloaded / $estimatedTotal) * 100));
+                        }
+
+                        if ($stepPercent === $lastStepPercent && ($now - $lastWrite) < 2 && $downloaded > 0) {
+                            return;
+                        }
+
+                        $lastWrite = $now;
+                        $lastStepPercent = $stepPercent;
+                        $globalPercent = max(9, 8 + (int) floor($stepPercent * 30 / 100));
+
+                        self::writeStatus(
+                            'downloading',
+                            'Baixando pacote de atualização',
+                            $globalPercent,
+                            self::formatDownloadDetail($downloaded, $total, $sourceDetail),
+                            $command,
+                            $downloaded,
+                            $total > 0 ? $total : null,
+                            $stepPercent
+                        );
+                    },
+                ])
+                ->get($url);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $status = $response->status();
+
+        // Servidor ignorou Range e mandou o arquivo inteiro — regrava se estavamos em append.
+        if ($append && $status === 200) {
+            $this->log($appPath, 'Servidor não suportou Range — baixando o pacote por completo.');
+            File::delete($destination);
+            $this->downloadPackageResumable($destination, $url, $expected, $appPath);
+
+            return;
+        }
+
+        if (! $response->successful() && $status !== 206) {
+            throw new RuntimeException('Falha ao baixar o pacote (HTTP '.$status.').');
         }
 
         if (! is_file($destination) || filesize($destination) < 1024) {
@@ -691,16 +1246,100 @@ class ErpUpdateService
         }
 
         $finalSize = (int) filesize($destination);
-
         self::writeStatus(
             'downloading',
             'Download concluído',
             38,
-            self::formatDownloadDetail($finalSize, $finalSize, $sourceDetail),
+            self::formatDownloadDetail($finalSize, $expectedSize > 0 ? $expectedSize : $finalSize, $sourceDetail),
             $command,
             $finalSize,
-            $finalSize
+            $expectedSize > 0 ? $expectedSize : $finalSize,
+            100
         );
+    }
+
+    /**
+     * @param  array{sha256: string, size: int}  $expected
+     */
+    private function assertDownloadedPackageIntegrity(string $path, array $expected): void
+    {
+        if (! is_file($path)) {
+            throw new RuntimeException('Arquivo do pacote não encontrado após o download.');
+        }
+
+        $size = (int) filesize($path);
+        $expectedSize = (int) ($expected['size'] ?? 0);
+        if ($expectedSize > 0 && $size !== $expectedSize) {
+            File::delete($path);
+            throw new RuntimeException(
+                'Tamanho do pacote não confere (baixado '.$size.' bytes, esperado '.$expectedSize.'). '
+                .'O download pode ter sido interrompido — tente novamente.'
+            );
+        }
+
+        $expectedSha = strtolower(trim((string) ($expected['sha256'] ?? '')));
+        if ($expectedSha === '') {
+            if (! self::isValidUpdatePackageFile($path)) {
+                File::delete($path);
+                throw new RuntimeException('Pacote inválido (não é um ZIP).');
+            }
+
+            return;
+        }
+
+        $actual = hash_file('sha256', $path);
+        if (! is_string($actual) || strtolower($actual) !== $expectedSha) {
+            File::delete($path);
+            throw new RuntimeException(
+                'Integridade do pacote falhou (SHA256). O arquivo pode estar corrompido — baixe novamente.'
+            );
+        }
+
+        if (! self::isValidUpdatePackageFile($path)) {
+            File::delete($path);
+            throw new RuntimeException('Pacote inválido após verificação (não é um ZIP).');
+        }
+    }
+
+    private function assertPackageStructure(string $sourceRoot): void
+    {
+        $artisan = $sourceRoot.DIRECTORY_SEPARATOR.'artisan';
+        $vendor = $sourceRoot.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php';
+        $config = $sourceRoot.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'unitec.php';
+
+        if (! is_file($artisan)) {
+            throw new RuntimeException('Pacote inválido: arquivo artisan ausente.');
+        }
+        if (! is_file($vendor)) {
+            throw new RuntimeException('Pacote inválido: vendor/autoload.php ausente.');
+        }
+        if (! is_file($config)) {
+            throw new RuntimeException('Pacote inválido: config/unitec.php ausente.');
+        }
+    }
+
+    private function friendlyUpdateErrorMessage(\Throwable $exception): string
+    {
+        $raw = trim($exception->getMessage());
+        if ($raw === '') {
+            return 'A atualização falhou. Banco, .env, storage e tools foram preservados. Tente atualizar de novo. Veja storage/logs/erp-update-spawn.log.';
+        }
+
+        if (str_contains(mb_strtolower($raw), 'espaço em disco')) {
+            return $raw;
+        }
+
+        if (str_contains(mb_strtolower($raw), 'conexão') || str_contains(mb_strtolower($raw), 'http')) {
+            return $raw;
+        }
+
+        if (str_contains(mb_strtolower($raw), 'sha256') || str_contains(mb_strtolower($raw), 'integridade')) {
+            return $raw;
+        }
+
+        return 'A atualização não foi concluída: '.$raw
+            .' Banco, .env, storage e tools foram preservados. Tente atualizar de novo (Instalar agora). '
+            .'Detalhes em storage/logs/erp-update-spawn.log.';
     }
 
     /**
@@ -1067,69 +1706,49 @@ class ErpUpdateService
     }
 
     /**
-     * Backup obrigatório antes de aplicar arquivos (banco + .env).
-     * Sem backup bem-sucedido, a atualização NÃO segue.
+     * @return array{
+     *     format?: int,
+     *     to_version?: string|null,
+     *     includes_vendor?: bool
+     * }
      */
-    private function runPreUpdateBackup(string $appPath): void
+    private function readUpdateManifest(string $extractRoot, string $sourceRoot): array
     {
-        $this->log($appPath, 'Iniciando backup pre-update (banco + .env).');
+        foreach ([
+            $sourceRoot.DIRECTORY_SEPARATOR.'unitec-update.json',
+            $extractRoot.DIRECTORY_SEPARATOR.'unitec-update.json',
+        ] as $path) {
+            if (! is_file($path)) {
+                continue;
+            }
 
-        self::writeStatus(
-            'backing_up',
-            'Gerando backup de segurança',
-            55,
-            '1% · preparando pasta e mysqldump',
-            'php artisan erp:backup (pré-update)',
-            null,
-            null,
-            1
-        );
+            try {
+                /** @var mixed $decoded */
+                $decoded = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+            } catch (\Throwable) {
+                continue;
+            }
 
-        self::writeStatus(
-            'backing_up',
-            'Gerando backup de segurança',
-            56,
-            '30% · exportando banco de dados',
-            'php artisan erp:backup (pré-update)',
-            null,
-            null,
-            30
-        );
-
-        try {
-            $result = app(DatabaseBackupService::class)->runPreUpdate();
-        } catch (\Throwable $e) {
-            throw new RuntimeException(
-                'Atualização abortada: falha no backup de segurança. Detalhe: '.$e->getMessage(),
-                0,
-                $e
-            );
+            if (is_array($decoded)) {
+                return $decoded;
+            }
         }
 
-        if (! ($result['ok'] ?? false)) {
-            throw new RuntimeException(
-                'Atualização abortada: backup de segurança falhou. '
-                .($result['message'] ?? 'Não foi possível gerar dump do banco / .env.')
-            );
-        }
-
-        $detail = (string) ($result['message'] ?? 'Backup OK');
-        $this->log($appPath, 'Backup pre-update OK: '.$detail);
-
-        self::writeStatus(
-            'backing_up',
-            'Backup de segurança concluído',
-            57,
-            '100% · '.$detail,
-            'php artisan erp:backup (pré-update)',
-            null,
-            null,
-            100
-        );
+        return [
+            'format' => 2,
+            'includes_vendor' => true,
+        ];
     }
 
-    private function applyPackage(string $sourceRoot, string $targetRoot): void
+    /**
+     * @param  array<string, mixed>  $manifest
+     */
+    private function applyPackage(string $sourceRoot, string $targetRoot, array $manifest = []): void
     {
+        $includesVendor = array_key_exists('includes_vendor', $manifest)
+            ? (bool) $manifest['includes_vendor']
+            : is_file($sourceRoot.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php');
+
         if (! is_file($sourceRoot.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php')) {
             throw new RuntimeException('Pacote inválido: vendor/autoload.php ausente.');
         }
@@ -1158,11 +1777,12 @@ class ErpUpdateService
             '.env.production',
             'composer.phar',
             'vc_redist.x64.exe',
+            'unitec-update.json',
         ];
 
         $appTotal = $this->countCopyableFiles($sourceRoot, $excludeDirs, $excludeFiles);
         $vendorRoot = $sourceRoot.DIRECTORY_SEPARATOR.'vendor';
-        $vendorTotal = is_dir($vendorRoot)
+        $vendorTotal = ($includesVendor && is_dir($vendorRoot))
             ? $this->countCopyableFiles($vendorRoot, [], [])
             : 0;
         $totalFiles = max(1, $appTotal + $vendorTotal);
@@ -1185,12 +1805,12 @@ class ErpUpdateService
             }
 
             $lastStepPercent = $stepPercent;
-            $globalPercent = 58 + (int) floor($stepPercent * 24 / 100);
+            $globalPercent = 52 + (int) floor($stepPercent * 30 / 100);
 
             ErpUpdateService::writeStatus(
                 'applying',
-                'Copiando arquivos do pacote',
-                min(82, max(58, $globalPercent)),
+                'Copiando arquivos',
+                min(82, max(52, $globalPercent)),
                 sprintf(
                     '%s%% · %s de %s · %s novos · %s iguais (mantidos)',
                     $stepPercent,
@@ -1208,13 +1828,15 @@ class ErpUpdateService
 
         $this->copyDirectory($sourceRoot, $targetRoot, $excludeDirs, $excludeFiles, $onProgress);
 
-        $this->copyDirectory(
-            $vendorRoot,
-            $targetRoot.DIRECTORY_SEPARATOR.'vendor',
-            ['laravel'.DIRECTORY_SEPARATOR.'pint'],
-            [],
-            $onProgress
-        );
+        if ($includesVendor && is_dir($vendorRoot)) {
+            $this->copyDirectory(
+                $vendorRoot,
+                $targetRoot.DIRECTORY_SEPARATOR.'vendor',
+                ['laravel'.DIRECTORY_SEPARATOR.'pint'],
+                [],
+                $onProgress
+            );
+        }
     }
 
     /**
@@ -1289,17 +1911,23 @@ class ErpUpdateService
             }
 
             $destination = $target.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            $sourcePath = $item->getPathname();
 
-            if ($item->isDir()) {
+            // Junções/symlinks Windows (ex.: vendor/unitec/*, public/storage) não são arquivos.
+            if ($item->isDir() || is_dir($sourcePath)) {
                 File::ensureDirectoryExists($destination);
 
+                continue;
+            }
+
+            if (! is_file($sourcePath)) {
                 continue;
             }
 
             File::ensureDirectoryExists(dirname($destination));
 
             // Já igual no destino: não reescreve (bem mais rápido no Windows/antivírus).
-            if ($this->filesAreIdentical($item->getPathname(), $destination)) {
+            if ($this->filesAreIdentical($sourcePath, $destination)) {
                 if ($onFileCopied !== null) {
                     $onFileCopied(true);
                 }
@@ -1307,7 +1935,7 @@ class ErpUpdateService
                 continue;
             }
 
-            File::copy($item->getPathname(), $destination);
+            File::copy($sourcePath, $destination);
 
             if ($onFileCopied !== null) {
                 $onFileCopied(false);
@@ -1380,9 +2008,11 @@ class ErpUpdateService
         chdir($appPath);
 
         try {
-            $this->log($appPath, 'Iniciando php artisan migrate --force');
+            // NUNCA migrate:fresh / db:wipe / db:seed no update — preserva dados do cliente.
+            $this->log($appPath, 'Iniciando php artisan migrate --force (incremental; sem fresh/wipe).');
             Artisan::call('migrate', ['--force' => true]);
             $output = trim((string) Artisan::output());
+            $this->assertUpdateDidNotResetDatabase($output);
             $this->log(
                 $appPath,
                 $output !== ''
@@ -1396,31 +2026,39 @@ class ErpUpdateService
         }
     }
 
+    private function assertUpdateDidNotResetDatabase(string $migrateOutput): void
+    {
+        $normalized = strtolower($migrateOutput);
+        foreach (['migrate:fresh', 'dropping all tables', 'db:wipe'] as $forbidden) {
+            if (str_contains($normalized, $forbidden)) {
+                throw new RuntimeException(
+                    'Atualização abortada por segurança: comando destrutivo de banco detectado ('.$forbidden.').'
+                );
+            }
+        }
+    }
+
     private function finalizeCaches(string $appPath): void
     {
         $previous = getcwd();
         chdir($appPath);
 
         try {
-            Artisan::call('config:cache');
+            $this->purgeStalePhpCaches($appPath);
 
-            try {
-                Artisan::call('view:cache');
-            } catch (\Throwable $e) {
-                $this->log($appPath, 'view:cache ignorado: '.$e->getMessage());
-                Artisan::call('view:clear');
-            }
+            $this->runArtisanWithoutOpcache($appPath, ['optimize:clear']);
+            $this->runArtisanWithoutOpcache($appPath, ['config:cache']);
 
-            try {
-                Artisan::call('route:cache');
-            } catch (\Throwable $e) {
-                $this->log($appPath, 'route:cache ignorado: '.$e->getMessage());
-            }
-
-            try {
-                Artisan::call('event:cache');
-            } catch (\Throwable $e) {
-                $this->log($appPath, 'event:cache ignorado: '.$e->getMessage());
+            $diskVersion = $this->readVersionFromDisk($appPath);
+            $cachedVersion = $this->readVersionFromCachedConfig($appPath);
+            if ($diskVersion !== '' && $cachedVersion !== '' && $diskVersion !== $cachedVersion) {
+                $this->log(
+                    $appPath,
+                    "Cache de config ficou com versão {$cachedVersion} (disco {$diskVersion}) — regenerando."
+                );
+                $this->purgeStalePhpCaches($appPath);
+                $this->runArtisanWithoutOpcache($appPath, ['optimize:clear']);
+                $this->runArtisanWithoutOpcache($appPath, ['config:cache']);
             }
 
             $this->ensurePhpOpcacheEnabled($appPath);
@@ -1429,6 +2067,210 @@ class ErpUpdateService
                 chdir($previous);
             }
         }
+    }
+
+    /**
+     * Garante que config/unitec.php do pacote foi gravado no destino (fora do skip "igual").
+     */
+    private function forceInstallVersionFile(string $sourceRoot, string $targetRoot): void
+    {
+        $source = $sourceRoot.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'unitec.php';
+        $target = $targetRoot.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'unitec.php';
+
+        if (! is_file($source)) {
+            return;
+        }
+
+        File::ensureDirectoryExists(dirname($target));
+        File::copy($source, $target);
+        clearstatcache(true, $target);
+    }
+
+    /**
+     * @param  list<string>  $artisanArgs
+     */
+    private function runArtisanWithoutOpcache(string $appPath, array $artisanArgs): void
+    {
+        $php = ErpUpdateProcessLauncher::resolvePhpBinary($appPath);
+        $artisan = $appPath.DIRECTORY_SEPARATOR.'artisan';
+        $label = implode(' ', $artisanArgs);
+        $critical = in_array($artisanArgs[0] ?? '', ['down', 'up', 'optimize:clear', 'optimize', 'migrate'], true);
+
+        try {
+            $command = array_merge(
+                [
+                    $php,
+                    '-d', 'opcache.enable=0',
+                    '-d', 'opcache.enable_cli=0',
+                    $artisan,
+                ],
+                $artisanArgs
+            );
+
+            $result = Process::path($appPath)
+                ->timeout(600)
+                ->run($command);
+
+            if ($result->successful()) {
+                return;
+            }
+
+            $detail = trim($result->errorOutput().' '.$result->output());
+            $this->log($appPath, 'artisan '.$label.' (subprocess) falhou: '.$detail);
+
+            if ($critical) {
+                throw new RuntimeException('Falha ao executar php artisan '.$label.'. '.$detail);
+            }
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            $this->log($appPath, 'subprocess artisan falhou: '.$e->getMessage());
+            if ($critical) {
+                throw new RuntimeException(
+                    'Falha ao executar php artisan '.$label.'. '.$e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+        }
+
+        // Fallback só para comandos não críticos.
+        $params = [];
+        $command = $artisanArgs[0] ?? '';
+        if ($command === '') {
+            return;
+        }
+        Artisan::call($command, $params);
+    }
+
+    /**
+     * Versão efetiva instalada: prioriza o arquivo no disco (fonte da verdade pós-update).
+     */
+    public static function readInstalledVersion(): string
+    {
+        $disk = (new self)->readVersionFromDisk(base_path());
+        if ($disk !== '') {
+            return $disk;
+        }
+
+        return (string) config('unitec.versao', '');
+    }
+
+    private function readVersionFromDisk(string $appPath): string
+    {
+        $path = $appPath.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'unitec.php';
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $content = (string) @file_get_contents($path);
+        if (preg_match("/'versao'\\s*=>\\s*'([^']+)'/", $content, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return '';
+    }
+
+    private function readVersionFromCachedConfig(string $appPath): string
+    {
+        $path = $appPath.DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR.'config.php';
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $content = (string) @file_get_contents($path);
+        if (preg_match("/'versao'\\s*=>\\s*'([^']+)'/", $content, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return '';
+    }
+
+    private function purgeStalePhpCaches(string $appPath): void
+    {
+        $cacheDir = $appPath.DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache';
+        if (is_dir($cacheDir)) {
+            foreach (glob($cacheDir.DIRECTORY_SEPARATOR.'*.php') ?: [] as $file) {
+                @unlink($file);
+            }
+        }
+
+        $configDir = $appPath.DIRECTORY_SEPARATOR.'config';
+        if (is_dir($configDir) && function_exists('opcache_invalidate')) {
+            foreach (glob($configDir.DIRECTORY_SEPARATOR.'*.php') ?: [] as $file) {
+                @opcache_invalidate($file, true);
+            }
+        }
+
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+
+        $opcacheDir = $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'opcache';
+        if (! is_dir($opcacheDir)) {
+            return;
+        }
+
+        try {
+            foreach (File::allFiles($opcacheDir) as $file) {
+                @unlink($file->getPathname());
+            }
+        } catch (\Throwable) {
+            // Melhor esforço — update não deve falhar por limpeza de cache.
+        }
+    }
+
+    /**
+     * Reinicia o artisan serve em segundo plano (Windows) para limpar OPcache em memória.
+     */
+    private function scheduleApplicationServerRestart(string $appPath, int $delaySeconds = 12): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return;
+        }
+
+        $script = $appPath.DIRECTORY_SEPARATOR.'scripts'.DIRECTORY_SEPARATOR.'reiniciar-servidor-apos-update.ps1';
+        if (! is_file($script)) {
+            $this->log($appPath, 'Aviso: script de reinicio pos-update ausente.');
+
+            return;
+        }
+
+        if (! function_exists('popen') || self::isShellFunctionDisabled('popen')) {
+            $this->log($appPath, 'Aviso: nao foi possivel agendar reinicio do servidor (popen indisponivel).');
+
+            return;
+        }
+
+        $delaySeconds = max(3, $delaySeconds);
+        $command = 'start "" /B powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File '
+            .escapeshellarg($script)
+            .' -AppPath '
+            .escapeshellarg($appPath)
+            .' -DelaySeconds '
+            .$delaySeconds;
+
+        $handle = @popen($command, 'r');
+        if ($handle === false) {
+            $this->log($appPath, 'Aviso: falha ao agendar reinicio do servidor apos update.');
+
+            return;
+        }
+
+        pclose($handle);
+        $this->log($appPath, 'Reinicio do servidor agendado apos update (+'.$delaySeconds.'s).');
+    }
+
+    private static function isShellFunctionDisabled(string $function): bool
+    {
+        $disabled = (string) ini_get('disable_functions');
+        if ($disabled === '') {
+            return false;
+        }
+
+        $list = array_map('trim', explode(',', strtolower($disabled)));
+
+        return in_array(strtolower($function), $list, true);
     }
 
     /**
@@ -1452,14 +2294,31 @@ class ErpUpdateService
                 $content = rtrim($content)."\nzend_extension=opcache\n";
             }
 
+            $opcacheDir = $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'opcache';
+            if (! is_dir($opcacheDir)) {
+                @mkdir($opcacheDir, 0775, true);
+            }
+
+            $opcacheDir = $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'opcache';
+            if (! is_dir($opcacheDir)) {
+                @mkdir($opcacheDir, 0775, true);
+            }
+
+            $opcacheDirIni = str_replace('\\', '/', $opcacheDir);
+
+            // Sempre valida timestamps: update aplica sem matar o PHP (evita porta zumbi).
             $settings = [
                 'opcache.enable' => '1',
-                'opcache.enable_cli' => '0',
-                'opcache.memory_consumption' => '128',
-                'opcache.interned_strings_buffer' => '16',
-                'opcache.max_accelerated_files' => '10000',
+                // artisan serve usa SAPI CLI — sem isso o OPcache nao acelera as telas.
+                'opcache.enable_cli' => '1',
+                'opcache.memory_consumption' => '256',
+                'opcache.interned_strings_buffer' => '32',
+                'opcache.max_accelerated_files' => '20000',
                 'opcache.validate_timestamps' => '1',
                 'opcache.revalidate_freq' => '2',
+                'opcache.file_cache' => '"'.$opcacheDirIni.'"',
+                'opcache.file_cache_only' => '0',
+                'opcache.file_cache_fallback' => '1',
                 'memory_limit' => '256M',
                 'max_execution_time' => '300',
                 'realpath_cache_size' => '4096k',
@@ -1490,13 +2349,41 @@ class ErpUpdateService
 
     private function log(string $appPath, string $message): void
     {
-        $logFile = $appPath.DIRECTORY_SEPARATOR.'instalacao.log';
-        $line = '['.now()->format('H:i:s').'] '.$message.PHP_EOL;
+        $line = '['.now()->format('Y-m-d H:i:s').'] '.$message.PHP_EOL;
 
-        try {
-            File::append($logFile, $line);
-        } catch (\Throwable) {
-            // ignore
+        foreach ([
+            $appPath.DIRECTORY_SEPARATOR.'instalacao.log',
+            storage_path('logs/erp-update-spawn.log'),
+        ] as $logFile) {
+            try {
+                File::ensureDirectoryExists(dirname($logFile));
+                File::append($logFile, $line);
+            } catch (\Throwable) {
+                // ignore
+            }
+        }
+    }
+
+    private function logException(string $appPath, string $context, \Throwable $exception): void
+    {
+        $this->log($appPath, 'EXCEPTION ['.$context.']: '.$exception->getMessage());
+        $this->log($appPath, 'EXCEPTION class='.$exception::class);
+        $this->log($appPath, 'EXCEPTION file='.$exception->getFile().':'.$exception->getLine());
+        foreach (explode("\n", $exception->getTraceAsString()) as $traceLine) {
+            $traceLine = trim($traceLine);
+            if ($traceLine !== '') {
+                $this->log($appPath, '  '.$traceLine);
+            }
+        }
+        $previous = $exception->getPrevious();
+        if ($previous instanceof \Throwable) {
+            $this->log($appPath, 'EXCEPTION previous: '.$previous->getMessage());
+            foreach (explode("\n", $previous->getTraceAsString()) as $traceLine) {
+                $traceLine = trim($traceLine);
+                if ($traceLine !== '') {
+                    $this->log($appPath, '  prev| '.$traceLine);
+                }
+            }
         }
     }
 
@@ -1520,12 +2407,11 @@ class ErpUpdateService
         return match ($state) {
             'starting' => ['step' => 1, 'label' => 'Preparar'],
             'downloading' => ['step' => 2, 'label' => 'Baixar pacote'],
-            'extracting' => ['step' => 3, 'label' => 'Extrair ZIP'],
-            'backing_up' => ['step' => 4, 'label' => 'Backup banco + .env'],
-            'applying' => ['step' => 5, 'label' => 'Aplicar arquivos'],
-            'migrating' => ['step' => 6, 'label' => 'Banco de dados'],
-            'finalizing' => ['step' => 7, 'label' => 'Finalizar'],
-            'completed' => ['step' => 8, 'label' => 'Concluído'],
+            'extracting' => ['step' => 3, 'label' => 'Verificar / extrair'],
+            'applying' => ['step' => 4, 'label' => 'Copiar arquivos'],
+            'migrating' => ['step' => 5, 'label' => 'Migrations'],
+            'finalizing' => ['step' => 6, 'label' => 'Limpeza de cache'],
+            'completed' => ['step' => 7, 'label' => 'Atualização concluída'],
             'failed' => ['step' => 0, 'label' => 'Erro'],
             default => ['step' => 0, 'label' => 'Aguardando'],
         };
@@ -1553,9 +2439,8 @@ class ErpUpdateService
         return [
             'starting' => [0, 8],
             'downloading' => [8, 38],
-            'extracting' => [38, 55],
-            'backing_up' => [55, 58],
-            'applying' => [58, 82],
+            'extracting' => [38, 52],
+            'applying' => [52, 82],
             'migrating' => [82, 92],
             'finalizing' => [92, 100],
             'completed' => [100, 100],
@@ -1571,7 +2456,6 @@ class ErpUpdateService
             'starting',
             'downloading',
             'extracting',
-            'backing_up',
             'applying',
             'migrating',
             'finalizing',
@@ -1640,7 +2524,7 @@ class ErpUpdateService
     }
 
     /**
-     * @param  'starting'|'downloading'|'extracting'|'backing_up'|'applying'|'migrating'|'finalizing'|'completed'|'failed'|'idle'  $state
+     * @param  'starting'|'downloading'|'extracting'|'applying'|'migrating'|'finalizing'|'completed'|'failed'|'idle'  $state
      */
     public static function writeStatus(
         string $state,
