@@ -1,0 +1,18 @@
+# Cloudflare Tunnel — Unitec ERP (produção / UnitecErpServer)
+#
+# Caminho oficial (serviço LocalSystem):
+#   C:\ProgramData\Unitec\cloudflared\config.yml
+#   C:\ProgramData\Unitec\cloudflared\<TUNNEL_ID>.json
+#   C:\ProgramData\Unitec\cloudflared\cloudflared.exe  (opcional; senão tools\cloudflared)
+#
+# O UnitecErpServer mantém o processo e grava status.json nesta pasta.
+#
+# Exemplo para erp.unierp.uk → PHP local :8765
+
+tunnel: TUNNEL_ID
+credentials-file: C:\ProgramData\Unitec\cloudflared\TUNNEL_ID.json
+
+ingress:
+  - hostname: erp.unierp.uk
+    service: http://127.0.0.1:8765
+  - service: http_status:404

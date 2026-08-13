@@ -1,0 +1,1324 @@
+/* ERP — Controle de Expedição (padrão Monitor / NFe) */
+
+.erp-expedicao-controle-page .fi-header,
+.erp-expedicao-controle-page .fi-page-header,
+.erp-expedicao-bipagem-page .fi-header,
+.erp-expedicao-bipagem-page .fi-page-header {
+    display: none !important;
+}
+
+.erp-expedicao-controle-page,
+.erp-expedicao-controle-page .fi-page-content,
+.erp-expedicao-controle-page .fi-page__content,
+.erp-expedicao-controle-page .fi-sc,
+.erp-expedicao-controle-page .fi-sc > div:first-child,
+.erp-expedicao-bipagem-page,
+.erp-expedicao-bipagem-page .fi-page-content,
+.erp-expedicao-bipagem-page .fi-page__content,
+.erp-expedicao-bipagem-page .fi-sc,
+.erp-expedicao-bipagem-page .fi-sc > div:first-child {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    row-gap: 0 !important;
+}
+
+.erp-expedicao-controle-page .fi-sc > div:not(.fi-hidden),
+.erp-expedicao-bipagem-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-expedicao-root {
+    margin-top: 0;
+}
+
+.erp-expedicao-controle-page .erp-expedicao,
+.erp-expedicao-bipagem-page .erp-expedicao {
+    width: calc(100% - 4mm);
+    margin-left: 2mm;
+    margin-bottom: 2mm;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md, 8px);
+    box-shadow: var(--erp-shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-expedicao__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: calc(0.35rem - 1mm) 0.75rem;
+    border-top-left-radius: var(--erp-radius-md, 8px);
+    border-top-right-radius: var(--erp-radius-md, 8px);
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: var(--erp-text-on-brand, #fff);
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.erp-expedicao__consulta {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    border-bottom: 1px solid var(--erp-border, #94a3b8);
+    padding: calc(0.5rem - 2mm) 0.85rem 0.6rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
+}
+
+.erp-expedicao-controle-page .erp-expedicao__consulta > legend {
+    display: block;
+    width: 100%;
+    padding: 0 0 calc(0.35rem - 2mm);
+    margin-bottom: calc(0.15rem - 1mm);
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-expedicao__consulta-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.erp-expedicao__inputs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem 1rem;
+}
+
+.erp-expedicao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__field > span,
+.erp-expedicao-bipagem-page .erp-expedicao__field > span {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+}
+
+.erp-expedicao__field-spacer {
+    visibility: hidden;
+    user-select: none;
+}
+
+.erp-expedicao__field--periodo {
+    flex: 0 0 auto;
+}
+
+.erp-expedicao__field--status {
+    min-width: 9.5rem;
+}
+
+.erp-expedicao__field--pedido {
+    flex: 1 1 10rem;
+    min-width: 10rem;
+    max-width: 16rem;
+}
+
+.erp-expedicao__field--action {
+    flex: 0 0 auto;
+}
+
+.erp-expedicao__periodo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+}
+
+.erp-expedicao__periodo-sep {
+    flex-shrink: 0;
+    min-width: 2rem;
+    padding: 0 0.15rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+    text-align: center;
+    white-space: nowrap;
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
+}
+
+.erp-expedicao__scan-input {
+    min-width: 260px;
+    background: #ecfdf5 !important;
+    border-color: #6ee7b7 !important;
+}
+
+.erp-expedicao__qtd-input {
+    width: 90px;
+}
+
+/* Campos de consulta — visíveis (controle + bipagem) */
+.erp-expedicao-controle-page .erp-expedicao__field .erp-nfe__select,
+.erp-expedicao-controle-page .erp-expedicao__field .erp-nfe__input,
+.erp-expedicao-controle-page .erp-expedicao__periodo .erp-nfe__period-input,
+.erp-expedicao-bipagem-page .erp-expedicao__field .erp-nfe__select,
+.erp-expedicao-bipagem-page .erp-expedicao__field .erp-nfe__input {
+    height: 2.125rem;
+    min-height: 2.125rem;
+    box-sizing: border-box;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--erp-text, #0f172a);
+    background: #fff;
+    border: 1px solid var(--erp-border, #94a3b8);
+    border-radius: var(--erp-radius-sm, 6px);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.erp-expedicao-controle-page .erp-expedicao__field .erp-nfe__select:focus,
+.erp-expedicao-controle-page .erp-expedicao__field .erp-nfe__input:focus,
+.erp-expedicao-controle-page .erp-expedicao__periodo .erp-nfe__period-input:focus,
+.erp-expedicao-bipagem-page .erp-expedicao__field .erp-nfe__select:focus,
+.erp-expedicao-bipagem-page .erp-expedicao__field .erp-nfe__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow:
+        inset 0 1px 2px rgba(15, 23, 42, 0.06),
+        0 0 0 2px rgba(30, 90, 158, 0.2);
+}
+
+.erp-expedicao-controle-page .erp-expedicao__field .erp-nfe__select {
+    min-width: 9.5rem;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__periodo .erp-nfe__period-input {
+    width: calc(9.5rem + 0.5rem);
+    min-width: calc(9.5rem + 0.5rem);
+    overflow: visible;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__periodo .erp-nfe__period-input.erp-date-input {
+    padding-right: 2.25rem !important;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__btn-consultar,
+.erp-expedicao-bipagem-page .erp-expedicao__btn-consultar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7.25rem;
+    height: 2.125rem;
+    padding: 0.35rem 1rem;
+    border: 1px solid #164a85;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 52%, #164a85 100%);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 2px 4px rgba(15, 40, 71, 0.22);
+    transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__btn-consultar:hover,
+.erp-expedicao-bipagem-page .erp-expedicao__btn-consultar:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+
+.erp-expedicao-controle-page .erp-expedicao__btn-consultar:active,
+.erp-expedicao-bipagem-page .erp-expedicao__btn-consultar:active {
+    transform: translateY(0);
+    filter: brightness(0.96);
+}
+
+/* Grade preenche a altura da tela (padrão erp-grid / Orçamento) */
+.erp-expedicao-controle-page .fi-sc > div:has(.fi-ta),
+.erp-expedicao-controle-page .fi-sc-component:has(.fi-ta) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-expedicao-controle-page .fi-ta,
+.erp-expedicao-controle-page .fi-ta-ctn,
+.erp-expedicao-controle-page .fi-ta-main {
+    flex: 1;
+    min-height: 0;
+}
+
+.erp-expedicao-controle-page .fi-ta-ctn {
+    margin-bottom: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-content-ctn {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto !important;
+}
+
+.erp-expedicao-controle-page .fi-sc > div:has(.erp-expedicao__footer) {
+    flex-shrink: 0;
+    width: 100%;
+}
+
+/* Grade Filament (controle) — colunas fixas + cliente flex (padrão Orçamento) */
+.erp-expedicao-controle-page .fi-ta-table {
+    border-collapse: collapse;
+    table-layout: auto !important;
+    width: 100% !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(1),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 2.2rem;
+    max-width: 2.2rem;
+    padding-inline: 0.12rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(2),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 5.25rem;
+    max-width: 5.25rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(3),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-expedicao-controle-page .fi-ta-header-cell-cliente_nome,
+.erp-expedicao-controle-page .fi-ta-cell-cliente_nome {
+    width: auto !important;
+    min-width: 8rem;
+    max-width: none;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(3) .fi-ta-text-item,
+.erp-expedicao-controle-page .fi-ta-cell-cliente_nome .fi-ta-text-item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(4),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 6.25rem;
+    max-width: 6.25rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(5),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 6.25rem;
+    max-width: 6.25rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(6),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 8rem;
+    max-width: 9rem;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(7),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-expedicao-controle-page .fi-ta-header-cell-venda\.total,
+.erp-expedicao-controle-page .fi-ta-cell-venda\.total {
+    width: 5.85rem !important;
+    min-width: 5.85rem !important;
+    max-width: 5.85rem !important;
+    padding-inline: 0.18rem 0.22rem !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-col,
+.erp-expedicao-controle-page .fi-ta-cell-venda\.total .fi-ta-col {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-col .fi-ta-text,
+.erp-expedicao-controle-page .fi-ta-cell-venda\.total .fi-ta-col .fi-ta-text {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-text-item,
+.erp-expedicao-controle-page .fi-ta-cell-venda\.total .fi-ta-text-item {
+    overflow: hidden !important;
+    width: 100%;
+    max-width: 100% !important;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-total-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.2rem;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-total-cell__currency {
+    flex: 0 0 auto;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-expedicao-controle-page .erp-expedicao-total-cell__amount {
+    flex: 0 0 7ch;
+    width: 7ch;
+    min-width: 7ch;
+    max-width: 7ch;
+    text-align: right;
+    color: var(--erp-text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected .erp-expedicao-total-cell__currency,
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected .erp-expedicao-total-cell__amount,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked .erp-expedicao-total-cell__currency,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked .erp-expedicao-total-cell__amount {
+    color: #0f172a !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:nth-child(8),
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    width: 6.5rem;
+    max-width: 6.5rem;
+    padding-inline: 0.12rem !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell {
+    padding: 0.5mm 0.45rem !important;
+    line-height: 0.9 !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row {
+    height: calc(1.375rem - 1mm);
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell {
+    padding: 0.05rem 0.45rem !important;
+    height: calc(1.375rem - 1mm) !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    white-space: nowrap;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row .fi-ta-cell .fi-badge {
+    padding: 0.02rem 0.35rem !important;
+    font-size: 0.6875rem !important;
+}
+
+.erp-expedicao-controle-page button.fi-ta-col,
+.erp-expedicao-controle-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-text-item,
+.erp-expedicao-controle-page .fi-ta-col,
+.erp-expedicao-controle-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-header-cell-sort-btn svg,
+.erp-expedicao-controle-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-table input[type="checkbox"],
+.erp-expedicao-controle-page .fi-ta-table .fi-checkbox-input,
+.erp-expedicao-controle-page .erp-expedicao__check {
+    width: calc(1.25rem - 1.5mm) !important;
+    height: calc(1.25rem - 1.5mm) !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-selection-cell,
+.erp-expedicao-controle-page .fi-ta-selection-header-cell {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.erp-list-page.erp-expedicao-controle-page .fi-pagination {
+    padding: calc(0.35rem - 0.5mm) 0.5rem !important;
+}
+
+.erp-expedicao-controle-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked .fi-ta-text-item,
+.erp-expedicao-controle-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text,
+.erp-expedicao-controle-page .fi-ta-row.erp-expedicao-row--checked .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-expedicao-row--checked {
+    outline: none;
+}
+
+/* Rodapé: total/legenda + ações (controle + bipagem) */
+.erp-expedicao-controle-page .erp-expedicao__footer,
+.erp-expedicao-bipagem-page .erp-expedicao__footer {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    margin-top: 0;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__total {
+    justify-content: flex-end;
+    margin: 0 0.65rem !important;
+    padding: 0.35rem 0.65rem !important;
+    border-radius: 0 !important;
+    border-left: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-right: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-bottom: none !important;
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%) !important;
+    box-shadow: none !important;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__total-label {
+    font-size: 0.75rem !important;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__total-value {
+    font-size: 0.875rem !important;
+}
+
+.erp-expedicao-actions {
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.erp-expedicao-controle-page .erp-expedicao__footer .erp-nfe-actions,
+.erp-expedicao-bipagem-page .erp-expedicao__footer .erp-nfe-actions {
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    justify-content: flex-start;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__btn,
+.erp-expedicao-bipagem-page .erp-nfe-actions__btn {
+    min-width: 6.25rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__btn:hover,
+.erp-expedicao-bipagem-page .erp-nfe-actions__btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.erp-expedicao-bipagem-page .erp-nfe-actions__btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.35);
+    transform: none !important;
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon svg,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon svg {
+    width: 1.02rem;
+    height: 1.02rem;
+    display: block;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55));
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon--new svg,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon--new svg {
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.12rem;
+    border-radius: 7px;
+    border: 1px solid rgba(15, 52, 96, 0.28);
+    background: linear-gradient(180deg, #ffffff 0%, #eaf2fc 52%, #d3e2f6 100%);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -2px 3px rgba(15, 52, 96, 0.18),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon--new,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon--new {
+    border-color: rgba(6, 78, 59, 0.45);
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 52%, #15803d 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(6, 78, 59, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(6, 78, 59, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon--close,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon--close {
+    border-color: rgba(15, 23, 42, 0.45);
+    background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 52%, #94a3b8 100%);
+    color: #0f172a;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 -2px 3px rgba(15, 23, 42, 0.22),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__icon--cancel,
+.erp-expedicao-bipagem-page .erp-nfe-actions__icon--cancel {
+    font-size: 0.8rem;
+    border-radius: 50%;
+    border-color: rgba(127, 29, 29, 0.5);
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 52%, #b91c1c 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(127, 29, 29, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(127, 29, 29, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-expedicao-controle-page .erp-nfe-actions__label,
+.erp-expedicao-bipagem-page .erp-nfe-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}
+
+/* Bipagem — layout: grade preenche a tela (espelha erp-grid / controle) */
+.erp-list-page.erp-expedicao-bipagem-page .fi-sc > div:has(.erp-expedicao-bipagem-root),
+.erp-list-page.erp-expedicao-bipagem-page .fi-sc-component:has(.erp-expedicao-bipagem-root) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
+.erp-expedicao-bipagem-page .fi-sc > div:has(.erp-expedicao__footer),
+.erp-expedicao-bipagem-page .fi-sc-component:has(.erp-expedicao__footer) {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    width: 100%;
+}
+
+.erp-expedicao-bipagem-root {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao.erp-expedicao-bipagem {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__topbar,
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem__header,
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem__scan {
+    flex-shrink: 0;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__consulta > legend {
+    display: block;
+    width: 100%;
+    padding: 0 0 calc(0.35rem - 2mm);
+    margin-bottom: calc(0.15rem - 1mm);
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__field--scan {
+    flex: 0 0 7cm;
+    width: 7cm;
+    min-width: 7cm;
+    max-width: 7cm;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__field--qtd {
+    flex: 0 0 6.5rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__field--ordem {
+    flex: 0 0 calc(8.5rem + 2mm);
+    min-width: calc(8.5rem + 2mm);
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__ordem-select {
+    width: 100%;
+    min-width: 0;
+    height: 1.625rem;
+    padding: 0 0.35rem;
+    border: 1px solid var(--erp-border-input, #94a3b8);
+    border-radius: 3px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__ordem-select:focus {
+    outline: 2px solid #93c5fd;
+    outline-offset: 0;
+    border-color: #3b82f6;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__scan-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: #ecfdf5 !important;
+    border-color: #6ee7b7 !important;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__qtd-input {
+    width: 100%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-expedicao-bipagem__header {
+    padding: 0.35rem 0.85rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+    color: #15803d;
+    font-size: 0.875rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.erp-expedicao-bipagem__status--pendente {
+    color: #fca5a5;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem__status--completo {
+    color: #86efac;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem__grid-ctn {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0.65rem;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: var(--erp-radius-md, 8px) var(--erp-radius-md, 8px) 0 0;
+    background: #fff;
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18));
+    overflow: hidden;
+}
+
+.erp-expedicao-bipagem__grid-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    margin: 0;
+    align-content: flex-start;
+}
+
+.erp-expedicao-bipagem__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+}
+
+.erp-expedicao-bipagem__grid tbody {
+    vertical-align: top;
+}
+
+.erp-expedicao-bipagem__grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.5mm 0.45rem !important;
+    line-height: 1.15 !important;
+    font-size: 0.7rem !important;
+    font-weight: 700;
+    white-space: nowrap;
+    color: #fff !important;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%) !important;
+    border-right: 1px solid rgb(255 255 255 / 40%);
+    border-bottom: 1px solid rgb(255 255 255 / 25%);
+}
+
+.erp-expedicao-bipagem__grid thead th:last-child {
+    border-right: none;
+}
+
+.erp-expedicao-bipagem__grid tbody td,
+.erp-expedicao-bipagem__grid--totals tbody td {
+    padding: 0.05rem 0.45rem !important;
+    height: calc(1.375rem - 1mm);
+    max-height: calc(1.375rem - 1mm);
+    line-height: 1.15 !important;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-right: 1px solid #b8c8d8;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-expedicao-bipagem__grid tbody td:last-child,
+.erp-expedicao-bipagem__grid--totals tbody td:last-child {
+    border-right: none;
+}
+
+.erp-expedicao-bipagem__grid tbody tr:nth-child(even) td {
+    background: var(--erp-row-zebra, #f4f8fc);
+}
+
+.erp-expedicao-bipagem__totals {
+    flex-shrink: 0;
+    border-top: 1px solid var(--erp-border, #94a3b8);
+    background: var(--erp-bg-muted, #eef3fa);
+}
+
+.erp-expedicao-bipagem__grid--totals {
+    margin: 0;
+}
+
+.erp-expedicao-bipagem__grid--totals tbody td {
+    border-bottom: none;
+    background: var(--erp-bg-muted, #eef3fa);
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem__col-check {
+    width: 2.2rem;
+    text-align: center;
+}
+
+.erp-expedicao-bipagem__col-pedido {
+    width: 5.25rem;
+}
+
+.erp-expedicao-bipagem__col-cod {
+    width: 3.5rem;
+}
+
+.erp-expedicao-bipagem__col-barras {
+    width: 9.5rem;
+}
+
+.erp-expedicao-bipagem__col-desc {
+    width: auto;
+    min-width: 8rem;
+}
+
+.erp-expedicao-bipagem__col-local {
+    width: calc(6rem + 5mm);
+    min-width: calc(6rem + 5mm);
+    max-width: calc(6rem + 5mm);
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.erp-expedicao-bipagem__col-num {
+    width: 5.5rem;
+}
+
+.erp-expedicao-bipagem__col-num,
+.erp-expedicao__col-num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao__check {
+    width: calc(1.25rem - 1.5mm) !important;
+    height: calc(1.25rem - 1.5mm) !important;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked td {
+    background: #60a5fa !important;
+    box-shadow: none;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked:hover td {
+    background: #3b82f6 !important;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-row--zero td {
+    color: #dc2626;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-row--partial td {
+    color: #2563eb;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-row--complete td {
+    color: #16a34a;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem__pedido-sep td {
+    background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%) !important;
+    color: #14532d !important;
+    font-weight: 800;
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    text-align: left;
+    padding: calc(0.4rem - 1mm) 0.55rem !important;
+    border-top: 2px solid #16a34a !important;
+    border-bottom: 1px solid #22c55e !important;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked.erp-expedicao-row--zero td,
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked.erp-expedicao-row--partial td,
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem-row--checked.erp-expedicao-row--complete td {
+    color: #0f172a !important;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-bipagem__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: flex-start;
+    align-items: center;
+    margin: 0 0.65rem !important;
+    padding: 0.35rem 0.65rem !important;
+    border-left: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-right: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-bottom: none !important;
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%) !important;
+    font-size: 0.75rem;
+}
+
+.erp-expedicao-legend {
+    color: #000;
+}
+
+.erp-expedicao-legend::before {
+    content: '';
+    display: inline-block;
+    width: calc(0.65rem + 1mm);
+    height: calc(0.65rem + 1mm);
+    border-radius: 50%;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+.erp-expedicao-legend--zero::before { background: #ff0000; }
+.erp-expedicao-legend--partial::before { background: #0066ff; }
+.erp-expedicao-legend--complete::before { background: #00c853; }
+
+/* Aviso central — mesmo padrão visual do PDV (produto não encontrado) */
+.erp-expedicao-controle-page .erp-expedicao-aviso {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    background: rgba(15, 52, 96, 0.18);
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__box {
+    pointer-events: auto;
+    width: min(90vw, 30rem);
+    background: #fff;
+    border: 3px solid #dc2626;
+    border-radius: 16px;
+    box-shadow: 0 22px 60px rgba(220, 38, 38, 0.4);
+    padding: 1.8rem 2rem 1.5rem;
+    text-align: center;
+    animation: erp-expedicao-aviso-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes erp-expedicao-aviso-pulse {
+    from {
+        transform: scale(1);
+        box-shadow: 0 22px 60px rgba(220, 38, 38, 0.4);
+    }
+
+    to {
+        transform: scale(1.03);
+        box-shadow: 0 26px 72px rgba(220, 38, 38, 0.55);
+    }
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__icon {
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: 0 auto 0.6rem;
+    border-radius: 50%;
+    background: #dc2626;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 3.2rem;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__title {
+    margin: 0 0 0.4rem;
+    color: #b91c1c;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__text {
+    margin: 0 0 0.2rem;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__btn {
+    margin-top: 0.6rem;
+    min-width: 8rem;
+    padding: 0.6rem 1.4rem;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__btn:hover {
+    background: #b91c1c;
+}
+
+.erp-expedicao-controle-page .erp-expedicao-aviso__hint {
+    margin: 0.7rem 0 0;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+/* Modal confirmar expedição — bipagem */
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: grid;
+    place-items: center;
+    background: rgba(15, 52, 96, 0.22);
+    padding: 1rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__box {
+    width: min(92vw, 34rem);
+    max-height: min(92vh, 44rem);
+    overflow: auto;
+    background: #fff;
+    border: 2px solid #1e5a9e;
+    border-radius: 14px;
+    box-shadow: 0 22px 60px rgba(15, 52, 96, 0.28);
+    padding: 1.25rem 1.4rem 1.1rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__title {
+    margin: 0;
+    color: #0f2847;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__progress {
+    flex-shrink: 0;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0c4a6e;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__pedido {
+    margin: 0 0 0.9rem;
+    color: #14532d;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__pergunta-label {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: #0f172a;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__opcoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__opcao {
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__opcao.is-active {
+    border-color: #1e5a9e;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: inset 0 0 0 1px #1e5a9e;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__secao {
+    margin-top: 0.95rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__field {
+    display: block;
+    margin-bottom: 0.7rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__field-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #334155;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__field-hint {
+    display: block;
+    margin-top: 0.2rem;
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__transportadora-btn,
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__input {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.82rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__transportadora-btn {
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__peso {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__peso-label {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__peso-valor {
+    color: #0f2847;
+    font-size: 1rem;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__aviso {
+    margin: 0.35rem 0 0;
+    padding: 0.45rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__aviso--info {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__aviso--warn {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__texto-retirada {
+    margin: 0 0 0.65rem;
+    color: #334155;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__btn-sec {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: #0f2847;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__acoes {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__btn {
+    min-width: 7rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__btn--cancel {
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-expedicao-bipagem-page .erp-expedicao-confirmar__btn--ok {
+    border: 1px solid #15803d;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+    color: #fff;
+}

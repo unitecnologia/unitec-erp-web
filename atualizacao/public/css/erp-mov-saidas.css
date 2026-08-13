@@ -1,0 +1,1159 @@
+/* Outras Saídas / Movimento — janela operacional no padrão OS */
+
+.erp-mov-saidas-body {
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem 0;
+}
+
+.erp-mov-saidas-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    background: #fffbeb;
+    color: #78350f;
+}
+
+.erp-mov-saidas-alert.is-ok {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #14532d;
+}
+
+.erp-mov-saidas-alert > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.erp-mov-saidas-alert.is-ok > span {
+    background: #16a34a;
+}
+
+.erp-mov-saidas-alert strong {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.erp-mov-saidas-alert p {
+    margin: 0.15rem 0 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.erp-mov-saidas-alert button {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.erp-mov-saidas-alert button:hover {
+    opacity: 1;
+}
+
+.erp-mov-saidas-window .erp-os-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.erp-mov-saidas-panel {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem 0.5rem;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.erp-mov-saidas-panel--items {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.erp-mov-saidas-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.erp-mov-saidas-panel__head strong {
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.erp-mov-saidas-panel__head p {
+    margin: 0.05rem 0 0;
+    color: #64748b;
+    font-size: 0.7rem;
+}
+
+.erp-mov-saidas-status {
+    flex-shrink: 0;
+    padding: 0.22rem 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.erp-mov-saidas-status.is-fechado {
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.erp-mov-saidas-status.is-cancelado {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.erp-mov-saidas-fields {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(12rem, 1.4fr) 8.5rem 7rem 7.5rem minmax(10rem, 1fr) minmax(10rem, 1fr);
+    gap: 0.35rem 0.45rem;
+    align-items: start;
+}
+
+.erp-mov-saidas-field {
+    position: relative;
+    display: grid;
+    gap: 0.1rem;
+    color: #334155;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-field--fornecedor {
+    grid-column: 1 / 5;
+}
+
+.erp-mov-saidas-field--obs {
+    grid-column: 5 / -1;
+}
+
+.erp-mov-saidas-field input,
+.erp-mov-saidas-field select,
+.erp-mov-saidas-field textarea,
+.erp-mov-saidas-product input {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.erp-mov-saidas-field textarea {
+    min-height: 2.15rem;
+    resize: vertical;
+}
+
+.erp-mov-saidas-field input:focus,
+.erp-mov-saidas-field select:focus,
+.erp-mov-saidas-field textarea:focus,
+.erp-mov-saidas-product input:focus {
+    outline: 0;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+}
+
+.erp-mov-saidas-field input[readonly] {
+    background: #edf3fa;
+    color: #475569;
+}
+
+.erp-mov-saidas-product {
+    position: relative;
+    display: grid;
+    gap: 0.2rem;
+    width: min(28rem, 100%);
+    color: #334155;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-lookup {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    overflow: auto;
+    max-height: 15rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 14px 28px rgb(15 23 42 / 18%);
+}
+
+.erp-mov-saidas-lookup button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem 0.75rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.48rem 0.6rem;
+    border: 0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    color: #17233a;
+    text-align: left;
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+}
+
+.erp-mov-saidas-lookup button:hover,
+.erp-mov-saidas-lookup button.is-selected {
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-mov-saidas-lookup button strong {
+    overflow: hidden;
+    color: #1d4ed8;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-lookup button:hover strong,
+.erp-mov-saidas-lookup button.is-selected strong {
+    color: #fff;
+}
+
+.erp-mov-saidas-lookup button span {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    color: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.erp-mov-saidas-lookup button em {
+    color: #1e5a9e;
+    font-style: normal;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-lookup button:hover em,
+.erp-mov-saidas-lookup button.is-selected em {
+    color: #dbeafe;
+}
+
+.erp-mov-saidas-table-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #f8fafc;
+}
+
+.erp-mov-saidas-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+}
+
+.erp-mov-saidas-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.32rem 0.45rem;
+    background: linear-gradient(180deg, #1e5a9e, #164a82);
+    color: #fff;
+    font-size: 0.64rem;
+    font-weight: 800;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-right: 1px solid rgb(255 255 255 / 30%);
+}
+
+.erp-mov-saidas-table th:last-child {
+    border-right: 0;
+}
+
+.erp-mov-saidas-table th:nth-last-child(-n + 3),
+.erp-mov-saidas-table td:nth-last-child(-n + 3) {
+    text-align: right;
+}
+
+.erp-mov-saidas-table td {
+    padding: 0.3rem 0.45rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-mov-saidas-table td:last-child {
+    border-right: 0;
+}
+
+.erp-mov-saidas-table tbody tr:hover td {
+    background: #eff6ff;
+}
+
+.erp-mov-saidas-table tbody tr {
+    cursor: pointer;
+}
+
+.erp-mov-saidas-table tbody tr.is-selected td {
+    background: #dbeafe;
+    color: #0f3460;
+}
+
+.erp-mov-saidas-confirm {
+    position: fixed;
+    z-index: 120;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.erp-mov-saidas-confirm__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 48%);
+}
+
+.erp-mov-saidas-confirm__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(25rem, 100%);
+    padding: 1rem;
+    border: 1px solid #94a3b8;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 18px 44px rgb(15 23 42 / 32%);
+}
+
+.erp-mov-saidas-confirm__dialog strong {
+    color: #0f3460;
+    font-size: 0.95rem;
+}
+
+.erp-mov-saidas-confirm__dialog p {
+    margin: 0.35rem 0 0.9rem;
+    color: #475569;
+    font-size: 0.84rem;
+}
+
+.erp-mov-saidas-confirm__dialog > div {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+
+.erp-mov-saidas-confirm__dialog button {
+    min-height: 2rem;
+    padding: 0.32rem 0.7rem;
+    border: 1px solid #86efac;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    color: #fff;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-mov-saidas-confirm__dialog button:last-child {
+    border-color: #b8c9dc;
+    background: #f8fafc;
+    color: #334155;
+}
+
+.erp-mov-saidas-empty {
+    padding: 3.25rem 1rem !important;
+    color: #64748b !important;
+    text-align: center !important;
+    background: #f8fafc !important;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn:disabled:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.erp-mov-saidas-page a.erp-os-actions__btn {
+    text-decoration: none;
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__emitir-nfe {
+    border-color: #c4b5fd;
+    background: linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%);
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__emitir-nfe:hover {
+    background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__reabrir {
+    border-color: #93c5fd;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__reabrir:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+}
+
+/* Barra de ações — botões em bloco, padrão operacional do ERP */
+.erp-mov-saidas-page .erp-os-actions {
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn {
+    flex-direction: column !important;
+    gap: 0.08rem;
+    min-width: 5rem;
+    min-height: 3.05rem;
+    padding: 0.28rem 0.55rem !important;
+    border-color: #b8c9dc;
+    background: linear-gradient(180deg, #fff 0%, #edf3fa 100%);
+    color: #173b69;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 16%);
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn:hover:not(:disabled) {
+    border-color: #60a5fa;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.erp-mov-saidas-page .erp-os-actions__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0 !important;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.72rem;
+}
+
+.erp-mov-saidas-page .erp-os-actions__label {
+    font-size: 0.68rem;
+    color: inherit;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn > kbd {
+    position: absolute;
+    bottom: 0.22rem;
+    left: 0.22rem;
+    padding: 0.04rem 0.18rem;
+    border-radius: 3px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-family: inherit;
+    font-size: 0.58rem;
+    font-weight: 800;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn--save {
+    border-color: #3b82f6;
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    color: #fff;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn--save .erp-os-actions__icon,
+.erp-mov-saidas-page .erp-os-actions__btn--save > kbd {
+    background: rgb(255 255 255 / 19%);
+    color: #fff;
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__reabrir {
+    border-color: #60a5fa;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__emitir-nfe {
+    border-color: #8b5cf6;
+    background: linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%);
+    color: #fff;
+}
+
+.erp-mov-saidas-page .erp-mov-saidas__emitir-nfe .erp-os-actions__icon {
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn--exit {
+    margin-left: auto;
+    border-color: #fca5a5;
+    background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+    color: #b91c1c;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn--exit .erp-os-actions__icon,
+.erp-mov-saidas-page .erp-os-actions__btn--exit > kbd {
+    background: #fecaca;
+    color: #b91c1c;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn:disabled {
+    border-color: #94a3b8;
+    background: #e2e8f0;
+    color: #64748b;
+    opacity: 0.72;
+}
+
+.erp-mov-saidas-page .erp-os-actions__btn:disabled .erp-os-actions__icon {
+    background: #cbd5e1;
+    color: #64748b;
+}
+
+@media (max-width: 1100px) {
+    .erp-mov-saidas-fields {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .erp-mov-saidas-field--code,
+    .erp-mov-saidas-field--tipo,
+    .erp-mov-saidas-field--plano,
+    .erp-mov-saidas-field--estoque,
+    .erp-mov-saidas-field--fornecedor,
+    .erp-mov-saidas-field--obs {
+        grid-column: auto;
+    }
+
+    .erp-mov-saidas-field--tipo,
+    .erp-mov-saidas-field--plano,
+    .erp-mov-saidas-field--estoque {
+        grid-column: span 2;
+    }
+
+    .erp-mov-saidas-field--fornecedor,
+    .erp-mov-saidas-field--obs {
+        grid-column: 1 / -1;
+    }
+
+    .erp-mov-saidas-panel__head {
+        flex-direction: column;
+    }
+
+    .erp-mov-saidas-product {
+        width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    .erp-mov-saidas-fields {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .erp-mov-saidas-field--tipo,
+    .erp-mov-saidas-field--plano,
+    .erp-mov-saidas-field--estoque {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Consulta — lista de movimentos */
+.erp-mov-saidas-consulta {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-mov-saidas-consulta .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 55%);
+}
+
+.erp-mov-saidas-consulta__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(72rem, calc(100vw - 1.5rem));
+    height: min(38rem, calc(100dvh - 2rem));
+    overflow: hidden;
+    border: 1px solid #94a3b8;
+    border-radius: 10px;
+    background: #e8eef6;
+    box-shadow: 0 22px 48px rgb(15 23 42 / 35%);
+}
+
+.erp-mov-saidas-consulta__titlebar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a82 100%);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-consulta .erp-lookup-modal__close {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 16%);
+    color: #fff;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-mov-saidas-consulta .erp-lookup-modal__close:hover {
+    background: rgb(255 255 255 / 28%);
+}
+
+.erp-mov-saidas-consulta__body {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+    padding: 0.65rem 0.75rem 0.35rem;
+}
+
+.erp-mov-saidas-consulta__toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.erp-mov-saidas-consulta__search {
+    position: relative;
+    display: grid;
+    gap: 0.2rem;
+    width: min(28rem, 100%);
+    color: #334155;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-consulta__search input {
+    min-height: 2.15rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.erp-mov-saidas-consulta__search input:focus {
+    outline: 0;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+}
+
+.erp-mov-saidas-consulta__fornecedores {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    overflow: auto;
+    max-height: 13rem;
+    padding: 0.2rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgb(15 23 42 / 20%);
+}
+
+.erp-mov-saidas-consulta__fornecedores button {
+    display: block;
+    width: 100%;
+    padding: 0.42rem 0.55rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #17233a;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-mov-saidas-consulta__fornecedores button:hover {
+    background: #eff6ff;
+    color: #1e5a9e;
+}
+
+.erp-mov-saidas-consulta__count {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-consulta__table-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.erp-mov-saidas-consulta__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.erp-mov-saidas-consulta__table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.36rem 0.5rem;
+    background: linear-gradient(180deg, #1e5a9e, #164a82);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-right: 1px solid rgb(255 255 255 / 30%);
+}
+
+.erp-mov-saidas-consulta__table th:last-child {
+    border-right: 0;
+}
+
+.erp-mov-saidas-consulta__table td {
+    padding: 0.34rem 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    color: #0f172a;
+    white-space: nowrap;
+    line-height: 1.15;
+}
+
+.erp-mov-saidas-consulta__table td:last-child {
+    border-right: 0;
+}
+
+.erp-mov-saidas-consulta__table td.is-obs {
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-consulta__table td.is-fornecedor {
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-consulta__table td.is-movimento {
+    color: #1e5a9e;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-consulta__table td.is-code {
+    font-weight: 800;
+    color: #1e5a9e;
+}
+
+.erp-mov-saidas-consulta__table tbody tr {
+    cursor: pointer;
+}
+
+.erp-mov-saidas-consulta__table tbody tr:hover td {
+    background: #eff6ff;
+}
+
+.erp-mov-saidas-consulta__table tbody tr.is-selected td {
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-mov-saidas-consulta__table tbody tr.is-selected td.is-code {
+    color: #dbeafe;
+}
+
+.erp-mov-saidas-consulta__table td.is-empty {
+    padding: 3rem 1rem;
+    color: #64748b;
+    text-align: center;
+    white-space: normal;
+}
+
+.erp-mov-saidas-consulta__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.erp-mov-saidas-consulta__badge.is-aberto {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.erp-mov-saidas-consulta__badge.is-fechado {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.erp-mov-saidas-consulta__badge.is-cancelado {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.erp-mov-saidas-consulta__table tbody tr.is-selected .erp-mov-saidas-consulta__badge.is-aberto {
+    background: #bbf7d0;
+    color: #14532d;
+}
+
+.erp-mov-saidas-consulta__table tbody tr.is-selected .erp-mov-saidas-consulta__badge.is-fechado {
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+.erp-mov-saidas-consulta__hint {
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.erp-mov-saidas-consulta__actions {
+    margin-top: auto;
+}
+
+.erp-mov-saidas-consulta__actions .erp-os-actions__btn--exit {
+    margin-left: auto;
+}
+
+.erp-mov-saidas-consulta__actions .erp-os-actions__btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+/* Barra incluir produto — mesmo modelo da NF-e */
+.erp-mov-saidas-panel--items {
+    overflow: visible;
+}
+
+.erp-mov-saidas-inclusao {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 30;
+    overflow: visible;
+}
+
+.erp-mov-saidas-inclusao[data-lookup-open="1"] {
+    z-index: 60;
+}
+
+.erp-mov-saidas-inclusao__box {
+    position: relative;
+    padding: 0.55rem 0.5rem 0.35rem;
+    border: 1px solid #9eb6d4;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    overflow: visible;
+}
+
+.erp-mov-saidas-inclusao__legend {
+    position: absolute;
+    top: -0.55rem;
+    left: 0.65rem;
+    z-index: 2;
+    padding: 0 0.25rem;
+    background: #fff;
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.erp-mov-saidas-inclusao__row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.erp-mov-saidas-inclusao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.erp-mov-saidas-inclusao__field > span {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #0f3460;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-inclusao__field--barcode {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+    overflow: visible;
+}
+
+.erp-mov-saidas-inclusao__field--qtd {
+    flex: 0 0 5.5rem;
+}
+
+.erp-mov-saidas-inclusao__field--preco {
+    flex: 0 0 8.5rem;
+}
+
+.erp-mov-saidas-inclusao__field--total {
+    flex: 0 0 7rem;
+}
+
+.erp-mov-saidas-inclusao__barcode-wrap {
+    position: relative;
+    display: block;
+    overflow: visible;
+    min-width: 0;
+}
+
+.erp-mov-saidas-inclusao__input {
+    width: 100%;
+    min-height: 1.85rem;
+    height: 1.85rem;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid #7f9bb8;
+    border-radius: 6px;
+    background: #fff9e8;
+    color: #0f3460;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    line-height: 1.25;
+    box-sizing: border-box;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 5%);
+}
+
+.erp-mov-saidas-inclusao__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fffef8;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 16%);
+}
+
+.erp-mov-saidas-inclusao__input--total {
+    background: #edf3fa;
+    color: #475569;
+    text-align: right;
+}
+
+.erp-mov-saidas-inclusao__suggest-wrap {
+    position: absolute;
+    z-index: 90;
+    top: calc(100% + 2px);
+    left: 0;
+    width: min(42rem, 92vw);
+}
+
+.erp-mov-saidas-inclusao__suggest {
+    margin: 0;
+    padding: 0.2rem;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+    max-height: min(320px, 45vh);
+    overflow: auto;
+    width: 100%;
+}
+
+.erp-mov-saidas-inclusao__suggest--empty {
+    position: absolute;
+    z-index: 90;
+    top: calc(100% + 2px);
+    left: 0;
+    min-width: 16rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.75rem;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+
+.erp-mov-saidas-inclusao__suggest button {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 3.2rem minmax(0, 1fr) minmax(9rem, 14rem) 5.2rem;
+    gap: 0.35rem;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.3rem 0.45rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    color: #0f172a;
+    font-family: inherit;
+}
+
+.erp-mov-saidas-inclusao__suggest button:hover {
+    background: #eff6ff;
+}
+
+.erp-mov-saidas-inclusao__suggest button.is-selected {
+    background: #1e5a9e;
+    color: #fff;
+    box-shadow: inset 0 0 0 1px #0f3460;
+}
+
+.erp-mov-saidas-inclusao__suggest-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.35rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    background: #dbeafe;
+    color: #1e40af;
+    font-weight: 800;
+    font-size: 0.68rem;
+}
+
+.erp-mov-saidas-inclusao__suggest button.is-selected .erp-mov-saidas-inclusao__suggest-code {
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+}
+
+.erp-mov-saidas-inclusao__suggest-nome {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+}
+
+.erp-mov-saidas-inclusao__suggest-estoques {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    justify-content: flex-end;
+}
+
+.erp-mov-saidas-inclusao__suggest-est {
+    padding: 0.08rem 0.28rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-inclusao__suggest-est--atual {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.erp-mov-saidas-inclusao__suggest-est--reservado {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.erp-mov-saidas-inclusao__suggest-est--disponivel {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.erp-mov-saidas-inclusao__suggest button.is-selected .erp-mov-saidas-inclusao__suggest-est {
+    background: rgb(255 255 255 / 16%);
+    color: #fff;
+}
+
+.erp-mov-saidas-inclusao__suggest-preco {
+    text-align: right;
+    font-weight: 800;
+    color: #1e5a9e;
+    white-space: nowrap;
+}
+
+.erp-mov-saidas-inclusao__suggest button.is-selected .erp-mov-saidas-inclusao__suggest-preco {
+    color: #dbeafe;
+}
+
+@media (max-width: 900px) {
+    .erp-mov-saidas-inclusao__row {
+        flex-wrap: wrap;
+    }
+
+    .erp-mov-saidas-inclusao__field--barcode {
+        flex: 1 1 100%;
+    }
+
+    .erp-mov-saidas-inclusao__suggest button {
+        grid-template-columns: 3.2rem minmax(0, 1fr);
+    }
+
+    .erp-mov-saidas-inclusao__suggest-estoques,
+    .erp-mov-saidas-inclusao__suggest-preco {
+        grid-column: 2;
+    }
+}

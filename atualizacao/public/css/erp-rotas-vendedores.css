@@ -1,0 +1,608 @@
+/* Rotas de Vendedores — alinhado ao padrão ERP (locate + workspace + action bar) */
+
+.erp-list-page.erp-rotas-vendedores-page .fi-sc > div:has(.erp-rotas) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    flex-shrink: 1 !important;
+}
+
+.erp-rotas-vendedores-page .fi-page-header,
+.erp-rotas-vendedores-page .fi-header {
+    display: none !important;
+}
+
+.erp-rotas-vendedores-page .fi-page-content,
+.erp-rotas-vendedores-page .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    gap: 0 !important;
+    padding: 0 !important;
+}
+
+.erp-rotas-vendedores-page .fi-sc > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-rotas {
+    font-family: var(--erp-font);
+    background: var(--erp-bg-app);
+    padding: 0.5rem 0.65rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.45rem;
+}
+
+.erp-rotas__locate {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.75rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+    flex-shrink: 0;
+}
+
+.erp-rotas__locate-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--erp-text-muted, #5b6b7c);
+    white-space: nowrap;
+}
+
+.erp-rotas__locate-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.erp-rotas__inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.erp-rotas__inline > span {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--erp-text-muted, #5b6b7c);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.erp-rotas__inline--grow {
+    flex: 1 1 16rem;
+}
+
+.erp-rotas__inline--grow .erp-rotas__input {
+    flex: 1 1 auto;
+    min-width: 10rem;
+}
+
+.erp-rotas__select,
+.erp-rotas__input {
+    height: 1.85rem;
+    border: 1px solid var(--erp-border-input, #9eb0c3);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--erp-text, #1f2a37);
+    padding: 0 0.5rem;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+    line-height: 1.2;
+}
+
+.erp-rotas__select {
+    min-width: 12rem;
+}
+
+.erp-rotas__input--sm {
+    width: 14rem;
+    max-width: 100%;
+}
+
+.erp-rotas__select:focus,
+.erp-rotas__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--erp-brand-primary) 22%, transparent);
+}
+
+.erp-rotas__workspace {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.erp-rotas__summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.35rem 0.65rem;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c9d4e2);
+    border-radius: var(--erp-radius-md, 6px);
+    box-shadow: var(--erp-shadow-md);
+    font-size: 0.8125rem;
+    color: var(--erp-text-muted, #5b6b7c);
+    flex-shrink: 0;
+}
+
+.erp-rotas__summary strong {
+    color: var(--erp-text, #1f2a37);
+}
+
+.erp-rotas__dirty {
+    margin-left: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #b45309;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+}
+
+.erp-rotas__select--sm {
+    min-width: 10rem;
+}
+
+.erp-rotas__table-wrap--full {
+    flex: 1 1 auto;
+    min-height: 0;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c9d4e2);
+    border-radius: var(--erp-radius-md, 6px);
+    box-shadow: var(--erp-shadow-md);
+}
+
+.erp-rotas__col-check {
+    width: 6.5rem;
+}
+
+.erp-rotas__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 650;
+    color: var(--erp-text, #1f2a37);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-rotas__check input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--erp-brand-primary, #2f5d8c);
+}
+
+.erp-rotas__table tbody tr.is-marked {
+    background: color-mix(in srgb, var(--erp-brand-primary) 7%, #fff);
+}
+
+.erp-rotas__muted {
+    color: var(--erp-text-muted, #5b6b7c);
+}
+
+.erp-rotas__sidebar,
+.erp-rotas__detail {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c9d4e2);
+    border-radius: var(--erp-radius-md, 6px);
+    box-shadow: var(--erp-shadow-md);
+    overflow: hidden;
+}
+
+.erp-rotas__panel-title,
+.erp-rotas__detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.4rem 0.65rem;
+    background: var(--erp-bg-toolbar, #eef3f8);
+    border-bottom: 1px solid var(--erp-border-light, #c9d4e2);
+    flex-shrink: 0;
+}
+
+.erp-rotas__panel-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--erp-text-muted, #5b6b7c);
+}
+
+.erp-rotas__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--erp-brand-primary) 16%, #fff);
+    color: var(--erp-brand-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.erp-rotas__rota-list {
+    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.erp-rotas__rota-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    text-align: left;
+    border: 0;
+    border-bottom: 1px solid #edf1f6;
+    background: transparent;
+    padding: 0.5rem 0.65rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.erp-rotas__rota-item:hover {
+    background: #f5f8fb;
+}
+
+.erp-rotas__rota-item.is-active {
+    background: color-mix(in srgb, var(--erp-brand-primary) 12%, #fff);
+    box-shadow: inset 3px 0 0 var(--erp-brand-primary);
+}
+
+.erp-rotas__rota-item.is-inactive .erp-rotas__rota-name {
+    color: #8a97a6;
+}
+
+.erp-rotas__rota-name {
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+    font-weight: 650;
+    color: var(--erp-text, #1f2a37);
+}
+
+.erp-rotas__rota-meta {
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #5b6b7c);
+}
+
+.erp-rotas__tag {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.5rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #8a5a00;
+    background: #fff3cd;
+    border: 1px solid #f0d58a;
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+}
+
+.erp-rotas__detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.erp-rotas__detail-info strong {
+    font-size: 0.875rem;
+    color: var(--erp-text, #1f2a37);
+}
+
+.erp-rotas__detail-info span {
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #5b6b7c);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-rotas__detail-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.erp-rotas__table-wrap {
+    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.erp-rotas__table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.erp-rotas__table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--erp-brand-primary, #2f5d8c);
+    color: var(--erp-text-on-brand, #fff);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.35rem 0.55rem;
+    border-right: 1px solid rgb(255 255 255 / 35%);
+    white-space: nowrap;
+}
+
+.erp-rotas__table th:last-child {
+    border-right: none;
+}
+
+.erp-rotas__table td {
+    padding: 0.28rem 0.55rem;
+    border-bottom: 1px solid #e6edf5;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+    vertical-align: middle;
+    height: calc(1.5rem);
+}
+
+.erp-rotas__table tbody tr {
+    cursor: pointer;
+}
+
+.erp-rotas__table tbody tr:nth-child(even) {
+    background: #f7fafc;
+}
+
+.erp-rotas__table tbody tr:hover {
+    background: #eef5fb;
+}
+
+.erp-rotas__table tbody tr.is-selected {
+    background: color-mix(in srgb, var(--erp-brand-primary) 14%, #fff);
+}
+
+.erp-rotas__col-ordem {
+    width: 7rem;
+}
+
+.erp-rotas__col-cidade {
+    width: 12%;
+}
+
+.erp-rotas__col-endereco {
+    width: 28%;
+    max-width: 22rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-rotas__col-fone {
+    width: 8.5rem;
+    white-space: nowrap;
+}
+
+.erp-rotas__col-mapa {
+    width: 3.2rem;
+    text-align: center;
+}
+
+.erp-rotas__map-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 6px;
+    border: 1px solid var(--erp-border-input, #9eb0c3);
+    background: #fff;
+    text-decoration: none;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.erp-rotas__map-btn:hover {
+    border-color: var(--erp-brand-primary, #2f5d8c);
+    background: color-mix(in srgb, var(--erp-brand-primary) 10%, #fff);
+}
+
+.erp-rotas__col-acoes {
+    width: 4.8rem;
+    text-align: right;
+}
+
+.erp-rotas__ordem {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.erp-rotas__ordem-input {
+    width: 2.6rem;
+    height: 1.45rem;
+    text-align: center;
+    border: 1px solid var(--erp-border-input, #9eb0c3);
+    border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 650;
+    padding: 0;
+}
+
+.erp-rotas__icon-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid var(--erp-border-input, #9eb0c3);
+    border-radius: 3px;
+    background: #fff;
+    color: #5b6b7c;
+    cursor: pointer;
+    font-size: 0.58rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.erp-rotas__icon-btn:hover {
+    color: var(--erp-brand-primary);
+    border-color: var(--erp-brand-primary);
+}
+
+.erp-rotas__cliente-name {
+    font-weight: 650;
+    line-height: 1.15;
+}
+
+.erp-rotas__cliente-code {
+    font-size: 0.7rem;
+    color: var(--erp-text-muted, #5b6b7c);
+}
+
+.erp-rotas__text-btn {
+    border: 0;
+    background: transparent;
+    color: #b42318;
+    font-size: 0.75rem;
+    font-weight: 650;
+    cursor: pointer;
+    padding: 0;
+}
+
+.erp-rotas__text-btn:hover {
+    text-decoration: underline;
+}
+
+.erp-rotas__empty,
+.erp-rotas__empty-cell,
+.erp-rotas__placeholder {
+    color: var(--erp-text-muted, #5b6b7c);
+    text-align: center;
+    padding: 1.5rem 1rem;
+    font-size: 0.8125rem;
+}
+
+.erp-rotas__placeholder {
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 22rem;
+}
+
+.erp-rotas__placeholder strong {
+    color: var(--erp-text, #1f2a37);
+    font-size: 0.95rem;
+}
+
+.erp-rotas__pick-list {
+    margin-top: 0.65rem;
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--erp-border-light, #c9d4e2);
+    border-radius: 4px;
+    background: #fff;
+}
+
+.erp-rotas__pick-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    text-align: left;
+    border: 0;
+    border-bottom: 1px solid #edf1f6;
+    background: transparent;
+    padding: 0.5rem 0.65rem;
+    cursor: pointer;
+}
+
+.erp-rotas__pick-item:last-child {
+    border-bottom: 0;
+}
+
+.erp-rotas__pick-item:hover,
+.erp-rotas__pick-item.is-active {
+    background: color-mix(in srgb, var(--erp-brand-primary) 12%, #fff);
+}
+
+.erp-rotas__pick-name {
+    font-weight: 650;
+    color: var(--erp-text, #1f2a37);
+    font-size: 0.8125rem;
+}
+
+.erp-rotas__pick-meta {
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #5b6b7c);
+}
+
+@media (max-width: 960px) {
+    .erp-rotas__workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-rotas__sidebar {
+        max-height: 12rem;
+    }
+}
+
+/* Action bar compacta — mesmo tamanho da tela de Produtos */
+.erp-rotas-vendedores-page .erp-unidades-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+}
+
+.erp-rotas-vendedores-page .erp-unidades-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-rotas-vendedores-page .erp-unidades-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-rotas-vendedores-page .erp-unidades-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-rotas-vendedores-page .erp-unidades-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}

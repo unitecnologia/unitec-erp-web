@@ -1,0 +1,11 @@
+/* ERP — Entregadores (larguras de colunas; UI em erp-list-ui.css) */
+
+.erp-entregadores-page .fi-ta-header-cell:nth-child(1),
+.erp-entregadores-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 12%;
+}
+
+.erp-entregadores-page .fi-ta-header-cell:nth-child(2),
+.erp-entregadores-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 88%;
+}

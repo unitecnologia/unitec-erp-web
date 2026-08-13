@@ -1,0 +1,138 @@
+/* ERP — Aniversariantes (larguras de colunas; UI em erp-list-ui.css + erp-aniversariantes.css) */
+
+.erp-aniversariantes-page .fi-ta-header-cell:nth-child(1),
+.erp-aniversariantes-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 10%;
+}
+
+.erp-aniversariantes-page .fi-ta-header-cell:nth-child(2),
+.erp-aniversariantes-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 45%;
+}
+
+.erp-aniversariantes-page .fi-ta-header-cell:nth-child(3),
+.erp-aniversariantes-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 45%;
+}
+
+.erp-aniversariantes__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-bottom: 0.45rem;
+}
+
+.erp-aniversariantes__panel {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.75rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+    min-width: min(100%, 28rem);
+    flex: 1 1 28rem;
+}
+
+.erp-aniversariantes__panel-title {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.erp-aniversariantes__period-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-aniversariantes__period {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.erp-aniversariantes__period-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text-muted);
+    text-transform: lowercase;
+}
+
+.erp-aniversariantes__select {
+    min-width: 10rem;
+}
+
+.erp-aniversariantes {
+    font-family: var(--erp-font);
+    background: var(--erp-bg-app);
+    padding: 0.5rem 0.65rem 0;
+    flex-shrink: 0;
+}
+
+.erp-aniversariantes__period-input,
+.erp-aniversariantes__select {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    border: 1px solid var(--erp-border);
+    border-radius: var(--erp-radius-sm);
+    padding: 0.35rem 0.55rem;
+    background: var(--erp-bg-panel);
+    color: var(--erp-text);
+}
+
+.erp-aniversariantes__period-input:focus,
+.erp-aniversariantes__select:focus {
+    outline: none;
+    border-color: var(--erp-focus-ring);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.erp-aniversariantes__btn {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--erp-action-primary-dark);
+    border-radius: var(--erp-radius-sm);
+    background: linear-gradient(180deg, var(--erp-action-primary) 0%, var(--erp-action-primary-dark) 100%);
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--erp-text-inverse);
+}
+
+.erp-aniversariantes__btn:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, var(--erp-action-primary) 100%);
+}
+
+@media (max-width: 1024px) {
+    .erp-aniversariantes__toolbar {
+        flex-direction: column;
+    }
+
+    .erp-aniversariantes__panel {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .erp-aniversariantes__period {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+}

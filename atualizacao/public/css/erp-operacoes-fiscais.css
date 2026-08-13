@@ -1,0 +1,266 @@
+.erp-operacoes-fiscais {
+    display: flex;
+    flex-direction: column;
+    width: min(72rem, calc(100vw - 1.5rem));
+    height: min(44rem, calc(100dvh - var(--erp-os-chrome)));
+    max-width: 100%;
+    max-height: calc(100dvh - var(--erp-os-chrome));
+    margin: 0;
+    color: #17233a;
+}
+
+.erp-operacoes-fiscais__body {
+    gap: 0.65rem;
+    padding: 0.7rem;
+}
+
+.erp-operacoes-fiscais .erp-os-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.erp-operacoes-fiscais__header {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f8fbff, #e8f0fa);
+}
+
+.erp-operacoes-fiscais__header > div > span {
+    color: #2563eb;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.erp-operacoes-fiscais__header h1 {
+    margin: 0.1rem 0;
+    color: #0f3460;
+    font-size: 1.15rem;
+}
+
+.erp-operacoes-fiscais__header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.76rem;
+}
+
+.erp-operacoes-fiscais__card {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0.55rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgb(15 52 96 / 6%);
+}
+
+.erp-operacoes-fiscais__table-wrap {
+    overflow: visible;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+}
+
+.erp-operacoes-fiscais__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.erp-operacoes-fiscais__table th {
+    padding: 0.32rem 0.5rem;
+    border-right: 1px solid rgb(255 255 255 / 28%);
+    background: linear-gradient(180deg, #1e5a9e, #164a82);
+    color: #fff;
+    font-size: 0.69rem;
+    font-weight: 800;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.erp-operacoes-fiscais__table th:last-child {
+    border-right: 0;
+}
+
+.erp-operacoes-fiscais__table td {
+    padding: 0.2rem 0.5rem;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-operacoes-fiscais__table td:first-child {
+    color: #0f3460;
+    font-weight: 700;
+}
+
+.erp-operacoes-fiscais__table td:last-child {
+    border-right: 0;
+}
+
+.erp-operacoes-fiscais__table input {
+    width: 100%;
+    min-height: 1.7rem;
+    padding: 0.22rem 0.42rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 5px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-weight: 700;
+}
+
+.erp-operacoes-fiscais__table input:focus,
+.erp-operacoes-fiscais__mensagem textarea:focus {
+    outline: 0;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+}
+
+.erp-operacoes-fiscais__cfop-cell {
+    position: relative;
+    width: 28%;
+}
+
+.erp-operacoes-fiscais__cfop-lookup {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 2px);
+    left: 0;
+    width: min(30rem, 85vw);
+    max-height: 14rem;
+    overflow: auto;
+    padding: 0.2rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 12px 24px rgb(15 23 42 / 22%);
+}
+
+.erp-operacoes-fiscais__cfop-lookup button {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.35rem 0.45rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #17233a;
+    font: inherit;
+    font-size: 0.72rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-operacoes-fiscais__cfop-lookup button strong {
+    color: #1e5a9e;
+}
+
+.erp-operacoes-fiscais__cfop-lookup button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-operacoes-fiscais__cfop-lookup button:hover {
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-operacoes-fiscais__cfop-lookup button:hover strong {
+    color: #dbeafe;
+}
+
+.erp-operacoes-fiscais__cfop-empty {
+    padding: 0.5rem;
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.erp-operacoes-fiscais__mensagem {
+    display: grid;
+    gap: 0.28rem;
+    margin-top: 0.45rem;
+    color: #334155;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.erp-operacoes-fiscais__mensagem textarea {
+    width: 100%;
+    min-height: 3rem;
+    max-height: 3rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 6px;
+    resize: vertical;
+    font: inherit;
+    font-size: 0.84rem;
+}
+
+.erp-operacoes-fiscais__actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+}
+
+.erp-operacoes-fiscais__actions button,
+.erp-operacoes-fiscais__actions a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.35rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid #86efac;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    color: #fff;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.erp-operacoes-fiscais__actions a {
+    border-color: #fecaca;
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+}
+
+.erp-operacoes-fiscais__alert {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #fcd34d;
+    border-radius: 7px;
+    background: #fffbeb;
+    color: #78350f;
+    font-size: 0.82rem;
+}
+
+.erp-operacoes-fiscais__alert.is-ok {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #14532d;
+}
+
+.erp-operacoes-fiscais__alert button {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+@media (max-width: 640px) {
+    .erp-operacoes-fiscais__table {
+        min-width: 36rem;
+    }
+}

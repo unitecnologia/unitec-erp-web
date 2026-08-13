@@ -1,0 +1,374 @@
+/* Campos — layout Delphi uTerminais.pas */
+
+
+
+.erp-terminais-form--config {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0.35rem;
+
+}
+
+
+
+.erp-terminais-form__checks {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 0.45rem 1rem;
+
+    margin-top: 0.25rem;
+
+}
+
+
+
+.erp-terminais-form__checks--stack {
+
+    flex-direction: column;
+
+    flex-wrap: nowrap;
+
+    align-items: flex-start;
+
+    gap: 0.2rem;
+
+}
+
+
+
+.erp-terminais-form__radios {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 0.55rem 0.85rem;
+
+}
+
+
+
+.erp-terminais-form__stub,
+
+.erp-terminais-form__hint {
+
+    margin: 0.75rem 0 0;
+
+    font-size: 0.78rem;
+
+    color: var(--erp-text-muted, #64748b);
+
+}
+
+
+
+.erp-terminais-form__actions {
+
+    margin-top: 0.75rem;
+
+}
+
+
+
+.erp-terminais-form__test-btn {
+
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+
+    background: #fff;
+
+    padding: 0.35rem 0.85rem;
+
+    font-size: 0.78rem;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    border-radius: var(--erp-radius-sm, 6px);
+
+}
+
+
+
+.erp-terminais-form__usa-tef {
+
+    display: inline-flex;
+
+    margin-bottom: 0.65rem;
+
+    font-weight: 700;
+
+}
+
+
+
+.erp-terminais-form-page .erp-pcad__group {
+
+    margin-bottom: 0;
+
+}
+
+
+
+.erp-terminais-form-page .erp-pcad__group-title {
+
+    margin-bottom: 0.35rem;
+
+}
+
+
+
+.erp-pcad__check--inline {
+
+    margin-left: 0.35rem;
+
+}
+
+
+
+.erp-terminais-form__printer-row {
+
+    display: grid;
+
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
+
+    gap: 0.65rem 1rem;
+
+    align-items: center;
+
+}
+
+
+
+.erp-terminais-form__inline-fields {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    align-items: center;
+
+    gap: 0.28rem 0.55rem;
+
+}
+
+
+
+.erp-terminais-form__escpos-row {
+
+    display: grid;
+
+    grid-template-columns: auto minmax(8rem, 1fr) auto minmax(7rem, 0.85fr) auto;
+
+    gap: 0.35rem 0.55rem;
+
+    align-items: center;
+
+}
+
+
+
+.erp-terminais-form__porta-wrap {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 0.25rem;
+
+}
+
+
+
+.erp-terminais-form__porta-btn {
+
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+
+    background: var(--erp-bg-panel, #fff);
+
+    border-radius: var(--erp-radius-sm, 6px);
+
+    width: 1.85rem;
+
+    height: 1.85rem;
+
+    cursor: pointer;
+
+    font-size: 0.85rem;
+
+    line-height: 1;
+
+}
+
+
+
+.erp-terminais-form__path-row {
+
+    display: grid;
+
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    gap: 0.35rem;
+
+    align-items: center;
+
+}
+
+
+
+.erp-terminais-form__browse-btn {
+
+    border: 1px solid var(--erp-border-light, #94a3b8);
+
+    background: var(--erp-bg-panel, #fff);
+
+    border-radius: var(--erp-radius-sm, 6px);
+
+    width: 1.85rem;
+
+    height: 1.85rem;
+
+    cursor: pointer;
+
+}
+
+
+
+.erp-terminais-form__meia-folha {
+
+    display: inline-flex;
+
+    margin-top: 0.35rem;
+
+}
+
+
+
+.erp-terminais-form__bottom {
+
+    display: grid;
+
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+
+    gap: 0.55rem;
+
+    align-items: start;
+
+}
+
+
+
+.erp-terminais-form__bottom-right {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0.35rem;
+
+    min-width: 0;
+
+}
+
+
+
+.erp-terminais-form__operacao-grid {
+
+    display: grid;
+
+    grid-template-columns: minmax(10rem, 12.5rem) minmax(0, 1fr);
+
+    gap: 0.55rem;
+
+    align-items: start;
+
+}
+
+
+
+.erp-terminais-form__operacao-select .erp-pcad-form__select {
+
+    width: 100%;
+
+}
+
+
+
+.erp-terminais-form__operacao-list {
+
+    margin: 1.15rem 0 0;
+
+    padding: 0.25rem 0.35rem;
+
+    list-style: none;
+
+    border: 1px solid var(--erp-border-light, #cbd5e1);
+
+    background: var(--erp-bg-panel, #fff);
+
+    min-height: 6.25rem;
+
+}
+
+
+
+.erp-terminais-form__operacao-list li {
+
+    padding: 0.1rem 0.15rem;
+
+}
+
+
+
+.erp-terminais-form__operacao-list .erp-pcad__check {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.35rem;
+
+    margin: 0;
+
+    font-weight: 600;
+
+}
+
+
+
+@media (max-width: 980px) {
+
+    .erp-terminais-form__printer-row,
+
+    .erp-terminais-form__bottom,
+
+    .erp-terminais-form__operacao-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+
+    .erp-terminais-form__operacao-list {
+
+        margin-top: 0.35rem;
+
+    }
+
+
+
+    .erp-terminais-form__escpos-row {
+
+        grid-template-columns: 1fr 1fr;
+
+    }
+
+}
+

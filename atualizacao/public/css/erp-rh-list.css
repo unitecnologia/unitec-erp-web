@@ -1,0 +1,577 @@
+/* ERP — Mini RH listagens (funcionários, cargos, departamentos) — gerado a partir de erp-logistica-simple.css */
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios,
+.erp-rh-cargos-page .erp-rh-cargos,
+.erp-rh-departamentos-page .erp-rh-departamentos {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+    font-family: var(--erp-font);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__filters,
+.erp-rh-cargos-page .erp-rh-cargos__filters,
+.erp-rh-departamentos-page .erp-rh-departamentos__filters {
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem !important;
+    margin: 0 0 0.35rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-left: 4px solid var(--erp-brand-primary) !important;
+    border-top: none !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    display: block !important;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__filters-row,
+.erp-rh-cargos-page .erp-rh-cargos__filters-row,
+.erp-rh-departamentos-page .erp-rh-departamentos__filters-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .erp-rh-funcionarios-page .erp-rh-funcionarios__filters-row,
+    .erp-rh-cargos-page .erp-rh-cargos__filters-row,
+    .erp-rh-departamentos-page .erp-rh-departamentos__filters-row {
+        flex-wrap: wrap;
+    }
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__search-group,
+.erp-rh-cargos-page .erp-rh-cargos__search-group,
+.erp-rh-departamentos-page .erp-rh-departamentos__search-group {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__locate-label,
+.erp-rh-cargos-page .erp-rh-cargos__locate-label,
+.erp-rh-departamentos-page .erp-rh-departamentos__locate-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--erp-brand-primary-dark);
+    white-space: nowrap;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__search-field,
+.erp-rh-cargos-page .erp-rh-cargos__search-field,
+.erp-rh-departamentos-page .erp-rh-departamentos__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    flex-shrink: 0;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__search-text,
+.erp-rh-cargos-page .erp-rh-cargos__search-text,
+.erp-rh-departamentos-page .erp-rh-departamentos__search-text {
+    flex: 0 0 auto;
+    width: 11cm;
+    max-width: 11cm;
+    min-width: 6rem;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__search-actions,
+.erp-rh-cargos-page .erp-rh-cargos__search-actions,
+.erp-rh-departamentos-page .erp-rh-departamentos__search-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-group,
+.erp-rh-cargos-page .erp-rh-cargos__page-size-group,
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-label,
+.erp-rh-cargos-page .erp-rh-cargos__page-size-label,
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-select,
+.erp-rh-cargos-page .erp-rh-cargos__page-size-select,
+.erp-rh-departamentos-page .erp-rh-departamentos__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__select,
+.erp-rh-cargos-page .erp-rh-cargos__select,
+.erp-rh-departamentos-page .erp-rh-departamentos__select,
+.erp-rh-funcionarios-page .erp-rh-funcionarios__input,
+.erp-rh-cargos-page .erp-rh-cargos__input,
+.erp-rh-departamentos-page .erp-rh-departamentos__input {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    background: var(--erp-bg-panel);
+    color: var(--erp-text);
+    padding: 0.25rem 0.45rem;
+    min-height: 1.65rem;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__btn,
+.erp-rh-cargos-page .erp-rh-cargos__btn,
+.erp-rh-departamentos-page .erp-rh-departamentos__btn {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--erp-action-primary-dark);
+    border-radius: var(--erp-radius-sm);
+    background: linear-gradient(180deg, var(--erp-action-primary) 0%, var(--erp-action-primary-dark) 100%);
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--erp-text-inverse);
+    box-shadow: var(--erp-shadow-sm);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__btn--secondary,
+.erp-rh-cargos-page .erp-rh-cargos__btn--secondary,
+.erp-rh-departamentos-page .erp-rh-departamentos__btn--secondary {
+    background: var(--erp-bg-muted);
+    color: var(--erp-text);
+    border-color: var(--erp-border-light);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__hint,
+.erp-rh-cargos-page .erp-rh-cargos__hint,
+.erp-rh-departamentos-page .erp-rh-departamentos__hint {
+    margin: 0 0.65rem 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    line-height: 1.2;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__status-wrap,
+.erp-rh-cargos-page .erp-rh-cargos__status-wrap,
+.erp-rh-departamentos-page .erp-rh-departamentos__status-wrap {
+    flex-shrink: 0;
+    margin: 0 0.65rem 0;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__status,
+.erp-rh-cargos-page .erp-rh-cargos__status,
+.erp-rh-departamentos-page .erp-rh-departamentos__status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios__tab,
+.erp-rh-cargos-page .erp-rh-cargos__tab,
+.erp-rh-departamentos-page .erp-rh-departamentos__tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem !important;
+    line-height: 1.1;
+    min-height: 0;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+}
+
+.erp-rh-funcionarios-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-cargos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-rh-departamentos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-rh-funcionarios-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-cargos-page .fi-sc > div:not(.fi-hidden),
+.erp-rh-departamentos-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-rh-funcionarios-page.fi-page,
+.erp-rh-cargos-page.fi-page,
+.erp-rh-departamentos-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-rh-funcionarios-page .fi-sc > div:has(.fi-ta),
+.erp-rh-cargos-page .fi-sc > div:has(.fi-ta),
+.erp-rh-departamentos-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Grade compacta ─────────────────────────────────────────────── */
+
+.erp-rh-funcionarios-page .fi-ta-ctn,
+.erp-rh-cargos-page .fi-ta-ctn,
+.erp-rh-departamentos-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-header-cell,
+.erp-rh-cargos-page .fi-ta-header-cell,
+.erp-rh-departamentos-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-rh-funcionarios-page .fi-ta-cell,
+.erp-rh-cargos-page .fi-ta-cell,
+.erp-rh-departamentos-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row,
+.erp-rh-cargos-page .fi-ta-row,
+.erp-rh-departamentos-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-cargos-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-rh-departamentos-page .fi-ta-row:nth-child(even) .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-cargos-page .fi-ta-row:nth-child(odd) .fi-ta-cell,
+.erp-rh-departamentos-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-cargos-page .fi-ta-row:hover .fi-ta-cell,
+.erp-rh-departamentos-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row.erp-row-selected,
+.erp-rh-cargos-page .fi-ta-row.erp-row-selected,
+.erp-rh-departamentos-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+}
+
+.erp-rh-funcionarios-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-cargos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-rh-departamentos-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-rh-funcionarios-page .fi-pagination,
+.erp-rh-cargos-page .fi-pagination,
+.erp-rh-departamentos-page .fi-pagination {
+    padding: 0.25rem 0.5rem !important;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+}
+
+/* ── Action bar ───────────────────────────────────────────────── */
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios-actions,
+.erp-rh-cargos-page .erp-rh-cargos-actions,
+.erp-rh-departamentos-page .erp-rh-departamentos-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-rh-funcionarios-page .erp-rh-funcionarios-actions__btn,
+.erp-rh-cargos-page .erp-rh-cargos-actions__btn,
+.erp-rh-departamentos-page .erp-rh-departamentos-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+/* ── Larguras de colunas ──────────────────────────────────────── */
+
+.erp-rh-funcionarios-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-funcionarios-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-cargos-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-cargos-page .fi-ta-row .fi-ta-cell:nth-child(1),
+.erp-rh-departamentos-page .fi-ta-header-cell:nth-child(1),
+.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 12%;
+}
+
+.erp-rh-funcionarios-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-funcionarios-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-cargos-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-cargos-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-rh-departamentos-page .fi-ta-header-cell:nth-child(2),
+.erp-rh-departamentos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 88%;
+}
+
+/* ── Modal código/nome ──────────────────────────────────────────── */
+
+.erp-rh-funcionarios-page .erp-lookup-modal,
+.erp-rh-cargos-page .erp-lookup-modal,
+.erp-rh-departamentos-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__backdrop,
+.erp-rh-cargos-page .erp-lookup-modal__backdrop,
+.erp-rh-departamentos-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__window,
+.erp-rh-cargos-page .erp-lookup-modal__window,
+.erp-rh-departamentos-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+    pointer-events: auto;
+    width: min(calc(28rem + 1cm), calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__titlebar,
+.erp-rh-cargos-page .erp-lookup-modal__titlebar,
+.erp-rh-departamentos-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem 0.35rem 0.7rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: var(--erp-text-inverse, #fff);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-rh-funcionarios-page .erp-lookup-modal__close,
+.erp-rh-cargos-page .erp-lookup-modal__close,
+.erp-rh-departamentos-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--erp-text-inverse, #fff);
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-cargos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__body.erp-contador-form-modal__body {
+    padding: 0.55rem 0.65rem 0.5rem;
+    background: linear-gradient(180deg, #d9e6f5 0%, #e8f0fa 42%, #eef4fb 100%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-form__section,
+.erp-rh-cargos-page .erp-codigo-nome-form__section,
+.erp-rh-departamentos-page .erp-codigo-nome-form__section,
+.erp-transportadoras-page .erp-codigo-nome-form__section,
+.erp-veiculos-page .erp-codigo-nome-form__section {
+    margin: 0;
+    padding: 0.45rem 0.55rem 0.55rem;
+    border: 1px solid #a8bdd4;
+    border-left: 4px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: var(--erp-radius-md, 8px);
+    background: linear-gradient(180deg, #f7fafd 0%, #fff 18%, #fff 100%);
+    box-shadow:
+        0 1px 0 rgb(255 255 255 / 80%) inset,
+        0 2px 8px rgb(15 52 96 / 8%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-form__section-title,
+.erp-rh-cargos-page .erp-codigo-nome-form__section-title,
+.erp-rh-departamentos-page .erp-codigo-nome-form__section-title {
+    margin: 0 0 0.45rem;
+    padding: 0 0 0.3rem;
+    border-bottom: 1px solid #d4e0ef;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-form__section-grid,
+.erp-rh-cargos-page .erp-codigo-nome-form__section-grid,
+.erp-rh-departamentos-page .erp-codigo-nome-form__section-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-cargos-page .erp-codigo-nome-form__row.erp-pcad-form__row,
+.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row {
+    display: grid;
+    grid-template-columns: 5.8rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    min-height: 1.9rem;
+    padding: 0.18rem 0.35rem;
+    border-radius: var(--erp-radius-sm, 4px);
+    background: rgb(227 236 247 / 42%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-cargos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even),
+.erp-rh-departamentos-page .erp-codigo-nome-form__row.erp-pcad-form__row:nth-child(even) {
+    background: rgb(227 236 247 / 68%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__label,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__label {
+    width: auto;
+    min-width: 0;
+    text-align: right;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__input,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input {
+    min-height: 1.65rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.78rem;
+    border: 1px solid #9eb4cf;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 7%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-cargos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly],
+.erp-rh-departamentos-page .erp-codigo-nome-modal__form .erp-pcad-form__input[readonly] {
+    background: #edf2f8;
+    color: #475569;
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__actions,
+.erp-rh-cargos-page .erp-codigo-nome-modal__actions,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    border-top: 1px solid #a8bdd4;
+    background: linear-gradient(180deg, #dce8f6 0%, #d2e0f0 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-cargos-page .erp-codigo-nome-modal__actions.erp-pcad-actions,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions.erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-rh-funcionarios-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-cargos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn,
+.erp-rh-departamentos-page .erp-codigo-nome-modal__actions .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 3rem;
+}
+
+.erp-rh-funcionarios-page .erp-contador-form-modal__error--row,
+.erp-rh-cargos-page .erp-contador-form-modal__error--row,
+.erp-rh-departamentos-page .erp-contador-form-modal__error--row {
+    grid-column: 1 / -1;
+    margin: 0 0 0 5.8rem;
+    font-size: 0.68rem;
+    color: #b91c1c;
+}
+
+.erp-codigo-nome-modal__error {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #b91c1c;
+}
+
+@media (max-width: 1200px) {
+    .erp-rh-funcionarios-page .erp-rh-funcionarios__search-actions,
+    .erp-rh-funcionarios-page .erp-rh-funcionarios__page-size-group,
+    .erp-rh-cargos-page .erp-rh-cargos__search-actions,
+    .erp-rh-cargos-page .erp-rh-cargos__page-size-group,
+    .erp-rh-departamentos-page .erp-rh-departamentos__search-actions,
+    .erp-rh-departamentos-page .erp-rh-departamentos__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}

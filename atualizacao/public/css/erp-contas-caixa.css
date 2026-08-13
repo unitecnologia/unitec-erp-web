@@ -1,0 +1,552 @@
+/* Contas Caixa — janela moderna (não Delphi) */
+
+.fi-body:has(.erp-contas-caixa-page):not(:has(.erp-planos-contas-page)) {
+    background:
+        radial-gradient(120% 90% at 10% 0%, rgba(30, 90, 158, 0.22), transparent 55%),
+        radial-gradient(90% 80% at 100% 20%, rgba(15, 52, 96, 0.18), transparent 50%),
+        rgba(15, 23, 42, 0.52) !important;
+}
+
+.fi-body:has(.erp-contas-caixa-page):not(:has(.erp-planos-contas-page)) .fi-main > *,
+.fi-main:has(.erp-contas-caixa-page:not(.erp-planos-contas-page)) > :has(.erp-contas-caixa-page) {
+    width: min(56rem, 96vw) !important;
+    max-width: min(56rem, 96vw) !important;
+    height: min(36rem, calc(100dvh - 3.8rem)) !important;
+    max-height: calc(100dvh - 3.8rem) !important;
+}
+
+.fi-page.erp-contas-caixa-page:not(.erp-planos-contas-page) {
+    border: 1px solid #9db4d0 !important;
+    border-radius: 14px !important;
+    background: #f4f7fb !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.35) inset,
+        0 22px 55px rgba(15, 40, 71, 0.28) !important;
+    overflow: hidden !important;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-page-main,
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-page-content,
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-sc {
+    background: transparent !important;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.95rem;
+    background:
+        linear-gradient(135deg, #0f3460 0%, #1e5a9e 62%, #2a6fbd 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__eyebrow {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.72;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__close {
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 1.15rem;
+    transition: background 0.12s ease;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-window__close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-locate-wrap {
+    padding: 0.75rem 0.85rem 0.45rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__filters {
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #d5e2f0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem 0.7rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__search-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 18rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__locate-label {
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__input,
+.erp-contas-caixa-page .erp-contas-caixa__select {
+    height: 2.05rem;
+    border: 1px solid #c5d4e6;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.78rem;
+    outline: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__search-text {
+    flex: 1 1 auto;
+    min-width: 10rem;
+    max-width: 18rem;
+    padding: 0 0.7rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__input:focus,
+.erp-contas-caixa-page .erp-contas-caixa__select:focus {
+    border-color: #5b8fc7;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__search-actions {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__btn {
+    min-height: 2.05rem;
+    padding: 0 0.85rem;
+    border: 1px solid #1e5a9e;
+    border-radius: 8px;
+    background: #1e5a9e;
+    color: #fff;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__btn:hover {
+    background: #174a7c;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__btn--secondary {
+    border-color: #c5d4e6;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__btn--secondary:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__page-size-group {
+    margin-left: auto;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__page-size-select {
+    min-width: 4rem;
+    padding: 0 0.4rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa__hint {
+    margin: 0.45rem 0 0;
+    color: #64748b;
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-sc > div:has(.fi-ta-ctn) {
+    margin: 0 0.85rem 0.55rem !important;
+    border: 1px solid #d5e2f0 !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04) !important;
+    overflow: hidden !important;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-header-cell {
+    background: #f1f5f9 !important;
+    color: #0f3460 !important;
+    border-bottom: 1px solid #dbe5f0 !important;
+    font-size: 0.7rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-header-cell-sort-btn {
+    color: #0f3460 !important;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-row {
+    transition: background 0.1s ease;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-row:hover {
+    background: #f5f9fd !important;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-row.erp-list-row--selected,
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-row.is-selected,
+.erp-contas-caixa-page:not(.erp-planos-contas-page) tr.fi-ta-row[data-selected="true"] {
+    background: #e8f1fb !important;
+    box-shadow: inset 3px 0 0 #1e5a9e;
+}
+
+.erp-contas-caixa-page:not(.erp-planos-contas-page) .fi-ta-cell {
+    border-color: #eef2f7 !important;
+    font-size: 0.78rem !important;
+    color: #1e293b !important;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.2rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge--pdv {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge--subcaixa {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge--banco {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge--cofre {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-badge--default {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-name__sistema {
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.55rem 0.85rem 0.7rem;
+    border-top: 1px solid #d9e4f0;
+    background: linear-gradient(180deg, #eef3f9 0%, #e7eef7 100%);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.15rem;
+    padding: 0 0.8rem;
+    border: 1px solid #c5d4e6;
+    border-radius: 9px;
+    background: #fff;
+    color: #0f3460;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 750;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.05);
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn:hover {
+    border-color: #8fb0d4;
+    background: #f5f9fd;
+    transform: translateY(-1px);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--primary {
+    border-color: #1e5a9e;
+    background: linear-gradient(180deg, #2a6fbd 0%, #1e5a9e 100%);
+    color: #fff;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--primary:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    border-color: #2563eb;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--close {
+    margin-left: auto;
+    border-color: #fca5a5;
+    background: #fff5f5;
+    color: #b91c1c;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--close:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 6px;
+    background: #e8eef6;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--primary .erp-contas-caixa-actions__icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__btn--close .erp-contas-caixa-actions__icon {
+    background: #fecaca;
+    color: #b91c1c;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-actions__label kbd {
+    padding: 0.05rem 0.28rem;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    opacity: 0.75;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+/* Modal cadastro */
+.erp-contas-caixa-page .erp-contas-caixa-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, 96vw);
+    border: 1px solid #c5d4e6;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 40, 71, 0.28);
+    overflow: hidden;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    background: linear-gradient(135deg, #0f3460 0%, #1e5a9e 100%);
+    color: #fff;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__titlebar strong {
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__close {
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__body {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1rem 0.35rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__field {
+    display: grid;
+    gap: 0.28rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__field span {
+    color: #475569;
+    font-size: 0.7rem;
+    font-weight: 750;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__field input,
+.erp-contas-caixa-page .erp-contas-caixa-modal__field select {
+    height: 2.15rem;
+    padding: 0 0.7rem;
+    border: 1px solid #c5d4e6;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.8rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__field input:focus,
+.erp-contas-caixa-page .erp-contas-caixa-modal__field select:focus {
+    border-color: #5b8fc7;
+    background: #fff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__field--code input {
+    max-width: 8rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__error {
+    margin: -0.35rem 0 0;
+    color: #b91c1c;
+    font-size: 0.7rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.85rem 1rem 1rem;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__footer button {
+    min-height: 2.2rem;
+    padding: 0 0.95rem;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__footer .is-save {
+    border: 1px solid #1e5a9e;
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-contas-caixa-page .erp-contas-caixa-modal__footer .is-cancel {
+    border: 1px solid #c5d4e6;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-contas-caixa-page .erp-field-dd__btn {
+    height: 2.05rem;
+    padding: 0 0.7rem;
+    border: 1px solid #c5d4e6;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f3460;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 750;
+}
+
+.erp-contas-caixa-page .erp-field-dd__btn:hover,
+.erp-contas-caixa-page .erp-field-dd__btn[aria-expanded="true"] {
+    border-color: #5b8fc7;
+    background: #fff;
+}

@@ -1,0 +1,20 @@
+{
+  "name": "erp-whatsapp-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gateway WhatsApp interno do UNI ERP (Baileys)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.22",
+    "express": "^4.21.2",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

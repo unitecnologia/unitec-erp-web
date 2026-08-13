@@ -1,0 +1,254 @@
+/* ERP — Empresas: mesmo visual compacto de Produtos */
+
+.erp-empresas-page .erp-empresas {
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-empresas-page .erp-empresas__hint {
+    margin: 0 0.65rem 0.25rem;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    line-height: 1.2;
+}
+
+.erp-empresas-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-empresas-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-empresas-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-empresas-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Grade compacta (padrão Produtos) */
+.erp-empresas-page .fi-ta-ctn {
+    margin: 0 0.65rem !important;
+}
+
+.erp-empresas-page .fi-ta-table {
+    border-collapse: collapse;
+    width: auto;
+    min-width: 100%;
+}
+
+.erp-empresas-page .fi-ta-header-cell {
+    padding: 0.28rem 0.22rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    letter-spacing: 0.01em;
+    color: var(--erp-text-on-brand, #fff) !important;
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-empresas-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-empresas-page .fi-ta-cell {
+    padding: 0.05rem 0.22rem !important;
+    height: 1.375rem !important;
+    max-height: 1.375rem !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-empresas-page .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-empresas-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-empresas-page .fi-ta-header-cell-sort-btn svg,
+.erp-empresas-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-empresas-page .fi-ta-row {
+    height: 1.375rem;
+    background: transparent !important;
+}
+
+.erp-empresas-page .fi-ta-cell:first-of-type {
+    padding-inline-start: 0.18rem !important;
+}
+
+.erp-empresas-page .fi-ta-cell:last-of-type {
+    padding-inline-end: 0.18rem !important;
+}
+
+.erp-empresas-page button.fi-ta-col,
+.erp-empresas-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 1.375rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-empresas-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-empresas-page .fi-ta-text-item,
+.erp-empresas-page .fi-ta-col,
+.erp-empresas-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-empresas-page .fi-ta-row:nth-child(even) .fi-ta-cell,
+.erp-empresas-page .fi-ta-row.fi-striped .fi-ta-cell {
+    background: var(--erp-row-zebra, #f8fafc) !important;
+}
+
+.erp-empresas-page .fi-ta-row:nth-child(odd) .fi-ta-cell {
+    background: var(--erp-bg-panel, #fff) !important;
+}
+
+.erp-empresas-page .fi-ta-row:hover .fi-ta-cell {
+    background: var(--erp-row-hover, #e8f2ff) !important;
+}
+
+.erp-empresas-page .fi-ta-row.erp-row-selected {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+.erp-empresas-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+}
+
+.erp-empresas-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-empresas-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-empresas-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+.erp-empresas-page .fi-pagination {
+    padding: 0.05rem 0.45rem !important;
+    min-height: 1.55rem !important;
+    height: 1.55rem !important;
+    max-height: 1.55rem !important;
+    font-size: var(--erp-font-size-xs, 0.72rem);
+}
+
+/* Action bar compacta (padrão Produtos) */
+.erp-empresas-page .erp-empresas-actions {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-top: 1px solid #60a5fa;
+    box-shadow:
+        inset 0 1px 0 rgba(147, 197, 253, 0.35),
+        0 -2px 8px rgba(15, 40, 71, 0.12);
+}
+
+.erp-empresas-page .erp-empresas-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem !important;
+    padding: 0.2rem 0.35rem !important;
+}
+
+.erp-empresas-page .erp-empresas-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-empresas-page .erp-empresas-actions__icon {
+    width: 1.3rem !important;
+    height: 1.3rem !important;
+    font-size: 0.875rem !important;
+    margin-bottom: 0.12rem !important;
+}
+
+.erp-empresas-page .erp-empresas-actions__label {
+    font-size: 0.625rem !important;
+    line-height: 1.1 !important;
+    font-weight: 700;
+}
+
+/* Larguras de colunas */
+.erp-empresas-page .fi-ta-header-cell:nth-child(1),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 6%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(2),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 22%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(3),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 24%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(4),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 18%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(5),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 16%;
+}
+
+.erp-empresas-page .fi-ta-header-cell:nth-child(6),
+.erp-empresas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 14%;
+}

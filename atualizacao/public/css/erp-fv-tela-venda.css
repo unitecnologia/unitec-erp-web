@@ -1,0 +1,2047 @@
+/* ERP — Tela de Venda / Finalização (Monitor Força de Vendas)
+   Padrão visual alinhado ao Monitor / NFe / Expedição.
+   Tela fixa (100dvh, sem scroll da página): apenas a grade de itens rola. */
+
+/* Esconde menu + atalhos do shell (como no PDV) */
+.fi-body:has(.erp-fv-tela-venda-page) .erp-shell,
+.fi-body:has(.erp-fv-tela-venda-page) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-fv-tela-venda-page) .fi-main {
+    padding: 0 !important;
+    background: #d9e4f2;
+}
+
+.erp-fv-tela-venda-page .fi-header,
+.erp-fv-tela-venda-page .fi-page-header {
+    display: none !important;
+}
+
+/* ---- Trava a página na altura da janela (padrão PDV) ---- */
+.fi-body:has(.erp-fv-tela-venda-page) {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+    border-left: 4px solid #1e5a9e;
+    border-right: 4px solid #1e5a9e;
+}
+
+.fi-body:has(.erp-fv-tela-venda-page) .fi-layout,
+.fi-body:has(.erp-fv-tela-venda-page) .fi-main-ctn,
+.fi-body:has(.erp-fv-tela-venda-page) .fi-main {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.erp-fv-tela-venda-page,
+.erp-fv-tela-venda-page .fi-page-content,
+.erp-fv-tela-venda-page .fi-page__content,
+.erp-fv-tela-venda-page .fi-sc,
+.erp-fv-tela-venda-page .fi-sc > div:first-child {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    row-gap: 0 !important;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.erp-fv-tela-venda-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 100%;
+    min-height: 0;
+}
+
+.erp-fv-tv-root {
+    margin-top: 0;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv {
+    flex: 1;
+    min-height: 0;
+    width: calc(100% - 4mm - 5cm);
+    margin: 2mm auto 0;
+    border: 1px solid #9eb6d4;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 4px 14px rgba(15, 52, 96, 0.14);
+    background: #e8f0fa;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ---- Topbar ---- */
+.erp-fv-tv__topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0.85rem;
+    border-bottom: 1px solid #164a85;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+    color: #fff;
+}
+
+.erp-fv-tv__topbar-left {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.65rem;
+    min-width: 0;
+}
+
+.erp-fv-tv__topbar-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.erp-fv-tv__topbar-dav,
+.erp-fv-tv__topbar-badge {
+    display: inline-flex;
+    align-items: center;
+    font-style: normal;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.14);
+    letter-spacing: 0.02em;
+}
+
+.erp-fv-tv__topbar-badge {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: rgba(134, 239, 172, 0.45);
+    color: #ecfdf5;
+}
+
+.erp-fv-tv__topbar-meta {
+    font-weight: 600;
+    opacity: 0.88;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__topbar-link {
+    border: 0;
+    background: transparent;
+    color: #bfdbfe;
+    font-size: 0.78rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.erp-fv-tv__topbar-link:hover {
+    color: #fff;
+}
+
+/* ---- Barra de operação: vendedor / caixa / estoque / tabela ---- */
+.erp-fv-tv__oper {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.2rem 0.35rem;
+    padding: 0.2rem 0.45rem;
+    border-bottom: 1px solid #9eb6d4;
+    background: linear-gradient(180deg, #dbe7f5 0%, #cadcf0 100%);
+}
+
+.erp-fv-tv__oper-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.04rem;
+    min-width: 0;
+    flex: 1 1 10.5rem;
+}
+
+.erp-fv-tv__oper-field > span {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+}
+
+.erp-fv-tv__oper-field--estoque,
+.erp-fv-tv__oper-field--vendedor,
+.erp-fv-tv__oper-field--caixa,
+.erp-fv-tv__oper-field--tabela {
+    flex: 0 1 11rem;
+    max-width: 14rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__oper-select {
+    width: 100%;
+    min-height: 1.75rem;
+    padding: 0.15rem 1.5rem 0.15rem 0.4rem;
+    border: 1px solid #7fa0c4;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%230f3460'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.4rem center;
+    background-size: 0.95rem;
+    cursor: pointer;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__oper-select:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.erp-fv-tv__oper-static {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 1.75rem;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid #a8bdd6;
+    border-radius: 5px;
+    background: #eef4fb;
+    color: #0f3460;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.erp-fv-tv__oper-static svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    color: #1e5a9e;
+}
+
+.erp-fv-tv__oper-static > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__oper-static.is-warning {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.erp-fv-tv__oper-static.is-warning svg {
+    color: #d97706;
+}
+
+/* Combo compacto — tabela de preços */
+.erp-fv-tv__combo {
+    position: relative;
+    width: 100%;
+}
+
+.erp-fv-tv__combo-btn {
+    width: 100%;
+    min-height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem 0.15rem 0.45rem;
+    border: 1px solid #7fa0c4;
+    border-radius: 5px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
+}
+
+.erp-fv-tv__combo-btn:hover {
+    border-color: #5b86b8;
+}
+
+.erp-fv-tv__combo-btn:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.erp-fv-tv__combo-btn.is-warning {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.erp-fv-tv__combo-btn.is-warning:hover {
+    background: #fef3c7;
+}
+
+.erp-fv-tv__combo-btn.is-warning:focus {
+    border-color: #d97706;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.erp-fv-tv__combo-btn-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.erp-fv-tv__combo-btn-caret {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    color: #0f3460;
+    line-height: 1;
+}
+
+.erp-fv-tv__combo-panel {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    min-width: 100%;
+    max-height: 11rem;
+    overflow: auto;
+    margin: 0;
+    padding: 0.2rem;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+}
+
+.erp-fv-tv__combo-item {
+    width: 100%;
+    display: block;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.28rem 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.74rem;
+    font-weight: 650;
+    line-height: 1.2;
+    color: #0f172a;
+    font-family: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-tv__combo-item:hover,
+.erp-fv-tv__combo-item.is-active {
+    background: #93c5fd;
+    color: #0f172a;
+}
+
+.erp-fv-tv__combo-empty {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* ---- Painéis (cliente / produto) ---- */
+.erp-fv-tv__panel {
+    flex-shrink: 0;
+    margin: 0;
+    border: 0;
+    padding: 0.2rem 0.5rem 0.18rem;
+    background: #e8f0fa;
+}
+
+.erp-fv-tv__panel--produto {
+    padding-top: 0.15rem;
+    padding-bottom: 0.25rem;
+}
+
+/* Lista de sugestões precisa ficar acima da grade de itens (irmão seguinte no DOM). */
+.erp-fv-tv__panel--cliente:has(.erp-fv-tv__suggest),
+.erp-fv-tv__panel--produto:has(.erp-fv-tv__suggest) {
+    position: relative;
+    z-index: 60;
+}
+
+.erp-fv-tv__box {
+    position: relative;
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.45rem 0.3rem;
+    border: 1px solid #9eb6d4;
+    border-radius: 8px;
+    background: #eef4fb;
+    box-shadow: none;
+    overflow: visible;
+}
+
+/* Só o texto, sem “caixa” em volta — cobre a borda do painel com a mesma cor do fundo */
+.erp-fv-tv__box-legend {
+    position: absolute;
+    top: -0.38rem;
+    left: 0.65rem;
+    z-index: 2;
+    margin: 0;
+    padding: 0 0.15rem;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: #e8f0fa !important;
+    background-image: none !important;
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.15rem;
+}
+
+.erp-fv-tv__panel-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #0f3460;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.erp-fv-tv__panel-title--inline {
+    display: none;
+}
+
+.erp-fv-tv__panel-meta {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #3d5a80;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-tv__panel--meios {
+    flex: 1;
+    min-height: 0;
+    border-bottom: 0;
+    background: #e8f0fa;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.erp-fv-tv__row,
+.erp-fv-tv__meios-apply {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.15rem 0.25rem;
+}
+
+.erp-fv-tv__row--secondary {
+    margin-top: 0.18rem;
+    padding-top: 0.18rem;
+    border-top: 1px solid #b8c9de;
+}
+
+.erp-fv-tv__row--produto {
+    gap: 0.15rem 0.25rem;
+}
+
+.erp-fv-tv__field-group {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 0.2rem;
+    padding: 0.1rem 0.2rem 0.08rem;
+    border: 1px solid #a8bdd6;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.erp-fv-tv__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.04rem;
+    min-width: 0;
+}
+
+.erp-fv-tv__field > span,
+.erp-fv-tv__field-spacer {
+    font-size: 0.68rem;
+    font-weight: 750;
+    color: #0f3460;
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__field .erp-nfe__input,
+.erp-fv-tela-venda-page .erp-fv-tv__field textarea.erp-nfe__input {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.22rem 0.45rem;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__field .erp-nfe__input:focus,
+.erp-fv-tela-venda-page .erp-fv-tv__field textarea.erp-nfe__input:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    background: #fff;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__field .erp-nfe__input[readonly] {
+    background: #dce6f2;
+    border-color: #9eb6d4;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+/* Campos de lançamento: código / qtde / vlr. unit. */
+.erp-fv-tv__field--barcode > span,
+.erp-fv-tv__field--qtd > span,
+.erp-fv-tv__field--preco > span,
+.erp-fv-tv__field--total-item > span {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #0b3a75;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__input--barcode,
+.erp-fv-tela-venda-page .erp-fv-tv__field--qtd .erp-nfe__input,
+.erp-fv-tela-venda-page .erp-fv-tv__field--preco .erp-nfe__input {
+    min-height: 2.1rem !important;
+    border: 2px solid #1e5a9e !important;
+    background: #fff8e8 !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    box-shadow: inset 0 1px 2px rgba(15, 52, 96, 0.08);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__input--barcode::placeholder {
+    color: #64748b;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__input--barcode:focus,
+.erp-fv-tela-venda-page .erp-fv-tv__field--qtd .erp-nfe__input:focus,
+.erp-fv-tela-venda-page .erp-fv-tv__field--preco .erp-nfe__input:focus {
+    border-color: #1d4ed8 !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22) !important;
+}
+
+.erp-fv-tv__field--cod { width: 4.6rem; }
+.erp-fv-tv__field--num { width: 3.4rem; }
+.erp-fv-tv__field--uf { width: 2.8rem; }
+.erp-fv-tv__field--cep { width: 5.4rem; }
+.erp-fv-tv__field--pct { width: 4.4rem; }
+.erp-fv-tv__field--qtd { width: 5.2rem; }
+.erp-fv-tv__field--money { width: 6.2rem; }
+.erp-fv-tv__field--preco { width: 8.2rem; }
+
+.erp-fv-tv__preco-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.erp-fv-tv__preco-wrap .erp-nfe__input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-fv-tv__btn-desc {
+    flex: 0 0 1.7rem;
+    width: 1.7rem;
+    height: auto;
+    min-height: calc(1.95rem - 2mm);
+    padding: 0;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.erp-fv-tv__btn-desc:hover {
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #60a5fa;
+}
+
+.erp-fv-tv__btn-desc:active {
+    transform: translateY(1px);
+}
+
+.erp-fv-tv__field--doc { width: 8.4rem; }
+.erp-fv-tv__field--bairro { width: 7.4rem; }
+.erp-fv-tv__field--cidade { width: 8.4rem; }
+.erp-fv-tv__field--fone { width: 7.2rem; }
+.erp-fv-tv__field--vend { width: 9.6rem; }
+.erp-fv-tv__field--end { flex: 1 1 9rem; min-width: 8rem; }
+.erp-fv-tv__field--grow { flex: 1 1 12rem; min-width: 10rem; }
+.erp-fv-tv__field--barcode { flex: 1 1 12rem; min-width: 10rem; }
+.erp-fv-tv__field--obs { flex: 1 1 100%; }
+.erp-fv-tv__field--action { width: auto; }
+.erp-fv-tv__field--suggest { position: relative; }
+
+.erp-fv-tv__barcode-wrap {
+    position: relative;
+    min-width: 0;
+}
+
+/* ---- Sugestões de cliente / produto ---- */
+.erp-fv-tv__suggest {
+    position: absolute;
+    z-index: 80;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 0.2rem;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+    max-height: 220px;
+    overflow: auto;
+}
+
+.erp-fv-tv__suggest--produto {
+    min-width: min(44rem, 94vw);
+    max-height: min(320px, 45vh);
+}
+
+.erp-fv-tv__suggest--cliente {
+    min-width: min(52rem, 96vw);
+    max-height: min(320px, 45vh);
+}
+
+.erp-fv-tv__suggest button {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto auto;
+    gap: 0.4rem;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.3rem 0.45rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-fv-tv__suggest--produto button {
+    grid-template-columns: 3.2rem minmax(0, 1fr) 15.6rem 5.5rem;
+}
+
+.erp-fv-tv__suggest--cliente button {
+    grid-template-columns: 2.75rem minmax(0, 1fr) 18.6rem 10.6rem;
+}
+.erp-fv-tv__suggest button:hover {
+    background: #eff6ff;
+}
+
+.erp-fv-tv__suggest button.is-selected {
+    background: #93c5fd;
+    box-shadow: inset 3px 0 0 #1d4ed8;
+    color: #0f172a;
+}
+
+.erp-fv-tv__suggest-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.1rem;
+    padding: 0.05rem 0.25rem;
+    border-radius: 4px;
+    background: #e8eef8;
+    color: #1e40af;
+    font-weight: 700;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+}
+
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-code {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.erp-fv-tv__suggest-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-fv-tv__suggest-estoques {
+    display: grid;
+    grid-template-columns: 5.2rem 4.7rem 5.1rem;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__suggest-est {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+}
+
+.erp-fv-tv__suggest-est--atual {
+    background: #eef2f7;
+    color: #334155;
+    border-color: #d3ddea;
+}
+
+.erp-fv-tv__suggest-est--reservado {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+}
+
+.erp-fv-tv__suggest-est--disponivel {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-est {
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.erp-fv-tv__suggest-preco {
+    width: 5.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: #0f766e;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-preco {
+    color: #115e59;
+}
+
+.erp-fv-tv__suggest-credito {
+    display: grid;
+    grid-template-columns: 5.9rem 6.2rem 5.9rem;
+    align-items: center;
+    gap: 0.3rem;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__suggest-cred {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 1.2rem;
+    padding: 0.08rem 0.28rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-tv__suggest-cred--lim {
+    background: #eff6ff;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.erp-fv-tv__suggest-cred--util {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+}
+
+.erp-fv-tv__suggest-cred--venc {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.erp-fv-tv__suggest-cred--venc.is-vencido {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-cred {
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.erp-fv-tv__suggest-doc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 1.2rem;
+    padding: 0.08rem 0.35rem;
+    border-radius: 5px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-size: 0.74rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-tv__suggest-doc.is-cnpj {
+    background: #dbeafe;
+    color: #0f3460;
+}
+
+.erp-fv-tv__suggest-doc.is-cpf {
+    background: #e2e8f0;
+    color: #1e3a5f;
+}
+
+.erp-fv-tv__suggest-doc.is-empty {
+    visibility: hidden;
+}
+
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-doc,
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-doc.is-cnpj,
+.erp-fv-tv__suggest button.is-selected .erp-fv-tv__suggest-doc.is-cpf {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.erp-fv-tv__input--acr { color: #b91c1c !important; font-weight: 700; }
+.erp-fv-tv__input--desc { color: #1d4ed8 !important; font-weight: 700; }
+.erp-fv-tela-venda-page .erp-fv-tv__field .erp-fv-tv__input--total[readonly] {
+    min-height: 2.1rem;
+    border: 2px solid #1e5a9e;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 800;
+    box-shadow: inset 0 1px 2px rgba(15, 52, 96, 0.08);
+}
+
+.erp-fv-tv__btn-incluir {
+    min-height: 2.1rem;
+    padding: 0 0.95rem;
+    border: 1px solid #164a85;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(15, 52, 96, 0.22);
+}
+
+.erp-fv-tv__btn-incluir:hover {
+    filter: brightness(1.06);
+}
+
+.erp-fv-tv__btn-incluir:active {
+    transform: translateY(1px);
+}
+
+/* ---- Corpo: grade de itens + painel lateral ---- */
+.erp-fv-tv__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(280px + 1cm);
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    margin: 0 0.55rem 0.45rem;
+    border: 1px solid #7fa0c4;
+    border-radius: 8px;
+    background: #e8f0fa;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(15, 52, 96, 0.12);
+}
+
+.erp-fv-tv__grid-wrap {
+    overflow: auto;
+    min-height: 0;
+    border-right: 1px solid #7fa0c4;
+    background: #e8eef6;
+}
+
+.erp-fv-tv__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.8rem;
+}
+
+.erp-fv-tv__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #0a2548;
+    border-right: 1px solid #2a6bb0;
+    white-space: nowrap;
+    box-shadow: none;
+}
+
+.erp-fv-tv__grid th:last-child {
+    border-right: 0;
+}
+
+.erp-fv-tv__grid td {
+    padding: 0.12rem 0.14rem;
+    border-bottom: 1px solid #c5d4e8;
+    border-right: 1px solid #c5d4e8;
+    color: #0f172a;
+    vertical-align: middle;
+    background: #e8eef6 !important;
+}
+
+.erp-fv-tv__grid td:last-child {
+    border-right: 0;
+}
+
+.erp-fv-tv__grid tbody tr {
+    cursor: pointer;
+}
+
+.erp-fv-tv__grid tbody tr:hover:not(.is-selected) td {
+    background: #dce6f2 !important;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected td {
+    background: #1d4ed8 !important;
+    border-bottom-color: #3b82f6 !important;
+    border-right-color: #3b82f6 !important;
+    color: #fff;
+    box-shadow: none;
+}
+
+.erp-fv-tv__col-idx {
+    width: 2.4rem;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    text-align: center !important;
+}
+
+.erp-fv-tv__col-cod {
+    width: 4.6rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    color: #0f3460;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__grid th.erp-fv-tv__col-idx,
+.erp-fv-tv__grid th.erp-fv-tv__col-cod,
+.erp-fv-tv__grid td.erp-fv-tv__col-idx,
+.erp-fv-tv__grid td.erp-fv-tv__col-cod {
+    text-align: center !important;
+}
+
+.erp-fv-tv__col-num {
+    width: 5.6rem;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-weight: 650;
+}
+
+.erp-fv-tv__grid th.erp-fv-tv__col-num {
+    text-align: right !important;
+}
+
+.erp-fv-tv__grid td.erp-fv-tv__val-liq {
+    font-weight: 800;
+    border-left: 1px solid #c5d4e8;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected td.erp-fv-tv__val-liq {
+    border-left-color: #3b82f6;
+}
+
+/* Caixas das células — mesmo padrão da grade XML */
+.erp-fv-tv__cell {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0.1rem 0.28rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 2px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: inherit;
+    line-height: 1.25;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 8%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-fv-tv__cell--center {
+    text-align: center;
+}
+
+.erp-fv-tv__cell--desc {
+    text-align: left;
+    font-weight: 650;
+}
+
+.erp-fv-tv__cell--pull {
+    cursor: pointer;
+    user-select: none;
+}
+
+.erp-fv-tv__cell--num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.erp-fv-tv__cell--money {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 650;
+}
+
+.erp-fv-tv__money-rs {
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    line-height: 1;
+}
+
+.erp-fv-tv__money-val {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val { color: #b91c1c; }
+.erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val { color: #1d4ed8; }
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell {
+    border-color: rgb(255 255 255 / 45%) !important;
+    background: rgb(255 255 255 / 10%) !important;
+    color: #fff !important;
+    box-shadow: none;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__money-rs {
+    color: #bfdbfe !important;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__money-val,
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val,
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val {
+    color: #fff !important;
+}
+
+.erp-fv-tv__empty td {
+    text-align: center;
+    color: #64748b;
+    padding: 1.8rem 1rem !important;
+    font-size: 0.85rem;
+    border-right: 0 !important;
+    background: #e8eef6 !important;
+}
+
+.erp-fv-tv__val-acr { color: #b91c1c; }
+.erp-fv-tv__val-desc { color: #1d4ed8; }
+.erp-fv-tv__val-liq { font-weight: 750; color: #0f172a; }
+
+/* ---- Painel lateral (foto + totais) ---- */
+.erp-fv-tv__aside {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: #dce8f4;
+}
+
+.erp-fv-tv__foto {
+    flex: 1 1 auto;
+    min-height: 14rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.7rem;
+    border-bottom: 1px solid #b8c9de;
+    overflow: hidden;
+}
+
+.erp-fv-tv__foto img {
+    width: 100%;
+    max-height: 100%;
+    min-height: 12rem;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #9eb6d4;
+}
+
+.erp-fv-tv__foto-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 100%;
+    flex: 1;
+    min-height: 12rem;
+    padding: 1.2rem 0.75rem;
+    border: 1px dashed #9eb6d4;
+    border-radius: 6px;
+    background: #fff;
+    color: #7a93b0;
+    font-size: 0.8rem;
+}
+
+.erp-fv-tv__foto-empty svg {
+    width: 3rem;
+    height: 3rem;
+    opacity: 0.75;
+}
+
+.erp-fv-tv__foto-caption {
+    margin: 0;
+    max-width: 100%;
+    padding: 0 0.1rem;
+    font-size: 0.68rem;
+    font-weight: 650;
+    color: #334155;
+    text-align: center;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.erp-fv-tv__totais,
+.erp-fv-tv__fin-totais,
+.erp-fv-tv__saldo {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    padding: 0.55rem 0.6rem 0.65rem;
+    background: #e4edf7;
+}
+
+.erp-fv-tv__totais {
+    border-top: 1px solid #9eb6d4;
+}
+
+.erp-fv-tv__totais-head {
+    margin-bottom: 0.1rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-fv-tv__fin-totais {
+    min-width: 11rem;
+    border: 1px solid #9eb6d4;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.4rem 0.55rem;
+}
+
+.erp-fv-tv__total-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.55rem;
+    font-size: 0.76rem;
+    color: #3d5a80;
+    line-height: 1.35;
+}
+
+.erp-fv-tv__total-row strong {
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.erp-fv-tv__total-row--liq {
+    margin-top: 0.15rem;
+    padding: 0.38rem 0.45rem;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #7fa0c4;
+}
+
+.erp-fv-tv__total-row--liq span {
+    color: #0f3460;
+    font-weight: 800;
+    font-size: 0.95rem;
+}
+
+.erp-fv-tv__total-row--liq strong {
+    color: #1d4ed8;
+    font-size: 1.02rem;
+    font-weight: 800;
+}
+
+.erp-fv-tv__itens-count {
+    margin-top: 0.1rem;
+    font-size: 0.68rem;
+    font-weight: 650;
+    color: #3d5a80;
+    text-align: right;
+}
+.erp-fv-tv__fin-pag {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(200px, 0.7fr);
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    overflow: hidden;
+}
+
+.erp-fv-tv__meios-table-wrap {
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    overflow: auto;
+    background: #fff;
+}
+
+.erp-fv-tv__meios-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.erp-fv-tv__meios-table th,
+.erp-fv-tv__meios-table td {
+    padding: 0.28rem 0.55rem;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.erp-fv-tv__meios-table th {
+    position: sticky;
+    top: 0;
+    background: #e8f0fa;
+    text-align: left;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    font-size: 0.7rem;
+    font-weight: 750;
+}
+
+.erp-fv-tv__meios-table tbody tr {
+    cursor: pointer;
+}
+
+.erp-fv-tv__meios-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.erp-fv-tv__meios-table tbody tr.is-selected {
+    background: #dbeafe;
+}
+
+.erp-fv-tv__meios-apply {
+    flex-shrink: 0;
+    margin-top: 0.35rem;
+}
+
+.erp-fv-tv__hint {
+    flex-shrink: 0;
+    margin: 0.25rem 0 0;
+    font-size: 0.7rem;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-fv-tv__saldo {
+    border-left: 1px solid var(--erp-border-light, #c7d5e8);
+    gap: 0.4rem;
+    justify-content: flex-start;
+    overflow: auto;
+}
+
+.erp-fv-tv__saldo-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.55rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-fv-tv__saldo-box span {
+    color: var(--erp-text-muted, #64748b);
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.erp-fv-tv__saldo-box strong {
+    font-size: 0.98rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-fv-tv__saldo-box.is-warn {
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+
+.erp-fv-tv__saldo-box.is-warn strong {
+    color: #c2410c;
+}
+
+.erp-fv-tv__saldo-box.is-ok {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.erp-fv-tv__saldo-box.is-ok strong {
+    color: #15803d;
+}
+
+/* ---- Barra de ações (rodapé fixo, botões 3D) ---- */
+.erp-fv-tela-venda-page .erp-fv-tv-actions {
+    flex-shrink: 0;
+    width: calc(100% - 4mm - 5cm);
+    margin: 0 auto 2mm;
+    border: 1px solid #164a85;
+    border-top: 0;
+    border-radius: 0 0 10px 10px;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+    align-items: center;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+    box-shadow: 0 4px 14px rgba(15, 52, 96, 0.18);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn {
+    position: relative;
+    min-width: 6.2rem;
+    height: 3.35rem;
+    padding: 0.25rem 0.55rem 0.3rem;
+    border: 1px solid rgba(15, 52, 96, 0.22);
+    border-radius: 10px;
+    background:
+        linear-gradient(180deg, #ffffff 0%, #f3f7fc 55%, #e4edf8 100%);
+    color: #0f172a;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 -2px 0 rgba(15, 52, 96, 0.08) inset,
+        0 3px 0 rgba(15, 52, 96, 0.18),
+        0 8px 14px -8px rgba(15, 52, 96, 0.35);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn:hover:not(:disabled) {
+    filter: brightness(1.03);
+    transform: translateY(-1px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.95) inset,
+        0 -2px 0 rgba(15, 52, 96, 0.1) inset,
+        0 4px 0 rgba(15, 52, 96, 0.2),
+        0 10px 16px -8px rgba(15, 52, 96, 0.4);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 1px 0 rgba(15, 52, 96, 0.15),
+        0 3px 8px -4px rgba(15, 52, 96, 0.3);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    margin-bottom: 0.12rem;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #e8f0fa 0%, #d0dff0 100%);
+    color: #1e5a9e;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 1px 2px rgba(15, 52, 96, 0.18);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn .erp-nfe-actions__label {
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1.15;
+    color: #0f172a;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn .erp-nfe-actions__label kbd {
+    display: inline-block;
+    margin-right: 0.2rem;
+    padding: 0.05rem 0.28rem;
+    border-radius: 4px;
+    background: rgba(15, 52, 96, 0.1);
+    color: #0f3460;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+/* Remover item */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--warn {
+    border-color: #f0b429;
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--warn .erp-fv-tv-btn__icon {
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #fff;
+}
+
+/* Fechar / confirmar (sucesso) — sobrescreve o F4 vermelho global */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok,
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok[data-erp-key="F4"] {
+    border-color: #16a34a !important;
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 45%, #15803d 100%) !important;
+    color: #fff !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.35) inset,
+        0 -2px 0 rgba(21, 128, 61, 0.35) inset,
+        0 3px 0 #14532d,
+        0 8px 14px -8px rgba(21, 128, 61, 0.55) !important;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok .erp-fv-tv-btn__icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok .erp-nfe-actions__label,
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok .erp-nfe-actions__label kbd {
+    color: #fff !important;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--ok .erp-nfe-actions__label kbd {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+/* Cancelar */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--cancel {
+    border-color: #f87171;
+    background: linear-gradient(180deg, #fff5f5 0%, #fee2e2 50%, #fecaca 100%);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--cancel .erp-fv-tv-btn__icon {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    color: #fff;
+    border-radius: 999px;
+}
+
+/* Sair */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--exit {
+    margin-left: auto;
+    border-color: #b91c1c !important;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 45%, #991b1b 100%) !important;
+    color: #fff !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.28) inset,
+        0 -2px 0 rgba(127, 29, 29, 0.35) inset,
+        0 3px 0 #7f1d1d,
+        0 8px 14px -8px rgba(127, 29, 29, 0.55) !important;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--exit .erp-fv-tv-btn__icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--exit .erp-nfe-actions__label {
+    color: #fff !important;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+    transform: none !important;
+}
+
+.erp-fv-tv__btn-aplicar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-fv-tv__btn-aplicar svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+/* ---- Modal Finalização (janela separada sobre a venda) ---- */
+.erp-fv-tv.is-dimmed {
+    pointer-events: none;
+    filter: saturate(0.85) brightness(0.96);
+}
+
+@media (max-width: 1100px) {
+    .erp-fv-tv__body,
+    .erp-fv-tv__fin-pag {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-fv-tv__grid-wrap {
+        border-right: 0;
+        border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    }
+
+    .erp-fv-tv__saldo {
+        border-left: 0;
+        border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    }
+
+    .erp-fv-tv__foto {
+        display: none;
+    }
+}
+
+/* ---- Finalização: chrome PDV (atalhos / totais / rodapé) + topo DAV ---- */
+.erp-fv-fin {
+    z-index: 90;
+}
+
+.erp-fv-fin__top {
+    display: flex !important;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.erp-fv-fin__cliente-row {
+    display: flex;
+    flex: 1 1 26rem;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.erp-fv-fin__field--cliente {
+    flex: 1 1 16rem;
+    min-width: 0;
+    position: relative;
+}
+
+.erp-fv-fin__field--vendedor {
+    flex: 0 1 13rem;
+    min-width: 10rem;
+}
+
+.erp-fv-fin__field--cliente .erp-pdv-finalizar__input {
+    background: #fff;
+}
+
+.erp-fv-fin__field--vendedor .erp-pdv-finalizar__input {
+    background: #e8eef6;
+}
+
+.erp-fv-fin__suggest {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 2px);
+    left: 0;
+    right: auto;
+    min-width: min(52rem, 96vw);
+    margin: 0;
+    padding: 0.2rem;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+    max-height: 220px;
+    overflow: auto;
+}
+
+.erp-fv-fin__suggest button {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 18.6rem 10.6rem;
+    gap: 0.4rem;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.3rem 0.45rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    color: #0f172a;
+    font-family: inherit;
+    transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-fv-fin__suggest button:hover {
+    background: #eff6ff;
+}
+
+.erp-fv-fin__suggest button.is-selected {
+    background: #93c5fd;
+    box-shadow: inset 3px 0 0 #1d4ed8;
+    color: #0f172a;
+}
+
+.erp-fv-fin__suggest-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.1rem;
+    padding: 0.05rem 0.25rem;
+    border-radius: 4px;
+    background: #e8eef8;
+    color: #1e40af;
+    font-weight: 700;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-fin__suggest button.is-selected .erp-fv-fin__suggest-code {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.erp-fv-fin__suggest-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-fv-fin__suggest-credito {
+    display: grid;
+    grid-template-columns: 5.9rem 6.2rem 5.9rem;
+    align-items: center;
+    gap: 0.3rem;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-fv-fin__suggest-cred {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 1.2rem;
+    padding: 0.08rem 0.28rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-fin__suggest-cred--lim {
+    background: #eff6ff;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.erp-fv-fin__suggest-cred--util {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+}
+
+.erp-fv-fin__suggest-cred--venc {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.erp-fv-fin__suggest-cred--venc.is-vencido {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.erp-fv-fin__suggest button.is-selected .erp-fv-fin__suggest-cred {
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.erp-fv-fin__suggest-doc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 1.2rem;
+    padding: 0.08rem 0.35rem;
+    border-radius: 5px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-size: 0.74rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-fv-fin__suggest-doc.is-cnpj {
+    background: #dbeafe;
+    color: #0f3460;
+}
+
+.erp-fv-fin__suggest-doc.is-cpf {
+    background: #e2e8f0;
+    color: #1e3a5f;
+}
+
+.erp-fv-fin__suggest-doc.is-empty {
+    visibility: hidden;
+}
+
+.erp-fv-fin__suggest button.is-selected .erp-fv-fin__suggest-doc,
+.erp-fv-fin__suggest button.is-selected .erp-fv-fin__suggest-doc.is-cnpj,
+.erp-fv-fin__suggest button.is-selected .erp-fv-fin__suggest-doc.is-cpf {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.erp-fv-fin__suggest strong {
+    font-weight: 800;
+    color: #1e5a9e;
+}
+
+.erp-fv-fin__suggest em {
+    font-style: normal;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-fv-fin__ajuste-inputs {
+    display: grid;
+    grid-template-columns: minmax(4.2rem, 0.9fr) minmax(5.5rem, 1.2fr);
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.erp-fv-fin__ajuste-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-fv-fin__ajuste-suffix {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #64748b;
+    line-height: 1;
+}
+
+.erp-fv-fin__ajuste .erp-pdv-finalizar__input {
+    font-size: 1.15rem !important;
+    padding: 0.28rem 0.4rem;
+}
+
+.erp-fv-fin__footer.erp-pdv-finalizar__footer-actions {
+    justify-content: space-between;
+}
+
+.erp-pdv-finalizar__operacao-btn--faturar {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+    border-color: #1e40af !important;
+    color: #fff !important;
+}
+
+.erp-pdv-finalizar__operacao-btn--faturar:hover {
+    filter: brightness(1.06);
+}
+
+.erp-fv-fin__footer .erp-pdv-finalizar__operacao-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.35);
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 900px) {
+    .erp-fv-fin .erp-pdv-finalizar__body {
+        flex-direction: column;
+    }
+
+    .erp-fv-fin .erp-pdv-finalizar__totais-panel {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .erp-fv-fin__top {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.erp-fv-tv-desconto .erp-pdv-modal__hint {
+    margin: 0 0 0.65rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.erp-fv-tv-desconto .erp-pdv-desconto__valor {
+    width: calc(100% - 1cm);
+    max-width: calc(100% - 1cm);
+}
+
+.erp-fv-tv-desconto .erp-pdv-desconto__valor-input {
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    min-height: 2.75rem;
+}
+
+.erp-fv-tv-desconto .erp-pdv-desconto__valor-prefix {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+/* Modal Desconto/Acréscimo (Ctrl+D) — rodapé azul + Aplicar verde */
+.erp-fv-tv-desconto .erp-pdv-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.85rem !important;
+    border-top: 0 !important;
+    background: linear-gradient(180deg, #2b6cb0 0%, #1e5a9e 100%) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.erp-fv-tv-desconto .erp-pdv-modal__btn--primary {
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
+    border-color: #15803d !important;
+    color: #fff !important;
+    font-weight: 800;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+}
+
+.erp-fv-tv-desconto .erp-pdv-modal__btn--primary:hover {
+    filter: brightness(1.06);
+}
+
+.erp-fv-tv-desconto .erp-pdv-modal__btn:not(.erp-pdv-modal__btn--primary) {
+    background: #fff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    font-weight: 700;
+}
+
+.erp-fv-tv-desconto .erp-pdv-modal__btn:not(.erp-pdv-modal__btn--primary):hover {
+    background: #f8fafc !important;
+}
+
+/* Progresso — atualização de preços ao trocar tabela */
+.erp-fv-tv__tabela-progress {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    pointer-events: all;
+}
+
+.erp-fv-tv__tabela-progress-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.erp-fv-tv__tabela-progress-panel {
+    position: relative;
+    z-index: 1;
+    width: min(26rem, calc(100vw - 2rem));
+    padding: 1.35rem 1.4rem 1.15rem;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%);
+    border: 1px solid #9eb6d4;
+    box-shadow: 0 18px 48px rgba(15, 52, 96, 0.28);
+    text-align: center;
+}
+
+.erp-fv-tv__tabela-progress-spinner {
+    width: 2.1rem;
+    height: 2.1rem;
+    margin: 0 auto 0.85rem;
+    border-radius: 999px;
+    border: 3px solid #dbe7f5;
+    border-top-color: #1e5a9e;
+    animation: erp-fv-tv-spin 0.75s linear infinite;
+}
+
+@keyframes erp-fv-tv-spin {
+    to { transform: rotate(360deg); }
+}
+
+.erp-fv-tv__tabela-progress-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0f3460;
+    line-height: 1.3;
+}
+
+.erp-fv-tv__tabela-progress-detail {
+    margin: 0.35rem 0 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.erp-fv-tv__tabela-progress-track {
+    height: 0.7rem;
+    border-radius: 999px;
+    background: #e2eaf4;
+    overflow: hidden;
+    border: 1px solid #c7d5e8;
+}
+
+.erp-fv-tv__tabela-progress-bar {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1e5a9e 0%, #3b82f6 55%, #22c55e 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: width 0.22s ease;
+}
+
+.erp-fv-tv__tabela-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.45rem;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: #334155;
+    font-weight: 700;
+}
+
+.erp-fv-tv__tabela-progress-meta strong {
+    color: #1e5a9e;
+    font-size: 0.95rem;
+}
+
+.erp-fv-tv__tabela-progress-hint {
+    margin: 0.75rem 0 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}

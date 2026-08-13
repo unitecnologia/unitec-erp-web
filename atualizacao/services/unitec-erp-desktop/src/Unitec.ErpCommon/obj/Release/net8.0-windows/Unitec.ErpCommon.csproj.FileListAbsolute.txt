@@ -1,0 +1,13 @@
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\bin\Release\net8.0-windows\Unitec.ErpCommon.deps.json
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\bin\Release\net8.0-windows\Unitec.ErpCommon.dll
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\bin\Release\net8.0-windows\Unitec.ErpCommon.pdb
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.csproj.AssemblyReference.cache
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.GeneratedMSBuildEditorConfig.editorconfig
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.AssemblyInfoInputs.cache
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.AssemblyInfo.cs
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.csproj.CoreCompileInputs.cache
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.sourcelink.json
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.dll
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\refint\Unitec.ErpCommon.dll
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\Unitec.ErpCommon.pdb
+C:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpCommon\obj\Release\net8.0-windows\ref\Unitec.ErpCommon.dll

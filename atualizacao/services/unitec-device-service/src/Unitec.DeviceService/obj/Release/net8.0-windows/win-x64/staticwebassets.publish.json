@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "qyqneu1isgfrlZwmvmCC6pjznQVROSPCsWymDO95UrQ=",
+  "Source": "Unitec.DeviceService",
+  "BasePath": "_content/Unitec.DeviceService",
+  "Mode": "Default",
+  "ManifestType": "Publish",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

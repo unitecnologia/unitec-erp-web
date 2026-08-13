@@ -1,0 +1,9 @@
+F:\unitec-erp-desktop-build\updater\Unitec Atualizador.exe
+F:\unitec-erp-desktop-build\updater\Unitec Atualizador.dll
+F:\unitec-erp-desktop-build\updater\Unitec Atualizador.deps.json
+F:\unitec-erp-desktop-build\updater\Unitec Atualizador.runtimeconfig.json
+F:\unitec-erp-desktop-build\updater\Unitec Atualizador.pdb
+F:\unitec-erp-desktop-build\updater\System.Diagnostics.EventLog.dll
+F:\unitec-erp-desktop-build\updater\System.ServiceProcess.ServiceController.dll
+F:\unitec-erp-desktop-build\updater\Unitec.ErpCommon.dll
+F:\unitec-erp-desktop-build\updater\Unitec.ErpCommon.pdb

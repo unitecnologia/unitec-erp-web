@@ -1,0 +1,23 @@
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec Atualizador.exe
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec Atualizador.deps.json
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec Atualizador.runtimeconfig.json
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec Atualizador.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec Atualizador.pdb
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\System.Diagnostics.EventLog.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\System.ServiceProcess.ServiceController.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\runtimes\win\lib\net8.0\System.ServiceProcess.ServiceController.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec.ErpCommon.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\bin\Release\net8.0-windows\Unitec.ErpCommon.pdb
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.csproj.AssemblyReference.cache
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.GeneratedMSBuildEditorConfig.editorconfig
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.AssemblyInfoInputs.cache
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.AssemblyInfo.cs
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.csproj.CoreCompileInputs.cache
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.sourcelink.json
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.E.4562DD2F.Up2Date
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec Atualizador.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\refint\Unitec Atualizador.dll
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec Atualizador.pdb
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\Unitec.ErpUpdater.genruntimeconfig.cache
+c:\Projetos\unitec-erp-web\services\unitec-erp-desktop\src\Unitec.ErpUpdater\obj\Release\net8.0-windows\ref\Unitec Atualizador.dll

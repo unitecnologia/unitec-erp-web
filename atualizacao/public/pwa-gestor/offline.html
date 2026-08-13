@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0d2f57">
+    <title>Unitec Executivo · Offline</title>
+    <link rel="stylesheet" href="/css/erp-gestor.css">
+    <style>
+        .offline-banner {
+            background: #b45309;
+            color: #fff;
+            text-align: center;
+            font-size: 0.82rem;
+            font-weight: 750;
+            padding: 0.55rem 0.75rem;
+            border-radius: 12px;
+            margin-bottom: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+<div class="gestor-shell" data-theme="light" id="shell">
+    <div class="gestor-shell__inner">
+        <div class="offline-banner">Sem conexão — mostrando último pulso salvo</div>
+        <header class="gestor-head">
+            <div class="gestor-head__text">
+                <p class="gestor-head__eyebrow">Pulso da empresa</p>
+                <h1 class="gestor-head__title" id="saudacao">Offline</h1>
+                <p class="gestor-head__meta" id="meta">Dados em cache</p>
+            </div>
+        </header>
+
+        <section class="gestor-hero" id="hero">
+            <div class="gestor-ring" id="ring" style="--pct: 0">
+                <div class="gestor-ring__core">
+                    <span class="gestor-ring__value" id="pct">—</span>
+                    <span class="gestor-ring__short" id="short"></span>
+                </div>
+            </div>
+            <div class="gestor-hero__copy">
+                <h2 class="gestor-hero__title" id="saudeLabel">Sem dados</h2>
+                <p class="gestor-hero__msg" id="saudeMsg">Abra o app online uma vez para gravar o pulso.</p>
+            </div>
+        </section>
+
+        <section class="gestor-spotlight">
+            <div class="gestor-spotlight__card">
+                <p class="gestor-kicker">Faturamento hoje</p>
+                <p class="gestor-spotlight__value" id="fatHoje">R$ 0,00</p>
+            </div>
+            <div class="gestor-spotlight__card gestor-spotlight__card--soft">
+                <p class="gestor-kicker">Faturamento mês</p>
+                <p class="gestor-spotlight__value gestor-spotlight__value--sm" id="fatMes">R$ 0,00</p>
+            </div>
+        </section>
+
+        <section class="gestor-grid">
+            <article class="gestor-card"><p class="gestor-kicker">Caixa</p><p class="gestor-card__value" id="caixa">R$ 0,00</p></article>
+            <article class="gestor-card"><p class="gestor-kicker">Receber hoje</p><p class="gestor-card__value" id="receber">R$ 0,00</p></article>
+            <article class="gestor-card"><p class="gestor-kicker">Pagar hoje</p><p class="gestor-card__value" id="pagar">R$ 0,00</p></article>
+            <article class="gestor-card"><p class="gestor-kicker">Pedidos</p><p class="gestor-card__value" id="pedidos">0</p></article>
+            <article class="gestor-card"><p class="gestor-kicker">Entregas</p><p class="gestor-card__value" id="entregas">0</p></article>
+            <article class="gestor-card"><p class="gestor-kicker">Estoque baixo</p><p class="gestor-card__value" id="estoque">0</p></article>
+        </section>
+
+        <a class="gestor-cta" href="/gestor" id="retry">Tentar conectar</a>
+    </div>
+</div>
+<script>
+(function () {
+    function money(v) {
+        try {
+            return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } catch (e) {
+            return 'R$ 0,00';
+        }
+    }
+
+    const raw = localStorage.getItem('gestor_snapshot_v1');
+    if (!raw) return;
+
+    let s;
+    try { s = JSON.parse(raw); } catch (e) { return; }
+
+    const saude = s.saude || {};
+    const pct = Number(saude.percent || 0);
+    document.getElementById('saudacao').textContent = s.saudacao || 'Offline';
+    document.getElementById('meta').textContent = 'Cache · ' + (s.atualizado_em || '—');
+    document.getElementById('pct').textContent = Math.round(pct) + '%';
+    document.getElementById('short').textContent = saude.short || '';
+    document.getElementById('saudeLabel').textContent = saude.label || 'Saúde';
+    document.getElementById('saudeMsg').textContent = saude.message || '';
+    document.getElementById('ring').style.setProperty('--pct', String(Math.max(0, Math.min(100, pct))));
+    document.getElementById('hero').className = 'gestor-hero gestor-hero--' + (saude.tone || 'gray');
+    document.getElementById('fatHoje').textContent = money(s.faturamento_hoje);
+    document.getElementById('fatMes').textContent = money(s.faturamento_mes);
+    document.getElementById('caixa').textContent = money(s.caixa);
+    document.getElementById('receber').textContent = money(s.receber_hoje);
+    document.getElementById('pagar').textContent = money(s.pagar_hoje);
+    document.getElementById('pedidos').textContent = String(s.pedidos_pendentes || 0);
+    document.getElementById('entregas').textContent = String(s.entregas_pendentes || 0);
+    document.getElementById('estoque').textContent = String(s.estoque_baixo || 0);
+
+    const tema = localStorage.getItem('gestor_tema') || 'light';
+    document.getElementById('shell').setAttribute('data-theme', tema);
+})();
+</script>
+</body>
+</html>

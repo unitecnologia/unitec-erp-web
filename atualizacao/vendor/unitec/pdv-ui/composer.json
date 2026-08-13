@@ -1,0 +1,24 @@
+{
+    "name": "unitec/pdv-ui",
+    "description": "UI compartilhada do PDV Unitec (tela, CSS e JS) usada pelo ERP e pelo PDV offline. Fonte única: mudou aqui, muda nos dois.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Unitec\\PdvUi\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Unitec\\PdvUi\\PdvUiServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

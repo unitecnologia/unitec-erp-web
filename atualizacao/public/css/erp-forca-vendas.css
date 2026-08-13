@@ -1,0 +1,243 @@
+/* ERP — Força de Venda / Aparelhos VI (grade compacta + barra de ações reduzida) */
+
+/* Pedidos recebidos */
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(1),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 14%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(2),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 18%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(4),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 11%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(5),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 12%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(6),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 10%;
+}
+
+.erp-fv-pedidos-page .fi-ta-header-cell:nth-child(7),
+.erp-fv-pedidos-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 11%;
+}
+
+/* Aparelhos — larguras de colunas */
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(2),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-vi-aparelhos-page .fi-ta-header-cell:nth-child(2),
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 20%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(3),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-vi-aparelhos-page .fi-ta-header-cell:nth-child(3),
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 12%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(4),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-vi-aparelhos-page .fi-ta-header-cell:nth-child(4),
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 10%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(5),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-vi-aparelhos-page .fi-ta-header-cell:nth-child(5),
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 16%;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:nth-child(6),
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-vi-aparelhos-page .fi-ta-header-cell:nth-child(6),
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 10%;
+}
+
+/* Aparelhos — grade compacta (padrão Contas Caixa / Unidades) */
+.erp-fv-aparelhos-page .fi-ta-header-cell,
+.erp-vi-aparelhos-page .fi-ta-header-cell {
+    padding: 1mm 0.45rem !important;
+    line-height: 0.9 !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--erp-text-on-brand, #fff) !important;
+    overflow: visible !important;
+    border-right: 1px solid rgb(255 255 255 / 40%) !important;
+    border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-header-cell:last-child,
+.erp-vi-aparelhos-page .fi-ta-header-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row,
+.erp-vi-aparelhos-page .fi-ta-row {
+    height: calc(1.375rem - 1mm);
+}
+
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell,
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell {
+    padding: 0.05rem 0.45rem !important;
+    height: calc(1.375rem - 1mm) !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    line-height: 1.15 !important;
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    white-space: nowrap;
+    vertical-align: middle !important;
+    border-right: 1px solid #b8c8d8 !important;
+    border-bottom: 1px solid var(--erp-border-light, #d4e0ef) !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell:last-child,
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell:last-child {
+    border-right: none !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row .fi-ta-cell .fi-badge,
+.erp-vi-aparelhos-page .fi-ta-row .fi-ta-cell .fi-badge {
+    padding: 0.02rem 0.35rem !important;
+    font-size: 0.6875rem !important;
+}
+
+.erp-fv-aparelhos-page button.fi-ta-col,
+.erp-fv-aparelhos-page .fi-ta-col,
+.erp-vi-aparelhos-page button.fi-ta-col,
+.erp-vi-aparelhos-page .fi-ta-col {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: calc(1.375rem - 1mm) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-col .fi-ta-text,
+.erp-vi-aparelhos-page .fi-ta-col .fi-ta-text {
+    min-height: 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-text-item,
+.erp-fv-aparelhos-page .fi-ta-col,
+.erp-fv-aparelhos-page .fi-ta-col .fi-ta-text,
+.erp-vi-aparelhos-page .fi-ta-text-item,
+.erp-vi-aparelhos-page .fi-ta-col,
+.erp-vi-aparelhos-page .fi-ta-col .fi-ta-text {
+    font-size: var(--erp-font-size-grid, 0.8125rem) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-vi-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-cell {
+    background: #1e5a9e !important;
+    box-shadow: inset 3px 0 0 #0f3460 !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-fv-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-fv-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text,
+.erp-vi-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-cell,
+.erp-vi-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
+.erp-vi-aparelhos-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
+    color: #fff !important;
+}
+
+.erp-fv-aparelhos-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell,
+.erp-vi-aparelhos-page .fi-ta-row.erp-row-selected:hover .fi-ta-cell {
+    background: #1a4f8a !important;
+}
+
+.erp-fv-aparelhos-page .fi-pagination .fi-pagination-records-per-page-select-ctn,
+.erp-vi-aparelhos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+.erp-list-page.erp-fv-aparelhos-page .fi-pagination,
+.erp-list-page.erp-vi-aparelhos-page .fi-pagination {
+    padding: calc(0.35rem - 0.5mm) 0.5rem !important;
+}
+
+/* Filtro Situação + dica */
+.erp-fv-aparelhos-page .erp-unidades__locate,
+.erp-vi-aparelhos-page .erp-unidades__locate {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding-top: calc(0.55rem - 1.5mm);
+    padding-bottom: calc(0.55rem - 1.5mm);
+}
+
+.erp-fv-aparelhos-page .erp-unidades__locate-controls .erp-unidades__hint--top,
+.erp-vi-aparelhos-page .erp-unidades__locate-controls .erp-unidades__hint--top {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted);
+    line-height: 1.2;
+}
+
+.erp-fv-aparelhos-page .erp-unidades__locate-controls .erp-unidades__hint--top kbd,
+.erp-vi-aparelhos-page .erp-unidades__locate-controls .erp-unidades__hint--top kbd {
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+    background: #e2e8f0;
+    font-size: 0.68rem;
+}
+
+/* Barra de ações compacta */
+.erp-fv-aparelhos-page .erp-unidades-actions,
+.erp-vi-aparelhos-page .erp-unidades-actions {
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    justify-content: flex-start;
+}
+
+.erp-fv-aparelhos-page .erp-unidades-actions__btn,
+.erp-vi-aparelhos-page .erp-unidades-actions__btn {
+    min-width: 5.4rem;
+    height: 3rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.erp-fv-aparelhos-page .erp-unidades-actions__btn:hover,
+.erp-vi-aparelhos-page .erp-unidades-actions__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-fv-aparelhos-page .erp-unidades-actions__icon,
+.erp-vi-aparelhos-page .erp-unidades-actions__icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.12rem;
+}
+
+.erp-fv-aparelhos-page .erp-unidades-actions__label,
+.erp-vi-aparelhos-page .erp-unidades-actions__label {
+    font-size: 0.625rem;
+    line-height: 1.1;
+}

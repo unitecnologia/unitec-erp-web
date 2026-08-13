@@ -1,0 +1,89 @@
+.gestor-pwa-install {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+    display: none;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 0.9rem;
+    border-radius: 16px;
+    border: 1px solid rgba(15, 52, 96, 0.18);
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    color: #0f2847;
+}
+
+.gestor-pwa-install.is-visible {
+    display: flex;
+}
+
+.gestor-pwa-install__icon {
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 12px;
+    flex: 0 0 auto;
+    background: #0d2f57 center / cover no-repeat;
+    box-shadow: 0 2px 8px rgba(13, 47, 87, 0.28);
+}
+
+.gestor-pwa-install__body {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.gestor-pwa-install__title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 850;
+    line-height: 1.25;
+}
+
+.gestor-pwa-install__text {
+    margin: 0.2rem 0 0.65rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #475569;
+}
+
+.gestor-pwa-install__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.gestor-pwa-install__btn {
+    border: 0;
+    border-radius: 10px;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.gestor-pwa-install__btn--primary {
+    color: #fff;
+    background: linear-gradient(180deg, #2f6fbf 0%, #1e5a9e 100%);
+}
+
+.gestor-pwa-install__btn--ghost {
+    color: #334155;
+    background: #e2e8f0;
+}
+
+.gestor-shell[data-theme="dark"] .gestor-pwa-install {
+    border-color: rgba(148, 163, 184, 0.28);
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    color: #e2e8f0;
+}
+
+.gestor-shell[data-theme="dark"] .gestor-pwa-install__text {
+    color: #94a3b8;
+}
+
+.gestor-shell[data-theme="dark"] .gestor-pwa-install__btn--ghost {
+    color: #e2e8f0;
+    background: #334155;
+}
