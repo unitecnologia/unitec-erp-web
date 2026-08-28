@@ -204,14 +204,7 @@ if ($ApplyBundledSeed -and (Test-Path '.env')) {
     }
 } elseif ($isFreshInstall) {
     Invoke-Step 'Gerando arquivo .env' {
-        Write-EnvFile -path '.env' -templatePath '.env.mysql.example' -replacements @{
-            '__APP_URL__'     = $AppUrl
-            '__DB_HOST__'     = $DbHost
-            '__DB_PORT__'     = $DbPort
-            '__DB_DATABASE__' = $DbName
-            '__DB_USERNAME__' = $DbUser
-            '__DB_PASSWORD__' = (Format-EnvValue $DbPassword)
-        }
+        Write-EnvFile -path '.env' -templatePath '.env.mysql.example' -replacements (Get-UnitecFreshInstallEnvReplacements -AppPath $AppPath -AppUrl $AppUrl -DbHost $DbHost -DbPort $DbPort -DbName $DbName -DbUser $DbUser -DbPassword $DbPassword)
 
         Write-Ok 'Arquivo .env criado.'
     }

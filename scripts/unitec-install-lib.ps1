@@ -26,7 +26,8 @@ $script:UnitecDefaultDbName = 'unitec_erp'
 $script:UnitecDefaultDbUser = 'root'
 $script:UnitecDefaultDbPassword = 'rua@2050bc'
 $script:UnitecMinDiskSpaceMb = 2048
-$script:UnitecInstallerAssetNames = @('mariadb-win.zip', 'php-8.4-win.zip', 'vc_redist.x64.exe', 'HeidiSQL_12.18.0.7304_Setup.exe', 'unitec-erp.ico', 'cacert.pem')
+$script:UnitecInstallerAssetNames = @('mariadb-win.zip', 'php-8.4-win.zip', 'vc_redist.x64.exe', 'HeidiSQL_12.18.0.7304_Setup.exe', 'unitec-erp.ico', 'cacert.pem', 'cloudflare-install.env')
+$script:UnitecCloudflareInstallEnvAssetName = 'cloudflare-install.env'
 
 function Get-UnitecDefaultAppPath {
     return $script:UnitecDefaultAppPath
@@ -84,6 +85,94 @@ function Get-UnitecDefaultDatabaseSettings {
         DbName     = $script:UnitecDefaultDbName
         DbUser     = $script:UnitecDefaultDbUser
         DbPassword = $script:UnitecDefaultDbPassword
+    }
+}
+
+function Get-UnitecCloudflareInstallEnvCandidates {
+    param([string]$AppPath = '')
+
+    $candidates = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+        $candidates += Join-Path (Resolve-UnitecAppPath -Path $AppPath) ("installer\assets\{0}" -f $script:UnitecCloudflareInstallEnvAssetName)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        $candidates += Join-Path $PSScriptRoot ("..\installer\assets\{0}" -f $script:UnitecCloudflareInstallEnvAssetName)
+    }
+
+    return @($candidates | Select-Object -Unique)
+}
+
+function Read-UnitecCloudflareInstallEnvFile {
+    param([string]$AppPath = '')
+
+    $defaults = @{
+        CLOUDFLARE_API_TOKEN     = ''
+        CLOUDFLARE_ACCOUNT_ID    = '28103ae19943f8c0654a17b56e75b5da'
+        CLOUDFLARE_ZONE_ID       = 'a68a06560133f1b620e063cd0b0113ff'
+        CLOUDFLARE_BASE_DOMAIN   = 'unierp.uk'
+        CLOUDFLARE_LOCAL_SERVICE = 'http://127.0.0.1:8765'
+    }
+
+    foreach ($path in (Get-UnitecCloudflareInstallEnvCandidates -AppPath $AppPath)) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        foreach ($line in (Get-Content -LiteralPath $path -Encoding UTF8 -ErrorAction SilentlyContinue)) {
+            $trimmed = $line.Trim()
+            if ($trimmed -eq '' -or $trimmed.StartsWith('#')) {
+                continue
+            }
+
+            $eq = $trimmed.IndexOf('=')
+            if ($eq -lt 1) {
+                continue
+            }
+
+            $key = $trimmed.Substring(0, $eq).Trim()
+            $value = $trimmed.Substring($eq + 1).Trim()
+            if ($value.StartsWith('"') -and $value.EndsWith('"') -and $value.Length -ge 2) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+
+            if ($defaults.ContainsKey($key) -and $value -ne '') {
+                $defaults[$key] = $value
+            }
+        }
+
+        break
+    }
+
+    return $defaults
+}
+
+function Get-UnitecFreshInstallEnvReplacements {
+    param(
+        [string]$AppPath,
+        [string]$AppUrl,
+        [string]$DbHost,
+        [string]$DbPort,
+        [string]$DbName,
+        [string]$DbUser,
+        [string]$DbPassword
+    )
+
+    $cloudflare = Read-UnitecCloudflareInstallEnvFile -AppPath $AppPath
+
+    return @{
+        '__APP_URL__'                = $AppUrl
+        '__DB_HOST__'                = $DbHost
+        '__DB_PORT__'                = $DbPort
+        '__DB_DATABASE__'            = $DbName
+        '__DB_USERNAME__'            = $DbUser
+        '__DB_PASSWORD__'            = (Format-EnvValue $DbPassword)
+        '__CLOUDFLARE_API_TOKEN__'     = (Format-EnvValue $cloudflare.CLOUDFLARE_API_TOKEN)
+        '__CLOUDFLARE_ACCOUNT_ID__'    = $cloudflare.CLOUDFLARE_ACCOUNT_ID
+        '__CLOUDFLARE_ZONE_ID__'       = $cloudflare.CLOUDFLARE_ZONE_ID
+        '__CLOUDFLARE_BASE_DOMAIN__'   = $cloudflare.CLOUDFLARE_BASE_DOMAIN
+        '__CLOUDFLARE_LOCAL_SERVICE__' = $cloudflare.CLOUDFLARE_LOCAL_SERVICE
     }
 }
 
@@ -5879,14 +5968,7 @@ function Ensure-UnitecEnvFile {
     }
 
     $db = Get-UnitecDefaultDatabaseSettings
-    Write-EnvFile -path $envFile -templatePath $template -replacements @{
-        '__APP_URL__'     = $AppUrl
-        '__DB_HOST__'     = $db.DbHost
-        '__DB_PORT__'     = $db.DbPort
-        '__DB_DATABASE__' = $db.DbName
-        '__DB_USERNAME__' = $db.DbUser
-        '__DB_PASSWORD__' = (Format-EnvValue $db.DbPassword)
-    }
+    Write-EnvFile -path $envFile -templatePath $template -replacements (Get-UnitecFreshInstallEnvReplacements -AppPath $AppPath -AppUrl $AppUrl -DbHost $db.DbHost -DbPort $db.DbPort -DbName $db.DbName -DbUser $db.DbUser -DbPassword $db.DbPassword)
 
     $configCache = Join-Path $AppPath 'bootstrap\cache\config.php'
     if (Test-Path $configCache) {

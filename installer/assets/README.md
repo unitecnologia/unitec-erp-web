@@ -64,6 +64,16 @@ Salve como: `installer\assets\cacert.pem`
 
 O instalador copia para `tools\php\extras\ssl\cacert.pem` e configura `curl.cainfo` / `openssl.cafile` no `php.ini`.
 
+## Cloudflare Tunnel (Acesso remoto Unitec)
+
+Arquivo: **`cloudflare-install.env`** (nao versionado — copie de `cloudflare-install.env.example`)
+
+O instalador usa este arquivo **somente em instalacao nova** para preencher `CLOUDFLARE_*` no `.env` do cliente (provisionamento em `unierp.uk`).
+
+1. Copie `cloudflare-install.env.example` para `cloudflare-install.env`
+2. Preencha `CLOUDFLARE_API_TOKEN` com o token padrao Unitec
+3. Gere o Setup com `.\scripts\build-setup.ps1` — o arquivo entra no pacote via `Sync-InstallerAssetsToStaging`
+
 ## Geracao automatica
 
 Ao rodar **`.\scripts\build-setup.ps1`** ou **`.\scripts\criar-pacote-update.ps1`**, MariaDB, PHP, VC++ e **cacert.pem** sao baixados automaticamente se ainda nao existirem em `installer\assets\`. O HeidiSQL Setup deve ser baixado manualmente.

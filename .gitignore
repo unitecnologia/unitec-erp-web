@@ -40,6 +40,7 @@ Thumbs.db
 /installer/assets/php-8.4-win.zip
 /installer/assets/7z-extra.7z
 /installer/assets/7zSD.sfx
+/installer/assets/cloudflare-install.env
 
 # Ambiente local de desenvolvimento
 /tools/mysql/data/
