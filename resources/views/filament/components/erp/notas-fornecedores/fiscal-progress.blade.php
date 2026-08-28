@@ -33,19 +33,3 @@
         <p class="erp-nfe-fiscal-progress__hint">Aguarde, não feche esta tela.</p>
     </div>
 </div>
-
-<div
-    class="erp-nfe-fiscal-progress erp-nf-forn-fiscal-progress"
-    wire:loading.class="is-visible"
-    wire:target="openNotaFornecedorVisualizar,openNotaFornecedorVisualizarSelecionada"
-    aria-live="polite"
-    role="status"
->
-    <div class="erp-nfe-fiscal-progress__backdrop" aria-hidden="true"></div>
-    <div class="erp-nfe-fiscal-progress__panel">
-        <div class="erp-nfe-fiscal-progress__spinner" aria-hidden="true"></div>
-        <p class="erp-nfe-fiscal-progress__title">Carregando DANFE</p>
-        <p class="erp-nfe-fiscal-progress__status">Baixando XML completo na SEFAZ…</p>
-        <p class="erp-nfe-fiscal-progress__hint">Aguarde, não feche esta tela.</p>
-    </div>
-</div>

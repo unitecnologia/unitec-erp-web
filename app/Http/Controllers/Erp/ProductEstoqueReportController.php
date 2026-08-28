@@ -21,9 +21,18 @@ class ProductEstoqueReportController extends Controller
 {
     public function __invoke(Request $request): View|Response|StreamedResponse
     {
+        @ini_set('memory_limit', '512M');
+
         $empresa = $this->currentEmpresa();
         $builder = ProductListQueryBuilder::fromRequest($request, $empresa);
-        $products = $builder->build()->get();
+        $products = $builder->buildForReport()->get();
+
+        foreach ($products as $product) {
+            if (array_key_exists('estoque_empresa_atual', $product->getAttributes())) {
+                $product->setAttribute('estoque', $product->getAttribute('estoque_empresa_atual'));
+            }
+        }
+
         $isCritico = $builder->estoqueFilter === 'critico';
         $columns = $request->has('cols')
             ? ProductListagemReport::resolveColumns($request->query('cols'))
@@ -43,6 +52,7 @@ class ProductEstoqueReportController extends Controller
             'searchLabel' => filled($builder->localSearch)
                 ? (ProductListagemReport::searchFieldLabels()[$builder->searchColumn] ?? 'Descrição') . ': ' . $builder->localSearch
                 : null,
+            'validadePeriodoLabel' => $builder->validadePeriodoLabel(),
             'grupoFilter' => filled($builder->grupoFilter) ? $builder->grupoFilter : null,
             'printedAt' => now(),
             'empresaEndereco' => $this->formatEmpresaEndereco($empresa),
@@ -146,6 +156,8 @@ class ProductEstoqueReportController extends Controller
             'campo' => $builder->searchColumn,
             'q' => $builder->localSearch,
             'grupo' => $builder->grupoFilter,
+            'validade_de' => $builder->validadeDe,
+            'validade_ate' => $builder->validadeAte,
             'cols' => $request->has('cols')
                 ? $columns
                 : ($builder->estoqueFilter === 'critico'

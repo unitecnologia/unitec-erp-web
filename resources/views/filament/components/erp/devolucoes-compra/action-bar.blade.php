@@ -19,6 +19,20 @@
         <span class="erp-orcamentos-actions__icon">🖨</span>
         <span class="erp-orcamentos-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>
+    <button type="button" wire:click="emitirNfeDevolucaoCompra" class="erp-orcamentos-actions__btn" data-erp-key="F7">
+        <span class="erp-orcamentos-actions__icon">📄</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F7</kbd> | NF-e</span>
+    </button>
+    <button
+        type="button"
+        wire:click="reabrirDevolucao"
+        class="erp-orcamentos-actions__btn"
+        data-erp-key="F8"
+        title="Reabrir devolução finalizada para editar novamente"
+    >
+        <span class="erp-orcamentos-actions__icon">↩</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F8</kbd> | Reabrir</span>
+    </button>
     <button type="button" wire:click="closeScreen" class="erp-orcamentos-actions__btn erp-orcamentos-actions__btn--close">
         <span class="erp-orcamentos-actions__icon erp-orcamentos-actions__icon--close">✕</span>
         <span class="erp-orcamentos-actions__label">Fechar</span>

@@ -9,6 +9,7 @@ use App\Filament\Resources\ProductResource\Pages\Concerns\ManagesProductCardex;
 use App\Models\Empresa;
 use App\Models\Product;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ProductCloneService;
 use App\Support\Erp\ProductDeletionGuard;
 use App\Support\Erp\Queries\ProductListQueryBuilder;
@@ -164,6 +165,11 @@ class ListProducts extends ListRecords
     protected function erpListEntityName(): string
     {
         return 'um produto';
+    }
+
+    protected function erpListSyncChannel(): ?string
+    {
+        return ErpDataSyncVersion::CHANNEL_PRODUCTS;
     }
 
     protected function erpListSelectPrompt(string $action): string

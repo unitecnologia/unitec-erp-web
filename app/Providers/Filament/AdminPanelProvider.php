@@ -3,7 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\ComandosSistemaPage;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\AnaliseComprasPage;
+use App\Filament\Pages\OutrasSaidasMovimentoPage;
 use App\Filament\Pages\PdvPage;
 use App\Http\Controllers\OAuth\MeliOAuthCallbackController;
 use App\Support\Erp\ErpPageAssets;
@@ -47,6 +50,9 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
                 PdvPage::class,
+                ComandosSistemaPage::class,
+                OutrasSaidasMovimentoPage::class,
+                AnaliseComprasPage::class,
             ])
             ->widgets([])
             ->assets([
@@ -107,8 +113,8 @@ class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                AuthenticateSession::class,
                 ShareErrorsFromSession::class,
+                \App\Http\Middleware\EnsureBrowserDeviceCookie::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
@@ -116,10 +122,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                AuthenticateSession::class,
                 \App\Http\Middleware\EnsureEmpresaCadastrada::class,
                 \App\Http\Middleware\EnsureOnboardingCompleto::class,
                 \App\Http\Middleware\EnsureEmpresaSelecionada::class,
                 \App\Http\Middleware\EnsureLicencaAtiva::class,
+                \App\Http\Middleware\EnsureLicensedBrowserDevice::class,
             ]);
     }
 }

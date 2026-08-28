@@ -9,6 +9,7 @@ use App\Filament\Resources\NfeResource;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCancelamento;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCartaCorrecao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeCceDispatch;
+use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeContadorEmail;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeDanfeEmail;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeEmissaoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeEspelhoModal;
@@ -16,11 +17,17 @@ use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeHistoricoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeImportacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeInutilizacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeRelatorio;
+use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\OperacaoFiscal;
+use App\Models\OutrasSaidaMovimento;
 use App\Models\Person;
+use App\Models\Venda;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
+use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -49,6 +56,7 @@ class ListNfes extends ListRecords
     use ManagesNfeInutilizacao;
     use ManagesNfeHistoricoModal;
     use ManagesNfeRelatorio;
+    use ManagesNfeContadorEmail;
 
     protected static string $resource = NfeResource::class;
 
@@ -73,7 +81,7 @@ class ListNfes extends ListRecords
     public string $localSearchAte = '';
 
     #[Url(as: 'status')]
-    public string $statusFilter = 'aberta';
+    public string $statusFilter = 'todas';
 
     public function mount(): void
     {
@@ -89,11 +97,271 @@ class ListNfes extends ListRecords
         if ($this->activeDateSearchColumn() !== null) {
             $this->applyCurrentMonthDateFilter();
         }
+
+        $movimentoId = (int) request()->query('outras_saida_movimento', 0);
+        if ($movimentoId > 0) {
+            $this->abrirNfeDeOutrasSaida($movimentoId);
+
+            return;
+        }
+
+        $devolucaoCompraId = (int) request()->query('devolucao_compra_id', 0);
+        if ($devolucaoCompraId > 0) {
+            $this->abrirNfeDeDevolucaoCompra($devolucaoCompraId);
+
+            return;
+        }
+
+        $vendaId = (int) request()->query('venda_id', 0);
+        if ($vendaId > 0) {
+            $this->abrirNfeDeVendaMercadoria($vendaId);
+        }
     }
 
     protected static function erpListPageClass(): string
     {
         return 'erp-nfe-page';
+    }
+
+    private function abrirNfeDeOutrasSaida(int $movimentoId): void
+    {
+        $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
+
+        $movimento = OutrasSaidaMovimento::query()
+            ->with('itens')
+            ->whereKey($movimentoId)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
+            ->first();
+
+        if (! $movimento) {
+            Notification::make()
+                ->title('Movimento de saída não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $rows = $movimento->itens
+            ->filter(fn ($item): bool => (int) ($item->product_id ?? 0) > 0)
+            ->map(fn ($item): array => [
+                'product_id' => (int) $item->product_id,
+                'quantidade' => (float) $item->qtd,
+                'valor_unitario' => (float) $item->preco,
+                'descricao' => (string) ($item->produto_descricao ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        if ($rows === []) {
+            Notification::make()
+                ->title('O movimento não possui itens vinculados a produtos.')
+                ->body('Abra o movimento e grave novamente após incluir os produtos.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->createNfe();
+
+        $perda = $movimento->tipo_movimento === 'perda';
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        if ($perda) {
+            $cnpjEmpresa = preg_replace('/\D/', '', (string) ($empresa?->cnpj ?? '')) ?: '';
+            $destinatarioProprio = $cnpjEmpresa === ''
+                ? null
+                : Person::query()
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '/', ''), '-', '') = ?", [$cnpjEmpresa])
+                    ->first();
+
+            if (! $destinatarioProprio) {
+                $this->closeNfeModal();
+                Notification::make()
+                    ->title('Não é possível emitir a NF-e de perda para outro destinatário.')
+                    ->body('Cadastre a própria empresa em Pessoas com o mesmo CNPJ da empresa para usar como destinatário da NF-e de perda.')
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $this->nfeForm['cliente_id'] = (string) $destinatarioProprio->id;
+            $this->updatedNfeFormClienteId();
+        } elseif ($movimento->fornecedor_id) {
+            $this->nfeForm['cliente_id'] = (string) $movimento->fornecedor_id;
+            $this->updatedNfeFormClienteId();
+        }
+
+        $this->nfeForm['numero_pedido'] = (string) $movimento->numero;
+        $this->nfeForm['data_emissao'] = $movimento->data?->format('Y-m-d') ?? ErpTimezone::today();
+        $this->nfeForm['data_saida'] = $movimento->data?->format('Y-m-d') ?? ErpTimezone::today();
+
+        if ($perda && $empresaId) {
+            $cfop = OperacaoFiscal::forEmpresa($empresaId)->cfopSaidaPerda(false);
+
+            if ($cfop) {
+                $descricaoCfop = \App\Models\Cfop::query()
+                    ->where('codigo', $cfop)
+                    ->value('descricao');
+                $this->nfeForm['natureza_operacao'] = trim(
+                    $cfop.($descricaoCfop ? ' - '.mb_strtoupper((string) $descricaoCfop, 'UTF-8') : '')
+                );
+
+                foreach ($rows as $index => $row) {
+                    $rows[$index]['cfop'] = (string) $cfop;
+                }
+            }
+        }
+
+        $observacao = trim((string) ($movimento->observacoes ?? ''));
+        $origem = 'NF-e originada da saída de estoque nº '.ltrim((string) $movimento->numero, '0').'.';
+        $this->nfeForm['obs_contribuinte'] = trim($observacao === '' ? $origem : $origem.' '.$observacao);
+
+        $this->nfeModalRows = $rows;
+        $this->recalculateNfeTotais();
+        $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    private function abrirNfeDeDevolucaoCompra(int $devolucaoCompraId): void
+    {
+        $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
+
+        $devolucao = DevolucaoCompra::query()
+            ->with(['itens.product', 'compra', 'fornecedor', 'empresa'])
+            ->whereKey($devolucaoCompraId)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
+            ->first();
+
+        if (! $devolucao) {
+            Notification::make()
+                ->title('Devolução de compra não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $payload = app(NfeDevolucaoCompraService::class)->montarPayload($devolucao);
+
+            $this->createNfe();
+
+            $this->nfeModalDevolucaoCompraId = (int) $payload['devolucao_compra_id'];
+            $this->nfeForm['cliente_id'] = (string) $payload['cliente_id'];
+            $this->updatedNfeFormClienteId();
+            $this->nfeForm['finalidade'] = $payload['finalidade'];
+            $this->nfeForm['movimento'] = $payload['movimento'];
+            $this->nfeForm['numero_pedido'] = $payload['numero_pedido'];
+            $this->nfeForm['natureza_operacao'] = $payload['natureza_operacao'];
+            $this->nfeForm['data_emissao'] = $payload['data_emissao'];
+            $this->nfeForm['data_saida'] = $payload['data_saida'];
+            $this->nfeForm['obs_contribuinte'] = mb_strtoupper((string) $payload['obs_contribuinte'], 'UTF-8');
+
+            foreach ($payload['referencias'] as $referencia) {
+                $chave = trim((string) ($referencia['referencia'] ?? ''));
+
+                if ($chave !== '') {
+                    $this->nfeModalReferencias[] = ['referencia' => $chave];
+                }
+            }
+
+            $this->nfeModalRows = $payload['rows'];
+            $this->recalculateNfeTotais();
+        } catch (\Throwable $exception) {
+            $this->closeNfeModal();
+
+            Notification::make()
+                ->title('Não foi possível preparar a NF-e de devolução.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // saveNfe no mount quebra o layout Livewire (MissingLayoutException).
+        // Grava o rascunho no próximo request e recarrega o modal do banco.
+        $this->js('queueMicrotask(() => $wire.saveNfeDraftFromMount())');
+
+        Notification::make()
+            ->title('NF-e de devolução preparada.')
+            ->body('Revise os dados e transmita a nota.')
+            ->success()
+            ->send();
+
+        $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    private function abrirNfeDeVendaMercadoria(int $vendaId): void
+    {
+        $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
+
+        $venda = Venda::query()
+            ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.orcamento'])
+            ->whereKey($vendaId)
+            ->when(
+                $empresaId,
+                fn (Builder $query, int $id) => $query->whereHas(
+                    'forcaVendasOrder',
+                    fn (Builder $q) => $q->where('empresa_id', $id),
+                ),
+            )
+            ->first();
+
+        if (! $venda) {
+            Notification::make()
+                ->title('Venda não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $payload = app(NfeVendaMercadoriaService::class)->montarPayload($venda);
+
+            $this->createNfe();
+
+            $this->nfeModalVendaId = (int) $payload['venda_id'];
+            $this->nfeForm['cliente_id'] = (string) $payload['cliente_id'];
+            $this->updatedNfeFormClienteId();
+            $this->nfeForm['finalidade'] = $payload['finalidade'];
+            $this->nfeForm['movimento'] = $payload['movimento'];
+            $this->nfeForm['numero_pedido'] = $payload['numero_pedido'];
+            $this->nfeForm['natureza_operacao'] = $payload['natureza_operacao'];
+            $this->nfeForm['data_emissao'] = $payload['data_emissao'];
+            $this->nfeForm['data_saida'] = $payload['data_saida'];
+            $this->nfeForm['forma_pgto'] = $payload['forma_pgto'];
+            $this->nfeForm['meio_pgto'] = $payload['meio_pgto'];
+            $this->nfeForm['obs_contribuinte'] = mb_strtoupper((string) $payload['obs_contribuinte'], 'UTF-8');
+            $this->nfeModalFaturas = $payload['faturas'];
+            $this->nfeModalRows = $payload['rows'];
+            $this->recalculateNfeTotais();
+        } catch (\Throwable $exception) {
+            $this->closeNfeModal();
+
+            Notification::make()
+                ->title('Não foi possível preparar a NF-e de venda.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // saveNfe no mount quebra o layout Livewire (MissingLayoutException).
+        // Grava o rascunho no próximo request e recarrega o modal do banco.
+        $this->js('queueMicrotask(() => $wire.saveNfeDraftFromMount())');
+
+        Notification::make()
+            ->title('NF-e de venda preparada.')
+            ->body('Revise os dados e transmita a nota.')
+            ->success()
+            ->send();
+
+        $this->dispatch('erp-nfe-focus-item-codigo');
     }
 
     protected function erpListEntityName(): string
@@ -114,8 +382,7 @@ class ListNfes extends ListRecords
                 'F8' => ['method' => 'cartaCorrecaoNfe'],
                 'F9' => ['method' => 'openNfeDanfeEmailFromList'],
                 'F10' => ['method' => 'printRelatorioNfe'],
-                'F11' => ['method' => 'openNfeWhatsAppFromList'],
-                'F12' => ['method' => 'modulePending', 'params' => ['Fechar Mês']],
+                'F12' => ['method' => 'openNfeContadorEmailModal'],
             ],
         ];
     }
@@ -377,9 +644,11 @@ class ListNfes extends ListRecords
                 View::make('filament.components.erp.nfe.fiscal-whatsapp-modal'),
                 View::make('filament.components.erp.nfe.fiscal-danfe-email-modal'),
                 View::make('filament.components.erp.nfe.fiscal-cancel-modal'),
+                View::make('filament.components.erp.nfe.fiscal-cancel-aberta-modal'),
                 View::make('filament.components.erp.nfe.fiscal-inutilizar-modal'),
                 View::make('filament.components.erp.nfe.fiscal-inutilizar-sucesso-overlay'),
                 View::make('filament.components.erp.nfe.fiscal-erro-overlay'),
+                View::make('filament.components.erp.nfe.fiscal-sucesso-overlay'),
                 View::make('filament.components.erp.nfe.fiscal-cce-modal'),
                 View::make('filament.components.erp.nfe.fiscal-cce-sucesso-overlay'),
                 View::make('filament.components.erp.nfe.fiscal-cce-whatsapp-modal'),
@@ -387,6 +656,7 @@ class ListNfes extends ListRecords
                 View::make('filament.components.erp.nfe.historico-modal'),
                 View::make('filament.components.erp.nfe.espelho-modal'),
                 View::make('filament.components.erp.nfe.espelho-email-modal'),
+                View::make('filament.components.erp.nfe.email-contador-modal'),
             ]);
     }
 

@@ -38,7 +38,7 @@ class VendaResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('numero')
-                    ->label('Nº Pedido')
+                    ->label('Numero')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold)
@@ -56,6 +56,49 @@ class VendaResource extends Resource
                     ->date('d/m/Y')
                     ->sortable()
                     ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('hora_abertura')
+                    ->label('Hora ab.')
+                    ->alignCenter()
+                    ->sortable()
+                    ->width('5.35rem')
+                    ->extraHeaderAttributes(['class' => 'fi-ta-header-cell-hora_abertura'])
+                    ->extraCellAttributes(['class' => 'fi-ta-cell-hora_abertura'])
+                    ->weight(FontWeight::SemiBold)
+                    ->formatStateUsing(function (mixed $state): string {
+                        if ($state === null || $state === '') {
+                            return '—';
+                        }
+
+                        try {
+                            return \Illuminate\Support\Carbon::parse((string) $state)->format('H:i:s');
+                        } catch (\Throwable) {
+                            return '—';
+                        }
+                    }),
+                TextColumn::make('hora')
+                    ->label('Hora fe.')
+                    ->formatStateUsing(function ($state): string {
+                        if ($state === null || $state === '') {
+                            return '—';
+                        }
+
+                        if ($state instanceof \DateTimeInterface) {
+                            return $state->format('H:i:s');
+                        }
+
+                        try {
+                            return \Illuminate\Support\Carbon::parse((string) $state)->format('H:i:s');
+                        } catch (\Throwable) {
+                            $raw = (string) $state;
+
+                            return strlen($raw) >= 8 ? substr($raw, 0, 8) : $raw;
+                        }
+                    })
+                    ->alignCenter()
+                    ->width('5.35rem')
+                    ->extraHeaderAttributes(['class' => 'fi-ta-header-cell-hora'])
+                    ->extraCellAttributes(['class' => 'fi-ta-cell-hora'])
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.nome_razao')
                     ->label('Cliente')
@@ -89,11 +132,10 @@ class VendaResource extends Resource
                     ->label('Total')
                     ->view('filament.components.erp.vendas.columns.total')
                     ->disabledClick(),
-                TextColumn::make('status')
+                ViewColumn::make('status')
                     ->label('Situação')
-                    ->formatStateUsing(fn (string $state): string => Venda::statusLabels()[$state] ?? $state)
-                    ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
+                    ->view('filament.components.erp.vendas.columns.status')
+                    ->alignCenter(),
                 TextColumn::make('entrega.status')
                     ->label('Entrega')
                     ->formatStateUsing(fn (?string $state): string => $state
@@ -108,7 +150,7 @@ class VendaResource extends Resource
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.numero')
-                    ->label('Nº Caixa')
+                    ->label('Nº Dav')
                     ->alignCenter()
                     ->placeholder('—')
                     ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
@@ -128,24 +170,6 @@ class VendaResource extends Resource
 
                         return $serie.' / '.$numero;
                     })
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('hora')
-                    ->label('Hora')
-                    ->formatStateUsing(function ($state): string {
-                        if ($state === null) {
-                            return '—';
-                        }
-
-                        if ($state instanceof \DateTimeInterface) {
-                            return $state->format('H:i');
-                        }
-
-                        return substr((string) $state, 0, 5);
-                    })
-                    ->alignCenter()
-                    ->width('4.75rem')
-                    ->extraHeaderAttributes(['class' => 'fi-ta-header-cell-hora'])
-                    ->extraCellAttributes(['class' => 'fi-ta-cell-hora'])
                     ->weight(FontWeight::SemiBold),
                 ViewColumn::make('ver_itens')
                     ->label('')

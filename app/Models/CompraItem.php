@@ -21,7 +21,7 @@ class CompraItem extends Model
     {
         return [
             'quantidade' => 'decimal:3',
-            'valor_unitario' => 'decimal:2',
+            'valor_unitario' => 'decimal:4',
             'total' => 'decimal:2',
         ];
     }

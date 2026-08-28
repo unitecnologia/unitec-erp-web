@@ -61,6 +61,8 @@ class MigraFirebirdPage extends Page
 
     public bool $optCaixa = true;
 
+    public bool $optRecibos = true;
+
     public bool $optPdvVendas = true;
 
     public bool $optPdvNfce = true;
@@ -480,6 +482,7 @@ class MigraFirebirdPage extends Page
             'contas_receber' => 'Contas a receber',
             'planos_contas' => 'Plano de contas',
             'caixa' => 'Caixa (lançamentos)',
+            'recibos' => 'Recibos',
             'ultimos_precos' => 'Últimos preços produtos',
             'vendas_parametros' => 'Parâmetros fiscais',
             'pdv_vendas' => 'Vendas PDV',
@@ -587,6 +590,10 @@ class MigraFirebirdPage extends Page
             $only[] = 'caixa';
         }
 
+        if ($this->optRecibos) {
+            $only[] = 'recibos';
+        }
+
         if ($this->optPdvVendas) {
             $only[] = 'pdv_vendas';
         }
@@ -651,6 +658,7 @@ class MigraFirebirdPage extends Page
             app(\App\Support\Erp\Import\FirebirdVendasParametroImportService::class),
             app(\App\Support\Erp\Import\FirebirdCompraImportService::class),
             app(\App\Support\Erp\Import\FirebirdNotaFornecedorImportService::class),
+            app(\App\Support\Erp\Import\FirebirdReciboImportService::class),
         );
     }
 

@@ -39,31 +39,8 @@ class ListVendedores extends ListRecords
 
     public function mount(): void
     {
-        parent::mount();
-
-        $this->erpRestoreSearchColumnFromSession();
-
-        $onboardingTitle = ErpOnboarding::screenTitle();
-        ErpScreen::set($onboardingTitle ?? 'Operadores');
-
-        if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR && ! $this->vendedorModalOpen) {
-            $temFuncionarioRh = \Illuminate\Support\Facades\Schema::hasTable('rh_funcionarios')
-                && RhFuncionario::query()->exists();
-
-            if (! $temFuncionarioRh) {
-                Notification::make()
-                    ->title('Cadastre um Funcionário no RH antes de criar o Operador.')
-                    ->body('O Operador usa o nome do Funcionário RH.')
-                    ->warning()
-                    ->send();
-
-                $this->redirect(RhFuncionarioResource::getUrl('index'));
-
-                return;
-            }
-
-            $this->createVendedor();
-        }
+        // Tela obsoleta — cadastro em RH → Funcionários (aba Operador).
+        $this->redirect(RhFuncionarioResource::getUrl('index'));
     }
 
     /**

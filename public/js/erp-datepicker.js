@@ -598,68 +598,87 @@ window.ErpDatepicker = {
         input.dataset.erpDateMaskBound = '1';
     },
 
+    isIconZoneClick(input, event) {
+        if (! input || ! event) {
+            return false;
+        }
+
+        const rect = input.getBoundingClientRect();
+        const zone = Math.max(28, Math.min(44, rect.width * 0.35));
+
+        return event.clientX >= (rect.right - zone);
+    },
+
     bindOpenHandlers(input, picker, field, toggle) {
         if (input._erpDateOpenHandlers) {
+            input.removeEventListener('pointerdown', input._erpDateOpenHandlers.inputPointerDown);
             input.removeEventListener('mousedown', input._erpDateOpenHandlers.inputMousedown);
             input.removeEventListener('click', input._erpDateOpenHandlers.inputClick);
 
             if (input._erpDateToggle) {
+                input._erpDateToggle.removeEventListener('pointerdown', input._erpDateOpenHandlers.togglePointerDown);
                 input._erpDateToggle.removeEventListener('mousedown', input._erpDateOpenHandlers.mousedown);
                 input._erpDateToggle.removeEventListener('click', input._erpDateOpenHandlers.click);
             }
         }
 
         const self = this;
+        const openOnlyViaIcon = input.dataset.erpDateOpen === 'icon';
 
-        const openCalendar = () => {
-            if (! picker?.calendarContainer?.isConnected) {
-                self.bindInput(input);
-                const rebound = input._flatpickr;
+        const openCalendar = (event) => {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
 
-                if (rebound) {
-                    self.scheduleOpen(rebound);
+            self.openPicker(input);
+        };
+
+        const onInputClick = (event) => {
+            if (event.button !== 0) {
+                return;
+            }
+
+            if (openOnlyViaIcon) {
+                if (self.isIconZoneClick(input, event)) {
+                    openCalendar(event);
                 }
 
                 return;
             }
 
-            self.scheduleOpen(picker);
+            openCalendar(event);
         };
 
-        const onInputMousedown = (event) => {
-            if (event.button !== 0) {
-                return;
+        const onToggleMouseDown = (event) => {
+            // Evita blur do input; não abre aqui (senão o Flatpickr fecha no mesmo gesto).
+            if (event.button === 0) {
+                event.preventDefault();
             }
-
-            openCalendar();
         };
 
-        const onInputClick = () => {
-            openCalendar();
-        };
-
-        const onMousedown = (event) => {
-            event.preventDefault();
-        };
-
-        const onClick = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            openCalendar();
+        const onToggleClick = (event) => {
+            openCalendar(event);
         };
 
         input._erpDateOpenHandlers = {
-            inputMousedown: onInputMousedown,
+            inputPointerDown: onInputClick,
+            inputMousedown: onInputClick,
             inputClick: onInputClick,
-            mousedown: onMousedown,
-            click: onClick,
+            togglePointerDown: onToggleClick,
+            mousedown: onToggleMouseDown,
+            click: onToggleClick,
         };
-        input.addEventListener('mousedown', onInputMousedown);
-        input.addEventListener('click', onInputClick);
+
+        if (! openOnlyViaIcon) {
+            input.addEventListener('click', onInputClick);
+        } else {
+            input.addEventListener('click', onInputClick);
+        }
 
         if (toggle) {
-            toggle.addEventListener('mousedown', onMousedown);
-            toggle.addEventListener('click', onClick);
+            toggle.addEventListener('mousedown', onToggleMouseDown);
+            toggle.addEventListener('click', onToggleClick);
         }
 
         input._erpDateField = field;
@@ -668,10 +687,12 @@ window.ErpDatepicker = {
 
     destroy(input) {
         if (input._erpDateOpenHandlers) {
+            input.removeEventListener('pointerdown', input._erpDateOpenHandlers.inputPointerDown);
             input.removeEventListener('mousedown', input._erpDateOpenHandlers.inputMousedown);
             input.removeEventListener('click', input._erpDateOpenHandlers.inputClick);
 
             if (input._erpDateToggle) {
+                input._erpDateToggle.removeEventListener('pointerdown', input._erpDateOpenHandlers.togglePointerDown);
                 input._erpDateToggle.removeEventListener('mousedown', input._erpDateOpenHandlers.mousedown);
                 input._erpDateToggle.removeEventListener('click', input._erpDateOpenHandlers.click);
             }
@@ -784,13 +805,15 @@ window.ErpDatepicker = {
 
         let picker;
 
+        const openOnlyViaIcon = input.dataset.erpDateOpen === 'icon';
+
         try {
             picker = window.flatpickr(input, {
                 locale: window.flatpickr.l10ns.pt ?? 'pt',
                 dateFormat: 'd/m/Y',
                 allowInput: true,
                 disableMobile: true,
-                clickOpens: true,
+                clickOpens: ! openOnlyViaIcon,
                 appendTo: document.body,
                 ignoredFocusElements: toggle ? [toggle] : [],
                 defaultDate: parsedInitial ?? undefined,
@@ -832,7 +855,8 @@ window.ErpDatepicker = {
             if (! initial.fromWire) {
                 this.syncLivewire(input, input.dataset.erpDateSynced, false);
             }
-        } else {
+        } else if (document.activeElement !== input) {
+            // Evita apagar digitação em andamento quando o Livewire remonta o campo.
             input.value = '';
         }
 
@@ -841,6 +865,162 @@ window.ErpDatepicker = {
         input.dataset.erpDateBound = '1';
     },
 
+    openPicker(input) {
+        if (! input) {
+            return;
+        }
+
+        // Flatpickr fecha no mousedown "fora". Se abrirmos no mesmo gesto, abre e fecha
+        // na hora — por isso o 1º clique no ícone parecia não funcionar.
+        const run = (attempt = 0) => {
+            if (! window.flatpickr) {
+                if (attempt < 25) {
+                    window.setTimeout(() => run(attempt + 1), 40);
+                }
+
+                return;
+            }
+
+            this.bindInput(input);
+            const picker = input._flatpickr;
+
+            if (! picker || typeof picker.open !== 'function') {
+                if (attempt < 15) {
+                    window.setTimeout(() => run(attempt + 1), 40);
+                }
+
+                return;
+            }
+
+            if (! picker.isOpen) {
+                picker.open();
+            }
+        };
+
+        window.setTimeout(() => run(0), 0);
+        window.setTimeout(() => run(0), 40);
+    },
+
+    resolveDateInputFromEvent(event) {
+        const target = event?.target;
+
+        if (! (target instanceof Element)) {
+            return null;
+        }
+
+        const toggle = target.closest('.erp-date-field__toggle');
+
+        if (toggle) {
+            const field = toggle.closest('.erp-date-field');
+            const input = field?.querySelector(
+                'input[data-erp-date], input[data-mask="date-br"], input.erp-date-input'
+            );
+
+            return input instanceof HTMLInputElement ? input : null;
+        }
+
+        if (target instanceof HTMLInputElement) {
+            const isDateInput = target.matches(
+                'input[data-erp-date], input[data-mask="date-br"], input.erp-date-input'
+            );
+
+            if (! isDateInput) {
+                return null;
+            }
+
+            if (target.dataset.erpDateOpen === 'icon') {
+                return this.isIconZoneClick(target, event) ? target : null;
+            }
+
+            return target;
+        }
+
+        return null;
+    },
+
+    ensureGlobalOpenDelegation() {
+        if (window.__erpDatepickerOpenDelegated) {
+            return;
+        }
+
+        window.__erpDatepickerOpenDelegated = true;
+
+        const self = this;
+
+        const warmInput = (input) => {
+            if (input && ! input.disabled && ! input.readOnly) {
+                self.bindInput(input);
+            }
+        };
+
+        // Pré-liga ao passar o mouse / focar.
+        document.addEventListener(
+            'pointerover',
+            (event) => {
+                const target = event.target;
+
+                if (! (target instanceof Element)) {
+                    return;
+                }
+
+                const field = target.closest('.erp-date-field');
+                const input = field?.querySelector(
+                    'input[data-erp-date], input[data-mask="date-br"], input.erp-date-input'
+                ) || (
+                    target instanceof HTMLInputElement
+                    && target.matches('input[data-erp-date], input[data-mask="date-br"], input.erp-date-input')
+                        ? target
+                        : null
+                );
+
+                warmInput(input);
+            },
+            true
+        );
+
+        document.addEventListener(
+            'focusin',
+            (event) => {
+                const target = event.target;
+
+                if (
+                    target instanceof HTMLInputElement
+                    && target.matches('input[data-erp-date], input[data-mask="date-br"], input.erp-date-input')
+                ) {
+                    warmInput(target);
+                }
+            },
+            true
+        );
+
+        // Só no click (depois do mousedown). Abrir no pointerdown faz o Flatpickr fechar na hora.
+        document.addEventListener(
+            'click',
+            (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                const input = self.resolveDateInputFromEvent(event);
+
+                if (! input || input.disabled || input.readOnly) {
+                    return;
+                }
+
+                const fromToggle = Boolean(event.target.closest?.('.erp-date-field__toggle'));
+                const iconMode = input.dataset.erpDateOpen === 'icon';
+
+                if (! fromToggle && ! (iconMode && self.isIconZoneClick(input, event))) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                self.openPicker(input);
+            },
+            true
+        );
+    },
     commitAllIn(root = document) {
         root.querySelectorAll(this.selectors).forEach((input) => {
             if (input._flatpickr) {
@@ -860,12 +1040,15 @@ window.ErpDatepicker = {
     },
 
     init(root = document) {
+        this.ensureGlobalOpenDelegation();
         this.prepAll(root);
         this.refresh(root);
     },
 };
 
 function initErpDatepickers(root = document) {
+    window.ErpDatepicker.ensureGlobalOpenDelegation();
+
     if (typeof window.__erpPrepDateInputs === 'function') {
         window.__erpPrepDateInputs(root);
     }
@@ -907,6 +1090,7 @@ function initErpDatepickers(root = document) {
 }
 
 function bootErpDatepickers(root = document) {
+    window.ErpDatepicker.ensureGlobalOpenDelegation();
     initErpDatepickers(root);
 }
 

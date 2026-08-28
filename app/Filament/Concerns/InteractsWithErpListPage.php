@@ -2,6 +2,7 @@
 
 namespace App\Filament\Concerns;
 
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -13,7 +14,36 @@ trait InteractsWithErpListPage
 {
     public ?int $highlightedRecordId = null;
 
+    /** Versão local do canal de sync (híbrido em rede). */
+    public ?string $erpListSyncVersion = null;
+
     abstract protected static function erpListPageClass(): string;
+
+    /**
+     * Canal de ErpDataSyncVersion para esta lista. Null = sem poll automático.
+     */
+    protected function erpListSyncChannel(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Intervalo do poll em segundos (só checa versão; não recarrega a grade se não mudou).
+     */
+    protected function erpListSyncPollSeconds(): int
+    {
+        return 20;
+    }
+
+    public function erpListSyncPollEnabled(): bool
+    {
+        return $this->erpListSyncChannel() !== null;
+    }
+
+    public function erpListSyncPollIntervalSeconds(): int
+    {
+        return max(5, $this->erpListSyncPollSeconds());
+    }
 
     protected function erpListEntityName(): string
     {
@@ -106,11 +136,57 @@ trait InteractsWithErpListPage
     public function mountInteractsWithErpListPage(): void
     {
         $this->loadTable();
+        $this->syncErpListSyncVersionFromStore();
+    }
+
+    public function pollErpListSync(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $current = ErpDataSyncVersion::current($channel);
+
+        if ($this->erpListSyncVersion === null) {
+            $this->erpListSyncVersion = $current;
+            $this->skipRender();
+
+            return;
+        }
+
+        if (hash_equals($this->erpListSyncVersion, $current)) {
+            // Sem mudança: não re-renderiza a tabela (era a causa de cliques lentos).
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->erpListSyncVersion = $current;
+        $this->resetTable();
+    }
+
+    protected function syncErpListSyncVersionFromStore(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->erpListSyncVersion = null;
+
+            return;
+        }
+
+        $this->erpListSyncVersion = ErpDataSyncVersion::current($channel);
     }
 
     public function highlightRecord(int | string $recordId): void
     {
         $this->highlightedRecordId = (int) $recordId;
+        // Sem remount: o 2º clique do duplo clique precisa da mesma linha no DOM.
+        $this->skipRender();
     }
 
     protected function clearListSelection(): void
@@ -198,6 +274,7 @@ trait InteractsWithErpListPage
     public function refreshTable(): void
     {
         $this->resetTable();
+        $this->syncErpListSyncVersionFromStore();
 
         Notification::make()
             ->title('Lista atualizada.')

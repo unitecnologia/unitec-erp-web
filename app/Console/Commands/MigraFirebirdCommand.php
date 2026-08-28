@@ -10,7 +10,7 @@ use Throwable;
 class MigraFirebirdCommand extends Command
 {
     protected $signature = 'erp:migra-firebird
-                            {--only= : empresa,auxiliares,produtos,pessoas,clientes,contas,formas,vendedores,usuarios,contador,terminais,planos_contas,contas_pagar,conta_pagar_pagamentos,contas_receber,caixa,ultimos_precos,vendas_parametros,pdv_vendas,pdv_nfce,nfes,compras,notas_fornecedor,pdv_caixa_movimentos (csv)}
+                            {--only= : empresa,auxiliares,produtos,pessoas,clientes,contas,formas,vendedores,usuarios,contador,terminais,planos_contas,contas_pagar,conta_pagar_pagamentos,contas_receber,caixa,recibos,ultimos_precos,vendas_parametros,pdv_vendas,pdv_nfce,nfes,compras,notas_fornecedor,pdv_caixa_movimentos (csv)}
                             {--update : Atualiza registros já existentes (padrão: sim)}
                             {--no-update : Não atualiza existentes}
                             {--dry-run : Simula sem gravar}
@@ -71,6 +71,7 @@ class MigraFirebirdCommand extends Command
                     'conta_pagar_pagamentos',
                     'contas_receber',
                     'caixa',
+                    'recibos',
                     'ultimos_precos',
                     'vendas_parametros',
                     'pdv_vendas',

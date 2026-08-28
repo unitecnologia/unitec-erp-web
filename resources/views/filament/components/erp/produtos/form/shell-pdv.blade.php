@@ -2,7 +2,6 @@
     $formTabs = [
         'dados' => 'Dados Básicos',
         'impostos' => 'Impostos',
-        'promocao' => 'Promoção',
         'adicionais' => 'Adicionais',
         'foto' => 'Foto',
     ];
@@ -21,7 +20,8 @@
         ['field' => 'usa_imei', 'label' => 'Usa IMEI', 'disabled' => false],
         ['field' => 'contr_est_grade', 'label' => 'Contr. Est. Grade', 'disabled' => false],
         ['field' => 'mostrar_no_app', 'label' => 'Mostrar no App', 'disabled' => false],
-        ['field' => 'produto_pesado', 'label' => 'Produto Pesado', 'disabled' => false],
+        ['field' => 'produto_pesado', 'label' => 'Produto de Balança', 'disabled' => false],
+        ['field' => 'controla_lote_validade', 'label' => 'Controla lote/validade', 'disabled' => false],
     ];
 @endphp
 
@@ -45,8 +45,6 @@
                 @include('filament.components.erp.produtos.form.tabs.dados-basicos-pdv')
             @elseif ($this->activeFormTab === 'impostos')
                 @include('filament.components.erp.produtos.form.tabs.impostos')
-            @elseif ($this->activeFormTab === 'promocao')
-                @include('filament.components.erp.produtos.form.tabs.promocao')
             @elseif ($this->activeFormTab === 'foto')
                 @include('filament.components.erp.produtos.form.tabs.foto-pdv')
             @else
@@ -67,18 +65,6 @@
                             >
                             <span>{{ $param['label'] }}</span>
                         </label>
-                        @if ($param['field'] === 'produto_pesado' && ($this->data['produto_pesado'] ?? false))
-                            <div class="erp-produtos-pcad__params-prefixo">
-                                <label for="pprod-prefixo-balanca-pdv">Prefixo</label>
-                                <input
-                                    id="pprod-prefixo-balanca-pdv"
-                                    type="text"
-                                    wire:model="data.prefixo_balanca"
-                                    maxlength="10"
-                                    class="erp-pcad-form__input"
-                                >
-                            </div>
-                        @endif
                     @endforeach
                 </div>
             </fieldset>

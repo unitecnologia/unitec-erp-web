@@ -128,6 +128,12 @@ class DevolucaoCompra extends Model
         return $this->hasMany(DevolucaoCompraItem::class, 'devolucao_compra_id');
     }
 
+    public function nfe(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Nfe::class, 'devolucao_compra_id')
+            ->whereNot('status', Nfe::STATUS_CANCELADA);
+    }
+
     protected function casts(): array
     {
         return [

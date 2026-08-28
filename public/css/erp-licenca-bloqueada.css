@@ -1,0 +1,368 @@
+/* Licença bloqueada — layout em viewport (sem position:fixed; evita box 0x0 no Filament) */
+
+.fi-body:has(.erp-licenca-bloqueada-page),
+.fi-body.erp-licenca-bloqueada-body {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    background: #0b1a2e !important;
+}
+
+.fi-body:has(.erp-licenca-bloqueada-page) .erp-shell,
+.fi-body.erp-licenca-bloqueada-body .erp-shell,
+.fi-body:has(.erp-licenca-bloqueada-page) .erp-title-bar,
+.fi-body.erp-licenca-bloqueada-body .erp-title-bar,
+.fi-body:has(.erp-licenca-bloqueada-page) .erp-menu-bar,
+.fi-body.erp-licenca-bloqueada-body .erp-menu-bar,
+.fi-body:has(.erp-licenca-bloqueada-page) .erp-shortcut-bar,
+.fi-body.erp-licenca-bloqueada-body .erp-shortcut-bar,
+.fi-body:has(.erp-licenca-bloqueada-page) .erp-status-bar,
+.fi-body.erp-licenca-bloqueada-body .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-licenca-bloqueada-page) .fi-layout,
+.fi-body:has(.erp-licenca-bloqueada-page) .fi-main-ctn,
+.fi-body:has(.erp-licenca-bloqueada-page) .fi-main {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+}
+
+.fi-main .fi-page.erp-licenca-bloqueada-page {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: hidden !important;
+}
+
+.erp-licenca-bloqueada-page .fi-header,
+.erp-licenca-bloqueada-page .fi-page-header,
+.erp-licenca-bloqueada-page .fi-page-header-main-ctn {
+    display: none !important;
+}
+
+.erp-licenca-bloqueada-page .fi-page-main,
+.erp-licenca-bloqueada-page .fi-page-content,
+.erp-licenca-bloqueada-page .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    background: transparent !important;
+}
+
+.erp-licenca-bloqueada-page .fi-sc > * {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+}
+
+.erp-lb,
+.erp-licenca-bloqueada {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.7rem !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background:
+        radial-gradient(900px 420px at 50% 12%, rgba(59, 130, 246, 0.22), transparent 60%),
+        linear-gradient(165deg, #0b1a2e 0%, #13233f 42%, #1e3a5f 100%) !important;
+}
+
+.erp-lb__brand,
+.erp-licenca-bloqueada__brand {
+    color: rgba(226, 232, 240, 0.92) !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    text-align: center !important;
+    flex: 0 0 auto !important;
+}
+
+.erp-lb__card,
+.erp-licenca-bloqueada__card {
+    width: min(23.5rem, calc(100vw - 1.5rem)) !important;
+    max-height: min(92dvh, 100%) !important;
+    overflow: auto !important;
+    padding: 1rem 1.05rem 0.95rem !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45) !important;
+    box-sizing: border-box !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    flex: 0 1 auto !important;
+}
+
+.erp-lb__badge,
+.erp-licenca-bloqueada__badge {
+    display: inline-flex !important;
+    margin-bottom: 0.35rem !important;
+    padding: 0.14rem 0.5rem !important;
+    border-radius: 999px !important;
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+.erp-lb__title,
+.erp-licenca-bloqueada__title {
+    margin: 0 !important;
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    color: #0f172a !important;
+}
+
+.erp-lb__desc,
+.erp-licenca-bloqueada__desc {
+    margin: 0.35rem 0 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+    color: #64748b !important;
+}
+
+.erp-lb__meta,
+.erp-licenca-bloqueada__meta {
+    display: grid !important;
+    gap: 0.28rem !important;
+    margin: 0.75rem 0 0 !important;
+    padding: 0.55rem 0.65rem !important;
+    border-radius: 10px !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.erp-lb__meta > div,
+.erp-licenca-bloqueada__meta > div {
+    display: grid !important;
+    grid-template-columns: 5rem minmax(0, 1fr) !important;
+    gap: 0.35rem !important;
+    align-items: baseline !important;
+}
+
+.erp-lb__meta dt,
+.erp-licenca-bloqueada__meta dt {
+    margin: 0 !important;
+    font-size: 0.6rem !important;
+    font-weight: 700 !important;
+    color: #94a3b8 !important;
+    text-transform: uppercase !important;
+}
+
+.erp-lb__meta dd,
+.erp-licenca-bloqueada__meta dd {
+    margin: 0 !important;
+    font-size: 0.76rem !important;
+    font-weight: 700 !important;
+    color: #0f2744 !important;
+    word-break: break-word !important;
+}
+
+.erp-lb__loading,
+.erp-licenca-bloqueada__pix-loading {
+    margin-top: 0.65rem !important;
+    padding: 0.55rem 0.6rem !important;
+    border-radius: 8px !important;
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    color: #1d4ed8 !important;
+    font-size: 0.74rem !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+}
+
+.erp-lb__pix,
+.erp-licenca-bloqueada__pix {
+    margin-top: 0.7rem !important;
+    padding: 0.65rem 0.7rem 0.7rem !important;
+    border-radius: 12px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    text-align: center !important;
+}
+
+.erp-lb__pix-head,
+.erp-licenca-bloqueada__pix-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.5rem !important;
+    font-size: 0.82rem !important;
+    color: #0f172a !important;
+}
+
+.erp-lb__pix-head span,
+.erp-licenca-bloqueada__pix-head span {
+    font-weight: 800 !important;
+    color: #1d4ed8 !important;
+}
+
+.erp-lb__pix-desc,
+.erp-lb__pix-hint,
+.erp-licenca-bloqueada__pix-desc,
+.erp-licenca-bloqueada__pix-hint {
+    margin: 0.25rem 0 0 !important;
+    font-size: 0.66rem !important;
+    line-height: 1.3 !important;
+    color: #64748b !important;
+}
+
+.erp-lb__qr,
+.erp-licenca-bloqueada__qr {
+    width: 8rem !important;
+    height: 8rem !important;
+    margin: 0.5rem auto 0.3rem !important;
+    display: block !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 1px #e2e8f0 !important;
+}
+
+.erp-lb__copia,
+.erp-licenca-bloqueada__copia {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 0.35rem !important;
+    margin-top: 0.45rem !important;
+    align-items: center !important;
+}
+
+.erp-lb__copia-input,
+.erp-licenca-bloqueada__copia-input {
+    width: 100% !important;
+    min-height: 2rem !important;
+    padding: 0.35rem 0.5rem !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    font-size: 0.64rem !important;
+    color: #334155 !important;
+}
+
+.erp-lb__feedback,
+.erp-licenca-bloqueada__feedback {
+    margin: 0.55rem 0 0 !important;
+    padding: 0.45rem 0.55rem !important;
+    border-radius: 8px !important;
+    background: #fff7ed !important;
+    border: 1px solid #fdba74 !important;
+    color: #9a3412 !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+    text-align: left !important;
+}
+
+.erp-lb__actions,
+.erp-licenca-bloqueada__actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.4rem !important;
+    margin-top: 0.7rem !important;
+}
+
+.erp-lb__btn,
+.erp-licenca-bloqueada__btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 2.15rem !important;
+    padding: 0.4rem 0.75rem !important;
+    border-radius: 9px !important;
+    border: 1px solid transparent !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+}
+
+.erp-lb__btn:disabled,
+.erp-licenca-bloqueada__btn:disabled {
+    opacity: 0.55 !important;
+    cursor: wait !important;
+}
+
+.erp-lb__btn--primary,
+.erp-licenca-bloqueada__btn--primary {
+    grid-column: 1 / -1 !important;
+    background: #0f172a !important;
+    color: #fff !important;
+}
+
+.erp-lb__btn--accent,
+.erp-licenca-bloqueada__btn--accent {
+    grid-column: 1 / -1 !important;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
+    border-color: #1e40af !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px rgba(29, 78, 216, 0.28) !important;
+}
+
+.erp-lb__btn--ghost,
+.erp-licenca-bloqueada__btn--ghost {
+    background: #fff !important;
+    border-color: #cbd5e1 !important;
+    color: #334155 !important;
+}
+
+.erp-lb__btn--copy,
+.erp-licenca-bloqueada__btn--copy {
+    min-height: 2rem !important;
+    padding-inline: 0.65rem !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+}
+
+@media (max-height: 740px) {
+    .erp-lb__desc,
+    .erp-lb__pix-hint,
+    .erp-licenca-bloqueada__desc,
+    .erp-licenca-bloqueada__pix-hint {
+        display: none !important;
+    }
+
+    .erp-lb__qr,
+    .erp-licenca-bloqueada__qr {
+        width: 6.5rem !important;
+        height: 6.5rem !important;
+    }
+}

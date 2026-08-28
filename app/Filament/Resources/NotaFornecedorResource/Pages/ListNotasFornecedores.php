@@ -8,9 +8,9 @@ use App\Filament\Resources\NotaFornecedorResource;
 use App\Models\Empresa;
 use App\Models\NotaFornecedor;
 use App\Models\VendasParametro;
+use App\Support\Erp\Compra\CancelarCompraService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
-use App\Support\Erp\ErpTimezone;
 use App\Support\Fiscal\DistribuicaoDfeConfig;
 use App\Support\Fiscal\DistribuicaoDfeMensagens;
 use App\Support\Fiscal\DistribuicaoDfeService;
@@ -46,7 +46,7 @@ class ListNotasFornecedores extends ListRecords
     public string $localSearchAte = '';
 
     #[Url(as: 'campo')]
-    public string $searchColumn = 'periodo_entrada';
+    public string $searchColumn = 'data_emissao';
 
     #[Url(as: 'status')]
     public string $statusFilter = 'todas';
@@ -84,32 +84,18 @@ class ListNotasFornecedores extends ListRecords
 
         ErpScreen::set('Notas de Fornecedores');
 
-        $hoje = ErpTimezone::toLocal();
-
-        if ($this->periodoDe === '') {
-            $this->periodoDe = $hoje->copy()->startOfMonth()->toDateString();
-        }
-
-        if ($this->periodoAte === '') {
-            $this->periodoAte = $hoje->copy()->endOfMonth()->toDateString();
-        }
-
-        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? $this->periodoDe;
-        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? $this->periodoAte;
-
-        if ($this->periodoDeApplied === '') {
-            $this->periodoDeApplied = $this->periodoDe;
-        }
-
-        if ($this->periodoAteApplied === '') {
-            $this->periodoAteApplied = $this->periodoAte;
-        }
-
-        $this->periodoDeApplied = $this->normalizePeriodDate($this->periodoDeApplied) ?? $this->periodoDeApplied;
-        $this->periodoAteApplied = $this->normalizePeriodDate($this->periodoAteApplied) ?? $this->periodoAteApplied;
+        // Datas vazias = sem filtro de período (lista tudo).
+        $this->periodoDe = $this->normalizePeriodDate($this->periodoDe) ?? '';
+        $this->periodoAte = $this->normalizePeriodDate($this->periodoAte) ?? '';
+        $this->periodoDeApplied = $this->normalizePeriodDate($this->periodoDeApplied) ?? $this->periodoDe;
+        $this->periodoAteApplied = $this->normalizePeriodDate($this->periodoAteApplied) ?? $this->periodoAte;
+        $this->localSearchDe = $this->normalizePeriodDate($this->localSearchDe) ?? '';
+        $this->localSearchAte = $this->normalizePeriodDate($this->localSearchAte) ?? '';
 
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->searchColumn = $this->normalizeSearchColumn($this->searchColumn);
+
+        CancelarCompraService::repararNotasComCompraCancelada();
 
         $this->dispatch(
             'erp-hydrate-nf-forn-dates',
@@ -128,7 +114,7 @@ class ListNotasFornecedores extends ListRecords
 
         return array_key_exists($column, $this->filterFieldOptions())
             ? $column
-            : 'periodo_entrada';
+            : 'data_emissao';
     }
 
     /**
@@ -510,7 +496,8 @@ class ListNotasFornecedores extends ListRecords
 
     public function openNotaFornecedorVisualizar(int $notaId): void
     {
-        $this->highlightRecord($notaId);
+        // Não usar highlightRecord(): ele faz skipRender() e o modal DANFE não aparece.
+        $this->highlightedRecordId = (int) $notaId;
 
         $nota = NotaFornecedor::query()->find($notaId);
 
@@ -529,46 +516,7 @@ class ListNotasFornecedores extends ListRecords
             return;
         }
 
-        $empresa = $this->resolveEmpresaAtiva();
-
-        if (! $empresa) {
-            Notification::make()
-                ->title('Empresa não encontrada para baixar o XML da NF-e.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        try {
-            if (function_exists('set_time_limit')) {
-                @set_time_limit(120);
-            }
-
-            $nota = (new NotaFornecedorXmlDownloadService())->ensureProcNfe($nota, $empresa);
-        } catch (FiscalEngineException $exception) {
-            if ($exception->sefazCodigo === '596' || str_contains(mb_strtolower($exception->getMessage(), 'UTF-8'), 'prazo de 10 dias')) {
-                $this->showNfFornFiscalOverlay(
-                    'XML completo indisponível (prazo de 10 dias)',
-                    $exception->getMessage(),
-                    $exception->sefazCodigo,
-                    'Distribuição DF-e',
-                    'warning',
-                );
-            } else {
-                $this->showNfFornFiscalOverlay(
-                    'Falha ao obter XML da NF-e',
-                    $exception->getMessage(),
-                    $exception->sefazCodigo,
-                );
-            }
-        } catch (\Throwable $exception) {
-            $this->showNfFornFiscalOverlay(
-                'Não foi possível baixar o XML completo',
-                $exception->getMessage(),
-            );
-        }
-
+        // DANFE só com dados locais (XML completo ou resumo DF-e) — sem SEFAZ.
         $this->notaFornecedorDanfeId = (int) $nota->id;
         $this->notaFornecedorDanfeModalOpen = true;
     }
@@ -874,7 +822,6 @@ class ListNotasFornecedores extends ListRecords
 
         $importadas = (int) $resultado['importadas'];
         $atualizadas = (int) $resultado['atualizadas'];
-        $documentos = (int) $resultado['documentos'];
 
         if ($importadas === 0 && $atualizadas === 0) {
             Notification::make()
@@ -890,8 +837,7 @@ class ListNotasFornecedores extends ListRecords
             ->title('Consulta de lote concluída.')
             ->body(
                 sprintf(
-                    '%d documento(s) processado(s): %d nova(s), %d atualizada(s). NSU: %s',
-                    $documentos,
+                    '%d nota(s) nova(s), %d já existente(s) atualizada(s) (mesma chave). NSU: %s',
                     $importadas,
                     $atualizadas,
                     $resultado['ultimo_nsu'],

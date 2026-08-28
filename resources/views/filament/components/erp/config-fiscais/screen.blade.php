@@ -5,7 +5,6 @@
         'nfce' => 'NFC-e',
         'nfe' => 'NF-e',
         'pdv_offline' => 'PDVs Offline',
-        'email' => 'E-mail',
         'resp_tecnico' => 'Técnico Responsável',
     ];
 
@@ -58,8 +57,6 @@
                         @include('filament.components.erp.config-fiscais.tabs.pdv-offline')
                     @elseif ($this->activeTab === 'resp_tecnico')
                         @include('filament.components.erp.config-fiscais.tabs.resp-tecnico')
-                    @else
-                        @include('filament.components.erp.config-fiscais.tabs.email')
                     @endif
                 </div>
             </div>

@@ -40,7 +40,6 @@ class FirebirdProductImportService
             'qtd_atacado' => BrDecimalImport::parse($row['QTD_ATACADO'] ?? 0, 3),
             'estoque' => BrDecimalImport::parse($row['QTD_ATUAL'] ?? 0, 3),
             'estoque_minimo' => BrDecimalImport::parse($row['QTD_MIN'] ?? 0, 3),
-            'estoque_inicial' => BrDecimalImport::parse($row['ESTOQUE_INICIAL'] ?? 0, 3),
             'e_medio' => BrDecimalImport::parse($row['E_MEDIO'] ?? 0, 3),
             'ult_compra' => BrDecimalImport::parse($row['ULT_COMPRA'] ?? 0),
             'ult_compra_anterior' => BrDecimalImport::parse($row['ULT_COMPRA_ANTERIOR'] ?? 0),
@@ -80,7 +79,8 @@ class FirebirdProductImportService
             'peso_liq' => BrDecimalImport::parse($row['PESO_LIQ'] ?? 0, 3),
             'anp_code' => trim((string) ($row['ANP'] ?? '')) ?: null,
             'issqn' => BrDecimalImport::parse($row['ISSQN'] ?? 0),
-            'prefixo_balanca' => trim((string) ($row['PREFIXO_BALANCA'] ?? '')) ?: null,
+            // PLU = codigo do produto; prefixo_balanca legado não é mais gravado.
+            'prefixo_balanca' => null,
             'ativo' => $this->snToBool($row['ATIVO'] ?? 'S'),
             'is_fiscal' => $this->snToBool($row['EFISCAL'] ?? 'S'),
             'paga_comissao' => $this->snToBool($row['PAGA_COMISSAO'] ?? 'N'),
@@ -92,7 +92,8 @@ class FirebirdProductImportService
             'usa_tab_preco' => $this->snToBool($row['USA_TAB_PRECO'] ?? 'N'),
             'is_combustivel' => $this->snToBool($row['COMBUSTIVEL'] ?? 'N'),
             'usa_imei' => $this->snToBool($row['USA_IMEI'] ?? 'N'),
-            'produto_pesado' => $this->snToBool($row['PRODUTO_PESADO'] ?? 'N'),
+            'produto_pesado' => $this->snToBool($row['PRODUTO_PESADO'] ?? 'N')
+                || trim((string) ($row['PREFIXO_BALANCA'] ?? '')) !== '',
             'tributacao_monofasica' => $this->snToBool($row['TRIBUTACAO_MONOFASICA'] ?? 'N'),
             'is_restaurante' => $this->snToBool($row['RESTAUTANTE'] ?? 'N'),
             'tipo_restaurante' => trim((string) ($row['TIPO_RESTAURANTE'] ?? '')) ?: null,

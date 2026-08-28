@@ -88,7 +88,7 @@
                 open: false,
                 ativo: 0,
                 valor: @js($this->caixaId),
-                rotulo: @js($this->caixaLabel !== '' ? $this->caixaLabel : 'Selecione'),
+                rotulo: @js($this->caixaLabel !== '' ? $this->caixaLabel : 'Não definido'),
                 itens: @js(collect($this->caixaOpcoes)->map(fn ($op) => [
                     'id' => (int) $op['id'],
                     'nome' => $op['label'].(($op['situacao'] ?? '') === 'fechado' ? ' (fechado)' : ''),
@@ -121,7 +121,7 @@
         >
             <button
                 type="button"
-                class="erp-fv-tv__combo-btn"
+                @class(['erp-fv-tv__combo-btn', 'is-warning' => ! $this->caixaId])
                 @click="open ? open = false : abrir()"
                 @keydown.arrow-down.prevent="mover(1)"
                 @keydown.arrow-up.prevent="mover(-1)"
@@ -151,7 +151,7 @@
 
     <div class="erp-fv-tv__oper-field erp-fv-tv__oper-field--estoque">
         <span>Estoque</span>
-        <div class="erp-fv-tv__oper-static">
+        <div @class(['erp-fv-tv__oper-static', 'is-warning' => ! $this->estoqueId])>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 9l9-6 9 6"/>
                 <path d="M4 10v10h16V10"/>
@@ -264,7 +264,7 @@
                     aria-controls="fv-tv-cliente-sugestoes"
                 >
                 @if ($this->clienteSugestoesOpen && $this->clienteSugestoes !== [])
-                    <ul id="fv-tv-cliente-sugestoes" class="erp-fv-tv__suggest" role="listbox" aria-label="Clientes encontrados">
+                    <ul id="fv-tv-cliente-sugestoes" class="erp-fv-tv__suggest erp-fv-tv__suggest--cliente" role="listbox" aria-label="Clientes encontrados">
                         @foreach ($this->clienteSugestoes as $index => $sug)
                             <li wire:key="fv-tv-cli-sug-{{ $sug['id'] }}" role="presentation">
                                 <button
@@ -278,13 +278,20 @@
                                     <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
                                     <span class="erp-fv-tv__suggest-nome">{{ $sug['nome'] }}</span>
                                     <span class="erp-fv-tv__suggest-credito">
-                                        <span>Lim {{ $sug['limite'] ?? '0,00' }}</span>
-                                        <span>Util {{ $sug['utilizado'] ?? '0,00' }}</span>
-                                        <span @class(['is-vencido' => ($sug['tem_vencidas'] ?? false)])>Venc {{ $sug['vencidas'] ?? '0,00' }}</span>
+                                        <span class="erp-fv-tv__suggest-cred erp-fv-tv__suggest-cred--lim">Lim {{ $sug['limite'] ?? '0,00' }}</span>
+                                        <span class="erp-fv-tv__suggest-cred erp-fv-tv__suggest-cred--util">Util {{ $sug['utilizado'] ?? '0,00' }}</span>
+                                        <span @class([
+                                            'erp-fv-tv__suggest-cred',
+                                            'erp-fv-tv__suggest-cred--venc',
+                                            'is-vencido' => ($sug['tem_vencidas'] ?? false),
+                                        ])>Venc {{ $sug['vencidas'] ?? '0,00' }}</span>
                                     </span>
-                                    @if (filled($sug['cpf_cnpj'] ?? null))
-                                        <span class="erp-fv-tv__suggest-doc">{{ $sug['cpf_cnpj'] }}</span>
-                                    @endif
+                                    <span @class([
+                                        'erp-fv-tv__suggest-doc',
+                                        'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
+                                        'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
+                                        'is-empty' => blank($sug['cpf_cnpj'] ?? null),
+                                    ])>{{ $sug['cpf_cnpj'] ?? '' }}</span>
                                 </button>
                             </li>
                         @endforeach
@@ -462,17 +469,52 @@
                         class="{{ $this->itemSelecionado === $i ? 'is-selected' : '' }}"
                         wire:click="selecionarItem({{ $i }})"
                     >
-                        <td class="erp-fv-tv__col-idx">{{ $i + 1 }}</td>
-                        <td class="erp-fv-tv__col-cod">
-                            <span class="erp-fv-tv__prod-cod">{{ $item['codigo'] }}</span>
+                        <td class="erp-fv-tv__col-idx">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--center">{{ $i + 1 }}</div>
                         </td>
-                        <td class="erp-fv-tv__prod-nome">{{ $item['descricao'] }}</td>
-                        <td class="erp-fv-tv__col-num">{{ $this->formatQty($item['quantidade']) }}</td>
-                        <td class="erp-fv-tv__col-num">{{ $this->formatMoney($item['preco_unitario']) }}</td>
-                        <td class="erp-fv-tv__col-num">{{ $this->formatMoney($item['quantidade'] * $item['preco_unitario']) }}</td>
-                        <td class="erp-fv-tv__col-num erp-fv-tv__val-acr">{{ $this->formatMoney($item['acrescimo']) }}</td>
-                        <td class="erp-fv-tv__col-num erp-fv-tv__val-desc">{{ $this->formatMoney($item['desconto']) }}</td>
-                        <td class="erp-fv-tv__col-num erp-fv-tv__val-liq">{{ $this->formatMoney($item['total']) }}</td>
+                        <td class="erp-fv-tv__col-cod">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--center">{{ $item['codigo'] }}</div>
+                        </td>
+                        <td>
+                            <div
+                                class="erp-fv-tv__cell erp-fv-tv__cell--desc erp-fv-tv__cell--pull"
+                                title="Duplo clique: voltar para a barra de inclusão"
+                                wire:dblclick.stop="puxarItemParaInclusao({{ $i }})"
+                            >{{ $item['descricao'] }}</div>
+                        </td>
+                        <td class="erp-fv-tv__col-num">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--num">{{ $this->formatQty($item['quantidade']) }}</div>
+                        </td>
+                        <td class="erp-fv-tv__col-num">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                <span class="erp-fv-tv__money-rs">R$</span>
+                                <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['preco_unitario']) }}</span>
+                            </div>
+                        </td>
+                        <td class="erp-fv-tv__col-num">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                <span class="erp-fv-tv__money-rs">R$</span>
+                                <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['quantidade'] * $item['preco_unitario']) }}</span>
+                            </div>
+                        </td>
+                        <td class="erp-fv-tv__col-num">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-acr">
+                                <span class="erp-fv-tv__money-rs">R$</span>
+                                <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['acrescimo']) }}</span>
+                            </div>
+                        </td>
+                        <td class="erp-fv-tv__col-num">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-desc">
+                                <span class="erp-fv-tv__money-rs">R$</span>
+                                <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['desconto']) }}</span>
+                            </div>
+                        </td>
+                        <td class="erp-fv-tv__col-num erp-fv-tv__val-liq">
+                            <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                <span class="erp-fv-tv__money-rs">R$</span>
+                                <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['total']) }}</span>
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr class="erp-fv-tv__empty">

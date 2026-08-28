@@ -20,35 +20,36 @@
         <span class="erp-nfe-actions__label"><kbd>F5</kbd> | Inutilizar</span>
     </button>
     @if ($this->statusFilter === Nfe::STATUS_ABERTA)
-        <button type="button" wire:click="openNfeEspelhoFromList" class="erp-nfe-actions__btn" data-erp-key="F7">
+        <button type="button" wire:click="openNfeEspelhoFromList" class="erp-nfe-actions__btn" title="Espelho da NF-e em aberto">
             <span class="erp-nfe-actions__icon">📄</span>
-            <span class="erp-nfe-actions__label"><kbd>F7</kbd> | Espelho</span>
-        </button>
-    @else
-        <button type="button" wire:click="printNfeDanfeFromList" class="erp-nfe-actions__btn" data-erp-key="F7">
-            <span class="erp-nfe-actions__icon">🖨</span>
-            <span class="erp-nfe-actions__label"><kbd>F7</kbd> | Imprimir</span>
+            <span class="erp-nfe-actions__label">Espelho</span>
         </button>
     @endif
+    <button
+        type="button"
+        wire:click="printNfeDanfeFromList"
+        class="erp-nfe-actions__btn"
+        data-erp-key="F7"
+        title="Imprimir DANFE completo da NF-e transmitida"
+    >
+        <span class="erp-nfe-actions__icon">🖨</span>
+        <span class="erp-nfe-actions__label"><kbd>F7</kbd> | Imprimir</span>
+    </button>
     <button type="button" wire:click="cartaCorrecaoNfe" class="erp-nfe-actions__btn" data-erp-key="F8">
         <span class="erp-nfe-actions__icon">📝</span>
         <span class="erp-nfe-actions__label"><kbd>F8</kbd> | CCe</span>
     </button>
     <button type="button" wire:click="openNfeDanfeEmailFromList" class="erp-nfe-actions__btn" data-erp-key="F9">
         <span class="erp-nfe-actions__icon">✉</span>
-        <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Email</span>
+        <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Enviar</span>
     </button>
     <button type="button" wire:click="printRelatorioNfe" class="erp-nfe-actions__btn" data-erp-key="F10">
         <span class="erp-nfe-actions__icon">📊</span>
         <span class="erp-nfe-actions__label"><kbd>F10</kbd> | Relatório</span>
     </button>
-    <button type="button" wire:click="openNfeWhatsAppFromList" class="erp-nfe-actions__btn" data-erp-key="F11">
-        <span class="erp-nfe-actions__icon">📱</span>
-        <span class="erp-nfe-actions__label"><kbd>F11</kbd> | Whats</span>
-    </button>
-    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
-        <span class="erp-nfe-actions__icon">📅</span>
-        <span class="erp-nfe-actions__label"><kbd>F12</kbd> | Fechar Mês</span>
+    <button type="button" wire:click="openNfeContadorEmailModal" class="erp-nfe-actions__btn" data-erp-key="F12">
+        <span class="erp-nfe-actions__icon">📄</span>
+        <span class="erp-nfe-actions__label"><kbd>F12</kbd> | Gerar PDF</span>
     </button>
     <button type="button" wire:click="refreshTable" class="erp-nfe-actions__btn">
         <span class="erp-nfe-actions__icon">↻</span>

@@ -256,6 +256,12 @@ final class EstoqueReservaService
             return $erro !== null ? $erro : null;
         }
 
+        // Produto simples: só bloqueia reserva se o parâmetro geral estiver ON
+        // (mesmo critério do PDV).
+        if (! EstoqueNegativoPolicy::ativo()) {
+            return null;
+        }
+
         $disponivel = $this->disponivel($product, null, $estoqueId);
 
         if ($disponivel < $quantidade) {

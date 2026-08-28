@@ -6,8 +6,8 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ManagesOrcamentoEmailModal;
 use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ManagesOrcamentoViewModal;
-use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ManagesOrcamentoWhatsAppModal;
 use App\Models\Orcamento;
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -25,7 +25,6 @@ class ListOrcamentos extends ListRecords
     use InteractsWithErpListPage;
     use ManagesOrcamentoEmailModal;
     use ManagesOrcamentoViewModal;
-    use ManagesOrcamentoWhatsAppModal;
 
     protected static string $resource = OrcamentoResource::class;
 
@@ -92,7 +91,6 @@ class ListOrcamentos extends ListRecords
         $this->previewOverlayUrl = null;
         $this->viewModalOpen = false;
         $this->emailModalOpen = false;
-        $this->whatsAppModalOpen = false;
     }
 
     protected static function erpListPageClass(): string
@@ -105,6 +103,11 @@ class ListOrcamentos extends ListRecords
         return 'um orçamento';
     }
 
+    protected function erpListSyncChannel(): ?string
+    {
+        return ErpDataSyncVersion::CHANNEL_QUOTES;
+    }
+
     protected function customErpListKeyboardConfig(): array
     {
         return [
@@ -115,7 +118,6 @@ class ListOrcamentos extends ListRecords
                 'F4' => ['method' => 'cancelOrcamento'],
                 'F6' => ['method' => 'openPrintModal'],
                 'F9' => ['method' => 'openEmailModal'],
-                'F10' => ['method' => 'openWhatsAppModal'],
             ],
         ];
     }
@@ -171,10 +173,19 @@ class ListOrcamentos extends ListRecords
 
         match ($column) {
             'numero' => $query->where('numero', 'like', $like),
-            'cliente' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like)),
+            'cliente' => $query->where(function (Builder $outer) use ($like): void {
+                $outer->where('cliente_nome', 'like', $like)
+                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like));
+            }),
             'vendedor' => $query->whereHas('vendedor', fn (Builder $vendedorQuery): Builder => $vendedorQuery->where('nome', 'like', $like)),
-            'cidade' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('cidade_nome', 'like', $like)),
-            'uf' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('uf', 'like', $like)),
+            'cidade' => $query->where(function (Builder $outer) use ($like): void {
+                $outer->where('cliente_cidade', 'like', $like)
+                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('cidade_nome', 'like', $like));
+            }),
+            'uf' => $query->where(function (Builder $outer) use ($like): void {
+                $outer->where('cliente_uf', 'like', $like)
+                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('uf', 'like', $like));
+            }),
         };
     }
 
@@ -196,7 +207,6 @@ class ListOrcamentos extends ListRecords
                 View::make('filament.components.erp.orcamentos.action-bar'),
                 View::make('filament.components.erp.orcamentos.print-modal'),
                 View::make('filament.components.erp.orcamentos.email-modal'),
-                View::make('filament.components.erp.orcamentos.whatsapp-modal'),
                 View::make('filament.components.erp.orcamentos.preview-overlay'),
                 View::make('filament.components.erp.orcamentos.view-modal'),
             ]);
@@ -460,8 +470,7 @@ class ListOrcamentos extends ListRecords
         return match ($action) {
             'cancel' => 'um orçamento para cancelar',
             'print' => 'um orçamento para imprimir',
-            'email' => 'um orçamento para enviar e-mail',
-            'whatsapp' => 'um orçamento para enviar WhatsApp',
+            'enviar' => 'um orçamento para enviar',
             default => $this->defaultErpListSelectPrompt($action),
         };
     }

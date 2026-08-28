@@ -50,6 +50,8 @@ final class ErpUppercase
         'param_cf_account_id',
         'param_cf_zone_id',
         'param_cf_tunnel_id',
+        'param_portal_bkp_token',
+        'device_uuid',
     ];
 
     /**

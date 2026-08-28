@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'chave_nfe',
     'total',
     'status',
+    'lancamento_draft',
 ])]
 class Compra extends Model
 {
@@ -43,7 +44,7 @@ class Compra extends Model
     {
         $max = static::query()
             ->pluck('numero')
-            ->map(fn (string $numero): int => (int) preg_replace('/\D/', '', $numero))
+            ->map(fn (?string $numero): int => (int) preg_replace('/\D/', '', (string) $numero))
             ->max();
 
         return str_pad((string) (($max ?? 0) + 1), 6, '0', STR_PAD_LEFT);
@@ -62,6 +63,11 @@ class Compra extends Model
     public function itens(): HasMany
     {
         return $this->hasMany(CompraItem::class);
+    }
+
+    public function devolucoes(): HasMany
+    {
+        return $this->hasMany(DevolucaoCompra::class);
     }
 
     protected function casts(): array

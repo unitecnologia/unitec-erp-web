@@ -38,19 +38,6 @@ class TerminalFormDataTest extends TestCase
         ], $merged['impressora_extra']);
     }
 
-    public function test_it_clears_meia_folha_when_fechamento_is_not_a4_padrao(): void
-    {
-        session(['erp_empresa_id' => 1]);
-
-        $merged = (new TerminalFormMergerHarness)->merge([
-            'nome' => 'CAIXA-1',
-            'tipo_fechamento' => '2',
-            'meia_folha' => true,
-        ]);
-
-        $this->assertFalse($merged['meia_folha']);
-    }
-
     public function test_default_terminal_form_data_uses_pedido_a4(): void
     {
         $empresa = Empresa::query()->create([
@@ -73,5 +60,121 @@ class TerminalFormDataTest extends TestCase
         $this->assertSame('nfce_transmitir', TerminalFormOptions::normalizeTipoOperacaoPadrao('NFCE'));
         $this->assertSame('pedido_nao_fiscal', TerminalFormOptions::normalizeTipoOperacaoPadrao('ORCAMENTO'));
         $this->assertSame('pedido_nao_fiscal', TerminalFormOptions::normalizeTipoOperacaoPadrao('ECF_FISCAL_FINALIZAR'));
+    }
+
+    public function test_pdv_offline_merge_does_not_write_printer_fields(): void
+    {
+        $empresa = Empresa::query()->create([
+            'nome' => 'Empresa Teste',
+            'ativo' => true,
+        ]);
+
+        session(['erp_empresa_id' => $empresa->id]);
+
+        $harness = new TerminalFormMergerHarness;
+        $harness->data = [
+            'nome' => 'PDV1',
+            'origens_dispositivo' => ['pdv_offline'],
+        ];
+
+        $merged = $harness->merge([
+            'nome' => 'PDV1',
+            'origens_dispositivo' => ['pdv_offline'],
+            'tipo_impressora' => '0',
+            'nvias' => 9,
+            'modelo' => 'ELGIN',
+            'porta' => 'COM2',
+            'impressora_nome' => 'COM2',
+        ]);
+
+        $this->assertArrayNotHasKey('tipo_impressora', $merged);
+        $this->assertArrayNotHasKey('nvias', $merged);
+        $this->assertArrayNotHasKey('modelo', $merged);
+        $this->assertArrayNotHasKey('porta', $merged);
+        $this->assertArrayNotHasKey('impressora_nome', $merged);
+        $this->assertSame('PDV1', $merged['nome']);
+    }
+
+    public function test_update_merge_does_not_write_device_identity(): void
+    {
+        $empresa = Empresa::query()->create([
+            'nome' => 'Empresa Teste',
+            'ativo' => true,
+        ]);
+
+        session(['erp_empresa_id' => $empresa->id]);
+
+        $harness = new TerminalFormMergerHarness;
+        $harness->isNewTerminal = false;
+        $harness->data = [
+            'nome' => 'PDV1',
+            'origens_dispositivo' => ['pdv_offline'],
+        ];
+
+        $merged = $harness->merge([
+            'nome' => 'PDV1',
+            'device_uuid' => 'aeace488-e29d-4773-8436-d85106d857a0',
+            'origens_dispositivo' => ['PDV_OFFLINE'],
+            'categoria_licenca' => 'computador',
+            'device_platform' => 'pdv-offline',
+            'tipo_operacao_padrao' => 'modo_hibrido',
+        ]);
+
+        $this->assertArrayNotHasKey('device_uuid', $merged);
+        $this->assertArrayNotHasKey('origens_dispositivo', $merged);
+        $this->assertArrayNotHasKey('categoria_licenca', $merged);
+        $this->assertArrayNotHasKey('device_platform', $merged);
+        $this->assertSame('MODO_HIBRIDO', $merged['impressora_extra']['tipo_operacao_padrao'] ?? null);
+
+        $uuid = 'aeace488-e29d-4773-8436-d85106d857a0';
+        $terminal = \App\Models\Terminal::query()->create([
+            ...\App\Models\Terminal::defaultAttributes($empresa->id),
+            'empresa_id' => $empresa->id,
+            'nome' => 'PDV1',
+            'numero_logico_terminal' => 1,
+            'pdv' => true,
+            'ativo' => true,
+            'device_uuid' => $uuid,
+            'origens_dispositivo' => ['pdv_offline'],
+            'categoria_licenca' => 'computador',
+        ]);
+
+        $terminal->fill($merged);
+        $terminal->save();
+
+        $fresh = $terminal->fresh();
+        $this->assertSame($uuid, $fresh->device_uuid);
+        $this->assertContains('pdv_offline', $fresh->origens_dispositivo ?? []);
+    }
+
+    public function test_erp_web_merge_keeps_printer_fields(): void
+    {
+        $empresa = Empresa::query()->create([
+            'nome' => 'Empresa Teste',
+            'ativo' => true,
+        ]);
+
+        session(['erp_empresa_id' => $empresa->id]);
+
+        $harness = new TerminalFormMergerHarness;
+        $harness->data = [
+            'nome' => 'ERP',
+            'origens_dispositivo' => ['erp_web'],
+        ];
+
+        $merged = $harness->merge([
+            'nome' => 'ERP',
+            'origens_dispositivo' => ['erp_web'],
+            'tipo_impressora' => '1',
+            'nvias' => 2,
+            'modelo' => 'EPSON',
+            'porta' => 'RAW:POS-80C',
+        ]);
+
+        $this->assertSame('1', $merged['tipo_impressora']);
+        $this->assertSame(2, (int) $merged['nvias']);
+        $this->assertSame('EPSON', $merged['modelo']);
+        $this->assertSame('RAW:POS-80C', $merged['porta']);
+        $this->assertSame('POS-80C', $merged['impressora_nome']);
     }
 }

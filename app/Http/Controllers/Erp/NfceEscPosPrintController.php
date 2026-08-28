@@ -26,7 +26,7 @@ class NfceEscPosPrintController
         abort_unless($user, 403);
         abort_unless($venda->fiscal, 404);
 
-        $venda->load(['itens.product', 'pagamentos', 'person', 'sessao', 'nfce']);
+        $venda->load(['itens.product', 'pagamentos', 'person', 'sessao', 'nfce', 'venda', 'vendedor']);
 
         $empresaId = session('erp_empresa_id', $user->empresa_id);
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : $user->empresa;

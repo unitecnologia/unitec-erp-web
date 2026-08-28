@@ -2,7 +2,9 @@
 
 namespace App\Support\Pdv;
 
+use App\Models\ContaReceber;
 use App\Models\Empresa;
+use App\Models\ForcaVendasOrder;
 use App\Models\PdvCaixaSessao;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaItem;
@@ -11,13 +13,17 @@ use App\Models\PdvVendaPagamento;
 use App\Models\FormaPagamento;
 use App\Models\Person;
 use App\Models\Product;
-use App\Models\Terminal;
 use App\Models\User;
+use App\Models\Venda;
+use App\Models\Vendedor;
 use App\Support\Erp\Pdv\PdvCaixaMovimentoService;
+use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\Erp\Pdv\PdvStockService;
 use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
 use App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService;
+use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -83,6 +89,23 @@ class PdvRetornoService
         $existente = PdvVenda::query()->where('uuid', $uuid)->first();
 
         if ($existente !== null) {
+            $nfce = $venda['nfce'] ?? null;
+
+            if (is_array($nfce) && $nfce !== []) {
+                $this->importarNfce($existente, $empresa, $nfce);
+            }
+
+            if ($this->isEstornoPayload($venda)) {
+                return $this->aplicarEstornoOffline($existente->fresh() ?? $existente, $venda, $empresa, $uuid);
+            }
+
+            $this->completarContasReceberSeFaltar($existente, $venda);
+
+            $forcaOrderId = isset($venda['forca_order_id']) ? (int) $venda['forca_order_id'] : 0;
+            if ($forcaOrderId > 0) {
+                $this->concluirForcaViaPdv($forcaOrderId, $existente->fresh());
+            }
+
             return [
                 'uuid' => $uuid,
                 'status' => 'duplicado',
@@ -90,14 +113,24 @@ class PdvRetornoService
             ];
         }
 
-        return DB::transaction(function () use ($venda, $uuid, $empresa, $sessaoId, $terminal): array {
-            $userId = $this->resolverUsuario($empresa?->id);
+        $resultado = DB::transaction(function () use ($venda, $uuid, $empresa, $sessaoId, $terminal): array {
+            $userId = $this->resolverUsuario($empresa?->id, $venda['user_central_id'] ?? null);
 
             $itens = (array) ($venda['itens'] ?? []);
             $pagamentos = (array) ($venda['pagamentos'] ?? []);
             $nfce = $venda['nfce'] ?? null;
             $personId = $this->resolverPersonId($venda['cliente_central_id'] ?? null);
             $crediarioDias = $this->parseCrediarioDias($venda['crediario_dias'] ?? null);
+            $fechadoEm = $this->data($venda['fechado_em'] ?? $venda['created_at'] ?? null);
+            $abertoEm = $this->data($venda['aberto_em'] ?? null) ?? $fechadoEm;
+            $vendedorNome = $this->str($venda['vendedor_nome'] ?? null, 120);
+            $vendedorId = isset($venda['vendedor_central_id']) && $venda['vendedor_central_id']
+                ? (int) $venda['vendedor_central_id']
+                : null;
+
+            if ($vendedorId !== null && ! Vendedor::query()->whereKey($vendedorId)->exists()) {
+                $vendedorId = null;
+            }
 
             $pdvVenda = PdvVenda::query()->create([
                 'pdv_caixa_sessao_id' => $sessaoId,
@@ -105,6 +138,8 @@ class PdvRetornoService
                 'numero' => PdvVenda::nextNumero($sessaoId),
                 'person_id' => $personId,
                 'cpf_nota' => $this->str($venda['cliente_documento'] ?? null, 20),
+                'vendedor_id' => $vendedorId,
+                'vendedor_nome' => $vendedorNome,
                 'subtotal' => $this->num($venda['subtotal'] ?? 0),
                 'desconto' => $this->num($venda['desconto'] ?? 0),
                 'acrescimo' => $this->num($venda['acrescimo'] ?? 0),
@@ -112,7 +147,8 @@ class PdvRetornoService
                 'forma_pagamento' => $this->resolverFormaPagamento($pagamentos),
                 'fiscal' => $nfce !== null,
                 'situacao' => 'F',
-                'fechado_em' => $this->data($venda['fechado_em'] ?? $venda['created_at'] ?? null),
+                'aberto_em' => $abertoEm,
+                'fechado_em' => $fechadoEm,
                 'uuid' => $uuid,
                 'origem' => 'pdv_offline',
                 'terminal_offline' => $this->str($terminal ?? ($venda['terminal_id'] ?? null), 60),
@@ -124,6 +160,10 @@ class PdvRetornoService
                 $productId = isset($item['product_central_id']) && $item['product_central_id']
                     ? (int) $item['product_central_id']
                     : null;
+
+                if ($productId !== null && ! Product::query()->whereKey($productId)->exists()) {
+                    $productId = null;
+                }
 
                 PdvVendaItem::query()->create([
                     'pdv_venda_id' => $pdvVenda->id,
@@ -148,6 +188,8 @@ class PdvRetornoService
                             null,
                             null,
                             'PDV-OFF-'.str_pad((string) $pdvVenda->numero, 6, '0', STR_PAD_LEFT),
+                            null,
+                            $empresa,
                         );
                     }
                 }
@@ -178,6 +220,11 @@ class PdvRetornoService
                 $crediarioDias,
             );
 
+            $forcaOrderId = isset($venda['forca_order_id']) ? (int) $venda['forca_order_id'] : 0;
+            if ($forcaOrderId > 0) {
+                $this->concluirForcaViaPdv($forcaOrderId, $pdvVenda->fresh());
+            }
+
             return [
                 'uuid' => $uuid,
                 'status' => 'importado',
@@ -185,6 +232,57 @@ class PdvRetornoService
                 'numero' => (int) $pdvVenda->numero,
             ];
         });
+
+        if ($this->isEstornoPayload($venda)) {
+            $pdv = PdvVenda::query()->find($resultado['pdv_venda_id'] ?? 0);
+
+            if ($pdv !== null) {
+                return $this->aplicarEstornoOffline($pdv, $venda, $empresa, $uuid);
+            }
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * @param  array<string,mixed>  $venda
+     */
+    private function isEstornoPayload(array $venda): bool
+    {
+        $situacao = strtoupper(trim((string) ($venda['situacao'] ?? '')));
+        $status = strtolower(trim((string) ($venda['status'] ?? '')));
+
+        return $situacao === 'C' || $status === 'cancelada';
+    }
+
+    /**
+     * @param  array<string,mixed>  $venda
+     * @return array<string,mixed>
+     */
+    private function aplicarEstornoOffline(PdvVenda $pdvVenda, array $venda, ?Empresa $empresa, string $uuid): array
+    {
+        $motivo = trim((string) ($venda['motivo_estorno'] ?? ''));
+
+        if ($motivo === '') {
+            $motivo = PdvEstornoMotivo::MOTIVO_AUTOMATICO;
+        }
+
+        $pdvVenda->loadMissing(['itens', 'pagamentos', 'nfce', 'venda']);
+
+        $result = (new EstornarVendaService())->fromPdvVenda(
+            $pdvVenda,
+            $motivo,
+            EstornarVendaService::ORIGEM_PDV,
+            $empresa,
+            $pdvVenda->pdv_caixa_sessao_id ? (int) $pdvVenda->pdv_caixa_sessao_id : null,
+        );
+
+        return [
+            'uuid' => $uuid,
+            'status' => $result->alreadyCancelled ? 'duplicado' : 'importado',
+            'pdv_venda_id' => (int) $pdvVenda->id,
+            'numero' => (int) $pdvVenda->numero,
+        ];
     }
 
     /**
@@ -192,8 +290,7 @@ class PdvRetornoService
      */
     private function importarNfce(PdvVenda $pdvVenda, ?Empresa $empresa, array $nfce): void
     {
-        PdvVendaNfce::query()->create([
-            'pdv_venda_id' => $pdvVenda->id,
+        $attrs = [
             'empresa_id' => $empresa?->id,
             'operacao' => $this->str($nfce['operacao'] ?? 'VENDA', 32) ?: 'VENDA',
             'modelo' => $this->str($nfce['modelo'] ?? '65', 2) ?: '65',
@@ -209,7 +306,20 @@ class PdvRetornoService
             'qr_code_conteudo' => $nfce['qr_code_conteudo'] ?? null,
             'xml' => $nfce['xml'] ?? null,
             'motivo_contingencia' => $this->str($nfce['motivo_contingencia'] ?? null, 255),
+            'motivo_rejeicao' => $this->str($nfce['motivo_rejeicao'] ?? null, 255),
             'autorizada_em' => $this->data($nfce['autorizada_em'] ?? null),
+        ];
+
+        $existente = PdvVendaNfce::query()->where('pdv_venda_id', $pdvVenda->id)->first();
+
+        if ($existente !== null) {
+            $existente->fill($attrs)->save();
+
+            return;
+        }
+
+        PdvVendaNfce::query()->create($attrs + [
+            'pdv_venda_id' => $pdvVenda->id,
         ]);
     }
 
@@ -249,6 +359,112 @@ class PdvRetornoService
         }
     }
 
+    private function concluirForcaViaPdv(int $forcaOrderId, ?PdvVenda $pdvVenda): void
+    {
+        if ($pdvVenda === null || $forcaOrderId < 1) {
+            return;
+        }
+
+        $pdvVenda->loadMissing('venda');
+        $venda = $pdvVenda->venda;
+
+        if (! $venda instanceof Venda) {
+            $vendaId = (int) ($pdvVenda->venda_id ?? 0);
+            $venda = $vendaId > 0 ? Venda::query()->find($vendaId) : null;
+        }
+
+        if (! $venda instanceof Venda) {
+            Log::warning('PDV retorno: forca_order_id sem venda espelhada.', [
+                'forca_order_id' => $forcaOrderId,
+                'pdv_venda_id' => $pdvVenda->id,
+            ]);
+
+            return;
+        }
+
+        $order = ForcaVendasOrder::query()->find($forcaOrderId);
+
+        if ($order === null) {
+            Log::warning('PDV retorno: forca_order_id não encontrado.', [
+                'forca_order_id' => $forcaOrderId,
+                'pdv_venda_id' => $pdvVenda->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            (new ForcaVendasFaturamentoService())->concluirViaPdv($order, $venda);
+        } catch (Throwable $e) {
+            Log::error('PDV retorno: falha ao concluir Força via PDV.', [
+                'forca_order_id' => $forcaOrderId,
+                'venda_id' => $venda->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Vendas já importadas sem título (retorno antigo) recebem CR no reenvio,
+     * sem relançar caixa nem espelho.
+     *
+     * @param  array<string,mixed>  $venda
+     */
+    private function completarContasReceberSeFaltar(PdvVenda $pdvVenda, array $venda): void
+    {
+        if (! config('pdv_carga.retorno_gerar_financeiro', true)) {
+            return;
+        }
+
+        if ($this->jaTemContasReceber($pdvVenda)) {
+            return;
+        }
+
+        $pagServico = $this->pagamentosParaServicos((array) ($venda['pagamentos'] ?? []));
+
+        if ($pagServico === []) {
+            return;
+        }
+
+        $crediarioDias = $this->parseCrediarioDias($venda['crediario_dias'] ?? null);
+
+        (new PdvVendaFinanceiroService())->gerarContasReceber(
+            $pdvVenda,
+            $pdvVenda->person_id ? (int) $pdvVenda->person_id : null,
+            $pagServico,
+            $crediarioDias,
+        );
+    }
+
+    private function jaTemContasReceber(PdvVenda $venda): bool
+    {
+        $documento = 'PDV-'.str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
+
+        return ContaReceber::query()
+            ->where(function ($q) use ($documento): void {
+                $q->where('documento', $documento)
+                    ->orWhere('documento', 'like', $documento.'/%');
+            })
+            ->exists();
+    }
+
+    private function semAcento(string $value): string
+    {
+        $upper = mb_strtoupper(trim($value), 'UTF-8');
+        $map = [
+            'Á' => 'A', 'À' => 'A', 'Ã' => 'A', 'Â' => 'A',
+            'É' => 'E', 'Ê' => 'E',
+            'Í' => 'I',
+            'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O',
+            'Ú' => 'U',
+            'Ç' => 'C',
+        ];
+
+        return strtr($upper, $map);
+    }
+
     /**
      * Enriquece cada pagamento com tipo/aparece_contas_receber do cadastro de
      * formas de pagamento, para a correta classificação (cartão a receber etc.).
@@ -258,7 +474,7 @@ class PdvRetornoService
      */
     private function pagamentosParaServicos(array $pagamentos): array
     {
-        $cadastro = FormaPagamento::query()->get(['descricao', 'tipo', 'aparece_contas_receber'])
+        $cadastro = FormaPagamento::query()->get(['descricao', 'tipo', 'tipo_movimento', 'aparece_contas_receber'])
             ->keyBy(fn ($f) => mb_strtoupper(trim((string) $f->descricao), 'UTF-8'));
 
         $result = [];
@@ -271,18 +487,33 @@ class PdvRetornoService
                 continue;
             }
 
-            $cad = $cadastro->get($forma);
+            $cad = $cadastro->get($forma)
+                ?? $cadastro->first(fn ($f) => $this->semAcento((string) $f->descricao) === $this->semAcento($forma));
 
             // Prioriza o tipo enviado pelo PDV offline; cai no cadastro do ERP.
             $tipo = trim((string) ($p['tipo'] ?? '')) !== ''
                 ? (string) $p['tipo']
                 : (string) ($cad->tipo ?? '');
 
+            $tipoMovimento = trim((string) ($p['tipo_movimento'] ?? '')) !== ''
+                ? (string) $p['tipo_movimento']
+                : (string) ($cad->tipo_movimento ?? '');
+
+            $tipoLower = mb_strtolower($tipo, 'UTF-8');
+            if ($tipoMovimento === '' && in_array($tipoLower, ['crediario', 'cheque', 'boleto'], true)) {
+                $tipoMovimento = 'contas_receber';
+            }
+            if ($tipoMovimento === '' && PdvFinalizarPagamentosHelper::isFormaAPrazo($forma)) {
+                $tipoMovimento = 'contas_receber';
+            }
+
             $result[] = [
                 'forma' => $forma,
                 'valor' => $valor,
                 'tipo' => $tipo,
-                'aparece_contas_receber' => (bool) ($cad->aparece_contas_receber ?? false),
+                'tipo_movimento' => $tipoMovimento,
+                'aparece_contas_receber' => (bool) ($cad->aparece_contas_receber ?? false)
+                    || $tipoMovimento === 'contas_receber',
             ];
         }
 
@@ -325,19 +556,7 @@ class PdvRetornoService
 
     private function resolverTerminalId(int $empresaId, ?string $terminal): ?int
     {
-        $terminal = trim((string) $terminal);
-
-        if ($terminal === '') {
-            return null;
-        }
-
-        $model = Terminal::query()
-            ->where('empresa_id', $empresaId)
-            ->where(function ($q) use ($terminal): void {
-                $q->where('numero_logico_terminal', $terminal)
-                    ->orWhere('nome', $terminal);
-            })
-            ->first();
+        $model = PdvOfflineTerminalLookup::find($empresaId, (string) $terminal, false);
 
         return $model !== null ? (int) $model->id : null;
     }
@@ -373,8 +592,16 @@ class PdvRetornoService
         return $dias !== [] ? $dias : null;
     }
 
-    private function resolverUsuario(?int $empresaId): int
+    private function resolverUsuario(?int $empresaId, mixed $userCentralId = null): int
     {
+        $centralId = is_numeric($userCentralId) ? (int) $userCentralId : 0;
+        if ($centralId > 0) {
+            $byCentral = User::query()->whereKey($centralId)->first();
+            if ($byCentral !== null) {
+                return (int) $byCentral->id;
+            }
+        }
+
         $configured = config('pdv_carga.import_user_id');
 
         if ($configured && User::query()->whereKey((int) $configured)->exists()) {

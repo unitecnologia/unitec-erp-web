@@ -1,11 +1,14 @@
-/* ERP — Impressão de Recibos (janela compacta, padrão Contas Caixa + filtros de período) */
+/* ERP — Impressão de Recibos (janela moderna, alinhada a Contas Caixa) */
 
 .fi-body:has(.erp-recibos-page) {
     display: flex;
     flex-direction: column;
     height: 100dvh;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.48) !important;
+    background:
+        radial-gradient(120% 90% at 10% 0%, rgba(30, 90, 158, 0.22), transparent 55%),
+        radial-gradient(90% 80% at 100% 20%, rgba(15, 52, 96, 0.18), transparent 50%),
+        rgba(15, 23, 42, 0.52) !important;
 }
 
 .fi-body:has(.erp-recibos-page) .erp-menu-bar,
@@ -77,10 +80,12 @@
     margin: 0 auto !important;
     padding: 0 !important;
     overflow: hidden !important;
-    border: 1px solid #7f96b3 !important;
-    border-radius: 8px !important;
-    background: #e8eef6 !important;
-    box-shadow: 0 18px 48px rgba(15, 40, 71, 0.35) !important;
+    border: 1px solid #9db4d0 !important;
+    border-radius: 14px !important;
+    background: #f4f7fb !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.35) inset,
+        0 22px 55px rgba(15, 40, 71, 0.28) !important;
 }
 
 .erp-recibos-page .fi-page-main,
@@ -96,166 +101,217 @@
     background: transparent !important;
 }
 
+/* Titlebar */
 .erp-recibos-window__titlebar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
     flex-shrink: 0;
-    padding: 0.4rem 0.55rem 0.4rem 0.75rem;
-    background: linear-gradient(180deg, #2a6bb5 0%, #1e5a9e 100%);
+    padding: 0.7rem 0.95rem;
+    background: linear-gradient(135deg, #0f3460 0%, #1e5a9e 62%, #2a6fbd 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     color: #fff;
-    border-radius: 7px 7px 0 0;
+}
+
+.erp-recibos-window__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-recibos-window__eyebrow {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.72;
 }
 
 .erp-recibos-window__title {
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
 }
 
 .erp-recibos-window__close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.55rem;
-    height: 1.55rem;
+    width: 1.85rem;
+    height: 1.85rem;
     border: 0;
-    border-radius: 4px;
-    background: transparent;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
     color: #fff;
     font-size: 1.15rem;
     line-height: 1;
     cursor: pointer;
+    transition: background 0.12s ease;
 }
 
 .erp-recibos-window__close:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.22);
 }
 
+/* Toolbar / filtros */
 .erp-recibos-page .erp-recibos {
-    padding: 0.45rem 0.55rem 0.35rem !important;
+    padding: 0.75rem 0.85rem 0.45rem !important;
     margin: 0 !important;
     background: transparent !important;
     flex-shrink: 0;
+    font-family: var(--erp-font, inherit);
 }
 
 .erp-recibos-page .erp-recibos__filter-block {
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 0.4rem 0.55rem !important;
+    gap: 0.55rem 0.7rem !important;
     margin: 0 !important;
-    padding: 0.4rem 0.5rem !important;
-    background: #ffffff !important;
-    border: 1px solid #b8c8d8 !important;
-    border-left: 3px solid var(--erp-brand-primary, #1e5a9e) !important;
-    border-radius: 5px !important;
+    padding: 0.7rem 0.8rem !important;
+    background: #fff !important;
+    border: 1px solid #d5e2f0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04) !important;
 }
 
 .erp-recibos-page .erp-recibos__period {
     display: inline-flex !important;
     flex-wrap: nowrap !important;
     align-items: center;
-    gap: 0.3rem 0.35rem;
+    gap: 0.4rem 0.5rem;
 }
 
 .erp-recibos-page .erp-recibos__period-label {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.35rem;
     font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--erp-text, #0f172a);
+    font-weight: 650;
+    color: #64748b;
     white-space: nowrap;
 }
 
 .erp-recibos-page .erp-recibos__period-input,
 .erp-recibos-page .erp-recibos__period-input.erp-date-input,
 .erp-recibos-page .erp-recibos__period .erp-date-field {
-    width: calc(10.5ch + 2.1rem);
-    min-width: calc(10.5ch + 2.1rem);
-    max-width: calc(10.5ch + 2.1rem);
+    width: calc(12.5ch + 2.6rem);
+    min-width: calc(12.5ch + 2.6rem);
+    max-width: calc(12.5ch + 2.6rem);
 }
 
 .erp-recibos-page .erp-recibos__period-input,
 .erp-recibos-page .erp-recibos__period-input.erp-date-input {
-    height: 1.7rem;
-    min-height: 1.7rem;
+    height: 2.05rem;
+    min-height: 2.05rem;
     box-sizing: border-box;
-    padding: 0.1rem 2.1rem 0.1rem 0.35rem !important;
-    font-size: 0.72rem;
-    background: #ffffff !important;
-    border: 1px solid #94a3b8 !important;
-    border-radius: 4px !important;
+    padding: 0.15rem 2.35rem 0.15rem 0.55rem !important;
+    font-size: 0.78rem;
+    color: #0f172a;
+    background-color: #f8fafc !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231e5a9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.5rem center !important;
+    background-size: 1rem 1rem !important;
+    border: 1px solid #c5d4e6 !important;
+    border-radius: 8px !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+    cursor: text;
 }
 
 .erp-recibos-page .erp-recibos__locate-group {
     display: inline-flex;
     flex: 1 1 auto;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
     min-width: 0;
-    padding-left: 0.55rem;
-    border-left: 1px solid #b8c8d8;
+    padding-left: 0.65rem;
+    border-left: 1px solid #e2e8f0;
 }
 
 .erp-recibos-page .erp-recibos__locate-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--erp-brand-primary, #1e5a9e);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f3460;
     white-space: nowrap;
 }
 
 .erp-recibos-page .erp-recibos__select,
 .erp-recibos-page .erp-recibos__input {
-    height: 1.7rem;
-    min-height: 1.7rem;
-    padding: 0.1rem 0.35rem;
-    font-size: 0.72rem;
-    background: #ffffff !important;
-    border: 1px solid #94a3b8 !important;
-    border-radius: 4px !important;
+    height: 2.05rem;
+    min-height: 2.05rem;
+    padding: 0.15rem 0.65rem;
+    font-size: 0.78rem;
+    color: #0f172a;
+    background: #f8fafc !important;
+    border: 1px solid #c5d4e6 !important;
+    border-radius: 8px !important;
+    outline: none !important;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 
 .erp-recibos-page .erp-recibos__select:focus,
-.erp-recibos-page .erp-recibos__input:focus {
-    border-color: var(--erp-brand-primary, #1e5a9e) !important;
-    outline: none !important;
-    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18) !important;
+.erp-recibos-page .erp-recibos__input:focus,
+.erp-recibos-page .erp-recibos__period-input:focus,
+.erp-recibos-page .erp-recibos__period-input.erp-date-input:focus {
+    border-color: #5b8fc7 !important;
+    background-color: #fff !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+.erp-recibos-page .erp-recibos__period-input:focus,
+.erp-recibos-page .erp-recibos__period-input.erp-date-input:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231e5a9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.5rem center !important;
+    background-size: 1rem 1rem !important;
 }
 
 .erp-recibos-page .erp-recibos__locate-field {
     width: auto;
-    min-width: 5.5rem;
-    max-width: 6.5rem;
+    min-width: 6.5rem;
+    max-width: 8rem;
     flex-shrink: 0;
 }
 
 .erp-recibos-page .erp-recibos__locate-input {
     flex: 1 1 8rem;
-    min-width: 6rem;
+    min-width: 7rem;
 }
 
 .erp-recibos-page .erp-recibos__btn {
-    height: 1.7rem;
-    padding: 0 0.55rem;
-    border: 1px solid #94a3b8;
-    border-radius: 4px;
-    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
-    color: #0f172a;
-    font-size: 0.68rem;
-    font-weight: 700;
+    height: 2.05rem;
+    min-height: 2.05rem;
+    padding: 0 0.85rem;
+    border: 1px solid #1e5a9e;
+    border-radius: 8px;
+    background: #1e5a9e;
+    color: #fff;
+    font-size: 0.74rem;
+    font-weight: 750;
     cursor: pointer;
     white-space: nowrap;
+    transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .erp-recibos-page .erp-recibos__btn:hover {
-    border-color: #1e5a9e;
-    background: #ffffff;
+    background: #174a7c;
+    border-color: #174a7c;
 }
 
 .erp-recibos-page .erp-recibos__btn--secondary {
-    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    border-color: #c5d4e6;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-recibos-page .erp-recibos__btn--secondary:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
 }
 
 .erp-recibos-page .erp-recibos__page-size-group {
@@ -264,7 +320,7 @@
     flex: 0 0 auto;
     margin-left: auto;
     padding-left: 0.65rem;
-    border-left: 1px solid #b8c8d8;
+    border-left: 1px solid #e2e8f0;
 }
 
 .erp-recibos-page .erp-recibos__page-size-label {
@@ -273,8 +329,8 @@
     gap: 0.4rem;
     margin: 0;
     font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--erp-text, #0f172a);
+    font-weight: 650;
+    color: #64748b;
     white-space: nowrap;
 }
 
@@ -287,14 +343,51 @@
     display: none !important;
 }
 
+/* Grade */
 .erp-recibos-page .fi-ta-ctn {
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow: auto !important;
-    margin: 0 0.55rem !important;
-    background: #ffffff !important;
-    border: 1px solid #b8c8d8 !important;
-    border-radius: 5px !important;
+    margin: 0 0.85rem !important;
+    background: #fff !important;
+    border: 1px solid #d5e2f0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04) !important;
+}
+
+.erp-recibos-page .fi-ta-header-cell {
+    background: #f1f5f9 !important;
+    color: #0f3460 !important;
+    border-bottom: 1px solid #dbe5f0 !important;
+    font-size: 0.7rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.erp-recibos-page .fi-ta-header-cell-sort-btn {
+    color: #0f3460 !important;
+}
+
+.erp-recibos-page .fi-ta-row {
+    transition: background 0.1s ease;
+}
+
+.erp-recibos-page .fi-ta-row:hover {
+    background: #f5f9fd !important;
+}
+
+.erp-recibos-page .fi-ta-row.erp-list-row--selected,
+.erp-recibos-page .fi-ta-row.is-selected,
+.erp-recibos-page tr.fi-ta-row[data-selected="true"] {
+    background: #e8f1fb !important;
+    box-shadow: inset 3px 0 0 #1e5a9e;
+}
+
+.erp-recibos-page .fi-ta-cell {
+    border-color: #eef2f7 !important;
+    font-size: 0.78rem !important;
+    color: #1e293b !important;
 }
 
 .erp-recibos-page .fi-ta-header-cell:nth-child(1),
@@ -306,144 +399,620 @@
 .erp-recibos-page .fi-ta-header-cell:nth-child(4),
 .erp-recibos-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 20%; }
 
+/* Total */
 .erp-recibos-page .erp-recibos__footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     flex-shrink: 0;
     gap: 0.5rem;
-    margin: 0.35rem 0.55rem 0.15rem;
-    padding: 0.35rem 0.65rem;
-    background: #ffffff;
-    border: 1px solid #b8c8d8;
-    border-radius: 5px;
+    margin: 0.45rem 0.85rem 0.15rem;
+    padding: 0.55rem 0.85rem;
+    background: #fff;
+    border: 1px solid #d5e2f0;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.04);
 }
 
 .erp-recibos-page .erp-recibos__total-item {
     display: inline-flex;
     align-items: baseline;
-    gap: 0.4rem;
+    gap: 0.45rem;
 }
 
 .erp-recibos-page .erp-recibos__total-label {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 800;
-    color: var(--erp-brand-primary, #1e5a9e);
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
 }
 
 .erp-recibos-page .erp-recibos__total-value {
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 800;
-    color: #0f172a;
+    color: #0f3460;
     font-variant-numeric: tabular-nums;
 }
 
+/* Action bar */
 .erp-recibos-page .erp-unidades-actions {
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 0.35rem !important;
+    gap: 0.55rem !important;
     flex-shrink: 0 !important;
-    margin: 0.35rem 0.55rem 0.55rem !important;
-    padding: 0.4rem 0.45rem !important;
-    background: #ffffff !important;
-    border: 1px solid #b8c8d8 !important;
-    border-radius: 5px !important;
+    margin: 0 !important;
+    padding: 0.7rem 0.95rem 0.85rem !important;
+    background: linear-gradient(180deg, #f8fafc 0%, #e8eef6 100%) !important;
+    border: none !important;
+    border-top: 1px solid #c5d4e6 !important;
+    border-radius: 0 !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn {
     display: inline-flex !important;
+    flex-direction: column !important;
     align-items: center !important;
-    gap: 0.3rem !important;
-    height: 1.85rem !important;
-    padding: 0 0.55rem !important;
-    border: 1px solid #94a3b8 !important;
-    border-radius: 4px !important;
-    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%) !important;
-    color: #0f172a !important;
-    font-size: 0.72rem !important;
-    font-weight: 700 !important;
+    justify-content: center !important;
+    gap: 0.35rem !important;
+    min-width: 5.75rem !important;
+    min-height: 3.35rem !important;
+    height: auto !important;
+    padding: 0.45rem 0.85rem !important;
+    border: 1px solid #1e5a9e !important;
+    border-radius: 10px !important;
+    background: linear-gradient(180deg, #2a6fbd 0%, #1e5a9e 100%) !important;
+    color: #fff !important;
+    font-size: 0.8rem !important;
+    font-weight: 750 !important;
+    text-align: center !important;
     cursor: pointer !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 2px 6px rgba(15, 52, 96, 0.22) !important;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn:hover {
-    border-color: #1e5a9e !important;
-    background: #ffffff !important;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+    border-color: #2563eb !important;
+    transform: translateY(-1px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.25) inset,
+        0 4px 12px rgba(37, 99, 235, 0.28) !important;
+}
+
+.erp-recibos-page .erp-unidades-actions__btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(15, 52, 96, 0.2) !important;
+}
+
+.erp-recibos-page .erp-unidades-actions__btn .erp-unidades-actions__label {
+    color: #fff !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn[data-erp-key="F2"] {
-    background: linear-gradient(180deg, #1e5a9e 0%, #16487e 100%) !important;
-    border-color: #13406f !important;
-    color: #fff !important;
+    border-color: #0f3460 !important;
+    background: linear-gradient(180deg, #0f3460 0%, #0b2748 100%) !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn[data-erp-key="F2"]:hover {
-    background: linear-gradient(180deg, #2563ab 0%, #1e5a9e 100%) !important;
-}
-
-.erp-recibos-page .erp-unidades-actions__btn[data-erp-key="F2"] .erp-unidades-actions__label,
-.erp-recibos-page .erp-unidades-actions__btn[data-erp-key="F2"] .erp-unidades-actions__label kbd {
-    color: #fff !important;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    border-color: #1e5a9e !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn--close {
     margin-left: auto !important;
-    background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%) !important;
-    border-color: #991b1b !important;
+    border-color: #b91c1c !important;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%) !important;
     color: #fff !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.2) inset,
+        0 2px 6px rgba(185, 28, 28, 0.28) !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__btn--close:hover {
-    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%) !important;
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 100%) !important;
+    border-color: #ef4444 !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 4px 12px rgba(239, 68, 68, 0.32) !important;
 }
 
-.erp-recibos-page .erp-unidades-actions__btn--close .erp-unidades-actions__label,
-.erp-recibos-page .erp-unidades-actions__btn--close .erp-unidades-actions__label kbd {
+.erp-recibos-page .erp-unidades-actions__btn--close .erp-unidades-actions__label {
     color: #fff !important;
 }
 
 .erp-recibos-page .erp-unidades-actions__icon {
-    font-size: 0.78rem;
-    opacity: 0.9;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    opacity: 1;
 }
 
-.erp-recibos-page .erp-unidades-actions__label kbd {
-    font-family: inherit;
+.erp-recibos-page .erp-unidades-actions__btn--close .erp-unidades-actions__icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.erp-recibos-page .erp-unidades-actions__label {
+    display: block;
+    width: 100%;
+    text-align: center;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+}
+
+/* Modal formulário (Novo / Alterar Recibo) — só CSS, escopo da página */
+.erp-recibos-page .erp-fpgto-modal {
+    padding: 1rem;
+}
+
+.erp-recibos-page .erp-fpgto-modal__backdrop {
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(2px);
+}
+
+.erp-recibos-page .erp-fpgto-modal__dialog.erp-recibo-modal__dialog,
+.erp-recibos-page .erp-recibo-modal__dialog {
+    width: min(56rem, 96vw) !important;
+    max-width: min(56rem, 96vw) !important;
+    border: 1px solid #c5d4e6 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    box-shadow: 0 24px 60px rgba(15, 40, 71, 0.28) !important;
+    overflow: visible;
+}
+
+.erp-recibos-page .erp-fpgto-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.95rem;
+    background: linear-gradient(135deg, #0f3460 0%, #1e5a9e 62%, #2a6fbd 100%);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px 14px 0 0;
+}
+
+.erp-recibos-page .erp-recibo-modal__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-recibos-page .erp-recibo-modal__eyebrow {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.72;
+}
+
+.erp-recibos-page .erp-fpgto-modal__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.erp-recibos-page .erp-fpgto-modal__close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.erp-recibos-page .erp-fpgto-modal__body.erp-recibo-modal__body,
+.erp-recibos-page .erp-recibo-modal__body {
+    display: block !important;
+    padding: 1.05rem 1.15rem 0.5rem !important;
+    background: #fff !important;
+}
+
+.erp-recibos-page .erp-recibo-modal__grid {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(12rem, 1fr) minmax(9rem, 11rem);
+    gap: 0.65rem 0.75rem;
+    align-items: start;
+}
+
+.erp-recibos-page .erp-recibo-modal__code {
+    grid-column: 1;
+}
+
+.erp-recibos-page .erp-recibo-modal__emissao {
+    grid-column: 2;
+}
+
+.erp-recibos-page .erp-recibo-modal__valor {
+    grid-column: 3;
+}
+
+.erp-recibos-page .erp-recibo-modal__extenso,
+.erp-recibos-page .erp-recibo-modal__recebi,
+.erp-recibos-page .erp-recibo-modal__referente {
+    grid-column: 1 / -1;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.28rem !important;
+    margin: 0 !important;
+    grid-template-columns: none !important;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__label {
+    display: block !important;
+    text-align: left !important;
+    color: #334155 !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input,
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input.erp-date-input,
+.erp-recibos-page .erp-recibo-modal .erp-recibo-modal__textarea {
+    width: 100% !important;
+    min-height: 2.25rem !important;
+    padding: 0.45rem 0.7rem !important;
+    border: 1px solid #94a3b8 !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    font: inherit !important;
+    font-size: 0.82rem !important;
+    box-shadow: none !important;
+    cursor: text !important;
+    opacity: 1 !important;
+}
+
+/* Anti-autofill coloca readonly: nao deixar parecer campo bloqueado */
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input[readonly]:not(.erp-fpgto-field__input--code),
+.erp-recibos-page .erp-recibo-modal .erp-recibo-modal__textarea[readonly] {
+    background: #fff !important;
+    color: #0f172a !important;
+    cursor: text !important;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input:focus,
+.erp-recibos-page .erp-recibo-modal .erp-recibo-modal__textarea:focus {
+    border-color: #1e5a9e !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.16) !important;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input--code,
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input--code[readonly] {
+    max-width: 6.5rem !important;
+    background: #eef2f7 !important;
+    color: #64748b !important;
+    cursor: default !important;
+    pointer-events: none;
+}
+
+.erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input--money {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700 !important;
+}
+
+.erp-recibos-page .erp-recibo-modal__extenso .erp-fpgto-field__input,
+.erp-recibos-page .erp-recibo-modal__recebi .erp-fpgto-field__input,
+.erp-recibos-page .erp-recibo-modal__referente .erp-fpgto-field__input,
+.erp-recibos-page .erp-recibo-modal__referente .erp-recibo-modal__textarea {
+    text-transform: uppercase !important;
+}
+
+.erp-recibos-page .erp-recibo-modal__referente .erp-recibo-modal__textarea {
+    min-height: calc(2.25rem + 5cm) !important;
+    height: calc(2.25rem + 5cm) !important;
+    resize: vertical;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup {
+    position: relative;
+    width: 100%;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__panel {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__panel--empty {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.78rem;
+    color: #475569;
+    font-weight: 600;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__list {
+    list-style: none;
+    margin: 0;
+    padding: 0.2rem 0;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__item {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__item:last-child {
+    border-bottom: 0;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__item:hover {
+    background: #dbeafe;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__item--active {
+    background: #93c5fd;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__nome {
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 750;
+    text-transform: uppercase;
+    line-height: 1.25;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.erp-recibos-page .erp-recibo-recebi-lookup__doc {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 650;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup {
+    position: relative;
+    width: 100%;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 2px);
+    z-index: 40;
+    max-height: 14rem;
+    overflow: auto;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__panel--empty {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.78rem;
+    color: #475569;
+    font-weight: 600;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__list {
+    list-style: none;
+    margin: 0;
+    padding: 0.2rem 0;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__item {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.65rem;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__item:last-child {
+    border-bottom: 0;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__item:hover {
+    background: #dbeafe;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__item--active {
+    background: #93c5fd;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__codigo {
+    color: #1e5a9e;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    min-width: 3.5rem;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__nome {
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1.25;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.erp-recibos-page .erp-recibo-produto-lookup__hint {
+    padding: 0.4rem 0.7rem;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.erp-recibos-page .erp-recibo-modal__row {
+    display: contents;
+}
+
+.erp-recibos-page .erp-recibo-modal__row--emissao-valor {
+    display: contents;
+}
+
+.erp-recibos-page .erp-fpgto-modal__error {
+    margin: -0.35rem 0 0;
+    color: #b91c1c;
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.erp-recibos-page .erp-fpgto-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.85rem 1rem 1rem;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    border-radius: 0 0 14px 14px;
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 2.4rem;
+    padding: 0 1.05rem;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 750;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(15, 52, 96, 0.12);
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn:hover {
+    transform: translateY(-1px);
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn:active {
+    transform: translateY(0);
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn--save {
+    border: 1px solid #1e5a9e;
+    background: linear-gradient(180deg, #2a6fbd 0%, #1e5a9e 100%);
+    color: #fff;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.2) inset,
+        0 2px 6px rgba(15, 52, 96, 0.22);
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn--save:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    border-color: #2563eb;
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn--cancel {
+    border: 1px solid #b91c1c;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 2px 6px rgba(185, 28, 28, 0.22);
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn--cancel:hover {
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+    border-color: #ef4444;
+}
+
+.erp-recibos-page .erp-fpgto-modal__btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 0.75rem;
     font-weight: 800;
 }
 
-.erp-recibo-modal__dialog {
-    width: min(34rem, 96vw) !important;
-    max-width: min(34rem, 96vw) !important;
-}
-
-.erp-recibo-modal__body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-}
-
-.erp-recibo-modal__row {
-    display: grid;
-    grid-template-columns: 5.5rem 1fr 7.5rem;
-    gap: 0.55rem;
-}
-
-.erp-recibo-modal__textarea {
-    min-height: 4.5rem;
-    resize: vertical;
+.erp-recibos-page .erp-fpgto-modal__btn kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.55rem;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.18);
     font-family: inherit;
-}
-
-.erp-fpgto-field__input--money {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+    font-size: 0.66rem;
+    font-weight: 800;
+    line-height: 1;
 }
 
 @media (max-width: 720px) {
-    .erp-recibo-modal__row {
+    .erp-recibos-page .erp-recibo-modal__grid {
         grid-template-columns: 1fr;
+    }
+
+    .erp-recibos-page .erp-recibo-modal__code,
+    .erp-recibos-page .erp-recibo-modal__emissao,
+    .erp-recibos-page .erp-recibo-modal__valor,
+    .erp-recibos-page .erp-recibo-modal__extenso,
+    .erp-recibos-page .erp-recibo-modal__recebi,
+    .erp-recibos-page .erp-recibo-modal__referente {
+        grid-column: 1;
+    }
+
+    .erp-recibos-page .erp-recibo-modal .erp-fpgto-field__input--code {
+        max-width: none !important;
+    }
+
+    .erp-recibos-page .erp-fpgto-modal__footer {
+        flex-wrap: wrap;
     }
 
     .erp-recibos-page .erp-recibos__locate-group,
@@ -454,3 +1023,626 @@
         width: 100%;
     }
 }
+
+/* ── Modal impressão (F6) ─────────────────────────────────────── */
+.erp-recibos-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-recibos-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-recibos-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    background: #e3ecf7;
+    box-shadow: 0 8px 32px rgba(15, 52, 96, 0.35);
+    overflow: hidden;
+}
+
+.erp-recibos-page .erp-recibo-print-modal .erp-lookup-modal__window {
+    width: min(22rem, calc(100vw - 2rem));
+}
+
+.erp-recibos-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-recibos-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid rgb(255 255 255 / 35%);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-recibos-page .erp-recibo-print-modal__body {
+    display: flex;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding: 0.85rem;
+}
+
+.erp-recibos-page .erp-recibo-print-modal__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 5.5rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #f8fafc 0%, #dbeafe 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.erp-recibos-page .erp-recibo-print-modal__icon-printer {
+    font-size: 2.75rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(15, 40, 71, 0.2));
+}
+
+.erp-recibos-page .erp-recibo-print-modal__options {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+/* Mesmo visual dos botões de Impressão | Orçamento */
+.erp-recibos-page .erp-recibo-print-modal__option {
+    flex: 1;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+    transition: background var(--erp-transition, 0.15s ease), border-color var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease);
+}
+
+.erp-recibos-page .erp-recibo-print-modal__option:hover,
+.erp-recibos-page .erp-recibo-print-modal__option:focus {
+    background: #ffffff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.erp-recibos-page .erp-recibo-print-modal__option:active {
+    transform: translateY(0);
+}
+
+.erp-recibos-page .erp-recibo-print-modal__option--exit {
+    background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #fca5a5;
+}
+
+.erp-recibos-page .erp-recibo-print-modal__option--exit:hover,
+.erp-recibos-page .erp-recibo-print-modal__option--exit:focus {
+    border-color: var(--erp-action-danger, #dc2626);
+    background: #fff5f5;
+}
+
+/* ── Overlay visualizar ───────────────────────────────────────── */
+.erp-recibos-page .erp-recibo-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.erp-recibos-page .erp-recibo-preview-overlay .erp-form-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.erp-recibos-page .erp-recibo-preview-overlay .erp-form-overlay__panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(1280px, 98vw);
+    height: calc(100dvh - 5.5rem);
+    max-height: calc(100dvh - 5.5rem);
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.erp-recibos-page .erp-recibo-preview-overlay .erp-form-overlay__iframe {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    background: #c7d5e8;
+}
+
+
+/* Modal Enviar recibo (F9) — mesmo padrao Orcamentos */
+.erp-recibos-page .erp-orc-email-modal .erp-lookup-modal__window {
+    width: min(34rem, calc(100vw - 2rem));
+}
+
+.erp-recibos-page .erp-orc-email-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.75rem 0.85rem;
+}
+
+.erp-recibos-page .erp-orc-email-modal__field {
+    display: grid;
+    grid-template-columns: 5.25rem minmax(0, 1fr);
+    gap: 0.45rem 0.55rem;
+    align-items: center;
+}
+
+.erp-recibos-page .erp-orc-email-modal__field:has(.erp-orc-email-modal__attachments) {
+    align-items: start;
+}
+
+.erp-recibos-page .erp-orc-email-modal__label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-recibos-page .erp-orc-email-modal__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.82rem;
+}
+
+.erp-recibos-page .erp-orc-email-modal__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgb(30 90 158 / 18%);
+}
+
+.erp-recibos-page .erp-orc-email-modal__error {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: var(--erp-action-danger, #dc2626);
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-height: 5.5rem;
+    max-height: 8rem;
+    padding: 0.25rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    overflow: auto;
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachment {
+    width: 100%;
+    padding: 0.2rem 0.35rem;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.78rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachment:hover {
+    background: rgb(30 90 158 / 8%);
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachment.is-selected {
+    background: rgb(30 90 158 / 16%);
+    outline: 1px solid var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachments-empty {
+    padding: 0.35rem;
+    color: var(--erp-text-muted, #64748b);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+.erp-recibos-page .erp-orc-email-modal__attachment-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
+}
+
+.erp-recibos-page .erp-orc-email-modal__mini-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-recibos-page .erp-orc-email-modal__mini-btn:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    background: #fff;
+}
+
+.erp-recibos-page .erp-orc-email-modal__mini-btn--danger:hover {
+    border-color: var(--erp-action-danger, #dc2626);
+    background: #fff5f5;
+}
+
+.erp-recibos-page .erp-orc-email-modal__mini-btn span[aria-hidden="true"] {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.erp-recibos-page .erp-orc-email-modal__file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.erp-recibos-page .erp-orc-email-modal__hint {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-recibos-page .erp-orc-email-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    background: transparent;
+    padding: 0;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 3rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--erp-radius-md, 8px);
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--erp-text, #0f172a);
+    box-shadow: var(--erp-shadow-md, 0 4px 14px rgba(30, 90, 158, 0.14));
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn:hover {
+    background: #ffffff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18));
+    transform: translateY(-2px);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%);
+    border-color: #86efac;
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"]:hover {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp {
+    background: linear-gradient(180deg, #25d366 0%, #128c7e 100%) !important;
+    border-color: #86efac !important;
+    color: #fff !important;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"]:hover,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"]:hover,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp:hover,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp:hover {
+    background: linear-gradient(180deg, #2fe576 0%, #25d366 100%) !important;
+    border-color: #86efac !important;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%);
+    border-color: #fca5a5;
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__icon--save,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__icon,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__icon,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__icon,
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__icon,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-recibos-page .erp-orc-email-modal .erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+/* ── Modal envio unificado (F9 — e-mail + WhatsApp, padrão NF-e) ───────── */
+.erp-recibos-page .erp-orc-envio-modal .erp-lookup-modal__window {
+    position: relative;
+    width: min(42rem, calc(100vw - 2rem));
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field--message {
+    align-items: start;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input,
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: #0f172a;
+    background: #fff;
+    font-family: inherit;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    min-height: 8.5rem;
+    resize: vertical;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input:focus,
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__error {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: #b91c1c;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-size: 0.75rem;
+    color: #0f172a;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment.is-selected {
+    border-color: #16a34a;
+    background: #ecfdf5;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments-empty {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__hint {
+    grid-column: 2;
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-pcad-actions__btn.is-busy {
+    opacity: 0.92;
+    cursor: wait;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy[wire\:loading],
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy[style*="display: flex"] {
+    display: flex !important;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-panel {
+    position: relative;
+    z-index: 1;
+    width: min(22rem, 100%);
+    padding: 1rem 1.1rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #86efac;
+    background: linear-gradient(180deg, #f8fffb 0%, #eefcf3 100%);
+    box-shadow: 0 18px 40px rgba(15, 40, 71, 0.28);
+    text-align: center;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-spinner {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0 auto 0.55rem;
+    border: 2.5px solid #bbf7d0;
+    border-top-color: var(--erp-brand-accent-soft, #16a34a);
+    border-radius: 999px;
+    animation: erp-orc-email-busy-spin 0.7s linear infinite;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-status {
+    margin: 0 0 0.55rem;
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #14532d;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #86efac;
+    background: #ecfdf5;
+    overflow: hidden;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-bar {
+    height: 100%;
+    width: 38%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #15803d 0%, #16a34a 45%, #4ade80 100%);
+    background-size: 200% 100%;
+    animation: erp-orc-email-busy-slide 1.05s ease-in-out infinite;
+}
+
+.erp-recibos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+@keyframes erp-orc-email-busy-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes erp-orc-email-busy-slide {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(280%); }
+}
+

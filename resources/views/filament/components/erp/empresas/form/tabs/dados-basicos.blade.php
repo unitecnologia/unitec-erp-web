@@ -22,7 +22,7 @@
                 wire:target="searchEmpresaCnpj"
                 class="erp-pcad-form__btn erp-empresas-dados-form__btn-search"
             >
-                <span class="erp-pcad-form__btn-icon">🔍</span>
+                <span class="erp-pcad-form__btn-icon" aria-hidden="true">🔍</span>
                 <span wire:loading.remove wire:target="searchEmpresaCnpj">Pesquisar CNPJ</span>
                 <span wire:loading wire:target="searchEmpresaCnpj">...</span>
             </button>
@@ -61,7 +61,7 @@
                     <label class="erp-pcad-form__label" for="emp-cep"><u>F2</u> | CEP *</label>
                     <input id="emp-cep" type="text" wire:model="data.cep" data-mask="cep" class="erp-pcad-form__input erp-pcad-form__input--cep">
                     <button type="button" wire:click="modulePending('Pesquisar CEP')" class="erp-pcad-form__btn erp-empresas-dados-form__btn-icon-only">
-                        <span class="erp-pcad-form__btn-icon">🔍</span>
+                        <span class="erp-pcad-form__btn-icon" aria-hidden="true">🔍</span>
                     </button>
                     <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="emp-endereco">Endereço *</label>
                     <input id="emp-endereco" type="text" wire:model="data.endereco" class="erp-pcad-form__input">

@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 /**
  * Mantém a tabela `ncms` como catálogo único para lupa/cadastro de produto.
  * Alimenta a partir da IPBTAX (descrições oficiais) e do cadastro manual.
+ * Nunca esvazia a tabela: só cria/atualiza códigos (upsert).
  */
 final class NcmCatalogService
 {

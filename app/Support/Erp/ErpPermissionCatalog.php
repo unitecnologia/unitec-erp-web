@@ -32,11 +32,6 @@ class ErpPermissionCatalog
         'group' => 'Pessoas',
         'actions' => static::crudPrintActions(),
       ],
-      'vendedores' => [
-        'label' => 'Operadores',
-        'group' => 'Pessoas',
-        'actions' => static::crudPrintActions(),
-      ],
       'entregadores' => [
         'label' => 'Entregadores',
         'group' => 'Pessoas',
@@ -109,17 +104,25 @@ class ErpPermissionCatalog
         'group' => 'Compras',
         'actions' => [
           ...static::crudPrintActions(),
-          'import_xml' => 'Ler XML (F6)',
+          'import_xml' => 'Entrada XML (F2)',
           'close_month' => 'Fechar Mês (F9)',
         ],
       ],
       'devolucoes_compra' => [
         'label' => 'Devolução de Compra',
         'group' => 'Compras',
-        'actions' => static::crudPrintActions(),
+        'actions' => [
+          ...static::crudPrintActions(),
+          'emit_nfe' => 'Emitir NF-e (F7)',
+        ],
       ],
       'orcamentos' => [
         'label' => 'Orçamentos',
+        'group' => 'Vendas',
+        'actions' => static::crudPrintActions(),
+      ],
+      'promocoes' => [
+        'label' => 'Promoções',
         'group' => 'Vendas',
         'actions' => static::crudPrintActions(),
       ],
@@ -286,6 +289,15 @@ class ErpPermissionCatalog
           'access' => 'Acessar',
         ],
       ],
+      'comandos' => [
+        'label' => 'Comandos do Sistema',
+        'group' => 'Configurações',
+        'actions' => [
+          'access' => 'Acessar',
+          'warm' => 'Aquecer sistema',
+          'import_data' => 'Importar dados',
+        ],
+      ],
       'backup' => [
         'label' => 'Backup',
         'group' => 'Configurações',
@@ -293,15 +305,7 @@ class ErpPermissionCatalog
           'access' => 'Acessar',
           'create' => 'Gerar backup',
           'update' => 'Alterar configuração',
-        ],
-      ],
-      'forca_vendas' => [
-        'label' => 'Força de Venda',
-        'group' => 'Força de Venda',
-        'actions' => [
-          'access' => 'Acessar',
-          'config' => 'Pareamento / QR Code',
-          'delete' => 'Excluir / Revogar',
+          'restore' => 'Restaurar backup',
         ],
       ],
       'mercado_livre' => [
@@ -310,15 +314,6 @@ class ErpPermissionCatalog
         'actions' => [
           'access' => 'Acessar',
           'config' => 'Conectar conta / config',
-        ],
-      ],
-      'vendas_internas' => [
-        'label' => 'Vendas Internas',
-        'group' => 'Vendas Internas',
-        'actions' => [
-          'access' => 'Acessar',
-          'config' => 'Autorizar aparelhos',
-          'delete' => 'Excluir / Revogar',
         ],
       ],
       'logistica' => [

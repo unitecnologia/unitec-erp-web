@@ -31,11 +31,8 @@ class VendedorResource extends Resource
 
     public static function canAccess(): bool
     {
-        if (\App\Support\Erp\ErpOnboarding::step() === \App\Support\Erp\ErpOnboarding::STEP_COLABORADOR) {
-            return true;
-        }
-
-        return parent::canAccess();
+        // Tela obsoleta: ListVendedores redireciona para RH → Funcionários (aba Operador).
+        return true;
     }
 
     public static function table(Table $table): Table

@@ -108,6 +108,66 @@
     color: #0f172a;
 }
 
+.erp-dash--has-visao {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.erp-dash__visao-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.18rem 0.28rem;
+    border: 1px solid #c5d0de;
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+.erp-dash__visao-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #334155;
+    letter-spacing: 0.01em;
+}
+
+.erp-dash__visao-toggle {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid #c5d0de;
+    border-radius: 5px;
+    overflow: hidden;
+    background: #eef2f7;
+}
+
+.erp-dash__visao-btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #475569;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.34rem 0.62rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.erp-dash__visao-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.erp-dash__visao-btn.is-active {
+    background: #1e5a9e;
+    color: #ffffff;
+}
+
+.erp-dash__visao-btn + .erp-dash__visao-btn {
+    border-left: 1px solid #c5d0de;
+}
+
 /* Sem linha de gauges: sobe o resto do dashboard e fecha o vazio */
 .erp-dash:not(:has(.erp-dash__gauges-row)) {
     grid-template-rows: auto minmax(0, 1fr);
@@ -979,21 +1039,21 @@
 }
 
 .erp-dash-kpi__value {
-    margin: 0.04rem 0 0;
-    font-size: clamp(0.92rem, 1.15vw, 1.08rem);
-    font-weight: 800;
-    line-height: 1.1;
+    margin: 0.02rem 0 0;
+    font-size: clamp(0.78rem, 0.95vw, 0.92rem);
+    font-weight: 750;
+    line-height: 1.15;
     color: #0f3460;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
 }
 
 .erp-dash-kpi__hint {
-    margin: 0.06rem 0 0;
-    font-size: 0.66rem;
+    margin: 0.04rem 0 0;
+    font-size: 0.58rem;
     font-weight: 550;
     color: #5b6b80;
-    line-height: 1.2;
+    line-height: 1.15;
 }
 
 .erp-dash-kpi--blue .erp-dash-kpi__accent { background: #1d4ed8; }
@@ -1270,6 +1330,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.erp-dash-panel__empty {
+    margin: 0;
+    padding: 1.2rem 0.6rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: center;
 }
 
 .erp-dash-panel__body--chart canvas {

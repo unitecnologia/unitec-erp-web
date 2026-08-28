@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
@@ -23,7 +24,6 @@ use Laravel\Sanctum\HasApiTokens;
     'senha_app_forca_vendas',
     'empresa_id',
     'is_admin',
-    'is_supervisor',
     'ativo',
     'erp_profile_id',
     'vendedor_id',
@@ -42,7 +42,6 @@ class User extends Authenticatable implements FilamentUser
         return [
             'password' => 'hashed',
             'is_admin' => 'boolean',
-            'is_supervisor' => 'boolean',
             'ativo' => 'boolean',
         ];
     }
@@ -74,6 +73,13 @@ class User extends Authenticatable implements FilamentUser
     public function empresas(): BelongsToMany
     {
         return $this->belongsToMany(Empresa::class, 'empresa_user')->withTimestamps();
+    }
+
+    public function caixaContas(): BelongsToMany
+    {
+        return $this->belongsToMany(CaixaConta::class, 'caixa_conta_user')
+            ->withPivot(['empresa_id', 'is_padrao'])
+            ->withTimestamps();
     }
 
     /**
@@ -109,6 +115,95 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return in_array($empresaId, $this->accessibleEmpresaIds(), true);
+    }
+
+    /**
+     * Caixas PDV liberados para o usuário na empresa.
+     * Sem vínculo configurado: libera todos os tipo PDV (compatibilidade).
+     * Admin: todos os PDV.
+     *
+     * @return list<int>
+     */
+    public function accessibleCaixaContaIds(?int $empresaId = null): array
+    {
+        CaixaConta::ensurePdvOperacional();
+
+        $empresaId = $empresaId ?: (int) ($this->empresa_id ?? 0);
+
+        $all = CaixaConta::query()
+            ->assignable()
+            ->orderBy('codigo')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if ($this->is_admin || $empresaId <= 0) {
+            return $all;
+        }
+
+        $assigned = DB::table('caixa_conta_user')
+            ->where('user_id', $this->getKey())
+            ->where('empresa_id', $empresaId)
+            ->orderByDesc('is_padrao')
+            ->orderBy('caixa_conta_id')
+            ->pluck('caixa_conta_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if ($assigned === []) {
+            return $all;
+        }
+
+        return array_values(array_intersect($assigned, $all));
+    }
+
+    /**
+     * Há pelo menos um caixa tipo PDV liberado para operar no PDV.
+     */
+    public function podeOperarComCaixaPdv(?int $empresaId = null): bool
+    {
+        return $this->accessibleCaixaContaIds($empresaId) !== [];
+    }
+
+    public function defaultCaixaContaId(?int $empresaId = null): ?int
+    {
+        $empresaId = $empresaId ?: (int) ($this->empresa_id ?? 0);
+
+        if ($empresaId <= 0) {
+            return null;
+        }
+
+        $padrao = DB::table('caixa_conta_user')
+            ->where('user_id', $this->getKey())
+            ->where('empresa_id', $empresaId)
+            ->where('is_padrao', true)
+            ->value('caixa_conta_id');
+
+        if ($padrao) {
+            return (int) $padrao;
+        }
+
+        $ids = $this->accessibleCaixaContaIds($empresaId);
+
+        return $ids[0] ?? null;
+    }
+
+    public function defaultCaixaContaNome(?int $empresaId = null): ?string
+    {
+        $id = $this->defaultCaixaContaId($empresaId);
+
+        if (! $id) {
+            return null;
+        }
+
+        $nome = trim((string) (CaixaConta::query()->whereKey($id)->value('nome') ?? ''));
+
+        return $nome !== '' ? $nome : null;
+    }
+
+    public function canAccessCaixaConta(int $caixaContaId, ?int $empresaId = null): bool
+    {
+        return in_array($caixaContaId, $this->accessibleCaixaContaIds($empresaId), true);
     }
 
     public function erpProfile(): BelongsTo

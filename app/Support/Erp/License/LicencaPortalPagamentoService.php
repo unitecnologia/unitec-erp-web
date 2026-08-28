@@ -9,6 +9,49 @@ use Throwable;
 class LicencaPortalPagamentoService
 {
     /**
+     * Próxima mensalidade em aberto (vencimento de pagamento).
+     *
+     * @return array{
+     *     ok: bool,
+     *     message?: string,
+     *     invoice_id?: int,
+     *     amount?: string,
+     *     description?: string,
+     *     due_date?: string
+     * }
+     */
+    public function proximaMensalidade(string $cnpj): array
+    {
+        if (! filled(trim((string) config('unitec.licenca_api.base_url', '')))) {
+            return ['ok' => false, 'message' => 'URL do portal de licença não configurada.'];
+        }
+
+        try {
+            $session = $this->loginCliente($cnpj, timeout: 4);
+            $invoice = $this->proximaFaturaPendente($session, timeout: 4);
+
+            if ($invoice === null) {
+                return ['ok' => false, 'message' => 'Nenhuma mensalidade pendente no portal.'];
+            }
+
+            return [
+                'ok' => true,
+                'invoice_id' => (int) ($invoice['id'] ?? 0),
+                'amount' => (string) ($invoice['amount'] ?? ''),
+                'description' => (string) ($invoice['description'] ?? ''),
+                'due_date' => (string) ($invoice['dueDate'] ?? ''),
+            ];
+        } catch (Throwable $e) {
+            Log::warning('Falha ao consultar mensalidade no portal de licença.', [
+                'cnpj' => preg_replace('/\D/', '', $cnpj),
+                'message' => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Carrega a próxima fatura pendente e o QR Pix do portal Unitec.
      *
      * @return array{
@@ -129,14 +172,15 @@ class LicencaPortalPagamentoService
     /**
      * @return \GuzzleHttp\Cookie\CookieJar
      */
-    private function loginCliente(string $cnpj): \GuzzleHttp\Cookie\CookieJar
+    private function loginCliente(string $cnpj, ?int $timeout = null): \GuzzleHttp\Cookie\CookieJar
     {
         $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
-        $timeout = max(3, (int) config('unitec.licenca_api.timeout', 8));
+        $timeout = max(2, $timeout ?? (int) config('unitec.licenca_api.timeout', 8));
         $jar = new \GuzzleHttp\Cookie\CookieJar;
 
         $response = Http::withOptions(['cookies' => $jar])
             ->timeout($timeout)
+            ->connectTimeout(min(2, $timeout))
             ->acceptJson()
             ->asJson()
             ->post($baseUrl.'/api/auth/login', [
@@ -155,13 +199,14 @@ class LicencaPortalPagamentoService
      * @param  \GuzzleHttp\Cookie\CookieJar  $session
      * @return array<string, mixed>|null
      */
-    private function proximaFaturaPendente($session): ?array
+    private function proximaFaturaPendente($session, ?int $timeout = null): ?array
     {
         $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
-        $timeout = max(3, (int) config('unitec.licenca_api.timeout', 8));
+        $timeout = max(2, $timeout ?? (int) config('unitec.licenca_api.timeout', 8));
 
         $response = Http::withOptions(['cookies' => $session])
             ->timeout($timeout)
+            ->connectTimeout(min(2, $timeout))
             ->acceptJson()
             ->get($baseUrl.'/api/invoices');
 

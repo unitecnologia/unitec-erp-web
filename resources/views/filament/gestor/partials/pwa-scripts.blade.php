@@ -47,11 +47,12 @@
         }
     });
 
-    // Favorito/atalho no navegador: reaproveita a aba quando possível (não abre várias).
-    // Instalação PWA desativada por enquanto — uso normal via http://IP:8000/gestor/
-    window.UnitecGestorInstall = function () {
-        alert('Abra o Executivo no navegador em /gestor/. Favoritar a página evita abrir várias vezes.');
-    };
+    // Instalação: ver public/js/gestor-pwa-install.js (banner + beforeinstallprompt).
+    if (typeof window.UnitecGestorInstall !== 'function') {
+        window.UnitecGestorInstall = function () {
+            alert('Abra o Executivo em /gestor/ no Chrome/Edge (HTTPS ou 127.0.0.1) para instalar o app.');
+        };
+    }
 
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

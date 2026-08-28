@@ -105,9 +105,9 @@
                                 <button
                                     type="button"
                                     class="erp-devcompra-lancamento-modal__import-btn"
-                                    wire:click="importarCompra"
+                                    wire:click="openCompraSelecionarModal"
                                     @disabled(! $editable)
-                                >Importar</button>
+                                >Selecionar compra</button>
 
                                 @if ($this->compraLookupOpen && count($this->compraLookupResults) > 0)
                                     <div class="erp-devcompra-lancamento-modal__lookup">
@@ -177,12 +177,12 @@
                     <table class="erp-lookup-modal__grid erp-devcompra-lancamento-modal__grid">
                         <thead>
                             <tr>
-                                <th>Código</th>
-                                <th>Descrição</th>
-                                <th class="erp-devcompra-lancamento-modal__num">Quantidade</th>
-                                <th class="erp-devcompra-lancamento-modal__num">Qtd Devolvida</th>
-                                <th class="erp-devcompra-lancamento-modal__num">Preço</th>
-                                <th class="erp-devcompra-lancamento-modal__num">Total</th>
+                                <th class="erp-devcompra-lancamento-modal__col-code">Código</th>
+                                <th class="erp-devcompra-lancamento-modal__col-description">Produto</th>
+                                <th class="erp-devcompra-lancamento-modal__num erp-devcompra-lancamento-modal__col-quantity">Comprada</th>
+                                <th class="erp-devcompra-lancamento-modal__num erp-devcompra-lancamento-modal__col-return">Devolver</th>
+                                <th class="erp-devcompra-lancamento-modal__num erp-devcompra-lancamento-modal__col-price">Preço unit.</th>
+                                <th class="erp-devcompra-lancamento-modal__num erp-devcompra-lancamento-modal__col-total">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -192,10 +192,12 @@
                                     wire:click="selectItem({{ $index }})"
                                     @class(['erp-lookup-modal__row--selected' => $this->selectedItemIndex === $index])
                                 >
-                                    <td class="erp-devcompra-lancamento-modal__center">{{ $item['produto_codigo'] ?: '—' }}</td>
-                                    <td>{{ $item['produto_descricao'] ?: '—' }}</td>
+                                    <td class="erp-devcompra-lancamento-modal__center erp-devcompra-lancamento-modal__product-code">{{ $item['produto_codigo'] ?: '—' }}</td>
+                                    <td class="erp-devcompra-lancamento-modal__product-description">{{ $item['produto_descricao'] ?: '—' }}</td>
                                     <td class="erp-devcompra-lancamento-modal__num">
-                                        {{ number_format((float) ($item['qtd_comprada'] ?? 0), 3, ',', '.') }}
+                                        <span class="erp-devcompra-lancamento-modal__quantity-value">
+                                            {{ number_format((float) ($item['qtd_comprada'] ?? 0), 3, ',', '.') }}
+                                        </span>
                                     </td>
                                     <td class="erp-devcompra-lancamento-modal__num">
                                         @if ($editable)
@@ -212,10 +214,14 @@
                                         @endif
                                     </td>
                                     <td class="erp-devcompra-lancamento-modal__num">
-                                        {{ ErpMoney::formatBr((float) ($item['preco'] ?? 0)) }}
+                                        <span class="erp-devcompra-lancamento-modal__price-value">
+                                            R$ {{ ErpMoney::formatBr((float) ($item['preco'] ?? 0)) }}
+                                        </span>
                                     </td>
                                     <td class="erp-devcompra-lancamento-modal__num">
-                                        {{ ErpMoney::formatBr((float) ($item['total'] ?? 0)) }}
+                                        <span class="erp-devcompra-lancamento-modal__total-value">
+                                            R$ {{ ErpMoney::formatBr((float) ($item['total'] ?? 0)) }}
+                                        </span>
                                     </td>
                                 </tr>
                             @empty
@@ -234,6 +240,113 @@
                     <span class="erp-devcompra-lancamento-modal__footer-value">
                         R$ {{ number_format((float) $this->formTotal, 2, ',', '.') }}
                     </span>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if ($this->compraSelecionarModalOpen)
+    @php
+        $totalPages = max(1, (int) ceil($this->compraSelecionarTotal / $this->compraSelecionarPorPagina));
+    @endphp
+
+    <div
+        class="erp-lookup-modal erp-devcompra-selecionar-compra-modal"
+        wire:keydown.escape.window="closeCompraSelecionarModal"
+    >
+        <div class="erp-lookup-modal__backdrop" wire:click="closeCompraSelecionarModal"></div>
+
+        <div
+            class="erp-lookup-modal__window erp-devcompra-selecionar-compra-modal__window"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="erp-devcompra-selecionar-compra-title"
+            wire:click.stop
+        >
+            <div class="erp-lookup-modal__titlebar erp-devcompra-selecionar-compra-modal__titlebar">
+                <span id="erp-devcompra-selecionar-compra-title">Selecionar compra para devolução</span>
+                <button
+                    type="button"
+                    class="erp-lookup-modal__close"
+                    wire:click="closeCompraSelecionarModal"
+                    title="Fechar"
+                >✕</button>
+            </div>
+
+            <div class="erp-devcompra-selecionar-compra-modal__body">
+                <div class="erp-devcompra-selecionar-compra-modal__search">
+                    <label for="erp-devcompra-selecionar-busca">Localizar</label>
+                    <input
+                        id="erp-devcompra-selecionar-busca"
+                        type="search"
+                        wire:model.live.debounce.300ms="compraSelecionarBusca"
+                        placeholder="Número, nota, fornecedor ou chave da NF-e"
+                        autocomplete="off"
+                        autofocus
+                    >
+                    <span>{{ $this->compraSelecionarTotal }} compra(s)</span>
+                </div>
+
+                <div class="erp-devcompra-selecionar-compra-modal__table-wrap">
+                    <table class="erp-devcompra-selecionar-compra-modal__table">
+                        <thead>
+                            <tr>
+                                <th>Compra</th>
+                                <th>Data</th>
+                                <th>Nº Nota</th>
+                                <th>Fornecedor</th>
+                                <th>Situação</th>
+                                <th class="is-money">Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($this->compraSelecionarResults as $compra)
+                                <tr wire:key="devcompra-select-compra-{{ $compra['id'] }}">
+                                    <td class="is-number">{{ ltrim($compra['numero'], '0') ?: '0' }}</td>
+                                    <td>{{ $compra['data'] }}</td>
+                                    <td>{{ $compra['numero_nota'] }}</td>
+                                    <td class="is-fornecedor">{{ $compra['fornecedor'] }}</td>
+                                    <td><span class="erp-devcompra-selecionar-compra-modal__status">{{ $compra['status'] }}</span></td>
+                                    <td class="is-money">R$ {{ $compra['total'] }}</td>
+                                    <td class="is-action">
+                                        <button
+                                            type="button"
+                                            wire:click="selectCompraFromSelecionarModal({{ $compra['id'] }})"
+                                        >Selecionar</button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="is-empty">
+                                        Nenhuma compra encontrada.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="erp-devcompra-selecionar-compra-modal__footer">
+                    <span>Página {{ $this->compraSelecionarPagina }} de {{ $totalPages }}</span>
+                    <div>
+                        <button
+                            type="button"
+                            wire:click="compraSelecionarPaginaAnterior"
+                            @disabled($this->compraSelecionarPagina <= 1)
+                        >← Anterior</button>
+                        <button
+                            type="button"
+                            wire:click="compraSelecionarProximaPagina"
+                            @disabled($this->compraSelecionarPagina >= $totalPages)
+                        >Próxima →</button>
+                        <button
+                            type="button"
+                            class="is-close"
+                            wire:click="closeCompraSelecionarModal"
+                        ><kbd>ESC</kbd> Fechar</button>
+                    </div>
                 </div>
             </div>
         </div>

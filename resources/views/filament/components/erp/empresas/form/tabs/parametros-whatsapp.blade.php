@@ -31,13 +31,31 @@
 </div>
 
 <p class="erp-empresas-parametros__hint">
-    Conexão WhatsApp embarcada no ERP (Baileys). Use para envio de orçamentos e cobranças.
-    NF-e continua preferencialmente por e-mail.
+    Conexão WhatsApp embarcada no ERP (Baileys). Use para envio de orçamentos, cobranças e NF-e.
 </p>
 
 <div class="erp-empresas-parametros__section-title">Conexão</div>
 
-<div class="erp-whatsapp-panel" @if ($pollAtivo) wire:poll.3s="refreshWhatsAppStatus" @endif>
+@if ($empresaSalva)
+    <div class="erp-empresas-parametros__actions erp-whatsapp-panel__node-actions">
+        <button
+            type="button"
+            class="erp-pcad-form__btn"
+            wire:click="startWhatsAppNodeService"
+            wire:loading.attr="disabled"
+            wire:target="startWhatsAppNodeService"
+            title="Inicia ou reinicia o processo Node do gateway WhatsApp"
+        >
+            <span wire:loading.remove wire:target="startWhatsAppNodeService">Iniciar serviço Node</span>
+            <span wire:loading wire:target="startWhatsAppNodeService">Iniciando Node…</span>
+        </button>
+        <p class="erp-empresas-parametros__hint erp-whatsapp-panel__node-hint">
+            Use se o WhatsApp parar de responder ou o Node tiver sido finalizado. Depois clique em <strong>Conectar / Gerar QR</strong> se precisar.
+        </p>
+    </div>
+@endif
+
+<div class="erp-whatsapp-panel" @if ($pollAtivo) wire:poll.1s="refreshWhatsAppStatus" @endif>
     <div class="erp-whatsapp-panel__status-row">
         <div class="erp-whatsapp-panel__status">
             <span class="erp-whatsapp-panel__status-label">Status:</span>
@@ -61,6 +79,13 @@
         <div class="erp-whatsapp-panel__qr-wrap">
             <img src="{{ $this->whatsAppQr }}" alt="QR Code WhatsApp" class="erp-whatsapp-panel__qr">
             <p class="erp-empresas-parametros__hint">Abra o WhatsApp no celular → Aparelhos conectados → Conectar aparelho.</p>
+        </div>
+    @elseif ($aguardandoQr)
+        <div class="erp-whatsapp-panel__qr-wrap erp-whatsapp-panel__qr-wrap--pending">
+            <div class="erp-whatsapp-panel__qr-pending" aria-live="polite">
+                Gerando QR Code… aguarde alguns segundos.
+            </div>
+            <p class="erp-empresas-parametros__hint">Se não aparecer, clique em <strong>Conectar / Gerar QR</strong> novamente.</p>
         </div>
     @endif
 

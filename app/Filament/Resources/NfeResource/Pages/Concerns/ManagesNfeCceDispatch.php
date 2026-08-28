@@ -7,6 +7,7 @@ use App\Models\Nfe;
 use App\Models\NfeCartaCorrecao;
 use App\Models\NfeEvento;
 use App\Models\Person;
+use App\Models\Transportadora;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeCartaCorrecaoReportService;
@@ -256,7 +257,7 @@ trait ManagesNfeCceDispatch
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
+                ->body('Verifique a configuração de e-mail em Empresa → Parâmetros → E-mail.')
                 ->danger()
                 ->send();
 
@@ -296,9 +297,13 @@ trait ManagesNfeCceDispatch
             return '';
         }
 
-        $person = $this->resolveNfeCceDispatchPerson($context['nfe']);
+        $destinatario = $this->resolveNfeCceDispatchDestinatario($context['nfe']);
 
-        return trim((string) ($person?->nome_razao ?? $person?->nome ?? ''));
+        if ($destinatario instanceof Transportadora) {
+            return trim((string) ($destinatario->proprietario ?: $destinatario->apelido ?: ''));
+        }
+
+        return trim((string) ($destinatario?->nome_razao ?? $destinatario?->nome ?? ''));
     }
 
     #[Computed]
@@ -310,9 +315,9 @@ trait ManagesNfeCceDispatch
             return null;
         }
 
-        $person = $this->resolveNfeCceDispatchPerson($context['nfe']);
+        $destinatario = $this->resolveNfeCceDispatchDestinatario($context['nfe']);
 
-        if ($person instanceof Person) {
+        if ($destinatario instanceof Person || $destinatario instanceof Transportadora) {
             return null;
         }
 
@@ -441,11 +446,17 @@ trait ManagesNfeCceDispatch
         ];
     }
 
-    protected function resolveNfeCceDispatchPerson(Nfe $nfe): ?Person
+    protected function resolveNfeCceDispatchDestinatario(Nfe $nfe): Person|Transportadora|null
     {
         return $this->nfeCceDispatchDestinatario === 'transportadora'
             ? $nfe->transportadora
             : $nfe->cliente;
+    }
+
+    /** @deprecated Use resolveNfeCceDispatchDestinatario() */
+    protected function resolveNfeCceDispatchPerson(Nfe $nfe): Person|Transportadora|null
+    {
+        return $this->resolveNfeCceDispatchDestinatario($nfe);
     }
 
     protected function nfeCceDispatchDestinatarioLabel(): string

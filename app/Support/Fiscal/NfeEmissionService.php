@@ -7,6 +7,7 @@ use App\Models\Nfe;
 use App\Models\NfeEvento;
 use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
+use App\Support\Erp\Nfe\NfeEstoqueService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Unitec\FiscalEngine\FiscalEngine;
@@ -19,11 +20,16 @@ final class NfeEmissionService
         private readonly FiscalEngine $engine = new FiscalEngine(),
     ) {}
 
-    public function transmitir(Nfe $nfe, Empresa $empresa): Nfe
+    /**
+     * @param  (callable(int, string): void)|null  $onProgress
+     */
+    public function transmitir(Nfe $nfe, Empresa $empresa, ?callable $onProgress = null): Nfe
     {
         if ($nfe->status !== Nfe::STATUS_ABERTA) {
             throw new FiscalEngineException('Somente NF-e aberta pode ser transmitida.');
         }
+
+        FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_VALIDAR);
 
         $parametros = VendasParametro::forEmpresa((int) $empresa->id);
 
@@ -33,8 +39,29 @@ final class NfeEmissionService
 
         CaBundleResolver::setProjectRoot(base_path());
 
+        (new NfeEstoqueService())->validarAntesDeTransmitir($nfe, $empresa);
+
+        FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_XML);
+
         $request = $this->payloadBuilder->build($nfe, $empresa, $parametros);
-        $response = $this->engine->emitirNfe($request);
+
+        FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_ASSINAR);
+
+        $prepared = $this->engine->prepararNfeAssinada($request);
+
+        FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_SEFAZ);
+
+        $response = $this->engine->autorizarNfeAssinada(
+            nfeXml: $prepared['nfeXml'],
+            certificate: $request->certificate,
+            tpAmb: $request->ide->tpAmb,
+            chave: $prepared['chave'],
+            numero: $request->ide->numero,
+            serie: $request->ide->serie,
+            cNf: $request->ide->cNf,
+        );
+
+        FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_AUTORIZACAO);
 
         $nfe->update([
             'chave' => $response->chave,
@@ -57,6 +84,8 @@ final class NfeEmissionService
 
         (new ContadorCloudPortalHookService())->onNfeAutorizada($nfe, $empresa);
 
-        return $nfe;
+        (new NfeEstoqueService())->baixarSeAplicavel($nfe, $empresa);
+
+        return $nfe->fresh() ?? $nfe;
     }
 }

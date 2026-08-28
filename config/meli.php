@@ -2,19 +2,7 @@
 
 return [
 
-    'client_id' => env('MELI_CLIENT_ID'),
-
-    'client_secret' => env('MELI_CLIENT_SECRET'),
-
-    'redirect_uri' => env('MELI_REDIRECT_URI'),
-
-    // Hub Unitec: OAuth/webhook central para clientes sem domínio próprio.
-    'hub_url' => env('MELI_HUB_URL', 'https://unitecnologiasc.com.br'),
-
-    'hub_redirect_uri' => env('MELI_HUB_REDIRECT_URI', 'https://unitecnologiasc.com.br/meli/hub/oauth/callback'),
-
-    // true = este servidor É o hub Unitec (OAuth local).
-    'is_hub' => filter_var(env('MELI_IS_HUB', false), FILTER_VALIDATE_BOOL),
+    // Credenciais OAuth ficam no cadastro da empresa (param_meli_*). URLs fixas da API abaixo.
 
     'auth_url' => env('MELI_AUTH_URL', 'https://auth.mercadolivre.com.br/authorization'),
 

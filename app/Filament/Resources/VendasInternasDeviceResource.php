@@ -28,7 +28,7 @@ class VendasInternasDeviceResource extends Resource
 
     public static function canAccess(): bool
     {
-        return ErpAccess::currentCan('vendas_internas.access');
+        return false;
     }
 
     public static function table(Table $table): Table

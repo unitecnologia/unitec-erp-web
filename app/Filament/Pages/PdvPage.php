@@ -6,7 +6,6 @@ use App\Support\Erp\ErpAccess;
 use App\Filament\Pages\Concerns\ManagesPdvUi;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Pdv\TerminalResolver;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -49,13 +48,29 @@ class PdvPage extends Page
         if ($user && ! $user->podeOperarPdvNoTerminal($terminal)) {
             $nome = trim((string) ($terminal?->nome ?? '')) ?: 'este terminal';
 
-            Notification::make()
-                ->title('PDV não liberado para este usuário.')
-                ->body('Você não tem permissão para operar no PDV "'.$nome.'". Solicite liberação ao gerente.')
-                ->danger()
-                ->send();
+            $this->openPdvAcessoNegado(
+                'PDV não liberado',
+                [
+                    'Você não tem permissão para operar no PDV <strong>'.e($nome).'</strong>.',
+                    'Solicite ao gerente a liberação deste usuário para o terminal.',
+                ],
+                true,
+                'Depois tente abrir o PDV novamente.',
+            );
 
-            $this->redirect(filament()->getUrl());
+            return;
+        }
+
+        if ($user && ! $user->podeOperarComCaixaPdv()) {
+            $this->openPdvAcessoNegado(
+                'Sem caixa PDV liberado',
+                [
+                    'O PDV só opera com conta caixa do tipo <strong>PDV</strong>.',
+                    'Cadastre/libere um caixa PDV em Usuários e permissões → Caixas, ou ajuste o tipo em Contas Caixa.',
+                ],
+                true,
+                'Subcaixa (ex.: CAIXA GERAL) não serve para operar o PDV.',
+            );
 
             return;
         }
@@ -63,8 +78,8 @@ class PdvPage extends Page
         $this->loadPdvSessionState();
         $this->loadCupomFromSession();
 
-        if (! $this->garantirOperadorDoUsuarioLogado()) {
-            $this->redirect(filament()->getUrl());
+        if (! $this->garantirOperadorDoUsuarioLogado(notify: false)) {
+            $this->notificarOperadorObrigatorio(voltarDashboard: true);
 
             return;
         }

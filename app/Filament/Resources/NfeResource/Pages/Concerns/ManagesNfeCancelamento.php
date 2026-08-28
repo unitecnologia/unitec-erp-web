@@ -4,9 +4,14 @@ namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\Venda;
+use App\Support\Erp\Nfe\NfeInutilizacaoMotivo;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
+use App\Support\Erp\Vendas\EstornarVendaService;
 use App\Support\Fiscal\NfeCancelamentoService;
+use App\Support\Fiscal\NfeInutilizacaoService;
+use DomainException;
 use Filament\Notifications\Notification;
 use Livewire\Attributes\Computed;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
@@ -19,8 +24,16 @@ trait ManagesNfeCancelamento
 
     public string $nfeCancelJustificativa = '';
 
+    public bool $nfeCancelAbertaModalOpen = false;
+
+    public ?int $nfeCancelAbertaNfeId = null;
+
     public function cancelarNfe(): void
     {
+        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfe.cancel')) {
+            return;
+        }
+
         if ($this->nfeModalOpen && filled($this->nfeFiscalSucessoDetalhe)) {
             $this->showNfeFiscalOverlayInfo('Cancelar NF-e', 'Feche a tela de sucesso antes de cancelar.');
 
@@ -47,8 +60,20 @@ trait ManagesNfeCancelamento
             return;
         }
 
+        if ($nfe->status === Nfe::STATUS_INUTILIZADA) {
+            $this->notifyNfeCancelWarning('Esta NF-e já está inutilizada.');
+
+            return;
+        }
+
+        if ($nfe->status === Nfe::STATUS_ABERTA) {
+            $this->abrirCancelamentoNotaAberta($nfe);
+
+            return;
+        }
+
         if ($nfe->status !== Nfe::STATUS_TRANSMITIDA) {
-            $this->notifyNfeCancelWarning('Somente NF-e transmitida pode ser cancelada.');
+            $this->notifyNfeCancelWarning('Somente NF-e aberta ou transmitida pode ser cancelada.');
 
             return;
         }
@@ -62,6 +87,10 @@ trait ManagesNfeCancelamento
 
     public function confirmCancelarNfe(): void
     {
+        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfe.cancel')) {
+            return;
+        }
+
         $nfe = $this->nfeCancelNfeId
             ? Nfe::query()->find($this->nfeCancelNfeId)
             : null;
@@ -77,11 +106,13 @@ trait ManagesNfeCancelamento
             return;
         }
 
+        $justificativa = $this->nfeCancelJustificativa;
+
         try {
             $nfe = (new NfeCancelamentoService())->cancelar(
                 $nfe,
                 $empresa,
-                $this->nfeCancelJustificativa,
+                $justificativa,
             );
         } catch (FiscalEngineException $exception) {
             $this->notifyNfeCancelFiscalError($exception);
@@ -98,8 +129,32 @@ trait ManagesNfeCancelamento
         $this->resetTable();
 
         $body = filled($nfe->protocolo_cancelamento)
-            ? 'Protocolo: ' . $nfe->protocolo_cancelamento
+            ? 'Protocolo: '.$nfe->protocolo_cancelamento
             : 'Cancelamento registrado.';
+
+        $pedidoEstornado = $this->estornarPedidoAposCancelarNfe($nfe, $justificativa);
+
+        if ($pedidoEstornado === true) {
+            $body .= ' Pedido/venda vinculado também foi estornado.';
+            Notification::make()
+                ->title('NF-e cancelada e pedido estornado.')
+                ->body($body)
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        if (is_string($pedidoEstornado)) {
+            Notification::make()
+                ->title('NF-e cancelada — pedido NÃO estornado')
+                ->body($body.' '.$pedidoEstornado)
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('NF-e cancelada com sucesso.')
@@ -108,11 +163,137 @@ trait ManagesNfeCancelamento
             ->send();
     }
 
+    /**
+     * Após cancelar NF-e na SEFAZ, estorna o pedido vinculado (eixo comercial).
+     *
+     * @return true|string|null true = estornado; string = motivo da falha; null = sem pedido / já cancelado
+     */
+    protected function estornarPedidoAposCancelarNfe(Nfe $nfe, string $motivo): true|string|null
+    {
+        $vendaId = (int) ($nfe->venda_id ?? 0);
+
+        if ($vendaId <= 0) {
+            return null;
+        }
+
+        $venda = Venda::query()->find($vendaId);
+
+        if ($venda === null || $venda->status === Venda::STATUS_CANCELADO) {
+            return null;
+        }
+
+        try {
+            (new EstornarVendaService())->fromVenda(
+                $venda,
+                $motivo !== '' ? $motivo : PdvEstornoMotivo::MOTIVO_AUTOMATICO,
+                EstornarVendaService::ORIGEM_NFE_LISTA,
+                $nfe->empresa_id ? Empresa::query()->find((int) $nfe->empresa_id) : null,
+            );
+        } catch (DomainException $exception) {
+            return 'O pedido #'.$venda->numero.' permanece ativo: '.$exception->getMessage()
+                .' Trate o pedido manualmente (estoque/financeiro).';
+        } catch (FiscalEngineException $exception) {
+            return 'O pedido #'.$venda->numero.' permanece ativo (falha fiscal no estorno): '.$exception->getMessage();
+        }
+
+        return true;
+    }
+
+    public function confirmCancelarNfeAberta(): void
+    {
+        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfe.cancel')) {
+            return;
+        }
+
+        $nfe = $this->nfeCancelAbertaNfeId
+            ? Nfe::query()->find($this->nfeCancelAbertaNfeId)
+            : null;
+
+        $empresa = $nfe?->empresa_id
+            ? Empresa::query()->find($nfe->empresa_id)
+            : $this->resolveNfeCancelEmpresa();
+
+        if (! $nfe || ! $empresa) {
+            $this->closeNfeCancelAbertaModal();
+            $this->notifyNfeCancelWarning('Não foi possível localizar a NF-e aberta.');
+
+            return;
+        }
+
+        if ($nfe->status !== Nfe::STATUS_ABERTA) {
+            $this->closeNfeCancelAbertaModal();
+            $this->notifyNfeCancelWarning('A nota não está mais aberta.');
+
+            return;
+        }
+
+        $serie = (int) (ltrim((string) ($nfe->serie ?? '1'), '0') ?: 1);
+        $numero = (int) (ltrim(preg_replace('/\D/', '', (string) $nfe->numero) ?? '', '0') ?: '0');
+
+        if ($numero < 1) {
+            $this->closeNfeCancelAbertaModal();
+            $this->notifyNfeCancelWarning('NF-e sem número válido para inutilizar.');
+
+            return;
+        }
+
+        $service = new NfeInutilizacaoService();
+
+        try {
+            $response = $service->inutilizar(
+                $empresa,
+                $serie,
+                $numero,
+                $numero,
+                NfeInutilizacaoMotivo::TEXTO_PADRAO,
+            );
+        } catch (FiscalEngineException $exception) {
+            $this->closeNfeCancelAbertaModal();
+            $this->notifyNfeCancelFiscalError($exception);
+
+            return;
+        }
+
+        $this->zerarItensNfeAberta($nfe);
+        $service->marcarNotasLocaisInutilizadas($empresa, $serie, $numero, $numero);
+
+        $this->closeNfeCancelAbertaModal();
+
+        if ($this->nfeModalOpen && $this->nfeModalRecordId === $nfe->id) {
+            $this->closeNfeModal();
+        }
+
+        $this->clearListSelection();
+        $this->setStatusFilter(Nfe::STATUS_INUTILIZADA);
+        $this->resetTable();
+
+        if (method_exists($this, 'showNfeInutilizarSucessoOverlay')) {
+            $this->showNfeInutilizarSucessoOverlay($response);
+        } else {
+            Notification::make()
+                ->title('Nota aberta inutilizada.')
+                ->body('Itens zerados e numeração inutilizada na SEFAZ.')
+                ->success()
+                ->send();
+        }
+    }
+
     public function closeNfeCancelModal(): void
     {
         $this->nfeCancelModalOpen = false;
         $this->nfeCancelNfeId = null;
         $this->nfeCancelJustificativa = '';
+    }
+
+    public function closeNfeCancelAbertaModal(): void
+    {
+        $this->nfeCancelAbertaModalOpen = false;
+        $this->nfeCancelAbertaNfeId = null;
+    }
+
+    public function handleNfeCancelAbertaEscape(): void
+    {
+        $this->closeNfeCancelAbertaModal();
     }
 
     #[Computed]
@@ -148,6 +329,77 @@ trait ManagesNfeCancelamento
         $numero = ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero;
 
         return "Nota {$numero} | Série {$nfe->serie}";
+    }
+
+    #[Computed]
+    public function nfeCancelAbertaNumeroDetalhe(): string
+    {
+        if (! $this->nfeCancelAbertaNfeId) {
+            return '';
+        }
+
+        $nfe = Nfe::query()->find($this->nfeCancelAbertaNfeId);
+
+        if (! $nfe) {
+            return '';
+        }
+
+        $numero = ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero;
+
+        return "Nota {$numero} | Série {$nfe->serie}";
+    }
+
+    protected function abrirCancelamentoNotaAberta(Nfe $nfe): void
+    {
+        $numero = (int) (ltrim(preg_replace('/\D/', '', (string) $nfe->numero) ?? '', '0') ?: '0');
+
+        if ($numero < 1) {
+            $this->notifyNfeCancelWarning('NF-e aberta sem número válido para inutilizar.');
+
+            return;
+        }
+
+        $this->nfeCancelAbertaNfeId = $nfe->id;
+        $this->nfeCancelAbertaModalOpen = true;
+        $this->dispatch('erp-nfe-focus-cancel-aberta');
+    }
+
+    protected function zerarItensNfeAberta(Nfe $nfe): void
+    {
+        $nfe->itens()->delete();
+
+        if (method_exists($nfe, 'faturas')) {
+            $nfe->faturas()->delete();
+        }
+
+        if (method_exists($nfe, 'referencias')) {
+            $nfe->referencias()->delete();
+        }
+
+        $nfe->update([
+            'subtotal' => 0,
+            'desconto' => 0,
+            'frete' => 0,
+            'seguro' => 0,
+            'despesas' => 0,
+            'outros' => 0,
+            'troco' => 0,
+            'total' => 0,
+            'base_icms' => 0,
+            'total_icms' => 0,
+            'base_icms_st' => 0,
+            'valor_icms_st' => 0,
+            'base_ipi' => 0,
+            'total_ipi' => 0,
+            'base_icms_pis' => 0,
+            'total_icms_pis' => 0,
+            'base_icms_cofins' => 0,
+            'total_icms_cofins' => 0,
+            'total_desoneracao' => 0,
+            'cliente_id' => null,
+            'obs_fisco' => null,
+            'obs_contribuinte' => null,
+        ]);
     }
 
     protected function resolveNfeCancelTargetId(): ?int

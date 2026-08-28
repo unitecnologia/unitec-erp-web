@@ -32,6 +32,7 @@ final class FirebirdMigraService
         private readonly FirebirdVendasParametroImportService $vendasParametros,
         private readonly FirebirdCompraImportService $compras,
         private readonly FirebirdNotaFornecedorImportService $notasFornecedor,
+        private readonly FirebirdReciboImportService $recibos,
     ) {
     }
 
@@ -180,6 +181,13 @@ final class FirebirdMigraService
             'caixa', 'caixa_lancamentos', 'lancamentos_caixa' => [
                 'caixa' => $this->importCaixaLancamentos($updateExisting, $dryRun),
             ],
+            'recibos', 'recibo' => [
+                'recibos' => $this->recibos->importRows(
+                    $this->client->query('SELECT * FROM RECIBO ORDER BY CODIGO'),
+                    $updateExisting,
+                    $dryRun,
+                ),
+            ],
             'planos_contas', 'planos', 'plano' => [
                 'planos_contas' => $this->planosContas->importRows(
                     $this->client->query('SELECT * FROM PLANO ORDER BY CODIGO'),
@@ -286,7 +294,7 @@ final class FirebirdMigraService
                 'contas', 'empresa', 'auxiliares', 'produtos', 'pessoas',
                 'formas', 'vendedores', 'usuarios', 'contador', 'terminais',
                 'planos_contas', 'contas_pagar', 'conta_pagar_pagamentos', 'contas_receber',
-                'caixa', 'ultimos_precos', 'vendas_parametros',
+                'caixa', 'recibos', 'ultimos_precos', 'vendas_parametros',
                 'pdv_vendas', 'pdv_nfce', 'nfes', 'compras', 'notas_fornecedor', 'pdv_caixa_movimentos',
             ];
         }
@@ -326,7 +334,7 @@ final class FirebirdMigraService
             'contas', 'empresa', 'auxiliares', 'produtos', 'clientes', 'pessoas',
             'formas', 'vendedores', 'usuarios', 'contador', 'terminais',
             'planos_contas', 'contas_pagar', 'conta_pagar_pagamentos', 'contas_receber',
-            'caixa', 'ultimos_precos', 'vendas_parametros',
+            'caixa', 'recibos', 'ultimos_precos', 'vendas_parametros',
             'pdv_vendas', 'pdv_nfce', 'nfes', 'compras', 'notas_fornecedor', 'pdv_caixa_movimentos',
         ];
 
@@ -959,6 +967,7 @@ final class FirebirdMigraService
             'creceber' => 'contas_receber',
             'caixa_lancamentos' => 'caixa',
             'lancamentos_caixa' => 'caixa',
+            'recibo' => 'recibos',
             'planos' => 'planos_contas',
             'plano' => 'planos_contas',
             'cppagamento' => 'conta_pagar_pagamentos',

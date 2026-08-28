@@ -120,6 +120,7 @@ final class ContaReceberBaixaService
                     documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
                     historico: 'Recebimento conta a receber #'.($conta->numero ?: $conta->id),
                     caixaContaId: $caixaContaId > 0 ? $caixaContaId : null,
+                    empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
                 );
 
                 $ok++;
@@ -139,12 +140,13 @@ final class ContaReceberBaixaService
         string $documento,
         string $historico,
         ?int $caixaContaId,
+        ?int $empresaId = null,
     ): void {
         if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
             return;
         }
 
-        CaixaLancamento::query()->create([
+        $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),
             'emissao' => $data,
             'documento' => mb_substr($documento, 0, 40),
@@ -154,7 +156,13 @@ final class ContaReceberBaixaService
             'caixa_conta_id' => $caixaContaId,
             'entrada' => $valor,
             'saida' => 0,
-        ]);
+        ];
+
+        if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+            $payload['empresa_id'] = $empresaId ?? \App\Support\Erp\ErpContext::currentEmpresaId();
+        }
+
+        CaixaLancamento::query()->create($payload);
     }
 
     /**
@@ -166,8 +174,9 @@ final class ContaReceberBaixaService
         string $documento,
         string $historico,
         ?int $caixaContaId,
+        ?int $empresaId = null,
     ): void {
-        $this->lancarEntradaCaixa($valor, $data, $documento, $historico, $caixaContaId);
+        $this->lancarEntradaCaixa($valor, $data, $documento, $historico, $caixaContaId, $empresaId);
     }
 
     public function mapFormaConta(FormaPagamento $forma): string

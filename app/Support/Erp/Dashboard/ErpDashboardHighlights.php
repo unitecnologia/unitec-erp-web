@@ -9,45 +9,57 @@ use App\Models\Product;
 use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpEmpresaScopeFilter;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardHighlights
 {
+    /** @var int|list<int>|null */
+    private static int|array|null $empresaScope = null;
+
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return list<array{label: string, value: string, hint: string}>
      */
-    public static function build(): array
+    public static function build(int|array|null $empresaScope = null): array
     {
+        self::$empresaScope = $empresaScope;
+
         $inicio = ErpFinanceiroMetricas::hoje()->copy()->startOfMonth();
         $fim = ErpFinanceiroMetricas::hoje()->copy()->endOfMonth();
 
-        return [
-            static::safe('ticketMedio', $inicio, $fim, [
-                'label' => 'Ticket médio',
-                'value' => '—',
-                'hint' => 'Sem vendas no mês',
-            ]),
-            static::safe('produtoMaisVendido', $inicio, $fim, [
-                'label' => 'Produto mais vendido',
-                'value' => '—',
-                'hint' => 'Sem itens no mês',
-            ]),
-            static::safe('clienteMaisComprou', $inicio, $fim, [
-                'label' => 'Cliente que mais comprou',
-                'value' => '—',
-                'hint' => 'Sem clientes no mês',
-            ]),
-            static::safe('vendedorDestaque', $inicio, $fim, [
-                'label' => 'Vendedor destaque',
-                'value' => '—',
-                'hint' => 'Sem vendedores no mês',
-            ]),
-        ];
+        try {
+            return [
+                static::safe('ticketMedio', $inicio, $fim, [
+                    'label' => 'Ticket médio',
+                    'value' => '—',
+                    'hint' => 'Sem vendas no mês',
+                ]),
+                static::safe('produtoMaisVendido', $inicio, $fim, [
+                    'label' => 'Produto mais vendido',
+                    'value' => '—',
+                    'hint' => 'Sem itens no mês',
+                ]),
+                static::safe('clienteMaisComprou', $inicio, $fim, [
+                    'label' => 'Cliente que mais comprou',
+                    'value' => '—',
+                    'hint' => 'Sem clientes no mês',
+                ]),
+                static::safe('vendedorDestaque', $inicio, $fim, [
+                    'label' => 'Vendedor destaque',
+                    'value' => '—',
+                    'hint' => 'Sem vendedores no mês',
+                ]),
+            ];
+        } finally {
+            self::$empresaScope = null;
+        }
     }
 
     /**
@@ -76,29 +88,33 @@ final class ErpDashboardHighlights
         $qtd = 0;
 
         if (Schema::hasTable((new PdvVenda)->getTable())) {
-            $row = PdvVenda::query()
+            $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
                 ->where(function ($query) use ($inicio, $fim): void {
                     static::scopePdvPeriodo($query, $inicio, $fim);
-                })
-                ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(total), 0) as total')
-                ->first();
+                });
+
+            ErpEmpresaScopeFilter::applyPdvSessao($q, self::$empresaScope);
+
+            $row = $q->selectRaw('COUNT(*) as qtd, COALESCE(SUM(total), 0) as total')->first();
 
             $total += (float) ($row->total ?? 0);
             $qtd += (int) ($row->qtd ?? 0);
         }
 
         if (Schema::hasTable((new Venda)->getTable())) {
-            $row = Venda::query()
+            $q = Venda::query()
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                 ->where(function ($query): void {
                     $query->whereNull('plataforma')
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
                 })
                 ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString())
-                ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(total), 0) as total')
-                ->first();
+                ->whereDate('data', '<=', $fim->toDateString());
+
+            ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
+
+            $row = $q->selectRaw('COUNT(*) as qtd, COALESCE(SUM(total), 0) as total')->first();
 
             $total += (float) ($row->total ?? 0);
             $qtd += (int) ($row->qtd ?? 0);
@@ -130,11 +146,12 @@ final class ErpDashboardHighlights
         if (Schema::hasTable((new PdvVendaItem)->getTable()) && Schema::hasTable((new PdvVenda)->getTable())) {
             $rows = PdvVendaItem::query()
                 ->selectRaw('product_id, MAX(descricao) as descricao, SUM(quantidade) as qty')
-                ->whereHas('venda', function ($query) use ($inicio, $fim): void {
+                ->whereHas('venda', function (Builder $query) use ($inicio, $fim): void {
                     $query->where('situacao', '!=', 'C')
                         ->where(function ($periodo) use ($inicio, $fim): void {
                             static::scopePdvPeriodo($periodo, $inicio, $fim);
                         });
+                    ErpEmpresaScopeFilter::applyPdvSessao($query, self::$empresaScope);
                 })
                 ->groupBy('product_id')
                 ->get();
@@ -157,7 +174,7 @@ final class ErpDashboardHighlights
                 ->selectRaw('product_id, SUM(quantidade) as qty')
                 ->whereNotNull('product_id')
                 ->where('product_id', '>', 0)
-                ->whereHas('venda', function ($query) use ($inicio, $fim): void {
+                ->whereHas('venda', function (Builder $query) use ($inicio, $fim): void {
                     $query->whereNotIn('status', [Venda::STATUS_CANCELADO])
                         ->where('tipo', '!=', Venda::TIPO_CUPOM)
                         ->where(function ($plataforma): void {
@@ -166,6 +183,7 @@ final class ErpDashboardHighlights
                         })
                         ->whereDate('data', '>=', $inicio->toDateString())
                         ->whereDate('data', '<=', $fim->toDateString());
+                    ErpEmpresaScopeFilter::applyColumn($query, (new Venda)->getTable(), self::$empresaScope);
                 })
                 ->groupBy('product_id')
                 ->get();
@@ -215,15 +233,17 @@ final class ErpDashboardHighlights
         $totais = [];
 
         if (Schema::hasTable((new PdvVenda)->getTable())) {
-            $rows = PdvVenda::query()
+            $q = PdvVenda::query()
                 ->selectRaw('person_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
                 ->whereNotNull('person_id')
                 ->where(function ($query) use ($inicio, $fim): void {
                     static::scopePdvPeriodo($query, $inicio, $fim);
-                })
-                ->groupBy('person_id')
-                ->pluck('total', 'person_id');
+                });
+
+            ErpEmpresaScopeFilter::applyPdvSessao($q, self::$empresaScope);
+
+            $rows = $q->groupBy('person_id')->pluck('total', 'person_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -231,7 +251,7 @@ final class ErpDashboardHighlights
         }
 
         if (Schema::hasTable((new Venda)->getTable())) {
-            $rows = Venda::query()
+            $q = Venda::query()
                 ->selectRaw('cliente_id, SUM(total) as total')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                 ->whereNotNull('cliente_id')
@@ -240,9 +260,11 @@ final class ErpDashboardHighlights
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
                 })
                 ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString())
-                ->groupBy('cliente_id')
-                ->pluck('total', 'cliente_id');
+                ->whereDate('data', '<=', $fim->toDateString());
+
+            ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
+
+            $rows = $q->groupBy('cliente_id')->pluck('total', 'cliente_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -278,15 +300,17 @@ final class ErpDashboardHighlights
         $totais = [];
 
         if (Schema::hasTable((new PdvVenda)->getTable())) {
-            $rows = PdvVenda::query()
+            $q = PdvVenda::query()
                 ->selectRaw('vendedor_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
                 ->whereNotNull('vendedor_id')
                 ->where(function ($query) use ($inicio, $fim): void {
                     static::scopePdvPeriodo($query, $inicio, $fim);
-                })
-                ->groupBy('vendedor_id')
-                ->pluck('total', 'vendedor_id');
+                });
+
+            ErpEmpresaScopeFilter::applyPdvSessao($q, self::$empresaScope);
+
+            $rows = $q->groupBy('vendedor_id')->pluck('total', 'vendedor_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);
@@ -294,7 +318,7 @@ final class ErpDashboardHighlights
         }
 
         if (Schema::hasTable((new Venda)->getTable())) {
-            $rows = Venda::query()
+            $q = Venda::query()
                 ->selectRaw('vendedor_id, SUM(total) as total')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                 ->whereNotNull('vendedor_id')
@@ -303,9 +327,11 @@ final class ErpDashboardHighlights
                         ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
                 })
                 ->whereDate('data', '>=', $inicio->toDateString())
-                ->whereDate('data', '<=', $fim->toDateString())
-                ->groupBy('vendedor_id')
-                ->pluck('total', 'vendedor_id');
+                ->whereDate('data', '<=', $fim->toDateString());
+
+            ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), self::$empresaScope);
+
+            $rows = $q->groupBy('vendedor_id')->pluck('total', 'vendedor_id');
 
             foreach ($rows as $id => $total) {
                 $totais[(int) $id] = round((float) ($totais[(int) $id] ?? 0) + (float) $total, 2);

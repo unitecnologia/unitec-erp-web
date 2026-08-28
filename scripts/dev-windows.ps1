@@ -92,20 +92,19 @@ Write-Host 'Dev: OPcache + config:cache ativos (reinicie o servidor apos mudar .
 
 $appUrl = "http://127.0.0.1:$Port"
 
+if ($BindHost -eq '0.0.0.0') {
+    Register-UnitecFirewallRule -Port $Port
+}
+
 Write-Host ''
 Write-Host "Acesse: $appUrl/admin" -ForegroundColor Green
 Write-Host 'Login demo: USUARIO / 01' -ForegroundColor DarkGray
 
 if ($BindHost -eq '0.0.0.0') {
-    $lanIp = $null
-    try {
-        $lanIp = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-            Where-Object { $_.IPAddress -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' } |
-            Select-Object -First 1 -ExpandProperty IPAddress)
-    } catch {}
+    $lanIp = Get-UnitecLanIPv4Address
 
     if ($lanIp) {
-        Write-Host "App Forca de Vendas (rede): http://${lanIp}:$Port  (porta $Port liberada no firewall)" -ForegroundColor Cyan
+        Write-Host "App Forca de Vendas / estacoes: http://${lanIp}:$Port/admin/login" -ForegroundColor Cyan
     } else {
         Write-Host "Servidor publicado na rede (0.0.0.0:$Port) para o app Forca de Vendas." -ForegroundColor Cyan
     }

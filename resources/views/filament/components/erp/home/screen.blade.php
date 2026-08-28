@@ -1,10 +1,42 @@
 @php
-    use App\Support\Erp\Dashboard\ErpDashboardData;
-
-    $dash = ErpDashboardData::all();
+    $dash = $this->dashboardData;
+    $visao = $dash['visao'] ?? \App\Support\Erp\Dashboard\ErpDashboardScope::VISAO_EMPRESA;
 @endphp
 
-<div class="erp-dash">
+<div
+    wire:key="erp-dash-{{ $visao }}"
+    @class([
+        'erp-dash',
+        'erp-dash--has-visao' => $this->showDashboardVisaoToggle,
+    ])
+>
+    @if ($this->showDashboardVisaoToggle)
+        <div class="erp-dash__visao-bar" role="group" aria-label="Visão do dashboard">
+            @if (! empty($dash['visaoLabel']))
+                <span class="erp-dash__visao-label" role="status">{{ $dash['visaoLabel'] }}</span>
+            @endif
+
+            <div class="erp-dash__visao-toggle">
+                <button
+                    type="button"
+                    wire:click="setDashboardVisao('empresa')"
+                    @class(['erp-dash__visao-btn', 'is-active' => $visao === 'empresa'])
+                    @if ($visao === 'empresa') aria-pressed="true" @endif
+                >
+                    Empresa
+                </button>
+                <button
+                    type="button"
+                    wire:click="setDashboardVisao('grupo')"
+                    @class(['erp-dash__visao-btn', 'is-active' => $visao === 'grupo'])
+                    @if ($visao === 'grupo') aria-pressed="true" @endif
+                >
+                    Grupo
+                </button>
+            </div>
+        </div>
+    @endif
+
     @include('filament.components.erp.home.partials.kpi-cards', [
         'kpis' => $dash['kpis'],
     ])
@@ -12,6 +44,7 @@
     @include('filament.components.erp.home.partials.gauges', [
         'gauges' => $dash['gauges'] ?? [],
         'sellerGauges' => $dash['sellerGauges'] ?? [],
+        'visao' => $visao,
     ])
 
     <div class="erp-dash__layout">
@@ -22,6 +55,7 @@
                 'salesMixChart' => $dash['salesMixChart'] ?? [],
                 'fiscalDocsChart' => $dash['fiscalDocsChart'] ?? [],
                 'paymentMethodsChart' => $dash['paymentMethodsChart'] ?? [],
+                'visao' => $visao,
             ])
 
             <div class="erp-dash__sales-row">

@@ -24,6 +24,9 @@ final class LicencaSnapshot
         public readonly ?string $validoAte = null,
         public readonly ?string $nome = null,
         public readonly ?string $mensagem = null,
+        public readonly bool $bloquearAtualizacao = false,
+        public readonly ?int $quantidadeComputadores = null,
+        public readonly ?int $quantidadeTelefones = null,
         public readonly bool $fromCache = false,
     ) {}
 
@@ -57,7 +60,7 @@ final class LicencaSnapshot
     }
 
     /**
-     * @return array{status: string, valido_ate: ?string, nome: ?string, mensagem: ?string, from_cache: bool}
+     * @return array{status: string, valido_ate: ?string, nome: ?string, mensagem: ?string, bloquear_atualizacao: bool, quantidade_computadores: ?int, quantidade_telefones: ?int, from_cache: bool}
      */
     public function toArray(): array
     {
@@ -66,12 +69,15 @@ final class LicencaSnapshot
             'valido_ate' => $this->validoAte,
             'nome' => $this->nome,
             'mensagem' => $this->mensagem,
+            'bloquear_atualizacao' => $this->bloquearAtualizacao,
+            'quantidade_computadores' => $this->quantidadeComputadores,
+            'quantidade_telefones' => $this->quantidadeTelefones,
             'from_cache' => $this->fromCache,
         ];
     }
 
     /**
-     * @param  array{status?: string, valido_ate?: ?string, nome?: ?string, mensagem?: ?string}  $data
+     * @param  array{status?: string, valido_ate?: ?string, nome?: ?string, mensagem?: ?string, bloquear_atualizacao?: bool, quantidade_computadores?: ?int, quantidade_telefones?: ?int}  $data
      */
     public static function fromArray(array $data, bool $fromCache = false): self
     {
@@ -80,7 +86,19 @@ final class LicencaSnapshot
             validoAte: isset($data['valido_ate']) ? (string) $data['valido_ate'] : null,
             nome: isset($data['nome']) ? (string) $data['nome'] : null,
             mensagem: isset($data['mensagem']) ? (string) $data['mensagem'] : null,
+            bloquearAtualizacao: (bool) ($data['bloquear_atualizacao'] ?? false),
+            quantidadeComputadores: self::normalizeQuota($data['quantidade_computadores'] ?? null),
+            quantidadeTelefones: self::normalizeQuota($data['quantidade_telefones'] ?? null),
             fromCache: $fromCache,
         );
+    }
+
+    private static function normalizeQuota(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || strtolower((string) $value) === 'null') {
+            return null;
+        }
+
+        return max(0, (int) $value);
     }
 }

@@ -41,16 +41,25 @@
 <table class="danfe" cellspacing="0" cellpadding="0" style="margin-top: -1px;">
     <tr>
         <td style="width: 40%;">
-            <span class="danfe__label">IDENTIFICAÇÃO DO EMITENTE</span>
-            <span class="danfe__value">{{ $emitente['nome'] }}</span>
-            <span class="danfe__value danfe__value--normal">{{ $emitente['endereco'] }}</span>
-            @if (filled($emitente['bairro'] ?? null) || filled($emitente['cep'] ?? null))
-                <span class="danfe__value danfe__value--normal">
-                    {{ trim(($emitente['bairro'] ?? '').(filled($emitente['cep'] ?? null) ? ' — CEP '.($emitente['cep'] ?? '') : '')) }}
-                </span>
-            @endif
-            <span class="danfe__value danfe__value--normal">{{ $emitente['municipio'] }} - {{ $emitente['uf'] }}</span>
-            <span class="danfe__value danfe__value--normal">Fone/Fax: {{ $emitente['telefone'] ?: '&nbsp;' }}</span>
+            <div class="danfe__emitente">
+                <div class="danfe__emitente-text">
+                    <span class="danfe__label">IDENTIFICAÇÃO DO EMITENTE</span>
+                    <span class="danfe__value">{{ $emitente['nome'] }}</span>
+                    <span class="danfe__value danfe__value--normal">{{ $emitente['endereco'] }}</span>
+                    @if (filled($emitente['bairro'] ?? null) || filled($emitente['cep'] ?? null))
+                        <span class="danfe__value danfe__value--normal">
+                            {{ trim(($emitente['bairro'] ?? '').(filled($emitente['cep'] ?? null) ? ' — CEP '.($emitente['cep'] ?? '') : '')) }}
+                        </span>
+                    @endif
+                    <span class="danfe__value danfe__value--normal">{{ $emitente['municipio'] }} - {{ $emitente['uf'] }}</span>
+                    <span class="danfe__value danfe__value--normal">Fone/Fax: {{ $emitente['telefone'] ?: '' }}</span>
+                </div>
+                @if (filled($logoDataUri ?? null) || filled($logoUrl ?? null))
+                    <div class="danfe__emitente-logo">
+                        <img src="{{ $logoDataUri ?? $logoUrl }}" alt="Logo da empresa">
+                    </div>
+                @endif
+            </div>
         </td>
         <td style="width: 22%; text-align: center;">
             <div class="danfe__title">{{ ($espelho ?? false) ? 'ESPELHO' : 'DANFE' }}</div>
@@ -87,17 +96,17 @@
         </td>
         <td>
             <span class="danfe__label">PROTOCOLO DE AUTORIZAÇÃO DE USO</span>
-            <span class="danfe__value danfe__value--normal">{{ $protocolo ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $protocolo ?: '' }}</span>
         </td>
     </tr>
     <tr>
         <td>
             <span class="danfe__label">INSCRIÇÃO ESTADUAL</span>
-            <span class="danfe__value danfe__value--normal">{{ $emitente['ie'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $emitente['ie'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">IE DO SUBST. TRIB.</span>
-            <span class="danfe__value danfe__value--normal">{{ ($emitente['ie_st'] ?? '') ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ ($emitente['ie_st'] ?? '') ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">CNPJ</span>
@@ -127,15 +136,15 @@
     <tr>
         <td colspan="2">
             <span class="danfe__label">ENDEREÇO</span>
-            <span class="danfe__value danfe__value--normal">{{ $destinatario['endereco'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $destinatario['endereco'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">BAIRRO / DISTRITO</span>
-            <span class="danfe__value danfe__value--normal">{{ ($destinatario['bairro'] ?? '') ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ ($destinatario['bairro'] ?? '') ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">CEP</span>
-            <span class="danfe__value danfe__value--center">{{ ($destinatario['cep'] ?? '') ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ ($destinatario['cep'] ?? '') ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">DATA DA ENTRADA / SAÍDA</span>
@@ -145,23 +154,23 @@
     <tr>
         <td>
             <span class="danfe__label">MUNICÍPIO</span>
-            <span class="danfe__value danfe__value--normal">{{ $destinatario['municipio'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $destinatario['municipio'] ?: '' }}</span>
         </td>
         <td style="width: 7%;">
             <span class="danfe__label">UF</span>
-            <span class="danfe__value danfe__value--center">{{ $destinatario['uf'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $destinatario['uf'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">FONE / FAX</span>
-            <span class="danfe__value danfe__value--normal">{{ $destinatario['telefone'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $destinatario['telefone'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">INSCRIÇÃO ESTADUAL</span>
-            <span class="danfe__value danfe__value--normal">{{ $destinatario['ie'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $destinatario['ie'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">HORA DA ENTRADA / SAÍDA</span>
-            <span class="danfe__value danfe__value--center">{{ $horaEntrada ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $horaEntrada ?: '' }}</span>
         </td>
     </tr>
 </table>
@@ -229,73 +238,73 @@
     <tr>
         <td colspan="2" style="width: 36%;">
             <span class="danfe__label">NOME / RAZÃO SOCIAL</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['nome'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['nome'] ?: '' }}</span>
         </td>
         <td style="width: 18%;">
             <span class="danfe__label">FRETE POR CONTA</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['mod_frete_label'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['mod_frete_label'] ?: '' }}</span>
         </td>
         <td style="width: 12%;">
             <span class="danfe__label">CÓDIGO ANTT</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['antt'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['antt'] ?: '' }}</span>
         </td>
         <td style="width: 12%;">
             <span class="danfe__label">PLACA DO VEÍCULO</span>
-            <span class="danfe__value danfe__value--center">{{ $transportador['placa'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $transportador['placa'] ?: '' }}</span>
         </td>
         <td style="width: 10%;">
             <span class="danfe__label">UF</span>
-            <span class="danfe__value danfe__value--center">{{ $transportador['placa_uf'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $transportador['placa_uf'] ?: '' }}</span>
         </td>
     </tr>
-    <tr>
-        <td colspan="2">
+    <tr class="danfe__transport-address-row">
+        <td style="width: 14%;">
             <span class="danfe__label">CNPJ / CPF</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['cnpj'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['cnpj'] ?: '' }}</span>
         </td>
-        <td colspan="2">
+        <td colspan="3" style="width: 52%;">
             <span class="danfe__label">ENDEREÇO</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['endereco'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['endereco'] ?: '' }}</span>
         </td>
-        <td>
+        <td style="width: 24%;">
             <span class="danfe__label">MUNICÍPIO</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['municipio'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['municipio'] ?: '' }}</span>
         </td>
-        <td>
+        <td style="width: 10%;">
             <span class="danfe__label">UF</span>
-            <span class="danfe__value danfe__value--center">{{ $transportador['uf'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $transportador['uf'] ?: '' }}</span>
         </td>
     </tr>
     <tr>
         <td style="width: 12%;">
             <span class="danfe__label">QUANTIDADE</span>
-            <span class="danfe__value danfe__value--center">{{ $volumes['quantidade'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--center">{{ $volumes['quantidade'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">ESPÉCIE</span>
-            <span class="danfe__value danfe__value--normal">{{ $volumes['especie'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $volumes['especie'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">MARCA</span>
-            <span class="danfe__value danfe__value--normal">{{ $volumes['marca'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $volumes['marca'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">NUMERAÇÃO</span>
-            <span class="danfe__value danfe__value--normal">{{ $volumes['numeracao'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $volumes['numeracao'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">PESO BRUTO</span>
-            <span class="danfe__value danfe__value--right">{{ $volumes['peso_bruto'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--right">{{ $volumes['peso_bruto'] ?: '' }}</span>
         </td>
         <td>
             <span class="danfe__label">PESO LÍQUIDO</span>
-            <span class="danfe__value danfe__value--right">{{ $volumes['peso_liquido'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--right">{{ $volumes['peso_liquido'] ?: '' }}</span>
         </td>
     </tr>
     <tr>
         <td colspan="6">
             <span class="danfe__label">INSCRIÇÃO ESTADUAL</span>
-            <span class="danfe__value danfe__value--normal">{{ $transportador['ie'] ?: '&nbsp;' }}</span>
+            <span class="danfe__value danfe__value--normal">{{ $transportador['ie'] ?: '' }}</span>
         </td>
     </tr>
 </table>
@@ -382,7 +391,21 @@
         </td>
         <td>
             <span class="danfe__label">RESERVADO AO FISCO</span>
-            <div class="danfe__info-box">{{ $informacoesFisco !== '' ? $informacoesFisco : '&nbsp;' }}</div>
+            <div class="danfe__info-box">{{ $informacoesFisco }}</div>
+        </td>
+    </tr>
+</table>
+
+<table class="danfe danfe__generated-by" cellspacing="0" cellpadding="0" style="margin-top: -1px;">
+    <tr>
+        <td>
+            <span class="danfe__value danfe__value--normal" style="font-size: 7px; font-weight: 600;">
+                Documento gerado por Unitecnologia ERP
+                — {{ ($printedAt ?? \App\Support\Erp\ErpTimezone::toLocal())->timezone(\App\Support\Erp\ErpTimezone::DEFAULT)->format('d/m/Y H:i:s') }}
+                @if (filled($printedBy ?? null))
+                    — {{ $printedBy }}
+                @endif
+            </span>
         </td>
     </tr>
 </table>

@@ -4,6 +4,7 @@ namespace App\Support\Erp;
 
 use App\Models\Empresa;
 use App\Models\Product;
+use App\Support\Erp\Balanca\BalancaProductRules;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -46,7 +47,25 @@ class ProductFormValidator
 
         self::validateDuplicateBarcode($data, $excludeProductId);
 
+        self::validateDuplicateBarcodeCaixa($data, $excludeProductId);
+
         self::validateDuplicateReferencia($data, $excludeProductId);
+
+        self::validateBalanca($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected static function validateBalanca(array $data): void
+    {
+        $messages = BalancaProductRules::criticas($data);
+
+        if ($messages === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages($messages);
     }
 
     public static function validateGradeStock(array $data, float $gradeTotalQty, bool $bloquearEstoqueNegativo = false): void
@@ -159,6 +178,30 @@ class ProductFormValidator
             throw ValidationException::withMessages([
                 'codigo_barras' => 'Já existe produto cadastrado com este CÓDIGO DE BARRAS! '
                     . $existing->codigo . '-' . $existing->descricao,
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected static function validateDuplicateBarcodeCaixa(array $data, ?int $excludeProductId): void
+    {
+        $barcode = preg_replace('/\D/', '', (string) ($data['codigo_barras_caixa'] ?? ''));
+
+        if ($barcode === '') {
+            return;
+        }
+
+        $existing = Product::query()
+            ->where('codigo_barras_caixa', $barcode)
+            ->when($excludeProductId, fn ($query) => $query->where('id', '!=', $excludeProductId))
+            ->first();
+
+        if ($existing) {
+            throw ValidationException::withMessages([
+                'codigo_barras_caixa' => 'Já existe produto cadastrado com este CÓDIGO DE BARRAS DA CAIXA! '
+                    .$existing->codigo.'-'.$existing->descricao,
             ]);
         }
     }

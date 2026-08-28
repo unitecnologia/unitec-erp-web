@@ -30,6 +30,11 @@ class WhatsAppGatewayManager
         return storage_path('app/whatsapp/sessions');
     }
 
+    public function logPath(): string
+    {
+        return storage_path('logs/whatsapp-gateway.log');
+    }
+
     public function resolveOrCreateKey(Empresa $empresa): string
     {
         $existing = trim((string) ($empresa->param_whatsapp_interno_chave ?? ''));
@@ -91,27 +96,52 @@ class WhatsAppGatewayManager
 
     public function clearLocalSession(Empresa $empresa): void
     {
-        $sessionDir = $this->sessionsPath() . DIRECTORY_SEPARATOR . $empresa->getKey();
+        $sessionDir = $this->sessionsPath().DIRECTORY_SEPARATOR.$empresa->getKey();
 
         if (is_dir($sessionDir)) {
             File::deleteDirectory($sessionDir);
         }
     }
 
-    public function restartGateway(Empresa $empresa): void
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function restartGateway(Empresa $empresa): array
     {
-        $config = WhatsAppConfig::fromEmpresa($empresa);
-        $this->writeRuntimeConfig($empresa);
-        $this->stopGatewayProcess($config);
-        $this->startGatewayProcess();
+        $preflight = $this->preflightChecks();
 
-        for ($attempt = 0; $attempt < 10; $attempt++) {
+        if (! $preflight['ok']) {
+            return $preflight;
+        }
+
+        $this->writeRuntimeConfig($empresa);
+        $config = WhatsAppConfig::fromEmpresa($empresa->fresh() ?? $empresa);
+        $this->stopGatewayProcess($config);
+
+        $started = $this->startGatewayProcess();
+
+        if (! $started) {
+            return [
+                'ok' => false,
+                'message' => 'Não foi possível iniciar o serviço Node.'.$this->logHint(),
+            ];
+        }
+
+        for ($attempt = 0; $attempt < 25; $attempt++) {
             usleep(400_000);
 
             if ($this->isHealthy($config)) {
-                break;
+                return [
+                    'ok' => true,
+                    'message' => 'Serviço Node iniciado e respondendo.',
+                ];
             }
         }
+
+        return [
+            'ok' => false,
+            'message' => 'Serviço iniciado, mas ainda não respondeu.'.$this->logHint(),
+        ];
     }
 
     /**
@@ -145,18 +175,10 @@ class WhatsAppGatewayManager
             ];
         }
 
-        if (! $this->nodeAvailable()) {
-            return [
-                'ok' => false,
-                'message' => 'Node.js não encontrado. Rode novamente o dev-windows.ps1 (baixa em tools\\node) ou instale Node 20+ em https://nodejs.org',
-            ];
-        }
+        $preflight = $this->preflightChecks();
 
-        if (! is_file($this->gatewayRoot() . DIRECTORY_SEPARATOR . 'node_modules' . DIRECTORY_SEPARATOR . '@whiskeysockets' . DIRECTORY_SEPARATOR . 'baileys' . DIRECTORY_SEPARATOR . 'package.json')) {
-            return [
-                'ok' => false,
-                'message' => 'Dependências do gateway não instaladas. Rode: cd services/erp-whatsapp-gateway && npm install',
-            ];
+        if (! $preflight['ok']) {
+            return $preflight;
         }
 
         $started = $this->startGatewayProcess();
@@ -164,11 +186,11 @@ class WhatsAppGatewayManager
         if (! $started) {
             return [
                 'ok' => false,
-                'message' => 'Não foi possível iniciar o serviço WhatsApp interno.',
+                'message' => 'Não foi possível iniciar o serviço WhatsApp interno.'.$this->logHint(),
             ];
         }
 
-        for ($attempt = 0; $attempt < 10; $attempt++) {
+        for ($attempt = 0; $attempt < 25; $attempt++) {
             usleep(400_000);
 
             if ($this->isHealthy($config)) {
@@ -181,7 +203,7 @@ class WhatsAppGatewayManager
 
         return [
             'ok' => false,
-            'message' => 'Serviço iniciado, mas não respondeu a tempo. Verifique storage/logs ou reinicie o gateway.',
+            'message' => 'Serviço iniciado, mas não respondeu a tempo.'.$this->logHint(),
         ];
     }
 
@@ -190,7 +212,7 @@ class WhatsAppGatewayManager
         try {
             $response = Http::timeout(2)
                 ->acceptJson()
-                ->get($config->gatewayBaseUrl() . '/health');
+                ->get($config->gatewayBaseUrl().'/health');
 
             return $response->successful();
         } catch (\Throwable) {
@@ -210,7 +232,7 @@ class WhatsAppGatewayManager
                 ->withHeaders([
                     'X-Erp-Gateway-Key' => $key,
                 ])
-                ->get($config->gatewayBaseUrl() . '/sessions/' . $empresaId . '/status');
+                ->get($config->gatewayBaseUrl().'/sessions/'.$empresaId.'/status');
 
             return $response->successful();
         } catch (\Throwable) {
@@ -222,6 +244,20 @@ class WhatsAppGatewayManager
     {
         $port = $config->gatewayPort;
 
+        if (is_file($this->pidPath())) {
+            $pid = trim((string) File::get($this->pidPath()));
+
+            if ($pid !== '' && $pid !== 'windows-background' && ctype_digit($pid)) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $process = Process::fromShellCommandline('taskkill /F /PID '.$pid.' /T');
+                    $process->run();
+                } else {
+                    $process = new Process(['kill', $pid]);
+                    $process->run();
+                }
+            }
+        }
+
         if (PHP_OS_FAMILY === 'Windows') {
             $command = sprintf(
                 'powershell -NoProfile -Command "$p = Get-NetTCPConnection -LocalPort %d -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess; if ($p) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }"',
@@ -229,13 +265,6 @@ class WhatsAppGatewayManager
             );
             $process = Process::fromShellCommandline($command);
             $process->run();
-        } elseif (is_file($this->pidPath())) {
-            $pid = trim((string) File::get($this->pidPath()));
-
-            if ($pid !== '' && $pid !== 'windows-background' && ctype_digit($pid)) {
-                $process = new Process(['kill', $pid]);
-                $process->run();
-            }
         }
 
         if (is_file($this->pidPath())) {
@@ -248,6 +277,43 @@ class WhatsAppGatewayManager
     public function nodeExecutable(): ?string
     {
         return $this->resolveNodeExecutable();
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function preflightChecks(): array
+    {
+        if (! $this->nodeAvailable()) {
+            return [
+                'ok' => false,
+                'message' => 'Node.js não encontrado. Instale Node 20+ ou use o runtime em tools\\node.',
+            ];
+        }
+
+        $index = $this->gatewayRoot().DIRECTORY_SEPARATOR.'index.js';
+
+        if (! is_file($index)) {
+            return [
+                'ok' => false,
+                'message' => 'Gateway não encontrado em services/erp-whatsapp-gateway/index.js',
+            ];
+        }
+
+        $baileys = $this->gatewayRoot()
+            .DIRECTORY_SEPARATOR.'node_modules'
+            .DIRECTORY_SEPARATOR.'@whiskeysockets'
+            .DIRECTORY_SEPARATOR.'baileys'
+            .DIRECTORY_SEPARATOR.'package.json';
+
+        if (! is_file($baileys)) {
+            return [
+                'ok' => false,
+                'message' => 'Dependências do gateway não instaladas. Rode: cd services/erp-whatsapp-gateway && npm install',
+            ];
+        }
+
+        return ['ok' => true, 'message' => ''];
     }
 
     protected function nodeAvailable(): bool
@@ -269,16 +335,16 @@ class WhatsAppGatewayManager
             }
         }
 
-        $embedded = base_path('tools' . DIRECTORY_SEPARATOR . 'node' . DIRECTORY_SEPARATOR . 'node.exe');
+        $embedded = base_path('tools'.DIRECTORY_SEPARATOR.'node'.DIRECTORY_SEPARATOR.'node.exe');
 
         if (is_file($embedded)) {
             return $embedded;
         }
 
-        $nodeRoot = base_path('tools' . DIRECTORY_SEPARATOR . 'node');
+        $nodeRoot = base_path('tools'.DIRECTORY_SEPARATOR.'node');
 
         if (is_dir($nodeRoot)) {
-            $matches = glob($nodeRoot . DIRECTORY_SEPARATOR . 'node-v*-win-x64' . DIRECTORY_SEPARATOR . 'node.exe');
+            $matches = glob($nodeRoot.DIRECTORY_SEPARATOR.'node-v*-win-x64'.DIRECTORY_SEPARATOR.'node.exe');
 
             if (is_array($matches) && $matches !== []) {
                 rsort($matches);
@@ -291,9 +357,9 @@ class WhatsAppGatewayManager
 
         if (PHP_OS_FAMILY === 'Windows') {
             foreach ([
-                getenv('ProgramFiles') . DIRECTORY_SEPARATOR . 'nodejs' . DIRECTORY_SEPARATOR . 'node.exe',
-                getenv('ProgramFiles(x86)') . DIRECTORY_SEPARATOR . 'nodejs' . DIRECTORY_SEPARATOR . 'node.exe',
-                getenv('LOCALAPPDATA') . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'node' . DIRECTORY_SEPARATOR . 'node.exe',
+                getenv('ProgramFiles').DIRECTORY_SEPARATOR.'nodejs'.DIRECTORY_SEPARATOR.'node.exe',
+                getenv('ProgramFiles(x86)').DIRECTORY_SEPARATOR.'nodejs'.DIRECTORY_SEPARATOR.'node.exe',
+                getenv('LOCALAPPDATA').DIRECTORY_SEPARATOR.'Programs'.DIRECTORY_SEPARATOR.'node'.DIRECTORY_SEPARATOR.'node.exe',
             ] as $candidate) {
                 if (is_string($candidate) && is_file($candidate)) {
                     return $candidate;
@@ -327,21 +393,17 @@ class WhatsAppGatewayManager
             }
         }
 
-        $index = $this->gatewayRoot() . DIRECTORY_SEPARATOR . 'index.js';
+        $index = $this->gatewayRoot().DIRECTORY_SEPARATOR.'index.js';
 
         if (! is_file($index)) {
             return false;
         }
 
+        File::ensureDirectoryExists(dirname($this->pidPath()));
+        File::ensureDirectoryExists(dirname($this->logPath()));
+
         if (PHP_OS_FAMILY === 'Windows') {
-            $nodeArg = str_contains($nodeExecutable, ' ') ? '"' . $nodeExecutable . '"' : $nodeExecutable;
-            $command = 'start /B "" ' . $nodeArg . ' index.js > NUL 2>&1';
-            $process = Process::fromShellCommandline($command, $this->gatewayRoot());
-            $process->run();
-
-            File::put($this->pidPath(), 'windows-background');
-
-            return true;
+            return $this->startGatewayProcessWindows($nodeExecutable);
         }
 
         $process = new Process([$nodeExecutable, 'index.js'], $this->gatewayRoot());
@@ -351,6 +413,64 @@ class WhatsAppGatewayManager
         if ($process->getPid() !== null) {
             File::put($this->pidPath(), (string) $process->getPid());
         }
+
+        return true;
+    }
+
+    protected function startGatewayProcessWindows(string $nodeExecutable): bool
+    {
+        $nodeEscaped = str_replace("'", "''", $nodeExecutable);
+        $workEscaped = str_replace("'", "''", $this->gatewayRoot());
+        $logEscaped = str_replace("'", "''", $this->logPath());
+
+        // Mesmo padrão do Start-UnitecWhatsAppGateway (install-lib): Start-Process Hidden + PID real.
+        $script = <<<POWERSHELL
+\$ErrorActionPreference = 'Stop'
+\$log = '{$logEscaped}'
+\$dir = Split-Path -Parent \$log
+if (-not (Test-Path \$dir)) { New-Item -ItemType Directory -Path \$dir -Force | Out-Null }
+Add-Content -Path \$log -Value ("{0} --- start {1} index.js" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), '{$nodeEscaped}')
+\$p = Start-Process -FilePath '{$nodeEscaped}' -ArgumentList 'index.js' -WorkingDirectory '{$workEscaped}' -WindowStyle Hidden -PassThru
+if (-not \$p) { exit 1 }
+Start-Sleep -Milliseconds 800
+if (\$p.HasExited) {
+  Add-Content -Path \$log -Value ("{0} processo encerrou imediatamente exit={1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), \$p.ExitCode)
+  exit 2
+}
+Write-Output \$p.Id
+POWERSHELL;
+
+        $process = new Process([
+            'powershell',
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            $script,
+        ]);
+        $process->setTimeout(30);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            File::append(
+                $this->logPath(),
+                date('Y-m-d H:i:s').' start falhou: '.$process->getErrorOutput().' '.$process->getOutput().PHP_EOL
+            );
+
+            return false;
+        }
+
+        $pid = trim($process->getOutput());
+
+        if ($pid === '' || ! ctype_digit($pid)) {
+            File::append(
+                $this->logPath(),
+                date('Y-m-d H:i:s').' start sem PID. stdout='.$process->getOutput().' stderr='.$process->getErrorOutput().PHP_EOL
+            );
+
+            return false;
+        }
+
+        File::put($this->pidPath(), $pid);
 
         return true;
     }
@@ -368,12 +488,46 @@ class WhatsAppGatewayManager
         }
 
         if (PHP_OS_FAMILY === 'Windows') {
-            $process = new Process(['tasklist', '/FI', 'PID eq ' . $pid]);
+            $process = new Process(['tasklist', '/FI', 'PID eq '.$pid]);
             $process->run();
 
             return str_contains($process->getOutput(), $pid);
         }
 
-        return file_exists('/proc/' . $pid);
+        return file_exists('/proc/'.$pid);
+    }
+
+    protected function logHint(): string
+    {
+        $tail = $this->tailLog(12);
+
+        if ($tail === '') {
+            return ' Veja storage/logs/whatsapp-gateway.log';
+        }
+
+        return ' Detalhe: '.$tail;
+    }
+
+    protected function tailLog(int $lines = 12): string
+    {
+        if (! is_file($this->logPath())) {
+            return '';
+        }
+
+        try {
+            $content = (string) File::get($this->logPath());
+            $parts = preg_split("/\r\n|\n|\r/", trim($content)) ?: [];
+            $parts = array_values(array_filter($parts, static fn (string $line): bool => trim($line) !== ''));
+            $slice = array_slice($parts, -$lines);
+            $text = trim(implode(' | ', $slice));
+
+            if (strlen($text) > 400) {
+                return substr($text, -400);
+            }
+
+            return $text;
+        } catch (\Throwable) {
+            return '';
+        }
     }
 }

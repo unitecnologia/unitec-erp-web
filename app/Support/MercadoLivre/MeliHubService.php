@@ -10,28 +10,14 @@ use Illuminate\Support\Str;
 
 final class MeliHubService
 {
-    public function hubBaseUrl(): string
+    public function hubBaseUrl(?Empresa $context = null): string
     {
-        return rtrim((string) (config('meli.hub_url') ?: 'https://unitecnologiasc.com.br'), '/');
+        return MeliEmpresaConfig::hubUrl(MeliEmpresaConfig::hubEmpresa($context));
     }
 
-    public function isSelfHub(): bool
+    public function isSelfHub(?Empresa $context = null): bool
     {
-        if (filter_var(config('meli.is_hub'), FILTER_VALIDATE_BOOL)) {
-            return true;
-        }
-
-        $hubHost = strtolower((string) (parse_url($this->hubBaseUrl(), PHP_URL_HOST) ?: ''));
-        $appHost = strtolower((string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?: ''));
-        $requestHost = strtolower((string) request()->getHost());
-        $redirectHost = strtolower((string) (parse_url((string) config('meli.redirect_uri'), PHP_URL_HOST) ?: ''));
-
-        if ($hubHost === '') {
-            return true;
-        }
-
-        return in_array($hubHost, array_filter([$appHost, $requestHost, $redirectHost]), true)
-            && ! in_array($requestHost, ['127.0.0.1', 'localhost', '::1'], true);
+        return MeliEmpresaConfig::isSelfHub($context);
     }
 
     public function isLocalBrowser(): bool
@@ -39,28 +25,25 @@ final class MeliHubService
         return in_array(strtolower((string) request()->getHost()), ['127.0.0.1', 'localhost', '::1'], true);
     }
 
-    public function hubRedirectUri(): string
+    public function hubRedirectUri(?Empresa $hub = null): string
     {
-        $configured = trim((string) config('meli.hub_redirect_uri'));
-
-        if ($configured !== '') {
-            return $configured;
-        }
-
-        return $this->hubBaseUrl().'/meli/hub/oauth/callback';
+        return MeliEmpresaConfig::hubRedirectUri($hub ?? MeliEmpresaConfig::hubEmpresa());
     }
 
     /**
-     * Credenciais do app Unitec no hub (.env / config).
+     * Credenciais do app ML no hub (cadastro da empresa hub).
      *
      * @return array{client_id: string, client_secret: string, redirect_uri: string}
      */
-    public function hubAppCredentials(): array
+    public function hubAppCredentials(?Empresa $hub = null): array
     {
+        $hub ??= MeliEmpresaConfig::hubEmpresa();
+        $credentials = MeliEmpresaConfig::forEmpresa($hub);
+
         return [
-            'client_id' => trim((string) config('meli.client_id')),
-            'client_secret' => trim((string) config('meli.client_secret')),
-            'redirect_uri' => $this->hubRedirectUri(),
+            'client_id' => $credentials['client_id'],
+            'client_secret' => $credentials['client_secret'],
+            'redirect_uri' => $this->hubRedirectUri($hub),
         ];
     }
 
@@ -110,7 +93,7 @@ final class MeliHubService
         if ($credentials['client_id'] === '' || $credentials['client_secret'] === '') {
             return [
                 'ok' => false,
-                'message' => 'Hub Unitec sem MELI_CLIENT_ID / MELI_CLIENT_SECRET no .env.',
+                'message' => 'Hub sem Client ID / Client Secret. Preencha na aba Mercado Livre da empresa hub e grave (F5).',
             ];
         }
 
@@ -260,13 +243,13 @@ final class MeliHubService
      */
     public function createRemotePair(Empresa $empresa): array
     {
-        if ($this->isSelfHub()) {
+        if ($this->isSelfHub($empresa)) {
             return $this->createPair((int) $empresa->getKey(), (string) ($empresa->fantasia ?: $empresa->razao_social));
         }
 
         $response = Http::acceptJson()
             ->timeout(20)
-            ->post($this->hubBaseUrl().'/api/meli/hub/pair', [
+            ->post($this->hubBaseUrl($empresa).'/api/meli/hub/pair', [
                 'empresa_id' => $empresa->getKey(),
                 'client_label' => (string) ($empresa->fantasia ?: $empresa->razao_social),
             ]);
@@ -274,14 +257,14 @@ final class MeliHubService
         if ($response->status() === 404) {
             return [
                 'ok' => false,
-                'message' => 'Hub Unitec ainda sem a atualização do Mercado Livre. Publique o ERP em '.$this->hubBaseUrl().' e rode php artisan migrate.',
+                'message' => 'Hub Unitec ainda sem a atualização do Mercado Livre. Publique o ERP em '.$this->hubBaseUrl($empresa).' e rode php artisan migrate.',
             ];
         }
 
         if (! $response->successful()) {
             return [
                 'ok' => false,
-                'message' => 'Não foi possível falar com o hub Unitec ('.$this->hubBaseUrl().'). Status HTTP '.$response->status().'.',
+                'message' => 'Não foi possível falar com o hub Unitec ('.$this->hubBaseUrl($empresa).'). Status HTTP '.$response->status().'.',
             ];
         }
 

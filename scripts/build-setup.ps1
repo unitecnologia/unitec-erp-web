@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Monta o pacote offline e compila Instalador Sistema Facil.exe (Inno Setup).
@@ -12,7 +12,14 @@ param(
     [switch]$SkipNpm,
     [switch]$SkipRuntimeDownload,
     [switch]$SkipCompile,
-    [string]$MariaDbUrl = ''
+    # Embute .env de desenvolvimento + dump do banco unitec_erp no instalador.
+    [switch]$IncludeDevData,
+    [string]$MariaDbUrl = '',
+    [string]$DevDbHost = '127.0.0.1',
+    [string]$DevDbPort = '3306',
+    [string]$DevDbName = 'unitec_erp',
+    [string]$DevDbUser = 'root',
+    [string]$DevDbPassword = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +35,8 @@ $StagingDir = Join-Path $ProjectRoot 'dist\staging\unitec-erp-web'
 $OutputDir = Join-Path $ProjectRoot 'dist\output'
 $MariaDbAsset = Join-Path $ProjectRoot 'installer\assets\mariadb-win.zip'
 $Php84Asset = Join-Path $ProjectRoot 'installer\assets\php-8.4-win.zip'
+$NodeAsset = Join-Path $ProjectRoot 'installer\assets\node-win.zip'
+$WhatsAppGatewayDepsAsset = Join-Path $ProjectRoot 'installer\assets\whatsapp-gateway-node-modules.zip'
 $VcRedistAsset = Join-Path $ProjectRoot 'installer\assets\vc_redist.x64.exe'
 $CaCertAsset = Join-Path $ProjectRoot 'installer\assets\cacert.pem'
 $HeidiSqlAsset = Join-Path $ProjectRoot 'installer\assets\HeidiSQL_12.18.0.7304_Setup.exe'
@@ -87,8 +96,15 @@ function Ensure-Directory($path) {
 }
 
 function Ensure-StorageStructure($root) {
+    $storageRoot = Join-Path $root 'storage'
+    if (Test-Path $storageRoot) {
+        # Staging nao pode levar dumps/homolog/logs do PC de desenvolvimento (quebra o Inno).
+        Remove-Item $storageRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $dirs = @(
         'storage\app\public',
+        'storage\app\private',
         'storage\framework\cache\data',
         'storage\framework\sessions',
         'storage\framework\views',
@@ -101,12 +117,57 @@ function Ensure-StorageStructure($root) {
         Ensure-Directory $full
     }
 
-    foreach ($keep in @('storage\app\.gitignore', 'storage\framework\.gitignore', 'storage\logs\.gitignore')) {
+    foreach ($keep in @(
+        'storage\app\.gitignore',
+        'storage\framework\.gitignore',
+        'storage\logs\.gitignore',
+        'storage\app\public\.gitignore',
+        'storage\framework\cache\.gitignore',
+        'storage\framework\sessions\.gitignore',
+        'storage\framework\views\.gitignore'
+    )) {
         $src = Join-Path $ProjectRoot $keep
         $dst = Join-Path $root $keep
-        if ((Test-Path $src) -and -not (Test-Path $dst)) {
+        if ((Test-Path $src)) {
             Ensure-Directory (Split-Path $dst)
             Copy-Item $src $dst -Force
+        }
+    }
+}
+
+function Clear-LaravelRuntimeCaches($root) {
+    $cacheDir = Join-Path $root 'bootstrap\cache'
+    if (Test-Path $cacheDir) {
+        Get-ChildItem -Path $cacheDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne '.gitignore' } |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+
+    foreach ($relative in @(
+        'storage\framework\cache\data',
+        'storage\framework\sessions',
+        'storage\framework\views',
+        'tools\php\opcache'
+    )) {
+        $path = Join-Path $root $relative
+        if (Test-Path $path) {
+            Get-ChildItem -Path $path -Force -ErrorAction SilentlyContinue |
+                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # So caches compilados — scripts podem citar paths de exemplo sem ir para runtime.
+    if (Test-Path $cacheDir) {
+        $hits = Get-ChildItem $cacheDir -Filter *.php -ErrorAction SilentlyContinue |
+            Where-Object {
+                $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+                $text -and (
+                    $text.Contains('C:\Projetos\unitec-erp-web') -or
+                    $text.Contains('C:/Projetos/unitec-erp-web')
+                )
+            }
+        if ($hits) {
+            throw 'bootstrap/cache ainda contem referencia a C:\Projetos\unitec-erp-web'
         }
     }
 }
@@ -154,14 +215,128 @@ if (Test-Path $StagingDir) {
 Copy-UnitecProjectTree -SourceRoot $ProjectRoot -TargetRoot $StagingDir -ExcludeTools
 
 Ensure-StorageStructure $StagingDir
+Clear-LaravelRuntimeCaches $StagingDir
+Write-Host '>> storage/ do staging limpo (sem dados locais).' -ForegroundColor Gray
+Write-Host '>> caches Laravel/OPcache removidos do staging.' -ForegroundColor Gray
 
-if (Test-Path (Join-Path $StagingDir '.env')) {
-    Remove-Item (Join-Path $StagingDir '.env') -Force
+# Lixo de desenvolvimento que nao deve ir ao cliente (salvo IncludeDevData p/ .env)
+foreach ($junk in @(
+    '.env.appurl.local.bak',
+    '.env.backup',
+    '.env.production',
+    'instalacao.log',
+    '.phpunit.result.cache',
+    'composer-setup.php',
+    'composer.phar',
+    'vc_redist.x64.exe',
+    'tmp-print-props.txt',
+    '_tmp_parse_ps1.ps1',
+    'unitec_erp',
+    '.unitec-serve.pid'
+)) {
+    $junkPath = Join-Path $StagingDir $junk
+    if (Test-Path $junkPath) {
+        Remove-Item $junkPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if (-not $IncludeDevData) {
+    if (Test-Path (Join-Path $StagingDir '.env')) {
+        Remove-Item (Join-Path $StagingDir '.env') -Force
+    }
+
+    $seedDirCleanup = Join-Path $StagingDir 'installer\seed'
+    if (Test-Path $seedDirCleanup) {
+        Remove-Item $seedDirCleanup -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} else {
+    Write-Host '>> IncludeDevData: mantendo/preparando .env e dump do banco no staging' -ForegroundColor Cyan
+
+    $seedDir = Join-Path $StagingDir 'installer\seed'
+    Ensure-Directory $seedDir
+
+    $envSource = Join-Path $ProjectRoot '.env'
+    if (-not (Test-Path $envSource)) {
+        throw 'IncludeDevData requer .env na raiz do projeto.'
+    }
+
+    $envTarget = Join-Path $StagingDir '.env'
+    $envLines = Get-Content $envSource -Encoding UTF8
+    $rewritten = foreach ($line in $envLines) {
+        if ($line -match '^\s*APP_URL\s*=') {
+            'APP_URL=http://127.0.0.1:8765'
+        } elseif ($line -match '^\s*APP_ENV\s*=') {
+            'APP_ENV=production'
+        } else {
+            $line
+        }
+    }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines($envTarget, $rewritten, $utf8NoBom)
+    Write-Host '>> .env embutido (APP_URL=8765, APP_ENV=production)' -ForegroundColor Green
+
+    if ([string]::IsNullOrWhiteSpace($DevDbPassword)) {
+        $DevDbPassword = Get-UnitecDefaultDbPassword
+    }
+
+    $sqlPath = Join-Path $seedDir 'unitec_erp.sql'
+    Write-Host (">> Gerando dump {0}@{1}:{2}/{3} ..." -f $DevDbUser, $DevDbHost, $DevDbPort, $DevDbName) -ForegroundColor White
+    Export-UnitecDatabaseDump `
+        -OutputPath $sqlPath `
+        -DbHost $DevDbHost `
+        -DbPort $DevDbPort `
+        -DbUser $DevDbUser `
+        -DbPassword $DevDbPassword `
+        -DbName $DevDbName `
+        -AppPath $ProjectRoot | Out-Null
+
+    $sqlMb = [math]::Round((Get-Item $sqlPath).Length / 1MB, 1)
+    Write-Host (">> Dump gerado: {0} (~{1} MB)" -f $sqlPath, $sqlMb) -ForegroundColor Green
+
+    $flagPath = Join-Path $seedDir 'INCLUDE_DEV_DATA.flag'
+    $flagText = @(
+        'Unitec ERP - pacote com dados de desenvolvimento',
+        ("Gerado em: {0}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')),
+        ("Origem DB: {0}:{1}/{2}" -f $DevDbHost, $DevDbPort, $DevDbName),
+        'Na instalacao: sobrescreve .env e restaura este dump.'
+    )
+    [System.IO.File]::WriteAllLines($flagPath, $flagText, $utf8NoBom)
 }
 
 if (Test-Path (Join-Path $StagingDir 'tools')) {
     Remove-Item (Join-Path $StagingDir 'tools') -Recurse -Force
 }
+
+$nodeRuntime = Ensure-UnitecNodeRuntime -AppPath $ProjectRoot -SourceRoot $ProjectRoot
+if (-not $nodeRuntime) {
+    throw 'Node.js nao esta disponivel para montar o pacote offline do WhatsApp.'
+}
+
+$nodeRuntimeDir = Split-Path $nodeRuntime -Parent
+if (-not (Test-Path $NodeAsset)) {
+    Compress-Archive -Path (Join-Path $nodeRuntimeDir '*') -DestinationPath $NodeAsset -CompressionLevel Optimal -Force
+}
+
+$gatewaySource = Join-Path $ProjectRoot 'services\erp-whatsapp-gateway'
+$gatewayNodeModules = Join-Path $gatewaySource 'node_modules'
+$npmRuntime = Get-UnitecNpmExecutable -AppPath $ProjectRoot
+if (-not $npmRuntime) {
+    throw 'npm nao esta disponivel para montar o pacote offline do WhatsApp.'
+}
+
+if (-not (Test-Path $gatewayNodeModules)) {
+    Push-Location $gatewaySource
+    try {
+        & $npmRuntime ci --omit=dev --no-fund --no-audit
+        if ($LASTEXITCODE -ne 0) {
+            throw 'npm ci do gateway WhatsApp falhou ao montar o pacote offline.'
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+Compress-Archive -Path $gatewayNodeModules -DestinationPath $WhatsAppGatewayDepsAsset -CompressionLevel Optimal -Force
 
 if (-not (Test-Path $MariaDbAsset)) {
     if ($SkipRuntimeDownload) {
@@ -235,6 +410,22 @@ Write-Host ">> Icone: $IconAsset" -ForegroundColor Green
 Sync-InstallerAssetsToStaging -ProjectRoot $ProjectRoot -StagingDir $StagingDir
 Remove-PublicStorageLink -Root $StagingDir
 
+# Binarios desktop (servico + launcher + atualizador), se ja compilados.
+$desktopBin = Join-Path $ProjectRoot 'bin'
+$stagingBin = Join-Path $StagingDir 'bin'
+if ((Test-Path (Join-Path $desktopBin 'Unitec ERP.exe')) -and (Test-Path (Join-Path $desktopBin 'UnitecErpServer.exe'))) {
+    Ensure-Directory $stagingBin
+    Copy-Item (Join-Path $desktopBin '*') $stagingBin -Force -Recurse
+    Write-Host '>> Binarios Unitec ERP Desktop copiados para staging\bin.' -ForegroundColor Green
+} else {
+    Write-Host '>> AVISO: bin\Unitec ERP.exe / UnitecErpServer.exe ausentes. Rode scripts\build-erp-desktop.ps1 antes do instalador definitivo.' -ForegroundColor Yellow
+}
+
+# Cliente: um unico atalho (Unitec ERP.exe). Sem .bat na raiz do pacote.
+Get-ChildItem -Path $StagingDir -Filter '*.bat' -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+Write-Host '>> Removidos .bat da raiz do staging (cliente usa atalho Unitec ERP.exe).' -ForegroundColor Gray
+
 foreach ($optional in (Get-UnitecStagingOptionalPaths)) {
     $full = Join-Path $StagingDir $optional
     if (-not (Test-Path $full)) {
@@ -306,4 +497,8 @@ Write-Title 'Setup gerado com sucesso'
 Write-Host $setupExe -ForegroundColor Green
 Write-Host ''
 Write-Host 'Envie este arquivo ao cliente. Instalacao offline (sem internet na loja).' -ForegroundColor White
+if ($IncludeDevData) {
+    Write-Host 'ATENCAO: este setup inclui .env e dump do banco de desenvolvimento.' -ForegroundColor Yellow
+    Write-Host 'Ao instalar em C:\UNITECNOLOGIA_WEB, substitui .env e o banco unitec_erp.' -ForegroundColor Yellow
+}
 Write-Host ''

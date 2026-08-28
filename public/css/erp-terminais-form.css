@@ -435,20 +435,20 @@
 
 .erp-terminais-form__ativo-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 5.5rem;
-    gap: 0.45rem 0.65rem;
+    grid-template-columns: minmax(8rem, 14rem) 4.75rem minmax(0, 1fr);
+    gap: 0.3rem 0.75rem;
     align-items: end;
 }
 
 .erp-terminais-form__ativo-field {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.2rem;
     min-width: 0;
 }
 
 .erp-terminais-form__ativo-field--xs {
-    max-width: 5.5rem;
+    max-width: 5.75rem;
 }
 
 .erp-terminais-master__empty {
@@ -533,7 +533,7 @@
     flex: 1;
     min-height: 0;
     min-width: 0;
-    padding: 0.45rem 0.55rem 0.35rem;
+    padding: 0.3rem 0.4rem 0.25rem;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;

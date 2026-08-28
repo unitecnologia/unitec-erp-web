@@ -8,10 +8,9 @@
 
         $detailTabs = [
             'totais' => 'Totais',
-            'volumes' => 'Volumes',
             'fisco' => 'Informações do Fisco',
             'contribuinte' => 'Informações do Contribuinte',
-            'transportadora' => 'Transportadora',
+            'transportadora' => 'Transportadora / Volumes',
             'referencia' => 'Referência',
             'contingencia' => 'Contingência',
         ];
@@ -35,6 +34,9 @@
             ['key' => 'valor_st', 'label' => 'Valor de ICMS ST'],
             ['key' => 'total', 'label' => 'Total'],
         ];
+
+        $totaisRowSuperior = array_slice($totaisLabels, 0, 9);
+        $totaisRowInferior = array_slice($totaisLabels, 9);
     @endphp
 
     <div
@@ -47,6 +49,7 @@
         x-on:erp-nfe-focus-item-quantidade.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-qtd'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
         x-on:erp-nfe-focus-item-preco.window="$nextTick(() => { const el = document.getElementById('nfe-inclusao-preco'); if (!el) return; setTimeout(() => { el.focus(); el.select?.(); }, 30); })"
         x-on:erp-nfe-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-nfe-desconto-preco'); el?.focus(); el?.select?.(); })"
+        x-on:erp-nfe-focus-info-adicionais.window="$nextTick(() => { const el = document.getElementById('erp-nfe-info-adicionais-texto'); el?.focus(); el?.select?.(); })"
         x-on:keydown.ctrl.d.window.prevent="if (!$wire.nfeDescontoModalOpen) $wire.abrirNfeModalDescontoItem()"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeNfeModal"></div>
@@ -59,13 +62,21 @@
         >
             <div class="erp-lookup-modal__titlebar erp-nfe-lancamento-modal__titlebar">
                 <span id="erp-nfe-lancamento-title">Emissão de NF-e</span>
-                <div @class([
-                    'erp-nfe-lancamento-modal__status-box',
-                    'erp-nfe-lancamento-modal__status-box--titlebar',
-                    'erp-nfe-lancamento-modal__status-box--transmitida' => in_array($this->nfeModalStatus, ['TRANSMITIDA', 'AUTORIZADA'], true),
-                    'erp-nfe-lancamento-modal__status-box--cancelada' => $this->nfeModalStatus === 'CANCELADA',
-                ])>
-                    {{ $this->nfeModalStatus }}
+                <div class="erp-nfe-lancamento-modal__titlebar-badges">
+                    @if ($this->nfeModalHomologacao)
+                        <div
+                            class="erp-nfe-lancamento-modal__status-box erp-nfe-lancamento-modal__status-box--titlebar erp-nfe-lancamento-modal__status-box--homologacao"
+                            title="Ambiente de Homologação (SEFAZ de testes). Notas emitidas aqui não têm validade fiscal."
+                        >HOMOLOGAÇÃO</div>
+                    @endif
+                    <div @class([
+                        'erp-nfe-lancamento-modal__status-box',
+                        'erp-nfe-lancamento-modal__status-box--titlebar',
+                        'erp-nfe-lancamento-modal__status-box--transmitida' => in_array($this->nfeModalStatus, ['TRANSMITIDA', 'AUTORIZADA'], true),
+                        'erp-nfe-lancamento-modal__status-box--cancelada' => $this->nfeModalStatus === 'CANCELADA',
+                    ])>
+                        {{ $this->nfeModalStatus }}
+                    </div>
                 </div>
                 <button
                     type="button"
@@ -261,7 +272,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="3" class="erp-lookup-modal__empty">Nenhuma parcela. Use os botões acima ou forma à vista.</td>
+                                            <td colspan="3" class="erp-lookup-modal__empty">Nenhuma parcela. Selecione <strong>À PRAZO</strong> e use os botões acima.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -281,17 +292,77 @@
                 </div>
 
                 @if ($this->nfeModalDetailTab === 'totais')
-                    <div class="erp-nfe-lancamento-modal__detail-panel">
-                        <div class="erp-nfe-lancamento-modal__totais-grid">
-                            @foreach ($totaisLabels as $item)
-                                <div class="erp-nfe-lancamento-modal__total-field">
-                                    <span class="erp-nfe-lancamento-modal__total-label">{{ $item['label'] }}</span>
-                                    <span @class([
-                                        'erp-nfe-lancamento-modal__total-value',
-                                        'erp-nfe-lancamento-modal__total-value--strong' => $item['key'] === 'total',
-                                    ])>{{ $this->nfeModalTotais[$item['key']] ?? '0,00' }}</span>
-                                </div>
-                            @endforeach
+                    @php
+                        $nfeTotaisProduto = $this->nfeModalRows[$this->nfeSelectedRowIndex] ?? null;
+                        $nfeTotaisProdutoNome = trim((string) ($nfeTotaisProduto['descricao'] ?? ''));
+                        $nfeTotaisEditaveis = ['frete', 'seguro', 'outras', 'desconto'];
+                        $nfePodeEditarTotais = $this->nfeModalStatus === 'ABERTA';
+                    @endphp
+                    <div class="erp-nfe-lancamento-modal__totais-bar">
+                        <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--totais">
+                            <div class="erp-nfe-lancamento-modal__totais-grid" role="group" aria-label="Totais da nota">
+                                @foreach ([$totaisRowSuperior, $totaisRowInferior] as $totaisRow)
+                                    <div class="erp-nfe-lancamento-modal__totais-row">
+                                        @foreach ($totaisRow as $item)
+                                            @php
+                                                $nfeTotalEditavel = in_array($item['key'], $nfeTotaisEditaveis, true) && $nfePodeEditarTotais;
+                                            @endphp
+                                            <div class="erp-nfe-lancamento-modal__total-field">
+                                                <span class="erp-nfe-lancamento-modal__total-label">{{ $item['label'] }}</span>
+                                                @if ($nfeTotalEditavel)
+                                                    <input
+                                                        type="text"
+                                                        inputmode="decimal"
+                                                        value="{{ $this->nfeModalTotais[$item['key']] ?? '0,00' }}"
+                                                        class="erp-nfe-lancamento-modal__total-value erp-nfe-lancamento-modal__total-value--editable"
+                                                        data-erp-nfe-totais="{{ $item['key'] }}"
+                                                        data-mask="money-br"
+                                                        wire:key="nfe-totais-{{ $item['key'] }}-{{ $this->nfeModalTotais[$item['key']] ?? '0,00' }}"
+                                                        wire:keydown.enter.prevent="nfeTotaisEnter('{{ $item['key'] }}', $event.target.value)"
+                                                        wire:blur="nfeTotaisBlur('{{ $item['key'] }}', $event.target.value)"
+                                                        x-on:focus="$el.removeAttribute('readonly'); $el.select()"
+                                                        x-on:click="$el.removeAttribute('readonly'); $el.select()"
+                                                        @mouseup.prevent
+                                                        autocomplete="off"
+                                                        title="Rateia proporcionalmente nos itens da nota"
+                                                    >
+                                                @else
+                                                    <span @class([
+                                                        'erp-nfe-lancamento-modal__total-value',
+                                                        'erp-nfe-lancamento-modal__total-value--strong' => $item['key'] === 'total',
+                                                    ])>{{ $this->nfeModalTotais[$item['key']] ?? '0,00' }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--foto">
+                            <span class="erp-nfe-lancamento-modal__foto-label">Foto do produto</span>
+                            <div
+                                class="erp-nfe-lancamento-modal__totais-foto"
+                                aria-label="Foto do produto selecionado"
+                                @if ($nfeTotaisProdutoNome !== '') title="{{ $nfeTotaisProdutoNome }}" @endif
+                            >
+                                @if ($this->nfeSelectedRowFotoUrl)
+                                    <img
+                                        src="{{ $this->nfeSelectedRowFotoUrl }}"
+                                        alt="{{ $nfeTotaisProdutoNome !== '' ? $nfeTotaisProdutoNome : 'Foto do produto' }}"
+                                        class="erp-nfe-lancamento-modal__totais-foto-img"
+                                        wire:key="nfe-totais-foto-{{ md5($this->nfeSelectedRowFotoUrl) }}"
+                                    >
+                                @else
+                                    <span class="erp-nfe-lancamento-modal__totais-foto-empty">
+                                        @if ($nfeTotaisProduto !== null)
+                                            Sem foto
+                                        @else
+                                            Selecione um item
+                                        @endif
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @elseif ($this->nfeModalDetailTab === 'fisco')
@@ -340,9 +411,116 @@
                             </table>
                         </div>
                     </div>
-                @elseif ($this->nfeModalDetailTab === 'volumes')
-                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-volumes">
-                        <div class="erp-nfe-volumes__row">
+                @elseif ($this->nfeModalDetailTab === 'transportadora')
+                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-transportadora">
+                        <div class="erp-nfe-transportadora__row">
+                            <div class="erp-nfe-transportadora__field erp-nfe-transportadora__field--transportador" @if ($this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== []) data-lookup-open="1" @endif>
+                                <span class="erp-nfe-lancamento-modal__form-label">Código</span>
+                                <div class="erp-nfe-transportadora__transportador">
+                                    <input
+                                        type="text"
+                                        wire:model.live.debounce.250ms="nfeForm.transportadora_codigo"
+                                        wire:keydown.enter.prevent="resolverNfeTransportadoraPorCodigo"
+                                        class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__codigo"
+                                        inputmode="numeric"
+                                        autocomplete="off"
+                                        title="Código do transportador"
+                                    >
+                                    <div class="erp-nfe-transportadora__nome-wrap">
+                                        <input
+                                            type="text"
+                                            wire:model.live.debounce.250ms="nfeTransportadoraBusca"
+                                            wire:keydown.enter.prevent="confirmarNfeTransportadoraBusca"
+                                            wire:keydown.escape.prevent="fecharNfeSugestoesTransportadora"
+                                            wire:keydown.arrow-up.prevent="moverNfeSugestaoTransportadora(-1)"
+                                            wire:keydown.arrow-down.prevent="moverNfeSugestaoTransportadora(1)"
+                                            class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__nome"
+                                            autocomplete="off"
+                                            placeholder="Nome ou CNPJ — Enter"
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            aria-expanded="{{ $this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== [] ? 'true' : 'false' }}"
+                                            aria-controls="nfe-transportadora-sugestoes"
+                                        >
+                                        @if ($this->nfeTransportadoraSugestoesOpen && $this->nfeTransportadoraSugestoes !== [])
+                                            <ul id="nfe-transportadora-sugestoes" class="erp-nfe-transportadora__suggest" role="listbox" aria-label="Transportadoras encontradas">
+                                                @foreach ($this->nfeTransportadoraSugestoes as $index => $sug)
+                                                    <li wire:key="nfe-transp-sug-{{ $sug['id'] }}" role="presentation">
+                                                        <button
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected="{{ (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index ? 'true' : 'false' }}"
+                                                            wire:click="selecionarNfeTransportadora({{ $sug['id'] }})"
+                                                            @class(['is-selected' => (int) $this->nfeSelectedTransportadoraSugestaoIndex === (int) $index])
+                                                        >
+                                                            <span class="erp-nfe-transportadora__suggest-code">{{ $sug['codigo'] ?: '—' }}</span>
+                                                            <span class="erp-nfe-transportadora__suggest-nome">{{ $sug['nome'] }}</span>
+                                                            @if (filled($sug['cpf_cnpj'] ?? null))
+                                                                <span @class([
+                                                                    'erp-nfe-transportadora__suggest-doc',
+                                                                    'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
+                                                                    'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
+                                                                ])>{{ $sug['cpf_cnpj'] }}</span>
+                                                            @endif
+                                                        </button>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--frete">
+                                <span class="erp-nfe-lancamento-modal__form-label">Frete por Conta</span>
+                                <select
+                                    wire:model="nfeForm.tipo_frete"
+                                    class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__select"
+                                >
+                                    @foreach ($this->nfeFretePorContaOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--placa">
+                                <span class="erp-nfe-lancamento-modal__form-label">Placa veículo</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.placa"
+                                    maxlength="8"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__placa"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--uf">
+                                <span class="erp-nfe-lancamento-modal__form-label">UF</span>
+                                <select
+                                    wire:model="nfeForm.uf_placa"
+                                    class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__uf"
+                                >
+                                    <option value="">—</option>
+                                    @foreach ($this->nfeUfPlacaOptions as $uf => $ufLabel)
+                                        <option value="{{ $uf }}">{{ $ufLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="erp-nfe-volumes__row erp-nfe-transportadora__volumes">
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--qtd">
+                                <span class="erp-nfe-lancamento-modal__form-label">Qtde Volume</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.qvol"
+                                    inputmode="numeric"
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
+                                    autocomplete="off"
+                                >
+                            </label>
+
                             <label class="erp-nfe-volumes__field erp-nfe-volumes__field--especie">
                                 <span class="erp-nfe-lancamento-modal__form-label">Espécie</span>
                                 <input
@@ -354,22 +532,11 @@
                                 >
                             </label>
 
-                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--marca">
-                                <span class="erp-nfe-lancamento-modal__form-label">Marca</span>
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--peso">
+                                <span class="erp-nfe-lancamento-modal__form-label">Peso Bruto</span>
                                 <input
                                     type="text"
-                                    wire:model="nfeForm.marca"
-                                    data-erp-uppercase
-                                    class="erp-nfe-lancamento-modal__form-input"
-                                    autocomplete="off"
-                                >
-                            </label>
-
-                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--qtd">
-                                <span class="erp-nfe-lancamento-modal__form-label">Quantidade</span>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.qvol"
+                                    wire:model="nfeForm.peso_b"
                                     inputmode="decimal"
                                     class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
                                     autocomplete="off"
@@ -387,80 +554,38 @@
                                 >
                             </label>
 
-                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--peso">
-                                <span class="erp-nfe-lancamento-modal__form-label">Peso Bruto</span>
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--marca">
+                                <span class="erp-nfe-lancamento-modal__form-label">Marca</span>
                                 <input
                                     type="text"
-                                    wire:model="nfeForm.peso_b"
-                                    inputmode="decimal"
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-volumes__num"
+                                    wire:model="nfeForm.marca"
+                                    data-erp-uppercase
+                                    class="erp-nfe-lancamento-modal__form-input"
+                                    autocomplete="off"
+                                >
+                            </label>
+
+                            <label class="erp-nfe-volumes__field erp-nfe-volumes__field--numero">
+                                <span class="erp-nfe-lancamento-modal__form-label">Número</span>
+                                <input
+                                    type="text"
+                                    wire:model="nfeForm.nvol"
+                                    class="erp-nfe-lancamento-modal__form-input"
                                     autocomplete="off"
                                 >
                             </label>
                         </div>
-                    </div>
-                @elseif ($this->nfeModalDetailTab === 'transportadora')
-                    <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-transportadora">
-                        <div class="erp-nfe-transportadora__row">
-                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--frete">
-                                <span class="erp-nfe-lancamento-modal__form-label">Frete por Conta</span>
-                                <select
-                                    wire:model="nfeForm.tipo_frete"
-                                    class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__select"
-                                >
-                                    @foreach ($this->nfeFretePorContaOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </label>
 
-                            <div class="erp-nfe-transportadora__field erp-nfe-transportadora__field--transportador">
-                                <span class="erp-nfe-lancamento-modal__form-label">Transportador</span>
-                                <div class="erp-nfe-transportadora__transportador">
-                                    <input
-                                        type="text"
-                                        wire:model.live.debounce.250ms="nfeForm.transportadora_codigo"
-                                        wire:keydown.enter.prevent="resolverNfeTransportadoraPorCodigo"
-                                        class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__codigo"
-                                        inputmode="numeric"
-                                        autocomplete="off"
-                                        title="Código do transportador"
-                                    >
-                                    <select
-                                        wire:model.live="nfeForm.transportadora_id"
-                                        class="erp-nfe-lancamento-modal__form-select erp-nfe-transportadora__nome"
-                                    >
-                                        <option value="">—</option>
-                                        @foreach ($this->nfeTransportadorasOptions as $option)
-                                            <option value="{{ $option['id'] }}">{{ $option['nome'] }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-
-                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--placa">
-                                <span class="erp-nfe-lancamento-modal__form-label">Placa</span>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.placa"
-                                    maxlength="8"
-                                    data-erp-uppercase
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__placa"
-                                    autocomplete="off"
-                                >
-                            </label>
-
-                            <label class="erp-nfe-transportadora__field erp-nfe-transportadora__field--uf">
-                                <span class="erp-nfe-lancamento-modal__form-label">UF</span>
-                                <input
-                                    type="text"
-                                    wire:model="nfeForm.uf_placa"
-                                    maxlength="2"
-                                    data-erp-uppercase
-                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-transportadora__uf"
-                                    autocomplete="off"
-                                >
-                            </label>
+                        <div class="erp-nfe-transportadora__actions">
+                            <button
+                                type="button"
+                                wire:click="imprimirNfeEtiquetaVolume"
+                                class="erp-nfe-transportadora__etiqueta-btn"
+                                title="Imprimir etiqueta de volume"
+                            >
+                                <span aria-hidden="true">🏷</span>
+                                Imprimir Etiqueta
+                            </button>
                         </div>
                     </div>
                 @else
@@ -485,9 +610,8 @@
                         <button
                             type="button"
                             wire:click="transmitNfe"
-                            wire:loading.attr="disabled"
-                            wire:target="transmitNfe"
                             class="erp-nfe-actions__btn"
+                            data-erp-nfe-transmit-btn
                             @disabled(! $this->nfeModalRecordId || $this->nfeModalStatus !== 'ABERTA')
                             title="Transmitir"
                             data-erp-key="F3"
@@ -495,17 +619,6 @@
                             <span class="erp-nfe-actions__icon">📡</span>
                             <span wire:loading.remove wire:target="transmitNfe" class="erp-nfe-actions__label"><kbd>F3</kbd> | Transmitir</span>
                             <span wire:loading wire:target="transmitNfe" class="erp-nfe-actions__label">Transmitindo…</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            class="erp-nfe-actions__btn"
-                            disabled
-                            title="Imprimir"
-                            data-erp-key="F4"
-                        >
-                            <span class="erp-nfe-actions__icon">🖨</span>
-                            <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Imprimir</span>
                         </button>
 
                         <button
@@ -521,35 +634,13 @@
 
                         <button
                             type="button"
-                            wire:click="openNfeProdutos"
+                            wire:click="openNfeEspelhoFromModal"
                             class="erp-nfe-actions__btn"
-                            title="Produtos"
-                            data-erp-key="F8"
+                            @disabled($this->nfeModalStatus !== 'ABERTA')
+                            title="Espelho da NF-e (sem validade fiscal)"
                         >
-                            <span class="erp-nfe-actions__icon">📦</span>
-                            <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Produtos</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            class="erp-nfe-actions__btn"
-                            disabled
-                            title="Em breve — selecione o cliente no Destinatário"
-                            data-erp-key="F9"
-                        >
-                            <span class="erp-nfe-actions__icon">👤</span>
-                            <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Pessoas</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            wire:click="openNfeTransportadora"
-                            class="erp-nfe-actions__btn"
-                            title="Transportadora"
-                            data-erp-key="F10"
-                        >
-                            <span class="erp-nfe-actions__icon">🚚</span>
-                            <span class="erp-nfe-actions__label"><kbd>F10</kbd> | Transp.</span>
+                            <span class="erp-nfe-actions__icon">📄</span>
+                            <span class="erp-nfe-actions__label">Espelho de NFE</span>
                         </button>
 
                         <button
@@ -569,9 +660,9 @@
     </div>
 
     @include('filament.components.erp.nfe.lancamento-desconto-item')
+    @include('filament.components.erp.nfe.lancamento-info-adicionais-modal')
+    @include('filament.components.erp.nfe.item-delete-confirm')
     @include('filament.components.erp.nfe.fiscal-progress')
-    @include('filament.components.erp.nfe.fiscal-erro-overlay')
-    @include('filament.components.erp.nfe.fiscal-sucesso-overlay')
     @include('filament.components.erp.nfe.fiscal-info-overlay')
     @include('filament.components.erp.nfe.import-menu-modal')
     @include('filament.components.erp.nfe.import-list-modal')

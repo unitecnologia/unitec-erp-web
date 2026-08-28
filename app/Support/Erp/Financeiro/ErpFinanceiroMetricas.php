@@ -7,7 +7,8 @@ use App\Models\ContaPagar;
 use App\Models\ContaReceber;
 use App\Support\Erp\ErpTimezone;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -20,6 +21,11 @@ use Throwable;
  * - hoje: vencimento = hoje
  * - vencido/atrasadas: vencimento < hoje
  * - saldo caixa: Σentrada − Σsaída em caixa_lancamentos
+ *
+ * Filtro por empresa: aplicado quando a coluna empresa_id existir; no caixa,
+ * também restringe às contas liberadas do usuário na empresa (pivot).
+ * Visão empresa (um id): inclui registros com empresa_id nulo (legado).
+ * Visão grupo (lista): whereIn nas empresas acessíveis, sem null global.
  */
 final class ErpFinanceiroMetricas
 {
@@ -38,7 +44,10 @@ final class ErpFinanceiroMetricas
         return ErpTimezone::toLocal()->translatedFormat('d M Y');
     }
 
-    public static function saldoCaixa(?int $caixaContaId = null): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function saldoCaixa(?int $caixaContaId = null, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
@@ -48,10 +57,8 @@ final class ErpFinanceiroMetricas
             $qEntrada = CaixaLancamento::query();
             $qSaida = CaixaLancamento::query();
 
-            if ($caixaContaId && $caixaContaId > 0) {
-                $qEntrada->where('caixa_conta_id', $caixaContaId);
-                $qSaida->where('caixa_conta_id', $caixaContaId);
-            }
+            self::applyCaixaEscopo($qEntrada, $caixaContaId, $empresaScope);
+            self::applyCaixaEscopo($qSaida, $caixaContaId, $empresaScope);
 
             return round((float) $qEntrada->sum('entrada') - (float) $qSaida->sum('saida'), 2);
         } catch (Throwable) {
@@ -59,7 +66,10 @@ final class ErpFinanceiroMetricas
         }
     }
 
-    public static function saldoCaixaAte(Carbon $day, ?int $caixaContaId = null): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function saldoCaixaAte(Carbon $day, ?int $caixaContaId = null, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
@@ -69,10 +79,8 @@ final class ErpFinanceiroMetricas
             $qEntrada = CaixaLancamento::query()->whereDate('emissao', '<=', $day->toDateString());
             $qSaida = CaixaLancamento::query()->whereDate('emissao', '<=', $day->toDateString());
 
-            if ($caixaContaId && $caixaContaId > 0) {
-                $qEntrada->where('caixa_conta_id', $caixaContaId);
-                $qSaida->where('caixa_conta_id', $caixaContaId);
-            }
+            self::applyCaixaEscopo($qEntrada, $caixaContaId, $empresaScope);
+            self::applyCaixaEscopo($qSaida, $caixaContaId, $empresaScope);
 
             return round((float) $qEntrada->sum('entrada') - (float) $qSaida->sum('saida'), 2);
         } catch (Throwable) {
@@ -81,60 +89,67 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{qtd: int, valor: float}
      */
-    public static function receberNoDia(Carbon $day): array
+    public static function receberNoDia(Carbon $day, int|array|null $empresaScope = null): array
     {
-        return self::titulosReceber($day, $day);
+        return self::titulosReceber($day, $day, $empresaScope);
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{qtd: int, valor: float}
      */
-    public static function pagarNoDia(Carbon $day): array
+    public static function pagarNoDia(Carbon $day, int|array|null $empresaScope = null): array
     {
-        return self::titulosPagar($day, $day);
+        return self::titulosPagar($day, $day, $empresaScope);
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{qtd: int, valor: float}
      */
-    public static function receberVencido(?Carbon $hoje = null): array
-    {
-        $hoje ??= self::hoje();
-
-        return self::titulosReceber(null, $hoje->copy()->subDay());
-    }
-
-    /**
-     * @return array{qtd: int, valor: float}
-     */
-    public static function pagarVencido(?Carbon $hoje = null): array
+    public static function receberVencido(?Carbon $hoje = null, int|array|null $empresaScope = null): array
     {
         $hoje ??= self::hoje();
 
-        return self::titulosPagar(null, $hoje->copy()->subDay());
+        return self::titulosReceber(null, $hoje->copy()->subDay(), $empresaScope);
     }
 
     /**
-     * Mesma base do filtro "atrasadas" do ERP (saldo > 0 e vencimento < hoje).
-     *
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{qtd: int, valor: float}
+     */
+    public static function pagarVencido(?Carbon $hoje = null, int|array|null $empresaScope = null): array
+    {
+        $hoje ??= self::hoje();
+
+        return self::titulosPagar(null, $hoje->copy()->subDay(), $empresaScope);
+    }
+
+    /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{clientes: int, valor: float, qtd: int}
      */
-    public static function inadimplencia(?Carbon $hoje = null): array
+    public static function inadimplencia(?Carbon $hoje = null, int|array|null $empresaScope = null): array
     {
         $hoje ??= self::hoje();
-        $base = self::receberVencido($hoje);
+        $base = self::receberVencido($hoje, $empresaScope);
 
         try {
             if (! Schema::hasTable((new ContaReceber)->getTable())) {
                 return ['clientes' => 0, 'valor' => 0.0, 'qtd' => 0];
             }
 
-            $clientes = (int) ContaReceber::query()
+            $q = ContaReceber::query()
                 ->where('saldo', '>', 0)
                 ->whereDate('vencimento', '<', $hoje->toDateString())
-                ->whereNotNull('cliente_id')
+                ->whereNotNull('cliente_id');
+
+            self::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
+
+            $clientes = (int) $q
                 ->selectRaw('COUNT(DISTINCT cliente_id) as agregados')
                 ->value('agregados');
 
@@ -149,9 +164,10 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{qtd: int, valor: float}
      */
-    public static function titulosReceber(?Carbon $from, Carbon $to): array
+    public static function titulosReceber(?Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new ContaReceber)->getTable())) {
@@ -166,6 +182,8 @@ final class ErpFinanceiroMetricas
                 $q->whereDate('vencimento', '>=', $from->toDateString());
             }
 
+            self::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
+
             return [
                 'qtd' => (int) (clone $q)->count(),
                 'valor' => round((float) (clone $q)->sum('saldo'), 2),
@@ -176,9 +194,10 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{qtd: int, valor: float}
      */
-    public static function titulosPagar(?Carbon $from, Carbon $to): array
+    public static function titulosPagar(?Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new ContaPagar)->getTable())) {
@@ -193,6 +212,8 @@ final class ErpFinanceiroMetricas
                 $q->whereDate('vencimento', '>=', $from->toDateString());
             }
 
+            self::applyEmpresaColumn($q, (new ContaPagar)->getTable(), $empresaScope);
+
             return [
                 'qtd' => (int) (clone $q)->count(),
                 'valor' => round((float) (clone $q)->sum('saldo'), 2),
@@ -203,12 +224,13 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{entradas: float, saidas: float, resultado: float}
      */
-    public static function movimentosCaixaNoDia(Carbon $day): array
+    public static function movimentosCaixaNoDia(Carbon $day, int|array|null $empresaScope = null): array
     {
-        $entradas = self::sumCaixaCampo($day, $day, 'entrada');
-        $saidas = self::sumCaixaCampo($day, $day, 'saida');
+        $entradas = self::sumCaixaCampo($day, $day, 'entrada', $empresaScope);
+        $saidas = self::sumCaixaCampo($day, $day, 'saida', $empresaScope);
 
         return [
             'entradas' => $entradas,
@@ -217,39 +239,82 @@ final class ErpFinanceiroMetricas
         ];
     }
 
-    public static function sumCaixaCampo(Carbon $from, Carbon $to, string $campo): float
+    /**
+     * Resultado líquido (entrada - saída) por dia no intervalo, uma única query.
+     *
+     * @param  int|list<int>|null  $empresaScope
+     * @return array<string, float> chave Y-m-d
+     */
+    public static function resultadosCaixaPorDia(Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
+    {
+        try {
+            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+                return [];
+            }
+
+            $q = CaixaLancamento::query()
+                ->whereDate('emissao', '>=', $from->toDateString())
+                ->whereDate('emissao', '<=', $to->toDateString())
+                ->selectRaw('DATE(emissao) as dia, SUM(entrada) as entradas, SUM(saida) as saidas')
+                ->groupByRaw('DATE(emissao)');
+
+            self::applyCaixaEscopo($q, null, $empresaScope);
+
+            $out = [];
+            foreach ($q->get() as $row) {
+                $dia = (string) ($row->dia ?? '');
+                if ($dia === '') {
+                    continue;
+                }
+                // MySQL pode devolver datetime; normaliza para Y-m-d.
+                $key = strlen($dia) >= 10 ? substr($dia, 0, 10) : $dia;
+                $out[$key] = round((float) ($row->entradas ?? 0) - (float) ($row->saidas ?? 0), 2);
+            }
+
+            return $out;
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function sumCaixaCampo(Carbon $from, Carbon $to, string $campo, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
                 return 0.0;
             }
 
-            return round((float) CaixaLancamento::query()
+            $q = CaixaLancamento::query()
                 ->whereDate('emissao', '>=', $from->toDateString())
-                ->whereDate('emissao', '<=', $to->toDateString())
-                ->sum($campo), 2);
+                ->whereDate('emissao', '<=', $to->toDateString());
+
+            self::applyCaixaEscopo($q, null, $empresaScope);
+
+            return round((float) $q->sum($campo), 2);
         } catch (Throwable) {
             return 0.0;
         }
     }
 
     /**
-     * Snapshot rápido para cruzar ERP × Gestor (debug / testes).
-     *
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, float|int>
      */
-    public static function snapshotComparacao(): array
+    public static function snapshotComparacao(int|array|null $empresaScope = null): array
     {
         $hoje = self::hoje();
-        $recHoje = self::receberNoDia($hoje);
-        $pagHoje = self::pagarNoDia($hoje);
-        $recVenc = self::receberVencido($hoje);
-        $pagVenc = self::pagarVencido($hoje);
-        $inad = self::inadimplencia($hoje);
+        $recHoje = self::receberNoDia($hoje, $empresaScope);
+        $pagHoje = self::pagarNoDia($hoje, $empresaScope);
+        $recVenc = self::receberVencido($hoje, $empresaScope);
+        $pagVenc = self::pagarVencido($hoje, $empresaScope);
+        $inad = self::inadimplencia($hoje, $empresaScope);
 
         return [
             'hoje' => $hoje->toDateString(),
-            'saldo_caixa' => self::saldoCaixa(),
+            'saldo_caixa' => self::saldoCaixa(null, $empresaScope),
             'receber_hoje_valor' => $recHoje['valor'],
             'receber_hoje_qtd' => $recHoje['qtd'],
             'pagar_hoje_valor' => $pagHoje['valor'],
@@ -261,5 +326,113 @@ final class ErpFinanceiroMetricas
             'inadimplencia_valor' => $inad['valor'],
             'inadimplencia_clientes' => $inad['clientes'],
         ];
+    }
+
+    /**
+     * Visão empresa (um id): empresa_id = id.
+     * Instalação com 1 empresa: inclui também empresa_id nulo (legado).
+     * Visão grupo (lista): whereIn nas ids (sem null global).
+     *
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function applyEmpresaColumn(Builder $query, string $table, int|array|null $empresaScope): void
+    {
+        if ($empresaScope === null) {
+            return;
+        }
+
+        if (! Schema::hasColumn($table, 'empresa_id')) {
+            return;
+        }
+
+        if (is_array($empresaScope)) {
+            $ids = array_values(array_filter(array_map('intval', $empresaScope)));
+
+            if ($ids === []) {
+                return;
+            }
+
+            $query->whereIn($table.'.empresa_id', $ids);
+
+            return;
+        }
+
+        $empresaId = (int) $empresaScope;
+
+        if ($empresaId <= 0) {
+            return;
+        }
+
+        if (self::instalacaoTemUmaEmpresa()) {
+            $query->where(function (Builder $outer) use ($table, $empresaId): void {
+                $outer->where($table.'.empresa_id', $empresaId)
+                    ->orWhereNull($table.'.empresa_id');
+            });
+
+            return;
+        }
+
+        $query->where($table.'.empresa_id', $empresaId);
+    }
+
+    private static function instalacaoTemUmaEmpresa(): bool
+    {
+        static $unica = null;
+
+        if ($unica !== null) {
+            return $unica;
+        }
+
+        try {
+            if (! Schema::hasTable('empresas')) {
+                $unica = true;
+
+                return true;
+            }
+
+            $unica = \App\Models\Empresa::query()->count() <= 1;
+        } catch (Throwable) {
+            $unica = true;
+        }
+
+        return $unica;
+    }
+
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function applyCaixaEscopo(Builder $query, ?int $caixaContaId, int|array|null $empresaScope): void
+    {
+        $table = (new CaixaLancamento)->getTable();
+
+        if ($caixaContaId && $caixaContaId > 0) {
+            $query->where('caixa_conta_id', $caixaContaId);
+        }
+
+        self::applyEmpresaColumn($query, $table, $empresaScope);
+
+        if ($empresaScope === null || is_array($empresaScope) || (int) $empresaScope <= 0) {
+            return;
+        }
+
+        if (Schema::hasColumn($table, 'empresa_id')) {
+            return;
+        }
+
+        $empresaId = (int) $empresaScope;
+        $user = Auth::user();
+        if ($user === null || (bool) $user->is_admin) {
+            return;
+        }
+
+        $contaIds = $user->accessibleCaixaContaIds($empresaId);
+        $assigned = \Illuminate\Support\Facades\DB::table('caixa_conta_user')
+            ->where('user_id', $user->getKey())
+            ->where('empresa_id', $empresaId)
+            ->exists();
+
+        if ($assigned && $contaIds !== []) {
+            $query->whereIn('caixa_conta_id', $contaIds);
+        }
     }
 }

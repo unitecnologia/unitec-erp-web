@@ -47,6 +47,7 @@ trait ErpProductFormPage
     use ManagesProductImpostoPadrao;
     use ManagesProductLocalizacao;
     use ManagesProductReservas;
+    use ManagesProductLotes;
     use ManagesProductExitConfirm;
 
     public function getHeading(): string | Htmlable | null
@@ -87,6 +88,10 @@ trait ErpProductFormPage
             'erp-form-page',
             'erp-produtos-form-page',
         ];
+
+        if (! $this->isEditingProduct()) {
+            $classes[] = 'erp-produtos-form-page--create';
+        }
 
         if ($this->embedsInPdv) {
             $classes[] = 'erp-pdv-embed';
@@ -239,10 +244,6 @@ trait ErpProductFormPage
         $data = $this->ensureUniqueProductCodigo($data);
         $data = $this->resolveNcmDescricaoInFormData($data);
 
-        if ((float) ($data['estoque_inicial'] ?? 0) > 0 && (float) ($data['estoque'] ?? 0) <= 0) {
-            $data['estoque'] = $data['estoque_inicial'];
-        }
-
         return $data;
     }
 
@@ -337,6 +338,17 @@ trait ErpProductFormPage
             $merged['validade'] = null;
         }
 
+        if (($merged['lote'] ?? null) === '') {
+            $merged['lote'] = null;
+        } elseif (isset($merged['lote'])) {
+            $merged['lote'] = mb_substr(trim((string) $merged['lote']), 0, 60);
+            if ($merged['lote'] === '') {
+                $merged['lote'] = null;
+            }
+        }
+
+        $merged['controla_lote_validade'] = (bool) ($merged['controla_lote_validade'] ?? false);
+
         foreach (['promo_data_inicio', 'promo_data_fim'] as $promoDateField) {
             if (! empty($merged[$promoDateField]) && is_string($merged[$promoDateField]) && str_contains($merged[$promoDateField], '/')) {
                 try {
@@ -387,6 +399,10 @@ trait ErpProductFormPage
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
+        foreach (['nutri_valor_energetico', 'nutri_carboidratos', 'nutri_proteinas', 'nutri_gorduras_totais', 'nutri_gorduras_saturadas', 'nutri_gorduras_trans', 'nutri_fibra', 'nutri_sodio'] as $field) {
+            $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 1);
+        }
+
         foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs'] as $field) {
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 4);
         }
@@ -401,20 +417,54 @@ trait ErpProductFormPage
         $data['qtd_atacado'] = $this->formatBrDecimal($data['qtd_atacado'] ?? 0, 0);
         $data['estoque'] = $this->formatBrDecimal($data['estoque'] ?? 0, 3);
         $data['estoque_minimo'] = $this->formatBrDecimal($data['estoque_minimo'] ?? 0, 0);
-        $data['estoque_inicial'] = $this->formatBrDecimal($data['estoque_inicial'] ?? 0, 0);
         $data['peso_kg'] = $this->formatBrDecimal($data['peso_kg'] ?? 0, 3);
 
         if (! empty($data['validade'])) {
-            $data['validade'] = $this->formatBrDateForDisplay($data['validade']);
+            $data['validade'] = $this->formatIsoDateForInput($data['validade']);
         }
 
         foreach (['promo_data_inicio', 'promo_data_fim'] as $promoDateField) {
             if (! empty($data[$promoDateField])) {
-                $data[$promoDateField] = $this->formatBrDateForDisplay($data[$promoDateField]);
+                $data[$promoDateField] = $this->formatIsoDateForInput($data[$promoDateField]);
             }
         }
 
         return $this->ensureLocalizacaoFormKeys($data);
+    }
+
+    protected function formatIsoDateForInput(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return \Illuminate\Support\Carbon::instance($value)->format('Y-m-d');
+        }
+
+        $trimmed = trim((string) $value);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $trimmed)) {
+            return substr($trimmed, 0, 10);
+        }
+
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $trimmed)) {
+            try {
+                return \Illuminate\Support\Carbon::createFromFormat('d/m/Y', $trimmed)->format('Y-m-d');
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($trimmed)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     protected function formatBrDateForDisplay(mixed $value): ?string
@@ -466,6 +516,21 @@ trait ErpProductFormPage
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
+        foreach (['nutri_valor_energetico', 'nutri_carboidratos', 'nutri_proteinas', 'nutri_gorduras_totais', 'nutri_gorduras_saturadas', 'nutri_gorduras_trans', 'nutri_fibra', 'nutri_sodio'] as $field) {
+            $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 1);
+        }
+
+        $data['nutri_porcao_qtd'] = max(0, min(999, (int) ($data['nutri_porcao_qtd'] ?? 0)));
+        $data['nutri_medida_inteiro'] = max(0, min(99, (int) ($data['nutri_medida_inteiro'] ?? 0)));
+        $data['nutri_porcao_unidade'] = in_array(($data['nutri_porcao_unidade'] ?? '0'), ['0', '1', '2'], true)
+            ? (string) $data['nutri_porcao_unidade']
+            : '0';
+        $data['nutri_medida_fracao'] = in_array(($data['nutri_medida_fracao'] ?? '0'), ['0', '1', '2', '3', '4', '5'], true)
+            ? (string) $data['nutri_medida_fracao']
+            : '0';
+        $medidaTipo = preg_replace('/\D/', '', (string) ($data['nutri_medida_tipo'] ?? '00')) ?? '00';
+        $data['nutri_medida_tipo'] = str_pad(substr($medidaTipo, 0, 2), 2, '0', STR_PAD_LEFT);
+
         foreach (['mva_normal', 'icms_diferido', 'aliq_deson', 'aliq_ibs_uf', 'aliq_cbs', 'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs'] as $field) {
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 4);
         }
@@ -491,7 +556,6 @@ trait ErpProductFormPage
         $data['qtd_atacado'] = $this->parseBrDecimal($data['qtd_atacado'] ?? 0, 0);
         $data['estoque'] = $this->parseBrDecimal($data['estoque'] ?? 0, 3);
         $data['estoque_minimo'] = $this->parseBrDecimal($data['estoque_minimo'] ?? 0, 0);
-        $data['estoque_inicial'] = $this->parseBrDecimal($data['estoque_inicial'] ?? 0, 0);
         $data['peso_kg'] = $this->parseBrDecimal($data['peso_kg'] ?? 0, 3);
 
         return ProductLocalizacao::collapseFromForm($data);
@@ -604,6 +668,7 @@ trait ErpProductFormPage
             'codigo_barras' => 'Código de Barras',
             'referencia' => 'Referência',
             'validade' => 'Validade',
+            'lote' => 'Lote',
             'motivo_desoneracao' => 'Motivo Desoneração',
             'menu_id' => 'Menu',
             'principio_ativo_id' => 'Princípio Ativo',
@@ -683,6 +748,7 @@ trait ErpProductFormPage
 
         $this->switchProductFormEmpresaPrecos($fromEmpresaId, $empresaId);
         session(['erp_empresa_id' => $empresaId]);
+        \App\Support\Erp\ErpContext::clearMemo();
 
         if (! $this->isEditingProduct()) {
             $this->applyEmpresaImpostoPadraoToProductForm(notify: false);
@@ -720,9 +786,11 @@ trait ErpProductFormPage
             'loc_prateleira' => '',
             'loc_gaveta' => '',
             'loc_legado' => null,
+            'validade' => null,
+            'lote' => null,
+            'controla_lote_validade' => false,
             'estoque' => 0,
             'estoque_minimo' => 1,
-            'estoque_inicial' => 0,
             'peso_kg' => 0,
             'ativo' => true,
             'is_fiscal' => true,
@@ -741,6 +809,20 @@ trait ErpProductFormPage
             'principio_ativo_id' => null,
             'aplicacao' => null,
             'produto_pesado' => false,
+            'tem_info_nutricional' => false,
+            'nutri_porcao_qtd' => 0,
+            'nutri_porcao_unidade' => '0',
+            'nutri_medida_inteiro' => 0,
+            'nutri_medida_fracao' => '0',
+            'nutri_medida_tipo' => '00',
+            'nutri_valor_energetico' => 0,
+            'nutri_carboidratos' => 0,
+            'nutri_proteinas' => 0,
+            'nutri_gorduras_totais' => 0,
+            'nutri_gorduras_saturadas' => 0,
+            'nutri_gorduras_trans' => 0,
+            'nutri_fibra' => 0,
+            'nutri_sodio' => 0,
             'paga_comissao' => false,
             'preco_variavel' => false,
             'is_composicao' => false,

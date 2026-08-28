@@ -75,6 +75,7 @@ class OrcamentoResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.nome_razao')
                     ->label('Cliente')
+                    ->state(fn (Orcamento $record): string => $record->clienteDisplayNome() ?: '—')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
                 TextColumn::make('vendedor.nome')
@@ -84,11 +85,13 @@ class OrcamentoResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.cidade_nome')
                     ->label('Cidade')
+                    ->state(fn (Orcamento $record): string => $record->clienteDisplayCidade() ?: '—')
                     ->placeholder('—')
-                    ->tooltip(fn (Orcamento $record): ?string => $record->cliente?->cidade_nome)
+                    ->tooltip(fn (Orcamento $record): ?string => $record->clienteDisplayCidade() ?: null)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente.uf')
                     ->label('UF')
+                    ->state(fn (Orcamento $record): string => $record->clienteDisplayUf() ?: '—')
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),

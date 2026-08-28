@@ -6,6 +6,7 @@ use App\Models\Empresa;
 use App\Models\PdvVenda;
 use App\Models\Product;
 use App\Models\VendasParametro;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
@@ -30,6 +31,7 @@ final class PdvNfceFiscalPayloadBuilder
         ?int $cNfFixo = null,
         ?string $justificativaContingencia = null,
         ?\DateTimeInterface $dataContingencia = null,
+        ?int $serieNfce = null,
     ): EmitirNfceRequest {
         $this->validarPreRequisitos($empresa, $parametros, $operacao);
 
@@ -44,11 +46,15 @@ final class PdvNfceFiscalPayloadBuilder
         $tpAmb = $this->mapTpAmb((int) $parametros->ambiente);
         $tpEmis = $operacao === PdvFinalizarOperacao::NFCE_CONTINGENCIA ? 9 : 1;
         $cNf = $cNfFixo ?? random_int(1, 99999999);
-        $emissao = $venda->fechado_em ?? now();
+        // O banco conserva o instante em UTC; o XML fiscal exige data/hora local
+        // e offset do estabelecimento para dhEmi/chave de acesso.
+        $emissao = ErpTimezone::toLocal($venda->fechado_em ?? now());
         $justificativa = $tpEmis === 9
             ? NfceContingenciaJustificativa::normalize($justificativaContingencia)
             : null;
-        $dhContingencia = $tpEmis === 9 ? ($dataContingencia ?? $emissao) : null;
+        $dhContingencia = $tpEmis === 9
+            ? ErpTimezone::toLocal($dataContingencia ?? $emissao)
+            : null;
 
         $venda->loadMissing(['itens.product', 'pagamentos', 'person']);
 
@@ -151,12 +157,22 @@ final class PdvNfceFiscalPayloadBuilder
 
         $valorDesconto = round($valorDescontoItens + (float) $venda->desconto, 2);
         $valorAcrescimo = round($valorAcrescimoItens + (float) $venda->acrescimo, 2);
+        $valorNota = round((float) $venda->total, 2);
+        $totalPagamentos = round(array_sum(array_map(
+            static fn (PagamentoDto $pagamento): float => (float) $pagamento->valor,
+            $pagamentos,
+        )), 2);
+        $valorTroco = round(max(0, (float) $venda->troco), 2);
+
+        if ($valorTroco <= 0 && $totalPagamentos > $valorNota) {
+            $valorTroco = round($totalPagamentos - $valorNota, 2);
+        }
 
         return new EmitirNfceRequest(
             certificate: $certificate,
             emitente: $this->buildEmitente($empresa),
             ide: new IdeDto(
-                serie: (int) ltrim((string) ($parametros->serie ?: '1'), '0') ?: 1,
+                serie: $serieNfce ?? ((int) ltrim((string) ($parametros->serie ?: '1'), '0') ?: 1),
                 numero: $numeroNfce,
                 cNf: $cNf,
                 tpAmb: $tpAmb,
@@ -170,10 +186,11 @@ final class PdvNfceFiscalPayloadBuilder
             itens: $itens,
             pagamentos: $pagamentos,
             valorProdutos: round($valorProdutos, 2),
-            valorNota: round((float) $venda->total, 2),
+            valorNota: $valorNota,
             valorDesconto: $valorDesconto,
             valorAcrescimo: $valorAcrescimo,
             valorTotTrib: (float) ($ibptTotais['v_tot_trib'] ?? 0),
+            valorTroco: $valorTroco,
             destinatario: $destinatario,
             idToken: trim((string) ($parametros->id_token ?? '')),
             csc: trim((string) ($parametros->token ?? '')),
@@ -291,7 +308,7 @@ final class PdvNfceFiscalPayloadBuilder
 
     private function buildDestinatario(PdvVenda $venda): ?DestinatarioDto
     {
-        $cpf = NfceConsumidorIdentificado::cpfDigits($venda->cpf_nota);
+        $cpf = NfceConsumidorIdentificado::cpfDigitsDaVenda($venda);
 
         if ($cpf === '') {
             return null;

@@ -1,4 +1,4 @@
-﻿@if ($this->vendedorModalOpen)
+@if ($this->vendedorModalOpen)
     <div
         class="erp-lookup-modal erp-vendedor-form-modal"
         wire:keydown.escape.window="closeVendedorModal"
@@ -121,113 +121,9 @@
                                     @endforeach
                                 </select>
                                 @error('vendedorForm.usuario_id') <span class="erp-vendedor-form-modal__error">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div class="erp-pcad-form__row erp-vform__cell erp-vform__cell--half erp-vform__cell--top">
-                                <label class="erp-pcad-form__label">
-                                    Empresas <em class="erp-vform__req">*</em>
-                                </label>
-                                @php($empresaCodigos = $this->empresaCodigos())
-                                <div
-                                    class="erp-vform__multi"
-                                    x-data="{ open: false, q: '', codigos: @js($empresaCodigos) }"
-                                    @click.outside="open = false"
-                                    @keydown.escape.stop="open = false"
-                                >
-                                    <button type="button" class="erp-vform__multi-toggle" @click="open = !open">
-                                        <span
-                                            class="erp-vform__multi-summary"
-                                            :class="{ 'erp-vform__multi-summary--empty': !($wire.vendedorForm.empresas || []).length }"
-                                            x-text="($wire.vendedorForm.empresas || []).length
-                                                ? $wire.vendedorForm.empresas.map(id => codigos[id]).filter(Boolean).join(', ')
-                                                : 'Selecione as empresas...'"
-                                        ></span>
-                                        <span class="erp-vform__multi-count" x-show="($wire.vendedorForm.empresas || []).length"
-                                            x-text="($wire.vendedorForm.empresas || []).length"></span>
-                                        <svg class="erp-vform__multi-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="open ? 'transform:rotate(180deg)' : ''" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-
-                                    <div class="erp-vform__multi-panel" x-show="open" x-cloak x-transition.opacity>
-                                        @if (count($empresaCodigos))
-                                            <input type="text" class="erp-vform__multi-search" placeholder="Pesquisar empresa..." x-model="q" @click.stop>
-                                            <div class="erp-vform__multi-list">
-                                                @foreach ($this->empresaOptions() as $id => $nome)
-                                                    <label
-                                                        class="erp-vform__check"
-                                                        x-show="q === '' || @js(mb_strtolower(($empresaCodigos[$id] ?? '').' '.$nome, 'UTF-8')).includes(q.toLowerCase())"
-                                                    >
-                                                        <input type="checkbox" value="{{ $id }}" wire:model.live="vendedorForm.empresas">
-                                                        <strong>{{ $empresaCodigos[$id] ?? '' }}</strong> {{ $nome }}
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <span class="erp-vform__empresas-empty">Nenhuma empresa cadastrada.</span>
-                                        @endif
-                                    </div>
-                                </div>
-                                @error('vendedorForm.empresas')
-                                    <span class="erp-vendedor-form-modal__error">{{ $message }}</span>
-                                @enderror
-                                @error('vendedorForm.empresas.*')
-                                    <span class="erp-vendedor-form-modal__error">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            <div class="erp-pcad-form__row erp-vform__cell erp-vform__cell--half erp-vform__cell--top">
-                                <label class="erp-pcad-form__label" for="vendedor-caixa">
-                                    Caixa <em class="erp-vform__req">*</em>
-                                </label>
-                                @php($empresasSelecionadas = array_values(array_filter(array_map('intval', (array) ($this->vendedorForm['empresas'] ?? [])))))
-                                @php($caixaOptions = (array) $this->caixaContaOptions())
-                                @php($empresaNomes = (array) $this->empresaOptions())
-                                @php($empresaCodigosCaixa = (array) $this->empresaCodigos())
-                                <div class="erp-vform__field-stack">
-                                    @if (count($empresasSelecionadas) === 0)
-                                        <select id="vendedor-caixa" class="erp-pcad-form__select" disabled>
-                                            <option value="">Selecione a empresa primeiro...</option>
-                                        </select>
-                                    @elseif (count($empresasSelecionadas) === 1)
-                                        @php($empresaIdUnica = $empresasSelecionadas[0])
-                                        <select
-                                            id="vendedor-caixa"
-                                            wire:model="vendedorForm.caixas_por_empresa.{{ $empresaIdUnica }}"
-                                            class="erp-pcad-form__select"
-                                            required
-                                        >
-                                            <option value="">— selecione —</option>
-                                            @foreach ($caixaOptions as $caixaId => $caixaLabel)
-                                                <option value="{{ $caixaId }}">{{ $caixaLabel }}</option>
-                                            @endforeach
-                                        </select>
-                                    @else
-                                        <div class="erp-vform__caixas-por-empresa">
-                                            @foreach ($empresasSelecionadas as $empresaId)
-                                                <div class="erp-vform__caixa-empresa-row">
-                                                    <span class="erp-vform__caixa-empresa-badge" title="{{ $empresaNomes[$empresaId] ?? '' }}">
-                                                        Emp. {{ $empresaCodigosCaixa[$empresaId] ?? $empresaId }}
-                                                    </span>
-                                                    <select
-                                                        wire:model="vendedorForm.caixas_por_empresa.{{ $empresaId }}"
-                                                        class="erp-pcad-form__select"
-                                                        required
-                                                    >
-                                                        <option value="">— selecione —</option>
-                                                        @foreach ($caixaOptions as $caixaId => $caixaLabel)
-                                                            <option value="{{ $caixaId }}">{{ $caixaLabel }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                    @error('vendedorForm.caixas_por_empresa')
-                                        <span class="erp-vendedor-form-modal__error">{{ $message }}</span>
-                                    @enderror
-                                    @error('vendedorForm.caixas_por_empresa.*')
-                                        <span class="erp-vendedor-form-modal__error">{{ $message }}</span>
-                                    @enderror
-                                </div>
+                                <p class="erp-vform__hint">
+                                    Empresas e caixas deste operador vêm de <strong>Permissões / Usuários</strong> (abas Empresas e Caixas).
+                                </p>
                             </div>
 
                             <div class="erp-pcad-form__row erp-vform__cell erp-vform__cell--full erp-vform__cell--top">
@@ -434,3 +330,4 @@
 
     @include('filament.components.erp.form-scripts')
 @endif
+

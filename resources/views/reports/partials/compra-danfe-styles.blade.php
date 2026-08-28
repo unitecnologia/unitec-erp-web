@@ -88,6 +88,31 @@
         margin: 2px auto;
     }
 
+    .danfe__emitente {
+        display: table;
+        width: 100%;
+    }
+
+    .danfe__emitente-text {
+        display: table-cell;
+        vertical-align: top;
+    }
+
+    .danfe__emitente-logo {
+        display: table-cell;
+        vertical-align: middle;
+        width: 32%;
+        padding-left: 4px;
+        text-align: right;
+    }
+
+    .danfe__emitente-logo img {
+        display: inline-block;
+        max-width: 100%;
+        max-height: 56px;
+        object-fit: contain;
+    }
+
     .danfe__chave {
         font-size: 6.5pt;
         font-weight: 700;
@@ -200,5 +225,18 @@
         color: #666;
         font-weight: 400;
         padding: 0 2px;
+    }
+
+    .danfe__transport-address-row .danfe__value {
+        white-space: nowrap;
+        word-break: normal;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 6.5pt;
+        line-height: 1.1;
+    }
+
+    .danfe__transport-address-row td {
+        vertical-align: middle;
     }
 </style>

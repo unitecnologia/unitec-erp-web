@@ -33,17 +33,7 @@ class ProductListagemReport
      */
     public static function defaultColumns(): array
     {
-        return [
-            'codigo',
-            'codigo_barras',
-            'referencia',
-            'descricao',
-            'grupo',
-            'unidade',
-            'preco_venda',
-            'preco_compra',
-            'estoque',
-        ];
+        return array_keys(static::columnDefinitions());
     }
 
     /**
@@ -235,6 +225,7 @@ class ProductListagemReport
             'grupo' => 'Grupo',
             'preco_venda' => 'Preço',
             'estoque' => 'Estoque',
+            'validade' => 'Data validade',
         ];
     }
 

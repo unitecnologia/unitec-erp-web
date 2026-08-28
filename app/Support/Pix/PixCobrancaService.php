@@ -9,6 +9,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Pix\Contracts\PixProvider;
 use App\Support\Pix\Data\PixCobrancaInput;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -161,33 +162,40 @@ class PixCobrancaService
     }
 
     /**
-     * Marca a cobrança como paga e dá a baixa correspondente. Idempotente.
+     * Marca a cobrança como paga e dá a baixa correspondente. Idempotente (lock).
      */
     public function registrarPagamento(PixCobranca $cobranca): PixCobranca
     {
-        if ($cobranca->isPago()) {
-            return $cobranca;
-        }
+        return DB::transaction(function () use ($cobranca): PixCobranca {
+            $locked = PixCobranca::query()->whereKey($cobranca->id)->lockForUpdate()->firstOrFail();
 
-        $cobranca->forceFill([
-            'status' => PixCobranca::STATUS_PAGO,
-            'pago_em' => now(),
-        ])->save();
+            if ($locked->isPago()) {
+                return $locked;
+            }
 
-        // Título já existente: baixa direto a conta a receber.
-        if ($cobranca->origem === PixCobranca::ORIGEM_TITULO && $cobranca->conta_receber_id) {
-            $this->baixarTitulo($cobranca);
-        }
+            $locked->forceFill([
+                'status' => PixCobranca::STATUS_PAGO,
+                'pago_em' => now(),
+            ])->save();
 
-        // Pedido: a venda ainda não existe; o faturamento (Monitor) lê o flag
-        // de Pix pago no payload e gera o título já baixado.
+            // Título já existente: baixa direto a conta a receber.
+            if ($locked->origem === PixCobranca::ORIGEM_TITULO && $locked->conta_receber_id) {
+                $this->baixarTitulo($locked);
+            }
 
-        return $cobranca;
+            // Pedido: a venda ainda não existe; o faturamento (Monitor) lê o flag
+            // de Pix pago no payload e gera o título já baixado.
+
+            return $locked;
+        });
     }
 
     private function baixarTitulo(PixCobranca $cobranca): void
     {
-        $conta = $cobranca->contaReceber;
+        $conta = ContaReceber::query()
+            ->whereKey((int) $cobranca->conta_receber_id)
+            ->lockForUpdate()
+            ->first();
 
         if ($conta === null || (float) $conta->saldo <= 0) {
             return;
@@ -199,28 +207,26 @@ class PixCobrancaService
             return;
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($cobranca, $conta, $valorBaixa): void {
-            $recebido = (float) $conta->valor_recebido + $valorBaixa;
-            $maximo = (float) $conta->valor - (float) $conta->desconto + (float) $conta->juros;
+        $recebido = (float) $conta->valor_recebido + $valorBaixa;
+        $maximo = (float) $conta->valor - (float) $conta->desconto + (float) $conta->juros;
 
-            $conta->forceFill([
-                'valor_recebido' => min($recebido, $maximo),
-                'recebido_em' => $cobranca->pago_em ?? now(),
-                'forma' => ContaReceber::FORMA_PIX,
-            ])->save(); // saldo é recalculado no saving()
+        $conta->forceFill([
+            'valor_recebido' => min($recebido, $maximo),
+            'recebido_em' => $cobranca->pago_em ?? now(),
+            'forma' => ContaReceber::FORMA_PIX,
+        ])->save(); // saldo é recalculado no saving()
 
-            // PIX de título: baixa o CR e gera entrada no Livro Caixa (paridade FV).
-            $data = ($cobranca->pago_em ?? now())->toDateString();
-            $documento = (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id));
+        // PIX de título: baixa o CR e gera entrada no Livro Caixa (paridade FV).
+        $data = ($cobranca->pago_em ?? now())->toDateString();
+        $documento = (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id));
 
-            app(ContaReceberBaixaService::class)->registrarEntradaCaixa(
-                valor: $valorBaixa,
-                data: $data,
-                documento: $documento,
-                historico: 'Recebimento PIX #'.($conta->numero ?: $conta->id),
-                caixaContaId: $this->resolveCaixaContaIdPix($cobranca),
-            );
-        });
+        app(ContaReceberBaixaService::class)->registrarEntradaCaixa(
+            valor: $valorBaixa,
+            data: $data,
+            documento: $documento,
+            historico: 'Recebimento PIX #'.($conta->numero ?: $conta->id),
+            caixaContaId: $this->resolveCaixaContaIdPix($cobranca),
+        );
     }
 
     private function resolveCaixaContaIdPix(PixCobranca $cobranca): ?int

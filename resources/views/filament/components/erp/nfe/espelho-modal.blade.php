@@ -12,7 +12,7 @@
             aria-labelledby="erp-nfe-espelho-title"
         >
             <div class="erp-lookup-modal__titlebar erp-nfe-espelho-modal__titlebar">
-                <span id="erp-nfe-espelho-title">Espelho da NF-e — NOTA EM ABERTO — SEM VALOR FISCAL</span>
+                <span id="erp-nfe-espelho-title">Espelho da NF-e — SEM VALIDADE FISCAL</span>
                 <button type="button" class="erp-lookup-modal__close" wire:click="closeNfeEspelho" title="Fechar">✕</button>
             </div>
 

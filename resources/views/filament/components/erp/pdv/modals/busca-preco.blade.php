@@ -1,9 +1,9 @@
 @if ($this->activeModal === 'busca_preco')
-    <div class="erp-pdv-modal" role="dialog" aria-label="Busca preço">
+    <div class="erp-pdv-modal" role="dialog" aria-label="Consulta preço">
         <div class="erp-pdv-modal__backdrop" wire:click="cancelBuscaPreco"></div>
         <div class="erp-pdv-modal__window erp-pdv-modal__window--small">
             <header class="erp-pdv-modal__header">
-                <h2>Ctrl+L — Busca Preço</h2>
+                <h2>Ctrl+L — Consulta Preço</h2>
             </header>
             <div class="erp-pdv-modal__body">
                 <label class="erp-pdv-modal__label" for="erp-pdv-busca-preco-search">Código, barras ou descrição</label>

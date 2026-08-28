@@ -6,6 +6,7 @@ use App\Models\ContaReceber;
 use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Financeiro\FormaPagamentoDestino;
 use Carbon\Carbon;
 
 final class PdvVendaFinanceiroService
@@ -14,9 +15,10 @@ final class PdvVendaFinanceiroService
     public const CONSUMIDOR_FINAL_CODIGO = Person::CODIGO_CONSUMIDOR_FINAL;
 
     /**
-     * @param  array<int, array{forma: string, valor: string, tipo?: string, aparece_contas_receber?: bool}>  $pagamentos
+     * @param  array<int, array{forma: string, valor: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool}>  $pagamentos
      * @param  list<int>|null  $tabelaPrazoDias  Dias de vencimento do crediário (ex.: [30, 60, 90]).
      * @param  array{nsu?: string, autorizacao?: string, maquininha?: string, bandeira?: string, dias?: list<int>}|null  $cartaoCanhoto
+     * @param  list<string>|null  $chequeNumeros  Número do cheque por parcela (mesmo índice dos dias).
      */
     public function gerarContasReceber(
         PdvVenda $venda,
@@ -24,8 +26,13 @@ final class PdvVendaFinanceiroService
         array $pagamentos,
         ?array $tabelaPrazoDias = null,
         ?array $cartaoCanhoto = null,
+        ?array $chequeNumeros = null,
     ): void {
+        $venda->loadMissing('sessao');
         $personId = $personId ?: $this->resolveConsumidorFinalClienteId();
+        $empresaId = $venda->sessao?->empresa_id !== null
+            ? (int) $venda->sessao->empresa_id
+            : null;
 
         $numeroVenda = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
         $documentoBase = 'PDV-'.$numeroVenda;
@@ -39,30 +46,33 @@ final class PdvVendaFinanceiroService
                 continue;
             }
 
-            $isCartaoCr = PdvFinalizarPagamentosHelper::cartaoVaiParaContasReceber(
-                $pagamento,
-                PdvConfig::make()->lancarCartaoNoCaixa(),
-            );
-
-            $contaForma = match (true) {
-                $isCartaoCr => ContaReceber::FORMA_CARTAO,
-                str_contains($forma, 'CHEQUE') => ContaReceber::FORMA_CHEQUE,
-                str_contains($forma, 'BOLETO') => ContaReceber::FORMA_BOLETO,
-                PdvFinalizarPagamentosHelper::isFormaCrediario($forma) => ContaReceber::FORMA_CARTEIRA,
-                default => null,
-            };
-
-            if ($contaForma === null) {
+            if (
+                ! FormaPagamentoDestino::geraContasReceber($pagamento)
+                && ! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)
+            ) {
                 continue;
             }
 
+            $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+            $isCartao = PdvFinalizarPagamentosHelper::isFormaCartao($pagamento);
+            $isCheque = $tipo === 'cheque' || PdvFinalizarPagamentosHelper::isFormaCheque($forma);
+
+            $contaForma = match (true) {
+                $isCartao || in_array($tipo, ['cartao_credito', 'cartao_debito', 'tef'], true) => ContaReceber::FORMA_CARTAO,
+                $isCheque => ContaReceber::FORMA_CHEQUE,
+                $tipo === 'boleto' || str_contains($forma, 'BOLETO') => ContaReceber::FORMA_BOLETO,
+                $tipo === 'crediario' || PdvFinalizarPagamentosHelper::isFormaCrediario($forma) => ContaReceber::FORMA_CARTEIRA,
+                $tipo === 'pix' || str_contains($forma, 'PIX') => ContaReceber::FORMA_PIX,
+                default => ContaReceber::FORMA_CARTEIRA,
+            };
+
             $dias = match (true) {
-                $isCartaoCr => $this->normalizarDias($cartaoCanhoto['dias'] ?? null),
-                PdvFinalizarPagamentosHelper::isFormaCrediario($forma) => $this->normalizarDias($tabelaPrazoDias),
+                $isCartao => $this->normalizarDias($cartaoCanhoto['dias'] ?? null),
+                PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento) => $this->normalizarDias($tabelaPrazoDias),
                 default => [30],
             };
 
-            $canhoto = $isCartaoCr ? [
+            $canhoto = $isCartao ? [
                 'nsu' => trim((string) ($cartaoCanhoto['nsu'] ?? '')),
                 'autorizacao' => trim((string) ($cartaoCanhoto['autorizacao'] ?? '')),
                 'maquininha' => trim((string) ($cartaoCanhoto['maquininha'] ?? '')),
@@ -78,7 +88,9 @@ final class PdvVendaFinanceiroService
                 numeroVenda: $numeroVenda,
                 documentoBase: $documentoBase,
                 hoje: $hoje,
+                empresaId: $empresaId,
                 canhoto: $canhoto,
+                chequeNumeros: $isCheque ? ($chequeNumeros ?? []) : null,
             );
         }
     }
@@ -101,6 +113,7 @@ final class PdvVendaFinanceiroService
     /**
      * @param  list<int>  $dias
      * @param  array{nsu: string, autorizacao: string, maquininha?: string, bandeira: string}|null  $canhoto
+     * @param  list<string>|null  $chequeNumeros
      */
     private function criarParcelas(
         int $personId,
@@ -111,7 +124,9 @@ final class PdvVendaFinanceiroService
         string $numeroVenda,
         string $documentoBase,
         Carbon $hoje,
+        ?int $empresaId = null,
         ?array $canhoto = null,
+        ?array $chequeNumeros = null,
     ): void {
         $n = count($dias);
         $parcelaBase = floor($total / $n * 100) / 100;
@@ -138,7 +153,16 @@ final class PdvVendaFinanceiroService
                 }
             }
 
+            $numeroCheque = $chequeNumeros !== null
+                ? trim((string) ($chequeNumeros[$i] ?? ''))
+                : '';
+
+            if ($numeroCheque !== '') {
+                $historico .= ' | CHQ '.$numeroCheque;
+            }
+
             ContaReceber::query()->create([
+                'empresa_id' => $empresaId,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
                 'historico' => mb_substr($historico, 0, 500),
@@ -152,44 +176,43 @@ final class PdvVendaFinanceiroService
                 'cartao_maquininha' => $canhoto['maquininha'] ?? null,
                 'cartao_bandeira' => $canhoto['bandeira'] ?? null,
                 'cartao_parcela' => $canhoto !== null ? $parcelaLabel : null,
+                'numero_cheque' => $numeroCheque !== '' ? mb_substr($numeroCheque, 0, 40) : null,
             ]);
         }
     }
 
     private function resolveConsumidorFinalClienteId(): int
     {
-        $person = Person::query()
-            ->whereIn('codigo', Person::codigosConsumidorFinal())
-            ->orderByRaw('CASE WHEN codigo = ? THEN 0 ELSE 1 END', [Person::CODIGO_CONSUMIDOR_FINAL])
-            ->orderBy('id')
-            ->first();
-
-        if ($person) {
-            if (
-                (string) $person->codigo === Person::CODIGO_CONSUMIDOR_FINAL_LEGADO
-                && ! Person::query()->where('codigo', Person::CODIGO_CONSUMIDOR_FINAL)->exists()
-            ) {
-                $person->forceFill(['codigo' => Person::CODIGO_CONSUMIDOR_FINAL])->save();
-            }
-
-            return (int) $person->id;
-        }
-
-        $person = Person::query()->create([
-            'codigo' => Person::CODIGO_CONSUMIDOR_FINAL,
-            'pessoa_tipo' => Person::PESSOA_FISICA,
-            'nome_razao' => 'CONSUMIDOR FINAL',
-            'is_cliente' => true,
-            'ativo' => true,
-        ]);
-
-        return (int) $person->id;
+        return (int) Person::resolveConsumidorFinal()->id;
     }
 
     public function estornarContasReceber(PdvVenda $venda): ?string
     {
-        $numeroVenda = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
-        $documento = 'PDV-'.$numeroVenda;
+        $bloqueio = $this->motivoBloqueioEstornoContasReceber($venda);
+
+        if ($bloqueio !== null) {
+            return $bloqueio;
+        }
+
+        $documento = $this->documentoContasReceberPdv($venda);
+
+        ContaReceber::query()
+            ->where(function ($q) use ($documento): void {
+                $q->where('documento', $documento)
+                    ->orWhere('documento', 'like', $documento.'/%');
+            })
+            ->delete();
+
+        return null;
+    }
+
+    /**
+     * Valida se o estorno financeiro pode ocorrer, sem apagar títulos.
+     * Usar antes de cancelar NFC-e na SEFAZ.
+     */
+    public function motivoBloqueioEstornoContasReceber(PdvVenda $venda): ?string
+    {
+        $documento = $this->documentoContasReceberPdv($venda);
 
         $contas = ContaReceber::query()
             ->where(function ($q) use ($documento): void {
@@ -208,13 +231,13 @@ final class PdvVendaFinanceiroService
             }
         }
 
-        ContaReceber::query()
-            ->where(function ($q) use ($documento): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'/%');
-            })
-            ->delete();
-
         return null;
+    }
+
+    private function documentoContasReceberPdv(PdvVenda $venda): string
+    {
+        $numeroVenda = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
+
+        return 'PDV-'.$numeroVenda;
     }
 }

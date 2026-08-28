@@ -99,8 +99,11 @@ class CreateProduct extends CreateRecord
 
     protected function afterCreate(): void
     {
-        \App\Support\Erp\ProductInitialStockService::registerFromInitialStock($this->record);
         $this->syncProductChildRecords($this->record);
+
+        if ($this->record instanceof Product) {
+            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record->fresh());
+        }
 
         $prefill = NotaFornecedorProductPrefill::peek();
         $itemIndex = is_array($prefill) ? (int) ($prefill['item_index'] ?? -1) : -1;

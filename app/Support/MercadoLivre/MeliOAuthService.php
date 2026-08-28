@@ -201,31 +201,18 @@ final class MeliOAuthService
     }
 
     /**
-     * Credenciais do app ML: prioriza campos da empresa; fallback no .env.
+     * Credenciais do app ML — somente cadastro da empresa (banco).
      *
      * @return array{client_id: string, client_secret: string, redirect_uri: string}
      */
     public function resolveCredentials(?Empresa $empresa = null): array
     {
-        $clientId = trim((string) ($empresa?->param_meli_client_id ?: ''));
-        $clientSecret = trim((string) ($empresa?->param_meli_client_secret ?: ''));
-        $redirectUri = trim((string) ($empresa?->param_meli_redirect_uri ?: ''));
-
-        // Fallback opcional só se a empresa ainda não tiver preenchido na aba.
-        if ($clientId === '') {
-            $clientId = trim((string) config('meli.client_id'));
-        }
-        if ($clientSecret === '') {
-            $clientSecret = trim((string) config('meli.client_secret'));
-        }
-        if ($redirectUri === '') {
-            $redirectUri = trim((string) config('meli.redirect_uri'));
-        }
+        $config = MeliEmpresaConfig::forEmpresa($empresa);
 
         return [
-            'client_id' => $clientId,
-            'client_secret' => $clientSecret,
-            'redirect_uri' => $redirectUri,
+            'client_id' => $config['client_id'],
+            'client_secret' => $config['client_secret'],
+            'redirect_uri' => $config['redirect_uri'],
         ];
     }
 

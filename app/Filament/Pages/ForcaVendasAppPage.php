@@ -2,13 +2,11 @@
 
 namespace App\Filament\Pages;
 
-use App\Support\Erp\ErpAccess;
 use App\Support\ForcaVendas\ForcaVendasPairing;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 
 class ForcaVendasAppPage extends Page
@@ -27,15 +25,7 @@ class ForcaVendasAppPage extends Page
 
     public static function canAccess(): bool
     {
-        $user = Auth::user();
-
-        if ($user === null) {
-            return false;
-        }
-
-        return ErpAccess::currentCan('forca_vendas.config')
-            || (bool) $user->is_admin
-            || (bool) $user->is_supervisor;
+        return false;
     }
 
     public function mount(): void

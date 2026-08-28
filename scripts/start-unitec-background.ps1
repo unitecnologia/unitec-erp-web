@@ -1,7 +1,10 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Sobe MySQL e servidor do Unitec ERP ao iniciar o Windows (sem abrir navegador).
+    [LEGADO / NAO OFICIAL] Sobe MySQL+PHP sem o servico Windows.
+.DESCRIPTION
+    Auto-start oficial: servico UnitecErpServer (Automatic).
+    Este script permanece so para suporte/reparo manual — nao e registrado no logon.
 #>
 
 param(
@@ -14,11 +17,17 @@ $ErrorActionPreference = 'Stop'
 
 $AppPath = Resolve-UnitecAppPath -Path $AppPath -FallbackFromScriptRoot $PSScriptRoot
 
-if (-not (Test-Path (Join-Path $AppPath '.env'))) {
+# Se o servico existir, preferir ele.
+$svc = Get-Service -Name 'UnitecErpServer' -ErrorAction SilentlyContinue
+if ($svc) {
+    if ($svc.Status -ne 'Running') {
+        Start-Service -Name 'UnitecErpServer' -ErrorAction SilentlyContinue
+    }
     exit 0
 }
 
 try {
+    Ensure-UnitecEnvFile -AppPath $AppPath | Out-Null
     Sync-UnitecEnvAppUrl -AppPath $AppPath | Out-Null
     Start-UnitecStack -AppPath $AppPath -WaitSeconds 25
     exit 0

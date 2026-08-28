@@ -1,6 +1,5 @@
-<span
-    role="button"
-    tabindex="0"
+<button
+    type="button"
     wire:click.stop="openCompraLancamento({{ $record->getKey() }})"
     wire:keydown.enter.stop="openCompraLancamento({{ $record->getKey() }})"
     class="erp-compras__eye-btn"
@@ -27,4 +26,4 @@
             d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
         />
     </svg>
-</span>
+</button>

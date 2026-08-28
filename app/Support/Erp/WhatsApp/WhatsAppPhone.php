@@ -156,7 +156,7 @@ class WhatsAppPhone
 
             if (strlen($rest) === 9) {
 
-                return sprintf('(%s) %s-%s', $ddd, substr($rest, 0, 5), substr($rest, 5));
+                return sprintf('(%s)%s-%s', $ddd, substr($rest, 0, 5), substr($rest, 5));
 
             }
 
@@ -164,7 +164,7 @@ class WhatsAppPhone
 
             if (strlen($rest) === 8) {
 
-                return sprintf('(%s) %s-%s', $ddd, substr($rest, 0, 4), substr($rest, 4));
+                return sprintf('(%s)%s-%s', $ddd, substr($rest, 0, 4), substr($rest, 4));
 
             }
 

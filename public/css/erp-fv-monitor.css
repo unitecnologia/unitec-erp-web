@@ -124,7 +124,7 @@
 }
 
 .erp-fv-mon__field--plataforma {
-    flex: 0 0 11rem;
+    flex: 0 0 10.5rem;
 }
 
 .erp-fv-mon__field--periodo {
@@ -474,21 +474,15 @@
     }
 }
 
-/* ---- Realce da linha por situação (grade mestre) ---- */
-.fi-ta-row.erp-fv-mon--pendente .fi-ta-cell { box-shadow: inset 4px 0 0 #0f172a; }
-
-/* Badge Status = Pendente em preto */
+/* Badge Status = Pendente em preto (cor só no badge; sem faixa na linha) */
 .erp-fv-monitor-page .fi-ta-row.erp-fv-mon--pendente .fi-badge {
     background-color: #0f172a !important;
     color: #ffffff !important;
     --c-400: #0f172a;
     --c-600: #0f172a;
 }
-.fi-ta-row.erp-fv-mon--financeiro .fi-ta-cell { box-shadow: inset 4px 0 0 #eab308; }
-.fi-ta-row.erp-fv-mon--confirmado .fi-ta-cell { box-shadow: inset 4px 0 0 #2563eb; }
-.fi-ta-row.erp-fv-mon--faturado .fi-ta-cell { box-shadow: inset 4px 0 0 #16a34a; }
+
 .fi-ta-row.erp-fv-mon--cancelado .fi-ta-cell {
-    box-shadow: inset 4px 0 0 #dc2626;
     color: var(--erp-text-muted, #64748b);
 }
 
@@ -1179,6 +1173,35 @@
 
 .erp-fv-monitor-page .erp-field-dd__label {
     font-weight: 700;
+}
+
+/* Flag do Tipo de Pedido (Pendente marcado por padrão) — independente de .erp-list-page */
+.erp-fv-monitor-page .erp-field-dd__flag {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    width: 0.72rem;
+    height: 0.72rem;
+    border: 1px solid #64748b;
+    border-radius: 2px;
+    background: #fff;
+    position: relative;
+}
+
+.erp-fv-monitor-page .erp-field-dd__flag.is-on {
+    border-color: #1e5a9e;
+    background: #1e5a9e;
+}
+
+.erp-fv-monitor-page .erp-field-dd__flag.is-on::after {
+    content: '';
+    position: absolute;
+    left: 0.14rem;
+    top: 0.02rem;
+    width: 0.22rem;
+    height: 0.4rem;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
 }
 
 /* R$ fixo à esquerda · valor à direita (Desc. / Acmo. / TT Bruto / TT Líquido) */

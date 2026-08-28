@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ForcaVendas\ProductEstoqueFiliaisController;
 use App\Http\Controllers\Api\ForcaVendas\ProductPhotoController;
 use App\Http\Controllers\Api\ForcaVendas\SyncController as FvSyncController;
 use App\Http\Controllers\Api\Pdv\CargaController as PdvCargaController;
+use App\Http\Controllers\Api\Pdv\PedidosImportaveisController as PdvPedidosImportaveisController;
 use App\Http\Controllers\Api\Pdv\RetornoController as PdvRetornoController;
 use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
@@ -21,6 +22,12 @@ use App\Http\Controllers\Api\MeliHubPairController;
 use App\Http\Controllers\Webhooks\MercadoLivreWebhookController;
 use App\Http\Controllers\Webhooks\MercadoPagoWebhookController;
 use Illuminate\Support\Facades\Route;
+
+// Health check do launcher/serviço — JSON simples, sem Blade/Livewire/DB.
+Route::get('health', static fn () => response()->json([
+    'status' => 'ok',
+    'version' => (string) config('unitec.versao'),
+]))->name('api.health');
 
 Route::post('webhooks/mercadolivre', [MercadoLivreWebhookController::class, 'handle'])
     ->name('webhooks.mercadolivre');
@@ -95,8 +102,11 @@ Route::prefix('v1/pdv')->group(function (): void {
     Route::get('ping', [PdvCargaController::class, 'ping'])->middleware('throttle:120,1');
 
     Route::middleware('pdv.terminal.ativo')->group(function (): void {
+        Route::get('licenca', [PdvCargaController::class, 'licenca']);
         Route::get('carga/pull', [PdvCargaController::class, 'pull']);
         Route::get('carga/certificado', [PdvCargaController::class, 'certificado']);
+        Route::get('pedidos', [PdvPedidosImportaveisController::class, 'index']);
+        Route::get('pedidos/{id}', [PdvPedidosImportaveisController::class, 'show'])->whereNumber('id');
         Route::post('retorno', [PdvRetornoController::class, 'store']);
     });
 });

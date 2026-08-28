@@ -3,15 +3,17 @@
 namespace App\Support\Erp\Dashboard;
 
 use App\Models\Nfe;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 
 final class ErpDashboardNfeRejeitadasAlert
 {
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{tone: string, title: string, time: string, blink: bool}|null
      */
-    public static function resolve(?int $empresaId = null): ?array
+    public static function resolve(int|array|null $empresaScope = null): ?array
     {
-        $count = self::countRejeitadas($empresaId);
+        $count = self::countRejeitadas($empresaScope);
 
         if ($count <= 0) {
             return null;
@@ -27,19 +29,23 @@ final class ErpDashboardNfeRejeitadasAlert
         ];
     }
 
-    private static function countRejeitadas(?int $empresaId): int
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function countRejeitadas(int|array|null $empresaScope = null): int
     {
-        $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
-
-        if ($empresaId) {
-            $real = Nfe::query()
-                ->where('empresa_id', $empresaId)
-                ->where('status', Nfe::STATUS_DENEGADA)
-                ->count();
-
-            return $real;
+        if ($empresaScope === null) {
+            $empresaId = ErpDashboardCertificadoAlert::resolveEmpresaId();
+            $empresaScope = ($empresaId && $empresaId > 0) ? $empresaId : null;
         }
 
-        return 0;
+        if ($empresaScope === null) {
+            return 0;
+        }
+
+        $query = Nfe::query()->where('status', Nfe::STATUS_DENEGADA);
+        ErpFinanceiroMetricas::applyEmpresaColumn($query, (new Nfe)->getTable(), $empresaScope);
+
+        return (int) $query->count();
     }
 }

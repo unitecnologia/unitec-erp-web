@@ -60,6 +60,6 @@ Write-InstallLog -AppPath $AppPath -Message 'PHP corrigido (pdo_mysql OK).'
 
 Write-Host ''
 Write-Host 'Agora rode: Reiniciar Servicos.bat' -ForegroundColor Cyan
-Write-Host 'Ou: Unitec ERP.bat' -ForegroundColor Cyan
+Write-Host 'Ou: atalho Unitec ERP (Area de Trabalho)' -ForegroundColor Cyan
 Write-Host ''
 exit 0

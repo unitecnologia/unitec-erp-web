@@ -133,7 +133,7 @@ final class DatabaseBackupService
 
             $removed = $this->purgeOldBackups($destination);
             $size = (int) filesize($targetPath);
-            $this->markStatus($empresaId, 'ok');
+            $this->markStatus($empresaId, 'ok', 'Backup concluído - '.$this->formatBytes($size));
 
             $label = $preUpdate ? 'Backup pré-update' : 'Backup';
             $message = $label.' gerado: '.$filename.' ('.$this->formatBytes($size).').';
@@ -361,6 +361,324 @@ final class DatabaseBackupService
         );
     }
 
+    public function resolveMysqlClientPath(): string
+    {
+        $configured = trim((string) env('MYSQL_PATH', ''));
+
+        if ($configured !== '' && is_file($configured)) {
+            return $this->normalizePath($configured);
+        }
+
+        try {
+            $dumpPath = $this->resolveMysqldumpPath();
+            $binDir = dirname($dumpPath);
+            $siblings = [
+                $binDir.DIRECTORY_SEPARATOR.'mariadb.exe',
+                $binDir.DIRECTORY_SEPARATOR.'mysql.exe',
+                $binDir.DIRECTORY_SEPARATOR.'mariadb',
+                $binDir.DIRECTORY_SEPARATOR.'mysql',
+            ];
+
+            foreach ($siblings as $sibling) {
+                if (is_file($sibling)) {
+                    return $this->normalizePath($sibling);
+                }
+            }
+        } catch (Throwable) {
+            // continua nos candidates absolutos
+        }
+
+        $candidates = [
+            base_path('tools/mysql/bin/mariadb.exe'),
+            base_path('tools/mysql/bin/mysql.exe'),
+            base_path('tools/mysql/bin/mariadb'),
+            base_path('tools/mysql/bin/mysql'),
+            'C:\\xampp\\mysql\\bin\\mysql.exe',
+            'C:\\laragon\\bin\\mysql\\mysql-8.0.30\\bin\\mysql.exe',
+            'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe',
+            'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe',
+            'C:\\Program Files\\MariaDB 11.4\\bin\\mariadb.exe',
+            'C:\\Program Files\\MariaDB 10.11\\bin\\mariadb.exe',
+        ];
+
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                return $this->normalizePath($path);
+            }
+        }
+
+        $which = PHP_OS_FAMILY === 'Windows'
+            ? trim((string) shell_exec('where mysql 2>nul'))
+            : trim((string) shell_exec('command -v mysql 2>/dev/null'));
+
+        $first = preg_split('/\r\n|\r|\n/', $which)[0] ?? '';
+
+        if ($first !== '' && is_file($first)) {
+            return $this->normalizePath($first);
+        }
+
+        throw new RuntimeException(
+            'Cliente MySQL/MariaDB não encontrado. Defina MYSQL_PATH no .env ou instale o cliente MySQL.'
+        );
+    }
+
+    /**
+     * @return array{ok: bool, path?: string, name?: string, message: string}
+     */
+    public function validateSqlBackupPath(string $sqlPath): array
+    {
+        $normalized = $this->normalizePath(trim($sqlPath));
+
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            return ['ok' => false, 'message' => 'Caminho do backup inválido.'];
+        }
+
+        if (! is_file($normalized)) {
+            return ['ok' => false, 'message' => 'Arquivo de backup não encontrado.'];
+        }
+
+        $name = basename($normalized);
+        $lower = mb_strtolower($name);
+
+        if (! str_ends_with($lower, '.sql')) {
+            return ['ok' => false, 'message' => 'Selecione um arquivo .sql de backup.'];
+        }
+
+        if (! str_starts_with($name, self::FILE_PREFIX) && ! str_starts_with($name, self::PRE_UPDATE_PREFIX)) {
+            return ['ok' => false, 'message' => 'Arquivo não é um backup Unitec válido (prefixo unitec_erp_).'];
+        }
+
+        if (filesize($normalized) < 32) {
+            return ['ok' => false, 'message' => 'Arquivo de backup vazio ou corrompido.'];
+        }
+
+        return [
+            'ok' => true,
+            'path' => $normalized,
+            'name' => $name,
+            'message' => 'ok',
+        ];
+    }
+
+    /**
+     * Lista dumps .sql Unitec em qualquer pasta legível.
+     *
+     * @return list<array{name: string, path: string, kind: string, size: int, size_label: string, modified_at: string, modified_ts: int}>
+     */
+    public function listSqlBackupsInDirectory(string $directory, int $limit = 80): array
+    {
+        $directory = $this->normalizePath(trim($directory));
+
+        if ($directory === '' || str_contains($directory, '..') || ! is_dir($directory)) {
+            return [];
+        }
+
+        $files = collect(File::files($directory))
+            ->filter(function ($file): bool {
+                $name = $file->getFilename();
+                $lower = mb_strtolower($name);
+
+                $isBackup = str_starts_with($name, self::FILE_PREFIX)
+                    || str_starts_with($name, self::PRE_UPDATE_PREFIX);
+
+                return $isBackup && str_ends_with($lower, '.sql') && $file->getSize() >= 32;
+            })
+            ->sortByDesc(fn ($file): int => $file->getMTime())
+            ->take($limit)
+            ->values();
+
+        return $files->map(function ($file): array {
+            $size = (int) $file->getSize();
+
+            return [
+                'name' => $file->getFilename(),
+                'path' => $file->getPathname(),
+                'kind' => 'sql',
+                'size' => $size,
+                'size_label' => $this->formatBytes($size),
+                'modified_at' => ErpTimezone::toLocal(
+                    \Illuminate\Support\Carbon::createFromTimestamp($file->getMTime())
+                )->format('d/m/Y H:i'),
+                'modified_ts' => $file->getMTime(),
+            ];
+        })->all();
+    }
+
+    /**
+     * Restaura um dump .sql no banco atual (gera backup de segurança antes).
+     *
+     * @return array{ok: bool, message: string, safety_path?: string, restored_path?: string, restored_name?: string}
+     */
+    public function restore(string $sqlPath, ?int $empresaId = null): array
+    {
+        $validated = $this->validateSqlBackupPath($sqlPath);
+
+        if (! ($validated['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => (string) ($validated['message'] ?? 'Backup inválido.'),
+            ];
+        }
+
+        $sqlPath = (string) $validated['path'];
+        $sqlName = (string) $validated['name'];
+
+        $connection = config('database.connections.'.config('database.default'), []);
+        $database = (string) ($connection['database'] ?? '');
+        $host = (string) ($connection['host'] ?? '127.0.0.1');
+        $port = (string) ($connection['port'] ?? '3306');
+        $username = (string) ($connection['username'] ?? '');
+        $password = (string) ($connection['password'] ?? '');
+
+        if ($database === '' || $username === '') {
+            return [
+                'ok' => false,
+                'message' => 'Configuração do banco incompleta (.env).',
+            ];
+        }
+
+        try {
+            $mysql = $this->resolveMysqlClientPath();
+        } catch (Throwable $e) {
+            return [
+                'ok' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+
+        $safety = $this->run($empresaId, scheduled: false, preUpdate: false);
+
+        if (! ($safety['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => 'Não foi possível gerar o backup de segurança antes da restauração: '
+                    .(string) ($safety['message'] ?? 'falha desconhecida.'),
+            ];
+        }
+
+        $safetyPath = (string) ($safety['path'] ?? '');
+
+        try {
+            $import = $this->executeMysqlImport(
+                mysql: $mysql,
+                sqlPath: $sqlPath,
+                database: $database,
+                host: $host,
+                port: $port,
+                username: $username,
+                password: $password,
+            );
+
+            if (! ($import['ok'] ?? false)) {
+                $message = (string) ($import['message'] ?? 'Falha ao importar dump.');
+
+                return array_filter([
+                    'ok' => false,
+                    'message' => 'Falha ao restaurar: '.$message
+                        .($safetyPath !== '' ? ' Use o backup de segurança: '.$safetyPath : ''),
+                    'safety_path' => $safetyPath !== '' ? $safetyPath : null,
+                ], static fn ($value) => $value !== null);
+            }
+
+            return array_filter([
+                'ok' => true,
+                'message' => 'Banco restaurado a partir de '.$sqlName.'.'
+                    .($safetyPath !== '' ? ' Backup de segurança: '.basename($safetyPath).'.' : ''),
+                'safety_path' => $safetyPath !== '' ? $safetyPath : null,
+                'restored_path' => $sqlPath,
+                'restored_name' => $sqlName,
+            ], static fn ($value) => $value !== null);
+        } catch (Throwable $e) {
+            report($e);
+
+            return array_filter([
+                'ok' => false,
+                'message' => 'Erro ao restaurar: '.$e->getMessage()
+                    .($safetyPath !== '' ? ' Use o backup de segurança: '.$safetyPath : ''),
+                'safety_path' => $safetyPath !== '' ? $safetyPath : null,
+            ], static fn ($value) => $value !== null);
+        }
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function executeMysqlImport(
+        string $mysql,
+        string $sqlPath,
+        string $database,
+        string $host,
+        string $port,
+        string $username,
+        string $password,
+    ): array {
+        $attempts = $this->connectionAttempts($host, $port);
+        $lastError = '';
+
+        foreach ($attempts as $index => $attempt) {
+            if ($index > 0) {
+                usleep(350_000);
+            }
+
+            $defaultsFile = null;
+            $input = null;
+
+            try {
+                $defaultsFile = $this->writeDefaultsFile(
+                    $attempt['host'],
+                    $attempt['port'],
+                    $username,
+                    $password,
+                );
+
+                $command = [
+                    $mysql,
+                    '--defaults-extra-file='.$defaultsFile,
+                    '--protocol='.$attempt['protocol'],
+                    '--default-character-set=utf8mb4',
+                    $database,
+                ];
+
+                $input = fopen($sqlPath, 'rb');
+                if ($input === false) {
+                    return ['ok' => false, 'message' => 'Não foi possível ler o arquivo SQL.'];
+                }
+
+                $process = new Process($command);
+                $process->setTimeout(900);
+                $process->setWorkingDirectory(dirname($mysql));
+                $process->setEnv($this->processEnvironment(dirname($mysql)));
+                $process->setInput($input);
+                $process->run();
+
+                if (is_resource($input)) {
+                    fclose($input);
+                    $input = null;
+                }
+
+                if ($process->isSuccessful()) {
+                    return ['ok' => true, 'message' => 'ok'];
+                }
+
+                $lastError = trim($process->getErrorOutput().' '.$process->getOutput());
+                $lastError = $lastError !== '' ? $lastError : 'Importação MySQL falhou sem mensagem.';
+
+                if (! $this->isRetryableSocketError($lastError)) {
+                    break;
+                }
+            } finally {
+                if (is_resource($input)) {
+                    fclose($input);
+                }
+                if ($defaultsFile && is_file($defaultsFile)) {
+                    @unlink($defaultsFile);
+                }
+            }
+        }
+
+        return ['ok' => false, 'message' => $lastError];
+    }
+
     /**
      * @return list<array{name: string, path: string, kind: string, size: int, size_label: string, modified_at: string, modified_ts: int}>
      */
@@ -506,6 +824,14 @@ final class DatabaseBackupService
         }
 
         $empresa->forceFill($payload)->save();
+
+        if (in_array($status, ['ok', 'failed'], true)) {
+            app(PortalBkpReporter::class)->report(
+                $empresa,
+                $status,
+                $detail ?? ($status === 'ok' ? 'Backup concluído.' : 'Falha ao executar backup.'),
+            );
+        }
     }
 
     protected function normalizePath(string $path): string

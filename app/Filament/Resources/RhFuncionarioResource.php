@@ -33,6 +33,10 @@ class RhFuncionarioResource extends Resource
 
     public static function canAccess(): bool
     {
+        if (\App\Support\Erp\ErpOnboarding::step() === \App\Support\Erp\ErpOnboarding::STEP_COLABORADOR) {
+            return true;
+        }
+
         return ErpAccess::currentCan('rh.funcionarios.access');
     }
 

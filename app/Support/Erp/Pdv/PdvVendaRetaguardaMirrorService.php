@@ -6,6 +6,7 @@ use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Models\Venda;
 use App\Models\VendaItem;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Carbon;
 
@@ -24,14 +25,20 @@ final class PdvVendaRetaguardaMirrorService
             }
         }
 
-        $pdvVenda->loadMissing(['itens', 'pagamentos']);
+        $pdvVenda->loadMissing(['itens', 'pagamentos', 'sessao']);
 
         $fechamento = $this->resolveFechamento($pdvVenda);
+        $horaAbertura = $pdvVenda->aberto_em
+            ? ErpTimezone::toLocal($pdvVenda->aberto_em)->format('H:i:s')
+            : null;
 
         $venda = Venda::query()->create([
+            'empresa_id' => $pdvVenda->sessao?->empresa_id
+                ?? ErpContext::currentEmpresaId(),
             'numero' => Venda::nextNumero(),
             'data' => $fechamento->toDateString(),
             'hora' => $fechamento->format('H:i:s'),
+            'hora_abertura' => $horaAbertura,
             'cliente_id' => $this->resolveClienteId($pdvVenda),
             'vendedor_id' => $pdvVenda->vendedor_id,
             'vendedor_nome' => $pdvVenda->vendedor_nome,
@@ -75,9 +82,12 @@ final class PdvVendaRetaguardaMirrorService
     private function resolveFormaPagamento(PdvVenda $pdvVenda): string
     {
         if ($pdvVenda->pagamentos->isNotEmpty()) {
+            // Só o nome da forma (CREDIARIO, PIX…), sem (10x)/canhoto — evita “formas” novas no relatório.
             return $pdvVenda->pagamentos
-                ->map(fn ($pagamento): string => $pagamento->descricaoComCanhoto())
-                ->filter()
+                ->map(fn ($pagamento): string => trim((string) ($pagamento->forma ?? '')))
+                ->filter(fn (string $forma): bool => $forma !== '')
+                ->unique()
+                ->values()
                 ->implode(' / ');
         }
 
@@ -95,32 +105,7 @@ final class PdvVendaRetaguardaMirrorService
 
     private function resolveConsumidorFinalClienteId(): int
     {
-        $person = Person::query()
-            ->whereIn('codigo', Person::codigosConsumidorFinal())
-            ->orderByRaw('CASE WHEN codigo = ? THEN 0 ELSE 1 END', [Person::CODIGO_CONSUMIDOR_FINAL])
-            ->orderBy('id')
-            ->first();
-
-        if ($person) {
-            if (
-                (string) $person->codigo === Person::CODIGO_CONSUMIDOR_FINAL_LEGADO
-                && ! Person::query()->where('codigo', Person::CODIGO_CONSUMIDOR_FINAL)->exists()
-            ) {
-                $person->forceFill(['codigo' => Person::CODIGO_CONSUMIDOR_FINAL])->save();
-            }
-
-            return (int) $person->id;
-        }
-
-        $person = Person::query()->create([
-            'codigo' => Person::CODIGO_CONSUMIDOR_FINAL,
-            'pessoa_tipo' => Person::PESSOA_FISICA,
-            'nome_razao' => 'CONSUMIDOR FINAL',
-            'is_cliente' => true,
-            'ativo' => true,
-        ]);
-
-        return (int) $person->id;
+        return (int) Person::resolveConsumidorFinal()->id;
     }
 
     private function resolveFechamento(PdvVenda $pdvVenda): Carbon

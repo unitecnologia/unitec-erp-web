@@ -3,7 +3,7 @@
         <div class="erp-pdv-modal__backdrop" wire:click="cancelPdvAutorizacao"></div>
         <div class="erp-pdv-modal__window erp-pdv-modal__window--small">
             <header class="erp-pdv-modal__header">
-                <h2>Autorização do Supervisor</h2>
+                <h2>Autorização</h2>
             </header>
             <div class="erp-pdv-modal__body">
                 <p class="erp-pdv-modal__hint">Informe sua senha para continuar.</p>

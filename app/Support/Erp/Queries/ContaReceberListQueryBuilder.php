@@ -78,8 +78,8 @@ class ContaReceberListQueryBuilder
         }
 
         return $query
-            ->orderBy('vencimento')
-            ->orderBy('numero');
+            ->orderByDesc('emissao')
+            ->orderByDesc('numero');
     }
 
     protected function applyLocalSearch(Builder $query): void

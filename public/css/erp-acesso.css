@@ -710,6 +710,16 @@
     color: #854d0e;
 }
 
+.erp-permissoes-page .erp-permissoes__hint {
+    margin: 0;
+    padding: 0.32rem 0.5rem;
+    border-left: 3px solid #2563eb;
+    background: #eff6ff;
+    color: #334155;
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
 .erp-permissoes-page .erp-permissoes__field {
     display: flex;
     flex-direction: column;
@@ -719,6 +729,1069 @@
 
 .erp-permissoes-page .erp-permissoes__field--grow {
     flex: 1 1 14rem;
+}
+
+.fi-body:has(.erp-permissoes-page) .erp-shell,
+.fi-body:has(.erp-permissoes-page) .erp-menu-bar,
+.fi-body:has(.erp-permissoes-page) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-main:has(.erp-permissoes-page) {
+    min-height: 100vh;
+    padding: 0 !important;
+}
+
+.erp-permissoes-page .erp-permissoes.erp-os-window {
+    width: min(96vw, 1320px);
+    height: min(91vh, 860px);
+    min-height: 620px;
+    margin: auto;
+    overflow: hidden;
+}
+
+.erp-permissoes-page .erp-permissoes__body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    background: #f4f8fc;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar {
+    display: flex;
+    flex: 0 0 250px;
+    min-width: 220px;
+    flex-direction: column;
+    border-right: 1px solid #bdcde0;
+    background: #edf3f9;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar-tabs,
+.erp-permissoes-page .erp-permissoes__main-tabs {
+    display: flex;
+    border-bottom: 1px solid #bdcde0;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar-tabs button,
+.erp-permissoes-page .erp-permissoes__main-tabs button {
+    padding: 0.68rem 0.8rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #52637a;
+    font: inherit;
+    font-size: 0.77rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar-tabs button.is-active,
+.erp-permissoes-page .erp-permissoes__main-tabs button.is-active {
+    border-bottom-color: #1e5a9e;
+    background: #fff;
+    color: #0f3460;
+}
+
+.erp-permissoes-page .erp-permissoes__search {
+    margin: 0.65rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 5px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.76rem;
+}
+
+.erp-permissoes-page .erp-permissoes__list {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: auto;
+    padding: 0 0.45rem 0.5rem;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row {
+    display: grid;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.6rem 0.65rem;
+    border: 1px solid transparent;
+    border-bottom-color: #d5e0ec;
+    background: transparent;
+    color: #1e293b;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row:hover,
+.erp-permissoes-page .erp-permissoes__list-row.is-selected {
+    border-color: #82a8d3;
+    border-radius: 5px;
+    background: #dceeff;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row strong {
+    font-size: 0.75rem;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row small {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.66rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar-actions {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.6rem;
+    border-top: 1px solid #bdcde0;
+}
+
+.erp-permissoes-page .erp-permissoes__sidebar-actions a,
+.erp-permissoes-page .erp-permissoes__sidebar-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 2rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #7c9fc4;
+    border-radius: 5px;
+    background: #fff;
+    color: #174a7c;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 750;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.erp-permissoes-page .erp-permissoes__workspace {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.erp-permissoes-page .erp-permissoes__context {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #bdcde0;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__context > div > span,
+.erp-permissoes-page .erp-permissoes__editor label > span {
+    display: block;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.erp-permissoes-page .erp-permissoes__context h1 {
+    margin: 0.1rem 0 0;
+    color: #123d69;
+    font-size: 1.05rem;
+}
+
+.erp-permissoes-page .erp-permissoes__template {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.erp-permissoes-page .erp-permissoes__template select,
+.erp-permissoes-page .erp-permissoes__template button,
+.erp-permissoes-page .erp-permissoes__editor input {
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.74rem;
+}
+
+.erp-permissoes-page .erp-permissoes__editor,
+.erp-permissoes-page .erp-permissoes__tree {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem;
+}
+
+.erp-permissoes-page .erp-permissoes__editor {
+    display: grid;
+    align-content: start;
+    gap: 0.8rem;
+}
+
+.erp-permissoes-page .erp-permissoes__editor label {
+    display: grid;
+    gap: 0.3rem;
+    max-width: 42rem;
+}
+
+.erp-permissoes-page .erp-permissoes__user-form {
+    display: grid;
+    gap: 0.8rem;
+    max-width: 56rem;
+}
+
+.erp-permissoes-page .erp-permissoes__form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.erp-permissoes-page .erp-permissoes__form-grid label {
+    max-width: none;
+}
+
+.erp-permissoes-page .erp-permissoes__form-grid select {
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.74rem;
+}
+
+.erp-permissoes-page .erp-permissoes__form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.erp-permissoes-page .erp-permissoes__form-actions button {
+    min-height: 2rem;
+    padding: 0.2rem 0.8rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: 0.73rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__form-actions button.is-primary {
+    border-color: #164a82;
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__form-actions button.is-danger {
+    border-color: #d97706;
+    color: #9a3412;
+}
+
+.erp-permissoes-page .erp-permissoes__error {
+    color: #b91c1c;
+    font-size: 0.67rem;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group {
+    margin-bottom: 0.8rem;
+    border: 1px solid #bdcde0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > header,
+.erp-permissoes-page .erp-permissoes__tree-module > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #d5e0ec;
+    background: #eaf1f8;
+    color: #0f3460;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group button,
+.erp-permissoes-page .erp-permissoes__tree-module button {
+    margin-left: 0.25rem;
+    border: 0;
+    background: transparent;
+    color: #1e5a9e;
+    font: inherit;
+    font-size: 0.65rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-toggle {
+    margin-left: 0 !important;
+    color: inherit !important;
+    font-size: 0.74rem !important;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-module {
+    border-bottom: 1px solid #e1e8f0;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-module > div:first-child {
+    padding-left: 1.35rem;
+    background: #f7faff;
+    color: #334155;
+    font-size: 0.74rem;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.35rem;
+    padding: 0.55rem 0.75rem 0.65rem 2.3rem;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-actions label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #334155;
+    font-size: 0.7rem;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-actions input {
+    accent-color: #1e5a9e;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.95rem 1.1rem 1rem;
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba(30, 90, 158, 0.06), transparent 55%),
+        radial-gradient(90% 70% at 100% 0%, rgba(16, 185, 129, 0.05), transparent 50%),
+        #f7fafc;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #d5e2f0;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 1px 0 rgba(15, 52, 96, 0.04);
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-head h2 {
+    margin: 0;
+    color: #0f3460;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-head p {
+    margin: 0.2rem 0 0;
+    color: #64748b;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    max-width: 36rem;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-stats {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid #d7e3f0;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-stats em {
+    color: #0f3460;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.erp-permissoes-page .erp-permissoes__empresas-foot {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+.erp-permissoes-page .erp-permissoes__caixa-empresa {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #d5e2f0;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__caixa-empresa label {
+    color: #0f3460;
+    font-size: 0.74rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__caixa-empresa select {
+    min-width: min(100%, 22rem);
+    flex: 1;
+    max-width: 28rem;
+    padding: 0.42rem 0.65rem;
+    border: 1px solid #b6c7db;
+    border-radius: 7px;
+    background: #f8fafc;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 650;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5.4rem minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: stretch;
+    flex: 1;
+    min-height: 20rem;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid #c9d8ea;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 52, 96, 0.06);
+    overflow: hidden;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid #e5eef7;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel > header > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel > header strong {
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel > header small {
+    color: #64748b;
+    font-size: 0.66rem;
+    font-weight: 600;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--blocked > header {
+    background: linear-gradient(180deg, #fff7f7 0%, #fff 100%);
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--blocked > header strong {
+    color: #b42318;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--allowed > header {
+    background: linear-gradient(180deg, #f3fbf6 0%, #fff 100%);
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--allowed > header strong {
+    color: #067647;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel > header > span {
+    min-width: 1.65rem;
+    padding: 0.18rem 0.45rem;
+    border-radius: 999px;
+    background: #eef3f9;
+    color: #334155;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--blocked > header > span {
+    background: #fee4e2;
+    color: #912018;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--allowed > header > span {
+    background: #d1fadf;
+    color: #085d3a;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-toolbar {
+    padding: 0.65rem 0.75rem 0.15rem;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-search {
+    width: 100%;
+    padding: 0.48rem 0.7rem;
+    border: 1px solid #c5d4e6;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.76rem;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-search:focus {
+    border-color: #5b8fc7;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-list {
+    flex: 1;
+    min-height: 14rem;
+    overflow: auto;
+    padding: 0.55rem 0.65rem 0.75rem;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-item,
+.erp-permissoes-page .erp-permissoes__transfer-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 0 0 0.35rem;
+    border: 1px solid #e6eef7;
+    border-radius: 8px;
+    background: #fbfdff;
+    color: #334155;
+    font: inherit;
+    text-align: left;
+    transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-item {
+    gap: 0.65rem;
+    padding: 0.58rem 0.7rem;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-item:hover,
+.erp-permissoes-page .erp-permissoes__transfer-row:hover {
+    background: #f3f8fd;
+    border-color: #bfd3ea;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-item.is-selected,
+.erp-permissoes-page .erp-permissoes__transfer-row.is-selected {
+    background: #e8f1fb;
+    border-color: #7ea8d8;
+    box-shadow: inset 3px 0 0 #1e5a9e;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-row.is-padrao {
+    background: #edfaf3;
+    border-color: #86efac;
+    box-shadow: inset 3px 0 0 #16a34a;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.85rem;
+    height: 1.55rem;
+    padding: 0 0.35rem;
+    border-radius: 6px;
+    background: #e8eef6;
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 800;
+    flex: 0 0 auto;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-panel--allowed .erp-permissoes__transfer-code {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    font-weight: 650;
+    color: #1e293b;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-row-main {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0.55rem 0.65rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-padrao {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-right: 0.55rem;
+    padding: 0.22rem 0.45rem;
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 0.64rem;
+    font-weight: 750;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-row.is-padrao .erp-permissoes__transfer-padrao {
+    border-color: #22c55e;
+    background: #16a34a;
+    color: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-padrao input {
+    margin: 0;
+    accent-color: #16a34a;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 10rem;
+    margin: 0.35rem;
+    padding: 1.25rem 1rem;
+    border: 1px dashed #d5e0ec;
+    border-radius: 10px;
+    background: #f8fafc;
+    text-align: center;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-empty strong {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-empty span {
+    max-width: 16rem;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.45rem;
+    padding-top: 2.4rem;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.05rem;
+    min-width: 4.6rem;
+    min-height: 2.55rem;
+    padding: 0.3rem 0.35rem;
+    border: 1px solid #b7c9de;
+    border-radius: 10px;
+    background: #fff;
+    color: #174a7c;
+    font: inherit;
+    line-height: 1.05;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.06);
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button span {
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button small {
+    font-size: 0.58rem;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button:hover {
+    transform: translateY(-1px);
+    border-color: #6f94c0;
+    background: #eef5fc;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-allow,
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-allow-all {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-allow:hover,
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-allow-all:hover {
+    background: #dcfce7;
+    border-color: #22c55e;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-block,
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-block-all {
+    border-color: #fca5a5;
+    background: #fff5f5;
+    color: #b42318;
+}
+
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-block:hover,
+.erp-permissoes-page .erp-permissoes__transfer-controls button.is-block-all:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+@media (max-width: 980px) {
+    .erp-permissoes-page .erp-permissoes__empresas-head {
+        flex-direction: column;
+    }
+
+    .erp-permissoes-page .erp-permissoes__empresas-stats {
+        justify-content: flex-start;
+    }
+
+    .erp-permissoes-page .erp-permissoes__transfer {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-permissoes-page .erp-permissoes__transfer-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding-top: 0;
+    }
+}
+
+.erp-permissoes-page .erp-permissoes__menu-tree {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.9rem;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.7rem;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-toolbar > div {
+    display: inline-flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-toolbar button {
+    min-height: 1.85rem;
+    padding: 0.18rem 0.55rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 4px;
+    background: #fff;
+    color: #174a7c;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-toolbar button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section {
+    margin: 0 0 0.7rem;
+    border: 1px solid #bdcde0;
+    border-radius: 7px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #d5e0ec;
+    background: linear-gradient(90deg, #eaf1f8, #f8fbfe);
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section > header button {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: #0f3460;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section > header .erp-permissoes__menu-section-actions {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding-right: 0.45rem;
+    flex-shrink: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section > header .erp-permissoes__menu-section-actions button {
+    width: auto;
+    padding: 0.18rem 0.4rem;
+    border: 1px solid #a9bfd6;
+    border-radius: 3px;
+    color: #174a7c;
+    font-size: 0.62rem;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-section > header button:hover {
+    background: #dcecfb;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-items {
+    padding: 0.3rem 0;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-branch {
+    margin-left: calc(var(--menu-level) * 0.9rem);
+    border-bottom: 1px solid #e5edf5;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-branch:last-child {
+    border-bottom: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-branch > strong {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 750;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.48rem;
+    min-height: 1.95rem;
+    padding: 0.24rem 0.75rem 0.24rem calc(0.85rem + var(--menu-level) * 0.9rem);
+    border-left: 3px solid transparent;
+    color: #334155;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item:hover {
+    border-left-color: #8db4de;
+    background: #f1f7fd;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item:has(input:checked) {
+    border-left-color: #23834f;
+    background: #effaf4;
+    color: #155b36;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item input {
+    width: 0.9rem;
+    height: 0.9rem;
+    margin: 0;
+    accent-color: #23834f;
+    flex: 0 0 auto;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item span {
+    min-width: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item--fixed {
+    cursor: default;
+    opacity: 0.88;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item--fixed:hover {
+    border-left-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.erp-permissoes-page .erp-permissoes__menu-item--fixed em {
+    margin-left: 0.35rem;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-style: normal;
+    font-weight: 500;
+}
+
+.erp-permissoes-page .erp-permissoes__user-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.6rem;
+    margin: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__user-summary div {
+    padding: 0.7rem;
+    border: 1px solid #d5e0ec;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__user-summary dt {
+    color: #64748b;
+    font-size: 0.62rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.erp-permissoes-page .erp-permissoes__user-summary dd {
+    margin: 0.25rem 0 0;
+    font-size: 0.76rem;
+    font-weight: 650;
+}
+
+.erp-permissoes-page .erp-permissoes__actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.65rem 0.9rem;
+    border-top: 1px solid #bdcde0;
+    background: #edf3f9;
+}
+
+.erp-permissoes-page .erp-permissoes__actions button {
+    min-height: 2rem;
+    padding: 0.2rem 0.8rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: 0.73rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__actions button.is-primary {
+    border-color: #164a82;
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__actions button.is-danger {
+    border-color: #d97706;
+    color: #9a3412;
+}
+
+.erp-permissoes-page .erp-permissoes__notice,
+.erp-permissoes-page .erp-permissoes__hint,
+.erp-permissoes-page .erp-permissoes__empty {
+    margin: 0;
+    padding: 0.55rem 0.65rem;
+    border-radius: 5px;
+    background: #eff6ff;
+    color: #334155;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.erp-permissoes-page .erp-permissoes__notice {
+    border: 1px solid #e8c86a;
+    background: #fefce8;
+    color: #854d0e;
+}
+
+.erp-permissoes-page .erp-permissoes__empty {
+    color: #64748b;
+    text-align: center;
+}
+
+.erp-permissoes-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-permissoes-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 52%);
+}
+
+.erp-permissoes-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(94vw, 760px);
+    max-height: min(88vh, 720px);
+    overflow: auto;
 }
 
 @media (max-width: 1100px) {
@@ -1254,4 +2327,79 @@
 .erp-usuarios-page .erp-vform__empresas-empty {
     font-size: 0.72rem;
     color: var(--erp-text-muted, #64748b);
+}
+
+/* Vínculo operador (somente leitura) — Usuários / Permissões */
+
+.erp-usuarios-page .erp-usuario-form-modal__vinculo {
+    display: flex;
+    align-items: center;
+    min-height: 1.55rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid #c7d5e8;
+    border-radius: 4px;
+    background: #f1f5f9;
+    font-size: 0.74rem;
+    color: #334155;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__vinculo.is-linked {
+    border-color: #86a7cb;
+    background: #e8f1fb;
+    color: #0f3460;
+    font-weight: 600;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__vinculo.is-empty {
+    color: #64748b;
+    font-style: italic;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__hint {
+    margin: 0.15rem 0 0;
+    font-size: 0.68rem;
+    color: #64748b;
+    line-height: 1.3;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo > span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo__box {
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #f1f5f9;
+    font-size: 0.74rem;
+    color: #334155;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo__box.is-linked {
+    border-color: #86a7cb;
+    background: #e8f1fb;
+    color: #0f3460;
+    font-weight: 600;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo__box.is-empty {
+    color: #64748b;
+    font-style: italic;
+}
+
+.erp-permissoes-page .erp-perm-user-vinculo__hint {
+    font-size: 0.66rem;
+    color: #64748b;
+    line-height: 1.3;
 }

@@ -3,9 +3,10 @@
 namespace App\Support\Erp;
 
 use App\Filament\Resources\EmpresaResource;
+use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Resources\UserResource;
-use App\Filament\Resources\VendedorResource;
 use App\Models\Empresa;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Primeiro acesso (instalação zerada):
@@ -27,7 +28,7 @@ final class ErpOnboarding
 
     public static function step(): ?string
     {
-        if (! Empresa::query()->exists()) {
+        if (! Cache::remember('erp.empresa.exists', 120, static fn (): bool => Empresa::query()->exists())) {
             return self::STEP_EMPRESA;
         }
 
@@ -69,7 +70,7 @@ final class ErpOnboarding
         return match (self::step()) {
             self::STEP_EMPRESA => EmpresaResource::getUrl('create'),
             self::STEP_USUARIO => UserResource::getUrl('index'),
-            self::STEP_COLABORADOR => VendedorResource::getUrl('index'),
+            self::STEP_COLABORADOR => RhFuncionarioResource::getUrl('index'),
             default => null,
         };
     }
@@ -79,7 +80,7 @@ final class ErpOnboarding
         return match (self::step()) {
             self::STEP_EMPRESA => 'Primeiro acesso — Cadastro de Empresa',
             self::STEP_USUARIO => 'Primeiro acesso — Cadastro de Usuário',
-            self::STEP_COLABORADOR => 'Primeiro acesso — Cadastro de Operador (após Funcionário RH)',
+            self::STEP_COLABORADOR => 'Primeiro acesso — Cadastro de Funcionário (aba Operador)',
             default => null,
         };
     }

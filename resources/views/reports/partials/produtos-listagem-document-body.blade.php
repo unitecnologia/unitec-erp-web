@@ -49,6 +49,9 @@
             @if ($searchLabel)
                 <span>| FILTRO: {{ mb_strtoupper($searchLabel, 'UTF-8') }}</span>
             @endif
+            @if (! empty($validadePeriodoLabel))
+                <span>| VALIDADE: {{ mb_strtoupper($validadePeriodoLabel, 'UTF-8') }}</span>
+            @endif
         </div>
 
         <table class="prod-list-doc__table">

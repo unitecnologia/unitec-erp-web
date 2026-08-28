@@ -18,5 +18,5 @@
         <input id="term-time-livre" type="text" wire:model="data.time_tela_caixa_livre" data-mask="integer" class="erp-pcad-form__input erp-pcad-form__input--xs">
     </div>
 
-    <p class="erp-terminais-form__hint">Os botões F3 Vendedor e F4 Busca Avançada do PDV são controlados em Empresa &gt; Parâmetros.</p>
+    <p class="erp-terminais-form__hint">O botão F4 Busca Avançada do PDV é controlado em Empresa &gt; Parâmetros.</p>
 </div>

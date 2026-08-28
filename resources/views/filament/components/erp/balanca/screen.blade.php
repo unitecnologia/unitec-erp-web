@@ -93,18 +93,54 @@
         </div>
 
         <p class="erp-balanca__note">
-            Só entram produtos com código balança (Prefixo) preenchido no cadastro.
+            Só entram produtos marcados como <strong>Produto de Balança</strong>.
+            O tipo (peso ou unidade) segue a unidade do produto (KG → peso, UN → unidade).
+            O PLU na balança usa o código do produto.
+            Departamentos vêm dos grupos com <strong>Bal. marcado</strong>.
+            Depto + nutri saem no modelo <strong>modToledoMGV6</strong>.
         </p>
 
-        <div class="erp-balanca__status-block">
-            <span class="erp-balanca__label">Status</span>
-            <div class="erp-balanca__status" role="status" aria-live="polite">
-                @if ($this->running)
-                    Gerando arquivo…
-                @elseif (filled($this->status))
-                    {{ $this->status }}
-                @endif
+        <div class="erp-balanca__progress-block">
+            <div class="erp-balanca__progress-head">
+                <span class="erp-balanca__label">Progresso</span>
+                <span class="erp-balanca__progress-pct" wire:loading.remove wire:target="gerarArquivo">
+                    @if ($this->progressPercent > 0)
+                        {{ $this->progressPercent }}%
+                    @endif
+                </span>
+                <span class="erp-balanca__progress-pct" wire:loading wire:target="gerarArquivo">…</span>
             </div>
+
+            <div
+                class="erp-balanca__progress-track {{ $this->progressPercent >= 100 ? 'is-done' : '' }} {{ $this->feedbackTipo === 'erro' && $this->progressPercent === 0 && filled($this->progressLabel) ? 'is-error' : '' }}"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="{{ $this->progressPercent }}"
+                aria-label="Progresso da geração"
+                wire:loading.class="erp-balanca__progress-track--busy"
+                wire:target="gerarArquivo"
+            >
+                <div
+                    class="erp-balanca__progress-bar"
+                    style="width: {{ $this->progressPercent > 0 ? $this->progressPercent : 0 }}%;"
+                    wire:loading.class="erp-balanca__progress-bar--indeterminate"
+                    wire:target="gerarArquivo"
+                ></div>
+            </div>
+
+            <p class="erp-balanca__progress-label" role="status" aria-live="polite">
+                <span wire:loading.remove wire:target="gerarArquivo">
+                    @if (filled($this->progressLabel))
+                        {{ $this->progressLabel }}
+                    @elseif (filled($this->status))
+                        {{ $this->status }}
+                    @else
+                        Pronto para gerar
+                    @endif
+                </span>
+                <span wire:loading wire:target="gerarArquivo">Gerando arquivo…</span>
+            </p>
         </div>
 
         @if (count($this->arquivos) > 0)

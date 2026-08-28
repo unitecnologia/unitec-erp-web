@@ -35,24 +35,25 @@ final class GestorExecutivoService
     public function snapshot(?int $empresaId = null): array
     {
         $empresaId = $empresaId ?: $this->empresaId();
+        $empresaArg = $empresaId > 0 ? $empresaId : null;
         $hoje = ErpFinanceiroMetricas::hoje();
         $ontem = $hoje->copy()->subDay();
         $inicioMes = $hoje->copy()->startOfMonth();
 
-        $fatHoje = ErpDashboardSalesMetrics::faturamentoDia($hoje);
-        $fatOntem = ErpDashboardSalesMetrics::faturamentoDia($ontem);
-        $fatMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $hoje);
+        $fatHoje = ErpDashboardSalesMetrics::faturamentoDia($hoje, $empresaArg);
+        $fatOntem = ErpDashboardSalesMetrics::faturamentoDia($ontem, $empresaArg);
+        $fatMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $hoje, $empresaArg);
         $varDia = ErpDashboardSalesMetrics::variacaoPercentual($fatHoje, $fatOntem);
 
-        $caixa = ErpFinanceiroMetricas::saldoCaixa();
-        $receberHoje = (float) ErpFinanceiroMetricas::receberNoDia($hoje)['valor'];
-        $pagarHoje = (float) ErpFinanceiroMetricas::pagarNoDia($hoje)['valor'];
-        $receberVencido = (float) ErpFinanceiroMetricas::receberVencido($hoje)['valor'];
-        $pagarVencido = (float) ErpFinanceiroMetricas::pagarVencido($hoje)['valor'];
+        $caixa = ErpFinanceiroMetricas::saldoCaixa(null, $empresaArg);
+        $receberHoje = (float) ErpFinanceiroMetricas::receberNoDia($hoje, $empresaArg)['valor'];
+        $pagarHoje = (float) ErpFinanceiroMetricas::pagarNoDia($hoje, $empresaArg)['valor'];
+        $receberVencido = (float) ErpFinanceiroMetricas::receberVencido($hoje, $empresaArg)['valor'];
+        $pagarVencido = (float) ErpFinanceiroMetricas::pagarVencido($hoje, $empresaArg)['valor'];
 
         $pedidosPendentes = $this->countPedidosPendentes($empresaId);
-        $entregasPendentes = $this->countEntregasPendentes();
-        $estoqueBaixo = $this->countEstoqueBaixo();
+        $entregasPendentes = $this->countEntregasPendentes($empresaId);
+        $estoqueBaixo = $this->countEstoqueBaixo($empresaId);
 
         try {
             $saude = ErpDashboardGauges::saudeSnapshot($empresaId > 0 ? $empresaId : null);
@@ -129,13 +130,13 @@ final class GestorExecutivoService
         $empresaId = $empresaId ?: $this->empresaId();
 
         try {
-            $sales = ErpDashboardSalesChart::data();
+            $sales = ErpDashboardSalesChart::data(null, null, $empresaId > 0 ? $empresaId : null);
         } catch (Throwable) {
             $sales = ['defaultFrom' => '', 'defaultTo' => '', 'points' => []];
         }
 
         try {
-            $mix = ErpDashboardSalesMixChart::data();
+            $mix = ErpDashboardSalesMixChart::data($empresaId > 0 ? $empresaId : null);
         } catch (Throwable) {
             $mix = ['labels' => [], 'values' => [], 'colors' => []];
         }
@@ -147,7 +148,7 @@ final class GestorExecutivoService
         }
 
         try {
-            $payments = ErpDashboardPaymentMethodsChart::data();
+            $payments = ErpDashboardPaymentMethodsChart::data($empresaId > 0 ? $empresaId : null);
         } catch (Throwable) {
             $payments = ['labels' => [], 'values' => [], 'colors' => [], 'unit' => 'money'];
         }
@@ -201,26 +202,43 @@ final class GestorExecutivoService
         }
     }
 
-    private function countEntregasPendentes(): int
+    private function countEntregasPendentes(int $empresaId = 0): int
     {
         try {
             if (! Schema::hasTable((new Entrega)->getTable())) {
                 return 0;
             }
 
-            return (int) Entrega::query()
-                ->whereIn('status', Entrega::statusControleFiltro('pendentes'))
-                ->count();
+            $q = Entrega::query()
+                ->whereIn('status', Entrega::statusControleFiltro('pendentes'));
+
+            if ($empresaId > 0 && Schema::hasColumn((new Entrega)->getTable(), 'empresa_id')) {
+                $q->where('empresa_id', $empresaId);
+            }
+
+            return (int) $q->count();
         } catch (Throwable) {
             return 0;
         }
     }
 
-    private function countEstoqueBaixo(): int
+    private function countEstoqueBaixo(int $empresaId = 0): int
     {
         try {
             if (! Schema::hasTable((new Product)->getTable())) {
                 return 0;
+            }
+
+            $saldos = app(\App\Support\Erp\ProductEstoqueSaldoService::class);
+            if ($empresaId > 0 && $saldos->suportaEstoquePorEmpresa($empresaId)) {
+                $expr = $saldos->sqlEstoqueEmpresaExpression($saldos->estoqueIdParaEmpresa($empresaId));
+                $products = $saldos->tabelaProductsSql();
+
+                return (int) Product::query()
+                    ->where('ativo', true)
+                    ->where('estoque_minimo', '>', 0)
+                    ->whereRaw("{$expr} < {$products}.estoque_minimo")
+                    ->count();
             }
 
             return (int) Product::query()->estoqueCritico()->count();

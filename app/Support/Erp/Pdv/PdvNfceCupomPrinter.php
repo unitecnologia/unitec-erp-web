@@ -4,6 +4,7 @@ namespace App\Support\Erp\Pdv;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Printing\Documents\NfceCancelamentoProtocoloCupomPrintDocument;
 use App\Support\Erp\Printing\Documents\NfceCupomPrintDocument;
 use App\Support\Erp\Printing\PrintFacade;
 use Illuminate\Support\Facades\Auth;
@@ -50,16 +51,22 @@ final class PdvNfceCupomPrinter
 
     public static function livewireOpenProtocoloCancelamentoJs(int $pdvVendaId): string
     {
-        $url = self::protocoloCancelamentoUrl($pdvVendaId, true);
-        $payload = json_encode(self::printPayload($url, 1), JSON_THROW_ON_ERROR);
+        $venda = PdvVenda::query()->find($pdvVendaId);
+        if (! $venda) {
+            return '';
+        }
 
-        return '(function (payload) {
-            if (window.ErpPrint?.openCupom) {
-                window.ErpPrint.openCupom(payload);
-                return;
-            }
-            window.open(payload.url, "_blank");
-        })('.$payload.')';
+        $user = Auth::user();
+        $empresaId = session('erp_empresa_id', $user?->empresa_id);
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : $user?->empresa;
+
+        $document = new NfceCancelamentoProtocoloCupomPrintDocument(
+            venda: $venda,
+            empresa: $empresa,
+            usuario: (string) ($user?->name ?? 'OPERADOR'),
+        );
+
+        return PrintFacade::livewireOpenJs($document, 1);
     }
 
     /**

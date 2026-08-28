@@ -2,7 +2,6 @@
 
 namespace App\Support\Erp\Dashboard;
 
-use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
 use App\Models\Empresa;
@@ -10,7 +9,10 @@ use App\Models\ForcaVendasOrder;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaItem;
 use App\Models\Product;
+use App\Models\Venda;
+use App\Models\VendaItem;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpEmpresaScopeFilter;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
@@ -19,31 +21,38 @@ use Throwable;
 
 final class ErpDashboardGauges
 {
+    /** @var array<string, array<string, mixed>> */
+    private static array $gaugeMemo = [];
+
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return list<array<string, mixed>>
      */
-    public static function build(?int $empresaId = null): array
+    public static function build(?int $empresaId = null, int|array|null $empresaScope = null): array
     {
+        $scope = $empresaScope ?? $empresaId;
         $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+        $empresa = is_array($scope)
+            ? null
+            : ($scope ? Empresa::query()->find((int) $scope) : ($empresaId ? Empresa::query()->find($empresaId) : null));
 
         $hoje = ErpFinanceiroMetricas::hoje();
         $inicio = $hoje->copy()->startOfMonth();
-        $fim = $hoje->copy()->endOfMonth();
+        $fim = $hoje;
         $gauges = [];
 
         // Visão geral da empresa (agrega os demais indicadores).
-        $gauges[] = static::saudeEmpresa($empresa, $inicio, $fim);
+        $gauges[] = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
 
         // Meta de vendas da empresa: só no dashboard se o valor estiver preenchido (> 0).
-        $metaEmpresa = (float) ($empresa?->param_meta_vendas_mensal ?: 0);
+        $metaEmpresa = static::resolveMetaVendas($empresa, $scope);
         if ($metaEmpresa > 0) {
-            $realizado = static::realizadoPdvMonitor($inicio, $fim);
-            $gauges[] = static::metaVendas($empresa, $realizado);
+            $realizado = static::realizadoPdvMonitor($inicio, $fim, $scope);
+            $gauges[] = static::metaVendas($empresa, $realizado, $metaEmpresa);
         }
 
-        $gauges[] = static::recebimento($inicio, $fim);
-        $gauges[] = static::margemLucro($inicio, $fim);
+        $gauges[] = static::recebimento($inicio, $fim, $scope);
+        $gauges[] = static::margemLucro($inicio, $fim, $scope);
         $gauges[] = static::saudeEstoque();
 
         return $gauges;
@@ -71,9 +80,10 @@ final class ErpDashboardGauges
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
         $hoje = ErpFinanceiroMetricas::hoje();
         $inicio = $hoje->copy()->startOfMonth();
-        $fim = $hoje->copy()->endOfMonth();
+        $fim = $hoje;
+        $scope = ($empresaId && $empresaId > 0) ? $empresaId : null;
 
-        $gauge = static::saudeEmpresa($empresa, $inicio, $fim);
+        $gauge = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
         $status = static::healthStatus((float) ($gauge['percent'] ?? 0));
 
         return [
@@ -87,29 +97,39 @@ final class ErpDashboardGauges
     }
 
     /**
-     * Gauges individuais: colaborador com Meta Venda Mensal preenchida (> 0).
-     *
+     * @param  int|list<int>|null  $empresaScope
      * @return list<array<string, mixed>>
      */
-    public static function buildVendedores(?int $empresaId = null): array
+    public static function buildVendedores(?int $empresaId = null, int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new Vendedor)->getTable())) {
                 return [];
             }
 
+            $scope = $empresaScope ?? $empresaId;
             $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
 
             $hoje = ErpFinanceiroMetricas::hoje();
             $inicio = $hoje->copy()->startOfMonth();
-            $fim = $hoje->copy()->endOfMonth();
+            $fim = $hoje;
 
             $query = Vendedor::query()
                 ->where('ativo', true)
                 ->where('mobile_meta_venda', '>', 0)
                 ->orderBy('nome');
 
-            if ($empresaId) {
+            if (is_array($scope)) {
+                $query->where(function ($builder) use ($scope): void {
+                    $builder->whereIn('empresa_id', $scope)
+                        ->orWhereHas('empresas', fn ($q) => $q->whereIn('empresas.id', $scope));
+                });
+            } elseif ($scope) {
+                $query->where(function ($builder) use ($scope): void {
+                    $builder->where('empresa_id', $scope)
+                        ->orWhereHas('empresas', fn ($q) => $q->where('empresas.id', $scope));
+                });
+            } elseif ($empresaId) {
                 $query->where(function ($builder) use ($empresaId): void {
                     $builder->where('empresa_id', $empresaId)
                         ->orWhereHas('empresas', fn ($q) => $q->where('empresas.id', $empresaId));
@@ -242,11 +262,23 @@ final class ErpDashboardGauges
     }
 
     /**
+     * @param  int|list<int>|null  $scope
+     */
+    private static function resolveMetaVendas(?Empresa $empresa, int|array|null $scope): float
+    {
+        if (is_array($scope)) {
+            return (float) Empresa::query()->whereIn('id', $scope)->sum('param_meta_vendas_mensal');
+        }
+
+        return (float) ($empresa?->param_meta_vendas_mensal ?: 0);
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private static function metaVendas(?Empresa $empresa, float $realizado): array
+    private static function metaVendas(?Empresa $empresa, float $realizado, ?float $metaOverride = null): array
     {
-        $meta = (float) ($empresa?->param_meta_vendas_mensal ?: 0);
+        $meta = $metaOverride ?? (float) ($empresa?->param_meta_vendas_mensal ?: 0);
 
         return static::metaGauge(
             key: 'meta_vendas',
@@ -290,36 +322,45 @@ final class ErpDashboardGauges
     /**
      * Regra A: títulos com vencimento no mês × valor já recebido desses títulos.
      *
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function recebimento(Carbon $inicio, Carbon $fim): array
+    private static function recebimento(Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
+        $memoKey = 'recebimento:'.$inicio->toDateString().':'.$fim->toDateString().':'.static::scopeMemoKey($empresaScope);
+        if (isset(self::$gaugeMemo[$memoKey])) {
+            return self::$gaugeMemo[$memoKey];
+        }
+
         try {
             if (! Schema::hasTable((new ContaReceber)->getTable())) {
-                return static::emptyGauge('recebimento', 'Recebimento', 'Sem contas a receber');
+                return self::$gaugeMemo[$memoKey] = static::emptyGauge('recebimento', 'Recebimento', 'Sem contas a receber');
             }
 
-            $rows = ContaReceber::query()
+            $query = ContaReceber::query()
                 ->whereDate('vencimento', '>=', $inicio->toDateString())
-                ->whereDate('vencimento', '<=', $fim->toDateString())
-                ->get(['valor', 'desconto', 'juros', 'valor_recebido']);
+                ->whereDate('vencimento', '<=', $fim->toDateString());
 
-            if ($rows->isEmpty()) {
-                return static::emptyGauge('recebimento', 'Recebimento', 'Nenhum título no mês');
+            ErpFinanceiroMetricas::applyEmpresaColumn($query, (new ContaReceber)->getTable(), $empresaScope);
+
+            $row = $query
+                ->selectRaw(
+                    'COUNT(*) as qtd,'.
+                    'COALESCE(SUM(CASE WHEN (valor - desconto + juros) > 0 THEN (valor - desconto + juros) ELSE 0 END), 0) as previsto,'.
+                    'COALESCE(SUM(CASE WHEN valor_recebido > 0 THEN valor_recebido ELSE 0 END), 0) as recebido'
+                )
+                ->first();
+
+            $qtd = (int) ($row->qtd ?? 0);
+            if ($qtd === 0) {
+                return self::$gaugeMemo[$memoKey] = static::emptyGauge('recebimento', 'Recebimento', 'Nenhum título no mês');
             }
 
-            $previsto = 0.0;
-            $recebido = 0.0;
-
-            foreach ($rows as $row) {
-                $face = (float) $row->valor - (float) $row->desconto + (float) $row->juros;
-                $previsto += max(0, $face);
-                $recebido += max(0, (float) $row->valor_recebido);
-            }
-
+            $previsto = round((float) ($row->previsto ?? 0), 2);
+            $recebido = round((float) ($row->recebido ?? 0), 2);
             $percent = $previsto > 0 ? round(($recebido / $previsto) * 100, 1) : 0.0;
 
-            return [
+            return self::$gaugeMemo[$memoKey] = [
                 'key' => 'recebimento',
                 'label' => 'Recebimento',
                 'percent' => $percent,
@@ -334,31 +375,61 @@ final class ErpDashboardGauges
                 'detail' => null,
             ];
         } catch (Throwable) {
-            return static::emptyGauge('recebimento', 'Recebimento', 'Erro ao calcular');
+            return self::$gaugeMemo[$memoKey] = static::emptyGauge('recebimento', 'Recebimento', 'Erro ao calcular');
         }
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function margemLucro(Carbon $inicio, Carbon $fim): array
+    private static function margemLucro(Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
+        $memoKey = 'margem:'.$inicio->toDateString().':'.$fim->toDateString().':'.static::scopeMemoKey($empresaScope);
+        if (isset(self::$gaugeMemo[$memoKey])) {
+            return self::$gaugeMemo[$memoKey];
+        }
+
         try {
             $receita = 0.0;
             $custo = 0.0;
+            $unitCostSql = 'CASE'
+                .' WHEN COALESCE(products.preco_custo, 0) > 0 THEN products.preco_custo'
+                .' WHEN COALESCE(products.e_medio, 0) > 0 THEN products.e_medio'
+                .' WHEN COALESCE(products.preco_compra, 0) > 0 THEN products.preco_compra'
+                .' ELSE 0 END';
 
+            // Vendas da retaguarda são a fonte canônica: incluem os espelhos
+            // do PDV e os pedidos da Força de Vendas depois de faturados.
+            if (Schema::hasTable((new VendaItem)->getTable())
+                && Schema::hasTable((new Venda)->getTable())) {
+                $vendaQuery = VendaItem::query()
+                    ->join('vendas', 'vendas.id', '=', 'venda_itens.venda_id')
+                    ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id')
+                    ->whereNotIn('vendas.status', [Venda::STATUS_CANCELADO])
+                    ->whereDate('vendas.data', '>=', $inicio->toDateString())
+                    ->whereDate('vendas.data', '<=', $fim->toDateString());
+
+                ErpEmpresaScopeFilter::applyColumn($vendaQuery, 'vendas', $empresaScope);
+
+                $agg = $vendaQuery
+                    ->selectRaw(
+                        'COALESCE(SUM(venda_itens.total), 0) as receita,'.
+                        'COALESCE(SUM(venda_itens.quantidade * ('.$unitCostSql.')), 0) as custo'
+                    )
+                    ->first();
+
+                $receita += (float) ($agg->receita ?? 0);
+                $custo += (float) ($agg->custo ?? 0);
+            }
+
+            // PDV sem espelho na retaguarda; os espelhados já entraram acima.
             if (Schema::hasTable((new PdvVendaItem)->getTable())) {
-                $itens = PdvVendaItem::query()
-                    ->select([
-                        'pdv_venda_itens.quantidade',
-                        'pdv_venda_itens.total',
-                        'products.preco_custo',
-                        'products.e_medio',
-                        'products.preco_compra',
-                    ])
+                $pdvQuery = PdvVendaItem::query()
                     ->join('pdv_vendas', 'pdv_vendas.id', '=', 'pdv_venda_itens.pdv_venda_id')
                     ->leftJoin('products', 'products.id', '=', 'pdv_venda_itens.product_id')
                     ->where('pdv_vendas.situacao', '!=', 'C')
+                    ->whereNull('pdv_vendas.venda_id')
                     ->where(function ($query) use ($inicio, $fim): void {
                         $query->where(function ($fechamento) use ($inicio, $fim): void {
                             $fechamento->whereNotNull('pdv_vendas.fechado_em')
@@ -369,88 +440,44 @@ final class ErpDashboardGauges
                                 ->whereDate('pdv_vendas.created_at', '>=', $inicio->toDateString())
                                 ->whereDate('pdv_vendas.created_at', '<=', $fim->toDateString());
                         });
-                    })
-                    ->get();
+                    });
 
-                foreach ($itens as $item) {
-                    $receita += (float) $item->total;
-                    $unitCost = static::productUnitCost(
-                        $item->preco_custo,
-                        $item->e_medio,
-                        $item->preco_compra,
-                    );
-                    $custo += ((float) $item->quantidade) * $unitCost;
-                }
-            }
+                if ($empresaScope !== null) {
+                    $ids = is_array($empresaScope)
+                        ? array_values(array_filter(array_map('intval', $empresaScope)))
+                        : [(int) $empresaScope];
+                    $ids = array_values(array_filter($ids, fn (int $id): bool => $id > 0));
 
-            if (Schema::hasTable((new ForcaVendasOrder)->getTable())) {
-                $orders = ForcaVendasOrder::query()
-                    ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO)
-                    ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
-                    ->where(function ($query) use ($inicio, $fim): void {
-                        $query->where(function ($faturado) use ($inicio, $fim): void {
-                            $faturado->whereNotNull('faturado_at')
-                                ->whereDate('faturado_at', '>=', $inicio->toDateString())
-                                ->whereDate('faturado_at', '<=', $fim->toDateString());
-                        })->orWhere(function ($received) use ($inicio, $fim): void {
-                            $received->whereNull('faturado_at')
-                                ->whereNotNull('received_at')
-                                ->whereDate('received_at', '>=', $inicio->toDateString())
-                                ->whereDate('received_at', '<=', $fim->toDateString());
+                    if ($ids !== []) {
+                        $pdvQuery->whereExists(function ($exists) use ($ids): void {
+                            $exists->selectRaw('1')
+                                ->from('pdv_caixa_sessoes')
+                                ->whereColumn('pdv_caixa_sessoes.id', 'pdv_vendas.pdv_caixa_sessao_id')
+                                ->whereIn('pdv_caixa_sessoes.empresa_id', $ids);
                         });
-                    })
-                    ->get(['payload', 'total']);
-
-                $productIds = [];
-                foreach ($orders as $order) {
-                    foreach ((array) ($order->payload['itens'] ?? []) as $item) {
-                        $pid = (int) ($item['product_id'] ?? 0);
-                        if ($pid > 0) {
-                            $productIds[$pid] = true;
-                        }
                     }
                 }
 
-                $costs = Product::query()
-                    ->whereIn('id', array_keys($productIds))
-                    ->get(['id', 'preco_custo', 'e_medio', 'preco_compra'])
-                    ->keyBy('id');
+                $agg = $pdvQuery
+                    ->selectRaw(
+                        'COALESCE(SUM(pdv_venda_itens.total), 0) as receita,'.
+                        'COALESCE(SUM(pdv_venda_itens.quantidade * ('.$unitCostSql.')), 0) as custo'
+                    )
+                    ->first();
 
-                foreach ($orders as $order) {
-                    $itens = (array) ($order->payload['itens'] ?? []);
-                    if ($itens === []) {
-                        continue;
-                    }
-
-                    foreach ($itens as $item) {
-                        $qty = (float) ($item['quantidade'] ?? 0);
-                        $totalItem = (float) ($item['total'] ?? 0);
-                        if ($totalItem <= 0) {
-                            $preco = (float) ($item['preco'] ?? $item['preco_unitario'] ?? 0);
-                            $desc = (float) ($item['desconto'] ?? 0);
-                            $totalItem = max(0, ($qty * $preco) - $desc);
-                        }
-                        $receita += $totalItem;
-                        $product = $costs->get((int) ($item['product_id'] ?? 0));
-                        $unitCost = static::productUnitCost(
-                            $product?->preco_custo,
-                            $product?->e_medio,
-                            $product?->preco_compra,
-                        );
-                        $custo += $qty * $unitCost;
-                    }
-                }
+                $receita += (float) ($agg->receita ?? 0);
+                $custo += (float) ($agg->custo ?? 0);
             }
 
             if ($receita <= 0) {
-                return static::emptyGauge('margem', 'Margem de Lucro', 'Sem vendas no período');
+                return self::$gaugeMemo[$memoKey] = static::emptyGauge('margem', 'Margem de Lucro', 'Sem vendas no período');
             }
 
             $percent = round((($receita - $custo) / $receita) * 100, 1);
             $gaugeMax = 40.0;
             $needleTone = $gaugeMax > 0 ? ($percent / $gaugeMax) * 100 : $percent;
 
-            return [
+            return self::$gaugeMemo[$memoKey] = [
                 'key' => 'margem',
                 'label' => 'Margem de Lucro',
                 'percent' => max(0, min(100, $percent)),
@@ -466,7 +493,7 @@ final class ErpDashboardGauges
                 'gauge_max' => $gaugeMax,
             ];
         } catch (Throwable) {
-            return static::emptyGauge('margem', 'Margem de Lucro', 'Erro ao calcular');
+            return self::$gaugeMemo[$memoKey] = static::emptyGauge('margem', 'Margem de Lucro', 'Erro ao calcular');
         }
     }
 
@@ -475,46 +502,45 @@ final class ErpDashboardGauges
      */
     private static function saudeEstoque(): array
     {
+        if (isset(self::$gaugeMemo['estoque'])) {
+            return self::$gaugeMemo['estoque'];
+        }
+
         try {
             if (! Schema::hasTable((new Product)->getTable())) {
-                return static::emptyGauge('estoque', 'Estoque', 'Sem produtos');
+                return self::$gaugeMemo['estoque'] = static::emptyGauge('estoque', 'Estoque', 'Sem produtos');
             }
 
-            $rows = Product::query()
+            $row = Product::query()
                 ->where('ativo', true)
-                ->get(['estoque', 'estoque_minimo']);
+                ->selectRaw(
+                    'COUNT(*) as total,'.
+                    'COALESCE(SUM(CASE'
+                    .' WHEN COALESCE(estoque, 0) <= 0 THEN 0'
+                    .' WHEN COALESCE(estoque_minimo, 0) > 0 AND COALESCE(estoque, 0) < estoque_minimo THEN 0'
+                    .' ELSE 1 END), 0) as ok,'.
+                    'COALESCE(SUM(CASE'
+                    .' WHEN COALESCE(estoque, 0) > 0 AND COALESCE(estoque_minimo, 0) > 0'
+                    .' AND COALESCE(estoque, 0) < estoque_minimo THEN 1 ELSE 0 END), 0) as abaixo,'.
+                    'COALESCE(SUM(CASE WHEN COALESCE(estoque, 0) <= 0 THEN 1 ELSE 0 END), 0) as zerado,'.
+                    'COALESCE(SUM(CASE'
+                    .' WHEN COALESCE(estoque_minimo, 0) > 0 AND COALESCE(estoque, 0) < estoque_minimo THEN 1'
+                    .' ELSE 0 END), 0) as critico'
+                )
+                ->first();
 
-            $total = $rows->count();
+            $total = (int) ($row->total ?? 0);
             if ($total === 0) {
-                return static::emptyGauge('estoque', 'Estoque', 'Nenhum produto ativo');
+                return self::$gaugeMemo['estoque'] = static::emptyGauge('estoque', 'Estoque', 'Nenhum produto ativo');
             }
 
-            $ok = 0;
-            $abaixo = 0;
-            $zerado = 0;
-            $critico = 0;
-
-            foreach ($rows as $product) {
-                $qty = (float) $product->estoque;
-                $min = max(0.0, (float) ($product->estoque_minimo ?? 0));
-
-                // Mesma regra do KPI "Estoque crítico": mínimo > 0 e estoque < mínimo.
-                if ($min > 0 && $qty < $min) {
-                    $critico++;
-                }
-
-                if ($qty <= 0) {
-                    $zerado++;
-                } elseif ($qty < $min) {
-                    $abaixo++;
-                } else {
-                    $ok++;
-                }
-            }
-
+            $ok = (int) ($row->ok ?? 0);
+            $abaixo = (int) ($row->abaixo ?? 0);
+            $zerado = (int) ($row->zerado ?? 0);
+            $critico = (int) ($row->critico ?? 0);
             $percent = round(($ok / $total) * 100, 1);
 
-            return [
+            return self::$gaugeMemo['estoque'] = [
                 'key' => 'estoque',
                 'label' => 'Saúde do Estoque',
                 'percent' => $percent,
@@ -538,7 +564,7 @@ final class ErpDashboardGauges
                 ],
             ];
         } catch (Throwable) {
-            return static::emptyGauge('estoque', 'Saúde do Estoque', 'Erro ao calcular');
+            return self::$gaugeMemo['estoque'] = static::emptyGauge('estoque', 'Saúde do Estoque', 'Erro ao calcular');
         }
     }
 
@@ -547,25 +573,26 @@ final class ErpDashboardGauges
      *
      * @return array<string, mixed>
      */
-    private static function saudeEmpresa(?Empresa $empresa, Carbon $inicio, Carbon $fim): array
+    private static function saudeEmpresa(?Empresa $empresa, Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
         try {
             $factors = [
-                static::factorCaixa(),
-                static::factorVendas($empresa, $inicio, $fim),
-                static::factorLucro($inicio, $fim),
+                static::factorCaixa($empresaScope),
+                static::factorVendas($empresa, $inicio, $fim, $empresaScope),
+                static::factorLucro($inicio, $fim, $empresaScope),
                 static::factorEstoque(),
-                static::factorRecebimento($inicio, $fim),
-                static::factorContasPagar(),
-                static::factorInadimplencia(),
+                static::factorRecebimento($inicio, $fim, $empresaScope),
+                static::factorContasPagar($empresaScope),
+                static::factorInadimplencia($empresaScope),
             ];
 
             $score = static::scoreFromFactors($factors);
             $status = static::healthStatus((float) $score['percent']);
+            $label = is_array($empresaScope) ? 'Saúde do Grupo' : 'Saúde da Empresa';
 
             return [
                 'key' => 'saude_empresa',
-                'label' => 'Saúde da Empresa',
+                'label' => $label,
                 'percent' => $score['percent'],
                 'display_percent' => static::formatPercent((float) $score['percent']),
                 'value_label' => $status['label'],
@@ -580,10 +607,13 @@ final class ErpDashboardGauges
                     'status' => $status['label'],
                     'message' => $status['message'],
                     'factors' => $score['factors'],
+                    'modal_title' => $label.' — detalhe',
                 ],
             ];
         } catch (Throwable) {
-            return static::emptyGauge('saude_empresa', 'Saúde da Empresa', 'Erro ao calcular');
+            $label = is_array($empresaScope) ? 'Saúde do Grupo' : 'Saúde da Empresa';
+
+            return static::emptyGauge('saude_empresa', $label, 'Erro ao calcular');
         }
     }
 
@@ -678,21 +708,24 @@ final class ErpDashboardGauges
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorCaixa(): array
+    private static function factorCaixa(int|array|null $empresaScope = null): array
     {
         try {
-            $saldo = ErpFinanceiroMetricas::saldoCaixa();
+            $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
             $hoje = ErpFinanceiroMetricas::hoje();
             $obrigacoes = 0.0;
 
             if (Schema::hasTable((new ContaPagar)->getTable())) {
                 // Inclui vencidos + a vencer em até 7 dias (pressão de caixa).
-                $obrigacoes = (float) ContaPagar::query()
+                $pagarQuery = ContaPagar::query()
                     ->where('saldo', '>', 0)
-                    ->whereDate('vencimento', '<=', $hoje->copy()->addDays(7)->toDateString())
-                    ->sum('saldo');
+                    ->whereDate('vencimento', '<=', $hoje->copy()->addDays(7)->toDateString());
+
+                ErpFinanceiroMetricas::applyEmpresaColumn($pagarQuery, (new ContaPagar)->getTable(), $empresaScope);
+                $obrigacoes = (float) $pagarQuery->sum('saldo');
             }
 
             if ($obrigacoes <= 0.01) {
@@ -731,12 +764,12 @@ final class ErpDashboardGauges
     /**
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorVendas(?Empresa $empresa, Carbon $inicio, Carbon $fim): array
+    private static function factorVendas(?Empresa $empresa, Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
         try {
             // Mesma base do KPI "Faturamento" / Executivo (vendas + PDV sem venda_id).
-            $realizado = ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim);
-            $meta = (float) ($empresa?->param_meta_vendas_mensal ?: 0);
+            $realizado = ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim, $empresaScope);
+            $meta = static::resolveMetaVendas($empresa, $empresaScope);
 
             if ($meta > 0) {
                 $percent = min(100.0, round(($realizado / $meta) * 100, 1));
@@ -757,7 +790,7 @@ final class ErpDashboardGauges
             if ($fimAnt->gt($corte)) {
                 $fimAnt = $corte;
             }
-            $anterior = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioAnt, $fimAnt);
+            $anterior = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioAnt, $fimAnt, $empresaScope);
 
             if ($anterior <= 0.01) {
                 $percent = $realizado > 0 ? 80.0 : 50.0;
@@ -780,11 +813,12 @@ final class ErpDashboardGauges
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorLucro(Carbon $inicio, Carbon $fim): array
+    private static function factorLucro(Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
-        $gauge = static::margemLucro($inicio, $fim);
+        $gauge = static::margemLucro($inicio, $fim, $empresaScope);
         $margem = (float) ($gauge['percent'] ?? 0);
         // Margem de contribuição → nota: ~40% de margem ≈ 100 na saúde.
         $percent = max(0.0, min(100.0, round($margem * 2.5, 1)));
@@ -820,11 +854,12 @@ final class ErpDashboardGauges
     /**
      * Recebimento dos títulos com vencimento no mês (recebido ÷ previsto).
      *
+     * @param  int|list<int>|null  $empresaScope
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorRecebimento(Carbon $inicio, Carbon $fim): array
+    private static function factorRecebimento(Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
-        $gauge = static::recebimento($inicio, $fim);
+        $gauge = static::recebimento($inicio, $fim, $empresaScope);
         $recebidoLabel = (string) ($gauge['value_label'] ?? 'R$ 0,00');
         $previstoLabel = (string) ($gauge['meta_label'] ?? 'Previsto: R$ 0,00');
         // meta_label vem como "Previsto: R$ X" — monta dica completa.
@@ -840,17 +875,20 @@ final class ErpDashboardGauges
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorContasPagar(): array
+    private static function factorContasPagar(int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new ContaPagar)->getTable())) {
                 return ['key' => 'pagar', 'label' => 'Contas a pagar', 'percent' => 70.0, 'weight' => 10, 'hint' => 'Sem contas a pagar'];
             }
 
-            $aberto = (float) ContaPagar::query()->where('saldo', '>', 0)->sum('saldo');
-            $vencido = (float) ErpFinanceiroMetricas::pagarVencido()['valor'];
+            $abertoQuery = ContaPagar::query()->where('saldo', '>', 0);
+            ErpFinanceiroMetricas::applyEmpresaColumn($abertoQuery, (new ContaPagar)->getTable(), $empresaScope);
+            $aberto = (float) $abertoQuery->sum('saldo');
+            $vencido = (float) ErpFinanceiroMetricas::pagarVencido(null, $empresaScope)['valor'];
 
             if ($aberto <= 0.01) {
                 return [
@@ -878,17 +916,20 @@ final class ErpDashboardGauges
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{key: string, label: string, percent: float, weight: float, hint: string}
      */
-    private static function factorInadimplencia(): array
+    private static function factorInadimplencia(int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new ContaReceber)->getTable())) {
                 return ['key' => 'inadimplencia', 'label' => 'Inadimplência', 'percent' => 70.0, 'weight' => 15, 'hint' => 'Sem contas a receber'];
             }
 
-            $aberto = (float) ContaReceber::query()->where('saldo', '>', 0)->sum('saldo');
-            $vencido = (float) ErpFinanceiroMetricas::receberVencido()['valor'];
+            $abertoQuery = ContaReceber::query()->where('saldo', '>', 0);
+            ErpFinanceiroMetricas::applyEmpresaColumn($abertoQuery, (new ContaReceber)->getTable(), $empresaScope);
+            $aberto = (float) $abertoQuery->sum('saldo');
+            $vencido = (float) ErpFinanceiroMetricas::receberVencido(null, $empresaScope)['valor'];
 
             if ($aberto <= 0.01) {
                 return [
@@ -915,13 +956,13 @@ final class ErpDashboardGauges
         }
     }
 
-    public static function realizadoPdvMonitor(Carbon $inicio, Carbon $fim): float
+    public static function realizadoPdvMonitor(Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): float
     {
         $total = 0.0;
 
         try {
             if (Schema::hasTable((new PdvVenda)->getTable())) {
-                $total += (float) PdvVenda::query()
+                $pdvQuery = PdvVenda::query()
                     ->where('situacao', '!=', 'C')
                     ->where(function ($query) use ($inicio, $fim): void {
                         $query->where(function ($fechamento) use ($inicio, $fim): void {
@@ -933,12 +974,15 @@ final class ErpDashboardGauges
                                 ->whereDate('created_at', '>=', $inicio->toDateString())
                                 ->whereDate('created_at', '<=', $fim->toDateString());
                         });
-                    })
-                    ->sum('total');
+                    });
+
+                ErpEmpresaScopeFilter::applyPdvSessao($pdvQuery, $empresaScope);
+
+                $total += (float) $pdvQuery->sum('total');
             }
 
             if (Schema::hasTable((new ForcaVendasOrder)->getTable())) {
-                $total += (float) ForcaVendasOrder::query()
+                $fvQuery = ForcaVendasOrder::query()
                     ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO)
                     ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
                     ->where(function ($query) use ($inicio, $fim): void {
@@ -952,26 +996,17 @@ final class ErpDashboardGauges
                                 ->whereDate('received_at', '>=', $inicio->toDateString())
                                 ->whereDate('received_at', '<=', $fim->toDateString());
                         });
-                    })
-                    ->sum('total');
+                    });
+
+                ErpEmpresaScopeFilter::applyColumn($fvQuery, (new ForcaVendasOrder)->getTable(), $empresaScope);
+
+                $total += (float) $fvQuery->sum('total');
             }
         } catch (Throwable) {
             return round($total, 2);
         }
 
         return round($total, 2);
-    }
-
-    private static function productUnitCost(mixed $precoCusto, mixed $eMedio, mixed $precoCompra): float
-    {
-        foreach ([$precoCusto, $eMedio, $precoCompra] as $value) {
-            $n = (float) $value;
-            if ($n > 0) {
-                return $n;
-            }
-        }
-
-        return 0.0;
     }
 
     /**
@@ -998,6 +1033,25 @@ final class ErpDashboardGauges
         }
 
         return 'green';
+    }
+
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function scopeMemoKey(int|array|null $empresaScope): string
+    {
+        if ($empresaScope === null) {
+            return 'all';
+        }
+
+        if (is_array($empresaScope)) {
+            $ids = array_values(array_filter(array_map('intval', $empresaScope)));
+            sort($ids);
+
+            return 'g:'.implode(',', $ids);
+        }
+
+        return 'e:'.(int) $empresaScope;
     }
 
     private static function formatPercent(float $percent): string

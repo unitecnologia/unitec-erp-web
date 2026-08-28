@@ -1,17 +1,22 @@
 <?php
 
 use App\Http\Controllers\Erp\AjusteEstoqueListagemReportController;
+use App\Http\Controllers\Erp\AtualizacaoProgressController;
 use App\Http\Controllers\Erp\ComissaoVendedoresReportController;
 use App\Http\Controllers\Erp\CompraDanfeReportController;
 use App\Http\Controllers\Erp\NotaFornecedorDanfeReportController;
 use App\Http\Controllers\Erp\NfeCartaCorrecaoReportController;
 use App\Http\Controllers\Erp\NfeDanfeReportController;
 use App\Http\Controllers\Erp\NfeEspelhoReportController;
+use App\Http\Controllers\Erp\NfeEtiquetaVolumeReportController;
 use App\Http\Controllers\Erp\NfeListagemReportController;
 use App\Http\Controllers\Erp\ExpedicaoRetiradaReportController;
 use App\Http\Controllers\Erp\ExpedicaoSeparacaoReportController;
-use App\Http\Controllers\Erp\ErpUpdateController;
+use App\Http\Controllers\Erp\ErpWarmUrlsController;
+use App\Http\Controllers\Erp\ErpBrowserResetController;
+use App\Http\Controllers\Erp\DeviceServiceEnsureController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
+use App\Http\Controllers\Erp\NfceCancelamentoProtocoloEscPosPrintController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloReportController;
 use App\Http\Controllers\Erp\NfceCupomReportController;
 use App\Http\Controllers\Erp\NfceEscPosPrintController;
@@ -19,9 +24,13 @@ use App\Http\Controllers\Erp\NfceRelatorioReportController;
 use App\Http\Controllers\Erp\QzTraySignController;
 use App\Http\Controllers\Erp\PdvCupomReportController;
 use App\Http\Controllers\Erp\PdvEscPosPrintController;
+use App\Http\Controllers\Erp\PdvCaixaResumoEscPosPrintController;
+use App\Http\Controllers\Erp\PdvMovimentoCaixaEscPosPrintController;
+use App\Http\Controllers\Erp\PdvMovimentoCaixaReportController;
 use App\Http\Controllers\Erp\PersonListagemReportController;
 use App\Http\Controllers\Erp\ProductEstoqueReportController;
 use App\Http\Controllers\Erp\ContaReceberCartoesReportController;
+use App\Http\Controllers\Erp\ReciboEscPosPrintController;
 use App\Http\Controllers\Erp\ReciboReportController;
 use App\Http\Controllers\Erp\TabularReportController;
 use App\Http\Controllers\Erp\VendaListagemReportController;
@@ -33,6 +42,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Pós-instalação / reinstalação: limpa cookie+storage do navegador e vai ao login.
+Route::middleware('web')->get('/admin/sessao-limpa', ErpBrowserResetController::class)
+    ->name('erp.browser.reset');
+
 // Hub Mercado Livre (público) — OAuth central Unitec para clientes sem domínio.
 Route::middleware('web')->group(function (): void {
     Route::get('/meli/hub/connect', [MeliHubOAuthController::class, 'connect'])
@@ -42,6 +55,12 @@ Route::middleware('web')->group(function (): void {
 });
 
 Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/admin/erp/atualizacao-progress', AtualizacaoProgressController::class)
+        ->name('erp.atualizacao.progress');
+    Route::get('/admin/erp/warm-urls', ErpWarmUrlsController::class)
+        ->name('erp.warm.urls');
+    Route::post('/admin/erp/device-service/ensure', DeviceServiceEnsureController::class)
+        ->name('erp.device-service.ensure');
     Route::get('/admin/erp/files/{path}', PublicStorageFileController::class)
         ->where('path', '.*')
         ->name('erp.storage.file');
@@ -60,18 +79,32 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/recibo/{recibo}', ReciboReportController::class)
         ->middleware('erp.permission:recibos.print')
         ->name('erp.reports.recibo');
+    Route::get('/admin/print/recibo-escpos/{recibo}', ReciboEscPosPrintController::class)
+        ->middleware('erp.permission:recibos.print')
+        ->name('erp.print.recibo-escpos');
     Route::get('/admin/reports/ajustes-estoque-listagem', AjusteEstoqueListagemReportController::class)
         ->middleware('erp.permission:ajuste_estoque.access')
         ->name('erp.reports.ajustes-estoque-listagem');
     Route::get('/admin/reports/comissao-vendedores', ComissaoVendedoresReportController::class)
         ->middleware('erp.permission:vendas.print')
         ->name('erp.reports.comissao-vendedores');
+    Route::get('/admin/reports/r/{slug}/chart', [TabularReportController::class, 'chart'])
+        ->where('slug', '[a-z0-9\-]+')
+        ->name('erp.reports.tabular.chart');
     Route::get('/admin/reports/r/{slug}', TabularReportController::class)
         ->where('slug', '[a-z0-9\-]+')
         ->name('erp.reports.tabular');
     Route::get('/admin/reports/pdv-cupom/{venda}', PdvCupomReportController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.reports.pdv-cupom');
+    Route::get('/admin/reports/pdv-resumo-caixa/{sessao}', \App\Http\Controllers\Erp\PdvCaixaResumoReportController::class)
+        ->name('erp.reports.pdv-resumo-caixa');
+    Route::get('/admin/print/pdv-resumo-caixa-escpos/{sessao}', PdvCaixaResumoEscPosPrintController::class)
+        ->name('erp.print.pdv-resumo-caixa-escpos');
+    Route::get('/admin/reports/pdv-movimento-caixa/{movimento}', PdvMovimentoCaixaReportController::class)
+        ->name('erp.reports.pdv-movimento-caixa');
+    Route::get('/admin/print/pdv-movimento-escpos/{movimento}', PdvMovimentoCaixaEscPosPrintController::class)
+        ->name('erp.print.pdv-movimento-escpos');
     Route::get('/admin/reports/pdv-carne-bobina', \App\Http\Controllers\Erp\PdvCarneBobinaReportController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.reports.pdv-carne-bobina');
@@ -97,6 +130,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/nfce-cancelamento-protocolo/{venda}', NfceCancelamentoProtocoloReportController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.reports.nfce-cancelamento-protocolo');
+    Route::get('/admin/print/nfce-cancelamento-escpos/{venda}', NfceCancelamentoProtocoloEscPosPrintController::class)
+        ->middleware('erp.permission:vendas.reprint_cupom')
+        ->name('erp.print.nfce-cancelamento-escpos');
     Route::get('/admin/reports/compra-danfe/{compra}', CompraDanfeReportController::class)
         ->name('erp.reports.compra-danfe');
     Route::get('/admin/reports/nota-fornecedor-danfe/{nota}', NotaFornecedorDanfeReportController::class)
@@ -106,6 +142,8 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.reports.nfe-danfe');
     Route::get('/admin/reports/nfe-espelho/{nfe}', NfeEspelhoReportController::class)
         ->name('erp.reports.nfe-espelho');
+    Route::get('/admin/reports/nfe-etiqueta-volume/{nfe}', NfeEtiquetaVolumeReportController::class)
+        ->name('erp.reports.nfe-etiqueta-volume');
     Route::get('/admin/reports/nfe-listagem', NfeListagemReportController::class)
         ->middleware('erp.permission:nfe.access')
         ->name('erp.reports.nfe-listagem');
@@ -119,27 +157,4 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/expedicao-retirada/{entrega}', ExpedicaoRetiradaReportController::class)
         ->middleware('erp.permission:logistica.print')
         ->name('erp.reports.expedicao-retirada');
-    Route::post('/admin/erp-update/launch', [ErpUpdateController::class, 'launch'])
-        ->name('erp.update.launch');
-    Route::post('/admin/erp-update/download', [ErpUpdateController::class, 'download'])
-        ->name('erp.update.download');
-});
-
-// Status/reset sem sessão e sem CSRF: durante o update a pasta sessions pode sumir
-// e o PreventRequestForgery estoura "Session store not set" (Server Error no poll).
-Route::middleware(['web'])->group(function (): void {
-    Route::get('/admin/erp-update/status', [ErpUpdateController::class, 'status'])
-        ->withoutMiddleware([
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
-        ])
-        ->name('erp.update.status');
-    Route::post('/admin/erp-update/reset', [ErpUpdateController::class, 'reset'])
-        ->withoutMiddleware([
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
-        ])
-        ->name('erp.update.reset');
 });

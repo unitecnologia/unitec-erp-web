@@ -1,0 +1,564 @@
+/* Análise e Sugestão de Compra — janela operacional (padrão OS) */
+
+.erp-analise-compras-window {
+    width: min(1580px, calc(100vw - (var(--erp-os-gap) * 2)));
+}
+
+.erp-analise-compras-window .erp-os-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.erp-analise-compras-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.45rem 0.55rem 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-analise-compras-panel {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.55rem 0.7rem 0.65rem;
+    background: #fff;
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.erp-analise-compras-panel--grid {
+    flex: 1 1 0;
+    min-height: 0;
+    padding-bottom: 0.45rem;
+}
+
+.erp-analise-compras-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.erp-analise-compras-panel__head strong {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #0f2847;
+}
+
+.erp-analise-compras-panel__head p {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.erp-analise-compras-panel__head--toolbar {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.erp-analise-compras-cobertura {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #075985;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid #bae6fd;
+}
+
+.erp-analise-compras-cobertura strong {
+    font-size: 0.9rem;
+    color: #0369a1;
+}
+
+.erp-analise-compras-fields {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem 0.65rem;
+}
+
+.erp-analise-compras-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.erp-analise-compras-field > span {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.01em;
+}
+
+.erp-analise-compras-field input,
+.erp-analise-compras-field select,
+.erp-analise-compras-localizar input,
+.erp-analise-compras-localizar select {
+    width: 100%;
+    min-height: 2.1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.84rem;
+    color: #0f172a;
+    background: #fff;
+}
+
+.erp-analise-compras-field input:focus,
+.erp-analise-compras-field select:focus,
+.erp-analise-compras-localizar input:focus,
+.erp-analise-compras-localizar select:focus {
+    outline: 2px solid rgba(30, 90, 158, 0.25);
+    border-color: #1e5a9e;
+}
+
+.erp-analise-compras-field--wide {
+    grid-column: span 2;
+}
+
+.erp-analise-compras-field--produto {
+    grid-column: span 2;
+    position: relative;
+    z-index: 3;
+}
+
+.erp-analise-compras-field--fornecedor {
+    grid-column: span 2;
+    position: relative;
+    z-index: 2;
+}
+
+.erp-analise-compras-produto {
+    position: relative;
+}
+
+.erp-analise-compras-produto__clear {
+    position: absolute;
+    top: 50%;
+    right: 0.4rem;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 1.45rem;
+    height: 1.45rem;
+    border: 0;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-analise-compras-produto__clear:hover {
+    background: #cbd5e1;
+}
+
+.erp-analise-compras-produto input[type="search"] {
+    padding-right: 2rem;
+}
+
+.erp-analise-compras-produto-lookup {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: auto;
+    max-height: 16rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 14px 28px rgb(15 23 42 / 18%);
+}
+
+.erp-analise-compras-produto-lookup li {
+    margin: 0;
+}
+
+.erp-analise-compras-produto-lookup button {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.48rem 0.6rem;
+    border: 0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    color: #17233a;
+    text-align: left;
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+}
+
+.erp-analise-compras-produto-lookup li:last-child button {
+    border-bottom: 0;
+}
+
+.erp-analise-compras-produto-lookup button:hover,
+.erp-analise-compras-produto-lookup button.is-selected {
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-analise-compras-produto-lookup__code {
+    font-weight: 800;
+    color: #1d4ed8;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-produto-lookup__nome {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.erp-analise-compras-produto-lookup__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-produto-lookup__meta em {
+    font-style: normal;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-analise-compras-produto-lookup__meta strong {
+    font-weight: 800;
+    color: #0f766e;
+}
+
+.erp-analise-compras-produto-lookup button:hover .erp-analise-compras-produto-lookup__code,
+.erp-analise-compras-produto-lookup button.is-selected .erp-analise-compras-produto-lookup__code,
+.erp-analise-compras-produto-lookup button:hover .erp-analise-compras-produto-lookup__meta em,
+.erp-analise-compras-produto-lookup button.is-selected .erp-analise-compras-produto-lookup__meta em,
+.erp-analise-compras-produto-lookup button:hover .erp-analise-compras-produto-lookup__meta strong,
+.erp-analise-compras-produto-lookup button.is-selected .erp-analise-compras-produto-lookup__meta strong {
+    color: #dbeafe;
+}
+
+.erp-analise-compras-field--sm {
+    max-width: 9rem;
+}
+
+.erp-analise-compras-fornecedor {
+    position: relative;
+}
+
+.erp-analise-compras-fornecedor__clear {
+    position: absolute;
+    top: 50%;
+    right: 0.4rem;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 1.45rem;
+    height: 1.45rem;
+    border: 0;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-analise-compras-fornecedor__clear:hover {
+    background: #cbd5e1;
+}
+
+.erp-analise-compras-fornecedor input[type="search"] {
+    padding-right: 2rem;
+}
+
+.erp-analise-compras-lookup {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    overflow: auto;
+    max-height: 15rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 14px 28px rgb(15 23 42 / 18%);
+}
+
+.erp-analise-compras-lookup button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem 0.75rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.48rem 0.6rem;
+    border: 0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    color: #17233a;
+    text-align: left;
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+}
+
+.erp-analise-compras-lookup button:last-child {
+    border-bottom: 0;
+}
+
+.erp-analise-compras-lookup button:hover,
+.erp-analise-compras-lookup button.is-selected {
+    background: #1e5a9e;
+    color: #fff;
+}
+
+.erp-analise-compras-lookup button strong {
+    overflow: hidden;
+    color: #1d4ed8;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-lookup button:hover strong,
+.erp-analise-compras-lookup button.is-selected strong {
+    color: #fff;
+}
+
+.erp-analise-compras-lookup button em {
+    color: #1e5a9e;
+    font-style: normal;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-lookup button:hover em,
+.erp-analise-compras-lookup button.is-selected em {
+    color: #dbeafe;
+}
+
+.erp-analise-compras-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 1.1rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.erp-analise-compras-checks label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+}
+
+.erp-analise-compras-localizar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1 1 18rem;
+}
+
+.erp-analise-compras-localizar select {
+    max-width: 8.5rem;
+}
+
+.erp-analise-compras-localizar input[type="search"] {
+    flex: 1 1 12rem;
+    min-width: 10rem;
+}
+
+.erp-analise-compras-ghost {
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 7px;
+    min-height: 2.1rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-analise-compras-ghost:hover {
+    background: #f1f5f9;
+}
+
+.erp-analise-compras-meta {
+    font-size: 0.78rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-table-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.erp-analise-compras-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.78rem;
+    min-width: 1280px;
+}
+
+.erp-analise-compras-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef3f9 100%);
+    border-bottom: 1px solid #c5d4e8;
+    padding: 0.5rem 0.45rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.erp-analise-compras-table tbody td {
+    padding: 0.4rem 0.45rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    white-space: nowrap;
+    color: #0f172a;
+}
+
+.erp-analise-compras-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.erp-analise-compras-table tbody tr.is-selected {
+    background: #ecfeff;
+}
+
+.erp-analise-compras-table .is-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-analise-compras-table .is-check {
+    width: 2.1rem;
+    text-align: center;
+}
+
+.erp-analise-compras-table .is-desc {
+    max-width: 15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-analise-compras-table .is-sugestao {
+    font-weight: 800;
+    color: #0f766e;
+}
+
+.erp-analise-compras-table .is-empty {
+    text-align: center;
+    padding: 2.4rem 1rem;
+    color: #64748b;
+    white-space: normal;
+}
+
+.erp-analise-compras-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.erp-analise-compras-badge.is-urgente {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.erp-analise-compras-badge.is-atencao {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.erp-analise-compras-badge.is-normal {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.erp-analise-compras-badge.is-muted {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.erp-analise-compras-actions__pedido {
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
+    border-color: #93c5fd !important;
+}
+
+.erp-os-actions__btn:disabled,
+.erp-os-actions__btn[disabled] {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+    .erp-analise-compras-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .erp-analise-compras-field--wide,
+    .erp-analise-compras-field--produto,
+    .erp-analise-compras-field--fornecedor {
+        grid-column: span 2;
+    }
+
+    .erp-analise-compras-produto-lookup button {
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+    }
+
+    .erp-analise-compras-produto-lookup__meta {
+        grid-column: 1 / -1;
+    }
+
+    .erp-analise-compras-field--sm {
+        max-width: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .erp-analise-compras-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-analise-compras-field--wide,
+    .erp-analise-compras-field--produto,
+    .erp-analise-compras-field--fornecedor {
+        grid-column: auto;
+    }
+}

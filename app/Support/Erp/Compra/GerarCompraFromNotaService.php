@@ -4,27 +4,25 @@ namespace App\Support\Erp\Compra;
 
 use App\Models\Compra;
 use App\Models\CompraItem;
-use App\Models\Estoque;
 use App\Models\NotaFornecedor;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorFornecedorCadastro;
-use App\Support\Erp\ProductEstoqueSaldoService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Gera Compra + itens a partir da nota de fornecedor (XML já vinculado)
- * e lança entrada de estoque. Só então marca a nota como "Gerou Compras".
+ * Gera Compra + itens a partir da nota de fornecedor (XML já vinculado),
+ * deixa a compra ABERTA (estoque/financeiro só no Finalizar do lançamento)
+ * e marca a nota como "Gerou Compras".
  */
 final class GerarCompraFromNotaService
 {
     public const OPERACAO = 'GERAR_COMPRA_XML';
 
     public function __construct(
-        private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
         private readonly ErpOperacaoLogService $operacaoLog = new ErpOperacaoLogService(),
     ) {}
 
@@ -41,7 +39,7 @@ final class GerarCompraFromNotaService
                 : null;
 
             if ($compraExistente && $compraExistente->status !== Compra::STATUS_CANCELADA) {
-                throw new DomainException('Esta nota já gerou compra e entrada de estoque.');
+                throw new DomainException('Esta nota já gerou compra. Abra o lançamento para finalizar.');
             }
         }
 
@@ -71,7 +69,6 @@ final class GerarCompraFromNotaService
 
         $fornecedorId = $this->resolveFornecedorId($nota);
         $empresaId = $nota->empresa_id ? (int) $nota->empresa_id : null;
-        $estoqueId = $this->resolveEstoqueId($empresaId);
         $total = round(array_sum(array_column($itens, 'total')), 2);
         $momento = ErpTimezone::toLocal();
 
@@ -80,7 +77,6 @@ final class GerarCompraFromNotaService
             $itens,
             $fornecedorId,
             $empresaId,
-            $estoqueId,
             $total,
             $momento,
         ): Compra {
@@ -95,7 +91,7 @@ final class GerarCompraFromNotaService
                 'fornecedor_id' => $fornecedorId,
                 'chave_nfe' => preg_replace('/\D/', '', (string) $nota->chave) ?: null,
                 'total' => $total,
-                'status' => Compra::STATUS_FECHADA,
+                'status' => Compra::STATUS_ABERTA,
             ]);
 
             foreach ($itens as $item) {
@@ -109,12 +105,29 @@ final class GerarCompraFromNotaService
 
                 $product = Product::query()->find($item['product_id']);
 
-                if ($product && ! $product->is_servico) {
-                    $this->saldos->incrementar(
-                        (int) $product->id,
-                        (float) $item['quantidade'],
-                        $estoqueId,
-                    );
+                if ($product) {
+                    $updates = [];
+                    $und = (string) ($item['und'] ?? '');
+                    $grupo = (string) ($item['grupo'] ?? '');
+
+                    if ($und !== '' && $und !== (string) $product->unidade) {
+                        $updates['unidade'] = $und;
+                    }
+
+                    if ($grupo !== '' && $grupo !== (string) $product->grupo) {
+                        $updates['grupo'] = $grupo;
+                    }
+
+                    $custo = (float) $item['valor_unitario'];
+                    if ($custo > 0) {
+                        $updates['preco_compra'] = $custo;
+                        $updates['preco_custo'] = $custo;
+                        $updates['ult_compra'] = $custo;
+                    }
+
+                    if ($updates !== []) {
+                        $product->forceFill($updates)->save();
+                    }
                 }
             }
 
@@ -128,7 +141,7 @@ final class GerarCompraFromNotaService
 
         $this->operacaoLog->registrar(
             operacao: self::OPERACAO,
-            resumo: 'Compra #'.$compra->numero.' gerada da NF '.$nota->numero.' (entrada de estoque).',
+            resumo: 'Compra #'.$compra->numero.' gerada da NF '.$nota->numero.' (aberta — finalizar no lançamento).',
             origem: 'nota_fornecedor',
             documentoTipo: 'compra',
             documentoId: (int) $compra->id,
@@ -138,7 +151,6 @@ final class GerarCompraFromNotaService
                 'chave' => $nota->chave,
                 'itens' => count($itens),
                 'total' => $total,
-                'estoque_id' => $estoqueId,
             ],
             empresaId: $empresaId,
         );
@@ -162,8 +174,10 @@ final class GerarCompraFromNotaService
             $productId = (int) $row['product_id'];
             $qtdEmb = BrDecimal::parse($row['qtd_emb'] ?? 0, 3);
             $qtdUnid = BrDecimal::parse($row['qtd_unid'] ?? 1, 3);
+            // Qtd.Compra no lançamento = Qtd. Total do XML.
             $qtdTotal = BrDecimal::parse($row['qtd_total'] ?? 0, 3);
             $precoEmb = BrDecimal::parse($row['prc_unitario'] ?? 0, 4);
+            $valorCheioInformado = BrDecimal::parse($row['valor_total'] ?? 0, 2);
 
             if ($qtdUnid <= 0) {
                 $qtdUnid = 1.0;
@@ -177,22 +191,25 @@ final class GerarCompraFromNotaService
                 continue;
             }
 
-            // Total monetário = qtd comercial (emb) × preço unitário da nota.
-            // Se emb não veio, cai para total = estoque × (preço / fator).
-            if ($qtdEmb > 0) {
+            // Valor cheio da nota (vProd / emb × prc). Preferência: valor_total do modal.
+            if ($valorCheioInformado > 0) {
+                $totalLinha = round($valorCheioInformado, 2);
+            } elseif ($qtdEmb > 0) {
                 $totalLinha = round($qtdEmb * $precoEmb, 2);
             } else {
                 $totalLinha = round($qtdTotal * ($precoEmb / $qtdUnid), 2);
             }
 
-            // Custo por unidade de estoque = total / quantidade de estoque.
-            $valorUnitarioEstoque = round($totalLinha / $qtdTotal, 4);
+            // vL. custo = valor cheio ÷ Qtd.Compra (qtd total).
+            $vlCusto = round($totalLinha / $qtdTotal, 4);
 
             $out[] = [
                 'product_id' => $productId,
                 'quantidade' => $qtdTotal,
-                'valor_unitario' => round($valorUnitarioEstoque, 2),
+                'valor_unitario' => $vlCusto,
                 'total' => $totalLinha,
+                'und' => mb_strtoupper(trim((string) ($row['und'] ?? '')), 'UTF-8'),
+                'grupo' => trim((string) ($row['grupo'] ?? '')),
             ];
         }
 
@@ -207,20 +224,5 @@ final class GerarCompraFromNotaService
         ]);
 
         return $cadastro['person']?->id;
-    }
-
-    private function resolveEstoqueId(?int $empresaId): ?int
-    {
-        if (! $empresaId) {
-            return null;
-        }
-
-        $id = Estoque::query()
-            ->where('empresa_id', $empresaId)
-            ->where('ativo', true)
-            ->orderBy('codigo')
-            ->value('id');
-
-        return $id ? (int) $id : null;
     }
 }

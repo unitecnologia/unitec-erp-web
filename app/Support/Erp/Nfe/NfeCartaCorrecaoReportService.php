@@ -125,7 +125,20 @@ final class NfeCartaCorrecaoReportService
     public function resolveDestinatarioContato(Nfe $nfe, string $tipo): array
     {
         $nfe->loadMissing(['cliente', 'transportadora']);
-        $person = $tipo === 'transportadora' ? $nfe->transportadora : $nfe->cliente;
+
+        if ($tipo === 'transportadora') {
+            $transportadora = $nfe->transportadora;
+            $nome = trim((string) ($transportadora?->proprietario ?: $transportadora?->apelido ?: ''));
+            $phoneDigits = preg_replace('/\D/', '', (string) ($transportadora?->whatsapp ?? '')) ?? '';
+
+            return [
+                'email' => '',
+                'phoneDigits' => $phoneDigits,
+                'nome' => $nome,
+            ];
+        }
+
+        $person = $nfe->cliente;
         $nome = trim((string) ($person?->nome_razao ?? $person?->nome ?? ''));
         $email = trim((string) ($person?->email ?? $person?->email2 ?? ''));
         $phoneDigits = preg_replace('/\D/', '', (string) ($person?->celular1 ?: ($person?->whatsapp ?: ($person?->celular2 ?? '')))) ?? '';

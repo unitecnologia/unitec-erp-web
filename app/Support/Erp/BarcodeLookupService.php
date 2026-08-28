@@ -88,7 +88,7 @@ class BarcodeLookupService
         $networkError = false;
 
         if ($this->resolveCosmosToken() === null && $this->isBrazilianBarcode($barcode)) {
-            throw new RuntimeException('Configure o token Cosmos (Bluesoft) em Configurações » Empresa » API de Serviços.');
+            throw new RuntimeException('Configure o token Cosmos (Bluesoft) em Configurações » Empresa » Busca Produto Auto.');
         }
 
         $result = $this->tryFetchFromCosmos($barcode, $networkError);
@@ -178,7 +178,7 @@ class BarcodeLookupService
             return null;
         } catch (RequestException $exception) {
             if ($exception->response?->status() === 401) {
-                throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » API de Serviços.');
+                throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » Busca Produto Auto.');
             }
 
             if ($exception->response?->status() === 429) {
@@ -191,7 +191,7 @@ class BarcodeLookupService
         $this->incrementCosmosDailyQuota();
 
         if ($response->status() === 401) {
-            throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » API de Serviços.');
+            throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » Busca Produto Auto.');
         }
 
         if ($response->status() === 429) {

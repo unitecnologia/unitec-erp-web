@@ -64,7 +64,7 @@ class RotasVendedoresPage extends Page
 
     public static function canAccess(): bool
     {
-        return ErpAccess::currentCan('forca_vendas.access');
+        return false;
     }
 
     public function getHeading(): string|Htmlable|null

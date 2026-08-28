@@ -194,7 +194,7 @@ final class NfeHistoricoService
     private function montarTransporte(Nfe $nfe): array
     {
         return [
-            'transportadora' => mb_strtoupper((string) ($nfe->transportadora?->nome_razao ?: '—'), 'UTF-8'),
+            'transportadora' => mb_strtoupper((string) ($nfe->transportadora?->proprietario ?: $nfe->transportadora?->apelido ?: '—'), 'UTF-8'),
             'tipo_frete' => (string) ($nfe->tipo_frete ?: '—'),
             'placa' => (string) ($nfe->placa ?: '—'),
             'uf_placa' => (string) ($nfe->uf_placa ?: '—'),

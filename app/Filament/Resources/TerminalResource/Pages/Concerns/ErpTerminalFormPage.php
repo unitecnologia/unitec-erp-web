@@ -85,7 +85,7 @@ trait ErpTerminalFormPage
      */
     public function terminalTabKeys(): array
     {
-        return ['configuracoes', 'balanca', 'sat', 'tef'];
+        return ['configuracoes', 'balanca', 'tef'];
     }
 
     public function saveForm(): void
@@ -145,8 +145,14 @@ trait ErpTerminalFormPage
             $merged['empresa_id'] = TerminalResolver::make()->resolveEmpresaId();
         }
 
-        if (($merged['tipo_fechamento'] ?? null) !== '0' && ($merged['tipo_fechamento'] ?? null) !== 0) {
-            $merged['meia_folha'] = false;
+        unset($merged['meia_folha']);
+
+        if ($this instanceof EditRecord) {
+            unset(
+                $merged['serie'],
+                $merged['numeracao_inicial'],
+                $merged['usar_numero_inicial'],
+            );
         }
 
         return $merged;
@@ -201,6 +207,14 @@ trait ErpTerminalFormPage
             'nvias' => 1,
             'tipo_impressora' => '1',
             'tipo_fechamento' => '0',
+            'balanca_marca' => 'balToledo',
+            'balanca_porta' => 'COM3',
+            'balanca_velocidade' => '9600',
+            'balanca_databits' => '8',
+            'balanca_paridade' => 'None',
+            'balanca_stopbits' => '1',
+            'balanca_handshaking' => 'None',
+            'ler_peso' => false,
         ];
     }
 }

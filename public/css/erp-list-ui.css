@@ -129,6 +129,7 @@
 .erp-ajusta-estoque-grupo__locate-label,
 .erp-entregadores__locate-label,
 .erp-contadores__locate-label,
+.erp-transportadoras__locate-label,
 .erp-terminais__locate-label,
 .erp-aniversariantes__locate-label,
 .erp-produtos__locate-label,
@@ -246,6 +247,7 @@
 .erp-ajusta-estoque-grupo__select,
 .erp-entregadores__select,
 .erp-contadores__select,
+.erp-transportadoras__select,
 .erp-terminais__select,
 .erp-aniversariantes__select,
 .erp-pessoas__input,
@@ -261,6 +263,7 @@
 .erp-ajusta-estoque-grupo__input,
 .erp-entregadores__input,
 .erp-contadores__input,
+.erp-transportadoras__input,
 .erp-terminais__input,
 .erp-aniversariantes__input,
 .erp-produtos__select,
@@ -312,6 +315,7 @@
 .erp-ajusta-estoque-grupo__select:focus,
 .erp-entregadores__select:focus,
 .erp-contadores__select:focus,
+.erp-transportadoras__select:focus,
 .erp-aniversariantes__select:focus,
 .erp-pessoas__input:focus,
 .erp-vendedores__input:focus,
@@ -326,6 +330,7 @@
 .erp-ajusta-estoque-grupo__input:focus,
 .erp-entregadores__input:focus,
 .erp-contadores__input:focus,
+.erp-transportadoras__input:focus,
 .erp-aniversariantes__input:focus,
 .erp-produtos__select:focus,
 .erp-produtos__input:focus,
@@ -383,6 +388,7 @@
 .erp-ajusta-estoque-grupo__btn,
 .erp-entregadores__btn,
 .erp-contadores__btn,
+.erp-transportadoras__btn,
 .erp-aniversariantes__btn,
 .erp-produtos__btn,
 .erp-usuarios__btn,
@@ -418,6 +424,7 @@
 .erp-ajusta-estoque-grupo__btn:hover,
 .erp-entregadores__btn:hover,
 .erp-contadores__btn:hover,
+.erp-transportadoras__btn:hover,
 .erp-aniversariantes__btn:hover,
 .erp-produtos__btn:hover,
 .erp-usuarios__btn:hover,
@@ -444,6 +451,7 @@
 .erp-ajusta-estoque-grupo__btn:focus-visible,
 .erp-entregadores__btn:focus-visible,
 .erp-contadores__btn:focus-visible,
+.erp-transportadoras__btn:focus-visible,
 .erp-aniversariantes__btn:focus-visible,
 .erp-produtos__btn:focus-visible,
 .erp-empresas__btn:focus-visible {
@@ -1109,8 +1117,10 @@ a.erp-produtos__tab {
 .erp-receber-actions__icon--new,
 .erp-ajustes-estoque-actions__icon--new,
 .erp-pagar-actions__icon--new,
-[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__icon"] {
-    background: rgba(255, 255, 255, 0.25);
+.erp-transportadoras-actions__icon--new,
+[class$="-actions__btn"][data-erp-key="F2"] [class$="-actions__icon"],
+[class$="-actions__btn"][data-erp-key="F2"] [class*="-actions__icon--"] {
+    background: rgba(255, 255, 255, 0.28);
     color: var(--erp-text-inverse);
     font-weight: 800;
 }

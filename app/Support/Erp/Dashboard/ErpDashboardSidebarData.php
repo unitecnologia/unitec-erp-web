@@ -5,29 +5,32 @@ namespace App\Support\Erp\Dashboard;
 use App\Models\ContaPagar;
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Throwable;
+use Illuminate\Support\Facades\Schema;
 
 final class ErpDashboardSidebarData
 {
     /**
      * Títulos a pagar vencidos (saldo > 0 e vencimento &lt; hoje).
      *
+     * @param  int|list<int>|null  $empresaScope
      * @return array{total: int, items: list<array<string, string>>}
      */
-    public static function contasPagarVencidas(int $limit = 50): array
+    public static function contasPagarVencidas(int $limit = 50, int|array|null $empresaScope = null): array
     {
         try {
             if (! Schema::hasTable((new ContaPagar)->getTable())) {
                 return ['total' => 0, 'items' => []];
             }
 
-            $hoje = Carbon::today()->toDateString();
+            $hoje = ErpFinanceiroMetricas::hoje()->toDateString();
 
             $base = ContaPagar::query()
                 ->where('saldo', '>', 0)
                 ->whereDate('vencimento', '<', $hoje);
+
+            ErpFinanceiroMetricas::applyEmpresaColumn($base, (new ContaPagar)->getTable(), $empresaScope);
 
             $total = (int) (clone $base)->count();
 

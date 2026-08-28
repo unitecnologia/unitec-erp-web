@@ -1,18 +1,22 @@
 ; Unitec ERP Web - instalador Windows (Inno Setup)
 ; Compilar apos: .\scripts\build-setup.ps1
+;
+; Fluxo:
+; - Pasta nova (sem .env / sem tools\mysql\data) → instalação do zero
+; - Pasta já existente → recupera (atualiza arquivos, NÃO apaga o banco)
+;
+; Atalhos: somente bin\Unitec ERP.exe
+; Auto-start: servico Windows UnitecErpServer (Automatic)
+; Sem PowerShell no atalho do cliente.
 
 #define MyAppName "UNI SISTEMAS 3.0"
-#define MyAppVersion "6.4.1.41"
+#define MyAppVersion "6.4.1.86"
 #define MyAppVerName "UNI SISTEMAS 3.0"
 #define MyAppPublisher "UNITECNOLOGIA"
 #define MyAppURL "https://unitecnologiasc.com.br/"
 #define MyAppDir "C:\UNITECNOLOGIA_WEB"
 #define MyStagingDir "..\dist\staging\unitec-erp-web"
 #define SiteBase "http://127.0.0.1:8765"
-#define LauncherUnitec "Unitec ERP.bat"
-#define LauncherRetaguarda "INFORSYSTEM Retaguarda.bat"
-#define LauncherPdv "INFORSYSTEM PDV.bat"
-#define LauncherPreVenda "INFORSYSTEM Pre-venda.bat"
 #define MyAppIcon "assets\unitec-erp.ico"
 
 [Setup]
@@ -42,27 +46,27 @@ SetupIconFile={#MyAppIcon}
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "Criar atalho &""Unitec ERP"" na Area de Trabalho"; GroupDescription: "Atalhos:"; Flags: checkedonce
+; Sem task de atalho no Inno — evita duplicar com New-UnitecDesktopShortcuts.
 
 [Files]
-Source: "{#MyStagingDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".env,public\storage"
+; Nao sobrescreve dados do cliente em pacote padrao.
+; Se o build incluir installer\seed (IncludeDevData), o .env vem no staging e sera aplicado.
+Source: "{#MyStagingDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".env.backup,.env.production,public\storage"
 
 [Icons]
-Name: "{group}\Unitec ERP"; Filename: "{app}\{#LauncherUnitec}"; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"; Comment: "Abrir o sistema"
-Name: "{group}\INFORSYSTEM Retaguarda"; Filename: "{app}\{#LauncherRetaguarda}"; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"
-Name: "{group}\INFORSYSTEM PDV"; Filename: "{app}\{#LauncherPdv}"; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"
-Name: "{group}\INFORSYSTEM Pre-venda"; Filename: "{app}\{#LauncherPreVenda}"; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"
+; Menu Iniciar: somente Unitec ERP.exe (servico Windows cuida do stack).
+; Area de Trabalho: criada so pelo scripts\unitec-install-lib.ps1 (New-UnitecDesktopShortcuts).
+Name: "{group}\Unitec ERP"; Filename: "{app}\bin\Unitec ERP.exe"; Parameters: "--app ""{app}"""; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"; Comment: "Abrir Unitec ERP"
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\Unitec ERP"; Filename: "{app}\{#LauncherUnitec}"; WorkingDir: "{app}"; IconFilename: "{app}\installer\{#MyAppIcon}"; Tasks: desktopicon; Comment: "Abrir o Unitec ERP"
 
+; Nao apaga a pasta inteira no desinstalar — preserva banco (tools\mysql\data) e .env.
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}"
+Type: files; Name: "{app}\.unitec-serve.pid"
 
 [Messages]
-brazilianportuguese.WelcomeLabel2=Este assistente instala o Unitec ERP ({#MyAppVerName}).%n%nVoce so precisa clicar em Avancar e Instalar.%n%nO sistema abrira sozinho ao terminar.%n%nRequisitos: Windows 10 ou superior, 64 bits, 2 GB livres em C:
-brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin:%n  Usuario: USUARIO%n  Senha: 01
+brazilianportuguese.WelcomeLabel2=Este assistente instala o Unitec ERP ({#MyAppVerName}).%n%nSe a pasta C:\UNITECNOLOGIA_WEB ja existir, o instalador RECUPERA o sistema sem apagar o banco de dados.%n%nSe for a primeira vez, instala do zero.%n%nO sistema abre em janela de aplicativo (Chrome/Edge).%n%nRequisitos: Windows 10 ou superior, 64 bits, 2 GB livres em C:
+brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin (instalacao nova):%n  Usuario: USUARIO%n  Senha: 01
 
 [Code]
 var
@@ -72,6 +76,18 @@ var
   DbHostLabel: TNewStaticText;
   DbHostEdit: TNewEdit;
   SelectedDbHost: String;
+  IsRecoveryInstall: Boolean;
+
+function IsExistingUnitecInstall(): Boolean;
+begin
+  { Sinais duraveis de instalacao anterior — nao usa so index.php (Setup sempre copia). }
+  Result :=
+    FileExists(ExpandConstant('{#MyAppDir}\.env')) or
+    FileExists(ExpandConstant('{#MyAppDir}\.env.backup')) or
+    FileExists(ExpandConstant('{#MyAppDir}\.env.production')) or
+    FileExists(ExpandConstant('{#MyAppDir}\tools\mysql\data\ibdata1')) or
+    DirExists(ExpandConstant('{#MyAppDir}\tools\mysql\data\unitec_erp'));
+end;
 
 function InitializeSetup(): Boolean;
 var
@@ -79,6 +95,7 @@ var
 begin
   Result := True;
   SelectedDbHost := '127.0.0.1';
+  IsRecoveryInstall := IsExistingUnitecInstall();
 
   if not IsWin64 then
   begin
@@ -95,6 +112,16 @@ begin
       Result := False;
       Exit;
     end;
+  end;
+
+  if IsRecoveryInstall then
+  begin
+    MsgBox(
+      'Instalacao existente detectada em C:\UNITECNOLOGIA_WEB.' + #13#10 + #13#10 +
+      'O instalador vai atualizar os arquivos do programa.' + #13#10 + #13#10 +
+      'Pacote padrao: mantem .env e banco.' + #13#10 +
+      'Pacote com dados de desenvolvimento embutidos: substitui .env e banco.',
+      mbInformation, MB_OK);
   end;
 end;
 
@@ -167,10 +194,21 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   Params: String;
+  HasDevSeed: Boolean;
 begin
   if CurStep = ssPostInstall then
   begin
-    Params := '-Sta -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\scripts\instalar-tudo.ps1') + '" -NoPause -FromSetup -AppPath "' + ExpandConstant('{app}') + '" -AppUrl "{#SiteBase}" -DbHost "' + SelectedDbHost + '"';
+    HasDevSeed := FileExists(ExpandConstant('{app}\installer\seed\INCLUDE_DEV_DATA.flag'));
+
+    Params := '-Sta -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File "' +
+      ExpandConstant('{app}\scripts\instalar-tudo.ps1') +
+      '" -NoPause -FromSetup -AppPath "' + ExpandConstant('{app}') +
+      '" -AppUrl "{#SiteBase}" -DbHost "' + SelectedDbHost + '"';
+
+    if HasDevSeed then
+      Params := Params + ' -ApplyBundledSeed'
+    else if IsRecoveryInstall then
+      Params := Params + ' -Recovery';
 
     if not Exec('powershell.exe', Params, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin

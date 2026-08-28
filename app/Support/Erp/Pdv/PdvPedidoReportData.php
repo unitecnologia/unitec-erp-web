@@ -11,6 +11,12 @@ final class PdvPedidoReportData
 {
     public const TIPO_IMPRESSORA_PEDIDO_A4 = '0';
 
+    public const TIPO_IMPRESSORA_ESC_POS = '1';
+
+    public const TIPO_IMPRESSORA_GRAFICO = '2';
+
+    public const TIPO_IMPRESSORA_NFCE_A4 = '3';
+
     public static function shouldUsePedidoA4(?Terminal $terminal): bool
     {
         return (string) ($terminal?->tipo_impressora ?? '1') === self::TIPO_IMPRESSORA_PEDIDO_A4;

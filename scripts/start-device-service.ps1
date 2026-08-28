@@ -1,8 +1,9 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root 'services\unitec-device-service\dist'
 $exe = Join-Path $dist 'Unitec.DeviceService.exe'
+$serviceName = 'UnitecDeviceService'
 
 $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
             [System.Environment]::GetEnvironmentVariable('Path', 'User')
@@ -22,12 +23,14 @@ if (Test-Online) {
 if (-not (Test-Path $exe)) {
     $project = Join-Path $root 'services\unitec-device-service\src\Unitec.DeviceService\Unitec.DeviceService.csproj'
     Write-Host 'Publicando...'
-    Get-Process -Name 'Unitec.DeviceService' -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Sleep 1
     & dotnet publish $project -c Release -r win-x64 --self-contained false -o $dist
 }
 
-Write-Host 'Iniciando Unitec.DeviceService.exe...'
-Start-Process -FilePath $exe -WorkingDirectory $dist
+if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
+    throw "Serviço $serviceName não instalado. Execute scripts\install-device-service-startup.ps1 como administrador."
+}
+
+Write-Host 'Iniciando serviço Unitec Device Service...'
+Start-Service -Name $serviceName -ErrorAction SilentlyContinue
 Start-Sleep 3
 if (Test-Online) { Write-Host 'OK online.' } else { Write-Warning 'Nao respondeu ainda.' }

@@ -169,7 +169,6 @@ class AprovacoesGestorPage extends Page
 
         return $user !== null && (
             (bool) $user->is_admin
-            || (bool) $user->is_supervisor
             || ErpAccess::can($user, 'forca_vendas.access')
         );
     }
@@ -182,7 +181,7 @@ class AprovacoesGestorPage extends Page
             return false;
         }
 
-        if ($user->is_admin || $user->is_supervisor) {
+        if ($user->is_admin) {
             return true;
         }
 
@@ -199,7 +198,7 @@ class AprovacoesGestorPage extends Page
             return false;
         }
 
-        if ($user->is_admin || $user->is_supervisor) {
+        if ($user->is_admin) {
             return true;
         }
 

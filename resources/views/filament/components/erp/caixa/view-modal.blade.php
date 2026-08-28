@@ -37,7 +37,7 @@
                     </div>
                     <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--wide">
                         <span class="erp-caixa-view-modal__label">Histórico</span>
-                        <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['historico'] ?? '—' }}</span>
+                        <span class="erp-caixa-view-modal__value">{{ preg_replace('/^\[MANUAL\]\s*/iu', '', (string) ($this->viewModalData['historico'] ?? '—')) }}</span>
                     </div>
                     <div class="erp-caixa-view-modal__field">
                         <span class="erp-caixa-view-modal__label">Plano de Contas</span>

@@ -65,6 +65,10 @@ class GestorPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::SCRIPTS_AFTER,
+                fn (): \Illuminate\Contracts\View\View => view('filament.components.erp.no-browser-hints'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_AFTER,
                 fn (): \Illuminate\Contracts\View\View => view('filament.gestor.partials.pwa-scripts'),
             )
             ->renderHook(
@@ -75,8 +79,8 @@ class GestorPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                AuthenticateSession::class,
                 ShareErrorsFromSession::class,
+                \App\Http\Middleware\EnsureBrowserDeviceCookie::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
@@ -84,6 +88,10 @@ class GestorPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                AuthenticateSession::class,
+                \App\Http\Middleware\EnsureEmpresaSelecionada::class,
+                \App\Http\Middleware\EnsureLicencaAtiva::class,
+                \App\Http\Middleware\EnsureLicensedBrowserDevice::class,
             ]);
     }
 }

@@ -12,6 +12,7 @@ internal sealed class UpdateProgressForm : Form
         ("applying", "Copiar arquivos"),
         ("migrating", "Migrations"),
         ("finalizing", "Limpeza de cache"),
+        ("health", "Aguardando servidor"),
         ("completed", "Atualização concluída"),
     ];
 
@@ -50,7 +51,7 @@ internal sealed class UpdateProgressForm : Form
         MaximizeBox = false;
         MinimizeBox = true;
         ShowInTaskbar = true;
-        ClientSize = new Size(520, 520);
+        ClientSize = new Size(520, 552);
         BackColor = Color.FromArgb(248, 250, 252);
         Font = new Font("Segoe UI", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
@@ -103,25 +104,25 @@ internal sealed class UpdateProgressForm : Form
         _elapsedLabel.Size = new Size(480, 20);
 
         _stepsPanel.Location = new Point(20, 176);
-        _stepsPanel.Size = new Size(480, 260);
+        _stepsPanel.Size = new Size(480, 292);
         _stepsPanel.AutoScroll = false;
         BuildSteps();
 
         _hintLabel.Text = "Não feche esta janela até a instalação terminar.";
         _hintLabel.ForeColor = Color.FromArgb(71, 85, 105);
         _hintLabel.AutoSize = false;
-        _hintLabel.Location = new Point(20, 444);
+        _hintLabel.Location = new Point(20, 476);
         _hintLabel.Size = new Size(250, 40);
 
         _pickZipButton.Text = "Escolher ZIP…";
-        _pickZipButton.Location = new Point(280, 448);
+        _pickZipButton.Location = new Point(280, 480);
         _pickZipButton.Size = new Size(110, 32);
         _pickZipButton.Visible = true;
         _pickZipButton.Enabled = true;
         _pickZipButton.Click += (_, _) => PickZipAndStart();
 
         _closeButton.Text = "Fechar";
-        _closeButton.Location = new Point(400, 448);
+        _closeButton.Location = new Point(400, 480);
         _closeButton.Size = new Size(100, 32);
         _closeButton.Enabled = false;
         _closeButton.Click += (_, _) => Close();
@@ -191,24 +192,8 @@ internal sealed class UpdateProgressForm : Form
 
     private async Task OnShownAsync()
     {
-        var updatesDir = Path.Combine(_appPath, "storage", "app", "private", "updates");
-        var localZip = Path.Combine(updatesDir, "Unitec-ERP-Update.zip");
-
-        if (string.IsNullOrWhiteSpace(_zipPath) && !_cacheOnly && UpdatePipeline.IsLocalPackageReady(updatesDir, localZip))
-        {
-            _zipPath = localZip;
-            SetStatus("Usando pacote local já baixado…", 5);
-            MarkStep("downloading", 100);
-        }
-
-        if (string.IsNullOrWhiteSpace(_zipPath) && !_cacheOnly)
-        {
-            SetFailed(
-                "Nenhum ZIP de atualização informado e nenhum pacote local pronto.",
-                "Clique em \"Escolher ZIP…\" ou use --zip \"caminho\\Unitec-ERP-Update.zip\".");
-            return;
-        }
-
+        // Fluxo novo: ZIP opcional — download vai para atualizacao/ via serviço.
+        SetStatus("Preparando…", 5);
         await StartPipelineAsync();
     }
 
@@ -227,7 +212,7 @@ internal sealed class UpdateProgressForm : Form
 
         using var dlg = new OpenFileDialog
         {
-            Title = "Selecione Unitec-ERP-Update.zip",
+            Title = "Selecione pacote (opcional — extrai para atualizacao/)",
             Filter = "Pacote Unitec ERP|Unitec-ERP-Update.zip;*.zip|Arquivos ZIP|*.zip",
             CheckFileExists = true,
         };
@@ -241,7 +226,7 @@ internal sealed class UpdateProgressForm : Form
         _finished = false;
         _closeButton.Enabled = false;
         ResetSteps();
-        SetStatus("ZIP selecionado. Iniciando…", 2);
+        SetStatus("ZIP selecionado. Extraindo para atualizacao/…", 2);
         _ = StartPipelineAsync();
     }
 
@@ -275,7 +260,7 @@ internal sealed class UpdateProgressForm : Form
             MarkAllDone();
             SetStatus($"Atualização concluída — versão {version ?? "ok"}", 100);
             _detailLabel.Text = string.Empty;
-            _hintLabel.Text = "Pode fechar esta janela.";
+            _hintLabel.Text = "Se houver update na pasta atualizacao/, o login perguntará Sim/Não.";
             _hintLabel.ForeColor = Color.FromArgb(71, 85, 105);
             _statusLabel.ForeColor = Color.FromArgb(30, 41, 59);
             _finished = true;

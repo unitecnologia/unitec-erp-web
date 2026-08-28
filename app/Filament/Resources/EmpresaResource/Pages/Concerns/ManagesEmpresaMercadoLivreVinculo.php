@@ -6,7 +6,7 @@ use App\Models\Empresa;
 use App\Models\MeliHubPair;
 use App\Support\Erp\ErpAccess;
 use App\Support\MercadoLivre\MeliApiClient;
-use App\Support\MercadoLivre\MeliEnvCredentials;
+use App\Support\MercadoLivre\MeliEmpresaConfig;
 use App\Support\MercadoLivre\MeliHubService;
 use App\Support\MercadoLivre\MeliOAuthService;
 use Filament\Notifications\Notification;
@@ -51,18 +51,21 @@ trait ManagesEmpresaMercadoLivreVinculo
     {
         $hub = app(MeliHubService::class);
 
-        // Instalação Unitec (mesmo domínio do hub): OAuth local com credenciais do .env.
-        if ($hub->isSelfHub()) {
-            $this->hydrateMercadoLivreCredentialsFromEnv();
+        if ($hub->isSelfHub($empresa)) {
+            $credentials = MeliEmpresaConfig::forEmpresa(MeliEmpresaConfig::hubEmpresa($empresa));
 
-            $credentials = $hub->hubAppCredentials();
             if (trim((string) ($this->data['param_meli_client_id'] ?? '')) === '') {
                 $this->data['param_meli_client_id'] = $credentials['client_id'];
             }
             if (trim((string) ($this->data['param_meli_client_secret'] ?? '')) === '') {
                 $this->data['param_meli_client_secret'] = $credentials['client_secret'];
             }
-            $this->data['param_meli_redirect_uri'] = rtrim($hub->hubBaseUrl(), '/').'/admin/meli/oauth/callback';
+
+            $this->data['param_meli_redirect_uri'] = MeliEmpresaConfig::redirectUri($empresa);
+            if ($this->data['param_meli_redirect_uri'] === '') {
+                $this->data['param_meli_redirect_uri'] = rtrim($hub->hubBaseUrl($empresa), '/').'/admin/meli/oauth/callback';
+            }
+
             $this->persistMercadoLivreAppCredentials($empresa);
             $empresa->refresh();
 
@@ -84,7 +87,6 @@ trait ManagesEmpresaMercadoLivreVinculo
             return;
         }
 
-        // ERP do cliente (sem site): pareamento no hub Unitec.
         if ($hub->isLocalBrowser()) {
             Notification::make()
                 ->title('Mercado Livre')
@@ -248,7 +250,6 @@ trait ManagesEmpresaMercadoLivreVinculo
             return;
         }
 
-        $this->hydrateMercadoLivreCredentialsFromEnv();
         $empresa->refresh();
 
         $token = app(MeliApiClient::class)->accessTokenForEmpresa($empresa);
@@ -320,10 +321,6 @@ trait ManagesEmpresaMercadoLivreVinculo
                 'param_meli_modo' => $modo,
             ]);
         }
-
-        if ($modo === 'hub') {
-            $this->hydrateMercadoLivreCredentialsFromEnv();
-        }
     }
 
     public function mercadoLivreModoAtual(): string
@@ -370,94 +367,22 @@ trait ManagesEmpresaMercadoLivreVinculo
         }
 
         $this->persistMercadoLivreFields($empresa, $fields);
-
-        MeliEnvCredentials::writeToEnv([
-            'client_id' => $fields['param_meli_client_id'],
-            'client_secret' => $fields['param_meli_client_secret'],
-            'redirect_uri' => $fields['param_meli_redirect_uri'],
-            'is_hub' => filter_var($this->data['meli_env_is_hub'] ?? config('meli.is_hub'), FILTER_VALIDATE_BOOL),
-            'app_url' => rtrim(trim((string) ($this->data['meli_env_app_url'] ?? config('app.url'))), '/'),
-            'hub_url' => rtrim(trim((string) ($this->data['meli_env_hub_url'] ?? config('meli.hub_url'))), '/'),
-        ]);
     }
 
-    protected function hydrateMercadoLivreCredentialsFromEnv(): void
+    protected function hydrateMercadoLivreFormDefaults(): void
     {
-        $fromEnv = MeliEnvCredentials::fromEnv();
+        $empresa = $this->resolveEmpresaRecordForMercadoLivre();
+        $defaults = MeliEmpresaConfig::formDefaults($empresa);
 
-        $map = [
-            'param_meli_client_id' => $fromEnv['client_id'],
-            'param_meli_client_secret' => $fromEnv['client_secret'],
-            'param_meli_redirect_uri' => $fromEnv['redirect_uri'],
-        ];
-
-        foreach ($map as $field => $envValue) {
-            $current = trim((string) ($this->data[$field] ?? ''));
-
-            if ($current === '' && $envValue !== '') {
-                $this->data[$field] = $envValue;
+        foreach ($defaults as $field => $value) {
+            if (! array_key_exists($field, $this->data) || blank($this->data[$field] ?? null)) {
+                $this->data[$field] = $value;
             }
         }
-
-        $this->data['meli_env_is_hub'] = $fromEnv['is_hub'];
-        $this->data['meli_env_app_url'] = $fromEnv['app_url'] !== ''
-            ? $fromEnv['app_url']
-            : 'https://unitecnologiasc.com.br';
-        $this->data['meli_env_hub_url'] = $fromEnv['hub_url'] !== ''
-            ? $fromEnv['hub_url']
-            : 'https://unitecnologiasc.com.br';
 
         if (! filled($this->data['param_meli_modo'] ?? null)) {
             $this->data['param_meli_modo'] = 'hub';
         }
-    }
-
-    public function salvarMercadoLivreAvancado(): void
-    {
-        if (! ErpAccess::currentCan('mercado_livre.config') && ! ErpAccess::currentCan('empresa.update')) {
-            Notification::make()
-                ->title('Mercado Livre')
-                ->body('Sem permissão para salvar configuração avançada.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $empresa = $this->resolveEmpresaRecordForMercadoLivre();
-
-        $payload = [
-            'client_id' => trim((string) ($this->data['param_meli_client_id'] ?? '')),
-            'client_secret' => trim((string) ($this->data['param_meli_client_secret'] ?? '')),
-            'redirect_uri' => trim((string) ($this->data['param_meli_redirect_uri'] ?? '')),
-            'is_hub' => filter_var($this->data['meli_env_is_hub'] ?? false, FILTER_VALIDATE_BOOL),
-            'app_url' => rtrim(trim((string) ($this->data['meli_env_app_url'] ?? '')), '/'),
-            'hub_url' => rtrim(trim((string) ($this->data['meli_env_hub_url'] ?? '')), '/'),
-        ];
-
-        if ($payload['redirect_uri'] === '' && $payload['app_url'] !== '') {
-            $payload['redirect_uri'] = $payload['app_url'].'/admin/meli/oauth/callback';
-            $this->data['param_meli_redirect_uri'] = $payload['redirect_uri'];
-        }
-
-        if ($empresa) {
-            $this->persistMercadoLivreFields($empresa, [
-                'param_meli_modo' => 'hub',
-                'param_meli_client_id' => $payload['client_id'],
-                'param_meli_client_secret' => $payload['client_secret'],
-                'param_meli_redirect_uri' => $payload['redirect_uri'],
-            ]);
-        }
-
-        $ok = MeliEnvCredentials::writeToEnv($payload);
-
-        Notification::make()
-            ->title('Mercado Livre')
-            ->body($ok
-                ? 'Configuração avançada salva no .env (APP_URL, MELI_IS_HUB, credenciais).'
-                : 'Não foi possível gravar o .env (permissão de arquivo). Valores da empresa foram salvos.')
-            ->{$ok ? 'success' : 'warning'}()
-            ->send();
     }
 
     protected function sanitizeMercadoLivreLocalRedirectUri(): void
@@ -474,17 +399,18 @@ trait ManagesEmpresaMercadoLivreVinculo
             return;
         }
 
-        $fromEnv = trim((string) (MeliEnvCredentials::fromEnv()['redirect_uri'] ?? ''));
-        $envHost = strtolower((string) (parse_url($fromEnv, PHP_URL_HOST) ?? ''));
+        $empresa = $this->resolveEmpresaRecordForMercadoLivre();
+        $replacement = MeliEmpresaConfig::redirectUri($empresa);
+        $replacementHost = strtolower((string) (parse_url($replacement, PHP_URL_HOST) ?: ''));
 
-        if ($fromEnv !== '' && ! in_array($envHost, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->data['param_meli_redirect_uri'] = $fromEnv;
+        if ($replacement !== '' && ! in_array($replacementHost, ['127.0.0.1', 'localhost', '::1'], true)) {
+            $this->data['param_meli_redirect_uri'] = $replacement;
         } else {
             $this->data['param_meli_redirect_uri'] = '';
         }
 
-        if ($this->record instanceof Empresa && filled($this->record->getKey())) {
-            $this->persistMercadoLivreFields($this->record, [
+        if ($empresa instanceof Empresa && filled($empresa->getKey())) {
+            $this->persistMercadoLivreFields($empresa, [
                 'param_meli_redirect_uri' => (string) ($this->data['param_meli_redirect_uri'] ?? ''),
             ]);
         }

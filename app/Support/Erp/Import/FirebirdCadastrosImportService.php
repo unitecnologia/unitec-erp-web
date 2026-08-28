@@ -456,8 +456,7 @@ class FirebirdCadastrosImportService
                 $payload = [
                     'name' => $login,
                     'empresa_id' => $empresaId,
-                    'is_admin' => $this->snToBool($row['USU_MASTER'] ?? 'N') || $this->snToBool($row['SUPERVISOR'] ?? 'N'),
-                    'is_supervisor' => $this->snToBool($row['SUPERVISOR'] ?? 'N'),
+                    'is_admin' => $this->snToBool($row['USU_MASTER'] ?? 'N'),
                     'ativo' => $this->snToBool($row['ATIVO'] ?? 'S'),
                     'vendedor_id' => $vendedorId,
                 ];
@@ -671,7 +670,6 @@ class FirebirdCadastrosImportService
                     'usar_numero_inicial' => $this->snToBool($row['USAR_NUMERO_INICIAL'] ?? 'N'),
                     'tipo_impressora' => trim((string) ($row['TIPOIMPRESSORA'] ?? '0')) ?: '0',
                     'tipo_fechamento' => trim((string) ($row['TIPOFECHAMENTO'] ?? '')) ?: null,
-                    'meia_folha' => $this->snToBool($row['MEIAFOLHA'] ?? 'N'),
                     'pagina_codigo' => trim((string) ($row['PAGINA_CODIGO'] ?? '')) ?: null,
                     'margem_superior' => BrDecimalImport::parse($row['MARGEM_SUPERIOR'] ?? null),
                     'margem_inferior' => BrDecimalImport::parse($row['MARGEM_INFERIOR'] ?? null),
@@ -689,9 +687,6 @@ class FirebirdCadastrosImportService
                     'qtd_tentativa_conect_bal' => filled($row['QTD_TENTATIVA_CONECT_BAL'] ?? null)
                         ? (int) $row['QTD_TENTATIVA_CONECT_BAL']
                         : null,
-                    'caminho_sat_dll' => trim((string) ($row['CAMINHO_SAT_DLL'] ?? '')) ?: null,
-                    'modelo_sat_dll' => trim((string) ($row['MODELO_SAT_DLL'] ?? '')) ?: null,
-                    'tipo_sat_dll' => trim((string) ($row['TIPO_SAT_DLL'] ?? '')) ?: null,
                     'modelo_tef' => filled($row['MODELO_TEF'] ?? null) ? (int) $row['MODELO_TEF'] : null,
                     'tef_gerenciador' => filled($row['TEF_GERENCIADOR'] ?? null) ? (int) $row['TEF_GERENCIADOR'] : null,
                     'ip_servidor_tef' => trim((string) ($row['IP_SERVIDOR_TEF'] ?? '')) ?: null,

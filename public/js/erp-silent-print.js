@@ -116,7 +116,7 @@
                 return;
             }
             if (result && result.reason === 'offline') {
-                notify('Device Service offline na bandeja. Abrindo impressão do Windows.');
+                notify('Device Service (serviço local) offline. Abrindo impressão do Windows.');
             } else {
                 notify('Não foi possível imprimir silencioso. Abrindo impressão do Windows.');
             }

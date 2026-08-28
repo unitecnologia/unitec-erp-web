@@ -91,13 +91,17 @@ class Empresa extends Model
         }
 
         foreach ([
+            ...EmpresaParametros::moduleEnableFields(),
             ...EmpresaParametros::difalBooleanFields(),
             ...EmpresaParametros::pixBooleanFields(),
             ...EmpresaParametros::boletoBooleanFields(),
             ...EmpresaParametros::apiServicosBooleanFields(),
+            ...EmpresaParametros::acessoRemotoBooleanFields(),
+            ...EmpresaParametros::licencaApiBooleanFields(),
             ...EmpresaParametros::whatsAppBooleanFields(),
             ...EmpresaParametros::portalContadorBooleanFields(),
             ...EmpresaParametros::mercadoLivreBooleanFields(),
+            ...EmpresaParametros::ifoodBooleanFields(),
             ...EmpresaParametros::sistemaBooleanFields(),
             ...EmpresaParametros::expedicaoBooleanFields(),
         ] as $field => $meta) {
@@ -105,6 +109,7 @@ class Empresa extends Model
         }
 
         $casts['param_api_servicos_timeout'] = 'integer';
+        $casts['param_licenca_api_timeout'] = 'integer';
         $casts['param_whatsapp_timeout'] = 'integer';
         $casts['param_whatsapp_gateway_port'] = 'integer';
         $casts['param_whatsapp_limite_dia'] = 'integer';

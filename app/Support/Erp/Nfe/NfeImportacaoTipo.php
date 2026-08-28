@@ -25,7 +25,7 @@ final class NfeImportacaoTipo
     {
         return [
             ['tipo' => self::VENDA, 'label' => 'Pedido', 'hotkey' => 'F2', 'implemented' => true],
-            ['tipo' => self::DEV_COMPRA, 'label' => 'Dev. Compra', 'hotkey' => 'F3', 'implemented' => false],
+            ['tipo' => self::DEV_COMPRA, 'label' => 'Dev. Compra', 'hotkey' => 'F3', 'implemented' => true],
             ['tipo' => self::DEV_VENDA, 'label' => 'Dev. Venda', 'hotkey' => 'F4', 'implemented' => false],
             ['tipo' => self::OS, 'label' => 'O. S.', 'hotkey' => 'F5', 'implemented' => false],
             ['tipo' => self::NFCE, 'label' => 'NFCe', 'hotkey' => 'F6', 'implemented' => true],

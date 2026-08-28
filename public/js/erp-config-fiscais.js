@@ -78,7 +78,30 @@ function bindErpConfigFiscaisKeys() {
 
         if (event.key === 'F2') {
             event.preventDefault();
-            component.call('saveConfig');
+
+            // Blur do campo ativo para flush de wire:model.blur / commit do valor digitado.
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+
+            // Preferir o botão wire:click para o Livewire sincronizar wire:model
+            // deferred (ex.: ID Token / série) antes de gravar.
+            const saveBtn = document.querySelector(
+                '.erp-config-fiscais-page [wire\\:click="saveConfig"], .erp-config-fiscais-page [wire\\:click=\'saveConfig\']'
+            );
+
+            if (saveBtn instanceof HTMLElement) {
+                saveBtn.click();
+
+                return;
+            }
+
+            const wire = component;
+            if (typeof wire?.$commit === 'function') {
+                wire.$commit().then(() => wire.call('saveConfig'));
+            } else {
+                wire.call('saveConfig');
+            }
 
             return;
         }

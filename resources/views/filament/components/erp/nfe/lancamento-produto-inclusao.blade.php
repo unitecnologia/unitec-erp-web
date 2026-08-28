@@ -96,7 +96,7 @@
                     <button
                         type="button"
                         class="erp-nfe-inclusao__btn-pct"
-                        wire:click="abrirNfeModalDescontoItem"
+                        wire:click="abrirNfeModalDescontoItem('form')"
                         title="Desconto / Acréscimo (Ctrl+D)"
                     >
                         %

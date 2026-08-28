@@ -211,12 +211,12 @@ window.ErpMasks = {
 
         if (digits.length <= 10) {
             return digits
-                .replace(/^(\d{2})(\d)/, '($1) $2')
+                .replace(/^(\d{2})(\d)/, '($1)$2')
                 .replace(/(\d{4})(\d{1,4})$/, '$1-$2');
         }
 
         return digits
-            .replace(/^(\d{2})(\d)/, '($1) $2')
+            .replace(/^(\d{2})(\d)/, '($1)$2')
             .replace(/(\d{5})(\d{1,4})$/, '$1-$2');
     },
 
@@ -677,12 +677,28 @@ window.ErpMasks = {
 
             input.value = this.finalizeMaskValue(input);
             this.apply(input, { thousands: this.isBrDecimalMask(input.dataset.mask) });
+        } else if (input.dataset.mask === 'mobile-phone' || input.dataset.mask === 'phone') {
+            const field = this.getWireField(input);
+            const component = field ? this.getLivewireComponent(input) : null;
+            const wireValue = component ? this.readWireValue(component, field) : '';
+
+            if (wireValue !== '' && input.value === '') {
+                input.value = wireValue;
+            }
+
+            if (input.dataset.mask === 'mobile-phone') {
+                input.setAttribute('maxlength', '14');
+            }
+
+            if (input.value !== '') {
+                this.apply(input, { allowEmptySync: true });
+            }
         } else if (input.value) {
             this.apply(input);
         }
 
-        if (input.dataset.mask === 'mobile-phone') {
-            input.setAttribute('maxlength', '16');
+        if (input.dataset.mask === 'mobile-phone' && ! input.hasAttribute('maxlength')) {
+            input.setAttribute('maxlength', '14');
         }
     },
 
@@ -742,7 +758,13 @@ window.ErpMasks = {
 
             if (input.dataset.erpMaskBound !== '1') {
                 this.bindInput(input);
-            } else if (input.value || this.isBrDecimalMask(input.dataset.mask) || input.dataset.mask === 'integer') {
+            } else if (
+                input.value
+                || this.isBrDecimalMask(input.dataset.mask)
+                || input.dataset.mask === 'integer'
+                || input.dataset.mask === 'mobile-phone'
+                || input.dataset.mask === 'phone'
+            ) {
                 if (this.isBrDecimalMask(input.dataset.mask) || input.dataset.mask === 'integer') {
                     input.value = this.finalizeMaskValue(input);
                 }
@@ -762,4 +784,35 @@ window.ErpMasks = {
 
 function initErpMasks(root) {
     window.ErpMasks.init(root);
+}
+
+function bootErpMasks(root = document) {
+    if (! window.ErpMasks) {
+        return;
+    }
+
+    window.ErpMasks.init(root ?? document);
+}
+
+document.addEventListener('DOMContentLoaded', () => bootErpMasks(document));
+document.addEventListener('livewire:navigated', () => bootErpMasks(document));
+
+document.addEventListener('livewire:init', () => {
+    bootErpMasks(document);
+
+    window.Livewire.on('erp-masks-refresh', () => bootErpMasks(document));
+
+    window.Livewire.hook('morph.updated', ({ el }) => {
+        if (! (el instanceof HTMLElement)) {
+            bootErpMasks(document);
+
+            return;
+        }
+
+        bootErpMasks(el);
+    });
+});
+
+if (document.readyState !== 'loading') {
+    bootErpMasks(document);
 }

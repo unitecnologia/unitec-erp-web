@@ -52,7 +52,8 @@ class EnsureEmpresaSelecionada
 
     private function isAllowed(Request $request): bool
     {
-        if ($request->routeIs('filament.admin.auth.logout')) {
+        if ($request->routeIs('filament.admin.auth.logout')
+            || $request->routeIs('filament.gestor.auth.logout')) {
             return true;
         }
 
@@ -60,6 +61,7 @@ class EnsureEmpresaSelecionada
 
         return $path === 'admin/empresas/create'
             || str_starts_with($path, 'livewire/')
-            || str_starts_with($path, 'admin/livewire');
+            || str_starts_with($path, 'admin/livewire')
+            || str_starts_with($path, 'gestor/livewire');
     }
 }

@@ -40,6 +40,43 @@ function Get-UnitecDefaultDbPassword {
     return $script:UnitecDefaultDbPassword
 }
 
+<#
+.SYNOPSIS
+    TEMP seguro para instalacao (evita caminho 8.3 quebrado tipo C:\Users\XXX~1).
+    Expand-Archive e redirecoes usam $env:TEMP por baixo — precisa apontar para pasta fixa.
+#>
+function Initialize-UnitecSafeTempEnvironment {
+    param([string]$AppPath = '')
+
+    if ([string]::IsNullOrWhiteSpace($AppPath)) {
+        $AppPath = $script:UnitecDefaultAppPath
+    } else {
+        $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    }
+
+    $safeTemp = Join-Path $AppPath 'tools\_tmp'
+    New-Item -ItemType Directory -Path $safeTemp -Force | Out-Null
+    $safeTemp = (Get-Item -LiteralPath $safeTemp).FullName
+
+    $env:TEMP = $safeTemp
+    $env:TMP = $safeTemp
+
+    return $safeTemp
+}
+
+function New-UnitecInstallTempDir {
+    param(
+        [string]$AppPath = '',
+        [string]$Prefix = 'unitec'
+    )
+
+    $root = Initialize-UnitecSafeTempEnvironment -AppPath $AppPath
+    $dir = Join-Path $root ("{0}-{1}" -f $Prefix, [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+
+    return (Get-Item -LiteralPath $dir).FullName
+}
+
 function Get-UnitecDefaultDatabaseSettings {
     return @{
         DbHost     = '127.0.0.1'
@@ -219,7 +256,9 @@ character-set-server=utf8mb4
 collation-server=utf8mb4_unicode_ci
 innodb_buffer_pool_size=256M
 innodb_log_buffer_size=8M
-max_connections=50
+max_connections=200
+wait_timeout=120
+interactive_timeout=120
 key_buffer_size=8M
 "@
 
@@ -318,11 +357,9 @@ function Install-UnitecMysqlFromZip {
     Stop-UnitecEmbeddedMysql -AppPath $AppPath
     Remove-UnitecRuntimeDirectory -Path $targetRoot -AppPath $AppPath
 
-    $tempDir = Join-Path $env:TEMP ("unitec-mysql-{0}" -f [Guid]::NewGuid().ToString('N'))
-    Ensure-Directory $tempDir
-
+    $tempDir = New-UnitecInstallTempDir -AppPath $AppPath -Prefix 'mysql-extract'
     try {
-        Expand-Archive -Path $ZipPath -DestinationPath $tempDir -Force
+        Expand-Archive -LiteralPath $ZipPath -DestinationPath $tempDir -Force
 
         $extracted = Get-ChildItem $tempDir -Directory -ErrorAction SilentlyContinue |
             Where-Object { Test-Path (Join-Path $_.FullName 'bin\mysqld.exe') } |
@@ -349,7 +386,7 @@ Verifique installer\assets\mariadb-win.zip (deve ser o ZIP winx64 oficial).
 
         Write-Ok 'MariaDB instalado em tools\mysql.'
     } finally {
-        Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -374,11 +411,9 @@ function Install-UnitecPhpFromZip {
 
     Ensure-Directory $phpRoot
 
-    $tempDir = Join-Path $env:TEMP ('unitec-php-' + [Guid]::NewGuid().ToString('N'))
-    Ensure-Directory $tempDir
-
+    $tempDir = New-UnitecInstallTempDir -AppPath $AppPath -Prefix 'php-extract'
     try {
-        Expand-Archive -Path $ZipPath -DestinationPath $tempDir -Force
+        Expand-Archive -LiteralPath $ZipPath -DestinationPath $tempDir -Force
 
         if (Test-Path (Join-Path $tempDir 'php.exe')) {
             Get-ChildItem $tempDir -Force | Move-Item -Destination $phpRoot -Force
@@ -394,7 +429,7 @@ function Install-UnitecPhpFromZip {
         Write-Ok 'PHP instalado em tools\php.'
         return $phpRoot
     } finally {
-        Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -507,6 +542,24 @@ function Update-UnitecMysqlIniPerformance {
         $updated = $updated.TrimEnd() + [Environment]::NewLine + 'innodb_buffer_pool_size=256M' + [Environment]::NewLine
     }
 
+    if ($updated -match '(?m)^max_connections\s*=') {
+        $updated = $updated -replace '(?m)^max_connections\s*=\s*\d+\s*$', 'max_connections=200'
+    } else {
+        $updated = $updated.TrimEnd() + [Environment]::NewLine + 'max_connections=200' + [Environment]::NewLine
+    }
+
+    if ($updated -match '(?m)^wait_timeout\s*=') {
+        $updated = $updated -replace '(?m)^wait_timeout\s*=\s*\d+\s*$', 'wait_timeout=120'
+    } else {
+        $updated = $updated.TrimEnd() + [Environment]::NewLine + 'wait_timeout=120' + [Environment]::NewLine
+    }
+
+    if ($updated -match '(?m)^interactive_timeout\s*=') {
+        $updated = $updated -replace '(?m)^interactive_timeout\s*=\s*\d+\s*$', 'interactive_timeout=120'
+    } else {
+        $updated = $updated.TrimEnd() + [Environment]::NewLine + 'interactive_timeout=120' + [Environment]::NewLine
+    }
+
     if ($updated -eq $content) {
         return $false
     }
@@ -515,15 +568,105 @@ function Update-UnitecMysqlIniPerformance {
     return $true
 }
 
-function Register-UnitecMariaDbFirewallRule {
-    $ruleName = 'Unitec ERP MariaDB (porta 3306)'
-    $existing = & netsh advfirewall firewall show rule name="$ruleName" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        return
+function Test-UnitecIsAdministrator {
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+        return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch {
+        return $false
+    }
+}
+
+function Get-UnitecLanIPv4Address {
+    try {
+        $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.IPAddress -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and
+                $_.PrefixOrigin -ne 'WellKnown'
+            } |
+            Sort-Object -Property InterfaceMetric, IPAddress |
+            Select-Object -First 1 -ExpandProperty IPAddress
+
+        if (-not [string]::IsNullOrWhiteSpace($ip)) {
+            return [string]$ip
+        }
+    } catch {}
+
+    try {
+        $ip = (Get-CimInstance Win32_NetworkAdapterConfiguration -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPEnabled -and $_.IPAddress } |
+            ForEach-Object { $_.IPAddress } |
+            Where-Object { $_ -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' } |
+            Select-Object -First 1)
+
+        if (-not [string]::IsNullOrWhiteSpace($ip)) {
+            return [string]$ip
+        }
+    } catch {}
+
+    return $null
+}
+
+function Ensure-UnitecFirewallTcpRule {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuleName,
+        [Parameter(Mandatory = $true)][int]$Port,
+        [string]$Description = '',
+        [switch]$Quiet
+    )
+
+    if ($Port -lt 1 -or $Port -gt 65535) {
+        throw "Porta invalida para firewall: $Port"
     }
 
-    & netsh advfirewall firewall add rule name="$ruleName" dir=in action=allow protocol=TCP localport=3306 | Out-Null
-    Write-Ok 'Regra de firewall MariaDB (3306) configurada.'
+    if (-not (Test-UnitecIsAdministrator)) {
+        if (-not $Quiet) {
+            Write-Warn ("Nao foi possivel liberar a porta {0} no firewall (rode o instalador como Administrador)." -f $Port)
+        }
+        return $false
+    }
+
+    $null = & netsh advfirewall firewall delete rule name="$RuleName" 2>$null
+
+    $args = @(
+        'advfirewall', 'firewall', 'add', 'rule',
+        "name=$RuleName",
+        'dir=in',
+        'action=allow',
+        'protocol=TCP',
+        "localport=$Port",
+        'profile=any',
+        'enable=yes'
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Description)) {
+        $args += "description=$Description"
+    }
+
+    & netsh @args | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        if (-not $Quiet) {
+            Write-Warn ("Falha ao liberar a porta {0} no firewall do Windows." -f $Port)
+        }
+        return $false
+    }
+
+    if (-not $Quiet) {
+        Write-Ok ("Firewall: porta {0} liberada para a rede local ({1})." -f $Port, $RuleName)
+    }
+    return $true
+}
+
+function Register-UnitecMariaDbFirewallRule {
+    param([switch]$Quiet)
+
+    Ensure-UnitecFirewallTcpRule `
+        -RuleName 'Unitec ERP MariaDB (porta 3306)' `
+        -Port 3306 `
+        -Description 'Permite terminais/acesso remoto ao MariaDB do Unitec ERP.' `
+        -Quiet:$Quiet | Out-Null
 }
 
 function Initialize-UnitecNetworkDatabaseServer {
@@ -1244,16 +1387,135 @@ function Get-UnitecServePidFilePath {
     return Join-Path $AppPath $script:UnitecServePidFileName
 }
 
+function Stop-UnitecProcessTree {
+    param(
+        [Parameter(Mandatory = $true)][int]$ProcessId
+    )
+
+    if ($ProcessId -le 0) {
+        return $false
+    }
+
+    # NUNCA usar "& taskkill.exe ... 2>$null" com $ErrorActionPreference = 'Stop':
+    # no Windows PT-BR o stderr vira erro terminante
+    # ("ERRO: o processo '123' nao foi encontrado.") e aborta o instalador.
+    try {
+        if ($null -eq (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+            return $false
+        }
+    } catch {
+        return $false
+    }
+
+    try {
+        Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+    } catch {}
+
+    Start-Sleep -Milliseconds 120
+
+    if ($null -eq (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+        return $true
+    }
+
+    try {
+        $taskkill = Start-Process -FilePath 'taskkill.exe' `
+            -ArgumentList @('/F', '/T', '/PID', "$ProcessId") `
+            -Wait -PassThru -NoNewWindow -WindowStyle Hidden -ErrorAction SilentlyContinue
+
+        return ($null -ne $taskkill -and [int]$taskkill.ExitCode -eq 0)
+    } catch {
+        return $false
+    }
+}
+
 function Stop-UnitecApplicationServer {
     param([string]$AppPath)
 
-    $pidFile = Get-UnitecServePidFilePath -AppPath $AppPath
-    if (Test-Path $pidFile) {
-        $raw = (Get-Content $pidFile -Raw -ErrorAction SilentlyContinue)
-        if ($raw -match '(\d+)') {
-            Stop-Process -Id ([int]$matches[1]) -Force -ErrorAction SilentlyContinue
+    try {
+        $AppPath = Resolve-UnitecAppPath -Path $AppPath
+        $appPathNorm = $AppPath.TrimEnd('\')
+        $killed = @{}
+
+        $pidFile = Get-UnitecServePidFilePath -AppPath $AppPath
+        if (Test-Path $pidFile) {
+            $raw = (Get-Content $pidFile -Raw -ErrorAction SilentlyContinue)
+            if ($raw -match '(\d+)') {
+                $procId = [int]$Matches[1]
+                Stop-UnitecProcessTree -ProcessId $procId | Out-Null
+                $killed[$procId] = $true
+            }
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
         }
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+
+        # Sem .unitec-serve.pid o PHP antigo fica zumbi com OPcache em memoria
+        # (update "conclui" mas a tela continua na versao velha). Mata pelo path/porta.
+        $port = [int]$script:UnitecServePort
+        try {
+            $envUrl = Get-UnitecEnvValue -AppPath $AppPath -Key 'APP_URL'
+            if ($envUrl -match ':(\d+)') {
+                $port = [int]$Matches[1]
+            }
+        } catch {}
+
+        # 1) Mata pelo CommandLine (artisan serve / php -S).
+        Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+            $cmd = [string]$_.CommandLine
+            if ([string]::IsNullOrWhiteSpace($cmd)) {
+                return
+            }
+
+            $matchPath = $cmd.IndexOf($appPathNorm, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+            $matchPort = ($cmd -match ("(?i)(-S\s+\S+:{0}\b|--port={0}\b)" -f $port))
+
+            if ($matchPath -or $matchPort) {
+                $procId = [int]$_.ProcessId
+                if (-not $killed.ContainsKey($procId)) {
+                    Stop-UnitecProcessTree -ProcessId $procId | Out-Null
+                    $killed[$procId] = $true
+                }
+            }
+        }
+
+        # 2) Mata o que ainda segura a porta (LISTEN / ESTABLISHED) — cobre PID sem CommandLine.
+        try {
+            $portPids = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty OwningProcess -Unique |
+                Where-Object { $_ -and $_ -gt 0 }
+
+            foreach ($procId in $portPids) {
+                if (-not $killed.ContainsKey([int]$procId)) {
+                    Stop-UnitecProcessTree -ProcessId ([int]$procId) | Out-Null
+                    $killed[[int]$procId] = $true
+                }
+            }
+        } catch {}
+
+        # Aguarda a porta liberar de verdade (evita subir 2 listeners / zumbi).
+        $deadline = (Get-Date).AddSeconds(8)
+        while ((Get-Date) -lt $deadline) {
+            $stillListen = $false
+            try {
+                $stillListen = [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+            } catch {}
+
+            if (-not $stillListen) {
+                break
+            }
+
+            try {
+                Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty OwningProcess -Unique |
+                    ForEach-Object {
+                        Stop-UnitecProcessTree -ProcessId ([int]$_) | Out-Null
+                    }
+            } catch {}
+
+            Start-Sleep -Milliseconds 400
+        }
+
+        Start-Sleep -Milliseconds 300
+    } catch {
+        # Encerrar servidor antigo nunca deve abortar instalacao/abertura.
     }
 }
 
@@ -1307,10 +1569,14 @@ function Start-UnitecApplicationServer {
         [switch]$Restart
     )
 
+    # Se estiver como Administrador, reforça a liberacao da porta web para estacoes.
+    Register-UnitecFirewallRule -Quiet
+
     if ($Restart) {
         Stop-UnitecApplicationServer -AppPath $AppPath
     }
 
+    # Porta LISTEN com HTTP morto = zumbi. Nao "retorna ok" — forca kill + sobe de novo.
     if (Test-UnitecApplicationServerRunning -AppPath $AppPath) {
         Write-Ok ('Unitec ERP ja esta ativo em {0}' -f (Get-UnitecDefaultAppUrl))
         return $true
@@ -1324,6 +1590,8 @@ function Start-UnitecApplicationServer {
 
     Ensure-UnitecStorageStructure -AppPath $AppPath
     Initialize-UnitecRuntimePath -AppPath $AppPath
+    Ensure-UnitecPhpIniForWindowsDev -AppPath $AppPath | Out-Null
+    $null = Sync-UnitecEnvPerformanceSettings -AppPath $AppPath
 
     Push-Location $AppPath
     try {
@@ -1336,9 +1604,21 @@ function Start-UnitecApplicationServer {
 
         $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
 
-        # Habilita multiplos workers no servidor embutido do PHP para suportar
-        # acessos simultaneos (terminais + app ForÃ§a de Vendas).
-        $env:PHP_CLI_SERVER_WORKERS = "$($script:UnitecServeWorkers)"
+        # Workers: .env > padrao do script. Filament dispara varios pedidos em paralelo.
+        $workers = [string]$script:UnitecServeWorkers
+        $envFile = Join-Path $AppPath '.env'
+        if (Test-Path $envFile) {
+            $envRaw = Get-Content $envFile -Raw
+            if ($envRaw -match '(?m)^\s*PHP_CLI_SERVER_WORKERS\s*=\s*(\d+)') {
+                $workers = $Matches[1]
+            }
+        }
+        if ([int]$workers -lt 1) {
+            $workers = '8'
+        }
+
+        $env:PHP_CLI_SERVER_WORKERS = $workers
+        Write-Host ("PHP_CLI_SERVER_WORKERS={0}" -f $workers) -ForegroundColor DarkGray
 
         $proc = Start-Process -FilePath $phpExe -ArgumentList @(
             'artisan', 'serve',
@@ -1356,10 +1636,69 @@ function Start-UnitecApplicationServer {
             throw 'O Unitec ERP nao iniciou a tempo. Consulte instalacao.log'
         }
 
+        # Primeiro clique do usuario nao deve "pagar" a compilacao do OPcache.
+        Warm-UnitecApplicationCache -AppPath $AppPath
+
         Write-Ok ('Unitec ERP ativo em {0}' -f (Get-UnitecDefaultAppUrl))
         return $true
     } finally {
         Pop-Location
+    }
+}
+
+function Warm-UnitecApplicationCache {
+    param(
+        [string]$AppPath = '',
+        [string]$AppUrl = '',
+        [int]$Hits = 4
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+        $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    }
+
+    if ([string]::IsNullOrWhiteSpace($AppUrl)) {
+        $AppUrl = Get-UnitecDefaultAppUrl
+    }
+
+    $base = $AppUrl.TrimEnd('/')
+    $urls = @(
+        "$base/api/health",
+        "$base/admin/login"
+    )
+
+    Write-Host 'Aquecendo ERP (health check + telas do menu em segundo plano)...' -ForegroundColor DarkGray
+
+    $jobs = @()
+    for ($i = 0; $i -lt [Math]::Max(2, $Hits); $i++) {
+        $url = $urls[$i % $urls.Count]
+        $jobs += Start-Job -ScriptBlock {
+            param($Target)
+            try {
+                Invoke-WebRequest -Uri $Target -UseBasicParsing -TimeoutSec 20 | Out-Null
+            } catch {
+                # login/up podem responder 302/404 — ainda aquecem o PHP
+            }
+        } -ArgumentList $url
+    }
+
+    try {
+        $null = Wait-Job -Job $jobs -Timeout 20
+    } finally {
+        $jobs | Remove-Job -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($AppPath) -and (Test-Path (Join-Path $AppPath 'artisan'))) {
+        try {
+            Initialize-UnitecRuntimePath -AppPath $AppPath
+            $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
+            Start-UnitecHiddenProcess -FilePath $phpExe -ArgumentList @(
+                'artisan', 'unitec:warm', '-q'
+            ) -WorkingDirectory $AppPath | Out-Null
+            Write-Host 'Aquecimento completo (unitec:warm) iniciado em segundo plano.' -ForegroundColor DarkGray
+        } catch {
+            Write-Warn 'Nao foi possivel iniciar unitec:warm em segundo plano (ignorado).'
+        }
     }
 }
 
@@ -1378,6 +1717,7 @@ function Wait-UnitecApplicationReady {
 
     $base = $AppUrl.TrimEnd('/')
     $probeUrls = @(
+        "$base/api/health",
         "$base/admin/login",
         "$base/admin",
         $base
@@ -1391,12 +1731,23 @@ function Wait-UnitecApplicationReady {
         foreach ($probe in $probeUrls) {
             try {
                 $response = Invoke-WebRequest -Uri $probe -UseBasicParsing -TimeoutSec 5 -MaximumRedirection 5
+                if ($probe -like '*/api/health') {
+                    if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
+                        $body = [string]$response.Content
+                        if ($body -match '"status"\s*:\s*"ok"') {
+                            return $true
+                        }
+                    }
+
+                    continue
+                }
+
                 if (Test-UnitecHttpStatusReachable -StatusCode $response.StatusCode) {
                     return $true
                 }
             } catch {
                 $webResponse = $_.Exception.Response
-                if ($null -ne $webResponse) {
+                if ($null -ne $webResponse -and $probe -notlike '*/api/health') {
                     $statusCode = [int]$webResponse.StatusCode
                     if (Test-UnitecHttpStatusReachable -StatusCode $statusCode) {
                         return $true
@@ -1420,6 +1771,7 @@ function Start-UnitecStack {
     )
 
     $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    Ensure-UnitecEnvFile -AppPath $AppPath | Out-Null
     if (Sync-UnitecEnvPerformanceSettings -AppPath $AppPath) {
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
     }
@@ -1592,10 +1944,8 @@ function Ensure-UnitecApplicationSchema {
         return
     }
 
-    if (-not $Force -and (Test-UnitecMigrationSignatureCurrent -AppPath $AppPath)) {
-        return
-    }
-
+    # Sempre aplica migrate --force (idempotente). A assinatura de arquivos sozinha
+    # nao detecta restore de dump antigo com o mesmo codigo — schema fica atras.
     Push-Location $AppPath
     try {
         Write-Host 'Criando/atualizando tabelas (migrate)...' -ForegroundColor White
@@ -1732,17 +2082,46 @@ function Stop-UnitecLeigoProgress {
 
 function Remove-LegacyUnitecDesktopShortcuts {
     $desktop = [Environment]::GetFolderPath('Desktop')
+    $commonDesktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
 
-    foreach ($name in @(
-        'INFORSYSTEM Retaguarda.lnk',
-        'INFORSYSTEM PDV.lnk',
-        'INFORSYSTEM Pre-venda.lnk',
-        'Unitec ERP.lnk'
-    )) {
-        $path = Join-Path $desktop $name
-        if (Test-Path $path) {
-            Remove-Item $path -Force -ErrorAction SilentlyContinue
+    foreach ($folder in @($desktop, $commonDesktop)) {
+        if ([string]::IsNullOrWhiteSpace($folder) -or -not (Test-Path $folder)) {
+            continue
         }
+
+        foreach ($name in @(
+            'INFORSYSTEM Retaguarda.lnk',
+            'INFORSYSTEM PDV.lnk',
+            'INFORSYSTEM Pre-venda.lnk',
+            'UNISISTEMA Retaguarda.lnk',
+            'UNISISTEMA PDV.lnk',
+            'UNISISTEMA Pre-venda.lnk',
+            'Unitec ERP.lnk',
+            'UNI SISTEMAS 3.0.lnk'
+        )) {
+            $path = Join-Path $folder $name
+            if (Test-Path $path) {
+                Remove-Item $path -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+function Get-UnitecOpenAppShortcutTarget {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+
+    # Caminho oficial: somente Unitec ERP.exe (sem PowerShell / open-unitec-app).
+    $launcher = Join-Path $AppPath 'bin\Unitec ERP.exe'
+    if (-not (Test-Path $launcher)) {
+        return $null
+    }
+
+    return @{
+        TargetPath       = $launcher
+        Arguments        = ("--app `"{0}`"" -f $AppPath)
+        WorkingDirectory = $AppPath
     }
 }
 
@@ -1750,7 +2129,12 @@ function New-UnitecLeigoWelcomeCard {
     param([string]$AppPath = $script:UnitecDefaultAppPath)
 
     $appUrl = Get-UnitecDefaultAppUrl
-    $urls = Get-UnitecAppUrls -AppUrl $appUrl
+    $lanIp = Get-UnitecLanIPv4Address
+    $lanUrl = if (-not [string]::IsNullOrWhiteSpace($lanIp)) {
+        "http://${lanIp}:$($script:UnitecServePort)/admin/login"
+    } else {
+        "http://IP-DO-SERVIDOR:$($script:UnitecServePort)/admin/login"
+    }
     $desktop = [Environment]::GetFolderPath('Desktop')
     $cardPath = Join-Path $desktop 'COMO USAR - Unitec ERP.txt'
 
@@ -1761,19 +2145,22 @@ function New-UnitecLeigoWelcomeCard {
 
 1) Para abrir o sistema
    Duplo clique no atalho "Unitec ERP" na Area de Trabalho.
+   Abre em janela de aplicativo (Chrome/Edge --app).
 
 2) Login
    Usuario: USUARIO
    Senha:  01
    (Troque a senha depois do primeiro acesso.)
 
-3) Enderecos uteis
-   Retaguarda: $($urls.Retaguarda)
-   PDV:        $($urls.Pdv)
-   Pre-venda:  $($urls.PreVenda)
+3) Endereco local
+   $appUrl/admin/login
 
-4) Se nao abrir
- - Reinicie o computador e tente de novo.
+4) Outros computadores da loja (mesma rede)
+   Use: $lanUrl
+   Exemplo: http://192.168.0.52:$($script:UnitecServePort)/admin/login
+
+5) Se nao abrir
+ - Reinicie o computador servidor e tente de novo.
  - Pasta do sistema: $AppPath
  - Suporte: https://unitecnologiasc.com.br/
 
@@ -1785,37 +2172,64 @@ function New-UnitecLeigoWelcomeCard {
 }
 
 function Register-UnitecFirewallRule {
-    $ruleName = 'Unitec ERP (porta 8765)'
-    $existing = & netsh advfirewall firewall show rule name="$ruleName" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        return
+    param(
+        [int]$Port = 0,
+        [switch]$Quiet
+    )
+
+    if ($Port -le 0) {
+        $Port = [int]$script:UnitecServePort
     }
 
-    & netsh advfirewall firewall add rule name="$ruleName" dir=in action=allow protocol=TCP localport=$script:UnitecServePort | Out-Null
-    Write-Ok 'Regra de firewall configurada.'
+    Ensure-UnitecFirewallTcpRule `
+        -RuleName ("Unitec ERP (porta {0})" -f $Port) `
+        -Port $Port `
+        -Description 'Permite acesso do ERP pelas estacoes e pelo app Forca de Vendas na rede local.' `
+        -Quiet:$Quiet | Out-Null
+}
+
+function Register-UnitecNetworkFirewallRules {
+    param(
+        [int]$WebPort = 0,
+        [switch]$IncludeMariaDb
+    )
+
+    if ($WebPort -le 0) {
+        $WebPort = [int]$script:UnitecServePort
+    }
+
+    Register-UnitecFirewallRule -Port $WebPort
+
+    if ($IncludeMariaDb) {
+        Register-UnitecMariaDbFirewallRule
+    }
+
+    $lanIp = Get-UnitecLanIPv4Address
+    if (-not [string]::IsNullOrWhiteSpace($lanIp)) {
+        Write-Ok ("Estacoes na rede: http://{0}:{1}/admin/login" -f $lanIp, $WebPort)
+    }
+}
+
+function Unregister-UnitecLogonStartup {
+    param([string]$AppPath = $script:UnitecDefaultAppPath)
+
+    $taskName = 'UnitecERP_IniciarComWindows'
+    try {
+        $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($null -ne $existing) {
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
+            Write-Ok 'Tarefa legada de logon (UnitecERP_IniciarComWindows) removida — use o servico UnitecErpServer.'
+        }
+    } catch {
+        Write-Warn 'Nao foi possivel remover tarefa de logon legada (ignorado).'
+    }
 }
 
 function Register-UnitecLogonStartup {
     param([string]$AppPath = $script:UnitecDefaultAppPath)
 
-    $taskName = 'UnitecERP_IniciarComWindows'
-    $scriptPath = Join-Path $AppPath 'scripts\start-unitec-background.ps1'
-
-    if (-not (Test-Path $scriptPath)) {
-        return
-    }
-
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -AppPath `"$AppPath`"" -WorkingDirectory $AppPath
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-
-    try {
-        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
-        Write-Ok 'Sistema configurado para iniciar com o Windows.'
-    } catch {
-        Write-Warn 'Nao foi possivel criar tarefa de inicio automatico (ignorado).'
-    }
+    # Legado desativado: auto-start oficial e o servico Windows UnitecErpServer (Automatic).
+    Unregister-UnitecLogonStartup -AppPath $AppPath
 }
 
 function Resolve-UnitecAppIconPath {
@@ -1861,9 +2275,9 @@ function New-UnitecDesktopShortcuts {
     $AppPath = Resolve-UnitecAppPath -Path $AppPath
     Remove-LegacyUnitecDesktopShortcuts
 
-    $launcher = Join-Path $AppPath 'Unitec ERP.bat'
-    if (-not (Test-Path $launcher)) {
-        Write-Warn 'Unitec ERP.bat nao encontrado - atalho nao criado.'
+    $target = Get-UnitecOpenAppShortcutTarget -AppPath $AppPath
+    if ($null -eq $target) {
+        Write-Warn 'bin\Unitec ERP.exe nao encontrado - atalho nao criado. Rode scripts\build-erp-desktop.ps1.'
         return
     }
 
@@ -1871,13 +2285,15 @@ function New-UnitecDesktopShortcuts {
     $shell = New-Object -ComObject WScript.Shell
     $lnkPath = Join-Path $desktop 'Unitec ERP.lnk'
     $shortcut = $shell.CreateShortcut($lnkPath)
-    $shortcut.TargetPath = $launcher
-    $shortcut.WorkingDirectory = $AppPath
-    $shortcut.Description = 'Abrir Unitec ERP'
+    $shortcut.TargetPath = $target.TargetPath
+    $shortcut.Arguments = $target.Arguments
+    $shortcut.WorkingDirectory = $target.WorkingDirectory
+    $shortcut.WindowStyle = 7
+    $shortcut.Description = 'Abrir Unitec ERP (aplicativo)'
     Set-UnitecShortcutIcon -Shortcut $shortcut -AppPath $AppPath
     $shortcut.Save()
 
-    Write-Ok 'Atalho "Unitec ERP" criado na Area de Trabalho.'
+    Write-Ok 'Atalho "Unitec ERP" criado na Area de Trabalho (janela Chrome/Edge --app).'
     New-UnitecLeigoWelcomeCard -AppPath $AppPath
 }
 
@@ -2080,7 +2496,10 @@ function Copy-UnitecProjectTree {
         [string]$TargetRoot,
         [switch]$Quiet,
         [switch]$UpdateMode,
-        [switch]$ExcludeTools
+        [switch]$ExcludeTools,
+        # Update rotineiro: nao embute dist self-contained (~170 MB).
+        # Use -IncludeDeviceService quando o EXE da balanca/impressao mudar.
+        [switch]$IncludeDeviceService
     )
 
     $sourceFull = [System.IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
@@ -2111,14 +2530,28 @@ function Copy-UnitecProjectTree {
 
     if ($UpdateMode) {
         # Pacote de atualizacao: cliente ja tem runtime (tools/) e instalador.
-        # Nao embutir dezenas/centenas de MB desnecessarios no ZIP.
+        # bin/ contem o servico Windows em execucao e nao pode ser substituido
+        # pelo apply do login. Atualizacao do bin e feita separadamente.
         $excludeDirs += @(
+            'bin',
             'storage',
             'installer',
             'tests',
             'docs',
-            'suporte'
+            'suporte',
+            'staging',
+            'atualizacao',
+            'importar',
+            'apps',
+            # Device Service: src/tests sao sujeira de build/dev.
+            'services\unitec-device-service\src',
+            'services\unitec-device-service\tests'
         )
+
+        if (-not $IncludeDeviceService) {
+            # Pacote ERP slim: cliente ja tem o Dist; nao reenviar runtime .NET a cada update.
+            $excludeDirs += 'services\unitec-device-service\dist'
+        }
     }
 
     $projectArgs = @(
@@ -2148,8 +2581,33 @@ function Copy-UnitecProjectTree {
     if ($UpdateMode) {
         $projectArgs += '/XF'
         $projectArgs += 'composer.phar'
+        $projectArgs += 'composer-setup.php'
         $projectArgs += 'vc_redist.x64.exe'
         $projectArgs += 'vc_redist.x64.exe.bak'
+        $projectArgs += 'Desenvolver.bat'
+        $projectArgs += 'dev-windows.ps1'
+        $projectArgs += 'phpunit.xml'
+        $projectArgs += '.phpunit.result.cache'
+        $projectArgs += 'instalacao.log'
+        $projectArgs += 'tmp-print-props.txt'
+        $projectArgs += '_tmp_parse_ps1.ps1'
+        $projectArgs += '*.bak'
+        $projectArgs += '_tmp_*.ps1'
+        $projectArgs += 'Gerar Instalador*.bat'
+        $projectArgs += 'Gerar Pacote*.bat'
+        $projectArgs += 'Gerar Staging*.bat'
+        $projectArgs += 'Publicar Update*.bat'
+        $projectArgs += '.env.appurl.local.bak'
+        $projectArgs += '.env*.local*'
+        # OpenSSL provider DLL fica carregada pelo PHP embutido; apply falha no Windows.
+        # Mantem o .cnf da pasta resources\ssl\openssl no pacote.
+        $projectArgs += 'legacy.dll'
+        $projectArgs += 'fips.dll'
+        $projectArgs += 'legacy.so'
+        $projectArgs += 'legacy.dylib'
+        # Emuladores de balanca (so DEV).
+        $projectArgs += 'Balanca Teste Portable.exe'
+        $projectArgs += 'Balanca TesteRS232 Full.exe'
     }
 
     if (-not $Quiet) {
@@ -2196,10 +2654,63 @@ function Copy-UnitecProjectTree {
             (Join-Path $targetFull 'vendor\bin\pint'),
             (Join-Path $targetFull 'vendor\bin\pint.bat'),
             (Join-Path $targetFull 'composer.phar'),
-            (Join-Path $targetFull 'vc_redist.x64.exe')
+            (Join-Path $targetFull 'composer-setup.php'),
+            (Join-Path $targetFull 'vc_redist.x64.exe'),
+            (Join-Path $targetFull 'Desenvolver.bat'),
+            (Join-Path $targetFull 'phpunit.xml'),
+            (Join-Path $targetFull '.phpunit.result.cache'),
+            (Join-Path $targetFull 'instalacao.log'),
+            (Join-Path $targetFull 'tmp-print-props.txt'),
+            (Join-Path $targetFull '_tmp_parse_ps1.ps1'),
+            (Join-Path $targetFull '.env.appurl.local.bak'),
+            (Join-Path $targetFull 'scripts\dev-windows.ps1'),
+            (Join-Path $targetFull 'importar')
         )) {
             if (Test-Path $extra) {
                 Remove-Item $extra -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Residuos de build/dev que nao devem ir ao cliente.
+        Get-ChildItem -Path $targetFull -File -Force -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -like '*.bak' -or
+                $_.Name -like '_tmp_*' -or
+                $_.Name -like 'Gerar Instalador*.bat' -or
+                $_.Name -like 'Gerar Pacote*.bat' -or
+                $_.Name -like 'Gerar Staging*.bat' -or
+                $_.Name -like 'Publicar Update*.bat' -or
+                $_.Name -like '.env*.local*' -or
+                $_.Name -like 'Balanca Teste*.exe'
+            } |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+
+        # Device Service: remove src/tests (e dist, se nao foi pedido neste release).
+        $deviceDevOnly = @(
+            (Join-Path $targetFull 'services\unitec-device-service\src'),
+            (Join-Path $targetFull 'services\unitec-device-service\tests')
+        )
+        if (-not $IncludeDeviceService) {
+            $deviceDevOnly += (Join-Path $targetFull 'services\unitec-device-service\dist')
+        }
+        foreach ($devOnly in $deviceDevOnly) {
+            if (Test-Path $devOnly) {
+                Remove-Item $devOnly -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Qualquer bin/obj sob services/ (artefato de compilacao .NET).
+        $servicesRoot = Join-Path $targetFull 'services'
+        if (Test-Path $servicesRoot) {
+            Get-ChildItem -Path $servicesRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -eq 'bin' -or $_.Name -eq 'obj' } |
+                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        if ($IncludeDeviceService) {
+            $deviceDistExe = Join-Path $targetFull 'services\unitec-device-service\dist\Unitec.DeviceService.exe'
+            if (-not (Test-Path $deviceDistExe)) {
+                throw 'Pacote invalido: -IncludeDeviceService exige services\unitec-device-service\dist\Unitec.DeviceService.exe.'
             }
         }
     }
@@ -2397,11 +2908,13 @@ function Invoke-PhpExecutableTest {
         }
     }
 
-    $stderrFile = Join-Path $env:TEMP ("unitec-php-err-{0}.txt" -f [Guid]::NewGuid().ToString('N'))
+    # stderr ao lado do php.exe — evita $env:TEMP (caminho 8.3 quebrado em alguns PCs).
+    $phpDir = Split-Path -Parent $PhpExe
+    $stderrFile = Join-Path $phpDir 'unitec-php-err.txt'
     try {
         $output = & $PhpExe -r 'echo PHP_VERSION;' 2> $stderrFile
         $stderr = ''
-        if (Test-Path $stderrFile) {
+        if (Test-Path -LiteralPath $stderrFile) {
             $stderr = Get-UnitecTrimmedFileContent -Path $stderrFile
         }
 
@@ -2453,7 +2966,7 @@ function Invoke-PhpExecutableTest {
             VcRuntimeIssue = $false
         }
     } finally {
-        Remove-Item $stderrFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -2644,28 +3157,31 @@ function Test-BundledPhpRuntime {
         [switch]$AllowFix
     )
 
+    Initialize-UnitecSafeTempEnvironment -AppPath $script:UnitecDefaultAppPath | Out-Null
+
     $zipPath = Resolve-Php84ZipPath -SourceRoot $SourceRoot
-    $tempDir = Join-Path $env:TEMP ("unitec-php-test-{0}" -f [Guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+    # Caminho fixo (sem TEMP do perfil do usuario).
+    $tempDir = New-UnitecInstallTempDir -AppPath $script:UnitecDefaultAppPath -Prefix 'php-test'
 
     try {
-        Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $tempDir -Force
 
         $phpExe = Join-Path $tempDir 'php.exe'
-        if (-not (Test-Path $phpExe)) {
-            $subdir = Get-ChildItem $tempDir -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not (Test-Path -LiteralPath $phpExe)) {
+            $subdir = Get-ChildItem -LiteralPath $tempDir -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($subdir) {
                 $phpExe = Join-Path $subdir.FullName 'php.exe'
             }
         }
 
-        if (-not (Test-Path $phpExe)) {
+        if (-not (Test-Path -LiteralPath $phpExe)) {
             throw 'php.exe nao encontrado no pacote PHP 8.4 embutido.'
         }
 
         return Repair-PhpExecutableRuntime -SourceRoot $SourceRoot -PhpExe $phpExe -AllowFix:$AllowFix
     } finally {
-        Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -2675,6 +3191,8 @@ function Invoke-UnitecSystemRequirementsCheck {
         [switch]$FixVcRuntime,
         [switch]$Quiet
     )
+
+    Initialize-UnitecSafeTempEnvironment -AppPath $script:UnitecDefaultAppPath | Out-Null
 
     $results = @()
 
@@ -2811,48 +3329,6 @@ function Sync-InstallerAssetsToStaging {
             Copy-Item $source (Join-Path $targetDir $name) -Force
         }
     }
-}
-
-function Get-UnitecMegadlAssetPath {
-    param([string]$SourceRoot)
-
-    return Join-Path $SourceRoot 'installer\assets\megatools\megadl.exe'
-}
-
-function Sync-UnitecMegatoolsToStaging {
-    param(
-        [string]$ProjectRoot,
-        [string]$StagingDir
-    )
-
-    $sourceMegadl = Get-UnitecMegadlAssetPath -SourceRoot $ProjectRoot
-    if (-not (Test-Path $sourceMegadl)) {
-        return
-    }
-
-    $targetDir = Join-Path $StagingDir 'installer\assets\megatools'
-    Ensure-Directory $targetDir
-    Copy-Item $sourceMegadl (Join-Path $targetDir 'megadl.exe') -Force
-
-    $readme = Join-Path (Split-Path $sourceMegadl -Parent) 'README.txt'
-    if (Test-Path $readme) {
-        Copy-Item $readme (Join-Path $targetDir 'README.txt') -Force
-    }
-}
-
-function Ensure-UnitecMegadlAsset {
-    param(
-        [string]$SourceRoot,
-        [switch]$SkipDownload
-    )
-
-    $megadlPath = Get-UnitecMegadlAssetPath -SourceRoot $SourceRoot
-    if (Test-Path $megadlPath) {
-        return $megadlPath
-    }
-
-    Write-Warn 'megadl.exe nao e mais necessario (atualizacao via HTTPS/Dropbox). Ignorado.'
-    return $null
 }
 
 function Initialize-LaragonPath {
@@ -3463,6 +3939,8 @@ function Sync-UnitecEnvPerformanceSettings {
         SESSION_DRIVER     = 'file'
         CACHE_STORE        = 'file'
         QUEUE_CONNECTION   = 'sync'
+        # artisan serve usa SAPI CLI: sem workers as telas Filament/Livewire enfileiram e ficam lentas.
+        PHP_CLI_SERVER_WORKERS = '8'
     }
 
     $lines = @(Get-Content $envFile -Encoding UTF8)
@@ -3551,7 +4029,17 @@ function Invoke-UnitecDatabaseMigrate {
     try {
         Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:clear') -AllowFailure | Out-Null
 
-        $migrateCommand = if ($FreshInstall) { 'migrate:fresh' } else { 'migrate' }
+        $useFresh = [bool]$FreshInstall
+        if ($useFresh) {
+            $looksEmpty = Test-UnitecDatabaseLooksEmpty -AppPath $AppPath -LaragonPath $LaragonPath
+            if (-not $looksEmpty) {
+                Write-Warn 'migrate:fresh BLOQUEADO: banco ja possui dados. Usando migrate incremental.'
+                Write-InstallLog -AppPath $AppPath -Message 'SEGURANCA: migrate:fresh bloqueado — banco com dados detectado.'
+                $useFresh = $false
+            }
+        }
+
+        $migrateCommand = if ($useFresh) { 'migrate:fresh' } else { 'migrate' }
         $result = Invoke-UnitecArtisan -AppPath $AppPath -Arguments @($migrateCommand, '--force')
 
         if ($LogToInstallFile -and $result.Output) {
@@ -3714,6 +4202,44 @@ function Test-UnitecErpDataPresent {
         Where-Object { $_.Name -match '\.(frm|ibd|MAD|MAI)$' -and $_.Name -ne 'db.opt' })
 
     return ($tableFiles.Count -gt 5)
+}
+
+<#
+.SYNOPSIS
+    True se a pasta ja e uma instalacao Unitec (modo recupera — nao zerar banco).
+.DESCRIPTION
+    Detecta sinais duraveis: .env, backup de .env ou datadir do MariaDB embutido.
+    Nao usa so public/index.php (o Setup sempre copia isso antes do pos-install).
+#>
+function Test-UnitecExistingInstall {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    if (-not (Test-Path $AppPath)) {
+        return $false
+    }
+
+    foreach ($name in @('.env', '.env.backup', '.env.production')) {
+        if (Test-Path (Join-Path $AppPath $name)) {
+            return $true
+        }
+    }
+
+    $dataDir = Join-Path (Get-UnitecMysqlRoot -AppPath $AppPath) 'data'
+    if (Test-Path (Join-Path $dataDir 'ibdata1')) {
+        return $true
+    }
+
+    if (Test-UnitecErpDataPresent -DataDir $dataDir) {
+        return $true
+    }
+
+    $backupEnv = Find-UnitecEnvBackupCandidate -AppPath $AppPath
+    if ($backupEnv.Count -gt 0) {
+        return $true
+    }
+
+    return $false
 }
 
 function Invoke-UnitecPreUpdateBackup {
@@ -4549,6 +5075,235 @@ function Ensure-LaragonMysqlRootPassword {
     return $true
 }
 
+function Get-UnitecBundledSeedDir {
+    param([string]$AppPath)
+
+    return Join-Path (Resolve-UnitecAppPath -Path $AppPath) 'installer\seed'
+}
+
+function Test-UnitecBundledSeedPresent {
+    param([string]$AppPath)
+
+    $seedDir = Get-UnitecBundledSeedDir -AppPath $AppPath
+    $flag = Join-Path $seedDir 'INCLUDE_DEV_DATA.flag'
+    $sql = Join-Path $seedDir 'unitec_erp.sql'
+
+    return (Test-Path $flag) -and (Test-Path $sql) -and ((Get-Item $sql).Length -gt 1024)
+}
+
+function Get-UnitecBundledSeedSqlPath {
+    param([string]$AppPath)
+
+    return Join-Path (Get-UnitecBundledSeedDir -AppPath $AppPath) 'unitec_erp.sql'
+}
+
+function Resolve-UnitecMysqlDumpExe {
+    param(
+        [string]$AppPath = '',
+        [string]$PreferredBin = ''
+    )
+
+    $candidates = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($PreferredBin) -and (Test-Path $PreferredBin)) {
+        $candidates += $PreferredBin
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+        $bin = Join-Path (Get-UnitecMysqlRoot -AppPath $AppPath) 'bin'
+        foreach ($name in @('mariadb-dump.exe', 'mysqldump.exe')) {
+            $candidates += (Join-Path $bin $name)
+        }
+    }
+
+    foreach ($extra in @(
+        'C:\Projetos\unitec-erp-web\tools\mysql\bin\mysqldump.exe',
+        'C:\Projetos\unitec-erp-web\tools\mysql\bin\mariadb-dump.exe',
+        'C:\UNITECNOLOGIA_WEB\tools\mysql\bin\mysqldump.exe',
+        'C:\UNITECNOLOGIA_WEB\tools\mysql\bin\mariadb-dump.exe'
+    )) {
+        $candidates += $extra
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Resolve-UnitecMysqlClientExe {
+    param(
+        [string]$AppPath = '',
+        [string]$PreferredBin = ''
+    )
+
+    $candidates = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($PreferredBin) -and (Test-Path $PreferredBin)) {
+        $candidates += $PreferredBin
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+        $bin = Join-Path (Get-UnitecMysqlRoot -AppPath $AppPath) 'bin'
+        foreach ($name in @('mariadb.exe', 'mysql.exe')) {
+            $candidates += (Join-Path $bin $name)
+        }
+    }
+
+    foreach ($extra in @(
+        'C:\Projetos\unitec-erp-web\tools\mysql\bin\mysql.exe',
+        'C:\Projetos\unitec-erp-web\tools\mysql\bin\mariadb.exe',
+        'C:\UNITECNOLOGIA_WEB\tools\mysql\bin\mysql.exe',
+        'C:\UNITECNOLOGIA_WEB\tools\mysql\bin\mariadb.exe'
+    )) {
+        $candidates += $extra
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Export-UnitecDatabaseDump {
+    param(
+        [string]$OutputPath,
+        [string]$DbHost = '127.0.0.1',
+        [string]$DbPort = '3306',
+        [string]$DbUser = $script:UnitecDefaultDbUser,
+        [string]$DbPassword = '',
+        [string]$DbName = $script:UnitecDefaultDbName,
+        [string]$AppPath = '',
+        [string]$DumpExe = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+        $DbPassword = Get-UnitecDefaultDbPassword
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DumpExe)) {
+        $DumpExe = Resolve-UnitecMysqlDumpExe -AppPath $AppPath
+    }
+
+    if (-not $DumpExe -or -not (Test-Path $DumpExe)) {
+        throw 'mysqldump/mariadb-dump nao encontrado para gerar o dump do banco.'
+    }
+
+    $parent = Split-Path $OutputPath -Parent
+    Ensure-Directory $parent
+
+    if (Test-Path $OutputPath) {
+        Remove-Item $OutputPath -Force
+    }
+
+    if ($DbHost -eq 'localhost' -or $DbHost -eq '::1' -or [string]::IsNullOrWhiteSpace($DbHost)) {
+        $DbHost = '127.0.0.1'
+    }
+
+    $args = @(
+        ("--host={0}" -f $DbHost),
+        ("--port={0}" -f $DbPort),
+        ("--user={0}" -f $DbUser),
+        ("--password={0}" -f $DbPassword),
+        '--protocol=TCP',
+        '--single-transaction',
+        '--routines',
+        '--triggers',
+        '--events',
+        '--hex-blob',
+        '--default-character-set=utf8mb4',
+        '--databases',
+        $DbName,
+        ("--result-file={0}" -f $OutputPath)
+    )
+
+    & $DumpExe @args
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $OutputPath) -or ((Get-Item $OutputPath).Length -lt 1024)) {
+        throw ("Falha ao gerar dump do banco {0} (exit={1})." -f $DbName, $LASTEXITCODE)
+    }
+
+    return $OutputPath
+}
+
+function Import-UnitecBundledSeedDatabase {
+    param(
+        [string]$AppPath,
+        [string]$DbHost = '127.0.0.1',
+        [string]$DbPort = '3306',
+        [string]$DbUser = $script:UnitecDefaultDbUser,
+        [string]$DbPassword = '',
+        [string]$DbName = $script:UnitecDefaultDbName
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+
+    if (-not (Test-UnitecBundledSeedPresent -AppPath $AppPath)) {
+        throw 'Pacote de seed ausente (installer\seed\unitec_erp.sql + INCLUDE_DEV_DATA.flag).'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+        $DbPassword = Get-UnitecDefaultDbPassword
+    }
+
+    $sqlPath = Get-UnitecBundledSeedSqlPath -AppPath $AppPath
+    $mysqlExe = Resolve-UnitecMysqlClientExe -AppPath $AppPath
+
+    if (-not $mysqlExe) {
+        throw 'mysql/mariadb client nao encontrado para restaurar o seed.'
+    }
+
+    if ($DbHost -eq 'localhost' -or $DbHost -eq '::1' -or [string]::IsNullOrWhiteSpace($DbHost)) {
+        $DbHost = '127.0.0.1'
+    }
+
+    Write-Host (">> Restaurando banco embutido ({0})..." -f ([math]::Round((Get-Item $sqlPath).Length / 1MB, 1))) -ForegroundColor White
+
+    $dropArgs = @(
+        ("--host={0}" -f $DbHost),
+        ("--port={0}" -f $DbPort),
+        ("--user={0}" -f $DbUser),
+        ("--password={0}" -f $DbPassword),
+        '--protocol=TCP',
+        '--default-character-set=utf8mb4',
+        '-e',
+        ("DROP DATABASE IF EXISTS `{0}`; CREATE DATABASE `{0}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" -f $DbName)
+    )
+
+    & $mysqlExe @dropArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw ("Falha ao recriar o banco {0} antes do seed." -f $DbName)
+    }
+
+    $importArgs = @(
+        ("--host={0}" -f $DbHost),
+        ("--port={0}" -f $DbPort),
+        ("--user={0}" -f $DbUser),
+        ("--password={0}" -f $DbPassword),
+        '--protocol=TCP',
+        '--default-character-set=utf8mb4',
+        '--max_allowed_packet=512M'
+    )
+
+    $proc = Start-Process -FilePath $mysqlExe `
+        -ArgumentList $importArgs `
+        -RedirectStandardInput $sqlPath `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+
+    if ($proc.ExitCode -ne 0) {
+        throw ("Falha ao importar seed SQL ({0}) exit={1}." -f $sqlPath, $proc.ExitCode)
+    }
+
+    Write-Ok 'Banco embutido (seed de desenvolvimento) restaurado.'
+}
+
 function Ensure-UnitecDatabaseSetup {
     param(
         [string]$LaragonPath = 'C:\laragon',
@@ -4796,6 +5551,116 @@ try {
     }
 }
 
+function Get-UnitecSqlScalarFromEnv {
+    param(
+        [string]$AppPath,
+        [string]$LaragonPath = 'C:\laragon',
+        [Parameter(Mandatory = $true)]
+        [string]$Sql
+    )
+
+    $db = Get-UnitecDatabaseSettingsFromEnv -AppPath $AppPath
+    if ([string]::IsNullOrWhiteSpace($db.DbName)) {
+        return $null
+    }
+
+    $hosts = Get-UnitecDatabaseConnectionHostsFromEnv -AppPath $AppPath
+    foreach ($hostName in $hosts) {
+        $scalar = Test-UnitecSqlScalarViaPhp -AppPath $AppPath -User $db.DbUser -Password $db.DbPassword -Database $db.DbName -MysqlHost $hostName -Port $db.DbPort -Sql $Sql
+        if ($null -ne $scalar) {
+            return $scalar
+        }
+
+        $defaultsFile = $null
+        try {
+            $defaultsFile = New-UnitecMysqlDefaultsFile -User $db.DbUser -Password $db.DbPassword -MysqlHost $hostName -Port $db.DbPort
+            $mysqlExe = Get-MysqlExecutable -LaragonPath $LaragonPath -AppPath $AppPath
+            if (-not $mysqlExe) {
+                continue
+            }
+
+            $output = & $mysqlExe "--defaults-extra-file=$defaultsFile" $db.DbName '-N' '-e' $Sql 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                if ($null -eq $output -or "$output".Trim() -eq '') {
+                    return 0
+                }
+
+                return ([string]$output).Trim()
+            }
+        } catch {
+            continue
+        } finally {
+            if ($defaultsFile) {
+                Remove-Item $defaultsFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    return $null
+}
+
+function Test-UnitecDatabaseLooksEmpty {
+    param(
+        [string]$AppPath,
+        [string]$LaragonPath = 'C:\laragon'
+    )
+
+    # true  = banco vazio (pode migrate:fresh com seguranca)
+    # false = ha dados OU nao foi possivel confirmar (NUNCA apagar)
+
+    if (-not (Test-Path (Join-Path $AppPath '.env'))) {
+        return $true
+    }
+
+    $prefix = Get-UnitecEnvValue -AppPath $AppPath -Key 'DB_PREFIX'
+    if ([string]::IsNullOrWhiteSpace($prefix)) {
+        $prefix = 'unitec_'
+    }
+
+    $migrationsTable = "${prefix}migrations"
+    $usersTable = "${prefix}users"
+    $empresasTable = "${prefix}empresas"
+
+    $migrationCount = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$migrationsTable'"
+    if ($null -eq $migrationCount) {
+        return $false
+    }
+
+    if ([int]$migrationCount -gt 0) {
+        $rows = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM ``$migrationsTable``"
+        if ($null -eq $rows) {
+            return $false
+        }
+        if ([int]$rows -gt 0) {
+            return $false
+        }
+    }
+
+    $usersExist = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$usersTable'"
+    if ($null -ne $usersExist -and [int]$usersExist -gt 0) {
+        $userCount = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM ``$usersTable``"
+        if ($null -eq $userCount) {
+            return $false
+        }
+        if ([int]$userCount -gt 0) {
+            return $false
+        }
+    }
+
+    $empresasExist = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$empresasTable'"
+    if ($null -ne $empresasExist -and [int]$empresasExist -gt 0) {
+        $empresaCount = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM ``$empresasTable``"
+        if ($null -eq $empresaCount) {
+            return $false
+        }
+        if ([int]$empresaCount -gt 0) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Test-UnitecNeedsInitialSeed {
     param(
         [string]$AppPath,
@@ -4812,7 +5677,8 @@ function Test-UnitecNeedsInitialSeed {
 
     $db = Get-UnitecDatabaseSettingsFromEnv -AppPath $AppPath
     if ([string]::IsNullOrWhiteSpace($db.DbName)) {
-        return $true
+        # Sem nome de banco nao assumir vazio — evita seed/fresh indevido.
+        return $false
     }
 
     $prefix = Get-UnitecEnvValue -AppPath $AppPath -Key 'DB_PREFIX'
@@ -4820,44 +5686,24 @@ function Test-UnitecNeedsInitialSeed {
         $prefix = 'unitec_'
     }
 
+    # Seed so se a tabela users existir e estiver VAZIA (qualquer usuario conta).
+    # Antes olhava so o nome "USUARIO" — cliente que renomeou o admin era tratado
+    # como instalacao incompleta e podia cair em migrate:fresh.
     $table = "${prefix}users"
-    $escapedName = Escape-MySqlStringLiteral -Value 'USUARIO'
-    $sql = "SELECT COUNT(*) FROM ``$table`` WHERE name = '$escapedName'"
-    $hosts = Get-UnitecDatabaseConnectionHostsFromEnv -AppPath $AppPath
-
-    foreach ($hostName in $hosts) {
-        $scalar = Test-UnitecSqlScalarViaPhp -AppPath $AppPath -User $db.DbUser -Password $db.DbPassword -Database $db.DbName -MysqlHost $hostName -Port $db.DbPort -Sql $sql
-        if ($null -ne $scalar) {
-            return ([int]$scalar -eq 0)
-        }
-
-        $defaultsFile = $null
-        try {
-            $defaultsFile = New-UnitecMysqlDefaultsFile -User $db.DbUser -Password $db.DbPassword -MysqlHost $hostName -Port $db.DbPort
-            $mysqlExe = Get-MysqlExecutable -LaragonPath $LaragonPath -AppPath $AppPath
-            if (-not $mysqlExe) {
-                continue
-            }
-
-            $output = & $mysqlExe "--defaults-extra-file=$defaultsFile" $db.DbName '-N' '-e' $sql 2>$null
-            if ($LASTEXITCODE -eq 0) {
-                $count = 0
-                if ($null -ne $output -and "$output".Trim() -ne '') {
-                    $count = [int]([string]$output).Trim()
-                }
-
-                return ($count -eq 0)
-            }
-        } catch {
-            continue
-        } finally {
-            if ($defaultsFile) {
-                Remove-Item $defaultsFile -Force -ErrorAction SilentlyContinue
-            }
-        }
+    $tableExists = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$table'"
+    if ($null -eq $tableExists) {
+        return $false
+    }
+    if ([int]$tableExists -eq 0) {
+        return $true
     }
 
-    return $true
+    $userCount = Get-UnitecSqlScalarFromEnv -AppPath $AppPath -LaragonPath $LaragonPath -Sql "SELECT COUNT(*) FROM ``$table``"
+    if ($null -eq $userCount) {
+        return $false
+    }
+
+    return ([int]$userCount -eq 0)
 }
 
 function Ensure-UnitecDatabaseFromEnv {
@@ -4943,6 +5789,113 @@ function Write-EnvFile($path, $templatePath, $replacements) {
     }
 
     Set-UnitecUtf8NoBomFile -Path $path -Content $content
+}
+
+function Find-UnitecEnvBackupCandidate {
+    param([string]$AppPath)
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    $candidates = @()
+
+    foreach ($name in @('.env.backup', '.env.production')) {
+        $path = Join-Path $AppPath $name
+        if (Test-Path $path) {
+            $candidates += Get-Item -LiteralPath $path
+        }
+    }
+
+    $searchRoots = @(
+        (Join-Path $AppPath 'storage\app\backups'),
+        (Join-Path $AppPath 'storage\app\private')
+    )
+
+    foreach ($root in $searchRoots) {
+        if (-not (Test-Path $root)) {
+            continue
+        }
+
+        $candidates += @(Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -eq '.env' -or
+                $_.Name -like '*.env' -or
+                $_.Name -like '*preupdate*.env' -or
+                $_.Name -like 'unitec_erp_preupdate_*.env'
+            })
+    }
+
+    return @($candidates |
+        Where-Object { $_.Length -gt 50 } |
+        Sort-Object LastWriteTime -Descending)
+}
+
+<#
+.SYNOPSIS
+    Garante que o .env exista ao abrir o sistema (atalho/EXE).
+.DESCRIPTION
+    Se o .env sumiu: restaura o backup mais recente; se nao houver, recria a partir
+    de .env.mysql.example com os padroes do instalador e gera APP_KEY.
+#>
+function Ensure-UnitecEnvFile {
+    param(
+        [string]$AppPath,
+        [string]$AppUrl = ''
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    $envFile = Join-Path $AppPath '.env'
+
+    if (Test-Path $envFile) {
+        return @{ Created = $false; Restored = $false; Path = $envFile }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($AppUrl)) {
+        $AppUrl = Get-UnitecDefaultAppUrl
+    }
+
+    $backups = Find-UnitecEnvBackupCandidate -AppPath $AppPath
+    if ($backups.Count -gt 0) {
+        $source = $backups[0]
+        Copy-Item -LiteralPath $source.FullName -Destination $envFile -Force
+        Sync-UnitecEnvAppUrl -AppPath $AppPath -AppUrl $AppUrl | Out-Null
+        Write-InstallLog -AppPath $AppPath -Message ("Arquivo .env restaurado de {0}" -f $source.FullName)
+
+        if (Test-UnitecEnvMissingAppKey -AppPath $AppPath) {
+            $configCache = Join-Path $AppPath 'bootstrap\cache\config.php'
+            if (Test-Path $configCache) {
+                Remove-Item $configCache -Force -ErrorAction SilentlyContinue
+            }
+            Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('key:generate', '--force') -AllowFailure | Out-Null
+        }
+
+        return @{ Created = $true; Restored = $true; Path = $envFile; Source = $source.FullName }
+    }
+
+    $template = Join-Path $AppPath '.env.mysql.example'
+    if (-not (Test-Path $template)) {
+        $template = Join-Path $AppPath '.env.example'
+    }
+    if (-not (Test-Path $template)) {
+        throw 'Arquivo .env ausente e nao ha modelo (.env.mysql.example) para recriar. Reinstale o Unitec ERP.'
+    }
+
+    $db = Get-UnitecDefaultDatabaseSettings
+    Write-EnvFile -path $envFile -templatePath $template -replacements @{
+        '__APP_URL__'     = $AppUrl
+        '__DB_HOST__'     = $db.DbHost
+        '__DB_PORT__'     = $db.DbPort
+        '__DB_DATABASE__' = $db.DbName
+        '__DB_USERNAME__' = $db.DbUser
+        '__DB_PASSWORD__' = (Format-EnvValue $db.DbPassword)
+    }
+
+    $configCache = Join-Path $AppPath 'bootstrap\cache\config.php'
+    if (Test-Path $configCache) {
+        Remove-Item $configCache -Force -ErrorAction SilentlyContinue
+    }
+    Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('key:generate', '--force') | Out-Null
+    Write-InstallLog -AppPath $AppPath -Message 'Arquivo .env recriado com padroes do instalador (APP_KEY nova).'
+
+    return @{ Created = $true; Restored = $false; Path = $envFile; Source = $template }
 }
 
 function Test-OfflineBundleReady {
@@ -5269,6 +6222,9 @@ function Start-UnitecPhpArtisanServer {
         while ((Get-Date) -lt $deadline) {
             if (Test-UnitecWebServerListening -Port $Port) {
                 Write-Ok "Servidor PHP ativo em ${BindHost}:$Port"
+                if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+                    Warm-UnitecApplicationCache -AppPath $AppPath -AppUrl ("http://127.0.0.1:{0}" -f $Port)
+                }
                 return $true
             }
             Start-Sleep -Seconds 2
@@ -5424,6 +6380,51 @@ function Ensure-UnitecCaCertAsset {
     return (Resolve-Path $targetPath).Path
 }
 
+function Ensure-UnitecCloudflaredAsset {
+    param(
+        [string]$SourceRoot = '',
+        [switch]$SkipDownload
+    )
+
+    $root = if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
+        $SourceRoot
+    } else {
+        Join-Path $PSScriptRoot '..'
+    }
+    $root = [System.IO.Path]::GetFullPath($root)
+
+    $targetDir = Join-Path $root 'resources\cloudflared'
+    $targetPath = Join-Path $targetDir 'cloudflared.exe'
+
+    if ((Test-Path $targetPath) -and ((Get-Item $targetPath).Length -gt 1000000)) {
+        return (Resolve-Path $targetPath).Path
+    }
+
+    if ($SkipDownload) {
+        throw "Coloque cloudflared.exe em resources\cloudflared\ ou remova -SkipRuntimeDownload."
+    }
+
+    Ensure-Directory $targetDir
+    $url = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
+    $tmp = Join-Path $env:TEMP ('unitec-cloudflared-' + [guid]::NewGuid().ToString('N') + '.exe')
+
+    Write-Host ">> Baixando cloudflared Windows amd64 (~60 MB): $url" -ForegroundColor White
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+        Copy-Item -Force $tmp $targetPath
+    } catch {
+        throw "Falha ao baixar cloudflared.exe. Baixe manualmente de $url e salve em resources\cloudflared\cloudflared.exe"
+    } finally {
+        Remove-Item -Force $tmp -ErrorAction SilentlyContinue
+    }
+
+    if (-not (Test-Path $targetPath) -or ((Get-Item $targetPath).Length -lt 1000000)) {
+        throw 'Arquivo cloudflared.exe invalido em resources\cloudflared\'
+    }
+
+    return (Resolve-Path $targetPath).Path
+}
+
 function Ensure-UnitecPhpSslCaBundle {
     param(
         [string]$PhpDirectory,
@@ -5563,14 +6564,22 @@ function Configure-LaragonPhpIni {
             'memory_limit=256M'
         )
     } else {
+        # artisan serve / php -S usam SAPI CLI: enable_cli=1 e obrigatorio para OPcache valer nas telas.
+        $opcacheDir = ((Join-Path $AppPath 'tools\php\opcache') -replace '\\', '/')
+        Ensure-Directory (Join-Path $AppPath 'tools\php\opcache')
+
         @(
             'opcache.enable=1',
-            'opcache.enable_cli=0',
-            'opcache.memory_consumption=128',
-            'opcache.interned_strings_buffer=16',
-            'opcache.max_accelerated_files=10000',
+            'opcache.enable_cli=1',
+            'opcache.memory_consumption=256',
+            'opcache.interned_strings_buffer=32',
+            'opcache.max_accelerated_files=20000',
+            # Sempre 1: update aplica sem matar o PHP (evita porta zumbi apos update).
             'opcache.validate_timestamps=1',
             'opcache.revalidate_freq=2',
+            ('opcache.file_cache="' + $opcacheDir + '"'),
+            'opcache.file_cache_only=0',
+            'opcache.file_cache_fallback=1',
             'max_execution_time=300',
             'memory_limit=256M'
         )
@@ -5745,11 +6754,9 @@ function Install-LaragonPhpFromZip {
         New-Item -ItemType Directory -Path $phpRoot -Force | Out-Null
     }
 
-    $tempDir = Join-Path $env:TEMP ('unitec-php-' + [Guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-
+    $tempDir = New-UnitecInstallTempDir -AppPath $script:UnitecDefaultAppPath -Prefix 'laragon-php'
     try {
-        Expand-Archive -Path $ZipPath -DestinationPath $tempDir -Force
+        Expand-Archive -LiteralPath $ZipPath -DestinationPath $tempDir -Force
 
         $target = Join-Path $phpRoot $ExpectedFolderName
         if (Test-Path $target) {

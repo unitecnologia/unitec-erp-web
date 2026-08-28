@@ -3,14 +3,14 @@
 
     /** @var DevolucaoCompra $record */
     $situacao = (string) ($record->situacao ?? '');
-    $label = mb_strtoupper($record->situacaoLabel(), 'UTF-8');
-
-    $class = match ($situacao) {
-        DevolucaoCompra::SITUACAO_ABERTA => 'erp-orcamentos__status--aberto',
-        DevolucaoCompra::SITUACAO_FINALIZADA => 'erp-orcamentos__status--fechado',
-        DevolucaoCompra::SITUACAO_CANCELADA => 'erp-orcamentos__status--cancelado',
-        default => 'erp-orcamentos__status--aberto',
+    $label = match ($situacao) {
+        DevolucaoCompra::SITUACAO_ABERTA => 'Aberta',
+        DevolucaoCompra::SITUACAO_FINALIZADA => 'Finalizada',
+        DevolucaoCompra::SITUACAO_CANCELADA => 'Cancelada',
+        default => $record->situacaoLabel(),
     };
 @endphp
 
-<span class="erp-orcamentos__status {{ $class }}">{{ $label }}</span>
+<span @class(['erp-devcompra__status-chip', 'erp-devcompra__status-chip--'.$situacao])>
+    {{ $label }}
+</span>

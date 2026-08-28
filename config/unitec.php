@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.95',
+    'versao' => '6.4.1.159',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
     // Portal de renovação — nativo (não usa .env).
     'pagamento_url' => 'https://unitecnologiasc.digital',
@@ -24,26 +24,32 @@ return [
     */
     'licenca_suporte' => [
         'email' => 'sac@unitecnologiasc.com.br',
-        'whatsapp' => '47996446859',
+        'whatsapp' => '47984002117',
         'site' => 'https://unitecnologiasc.digital',
     ],
 
     /*
     | Zoom da interface no navegador (Chrome/Edge), em porcentagem.
-    | Ex.: 90 = menor, 100 = normal, 110 = maior. Faixa: 50â€“200.
-    | NÃ£o controla o Ctrl+/- do navegador â€” aplica escala visual do ERP.
+    | Ex.: 90 = menor, 100 = normal, 110 = maior. Faixa: 50–200.
     */
     'browser_zoom' => max(50, min(200, (int) env('UNITEC_BROWSER_ZOOM', 100))),
 
     /*
-    | AtualizaÃ§Ã£o remota (Ajuda â†’ Atualizar Sistema).
+    | Ao abrir o ERP: se o schema estiver atrás do código (ex. restore de dump
+    | antigo), aplica apenas `php artisan migrate --force`. Nunca migrate:fresh.
+    | ERP_AUTO_MIGRATE=false → só detecta e avisa, sem alterar o banco.
+    */
+    'auto_migrate' => filter_var(env('ERP_AUTO_MIGRATE', true), FILTER_VALIDATE_BOOL),
+
+    /*
+    | Atualização remota de produção (UnitecErpServer).
     |
     | UNITEC_UPDATE_DOWNLOAD_URL = link HTTPS DIRETO do ZIP (recomendado no .env).
-    | PadrÃ£o estÃ¡vel (GitHub Releases, canal "update"):
+    | Padrão estável (GitHub Releases, canal "update"):
     |   https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip
     |
     | O ZIP deve conter a pasta unitec-erp-web/ (ou artisan na raiz).
-    | Preserva .env, storage/ e tools/ na instalaÃ§Ã£o local.
+    | Serviço baixa o ZIP, extrai em atualizacao/; login pergunta Sim/Não.
     */
     'update_download_url' => env(
         'UNITEC_UPDATE_DOWNLOAD_URL',
@@ -76,18 +82,17 @@ return [
         'private_key' => env('QZ_PRIVATE_KEY_PATH', storage_path('app/qz/private-key.pem')),
     ],
 
-    /** @deprecated Use update_download_url com link HTTPS direto. */
-    'update_mega_folder_url' => 'https://mega.nz/folder/fx9SxYKR#gd8_9RLC0JXqaykepo-qAw',
-
     /*
     | Cloudflare Tunnel — provisionamento de subdomínio (Acesso remoto).
-    | Token também pode ser gravado na empresa (param_cf_*); empresa sobrescreve .env.
+    | Padrão Unitec (unierp.uk). Empresa (param_cf_*) e formulário sobrescrevem.
+    | Token também pode ir no .env (CLOUDFLARE_API_TOKEN).
     */
     'cloudflare' => [
+        // Token somente via .env (CLOUDFLARE_API_TOKEN).
         'api_token' => env('CLOUDFLARE_API_TOKEN', ''),
-        'account_id' => env('CLOUDFLARE_ACCOUNT_ID', ''),
-        'zone_id' => env('CLOUDFLARE_ZONE_ID', ''),
-        'base_domain' => env('CLOUDFLARE_BASE_DOMAIN', 'unierp.uk'),
+        'account_id' => env('CLOUDFLARE_ACCOUNT_ID') ?: '28103ae19943f8c0654a17b56e75b5da',
+        'zone_id' => env('CLOUDFLARE_ZONE_ID') ?: 'a68a06560133f1b620e063cd0b0113ff',
+        'base_domain' => env('CLOUDFLARE_BASE_DOMAIN') ?: 'unierp.uk',
         'local_service' => env('CLOUDFLARE_LOCAL_SERVICE', 'http://127.0.0.1:8765'),
         'program_data_dir' => env('CLOUDFLARE_PROGRAM_DATA_DIR', 'C:\\ProgramData\\Unitec\\cloudflared'),
     ],

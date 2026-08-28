@@ -56,14 +56,28 @@ trait ManagesPdvConfig
         return $this->pdvConfig()->marqueeTexto();
     }
 
+    /**
+     * Produtos de promoção com "Mostrar no PDV" para o carrossel idle.
+     *
+     * @return list<array{descricao:string,preco:string,preco_normal:string,foto_url:?string}>
+     */
+    public function getPdvPropagandaItensProperty(): array
+    {
+        $itens = app(\App\Support\Erp\Promocao\PromocaoPrecoService::class)->itensPropagandaPdv();
+
+        return array_map(static function (array $row): array {
+            return [
+                'descricao' => (string) ($row['descricao'] ?? ''),
+                'preco' => \App\Support\Erp\ErpMoney::formatBr((float) ($row['preco_promocao'] ?? 0)),
+                'preco_normal' => \App\Support\Erp\ErpMoney::formatBr((float) ($row['preco_normal'] ?? 0)),
+                'foto_url' => $row['foto_url'] ?? null,
+            ];
+        }, $itens);
+    }
+
     public function getPdvExibirResumoCaixaProperty(): bool
     {
         return $this->pdvConfig()->exibirResumoCaixa();
-    }
-
-    public function getPdvExibirF3VendedorProperty(): bool
-    {
-        return $this->pdvConfig()->exibirF3Vendedor();
     }
 
     public function getPdvPermitirDescontoItemProperty(): bool
@@ -84,6 +98,22 @@ trait ManagesPdvConfig
     public function getPdvLerPesoBalancaProperty(): bool
     {
         return $this->pdvConfig()->lerPesoBalanca();
+    }
+
+    /**
+     * @return array{
+     *     marca: string,
+     *     port: string,
+     *     baudRate: int,
+     *     dataBits: int,
+     *     parity: string,
+     *     stopBits: string,
+     *     handshake: string
+     * }
+     */
+    public function getPdvBalancaSettingsProperty(): array
+    {
+        return $this->pdvConfig()->balancaSerialSettings();
     }
 
     public function getPdvBuscaBalancaBarrasProperty(): bool
@@ -159,10 +189,13 @@ trait ManagesPdvConfig
     protected function notifyPdvError(string $title, ?string $body = null): void
     {
         if (($this->activeModal ?? null) === 'finalizar') {
-            $this->finalizarAlertaTitulo = mb_strtoupper(rtrim($title, '.'), 'UTF-8');
+            $titulo = mb_strtoupper(rtrim($title, '.'), 'UTF-8');
+            $this->finalizarAlertaTitulo = $titulo;
             $this->finalizarAlertaDetalhe = $body;
+            $this->finalizarAlertaFoco = str_contains($titulo, 'CLIENTE') ? 'cliente' : 'pagamento';
             $this->dispatch('erp-pdv-hide-fiscal-progress');
             $this->dispatch('erp-pdv-erro-beep');
+            $this->dispatch('erp-pdv-focus-finalizar-aviso');
 
             return;
         }

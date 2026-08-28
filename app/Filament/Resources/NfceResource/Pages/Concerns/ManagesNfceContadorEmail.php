@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\NfceResource\Pages\Concerns;
 
+use App\Models\Contador;
 use App\Models\Empresa;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
@@ -42,14 +43,26 @@ trait ManagesNfceContadorEmail
         }
 
         $service = app(NfceContadorPacoteService::class);
-        $email = $service->resolveContadorEmail($empresa);
-        $phone = $service->resolveContadorPhone($empresa);
+        $contador = Contador::paraEnvioEmail();
+
+        if (! $contador) {
+            Notification::make()
+                ->title('Contador não cadastrado.')
+                ->body('Cadastre o contador em RH → Contador, com e-mail para o envio do pacote.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $email = trim((string) ($contador->email ?? ''));
+        $phone = trim((string) ($contador->fone ?? ''));
         $phoneDigits = WhatsAppPhone::digitsOnly($phone);
 
-        if ($email === '' && $phoneDigits === '') {
+        if ($email === '') {
             Notification::make()
-                ->title('Contato do contador não configurado.')
-                ->body('Cadastre e-mail e/ou telefone no contador vinculado em Empresas → Parâmetros → Portal do Contador.')
+                ->title('E-mail do contador não cadastrado.')
+                ->body('Informe o e-mail no cadastro do Contador (RH → Contador) para enviar o pacote por e-mail.')
                 ->warning()
                 ->send();
 

@@ -19,7 +19,9 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Erp\Pdv\PdvClienteLimiteService;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
@@ -87,7 +89,7 @@ class ForcaVendasTelaVendaPage extends Page
 
     public string $clienteBusca = '';
 
-    /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string}> */
+    /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, doc_tipo?: string, limite?: string, utilizado?: string, vencidas?: string, tem_vencidas?: bool}> */
     public array $clienteSugestoes = [];
 
     public bool $clienteSugestoesOpen = false;
@@ -903,11 +905,25 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $raw = (string) ($value ?? '');
-        // Remove letras e símbolos; mantém só dígitos (máscara monetária BR).
-        $digits = preg_replace('/\D+/', '', $raw) ?: '0';
-        $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr(((int) $digits) / 100);
+        $this->normalizarValorPagamentoLinha($index, (string) ($value ?? ''));
+    }
+
+    /**
+     * Digitação normal (60 → 60,00). Não usa máscara de centavos do PDV.
+     */
+    private function normalizarValorPagamentoLinha(int $index, string $raw): void
+    {
+        $raw = trim($raw);
+        $somenteDigitos = preg_replace('/\D+/', '', $raw) ?? '';
+
+        if ($raw === '' || $somenteDigitos === '') {
+            $this->meiosPagamento[$index]['valor'] = '0,00';
+        } else {
+            $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr(ErpMoney::parseBr($raw, 2), 2);
+        }
+
         $this->formaSelecionadaId = (int) ($this->meiosPagamento[$index]['id'] ?? 0);
+        $this->selectedPagamentoIndex = $index;
     }
 
     public function adicionarItem(): void
@@ -947,6 +963,34 @@ class ForcaVendasTelaVendaPage extends Page
             Notification::make()->title('Quantidade inválida.')->warning()->send();
 
             return;
+        }
+
+        if ($this->bloquearSeOperacaoInvalida(exigeEstoque: ! $product->is_servico)) {
+            return;
+        }
+
+        if (EstoqueNegativoPolicy::ativo() && ! $product->is_servico) {
+            $jaNoPedido = 0.0;
+            foreach ($this->itens as $existente) {
+                if ((int) ($existente['product_id'] ?? 0) === (int) $product->id) {
+                    $jaNoPedido += (float) ($existente['quantidade'] ?? 0);
+                }
+            }
+
+            $disponivel = app(EstoqueReservaService::class)->disponivel($product, null, $this->estoqueId);
+
+            if ($disponivel < ($qtd + $jaNoPedido)) {
+                Notification::make()
+                    ->title(
+                        'Estoque insuficiente para '.$product->descricao
+                        .' (disponível: '.$this->formatQty($disponivel).').'
+                        .' Bloqueio de estoque negativo está ativo.'
+                    )
+                    ->danger()
+                    ->send();
+
+                return;
+            }
         }
 
         $productId = (int) $product->id;
@@ -1032,6 +1076,53 @@ class ForcaVendasTelaVendaPage extends Page
         $this->produtoAtualFoto = $item['foto'] ?? null;
     }
 
+    /**
+     * Duplo clique no nome do produto: remove da grade e recoloca na barra de inclusão.
+     */
+    public function puxarItemParaInclusao(int $index): void
+    {
+        if ($this->etapa !== 'venda' || $this->descontoModalOpen || $this->excluirItemModalOpen) {
+            return;
+        }
+
+        if (! isset($this->itens[$index])) {
+            return;
+        }
+
+        $item = $this->itens[$index];
+        $preco = (float) ($item['preco_unitario'] ?? 0);
+        $qtd = (float) ($item['quantidade'] ?? 0);
+        $desconto = (float) ($item['desconto'] ?? 0);
+        $acrescimo = (float) ($item['acrescimo'] ?? 0);
+
+        $this->produtoAtualId = (int) ($item['product_id'] ?? 0) ?: null;
+        $this->produtoAtualNome = (string) ($item['descricao'] ?? '');
+        $this->produtoAtualFoto = $item['foto'] ?? null;
+        $this->codigoBarras = $this->produtoAtualNome !== ''
+            ? $this->produtoAtualNome
+            : (string) ($item['codigo'] ?? '');
+        $this->quantidade = $this->formatQty($qtd > 0 ? $qtd : 1);
+        $this->precoUnitario = $this->formatMoney($preco);
+        $this->descontoValor = $this->formatMoney($desconto);
+        $this->acrescimoValor = $this->formatMoney($acrescimo);
+        $this->descontoPct = $preco > 0 && $qtd > 0
+            ? $this->formatMoney(($desconto / ($preco * $qtd)) * 100)
+            : '0,00';
+        $this->acrescimoPct = $preco > 0 && $qtd > 0
+            ? $this->formatMoney(($acrescimo / ($preco * $qtd)) * 100)
+            : '0,00';
+        $this->recalcularTotalItem();
+        $this->fecharSugestoesProduto();
+
+        array_splice($this->itens, $index, 1);
+        $this->itens = array_values($this->itens);
+        $this->itemSelecionado = $this->itens === []
+            ? null
+            : min($index, count($this->itens) - 1);
+
+        $this->dispatch('fv-tela-venda-focus-qtd');
+    }
+
     public function pedirConfirmacaoExcluirItem(): void
     {
         if ($this->etapa !== 'venda' || $this->descontoModalOpen || $this->excluirItemModalOpen) {
@@ -1080,9 +1171,18 @@ class ForcaVendasTelaVendaPage extends Page
     public function irParaFinalizacao(): void
     {
         if ($this->clienteId === null) {
-            Notification::make()->title('Selecione o cliente.')->warning()->send();
+            $busca = trim((string) $this->clienteBusca);
+            $nome = trim((string) $this->clienteNome);
 
-            return;
+            if ($this->ehTextoConsumidorFinal($busca) || $this->ehTextoConsumidorFinal($nome) || ($busca === '' && $nome === '')) {
+                $person = Person::resolveConsumidorFinal();
+                $this->aplicarCliente($person);
+                $this->clienteBusca = $this->formatarClienteBusca($person);
+            } else {
+                Notification::make()->title('Selecione o cliente.')->warning()->send();
+
+                return;
+            }
         }
 
         if ($this->itens === []) {
@@ -1143,14 +1243,18 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Enter no valor: se for cartão/POS, abre o canhoto (sem recalcular o valor).
+     * Enter no valor: grava o digitado e, se for cartão/POS, abre o canhoto.
      */
-    public function confirmarValorPagamentoLinha(): void
+    public function confirmarValorPagamentoLinha(?string $valorFromInput = null): void
     {
         $index = $this->selectedPagamentoIndex;
 
         if (! isset($this->meiosPagamento[$index])) {
             return;
+        }
+
+        if ($valorFromInput !== null) {
+            $this->normalizarValorPagamentoLinha($index, $valorFromInput);
         }
 
         $meio = $this->meiosPagamento[$index];
@@ -1226,6 +1330,10 @@ class ForcaVendasTelaVendaPage extends Page
             Notification::make()->title($msg)->warning()->send();
             $this->ensureCartaoCanhoto();
 
+            return;
+        }
+
+        if ($this->bloquearSeOperacaoInvalida(exigeEstoque: $this->pedidoExigeEstoque())) {
             return;
         }
 
@@ -1359,7 +1467,11 @@ class ForcaVendasTelaVendaPage extends Page
         $total = 0.0;
 
         foreach ($this->meiosPagamento as $meio) {
-            if (PdvFinalizarPagamentosHelper::isFormaAPrazo((string) ($meio['descricao'] ?? ''))) {
+            if (PdvFinalizarPagamentosHelper::isFormaAPrazoPagamento([
+                'forma' => (string) ($meio['descricao'] ?? $meio['forma'] ?? ''),
+                'tipo' => (string) ($meio['tipo'] ?? ''),
+                'tipo_movimento' => (string) ($meio['tipo_movimento'] ?? ''),
+            ])) {
                 $total += ErpMoney::parseBr($meio['valor'] ?? '0');
             }
         }
@@ -1697,34 +1809,14 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function carregarClientePadrao(): void
     {
-        $person = Person::query()
-            ->whereIn('codigo', Person::codigosConsumidorFinal())
-            ->orderByRaw('CASE WHEN codigo = ? THEN 0 ELSE 1 END', [Person::CODIGO_CONSUMIDOR_FINAL])
-            ->first();
-
-        if ($person) {
-            $this->aplicarCliente($person);
-            $this->clienteBusca = $this->formatarClienteBusca($person);
-        } else {
-            $this->clienteId = null;
-            $this->clienteCodigo = '';
-            $this->clienteNome = 'CONSUMIDOR FINAL';
-            $this->clienteCpfCnpj = '';
-            $this->clienteEndereco = '';
-            $this->clienteNumero = '';
-            $this->clienteBairro = '';
-            $this->clienteCep = '';
-            $this->clienteCidade = '';
-            $this->clienteUf = '';
-            $this->clienteFone = '';
-            $this->clienteWhatsapp = '';
-            $this->clienteBusca = 'CONSUMIDOR FINAL';
-        }
+        $person = Person::resolveConsumidorFinal();
+        $this->aplicarCliente($person);
+        $this->clienteBusca = $this->formatarClienteBusca($person);
     }
 
     /**
      * @param  \Illuminate\Support\Collection<int, Person>  $people
-     * @return list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, limite: string, utilizado: string, vencidas: string, tem_vencidas: bool}>
+     * @return list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, doc_tipo: string, limite: string, utilizado: string, vencidas: string, tem_vencidas: bool}>
      */
     private function montarSugestoesCliente($people): array
     {
@@ -1755,12 +1847,16 @@ class ForcaVendasTelaVendaPage extends Page
             $limite = round((float) ($p->limite_credito ?? 0), 2);
             $utilizado = round((float) ($abertos[$id] ?? 0), 2);
             $vencidas = round((float) ($vencidos[$id] ?? 0), 2);
+            $doc = (string) ($p->cpf_cnpj ?? '');
+            $digits = preg_replace('/\D+/', '', $doc) ?? '';
+            $docTipo = strlen($digits) === 14 ? 'cnpj' : (strlen($digits) === 11 ? 'cpf' : '');
 
             return [
                 'id' => $id,
                 'codigo' => (string) ($p->codigo ?? ''),
                 'nome' => (string) ($p->nome_razao ?? ''),
-                'cpf_cnpj' => (string) ($p->cpf_cnpj ?? ''),
+                'cpf_cnpj' => $doc,
+                'doc_tipo' => $docTipo,
                 'limite' => ErpMoney::formatBr($limite),
                 'utilizado' => ErpMoney::formatBr($utilizado),
                 'vencidas' => ErpMoney::formatBr($vencidas),
@@ -2155,9 +2251,22 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function precoVarejoProduto(Product $product): float
     {
+        $campanha = app(\App\Support\Erp\Promocao\PromocaoPrecoService::class)
+            ->precoVarejoAtivo($product);
+
+        if ($campanha !== null) {
+            return $campanha;
+        }
+
+        $hoje = \Illuminate\Support\Carbon::today();
+        $inicio = $product->promo_data_inicio;
+        $fim = $product->promo_data_fim;
         $promo = (float) ($product->promo_preco_venda ?? 0);
 
-        if ($promo > 0) {
+        if ($promo > 0 && filled($inicio) && filled($fim) && $hoje->between(
+            \Illuminate\Support\Carbon::parse($inicio)->startOfDay(),
+            \Illuminate\Support\Carbon::parse($fim)->endOfDay(),
+        )) {
             return round($promo, 2);
         }
 
@@ -2312,8 +2421,82 @@ class ForcaVendasTelaVendaPage extends Page
             $this->estoqueLabel = $estoque->label();
         } else {
             $this->estoqueId = null;
-            $this->estoqueLabel = trim((string) ($vendedor->estoque ?? '')) ?: 'Estoque padrão';
+            $this->estoqueLabel = '';
         }
+    }
+
+    private function estoqueOperacionalDefinido(): bool
+    {
+        return $this->estoqueId !== null && $this->estoqueId > 0;
+    }
+
+    private function caixaOperacionalDefinido(): bool
+    {
+        return $this->caixaId !== null && $this->caixaId > 0;
+    }
+
+    private function bloquearSeOperacaoInvalida(bool $exigeEstoque = true): bool
+    {
+        if (! $this->caixaOperacionalDefinido()) {
+            $this->notificarCaixaNaoDefinido();
+
+            return true;
+        }
+
+        if ($exigeEstoque && ! $this->estoqueOperacionalDefinido()) {
+            $this->notificarEstoqueNaoDefinido();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function pedidoExigeEstoque(): bool
+    {
+        foreach ($this->itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+
+            if ($productId <= 0) {
+                continue;
+            }
+
+            $isServico = Product::query()->whereKey($productId)->value('is_servico');
+
+            if (! $isServico) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function notificarEstoqueNaoDefinido(): void
+    {
+        $nome = trim($this->vendedorLabel) !== '' ? trim($this->vendedorLabel) : 'vendedor selecionado';
+
+        Notification::make()
+            ->title('Depósito de estoque não definido')
+            ->body(
+                'O vendedor '.$nome.' não possui estoque vinculado. '
+                .'Configure em Cadastros → Vendedores antes de lançar produtos.'
+            )
+            ->warning()
+            ->send();
+    }
+
+    private function notificarCaixaNaoDefinido(): void
+    {
+        $nome = trim($this->vendedorLabel) !== '' ? trim($this->vendedorLabel) : 'vendedor selecionado';
+
+        Notification::make()
+            ->title('Caixa não definido')
+            ->body(
+                'O vendedor '.$nome.' não possui caixa vinculado. '
+                .'Configure em Cadastros → Vendedores (ou Permissões do usuário) antes de vender.'
+            )
+            ->warning()
+            ->send();
     }
 
     private function carregarCaixaDoVendedor(Vendedor $vendedor): void
@@ -2385,6 +2568,14 @@ class ForcaVendasTelaVendaPage extends Page
         $this->caixaId = null;
         $this->caixaLabel = '';
         $this->aplicarVendedor($vendedor);
+
+        if (! $this->caixaOperacionalDefinido()) {
+            $this->notificarCaixaNaoDefinido();
+        }
+
+        if (! $this->estoqueOperacionalDefinido()) {
+            $this->notificarEstoqueNaoDefinido();
+        }
     }
 
     public function updatedCaixaId(mixed $value): void
@@ -2555,11 +2746,13 @@ class ForcaVendasTelaVendaPage extends Page
         $restante = max(0, round($this->totalLiquido() - $outros, 2));
         $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr($restante);
 
-        if (PdvFinalizarPagamentosHelper::isFormaAPrazo((string) ($this->meiosPagamento[$index]['descricao'] ?? ''))) {
+        if (PdvFinalizarPagamentosHelper::isFormaAPrazoPagamento($this->meiosPagamento[$index] ?? [])) {
             $pagamentos = array_map(static fn (array $m): array => [
                 'forma' => (string) $m['descricao'],
                 'atalho' => (string) $m['atalho'],
                 'valor' => (string) $m['valor'],
+                'tipo' => (string) ($m['tipo'] ?? ''),
+                'tipo_movimento' => (string) ($m['tipo_movimento'] ?? ''),
             ], $this->meiosPagamento);
 
             $pagamentos = PdvFinalizarPagamentosHelper::aplicarFormaPrazoExclusiva(
@@ -2766,16 +2959,19 @@ class ForcaVendasTelaVendaPage extends Page
             ->orderByRaw('CASE WHEN codigo = ? THEN 0 WHEN descricao LIKE ? THEN 1 ELSE 2 END', [$term, $term.'%'])
             ->orderBy('descricao')
             ->limit(12)
-            ->get(['id', 'codigo', 'descricao', 'preco_venda', 'estoque']);
+            ->get(['id', 'codigo', 'descricao', 'preco_venda']);
 
-        // Reservas ativas no depósito do vendedor (mesmo padrão da aba Estoques do produto).
-        $reservas = app(EstoqueReservaService::class)->totaisReservadosAtivos($this->estoqueId);
+        // Saldo físico e reservas no depósito do vendedor (mesmo critério da validação ao incluir item).
+        $reservaService = app(EstoqueReservaService::class);
+        $saldos = app(ProductEstoqueSaldoService::class);
+        $reservas = $reservaService->totaisReservadosAtivos($this->estoqueId);
 
         return $produtos
-            ->map(function (Product $product) use ($reservas): array {
+            ->map(function (Product $product) use ($reservas, $reservaService, $saldos): array {
                 $preco = $this->precoNaTabelaSelecionada($product) ?? (float) ($product->preco_venda ?? 0);
-                $atual = (float) ($product->estoque ?? 0);
+                $atual = $saldos->fisico((int) $product->id, $this->estoqueId);
                 $reservado = (float) ($reservas[$product->id] ?? 0);
+                $disponivel = $reservaService->disponivel($product, null, $this->estoqueId);
 
                 return [
                     'id' => (int) $product->id,
@@ -2783,7 +2979,7 @@ class ForcaVendasTelaVendaPage extends Page
                     'nome' => (string) ($product->descricao ?? ''),
                     'atual' => $this->formatQty($atual),
                     'reservado' => $this->formatQty($reservado),
-                    'disponivel' => $this->formatQty($atual - $reservado),
+                    'disponivel' => $this->formatQty($disponivel),
                     'preco' => $this->formatMoney($preco),
                 ];
             })

@@ -6,6 +6,7 @@ use App\Filament\Resources\ReciboResource;
 use App\Models\Empresa;
 use App\Models\Recibo;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\Recibo\ReciboBobinaBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,7 @@ class ReciboReportController
         abort_unless(ErpAccess::currentCan('recibos.print'), 403);
 
         $empresa = $this->currentEmpresa();
+        $bobina = $request->boolean('bobina');
 
         $data = [
             'recibo' => $recibo,
@@ -31,15 +33,34 @@ class ReciboReportController
             'printedAt' => now(),
             'closeUrl' => ReciboResource::getUrl('index'),
             'autoPrint' => $request->boolean('auto'),
+            'embedded' => $request->boolean('embed'),
+            'bobina' => $bobina,
         ];
 
-        if ($request->boolean('pdf')) {
-            return Pdf::loadView('reports.recibo-pdf', $data)
-                ->setPaper('a4', 'portrait')
-                ->download('recibo-'.$recibo->codigo.'.pdf');
+        if ($bobina) {
+            $data['bobinaLines'] = app(ReciboBobinaBuilder::class)->buildLines($recibo, $empresa);
         }
 
-        return view('reports.recibo', $data);
+        if ($request->boolean('pdf')) {
+            if ($bobina) {
+                $height = max(600, (count($data['bobinaLines']) + 4) * 14);
+
+                return Pdf::loadView('reports.recibo-bobina-pdf', $data)
+                    ->setPaper([0, 0, 226.77, $height], 'portrait')
+                    ->download('recibo-bobina-'.$recibo->codigo.'.pdf');
+            }
+
+            $pdf = Pdf::loadView('reports.recibo-pdf', $data)
+                ->setPaper('a4', 'portrait');
+
+            $filename = 'recibo-'.$recibo->codigo.'.pdf';
+
+            return $request->boolean('inline')
+                ? $pdf->stream($filename)
+                : $pdf->download($filename);
+        }
+
+        return view($bobina ? 'reports.recibo-bobina' : 'reports.recibo', $data);
     }
 
     protected function currentEmpresa(): ?Empresa
@@ -63,7 +84,7 @@ class ReciboReportController
             filled($empresa->uf) ? mb_strtoupper(trim($empresa->uf), 'UTF-8') : null,
         ]);
 
-        return $partes === [] ? '' : implode(' — ', $partes);
+        return $partes === [] ? '' : implode(', ', $partes);
     }
 
     protected function logoDataUri(?Empresa $empresa): ?string

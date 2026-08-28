@@ -40,6 +40,7 @@ class NfceListQueryBuilder
                 'pdvVenda.vendedor',
                 'pdvVenda.venda',
                 'pdvVenda.itens.product',
+                'pdvVenda.person',
             ]);
 
         if ($this->empresaId) {
@@ -99,7 +100,10 @@ class NfceListQueryBuilder
             'numero' => $query->where('numero', 'like', $like),
             'chave' => $query->where('chave', 'like', $like),
             'protocolo' => $query->where('protocolo', 'like', $like),
-            'cpf' => $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like)),
+            'cpf' => $query->where(function (Builder $outer) use ($like): void {
+                $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
+                    ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
+            }),
             'caixa' => $query->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like)),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {

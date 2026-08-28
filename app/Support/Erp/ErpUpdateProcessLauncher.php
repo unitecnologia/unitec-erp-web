@@ -2,201 +2,127 @@
 
 namespace App\Support\Erp;
 
+use App\Support\Erp\Atualizacao\AtualizacaoApplyService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 
-class ErpUpdateProcessLauncher
+/**
+ * Dispara exclusivamente o apply da árvore já depositada em atualizacao/.
+ */
+final class ErpUpdateProcessLauncher
 {
-    public static function launch(string $appPath, string $artisanCommand = 'unitec:apply-update'): bool
+    public static function launch(string $appPath): bool
     {
         $appPath = rtrim($appPath, '\\/');
-        $phpBinary = self::resolvePhpBinary($appPath);
+        $php = self::resolvePhpBinary($appPath);
         $artisan = $appPath.DIRECTORY_SEPARATOR.'artisan';
-        $logFile = storage_path('logs/erp-update-spawn.log');
+        $logFile = storage_path('logs/erp-atualizacao-apply.log');
 
-        if (! is_file($artisan)) {
-            self::log($logFile, 'ERRO: artisan nao encontrado em '.$artisan);
-
-            return false;
-        }
-
-        if (! self::isUsablePhpBinary($phpBinary)) {
-            self::log($logFile, 'ERRO: PHP invalido: '.$phpBinary);
-
+        if (! is_file($artisan) || ! self::isUsablePhpBinary($php)) {
             return false;
         }
 
         File::ensureDirectoryExists(dirname($logFile));
-        self::log($logFile, 'Disparando '.$artisanCommand);
-        self::log($logFile, 'PHP: '.$phpBinary);
-        self::log($logFile, 'AppPath: '.$appPath);
 
         if (PHP_OS_FAMILY === 'Windows') {
-            return self::launchViaWindowsBatch($appPath, $phpBinary, $artisan, $logFile, $artisanCommand)
-                || self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile, $artisanCommand);
-        }
+            $batch = storage_path('app/private/erp-atualizacao-apply.bat');
+            $quote = static fn (string $value): string => str_replace('"', '""', $value);
+            File::put($batch, implode("\r\n", [
+                '@echo off',
+                'chcp 65001 >nul',
+                'cd /d "'.$quote($appPath).'"',
+                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" unitec:apply-atualizacao --app-path="'.$quote($appPath).'" >> "'.$quote($logFile).'" 2>&1',
+            ])."\r\n");
 
-        return self::launchViaProcess($appPath, $phpBinary, $artisan, $logFile, $artisanCommand)
-            || self::launchViaUnixShell($appPath, $phpBinary, $artisan, $logFile, $artisanCommand);
-    }
+            $handle = @popen('start "" /B cmd /C '.escapeshellarg($batch), 'r');
+            if ($handle === false) {
+                return false;
+            }
 
-    public static function launchDownload(string $appPath, bool $force = false): bool
-    {
-        $command = 'unitec:download-update';
-        if ($force) {
-            $command .= ' --force';
-        }
-
-        return self::launch($appPath, $command);
-    }
-
-    public static function resolvePhpBinary(string $appPath): string
-    {
-        $embedded = self::findEmbeddedPhpExecutable($appPath);
-        if ($embedded !== null) {
-            return $embedded;
-        }
-
-        $binary = PHP_BINARY ?: '';
-        if (self::isUsablePhpBinary($binary)) {
-            return $binary;
-        }
-
-        if (PHP_OS_FAMILY === 'Windows') {
-            $where = trim((string) shell_exec('where php 2>NUL'));
-            $first = strtok($where, "\r\n");
-            if (is_string($first) && self::isUsablePhpBinary($first)) {
-                return $first;
+            pclose($handle);
+        } else {
+            try {
+                Process::path($appPath)
+                    ->timeout(null)
+                    ->start([$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan, 'unitec:apply-atualizacao', '--app-path='.$appPath]);
+            } catch (\Throwable) {
+                return false;
             }
         }
 
-        return 'php';
-    }
-
-    private static function launchViaProcess(
-        string $appPath,
-        string $phpBinary,
-        string $artisan,
-        string $logFile,
-        string $artisanCommand = 'unitec:apply-update'
-    ): bool {
-        try {
-            $parts = preg_split('/\s+/', trim($artisanCommand)) ?: ['unitec:apply-update'];
-            $args = array_merge([$phpBinary, $artisan], $parts, ['--app-path='.$appPath]);
-
-            $process = Process::path($appPath)
-                ->timeout(null)
-                ->env(self::inheritEnvironment())
-                ->start($args);
-
-            usleep(1_000_000);
-
-            if ($process->running()) {
-                self::log($logFile, 'Processo em execucao via Process::start ('.$artisanCommand.').');
-
+        for ($i = 0; $i < 8; $i++) {
+            $state = (string) (AtualizacaoApplyService::readProgress($appPath)['state'] ?? 'idle');
+            if (in_array($state, ['starting', 'copying', 'discovering', 'migrating', 'caching', 'finalizing', 'completed', 'failed'], true)) {
                 return true;
             }
 
-            self::log(
-                $logFile,
-                'Process::start encerrou cedo (codigo '.($process->exitCode() ?? 'null').').'
-            );
-
-            return self::waitForUpdateStart($logFile, 4, $artisanCommand);
-        } catch (\Throwable $exception) {
-            self::log($logFile, 'Process::start falhou: '.$exception->getMessage());
+            usleep(500_000);
         }
 
         return false;
     }
 
-    private static function launchViaWindowsBatch(
-        string $appPath,
-        string $phpBinary,
-        string $artisan,
-        string $logFile,
-        string $artisanCommand = 'unitec:apply-update'
-    ): bool {
-        if (self::isShellFunctionDisabled('popen')) {
-            self::log($logFile, 'ERRO: popen desabilitado no PHP.');
+    /**
+     * Gera caches Filament em background (não bloqueia o modal de atualização).
+     */
+    public static function launchFilamentCaches(string $appPath): bool
+    {
+        $appPath = rtrim($appPath, '\\/');
+        $php = self::resolvePhpBinary($appPath);
+        $artisan = $appPath.DIRECTORY_SEPARATOR.'artisan';
+        $logFile = $appPath.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'logs'
+            .DIRECTORY_SEPARATOR.'erp-filament-cache.log';
 
+        if (! is_file($artisan) || ! self::isUsablePhpBinary($php)) {
             return false;
         }
 
-        $isDownload = str_contains($artisanCommand, 'download-update');
-        $batchPath = storage_path('app/private/'.($isDownload ? 'erp-update-download-run.bat' : 'erp-update-run.bat'));
-        File::ensureDirectoryExists(dirname($batchPath));
+        File::ensureDirectoryExists(dirname($logFile));
 
-        $batch = implode("\r\n", [
-            '@echo off',
-            'chcp 65001 >nul',
-            'cd /d "'.str_replace('"', '""', $appPath).'"',
-            '"'.str_replace('"', '""', $phpBinary).'" "'.str_replace('"', '""', $artisan).'" '.$artisanCommand.' --app-path="'.str_replace('"', '""', $appPath).'" >> "'.str_replace('"', '""', $logFile).'" 2>&1',
-        ])."\r\n";
+        if (PHP_OS_FAMILY === 'Windows') {
+            $batch = $appPath.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
+                .DIRECTORY_SEPARATOR.'private'.DIRECTORY_SEPARATOR.'erp-filament-cache.bat';
+            $quote = static fn (string $value): string => str_replace('"', '""', $value);
+            File::put($batch, implode("\r\n", [
+                '@echo off',
+                'chcp 65001 >nul',
+                'cd /d "'.$quote($appPath).'"',
+                'echo [%date% %time%] Iniciando caches Filament >> "'.$quote($logFile).'"',
+                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" icons:cache >> "'.$quote($logFile).'" 2>&1',
+                '"'.$quote($php).'" -d opcache.enable=0 -d opcache.enable_cli=0 "'.$quote($artisan).'" filament:cache-components >> "'.$quote($logFile).'" 2>&1',
+                'echo [%date% %time%] Caches Filament concluidos >> "'.$quote($logFile).'"',
+            ])."\r\n");
 
-        File::put($batchPath, $batch);
-        self::log($logFile, 'Batch gerado: '.$batchPath);
+            $handle = @popen('start "" /B cmd /C '.escapeshellarg($batch), 'r');
+            if ($handle === false) {
+                return false;
+            }
 
-        $handle = @popen('start "" /B cmd /C '.escapeshellarg($batchPath), 'r');
-        if ($handle === false) {
-            self::log($logFile, 'ERRO: nao foi possivel executar o batch de atualizacao.');
+            pclose($handle);
 
+            return true;
+        }
+
+        try {
+            Process::path($appPath)
+                ->timeout(null)
+                ->start([$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan, 'icons:cache']);
+            Process::path($appPath)
+                ->timeout(null)
+                ->start([$php, '-d', 'opcache.enable=0', '-d', 'opcache.enable_cli=0', $artisan, 'filament:cache-components']);
+        } catch (\Throwable) {
             return false;
         }
 
-        pclose($handle);
-
-        return self::waitForUpdateStart($logFile, 8, $artisanCommand);
+        return true;
     }
 
-    private static function launchViaUnixShell(
-        string $appPath,
-        string $phpBinary,
-        string $artisan,
-        string $logFile,
-        string $artisanCommand = 'unitec:apply-update'
-    ): bool {
-        if (self::isShellFunctionDisabled('exec')) {
-            self::log($logFile, 'ERRO: exec desabilitado no PHP.');
-
-            return false;
-        }
-
-        $command = sprintf(
-            '%s %s %s --app-path=%s >> %s 2>&1 &',
-            escapeshellarg($phpBinary),
-            escapeshellarg($artisan),
-            $artisanCommand,
-            escapeshellarg($appPath),
-            escapeshellarg($logFile)
-        );
-
-        self::log($logFile, 'Fallback Unix: '.$command);
-        exec($command, $output, $exitCode);
-        self::log($logFile, 'Fallback exec exit='.$exitCode);
-
-        return self::waitForUpdateStart($logFile, 8, $artisanCommand);
-    }
-
-    private static function findEmbeddedPhpExecutable(string $appPath): ?string
+    public static function resolvePhpBinary(string $appPath): string
     {
         $candidates = [
             $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'php.exe',
+            PHP_BINARY ?: '',
         ];
-
-        $phpRoot = $appPath.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php';
-        if (is_dir($phpRoot)) {
-            foreach (scandir($phpRoot) ?: [] as $entry) {
-                if ($entry === '.' || $entry === '..') {
-                    continue;
-                }
-
-                $candidate = $phpRoot.DIRECTORY_SEPARATOR.$entry.DIRECTORY_SEPARATOR.'php.exe';
-                if (is_file($candidate)) {
-                    $candidates[] = $candidate;
-                }
-            }
-        }
 
         foreach ($candidates as $candidate) {
             if (self::isUsablePhpBinary($candidate)) {
@@ -204,111 +130,17 @@ class ErpUpdateProcessLauncher
             }
         }
 
-        return null;
+        return 'php';
     }
 
     private static function isUsablePhpBinary(string $path): bool
     {
-        if ($path === '' || $path === 'php') {
-            return $path === 'php';
-        }
-
-        if (! is_file($path)) {
-            return false;
-        }
-
-        $lower = strtolower($path);
-
-        return ! str_contains($lower, 'php-cgi')
-            && ! str_contains($lower, 'php-fpm');
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private static function inheritEnvironment(): array
-    {
-        $env = [];
-        $keys = ['PATH', 'PATHEXT', 'SystemRoot', 'TEMP', 'TMP', 'APP_ENV', 'COMPUTERNAME'];
-
-        foreach ($keys as $key) {
-            $value = getenv($key);
-            if (is_string($value) && $value !== '') {
-                $env[$key] = $value;
-            }
-        }
-
-        return $env;
-    }
-
-    private static function waitForUpdateStart(string $logFile, int $attempts = 6, string $artisanCommand = 'unitec:apply-update'): bool
-    {
-        $isDownload = str_contains($artisanCommand, 'download-update');
-
-        for ($i = 0; $i < $attempts; $i++) {
-            if ($isDownload) {
-                if (ErpUpdateService::isDownloadRunning() || ErpUpdateService::isLocalPackageReady()) {
-                    return true;
-                }
-                $meta = ErpUpdateService::readPackageMeta();
-                if (in_array((string) ($meta['download_state'] ?? ''), ['checking', 'downloading', 'ready', 'failed'], true)) {
-                    return true;
-                }
-            } elseif (self::looksLikeUpdateStarted($logFile)) {
-                return true;
-            }
-
-            usleep(500_000);
-        }
-
-        self::log($logFile, 'ERRO: processo de atualizacao nao confirmado apos espera.');
-
-        return false;
-    }
-
-    private static function looksLikeUpdateStarted(string $logFile): bool
-    {
-        if (is_file(storage_path('app/private/erp-update.lock'))) {
+        if ($path === 'php') {
             return true;
         }
 
-        $status = ErpUpdateService::readStatus();
-        $state = (string) ($status['state'] ?? 'idle');
-        $percent = (int) ($status['percent'] ?? 0);
-
-        if (in_array($state, ['downloading', 'extracting', 'applying', 'migrating', 'finalizing', 'completed', 'failed'], true)) {
-            return true;
-        }
-
-        if ($state === 'starting' && $percent > 5) {
-            return true;
-        }
-
-        if (! is_file($logFile)) {
-            return false;
-        }
-
-        $tail = (string) file_get_contents($logFile);
-
-        return str_contains($tail, 'Iniciando atualizacao via PHP.')
-            || str_contains($tail, 'Processo em execucao');
-    }
-
-    private static function isShellFunctionDisabled(string $function): bool
-    {
-        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-
-        return in_array($function, $disabled, true);
-    }
-
-    private static function log(string $logFile, string $message): void
-    {
-        $line = '['.now()->format('Y-m-d H:i:s').'] '.$message.PHP_EOL;
-
-        try {
-            File::append($logFile, $line);
-        } catch (\Throwable) {
-            // ignore
-        }
+        return $path !== '' && is_file($path)
+            && ! str_contains(strtolower($path), 'php-cgi')
+            && ! str_contains(strtolower($path), 'php-fpm');
     }
 }

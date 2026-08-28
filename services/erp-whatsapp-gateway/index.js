@@ -248,12 +248,37 @@ async function ensureConnectedSession(empresaId) {
 
 async function prepareRecipient(sock, jid) {
   try {
+    if (typeof sock.assertSessions === 'function') {
+      await sock.assertSessions([jid], true);
+    }
+  } catch (error) {
+    logger.warn({ err: error, jid }, 'assertSessions falhou');
+  }
+
+  try {
     await sock.presenceSubscribe(jid);
   } catch (error) {
     logger.warn({ err: error, jid }, 'presenceSubscribe falhou');
   }
 
-  await delay(250);
+  // Dá tempo da sessão de criptografia estabilizar (evita "Aguardando mensagem").
+  await delay(800);
+}
+
+/**
+ * Mantém a conexão ativa após o sendMessage para o upload/relay terminar.
+ * Sem isso o destinatário costuma ver "Aguardando mensagem" com 1 ✓.
+ */
+async function settleAfterSend(sock, jid, ms = 2500) {
+  try {
+    if (typeof sock.sendPresenceUpdate === 'function') {
+      await sock.sendPresenceUpdate('available', jid);
+    }
+  } catch {
+    // ignore
+  }
+
+  await delay(ms);
 }
 
 async function resolveBaileysVersion() {
@@ -313,6 +338,8 @@ async function sendTextMessage(sock, jid, text) {
     throw new Error('WhatsApp não aceitou a mensagem.');
   }
 
+  await settleAfterSend(sock, jid, 1500);
+
   return {
     key: sent.key,
   };
@@ -334,6 +361,43 @@ function publicStatus(state) {
     number: state.number,
     qr: state.qr,
   };
+}
+
+/**
+ * Aguarda QR / conexão / erro antes de responder o /start.
+ * Sem isso a UI fica em "Aguardando QR" com imagem vazia.
+ */
+function waitUntilSessionReady(empresaId, timeoutMs = 30000) {
+  const key = String(empresaId);
+  const startedAt = Date.now();
+
+  return new Promise((resolve) => {
+    const tick = () => {
+      const current = sessions.get(key);
+
+      if (! current) {
+        resolve(null);
+
+        return;
+      }
+
+      if (current.qr || current.status === 'conectado' || current.status === 'erro') {
+        resolve(current);
+
+        return;
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(current);
+
+        return;
+      }
+
+      setTimeout(tick, 200);
+    };
+
+    tick();
+  });
 }
 
 async function destroySession(empresaId, logout = true) {
@@ -363,7 +427,8 @@ async function destroySession(empresaId, logout = true) {
   }
 }
 
-async function startSession(empresaId) {
+async function startSession(empresaId, options = {}) {
+  const waitForQrMs = Number(options.waitForQrMs ?? 30000);
   const key = String(empresaId);
   let state = sessions.get(key);
 
@@ -376,7 +441,14 @@ async function startSession(empresaId) {
     return publicStatus(state);
   }
 
+  // Já gerando QR: aguarda o resultado em vez de devolver qr=null.
   if (state.starting) {
+    await waitUntilSessionReady(empresaId, waitForQrMs);
+
+    return publicStatus(sessions.get(key) ?? state);
+  }
+
+  if (state.qr && state.status === 'aguardando_qr') {
     return publicStatus(state);
   }
 
@@ -394,87 +466,96 @@ async function startSession(empresaId) {
   state.status = 'aguardando_qr';
   state.qr = null;
 
-  const dir = sessionDir(empresaId);
-  fs.mkdirSync(dir, { recursive: true });
+  try {
+    const dir = sessionDir(empresaId);
+    fs.mkdirSync(dir, { recursive: true });
 
-  const { state: authState, saveCreds } = await useMultiFileAuthState(dir);
-  const { version } = await resolveBaileysVersion();
+    const { state: authState, saveCreds } = await useMultiFileAuthState(dir);
+    const { version } = await resolveBaileysVersion();
 
-  const sock = makeWASocket({
-    version,
-    auth: authState,
-    logger,
-    printQRInTerminal: false,
-    syncFullHistory: false,
-    markOnlineOnConnect: false,
-  });
+    const sock = makeWASocket({
+      version,
+      auth: authState,
+      logger,
+      printQRInTerminal: false,
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+    });
 
-  state.sock = sock;
+    state.sock = sock;
 
-  sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', async (update) => {
-    const current = sessions.get(key);
+    sock.ev.on('connection.update', async (update) => {
+      const current = sessions.get(key);
 
-    if (!current) {
-      return;
-    }
-
-    if (update.qr) {
-      try {
-        current.qr = await QRCode.toDataURL(update.qr);
-      } catch (error) {
-        current.qr = null;
-        logger.error({ err: error }, 'Falha ao gerar QR');
-      }
-
-      current.status = 'aguardando_qr';
-    }
-
-    if (update.connection === 'open') {
-      const me = sock.user?.id ?? '';
-      const rawNumber = me.split(':')[0]?.split('@')[0] ?? '';
-      current.number = normalizeNumber(rawNumber) ?? rawNumber;
-      current.status = 'conectado';
-      current.qr = null;
-      current.starting = false;
-    }
-
-    if (update.connection === 'close') {
-      const statusCode = update.lastDisconnect?.error?.output?.statusCode;
-      current.starting = false;
-      current.qr = null;
-      current.sock = null;
-
-      if (statusCode === DisconnectReason.loggedOut) {
-        current.status = 'desconectado';
-        current.number = '';
-        sessions.delete(key);
-
-        const authDir = sessionDir(empresaId);
-
-        if (fs.existsSync(authDir)) {
-          fs.rmSync(authDir, { recursive: true, force: true });
-        }
-
+      if (!current) {
         return;
       }
 
-      current.status = 'desconectado';
+      if (update.qr) {
+        try {
+          current.qr = await QRCode.toDataURL(update.qr);
+        } catch (error) {
+          current.qr = null;
+          logger.error({ err: error }, 'Falha ao gerar QR');
+        }
 
-      if (statusCode !== DisconnectReason.loggedOut) {
-        setTimeout(() => {
-          startSession(empresaId).catch((error) => {
-            logger.error({ err: error }, 'Falha ao reconectar sessão');
-          });
-        }, 1500);
+        current.status = 'aguardando_qr';
+        current.starting = false;
       }
+
+      if (update.connection === 'open') {
+        const me = sock.user?.id ?? '';
+        const rawNumber = me.split(':')[0]?.split('@')[0] ?? '';
+        current.number = normalizeNumber(rawNumber) ?? rawNumber;
+        current.status = 'conectado';
+        current.qr = null;
+        current.starting = false;
+      }
+
+      if (update.connection === 'close') {
+        const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+        current.starting = false;
+        current.qr = null;
+        current.sock = null;
+
+        if (statusCode === DisconnectReason.loggedOut) {
+          current.status = 'desconectado';
+          current.number = '';
+          sessions.delete(key);
+
+          const authDir = sessionDir(empresaId);
+
+          if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true, force: true });
+          }
+
+          return;
+        }
+
+        current.status = 'desconectado';
+
+        if (statusCode !== DisconnectReason.loggedOut) {
+          setTimeout(() => {
+            startSession(empresaId).catch((error) => {
+              logger.error({ err: error }, 'Falha ao reconectar sessão');
+            });
+          }, 1500);
+        }
+      }
+    });
+
+    await waitUntilSessionReady(empresaId, waitForQrMs);
+  } finally {
+    const current = sessions.get(key);
+
+    if (current) {
+      current.starting = false;
     }
-  });
+  }
 
-  state.starting = false;
-
-  return publicStatus(state);
+  return publicStatus(sessions.get(key) ?? state);
 }
 
 async function restoreSessions() {
@@ -603,21 +684,26 @@ app.post('/sessions/:empresaId/send', requireAuth, async (req, res) => {
 
       const buffer = fs.readFileSync(documentPath);
 
-      if (text !== '') {
-        await sendTextMessage(state.sock, jid, text);
-      }
-
       await prepareRecipient(state.sock, jid);
 
-      const documentSent = await state.sock.sendMessage(jid, {
+      // Um único envio (documento + legenda) é mais estável que texto + anexo separados.
+      const payload = {
         document: buffer,
         mimetype,
         fileName: documentName,
-      });
+      };
+
+      if (text !== '') {
+        payload.caption = text;
+      }
+
+      const documentSent = await state.sock.sendMessage(jid, payload);
 
       if (!documentSent?.key?.id) {
         return res.status(500).json({ message: 'WhatsApp não aceitou o envio do documento.' });
       }
+
+      await settleAfterSend(state.sock, jid, 3000);
 
       return res.json({
         message: 'Documento enviado.',

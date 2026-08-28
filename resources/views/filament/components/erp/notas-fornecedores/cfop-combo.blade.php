@@ -9,18 +9,26 @@
     $current = preg_replace('/\D/', '', (string) $value) ?: '';
     $display = $current !== '' ? $current : '—';
     $itemIndexJs = $itemIndex === null ? 'null' : (int) $itemIndex;
+    $comboUid = 'cfop-'.($itemIndex === null ? 'header' : (int) $itemIndex);
 @endphp
 
 <div
     class="erp-nf-cfop-combo {{ $compact ? 'erp-nf-cfop-combo--compact' : '' }}"
     x-data="{
         open: false,
+        uid: @js($comboUid),
         panelStyle: {},
+        announceOpen() {
+            window.dispatchEvent(new CustomEvent('erp-nf-combo-open', { detail: { uid: this.uid } }));
+        },
         toggle() {
-            this.open = ! this.open;
-            if (! this.open) {
+            if (this.open) {
+                this.open = false;
                 return;
             }
+
+            this.announceOpen();
+            this.open = true;
 
             this.$nextTick(() => {
                 const btn = this.$refs.btn;
@@ -61,8 +69,9 @@
         },
     }"
     @keydown.escape.window="open = false"
+    @erp-nf-combo-open.window="if ($event.detail.uid !== uid) open = false"
     @click.outside="open = false"
-    wire:click.stop
+    @click.stop
 >
     <button
         type="button"

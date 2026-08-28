@@ -228,7 +228,7 @@
                         <div class="erp-dash-health-modal__backdrop" @click="healthOpen = false"></div>
                         <div class="erp-dash-health-modal__window" @click.stop>
                             <div class="erp-dash-health-modal__titlebar">
-                                <span id="erp-dash-health-modal-title">Saúde da Empresa — detalhe</span>
+                                <span id="erp-dash-health-modal-title">{{ $healthGauge['detail']['modal_title'] ?? (($healthGauge['label'] ?? 'Saúde da Empresa').' — detalhe') }}</span>
                                 <button
                                     type="button"
                                     class="erp-dash-health-modal__close"

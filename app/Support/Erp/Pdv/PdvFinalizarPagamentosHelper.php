@@ -3,9 +3,27 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Financeiro\FormaPagamentoDestino;
 
 final class PdvFinalizarPagamentosHelper
 {
+    /**
+     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string}  $pagamento
+     */
+    public static function isFormaAPrazoPagamento(array $pagamento): bool
+    {
+        // Cartão em CR usa canhoto, não zera as demais formas.
+        if (self::isFormaCartao($pagamento)) {
+            return false;
+        }
+
+        if (FormaPagamentoDestino::geraContasReceber($pagamento)) {
+            return true;
+        }
+
+        return self::isFormaAPrazo((string) ($pagamento['forma'] ?? ''));
+    }
+
     public static function isFormaAPrazo(string $forma): bool
     {
         $forma = mb_strtoupper(trim($forma), 'UTF-8');
@@ -24,8 +42,42 @@ final class PdvFinalizarPagamentosHelper
         return str_contains($forma, 'CREDIÁRIO') || str_contains($forma, 'CREDIARIO');
     }
 
+    public static function isFormaCheque(string $forma): bool
+    {
+        return str_contains(mb_strtoupper(trim($forma), 'UTF-8'), 'CHEQUE');
+    }
+
+    public static function isFormaBoleto(string $forma): bool
+    {
+        return str_contains(mb_strtoupper(trim($forma), 'UTF-8'), 'BOLETO');
+    }
+
     /**
-     * Cartão (crédito/débito/POS) marcado para Contas à Receber → conciliação via canhoto.
+     * Crediário / cheque / boleto: abre a tela Contas Receber | Parcelas (carnê).
+     * Cartão usa canhoto e não entra aqui.
+     *
+     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string}  $pagamento
+     */
+    public static function precisaParcelasCarne(array $pagamento): bool
+    {
+        if (self::isFormaCartao($pagamento)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+        $forma = (string) ($pagamento['forma'] ?? '');
+
+        if (in_array($tipo, ['crediario', 'cheque', 'boleto'], true)) {
+            return true;
+        }
+
+        return self::isFormaCrediario($forma)
+            || self::isFormaCheque($forma)
+            || self::isFormaBoleto($forma);
+    }
+
+    /**
+     * Cartão (crédito/débito/POS) com tipo_movimento Contas à Receber.
      *
      * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool|int|string}  $pagamento
      */
@@ -35,20 +87,12 @@ final class PdvFinalizarPagamentosHelper
             return false;
         }
 
-        $apareceCr = filter_var($pagamento['aparece_contas_receber'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $movimentoCr = strtolower(trim((string) ($pagamento['tipo_movimento'] ?? ''))) === 'contas_receber';
-
-        return $apareceCr || $movimentoCr;
+        return FormaPagamentoDestino::geraContasReceber($pagamento);
     }
 
     /**
-     * Decide se o cartão vai para Contas a Receber (ainda não caiu na conta)
-     * ou para o movimento de caixa.
-     *
-     * Regra:
-     * - Forma com Contas a Receber / tipo_movimento CR → sempre Contas a Receber
-     * - Parâmetro empresa "Lançar Cartão no Caixa" desmarcado → Contas a Receber
-     * - Parâmetro marcado e forma sem CR → lança no caixa
+     * Decide se o cartão vai para Contas a Receber.
+     * Fonte da verdade: tipo_movimento da forma (parametro empresa só se movimento vazio/legado).
      *
      * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool|int|string}  $pagamento
      */
@@ -58,11 +102,27 @@ final class PdvFinalizarPagamentosHelper
             return false;
         }
 
-        if (self::isFormaCartaoContasReceber($pagamento)) {
+        $movimento = FormaPagamentoDestino::from($pagamento);
+
+        if ($movimento === 'contas_receber') {
             return true;
         }
 
-        return ! $lancarCartaoNoCaixa;
+        if ($movimento === 'caixa') {
+            return false;
+        }
+
+        // Legado sem tipo_movimento: parâmetro empresa + flag aparece_contas_receber
+        if ($movimento === 'nenhum') {
+            $apareceCr = filter_var($pagamento['aparece_contas_receber'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            if ($apareceCr) {
+                return true;
+            }
+
+            return ! $lancarCartaoNoCaixa;
+        }
+
+        return false;
     }
 
     /**

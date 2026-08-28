@@ -168,18 +168,19 @@
             <div>{{ $modoLabel }}</div>
             <div>{{ $statusLabel }}</div>
             <div>Emissão: {{ $dataEmissao }} {{ $horaEmissao }}</div>
-            <div>PDV #{{ str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT) }} · Operador: {{ $usuario }}</div>
-            @if ($venda->vendedor_nome)
-                <div>Vendedor: {{ $venda->vendedor_nome }}</div>
+            <div>Operador: {{ $usuario }}</div>
+            @if (filled($numeroPedido ?? null))
+                <div>Número: {{ $numeroPedido }}</div>
+            @endif
+            <div>DAV: {{ $numeroPdv ?? str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT) }}</div>
+            @if (filled($vendedorNome ?? null))
+                <div>Vendedor: {{ $vendedorNome }}</div>
             @endif
             @if ($consumidorNome ?? null)
                 <div>Consumidor: {{ $consumidorNome }}</div>
                 @if (filled($consumidorEndereco ?? null))
                     <div>Endereço: {{ $consumidorEndereco }}</div>
                 @endif
-            @endif
-            @if ($cpfNotaMascarado ?? null)
-                <div>CPF: {{ $cpfNotaMascarado }}</div>
             @endif
         </div>
 
@@ -215,7 +216,7 @@
             <div class="meta meta--left" style="margin-top: 4px;">
                 <div><strong>Formas de pagamento</strong></div>
                 @foreach ($venda->pagamentos as $pagamento)
-                    <div>{{ $pagamento->descricaoComCanhoto() }}: R$ {{ number_format((float) $pagamento->valor, 2, ',', '') }}</div>
+                    <div>{{ $pagamento->linhaCupom() }}</div>
                 @endforeach
             </div>
         @else
@@ -224,8 +225,12 @@
             </div>
         @endif
 
+        @if (filled($cpfNota ?? null))
+            <div class="meta meta--left" style="margin-top: 4px;">CPF: {{ $cpfNota }}</div>
+        @endif
+
         @if ($venda->observacoes)
-            <div class="meta meta--left" style="margin-top: 4px;">Inf. adicionais: {{ $venda->observacoes }}</div>
+            <div class="meta meta--left" style="margin-top: 4px;">{{ $venda->observacoes }}</div>
         @endif
 
         <div class="divider"></div>

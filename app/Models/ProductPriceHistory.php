@@ -9,8 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'product_id',
     'ultimo_preco',
+    'preco_custo',
+    'preco_atacado',
+    'preco_especial',
     'registrado_em',
     'usuario',
+    'forma_alteracao',
 ])]
 class ProductPriceHistory extends Model
 {
@@ -18,6 +22,9 @@ class ProductPriceHistory extends Model
     {
         return [
             'ultimo_preco' => 'decimal:2',
+            'preco_custo' => 'decimal:2',
+            'preco_atacado' => 'decimal:2',
+            'preco_especial' => 'decimal:2',
             'registrado_em' => 'date',
         ];
     }

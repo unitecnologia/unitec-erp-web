@@ -40,7 +40,7 @@
                 <span><strong>VALIDADE:</strong> {{ (int) ($orcamento->validade_dias ?? 0) }} dias</span>
             </div>
             <div class="orc-doc__meta-row">
-                <span><strong>CLIENTE:</strong> {{ mb_strtoupper($orcamento->cliente?->nome_razao ?? '—', 'UTF-8') }}</span>
+                <span><strong>CLIENTE:</strong> {{ $orcamento->clienteDisplayNome() ?: '—' }}</span>
             </div>
             <div class="orc-doc__meta-row">
                 <span><strong>VENDEDOR:</strong> {{ mb_strtoupper($orcamento->vendedor?->nome ?? '—', 'UTF-8') }}</span>

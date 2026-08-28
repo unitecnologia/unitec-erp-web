@@ -154,6 +154,8 @@ class AcessoRapidoModals extends Component
             session(['erp_empresa_id' => (int) $target->empresa_id]);
         }
 
+        \App\Support\Erp\ErpContext::clearMemo();
+
         ErpAccess::storeInSession($target, $target->effectivePermissionKeys());
 
         $this->closeTrocarUsuario();

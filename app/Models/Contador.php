@@ -23,6 +23,25 @@ class Contador extends Model
 {
     protected $table = 'contadores';
 
+    /**
+     * Contador do cadastro local usado no envio por e-mail (pacote NFe/NFC-e).
+     * Não usa vínculo do Portal do Contador.
+     */
+    public static function paraEnvioEmail(): ?self
+    {
+        $comEmail = static::query()
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->orderBy('id')
+            ->first();
+
+        if ($comEmail) {
+            return $comEmail;
+        }
+
+        return static::query()->orderBy('id')->first();
+    }
+
     public static function nextCodigo(): string
     {
         $max = static::query()

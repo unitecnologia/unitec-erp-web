@@ -12,16 +12,17 @@ class ProductAuxiliarySeeder extends Seeder
     public function run(): void
     {
         foreach ([
-            ['sigla' => 'UN', 'descricao' => 'UNIDADE'],
-            ['sigla' => 'PC', 'descricao' => 'PC'],
-            ['sigla' => 'KG', 'descricao' => 'QUILOGRAMA'],
-            ['sigla' => 'CX', 'descricao' => 'CAIXA'],
-            ['sigla' => 'LT', 'descricao' => 'LITRO'],
-            ['sigla' => 'MT', 'descricao' => 'METRO'],
-            ['sigla' => 'M2', 'descricao' => 'METRO QUADRADO'],
-            ['sigla' => 'M3', 'descricao' => 'METRO CUBICO'],
-            ['sigla' => 'PAR', 'descricao' => 'PAR'],
-            ['sigla' => 'SC', 'descricao' => 'SACO'],
+            ['sigla' => 'UN', 'descricao' => 'Unidade'],
+            ['sigla' => 'PC', 'descricao' => 'Peça'],
+            ['sigla' => 'KG', 'descricao' => 'Quilograma'],
+            ['sigla' => 'CX', 'descricao' => 'Caixa'],
+            ['sigla' => 'LT', 'descricao' => 'Litro'],
+            ['sigla' => 'MT', 'descricao' => 'Metro'],
+            ['sigla' => 'M2', 'descricao' => 'Metro quadrado'],
+            ['sigla' => 'M3', 'descricao' => 'Metro cúbico'],
+            ['sigla' => 'PAR', 'descricao' => 'Par'],
+            ['sigla' => 'SC', 'descricao' => 'Saco'],
+            ['sigla' => 'KIT', 'descricao' => 'Kit'],
         ] as $unidade) {
             Unidade::query()->updateOrCreate(
                 ['sigla' => $unidade['sigla']],

@@ -55,7 +55,10 @@ class CaixaResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('historico')
                     ->label('Histórico')
-                    ->formatStateUsing(fn (?string $state): string => mb_strtoupper((string) ($state ?? ''), 'UTF-8'))
+                    ->formatStateUsing(fn (?string $state): string => mb_strtoupper(
+                        preg_replace('/^\[MANUAL\]\s*/iu', '', (string) ($state ?? '')) ?? '',
+                        'UTF-8',
+                    ))
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
                 TextColumn::make('plano_contas')

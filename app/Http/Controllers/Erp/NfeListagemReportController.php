@@ -104,7 +104,11 @@ class NfeListagemReportController extends Controller
                 fputcsv(
                     $handle,
                     array_map(
-                        fn (string $column): string => NfeListagemReport::cellValue($nfe, $column),
+                        fn (string $column): string => str_replace(
+                            ["\r", "\n"],
+                            ['', ' '],
+                            NfeListagemReport::cellValue($nfe, $column),
+                        ),
                         $columns,
                     ),
                     ';',

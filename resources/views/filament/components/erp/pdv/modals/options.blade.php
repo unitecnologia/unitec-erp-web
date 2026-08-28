@@ -27,18 +27,6 @@
                     </button>
                 </li>
 
-                @if ($this->pdvExibirF3Vendedor)
-                    <li>
-                        <button type="button" role="menuitem" wire:click="openVendedorModal" @disabled(! $caixaAberto)>
-                            <span class="erp-pdv-options__ico" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>
-                            </span>
-                            <span class="erp-pdv-options__txt">Vendedor</span>
-                            <kbd>F3</kbd>
-                        </button>
-                    </li>
-                @endif
-
                 <li>
                     <button type="button" role="menuitem" wire:click="openBuscaAvancadaModal" @disabled(! $caixaAberto)>
                         <span class="erp-pdv-options__ico" aria-hidden="true">
@@ -118,7 +106,7 @@
                         <span class="erp-pdv-options__ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13 21a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h5.4a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8Z"/><circle cx="8.5" cy="8.5" r="1"/></svg>
                         </span>
-                        <span class="erp-pdv-options__txt">Busca Preço</span>
+                        <span class="erp-pdv-options__txt">Consulta Preço</span>
                         <kbd>Ctrl+L</kbd>
                     </button>
                 </li>

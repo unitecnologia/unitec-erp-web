@@ -1,4 +1,4 @@
-const CACHE_NAME = 'unitec-executivo-v10';
+const CACHE_NAME = 'unitec-executivo-v12';
 const OFFLINE_URL = '/pwa-gestor/offline.html';
 const PRECACHE = [
   OFFLINE_URL,

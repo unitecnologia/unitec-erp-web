@@ -6,6 +6,7 @@ use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\NfeEvento;
 use App\Models\Person;
+use App\Models\Transportadora;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeEspelhoReportService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
@@ -34,12 +35,6 @@ trait ManagesNfeEspelhoModal
 
     public function handleNfeF7FromList(): void
     {
-        if ($this->statusFilter === Nfe::STATUS_ABERTA) {
-            $this->openNfeEspelhoFromList();
-
-            return;
-        }
-
         $this->printNfeDanfeFromList();
     }
 
@@ -63,6 +58,53 @@ trait ManagesNfeEspelhoModal
         }
 
         $this->nfeEspelhoNfeId = $nfe->id;
+        $this->nfeEspelhoModalOpen = true;
+        $this->dispatch('erp-nfe-focus-espelho-modal');
+    }
+
+    public function openNfeEspelhoFromModal(): void
+    {
+        if (! $this->nfeModalOpen) {
+            $this->openNfeEspelhoFromList();
+
+            return;
+        }
+
+        if ($this->nfeModalStatus !== 'ABERTA') {
+            Notification::make()
+                ->title('Espelho disponível apenas para NF-e aberta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! $this->nfeModalRecordId) {
+            Notification::make()
+                ->title('Grave a NF-e (F2) antes de visualizar o espelho.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($this->nfeModalRows === []) {
+            Notification::make()
+                ->title('Inclua ao menos um item antes de visualizar o espelho.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // Grava o estado atual para o espelho refletir a tela.
+        $this->saveNfe();
+
+        if (! $this->nfeModalRecordId) {
+            return;
+        }
+
+        $this->nfeEspelhoNfeId = (int) $this->nfeModalRecordId;
         $this->nfeEspelhoModalOpen = true;
         $this->dispatch('erp-nfe-focus-espelho-modal');
     }
@@ -206,7 +248,7 @@ trait ManagesNfeEspelhoModal
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
+                ->body('Verifique a configuração de e-mail em Empresa → Parâmetros → E-mail.')
                 ->danger()
                 ->send();
 
@@ -256,8 +298,12 @@ trait ManagesNfeEspelhoModal
         }
 
         $person = $this->nfeEspelhoEmailModalOpen
-            ? $this->resolveNfeEspelhoDestinatarioPerson($nfe, $this->nfeEspelhoEmailDestinatario)
+            ? $this->resolveNfeEspelhoDestinatario($nfe, $this->nfeEspelhoEmailDestinatario)
             : $nfe->cliente;
+
+        if ($person instanceof Transportadora) {
+            return mb_strtoupper((string) ($person->proprietario ?: $person->apelido ?: ''), 'UTF-8');
+        }
 
         return mb_strtoupper($person?->nome_razao ?? '', 'UTF-8');
     }
@@ -350,21 +396,33 @@ trait ManagesNfeEspelhoModal
 
     protected function applyNfeEspelhoEmailDestinatarioContato(Nfe $nfe): void
     {
-        $person = $this->resolveNfeEspelhoDestinatarioPerson($nfe, $this->nfeEspelhoEmailDestinatario);
+        $person = $this->resolveNfeEspelhoDestinatario($nfe, $this->nfeEspelhoEmailDestinatario);
         $report = app(NfeEspelhoReportService::class);
 
-        $this->nfeEspelhoEmailTo = trim((string) ($person?->email ?? ''));
+        $nome = $person instanceof Transportadora
+            ? (string) ($person->proprietario ?: $person->apelido ?: '')
+            : (string) ($person?->nome_razao ?? '');
+
+        $this->nfeEspelhoEmailTo = $person instanceof Person
+            ? trim((string) ($person->email ?? ''))
+            : '';
         $this->nfeEspelhoEmailMessage = $report->defaultEmailMessage(
             $nfe,
-            mb_strtoupper($person?->nome_razao ?? '', 'UTF-8'),
+            mb_strtoupper($nome, 'UTF-8'),
         );
     }
 
-    protected function resolveNfeEspelhoDestinatarioPerson(Nfe $nfe, string $destinatario): ?Person
+    protected function resolveNfeEspelhoDestinatario(Nfe $nfe, string $destinatario): Person|Transportadora|null
     {
         return $destinatario === 'fornecedor'
             ? $nfe->transportadora
             : $nfe->cliente;
+    }
+
+    /** @deprecated Use resolveNfeEspelhoDestinatario() */
+    protected function resolveNfeEspelhoDestinatarioPerson(Nfe $nfe, string $destinatario): Person|Transportadora|null
+    {
+        return $this->resolveNfeEspelhoDestinatario($nfe, $destinatario);
     }
 
     protected function nfeEspelhoDispatchDestinatarioLabel(): string

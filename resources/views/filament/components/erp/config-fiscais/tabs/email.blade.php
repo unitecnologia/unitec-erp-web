@@ -35,6 +35,7 @@
                         wire:model="form.email_api_key"
                         class="erp-pcad-form__input"
                         autocomplete="off"
+                        data-erp-preserve-case
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-form-type="other"
@@ -52,6 +53,7 @@
                         class="erp-pcad-form__input"
                         placeholder="contato@empresa.com.br"
                         autocomplete="off"
+                        data-erp-preserve-case
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-form-type="other"
@@ -86,6 +88,7 @@
                         class="erp-pcad-form__input"
                         placeholder="email-ssl.com.br"
                         autocomplete="off"
+                        data-erp-preserve-case
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-form-type="other"
@@ -116,6 +119,7 @@
                         class="erp-pcad-form__input"
                         placeholder="sac@empresa.com.br"
                         autocomplete="off"
+                        data-erp-preserve-case
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-form-type="other"
@@ -126,10 +130,11 @@
                     <label class="erp-pcad-form__label" for="cfg-email-pass">Senha</label>
                     <input
                         id="cfg-email-pass"
-                        type="text"
+                        type="password"
                         wire:model="form.email_senha"
-                        class="erp-pcad-form__input"
-                        autocomplete="off"
+                        class="erp-pcad-form__input erp-pcad-form__input--password"
+                        autocomplete="new-password"
+                        data-erp-preserve-case
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-form-type="other"
@@ -182,6 +187,7 @@
                 class="erp-pcad-form__input erp-config-fiscais-form__email-test-input"
                 placeholder="seu@email.com"
                 autocomplete="off"
+                data-erp-preserve-case
                 data-lpignore="true"
                 data-1p-ignore="true"
                 data-form-type="other"

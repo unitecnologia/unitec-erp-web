@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
 use App\Models\Cfop;
+use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\NfeEvento;
@@ -17,6 +18,7 @@ use App\Models\VendasParametro;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\CepLookupService;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeCalculoService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfe\NfeEspelhoReportService;
@@ -109,6 +111,8 @@ trait ManagesNfeEmissaoModal
     public string $nfeWhatsAppDestinatario = 'cliente';
 
     public string $nfeClienteCodigo = '';
+
+    public string $nfeClienteNome = '';
 
     public string $nfeClienteBusca = '';
 
@@ -299,7 +303,7 @@ trait ManagesNfeEmissaoModal
         }
 
         $valorParcela = round($total / $parcelas, 2);
-        $baseDate = $this->nfeForm['data_emissao'] ?? now()->format('Y-m-d');
+        $baseDate = $this->nfeForm['data_emissao'] ?? ErpTimezone::today();
         $this->nfeModalFaturas = [];
 
         for ($i = 1; $i <= $parcelas; $i++) {
@@ -316,15 +320,17 @@ trait ManagesNfeEmissaoModal
         }
     }
 
-    public function saveNfe(): void
+    public function saveNfe(bool $quiet = false): bool
     {
+        $this->ensureNfeDevolucaoVinculos();
+
         $clienteId = (int) ($this->nfeForm['cliente_id'] ?? 0);
 
         if ($clienteId <= 0) {
             Notification::make()->title('Informe o Cliente!')->warning()->send();
             $this->dispatch('erp-nfe-focus-cliente');
 
-            return;
+            return false;
         }
 
         $cliente = Person::query()->find($clienteId);
@@ -337,14 +343,14 @@ trait ManagesNfeEmissaoModal
                 ->send();
             $this->dispatch('erp-nfe-focus-cliente');
 
-            return;
+            return false;
         }
 
         if ($this->nfeModalRows === []) {
             Notification::make()->title('Informe os Itens da NF-e!')->warning()->send();
             $this->dispatch('erp-nfe-focus-item-produto');
 
-            return;
+            return false;
         }
 
         $this->validate(
@@ -368,7 +374,7 @@ trait ManagesNfeEmissaoModal
         } catch (\RuntimeException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 
-            return;
+            return false;
         }
         $this->syncNfeModalTotaisExtrasToItens();
         $this->recalculateNfeTotais();
@@ -581,17 +587,24 @@ trait ManagesNfeEmissaoModal
         });
 
         if (! $savedId) {
-            return;
+            return false;
         }
 
-        Notification::make()
-            ->title($isEditing ? 'NF-e gravada.' : 'NF-e incluída.')
-            ->success()
-            ->send();
+        // Garante F3 Transmitir liberado após F2 (nova ou edição).
+        $this->nfeModalRecordId = (int) $savedId;
+        $this->nfeModalStatus = 'ABERTA';
+
+        if (! $quiet) {
+            Notification::make()
+                ->title($isEditing ? 'NF-e gravada.' : 'NF-e incluída.')
+                ->success()
+                ->send();
+        }
 
         $this->clearListSelection();
         $this->resetTable();
         $this->highlightRecord($savedId);
+        $this->dispatch('erp-nfe-sync-transmit-btn');
 
         NfeEventoLogger::registrar(
             nfeId: $savedId,
@@ -601,6 +614,103 @@ trait ManagesNfeEmissaoModal
                 ? 'Dados da nota fiscal foram atualizados no sistema.'
                 : 'NF-e incluída no sistema em situação aberta.',
         );
+
+        return true;
+    }
+
+    /**
+     * Grava rascunho após mount (ex.: ?devolucao_compra_id=) e recarrega o modal do banco,
+     * para não perder referência/itens no próximo save/transmit.
+     */
+    public function saveNfeDraftFromMount(): bool
+    {
+        if (! $this->saveNfe(quiet: true)) {
+            return false;
+        }
+
+        if (! $this->nfeModalRecordId) {
+            return false;
+        }
+
+        $nfe = Nfe::query()
+            ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda', 'devolucaoCompra.compra'])
+            ->find($this->nfeModalRecordId);
+
+        if ($nfe) {
+            $this->loadNfeIntoModal($nfe);
+        }
+
+        return true;
+    }
+
+    /**
+     * Evita apagar chave referenciada / vínculo da devolução quando o estado do modal
+     * chegou incompleto (ex.: regravação no Transmitir após abrir via query string).
+     */
+    protected function ensureNfeDevolucaoVinculos(): void
+    {
+        if (($this->nfeForm['finalidade'] ?? '') !== 'devolucao') {
+            return;
+        }
+
+        if (! $this->nfeModalDevolucaoCompraId && $this->nfeModalRecordId) {
+            $existingDevId = (int) (Nfe::query()->whereKey($this->nfeModalRecordId)->value('devolucao_compra_id') ?? 0);
+
+            if ($existingDevId > 0) {
+                $this->nfeModalDevolucaoCompraId = $existingDevId;
+            }
+        }
+
+        if ($this->nfeModalReferencias !== []) {
+            return;
+        }
+
+        if ($this->nfeModalRecordId) {
+            $refs = NfeReferencia::query()
+                ->where('nfe_id', $this->nfeModalRecordId)
+                ->pluck('referencia')
+                ->all();
+
+            foreach ($refs as $ref) {
+                $digits = preg_replace('/\D/', '', (string) $ref) ?? '';
+
+                if (strlen($digits) === 44) {
+                    $this->nfeModalReferencias[] = ['referencia' => $digits];
+                }
+            }
+
+            if ($this->nfeModalReferencias !== []) {
+                return;
+            }
+
+            $chaveColuna = preg_replace(
+                '/\D/',
+                '',
+                (string) (Nfe::query()->whereKey($this->nfeModalRecordId)->value('chave_nfe_referenciada') ?? ''),
+            ) ?? '';
+
+            if (strlen($chaveColuna) === 44) {
+                $this->nfeModalReferencias[] = ['referencia' => $chaveColuna];
+
+                return;
+            }
+        }
+
+        $devolucaoId = (int) ($this->nfeModalDevolucaoCompraId ?? 0);
+
+        if ($devolucaoId <= 0) {
+            return;
+        }
+
+        $chaveCompra = preg_replace(
+            '/\D/',
+            '',
+            (string) (DevolucaoCompra::query()->with('compra')->find($devolucaoId)?->compra?->chave_nfe ?? ''),
+        ) ?? '';
+
+        if (strlen($chaveCompra) === 44) {
+            $this->nfeModalReferencias[] = ['referencia' => $chaveCompra];
+        }
     }
 
     public function transmitNfe(): void
@@ -614,9 +724,17 @@ trait ManagesNfeEmissaoModal
             return;
         }
 
-        $this->saveNfe();
+        try {
+            $savedOk = $this->saveNfe(quiet: true);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
 
-        if (! $this->nfeModalRecordId) {
+            throw $e;
+        }
+
+        if (! $savedOk || ! $this->nfeModalRecordId) {
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
+
             return;
         }
 
@@ -629,6 +747,7 @@ trait ManagesNfeEmissaoModal
                 ->title('Não foi possível localizar os dados para transmissão.')
                 ->warning()
                 ->send();
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
 
             return;
         }
@@ -638,25 +757,55 @@ trait ManagesNfeEmissaoModal
                 ->title('Somente NF-e aberta pode ser transmitida.')
                 ->warning()
                 ->send();
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
 
             return;
         }
 
         try {
             $nfe = (new NfeEmissionService())->transmitir($nfe, $empresa);
+            $this->loadNfeIntoModal($nfe);
+            $this->resetTable();
+            $this->showNfeFiscalOverlaySucesso($nfe);
         } catch (FiscalEngineException $exception) {
+            $this->registrarFalhaTransmissaoNfe((int) $nfe->id, $exception->getMessage(), $exception->sefazCodigo);
             $this->showNfeFiscalOverlayErro($exception);
-
-            return;
         } catch (\Throwable $exception) {
+            $this->registrarFalhaTransmissaoNfe((int) $nfe->id, $exception->getMessage());
             $this->showNfeFiscalOverlayErroGenerico($exception->getMessage());
+        } finally {
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
+        }
+    }
 
+    protected function registrarFalhaTransmissaoNfe(int $nfeId, string $mensagem, ?string $codigo = null): void
+    {
+        if ($nfeId <= 0) {
             return;
         }
 
-        $this->loadNfeIntoModal($nfe);
-        $this->resetTable();
-        $this->showNfeFiscalOverlaySucesso($nfe);
+        $descricao = trim($mensagem);
+        if (filled($codigo)) {
+            $descricao = trim("cStat {$codigo}. {$descricao}");
+        }
+
+        try {
+            NfeEventoLogger::registrar(
+                nfeId: $nfeId,
+                tipo: NfeEvento::TIPO_ERRO_TRANSMISSAO,
+                titulo: 'Falha na transmissão',
+                descricao: $descricao !== '' ? $descricao : 'Erro desconhecido na transmissão.',
+                metadata: filled($codigo) ? ['cStat' => $codigo] : null,
+            );
+        } catch (\Throwable) {
+            // Não bloquear overlay de erro se o log falhar.
+        }
+
+        \Illuminate\Support\Facades\Log::warning('NF-e transmissão falhou', [
+            'nfe_id' => $nfeId,
+            'cStat' => $codigo,
+            'message' => $mensagem,
+        ]);
     }
 
     /**
@@ -1545,8 +1694,8 @@ trait ManagesNfeEmissaoModal
             'cnpj' => $this->formatNfeCpfCnpj($nfe->cliente?->cpf_cnpj),
             'natureza_operacao' => ($nfe->cfop ? $nfe->cfop . ' - ' : '') . 'VENDA DE MERCADORIA',
             'numero_pedido' => $nfe->npedido ?? ($nfe->venda?->numero ?? ''),
-            'data_emissao' => $nfe->data_emissao?->format('Y-m-d') ?? now()->format('Y-m-d'),
-            'data_saida' => $nfe->data_saida?->format('Y-m-d') ?? now()->format('Y-m-d'),
+            'data_emissao' => $nfe->data_emissao?->format('Y-m-d') ?? ErpTimezone::today(),
+            'data_saida' => $nfe->data_saida?->format('Y-m-d') ?? ErpTimezone::today(),
             'consumidor_final' => $nfe->cliente?->isConsumidorFinalPadrao()
                 || $nfe->consumidor_final === '1'
                 || $nfe->consumidor_final === true,
@@ -1732,9 +1881,17 @@ trait ManagesNfeEmissaoModal
                 2,
             );
 
-            if (abs($modalValor - $itensValor) >= 0.009) {
-                $this->aplicarRateioNfeTotaisExtra($key, $modalValor);
+            if (abs($modalValor - $itensValor) < 0.009) {
+                continue;
             }
+
+            // Rodapé em 0 com valor nos itens: o desconto/frete veio da grade.
+            // Não zerar o rateio (input do rodapé nem sempre morph no Livewire).
+            if ($modalValor <= 0 && $itensValor > 0) {
+                continue;
+            }
+
+            $this->aplicarRateioNfeTotaisExtra($key, $modalValor);
         }
     }
 
@@ -1955,7 +2112,7 @@ trait ManagesNfeEmissaoModal
      */
     protected function defaultNfeFormData(?VendasParametro $params = null): array
     {
-        $today = now()->format('Y-m-d');
+        $today = ErpTimezone::today();
         $empresaId = $this->resolveEmpresaId();
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
 
@@ -2100,6 +2257,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeForm['consumidor_final'] = $person->isConsumidorFinalPadrao();
 
         $this->nfeClienteCodigo = (string) ($person->codigo ?? '');
+        $this->nfeClienteNome = trim((string) ($person->nome_razao ?? ''));
         $this->nfeClienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
         $this->nfeClienteWhatsapp = (string) ($person->whatsapp ?? $person->celular1 ?? '');
         $this->nfeClienteEndereco = (string) ($person->endereco ?? '');
@@ -2116,6 +2274,7 @@ trait ManagesNfeEmissaoModal
     protected function clearNfeClienteDisplay(bool $keepBusca = false): void
     {
         $this->nfeClienteCodigo = '';
+        $this->nfeClienteNome = '';
         if (! $keepBusca) {
             $this->nfeClienteBusca = '';
         }
@@ -2145,11 +2304,17 @@ trait ManagesNfeEmissaoModal
         }
 
         $termNorm = mb_strtoupper(trim($term), 'UTF-8');
-        $buscaNorm = mb_strtoupper(trim($this->nfeClienteBusca), 'UTF-8');
-        $codigoNorm = mb_strtoupper(trim($this->nfeClienteCodigo), 'UTF-8');
+        if ($termNorm === '') {
+            return false;
+        }
 
-        return $termNorm !== ''
-            && ($termNorm === $buscaNorm || $termNorm === $codigoNorm);
+        // Não comparar com nfeClienteBusca: o Livewire já atualiza esse campo
+        // para o texto digitado, então a lista nunca reabria após gravar a nota.
+        $formatadoNorm = mb_strtoupper(trim(
+            ($this->nfeClienteCodigo !== '' ? $this->nfeClienteCodigo.' — ' : '').$this->nfeClienteNome
+        ), 'UTF-8');
+
+        return $formatadoNorm !== '' && $termNorm === $formatadoNorm;
     }
 
     protected function formatNfeCpfCnpj(?string $value): string
@@ -2591,6 +2756,11 @@ trait ManagesNfeEmissaoModal
         $this->nfeFiscalSucessoNfeId = $nfe->id;
 
         $this->dispatch('erp-nfe-focus-fiscal-sucesso');
+        $this->js(
+            'window.__erpNfeShowFiscalSucessoOverlay && window.__erpNfeShowFiscalSucessoOverlay('
+            .Js::from(['detalhe' => $this->nfeFiscalSucessoDetalhe])
+            .')'
+        );
     }
 
     protected function showNfeFiscalOverlayErro(FiscalEngineException $exception): void
@@ -2599,12 +2769,33 @@ trait ManagesNfeEmissaoModal
         $this->closeNfeFiscalInfoOverlay();
 
         $resolvido = PdvNfceFiscalMensagens::resolver($exception);
-        $mensagem = $resolvido['corpo'] ?? trim($exception->getMessage());
+        $mensagemExcecao = trim($exception->getMessage());
 
-        $this->nfeFiscalOverlayTitulo = mb_strtoupper($resolvido['titulo'], 'UTF-8');
-        $this->nfeFiscalOverlayMensagem = $mensagem !== '' ? $mensagem : null;
-        $this->nfeFiscalOverlayCodigo = $exception->sefazCodigo;
+        // Pré-SEFAZ (ex.: NCM): título padrão + texto no corpo — overlay vermelho do meio da tela.
+        // Com cStat/corpo amigável: mantém título/código SEFAZ.
+        if (filled($exception->sefazCodigo) || filled($resolvido['corpo'] ?? null)) {
+            $mensagem = trim((string) ($resolvido['corpo'] ?? $mensagemExcecao));
+            $this->nfeFiscalOverlayTitulo = mb_strtoupper((string) $resolvido['titulo'], 'UTF-8');
+            $this->nfeFiscalOverlayMensagem = $mensagem !== '' ? $mensagem : null;
+            $this->nfeFiscalOverlayCodigo = $exception->sefazCodigo;
+        } else {
+            $this->nfeFiscalOverlayTitulo = 'NÃO FOI POSSÍVEL TRANSMITIR A NF-E';
+            $this->nfeFiscalOverlayMensagem = $mensagemExcecao !== ''
+                ? $mensagemExcecao
+                : 'Tente novamente em instantes.';
+            $this->nfeFiscalOverlayCodigo = null;
+        }
+
         $this->dispatch('erp-nfe-focus-fiscal-overlay');
+        $this->js(
+            'window.__erpNfeShowFiscalErroOverlay && window.__erpNfeShowFiscalErroOverlay('
+            .Js::from([
+                'titulo' => $this->nfeFiscalOverlayTitulo,
+                'mensagem' => $this->nfeFiscalOverlayMensagem,
+                'codigo' => $this->nfeFiscalOverlayCodigo,
+            ])
+            .')'
+        );
     }
 
     protected function showNfeFiscalOverlayErroGenerico(string $mensagem): void
@@ -2618,5 +2809,14 @@ trait ManagesNfeEmissaoModal
         $this->nfeFiscalOverlayMensagem = $mensagem !== '' ? $mensagem : 'Tente novamente em instantes.';
         $this->nfeFiscalOverlayCodigo = null;
         $this->dispatch('erp-nfe-focus-fiscal-overlay');
+        $this->js(
+            'window.__erpNfeShowFiscalErroOverlay && window.__erpNfeShowFiscalErroOverlay('
+            .Js::from([
+                'titulo' => $this->nfeFiscalOverlayTitulo,
+                'mensagem' => $this->nfeFiscalOverlayMensagem,
+                'codigo' => null,
+            ])
+            .')'
+        );
     }
 }

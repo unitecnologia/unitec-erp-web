@@ -45,19 +45,33 @@ class CaixaContaResource extends Resource
                 TextColumn::make('nome')
                     ->label('Descrição')
                     ->wrap(false)
-                    ->weight(FontWeight::Bold)
+                    ->html()
                     ->formatStateUsing(function (?string $state, CaixaConta $record): string {
-                        $nome = mb_strtoupper((string) $state, 'UTF-8');
+                        $nome = e(mb_strtoupper((string) $state, 'UTF-8'));
+                        $badge = $record->isSistema()
+                            ? ' <span class="erp-contas-caixa-name__sistema">SISTEMA</span>'
+                            : '';
 
-                        return $record->isSistema() ? $nome.' (SISTEMA)' : $nome;
+                        return '<span class="erp-contas-caixa-name">'.$nome.$badge.'</span>';
                     }),
                 TextColumn::make('tipo')
                     ->label('Tipo')
                     ->alignCenter()
-                    ->formatStateUsing(fn (?string $state, CaixaConta $record): string => $record->tipoLabel())
-                    ->weight(FontWeight::SemiBold),
+                    ->html()
+                    ->formatStateUsing(function (?string $state, CaixaConta $record): string {
+                        $label = $record->tipoLabel();
+                        $class = match ($label) {
+                            'PDV' => 'erp-contas-caixa-badge--pdv',
+                            'SUBCAIXA' => 'erp-contas-caixa-badge--subcaixa',
+                            'BANCO' => 'erp-contas-caixa-badge--banco',
+                            'COFRE' => 'erp-contas-caixa-badge--cofre',
+                            default => 'erp-contas-caixa-badge--default',
+                        };
+
+                        return '<span class="erp-contas-caixa-badge '.$class.'">'.e($label).'</span>';
+                    }),
                 TextColumn::make('ultimoUsuario.name')
-                    ->label('Último Usuário')
+                    ->label('Último usuário')
                     ->placeholder('—')
                     ->formatStateUsing(fn (?string $state): string => $state !== null && $state !== '' ? mb_strtoupper($state, 'UTF-8') : '—')
                     ->weight(FontWeight::SemiBold),

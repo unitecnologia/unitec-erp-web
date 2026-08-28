@@ -15,6 +15,12 @@ use App\Models\Cfop;
  */
 final class CfopEntradaResolver
 {
+    /** CFOP de saída tipicamente usados em substituição tributária. */
+    private const CFOP_SAIDA_ST = [
+        '5401', '5402', '5403', '5405',
+        '6401', '6402', '6403', '6404',
+    ];
+
     public function normalize(string|int|null $cfop): string
     {
         $digits = preg_replace('/\D/', '', (string) $cfop) ?? '';
@@ -82,6 +88,17 @@ final class CfopEntradaResolver
             ->exists();
     }
 
+    public static function isCfopSaidaSt(string|int|null $cfop): bool
+    {
+        $digits = preg_replace('/\D/', '', (string) $cfop) ?? '';
+
+        if (strlen($digits) > 4) {
+            $digits = substr($digits, -4);
+        }
+
+        return strlen($digits) === 4 && in_array($digits, self::CFOP_SAIDA_ST, true);
+    }
+
     /**
      * Resolve CFOP de entrada para a tela de importação:
      * converte saída→entrada e, se o código convertido não existir no cadastro,
@@ -109,5 +126,41 @@ final class CfopEntradaResolver
         }
 
         return $entrada !== '' ? $entrada : $fallbackNorm;
+    }
+
+    /**
+     * Resolve CFOP de entrada para um item, respeitando ST:
+     * item ST não cai no fallback genérico (1102) só porque o convertido não está cadastrado.
+     */
+    public function resolveParaItem(string|int|null $cfop, ?string $fallback = null, bool $temSt = false): string
+    {
+        if (! $temSt) {
+            return $this->resolve($cfop, $fallback);
+        }
+
+        $entrada = $this->toEntrada($cfop);
+
+        if ($this->isEntrada($entrada) && $this->existsEntrada($entrada)) {
+            return $entrada;
+        }
+
+        // Mantém o convertido ST mesmo sem cadastro (evita 1102).
+        if ($this->isEntrada($entrada) && strlen($entrada) === 4) {
+            return $entrada;
+        }
+
+        $saidaNorm = $this->normalize($cfop);
+        $interestadual = strlen($saidaNorm) === 4 && in_array($saidaNorm[0], ['6', '2'], true);
+        $stFallback = $interestadual ? '2403' : '1403';
+
+        if ($this->existsEntrada($stFallback)) {
+            return $stFallback;
+        }
+
+        if ($this->isEntrada($stFallback)) {
+            return $stFallback;
+        }
+
+        return $this->resolve($cfop, $fallback);
     }
 }

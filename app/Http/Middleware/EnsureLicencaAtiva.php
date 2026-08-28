@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Filament\Pages\LicencaBloqueadaPage;
+use App\Models\Empresa;
 use App\Support\Erp\License\LicencaRemotaService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,6 +26,12 @@ class EnsureLicencaAtiva
             return $next($request);
         }
 
+        // Primeiro acesso: a licença depende do CNPJ, que só existe após
+        // cadastrar a primeira empresa. Não bloquear esse cadastro.
+        if (! Cache::remember('erp.empresa.exists', 120, static fn (): bool => Empresa::query()->exists())) {
+            return $next($request);
+        }
+
         if ($this->isAllowed($request)) {
             return $next($request);
         }
@@ -39,8 +47,9 @@ class EnsureLicencaAtiva
             return redirect()->to(LicencaBloqueadaPage::getUrl());
         }
 
-        // Sessão antiga / sem gate: valida uma vez e grava (equivale ao login).
-        $snapshot = $this->licencas->validateAtLogin();
+        // Sessão antiga / sem gate: NÃO força HTTP no portal (deixava menu lento).
+        // Usa cache/grace local; se ainda assim bloquear, manda para a tela.
+        $snapshot = $this->licencas->ensureLoginGateWithoutRemote();
 
         if ($snapshot->isAllowed()) {
             return $next($request);
@@ -51,7 +60,8 @@ class EnsureLicencaAtiva
 
     private function isAllowed(Request $request): bool
     {
-        if ($request->routeIs('filament.admin.auth.logout')) {
+        if ($request->routeIs('filament.admin.auth.logout')
+            || $request->routeIs('filament.gestor.auth.logout')) {
             return true;
         }
 
@@ -61,6 +71,7 @@ class EnsureLicencaAtiva
             || $path === 'admin/licenca-sistema'
             || str_starts_with($path, 'admin/licenca-sistema')
             || str_starts_with($path, 'livewire/')
-            || str_starts_with($path, 'admin/livewire');
+            || str_starts_with($path, 'admin/livewire')
+            || str_starts_with($path, 'gestor/livewire');
     }
 }

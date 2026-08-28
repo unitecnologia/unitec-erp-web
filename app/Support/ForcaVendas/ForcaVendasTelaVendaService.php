@@ -9,6 +9,7 @@ use App\Models\OrcamentoItem;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use Illuminate\Support\Facades\DB;
@@ -133,7 +134,7 @@ class ForcaVendasTelaVendaService
                 'uuid' => $uuid,
                 'device_uuid' => 'monitor-web',
                 'user_id' => $user->id,
-                'empresa_id' => $user->empresa_id,
+                'empresa_id' => ErpContext::currentEmpresaId() ?? $user->empresa_id,
                 'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
                 'cliente_id' => $clienteId,
                 'vendedor_id' => $vendedorId,
@@ -261,6 +262,39 @@ class ForcaVendasTelaVendaService
 
         if ($itens === []) {
             throw new \RuntimeException('Inclua ao menos um item na venda.');
+        }
+
+        $caixaId = filled($data['caixa_conta_id'] ?? null) ? (int) $data['caixa_conta_id'] : null;
+
+        if ($caixaId === null || $caixaId <= 0) {
+            throw new \RuntimeException(
+                'Caixa não definido. Vincule um caixa ao vendedor antes de vender.'
+            );
+        }
+
+        $estoqueId = filled($data['estoque_id'] ?? null) ? (int) $data['estoque_id'] : null;
+
+        if ($estoqueId === null || $estoqueId <= 0) {
+            $productIds = collect($itens)
+                ->pluck('product_id')
+                ->filter(fn ($id): bool => (int) $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($productIds !== []) {
+                $temProdutoFisico = Product::query()
+                    ->whereIn('id', $productIds)
+                    ->where('is_servico', false)
+                    ->exists();
+
+                if ($temProdutoFisico) {
+                    throw new \RuntimeException(
+                        'Depósito de estoque não definido. Vincule um estoque ao vendedor antes de vender produtos.'
+                    );
+                }
+            }
         }
 
         $vendedorId = (int) ($data['vendedor_id'] ?? $user->vendedor_id ?? 0) ?: null;

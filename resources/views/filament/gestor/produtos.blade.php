@@ -53,6 +53,24 @@
                             <span class="gestor-field__label">Descrição NCM</span>
                             <input type="text" class="gestor-field__input" wire:model="ncmDescricao" readonly tabindex="-1" autocomplete="off">
                         </label>
+
+                        <label class="gestor-field" style="margin-bottom: 0;">
+                            <span class="gestor-field__label">Validade</span>
+                            <div class="gestor-date-wrap">
+                                <input
+                                    type="date"
+                                    class="gestor-field__input gestor-field__input--date"
+                                    wire:model.live="validade"
+                                    data-erp-native-date
+                                    @disabled(! $this->canEditCadastro())
+                                    onclick="try{this.showPicker()}catch(e){}"
+                                >
+                                <span class="gestor-date-wrap__icon" aria-hidden="true"></span>
+                            </div>
+                            @if ($this->validadeResumoAtual() !== '')
+                                <span class="gestor-validade-hint">{{ $this->validadeResumoAtual() }}</span>
+                            @endif
+                        </label>
                     </div>
 
                     <div class="gestor-edit__card">
@@ -138,16 +156,20 @@
                         </div>
                     </label>
 
+                    @php
+                        $resultados = mb_strlen(trim($busca)) >= 2 ? $this->resultados() : [];
+                    @endphp
+
                     <p class="gestor-note">
                         @if (mb_strlen(trim($busca)) < 2)
                             Digite ao menos 2 caracteres.
                         @else
-                            {{ count($this->resultados()) }} resultado(s)
+                            {{ count($resultados) }} resultado(s)
                         @endif
                     </p>
 
                     <ul class="gestor-list" role="list">
-                        @foreach ($this->resultados() as $item)
+                        @foreach ($resultados as $item)
                             <li>
                                 <button type="button" class="gestor-item" wire:click="selecionar({{ $item['id'] }})">
                                     <div class="gestor-item__main">
@@ -157,7 +179,16 @@
                                             @if ($item['grupo'] !== '')
                                                 · {{ $item['grupo'] }}
                                             @endif
+                                            @if (! empty($item['validade']))
+                                                · Val. {{ $item['validade'] }}
+                                            @endif
                                         </span>
+                                        @if (! empty($item['validade_label']))
+                                            <span class="gestor-item__validade gestor-item__validade--{{ $item['validade_status'] }}">
+                                                <span class="gestor-item__validade-dot" aria-hidden="true"></span>
+                                                {{ $item['validade_label'] }}
+                                            </span>
+                                        @endif
                                     </div>
                                     <div class="gestor-item__side">
                                         <span class="gestor-item__price">R$ {{ number_format($item['preco_venda'], 2, ',', '.') }}</span>

@@ -72,8 +72,8 @@ final class FinalizarDevolucaoCompraService
             : ($compra->empresa_id ? (int) $compra->empresa_id : ErpContext::currentEmpresaId());
         $estoqueId = $this->resolveEstoqueId($empresaId);
 
-        DB::transaction(function () use ($devolucao, $estoqueId): void {
-            $this->baixarEstoque($devolucao, $estoqueId);
+        DB::transaction(function () use ($devolucao, $estoqueId, $empresaId): void {
+            $this->baixarEstoque($devolucao, $estoqueId, $empresaId);
 
             $devolucao->update([
                 'situacao' => DevolucaoCompra::SITUACAO_FINALIZADA,
@@ -150,8 +150,10 @@ final class FinalizarDevolucaoCompraService
         return $map;
     }
 
-    private function baixarEstoque(DevolucaoCompra $devolucao, ?int $estoqueId): void
+    private function baixarEstoque(DevolucaoCompra $devolucao, ?int $estoqueId, ?int $empresaId = null): void
     {
+        $empresa = $empresaId ? \App\Models\Empresa::query()->find($empresaId) : null;
+
         foreach ($devolucao->itens as $item) {
             if (! $item->product_id) {
                 continue;
@@ -167,7 +169,16 @@ final class FinalizarDevolucaoCompraService
                 (int) $product->id,
                 (float) $item->qtd,
                 $estoqueId,
+                $empresa,
             );
+
+            if ($product->controla_lote_validade) {
+                try {
+                    (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, (float) $item->qtd);
+                } catch (\RuntimeException $e) {
+                    throw new DomainException($e->getMessage(), 0, $e);
+                }
+            }
         }
     }
 

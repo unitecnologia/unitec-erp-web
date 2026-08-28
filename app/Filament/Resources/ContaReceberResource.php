@@ -12,6 +12,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ContaReceberResource extends Resource
 {
@@ -87,6 +88,11 @@ class ContaReceberResource extends Resource
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
                     ->alignEnd()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('numero_cheque')
+                    ->label('Nº Cheque')
+                    ->placeholder('—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('desconto')
                     ->label('Desconto')
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
@@ -118,7 +124,9 @@ class ContaReceberResource extends Resource
                     ->view('filament.components.erp.receber.view-cell')
                     ->alignCenter(),
             ])
-            ->defaultSort('vencimento', 'asc')
+            ->defaultSort(fn (Builder $query): Builder => $query
+                ->orderByDesc('emissao')
+                ->orderByDesc('numero'))
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

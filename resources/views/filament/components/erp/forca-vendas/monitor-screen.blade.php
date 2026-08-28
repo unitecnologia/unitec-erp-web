@@ -31,9 +31,11 @@
                 @include('filament.components.erp.shared.search-field-dropdown', [
                     'fields' => ['todos' => '<todos>'] + $situacaoOptions,
                     'searchColumn' => $this->situacaoFilter,
+                    'markedFields' => [$this->situacaoFilter],
                     'wireProperty' => 'situacaoFilter',
                     'ariaLabel' => 'Tipo de Pedido',
                     'btnClass' => 'erp-fv-mon__dd-btn',
+                    'showFlag' => true,
                 ])
             </label>
 
@@ -212,71 +214,15 @@
 
             <label class="erp-fv-mon__field erp-fv-mon__field--plataforma">
                 <span>Plataforma</span>
-                <div
-                    class="erp-fv-mon__combo erp-fv-mon__combo--plataforma"
-                    wire:key="filtro-plataforma"
-                    x-data="{
-                        open: false,
-                        ativo: 0,
-                        valor: @js($this->plataformaSelectCombo()['valor']),
-                        rotulo: @js($this->plataformaSelectCombo()['rotulo']),
-                        todos: @js($this->plataformaSelectCombo()['todos']),
-                        itens: @js($this->plataformaSelectCombo()['itens']),
-                        opcoes() {
-                            return [{ id: 'todos', nome: this.todos }, ...this.itens];
-                        },
-                        abrir() {
-                            this.open = true;
-                            const idx = this.opcoes().findIndex(o => o.id === this.valor);
-                            this.ativo = idx >= 0 ? idx : 0;
-                        },
-                        mover(d) {
-                            if (! this.open) { this.abrir(); return; }
-                            const total = this.opcoes().length;
-                            if (total === 0) return;
-                            this.ativo = (this.ativo + d + total) % total;
-                            this.$nextTick(() => {
-                                const el = this.$refs.panel?.querySelector('.is-active');
-                                if (el) el.scrollIntoView({ block: 'nearest' });
-                            });
-                        },
-                        confirmar() {
-                            const op = this.opcoes()[this.ativo];
-                            if (op) this.escolher(op.id, op.nome);
-                        },
-                        escolher(id, nome) {
-                            this.valor = id;
-                            this.rotulo = id === 'todos' ? this.todos : nome;
-                            this.$wire.set('plataformaFilter', String(id));
-                            this.open = false;
-                        },
-                    }"
-                    @click.outside="open = false"
-                    @keydown.escape.stop="open = false"
-                >
-                    <button
-                        type="button"
-                        class="erp-fv-mon__select-btn"
-                        @click="open ? open = false : abrir()"
-                        @keydown.arrow-down.prevent="mover(1)"
-                        @keydown.arrow-up.prevent="mover(-1)"
-                        @keydown.enter.prevent="open ? confirmar() : abrir()"
-                        :aria-expanded="open"
-                    >
-                        <span class="erp-fv-mon__select-btn-label" x-text="rotulo"></span>
-                        <span class="erp-fv-mon__select-btn-caret" aria-hidden="true">▾</span>
-                    </button>
-                    <div class="erp-fv-mon__combo-panel erp-fv-mon__combo-panel--compact" x-ref="panel" x-show="open" x-cloak x-transition.opacity>
-                        <template x-for="(op, i) in opcoes()" :key="op.id">
-                            <button type="button"
-                                    class="erp-fv-mon__combo-item"
-                                    :class="{ 'is-active': i === ativo || op.id === valor }"
-                                    @mouseenter="ativo = i"
-                                    @click="escolher(op.id, op.nome)"
-                                    x-text="op.nome"></button>
-                        </template>
-                    </div>
-                </div>
+                @include('filament.components.erp.shared.search-field-dropdown', [
+                    'fields' => ['todos' => '<todas>'] + $this->plataformaOptions(),
+                    'searchColumn' => $this->plataformaFilter,
+                    'markedFields' => [$this->plataformaFilter],
+                    'wireProperty' => 'plataformaFilter',
+                    'ariaLabel' => 'Plataforma',
+                    'btnClass' => 'erp-fv-mon__dd-btn',
+                    'showFlag' => true,
+                ])
             </label>
 
             <fieldset class="erp-fv-mon__plataformas erp-fv-mon__plataformas--status">

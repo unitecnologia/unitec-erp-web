@@ -7,7 +7,6 @@ use App\Filament\Concerns\InteractsWithErpSimpleListPage;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\CaixaContaResource;
 use App\Models\CaixaConta;
-use App\Models\FormaPagamento;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -63,7 +62,7 @@ class ListCaixaContas extends ListRecords
 
     protected function erpSimpleListSearchInput(): string
     {
-        return '.erp-unidades__input';
+        return '.erp-contas-caixa__input';
     }
 
     protected function erpSimpleListCreateMethod(): string
@@ -85,6 +84,7 @@ class ListCaixaContas extends ListRecords
     {
         return [
             ...$this->buildSimpleListKeyboardConfig(),
+            'delete' => null,
             'refresh' => null,
         ];
     }
@@ -259,57 +259,10 @@ class ListCaixaContas extends ListRecords
 
     public function deleteContaCaixa(): void
     {
-        if ($this->showForm) {
-            return;
-        }
-
-        $recordId = $this->highlightedRecordIdOrNotify('delete');
-
-        if (! $recordId) {
-            return;
-        }
-
-        $record = CaixaConta::find($recordId);
-
-        if (! $record) {
-            return;
-        }
-
-        if ($record->isSistema()) {
-            Notification::make()
-                ->title('Conta do sistema.')
-                ->body('O CAIXA GERAL é protegido e não pode ser excluído.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        if ($record->lancamentos()->exists()) {
-            Notification::make()
-                ->title('Conta possui lançamentos no livro caixa e não pode ser excluída.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        if (FormaPagamento::query()->where('conta_destino_id', $record->id)->exists()) {
-            Notification::make()
-                ->title('Conta vinculada a forma de pagamento e não pode ser excluída.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $record->delete();
-        $this->clearListSelection();
-        $this->resetTable();
-
         Notification::make()
-            ->title('Conta caixa excluída.')
-            ->success()
+            ->title('Exclusão desabilitada.')
+            ->body('Contas caixa não podem ser excluídas nesta tela. Desative a conta se necessário.')
+            ->warning()
             ->send();
     }
 

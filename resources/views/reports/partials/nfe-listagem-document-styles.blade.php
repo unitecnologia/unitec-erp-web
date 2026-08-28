@@ -296,25 +296,23 @@
 
     .nfe-list-doc__table th.col-chave {
 
-        width: 7cm;
+        font-size: 2.15mm;
 
-        max-width: 7cm;
+        line-height: 1.25;
 
-        font-size: 2.35mm;
-
-        line-height: 1.1;
-
-        white-space: nowrap;
+        white-space: pre-line;
 
         word-break: normal;
 
-        letter-spacing: -0.02mm;
+        overflow-wrap: normal;
+
+        letter-spacing: -0.01mm;
 
         font-variant-numeric: tabular-nums;
 
         text-align: left;
 
-        overflow: hidden;
+        overflow: visible;
 
     }
 

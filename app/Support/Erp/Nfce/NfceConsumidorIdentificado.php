@@ -8,8 +8,8 @@ use App\Support\Erp\DocumentoExibicao;
 
 /**
  * Resolve o consumidor identificado da NFC-e (cadastro ou CPF na nota).
- * Nome e endereço vão para XML (produção) e cupom; CPF completo só no XML —
- * na exibição o CPF segue máscara LGPD.
+ * Nome, endereço e CPF formatado vão para o cupom; o XML fiscal usa CPF completo.
+ * cpfMascarado permanece disponível para telas com máscara LGPD.
  */
 final class NfceConsumidorIdentificado
 {
@@ -80,13 +80,43 @@ final class NfceConsumidorIdentificado
 
     public static function cpfMascarado(PdvVenda $venda): ?string
     {
-        $cpf = trim((string) ($venda->cpf_nota ?? ''));
+        $digits = self::cpfDigitsDaVenda($venda);
 
-        if ($cpf === '') {
+        if ($digits === '') {
             return null;
         }
 
-        return DocumentoExibicao::mascararCpf($cpf);
+        return DocumentoExibicao::mascararCpf($digits);
+    }
+
+    /**
+     * CPF completo formatado para o cupom DANFE (identificação do consumidor).
+     */
+    public static function cpfFormatado(PdvVenda $venda): ?string
+    {
+        $digits = self::cpfDigitsDaVenda($venda);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        return substr($digits, 0, 3).'.'.substr($digits, 3, 3).'.'.substr($digits, 6, 3).'-'.substr($digits, 9, 2);
+    }
+
+    /**
+     * Preferência: cpf_nota da venda; senão CPF 11 dígitos do cliente vinculado.
+     */
+    public static function cpfDigitsDaVenda(PdvVenda $venda): string
+    {
+        $digits = self::cpfDigits($venda->cpf_nota);
+
+        if ($digits !== '') {
+            return $digits;
+        }
+
+        $person = self::resolvePerson($venda);
+
+        return self::cpfDigits($person?->cpf_cnpj);
     }
 
     public static function cpfDigits(?string $cpf): string

@@ -4,6 +4,8 @@
     $salesMixChart = $salesMixChart ?? ['labels' => [], 'values' => [], 'colors' => []];
     $fiscalDocsChart = $fiscalDocsChart ?? ['labels' => [], 'values' => [], 'colors' => [], 'unit' => 'count'];
     $paymentMethodsChart = $paymentMethodsChart ?? ['labels' => [], 'values' => [], 'colors' => [], 'unit' => 'money'];
+    $visao = $visao ?? \App\Support\Erp\Dashboard\ErpDashboardScope::VISAO_EMPRESA;
+    $cashflowGlobal = $visao === \App\Support\Erp\Dashboard\ErpDashboardScope::VISAO_GRUPO;
 @endphp
 
 <section class="erp-dash__charts">
@@ -41,9 +43,16 @@
     <article class="erp-dash-panel erp-dash-panel--chart">
         <header class="erp-dash-panel__head">
             <h2 class="erp-dash-panel__title">Entradas x saídas</h2>
+            @if ($cashflowGlobal)
+                <span class="erp-dash-panel__meta">Grupo (empresas acessíveis)</span>
+            @endif
         </header>
         <div class="erp-dash-panel__body erp-dash-panel__body--chart">
-            <canvas id="erp-dash-cashflow-chart" aria-label="Gráfico de entradas e saídas"></canvas>
+            @if (! empty($cashflowChart['empty']) || (array_sum($cashflowChart['entradas'] ?? []) <= 0 && array_sum($cashflowChart['saidas'] ?? []) <= 0))
+                <p class="erp-dash-panel__empty">Sem movimentos de caixa no período.</p>
+            @else
+                <canvas id="erp-dash-cashflow-chart" aria-label="Gráfico de entradas e saídas"></canvas>
+            @endif
         </div>
     </article>
 
@@ -64,7 +73,11 @@
                 <span class="erp-dash-panel__meta">mês</span>
             </header>
             <div class="erp-dash-panel__body erp-dash-panel__body--chart erp-dash-panel__body--pie">
-                <canvas id="erp-dash-fiscal-chart" aria-label="Gráfico pizza de NFe e NFCe"></canvas>
+                @if (! empty($fiscalDocsChart['empty']) || array_sum($fiscalDocsChart['values'] ?? []) <= 0)
+                    <p class="erp-dash-panel__empty">Sem documentos no mês</p>
+                @else
+                    <canvas id="erp-dash-fiscal-chart" aria-label="Gráfico pizza de NFe e NFCe"></canvas>
+                @endif
             </div>
         </article>
 

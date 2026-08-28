@@ -19,13 +19,9 @@
         <span class="erp-orcamentos-actions__icon">🖨</span>
         <span class="erp-orcamentos-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>
-    <button type="button" wire:click="openEmailModal" class="erp-orcamentos-actions__btn" data-erp-key="F9">
+    <button type="button" wire:click="openEmailModal" class="erp-orcamentos-actions__btn" data-erp-key="F9" title="Enviar orçamento por e-mail ou WhatsApp">
         <span class="erp-orcamentos-actions__icon">✉</span>
-        <span class="erp-orcamentos-actions__label"><kbd>F9</kbd> | Email</span>
-    </button>
-    <button type="button" wire:click="openWhatsAppModal" class="erp-orcamentos-actions__btn" data-erp-key="F10">
-        <span class="erp-orcamentos-actions__icon">📱</span>
-        <span class="erp-orcamentos-actions__label"><kbd>F10</kbd> | Whats</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F9</kbd> | Enviar</span>
     </button>
     <button type="button" wire:click="closeScreen" class="erp-orcamentos-actions__btn erp-orcamentos-actions__btn--close">
         <span class="erp-orcamentos-actions__icon erp-orcamentos-actions__icon--close">✕</span>

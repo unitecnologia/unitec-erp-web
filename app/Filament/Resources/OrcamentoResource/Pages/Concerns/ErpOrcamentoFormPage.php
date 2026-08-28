@@ -6,16 +6,19 @@ use App\Filament\Concerns\InteractsWithErpFormReturnUrl;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
+use App\Models\FormaPagamento;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductGrade;
 use App\Models\Vendedor;
+use App\Support\Erp\CepLookupService;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\MunicipioLookupService;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use App\Support\Erp\Orcamento\OrcamentoPrecoService;
 use App\Support\Erp\Orcamento\OrcamentoTotaisService;
@@ -29,6 +32,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 trait ErpOrcamentoFormPage
 {
@@ -48,6 +52,8 @@ trait ErpOrcamentoFormPage
 
     public ?int $clienteId = null;
 
+    public bool $clienteAvulsoMode = false;
+
     public string $clienteCpfCnpj = '';
 
     public string $clienteEndereco = '';
@@ -61,6 +67,13 @@ trait ErpOrcamentoFormPage
     public string $clienteCidade = '';
 
     public string $clienteUf = 'SC';
+
+    /** @var list<array{codigo: string, nome: string, uf: string}> */
+    public array $orcCidadeSugestoes = [];
+
+    public bool $orcCidadeSugestoesOpen = false;
+
+    public int $orcCidadeSugestaoIndex = -1;
 
     public string $clienteFone = '';
 
@@ -103,11 +116,29 @@ trait ErpOrcamentoFormPage
 
     public string $itemPrecoDisplay = '';
 
-    public string $itemPrecoInput = '';
+    public string $itemPrecoInput = '0,00';
 
     public bool $itemPendingPrecoVariavel = false;
 
-    public string $itemTotalEntryDisplay = '';
+    public string $itemTotalEntryDisplay = '0,00';
+
+    public string $itemPendingDesconto = '0,00';
+
+    public string $itemPendingAcrescimo = '0,00';
+
+    public ?string $produtoAtualFoto = null;
+
+    public string $produtoAtualNome = '';
+
+    public bool $descontoModalOpen = false;
+
+    public ?string $itemAjusteAlvo = null;
+
+    public string $itemAjusteTipo = 'desconto';
+
+    public string $itemAjusteModo = 'percentual';
+
+    public string $itemAjusteValor = '0,00';
 
     /** @var array<int, array<string, mixed>> */
     public array $itens = [];
@@ -219,6 +250,40 @@ trait ErpOrcamentoFormPage
             ->all();
     }
 
+    /**
+     * @return array<int, array{id: int, descricao: string}>
+     */
+    public function formaPagamentoOptions(): array
+    {
+        $options = FormaPagamento::query()
+            ->where('ativo', true)
+            ->orderBy('codigo')
+            ->orderBy('descricao')
+            ->get(['id', 'descricao'])
+            ->map(function (FormaPagamento $forma): array {
+                $descricao = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
+
+                return [
+                    'id' => (int) $forma->id,
+                    'descricao' => $descricao,
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['descricao'] !== '')
+            ->values()
+            ->all();
+
+        $atual = mb_strtoupper(trim($this->formaPagamento), 'UTF-8');
+
+        if ($atual !== '' && ! collect($options)->contains(fn (array $row): bool => $row['descricao'] === $atual)) {
+            array_unshift($options, [
+                'id' => 0,
+                'descricao' => $atual,
+            ]);
+        }
+
+        return $options;
+    }
+
     protected function initializeOrcamentoFormDefaults(): void
     {
         // Padrão: vendedor amarrado ao usuário logado (mesma fonte do PDV/App).
@@ -246,8 +311,34 @@ trait ErpOrcamentoFormPage
 
         $cliente = $orcamento->cliente;
         $this->clienteId = $cliente?->id;
-        $this->clienteSearch = mb_strtoupper($cliente?->nome_razao ?? '', 'UTF-8');
-        $this->applyClienteFields($cliente);
+
+        $isCf = $cliente && (
+            Person::isCodigoConsumidorFinal($cliente->codigo)
+            || mb_strtoupper(trim((string) $cliente->nome_razao), 'UTF-8') === 'CONSUMIDOR FINAL'
+        );
+        $hasSnapshot = filled($orcamento->cliente_nome)
+            || filled($orcamento->cliente_cpf_cnpj)
+            || filled($orcamento->cliente_endereco)
+            || filled($orcamento->cliente_fone)
+            || filled($orcamento->cliente_whatsapp);
+
+        if ($hasSnapshot) {
+            $this->clienteAvulsoMode = true;
+            $this->clienteSearch = mb_strtoupper((string) ($orcamento->cliente_nome ?: $cliente?->nome_razao), 'UTF-8');
+            $this->clienteCpfCnpj = (string) ($orcamento->cliente_cpf_cnpj ?? '');
+            $this->clienteEndereco = mb_strtoupper((string) ($orcamento->cliente_endereco ?? ''), 'UTF-8');
+            $this->clienteNumero = (string) ($orcamento->cliente_numero ?? '');
+            $this->clienteBairro = mb_strtoupper((string) ($orcamento->cliente_bairro ?? ''), 'UTF-8');
+            $this->clienteCep = (string) ($orcamento->cliente_cep ?? '');
+            $this->clienteCidade = mb_strtoupper((string) ($orcamento->cliente_cidade ?? ''), 'UTF-8');
+            $this->clienteUf = mb_strtoupper((string) ($orcamento->cliente_uf ?: 'SC'), 'UTF-8');
+            $this->clienteFone = (string) ($orcamento->cliente_fone ?? '');
+            $this->clienteWhatsapp = (string) ($orcamento->cliente_whatsapp ?? '');
+        } else {
+            $this->clienteAvulsoMode = $isCf;
+            $this->clienteSearch = mb_strtoupper($cliente?->nome_razao ?? '', 'UTF-8');
+            $this->applyClienteFields($cliente, enterAvulso: $isCf);
+        }
 
         $this->vendedorId = $orcamento->vendedor_id;
         $this->formaPagamento = mb_strtoupper((string) ($orcamento->forma_pagamento ?? ''), 'UTF-8');
@@ -292,7 +383,7 @@ trait ErpOrcamentoFormPage
             if ($person) {
                 $this->clienteId = $person->id;
                 $this->clienteSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
-                $this->applyClienteFields($person);
+                $this->applyClienteFields($person, enterAvulso: true);
             }
         }
 
@@ -315,6 +406,13 @@ trait ErpOrcamentoFormPage
      */
     protected function mapItemToRow(OrcamentoItem $item): array
     {
+        $qtd = (float) $item->quantidade;
+        $preco = (float) $item->preco_unitario;
+        $desconto = (float) $item->desconto;
+        $bruto = round($qtd * $preco, 2);
+        $total = (float) $item->total;
+        $acrescimo = max(0, round($total - ($bruto - $desconto), 2));
+
         return [
             'id' => $item->id,
             'key' => 'item-' . $item->id,
@@ -322,13 +420,16 @@ trait ErpOrcamentoFormPage
             'product_id' => $item->product_id,
             'product_codigo' => $item->product?->codigo ?? '',
             'descricao' => mb_strtoupper((string) ($item->descricao ?? $item->product?->descricao ?? ''), 'UTF-8'),
-            'quantidade' => ErpMoney::formatBr((float) $item->quantidade, 3),
+            'quantidade' => ErpMoney::formatBr($qtd, 3),
             'unidade' => mb_strtoupper((string) ($item->product?->unidade ?? 'UN'), 'UTF-8'),
-            'preco_unitario' => ErpMoney::formatBr((float) $item->preco_unitario),
-            'total' => ErpMoney::formatBr((float) $item->total),
+            'preco_unitario' => ErpMoney::formatBr($preco),
+            'acrescimo' => ErpMoney::formatBr($acrescimo),
+            'desconto' => ErpMoney::formatBr($desconto),
+            'total' => ErpMoney::formatBr($total),
             'preco_variavel' => (bool) ($item->product?->preco_variavel ?? false),
             'product_grade_id' => $item->product_grade_id,
             'grade_descricao' => mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8'),
+            'foto' => $item->product?->fotoUrl(),
         ];
     }
 
@@ -359,6 +460,25 @@ trait ErpOrcamentoFormPage
             $this->clienteSearch = $upper;
         }
 
+        $term = trim($this->clienteSearch);
+
+        if ($term === '') {
+            $this->clienteAvulsoMode = false;
+            $this->clienteId = null;
+            $this->applyClienteFields(null);
+            $this->clienteLookupOpen = true;
+            $this->refreshClienteResults();
+
+            return;
+        }
+
+        // Em modo avulso o campo é o nome digitado — não abrir lookup a cada tecla.
+        if ($this->clienteAvulsoMode && $this->clienteId !== null) {
+            $this->clienteLookupOpen = false;
+
+            return;
+        }
+
         $this->clienteLookupOpen = true;
         $this->refreshClienteResults();
     }
@@ -369,11 +489,13 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $this->clienteLookupOpen = true;
-
-        if (filled(trim($this->clienteSearch))) {
-            $this->refreshClienteResults();
+        // Modo avulso: não abrir lookup no foco — usuário preenche dados manuais.
+        if ($this->clienteAvulsoMode && $this->clienteId !== null) {
+            return;
         }
+
+        $this->clienteLookupOpen = true;
+        $this->refreshClienteResults();
     }
 
     public function refreshClienteResults(): void
@@ -419,11 +541,38 @@ trait ErpOrcamentoFormPage
             ])
             ->all();
 
+        // Garante CONSUMIDOR FINAL nas sugestões quando a busca bate.
+        $termUpper = mb_strtoupper($term, 'UTF-8');
+        $cfHint = $term === ''
+            || str_contains('CONSUMIDOR FINAL', $termUpper)
+            || str_contains($termUpper, 'CONSUMIDOR')
+            || in_array($termUpper, ['CF', '000001'], true);
+
+        if ($cfHint) {
+            $cf = Person::resolveConsumidorFinal();
+            $already = collect($this->clienteResults)->contains(fn (array $row): bool => (int) $row['id'] === (int) $cf->id);
+
+            if (! $already) {
+                array_unshift($this->clienteResults, [
+                    'id' => $cf->id,
+                    'nome' => mb_strtoupper($cf->nome_razao, 'UTF-8'),
+                    'fantasia' => '',
+                    'cpf_cnpj' => $cf->cpf_cnpj ?? '',
+                ]);
+                $this->clienteResults = array_slice($this->clienteResults, 0, 50);
+            }
+        }
+
         $this->selectedClienteIndex = $this->clienteResults === [] ? null : 0;
     }
 
     public function moveClienteSelection(int $delta): void
     {
+        if ($this->clienteResults === [] && ! $this->clienteLookupOpen) {
+            $this->clienteLookupOpen = true;
+            $this->refreshClienteResults();
+        }
+
         if ($this->clienteResults === []) {
             return;
         }
@@ -431,6 +580,7 @@ trait ErpOrcamentoFormPage
         $index = ($this->selectedClienteIndex ?? 0) + $delta;
         $count = count($this->clienteResults);
         $this->selectedClienteIndex = max(0, min($count - 1, $index));
+        $this->clienteLookupOpen = true;
     }
 
     public function selectClienteResult(int $index): void
@@ -460,34 +610,213 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $this->clienteId = $person->id;
-        $this->clienteSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
-        $this->applyClienteFields($person);
-        $this->clienteLookupOpen = false;
-        $this->clienteResults = [];
-        $this->selectedClienteIndex = null;
-        $this->dispatch('erp-orcamento-masks-refresh');
-        $this->dispatch('erp-orcamento-focus-item-codigo');
+        $this->applyRegisteredOrAvulsoCliente($person);
     }
 
-    public function handleClienteEnter(): void
+    /**
+     * Enter no nome do cliente:
+     * - lista aberta → confirma a linha destacada (inclusive a primeira);
+     * - lista fechada (Esc) ou sem resultados → cadastro exato ou modo avulso;
+     * - já em modo avulso → Enter avança campo a campo.
+     */
+    public function handleClienteEnter(?string $typed = null): void
     {
         if ($this->orcamentoReadOnly()) {
             return;
         }
 
-        if ($this->clienteLookupOpen) {
-            $this->confirmClienteSelection();
+        if (is_string($typed)) {
+            $this->clienteSearch = mb_strtoupper(trim($typed), 'UTF-8');
         }
 
-        if ($this->clienteId !== null) {
-            $this->dispatch('erp-orcamento-focus-item-codigo');
+        if ($this->clienteAvulsoMode) {
+            $this->clienteLookupOpen = false;
+            $this->focusNextClienteAvulsoField('orc-cliente');
+
+            return;
         }
+
+        $nome = mb_strtoupper(trim($this->clienteSearch), 'UTF-8');
+
+        if ($nome === '') {
+            $this->clienteLookupOpen = false;
+
+            return;
+        }
+
+        if (
+            $this->clienteLookupOpen
+            && $this->clienteResults !== []
+            && $this->selectedClienteIndex !== null
+            && isset($this->clienteResults[$this->selectedClienteIndex])
+        ) {
+            $this->confirmClienteSelection();
+
+            return;
+        }
+
+        $exact = $this->findExactClienteMatch($nome);
+
+        if ($exact) {
+            $this->applyRegisteredOrAvulsoCliente($exact);
+
+            return;
+        }
+
+        $this->enterClienteAvulsoMode($nome);
     }
 
-    protected function applyClienteFields(?Person $person): void
+    public function focusNextClienteAvulsoField(string $fromId): void
+    {
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            return;
+        }
+
+        $order = [
+            'orc-cliente',
+            'orc-cpf',
+            'orc-fone',
+            'orc-whatsapp',
+            'orc-endereco',
+            'orc-numero-end',
+            'orc-bairro',
+            'orc-cep',
+            'orc-cidade',
+            'orc-uf',
+        ];
+
+        $index = array_search($fromId, $order, true);
+
+        if ($index === false) {
+            return;
+        }
+
+        // Evita remount e perda de foco no Enter.
+        $this->skipRender();
+
+        if ($index >= count($order) - 1) {
+            $this->dispatch('orc-focus-barcode');
+            $this->dispatch('erp-orcamento-focus-item-codigo');
+
+            return;
+        }
+
+        $this->dispatch('orc-focus-field', id: $order[$index + 1]);
+    }
+
+    /**
+     * Cliente cadastrado (não CF) ou CF → modo avulso.
+     */
+    protected function applyRegisteredOrAvulsoCliente(Person $person): void
+    {
+        $this->clienteId = $person->id;
+        $this->clienteLookupOpen = false;
+        $this->clienteResults = [];
+        $this->selectedClienteIndex = null;
+        $this->dispatch('erp-orcamento-masks-refresh');
+
+        if (Person::isCodigoConsumidorFinal($person->codigo)) {
+            $nome = mb_strtoupper(trim($this->clienteSearch), 'UTF-8');
+            if ($nome === '' || in_array($nome, ['CF', '000001', 'CONSUMIDOR FINAL'], true)) {
+                $nome = 'CONSUMIDOR FINAL';
+            }
+            $this->enterClienteAvulsoMode($nome);
+
+            return;
+        }
+
+        $this->clienteSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
+        $this->applyClienteFields($person, enterAvulso: false);
+        $this->fecharOrcCidadeSugestoes();
+        $this->dispatch('erp-orcamento-focus-item-codigo');
+    }
+
+    /**
+     * Nome avulso: vincula CONSUMIDOR FINAL, libera campos e foca o CPF.
+     */
+    protected function enterClienteAvulsoMode(string $nome): void
+    {
+        $cf = Person::resolveConsumidorFinal();
+        $this->clienteId = $cf->id;
+        $this->clienteSearch = mb_strtoupper(trim($nome), 'UTF-8');
+        $this->clienteAvulsoMode = true;
+        $this->clienteCpfCnpj = '';
+        $this->clienteEndereco = '';
+        $this->clienteNumero = '';
+        $this->clienteBairro = '';
+        $this->clienteCep = '';
+        $this->clienteCidade = '';
+        $this->clienteUf = 'SC';
+        $this->clienteFone = '';
+        $this->clienteWhatsapp = '';
+        $this->clienteLookupOpen = false;
+        $this->clienteResults = [];
+        $this->selectedClienteIndex = null;
+        $this->fecharOrcCidadeSugestoes();
+        $this->dispatch('erp-orcamento-masks-refresh');
+        $this->dispatch('orc-focus-field', id: 'orc-cpf');
+    }
+
+    protected function findExactClienteMatch(string $nome): ?Person
+    {
+        $nome = mb_strtoupper(trim($nome), 'UTF-8');
+
+        if ($nome === '') {
+            return null;
+        }
+
+        $base = Person::query()
+            ->where('ativo', true)
+            ->where('is_cliente', true);
+
+        $byNome = (clone $base)
+            ->whereRaw('UPPER(TRIM(nome_razao)) = ?', [$nome])
+            ->orderBy('id')
+            ->first();
+
+        if ($byNome) {
+            return $byNome;
+        }
+
+        $byFantasia = (clone $base)
+            ->whereRaw('UPPER(TRIM(apelido_fantasia)) = ?', [$nome])
+            ->orderBy('id')
+            ->first();
+
+        if ($byFantasia) {
+            return $byFantasia;
+        }
+
+        $digits = preg_replace('/\D/', '', $nome) ?? '';
+
+        if (strlen($digits) >= 11) {
+            return (clone $base)
+                ->whereRaw(
+                    "replace(replace(replace(replace(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') = ?",
+                    [$digits]
+                )
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (in_array($nome, ['CF', '000001'], true) || ctype_digit($nome)) {
+            $byCodigo = (clone $base)
+                ->where('codigo', $nome)
+                ->orderBy('id')
+                ->first();
+
+            if ($byCodigo) {
+                return $byCodigo;
+            }
+        }
+
+        return null;
+    }
+
+    protected function applyClienteFields(?Person $person, bool $enterAvulso = false): void
     {
         if (! $person) {
+            $this->clienteAvulsoMode = false;
             $this->clienteCpfCnpj = '';
             $this->clienteEndereco = '';
             $this->clienteNumero = '';
@@ -501,6 +830,24 @@ trait ErpOrcamentoFormPage
             return;
         }
 
+        $isCf = Person::isCodigoConsumidorFinal($person->codigo);
+
+        if ($isCf && $enterAvulso) {
+            $this->clienteAvulsoMode = true;
+            $this->clienteCpfCnpj = '';
+            $this->clienteEndereco = '';
+            $this->clienteNumero = '';
+            $this->clienteBairro = '';
+            $this->clienteCep = '';
+            $this->clienteCidade = '';
+            $this->clienteUf = 'SC';
+            $this->clienteFone = '';
+            $this->clienteWhatsapp = '';
+
+            return;
+        }
+
+        $this->clienteAvulsoMode = false;
         $this->clienteCpfCnpj = $person->cpf_cnpj ?? '';
         $this->clienteEndereco = mb_strtoupper((string) ($person->endereco ?? ''), 'UTF-8');
         $this->clienteNumero = (string) ($person->numero ?? '');
@@ -516,24 +863,263 @@ trait ErpOrcamentoFormPage
         }
     }
 
+    public function clienteCamposEditaveis(): bool
+    {
+        return $this->clienteAvulsoMode && ! $this->orcamentoReadOnly();
+    }
+
+    /**
+     * @return array{cliente_nome: ?string, cliente_cpf_cnpj: ?string, cliente_endereco: ?string, cliente_numero: ?string, cliente_bairro: ?string, cliente_cep: ?string, cliente_cidade: ?string, cliente_uf: ?string, cliente_fone: ?string, cliente_whatsapp: ?string}
+     */
+    protected function clienteSnapshotAttributes(): array
+    {
+        if (! $this->clienteAvulsoMode) {
+            return [
+                'cliente_nome' => null,
+                'cliente_cpf_cnpj' => null,
+                'cliente_endereco' => null,
+                'cliente_numero' => null,
+                'cliente_bairro' => null,
+                'cliente_cep' => null,
+                'cliente_cidade' => null,
+                'cliente_uf' => null,
+                'cliente_fone' => null,
+                'cliente_whatsapp' => null,
+            ];
+        }
+
+        $nome = mb_strtoupper(trim($this->clienteSearch), 'UTF-8');
+
+        return [
+            'cliente_nome' => $nome !== '' ? $nome : null,
+            'cliente_cpf_cnpj' => trim($this->clienteCpfCnpj) ?: null,
+            'cliente_endereco' => mb_strtoupper(trim($this->clienteEndereco), 'UTF-8') ?: null,
+            'cliente_numero' => trim($this->clienteNumero) ?: null,
+            'cliente_bairro' => mb_strtoupper(trim($this->clienteBairro), 'UTF-8') ?: null,
+            'cliente_cep' => trim($this->clienteCep) ?: null,
+            'cliente_cidade' => mb_strtoupper(trim($this->clienteCidade), 'UTF-8') ?: null,
+            'cliente_uf' => mb_strtoupper(trim($this->clienteUf), 'UTF-8') ?: null,
+            'cliente_fone' => trim($this->clienteFone) ?: null,
+            'cliente_whatsapp' => trim($this->clienteWhatsapp) ?: null,
+        ];
+    }
+
     public function closeClienteLookup(): void
     {
         $this->clienteLookupOpen = false;
     }
 
-    public function confirmClienteSelectionOnBlur(): void
+    public function updatedClienteCidade(?string $value): void
     {
-        if (! $this->clienteLookupOpen) {
-            return;
-        }
-
-        if ($this->selectedClienteIndex !== null && isset($this->clienteResults[$this->selectedClienteIndex])) {
-            $this->confirmClienteSelection();
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            $this->fecharOrcCidadeSugestoes();
 
             return;
         }
 
-        $this->closeClienteLookup();
+        $upper = mb_strtoupper((string) $value, 'UTF-8');
+
+        if ($this->clienteCidade !== $upper) {
+            $this->clienteCidade = $upper;
+        }
+
+        $this->buscarMunicipiosOrcamento($upper);
+    }
+
+    public function updatedClienteUf(?string $value): void
+    {
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            return;
+        }
+
+        $uf = mb_strtoupper(trim((string) $value), 'UTF-8');
+        $this->clienteUf = $uf;
+
+        if (mb_strlen(trim($this->clienteCidade)) >= 2) {
+            $this->buscarMunicipiosOrcamento($this->clienteCidade);
+
+            return;
+        }
+
+        $this->fecharOrcCidadeSugestoes();
+    }
+
+    public function buscarMunicipiosOrcamento(?string $termo = null): void
+    {
+        $termo = trim((string) ($termo ?? $this->clienteCidade));
+        $uf = strtoupper(trim($this->clienteUf));
+
+        if (mb_strlen($termo) < 2) {
+            $this->fecharOrcCidadeSugestoes();
+
+            return;
+        }
+
+        try {
+            $this->orcCidadeSugestoes = app(MunicipioLookupService::class)->search(
+                $termo,
+                strlen($uf) === 2 ? $uf : null,
+                25,
+            );
+        } catch (RuntimeException $exception) {
+            $this->fecharOrcCidadeSugestoes();
+            Notification::make()
+                ->title('Consulta de cidades')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->orcCidadeSugestoesOpen = $this->orcCidadeSugestoes !== [];
+        $this->orcCidadeSugestaoIndex = $this->orcCidadeSugestoes !== [] ? 0 : -1;
+    }
+
+    public function handleCidadeEnter(): void
+    {
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            return;
+        }
+
+        if ($this->orcCidadeSugestoesOpen && $this->orcCidadeSugestoes !== []) {
+            $this->confirmarOrcCidadeSugestao();
+
+            return;
+        }
+
+        $termo = trim($this->clienteCidade);
+
+        if (mb_strlen($termo) >= 2) {
+            $this->buscarMunicipiosOrcamento($termo);
+
+            if ($this->orcCidadeSugestoes !== []) {
+                $this->confirmarOrcCidadeSugestao();
+
+                return;
+            }
+        }
+
+        $this->focusNextClienteAvulsoField('orc-cidade');
+    }
+
+    public function confirmarOrcCidadeSugestao(): void
+    {
+        if ($this->orcCidadeSugestoes === []) {
+            $this->focusNextClienteAvulsoField('orc-cidade');
+
+            return;
+        }
+
+        $index = $this->orcCidadeSugestaoIndex;
+
+        if ($index < 0 || ! isset($this->orcCidadeSugestoes[$index])) {
+            $index = 0;
+        }
+
+        $sug = $this->orcCidadeSugestoes[$index];
+        $this->selecionarOrcCidade(
+            (string) $sug['codigo'],
+            (string) $sug['nome'],
+            (string) ($sug['uf'] ?? ''),
+        );
+    }
+
+    public function selecionarOrcCidade(string $codigo, string $nome, ?string $uf = null): void
+    {
+        $this->clienteCidade = mb_strtoupper(trim($nome), 'UTF-8');
+
+        $uf = strtoupper(trim((string) $uf));
+
+        if (strlen($uf) === 2) {
+            $this->clienteUf = $uf;
+        }
+
+        $this->fecharOrcCidadeSugestoes();
+        $this->dispatch('orc-focus-field', id: 'orc-uf');
+    }
+
+    public function moverOrcCidadeSugestao(int $delta): void
+    {
+        if (! $this->orcCidadeSugestoesOpen || $this->orcCidadeSugestoes === []) {
+            return;
+        }
+
+        $count = count($this->orcCidadeSugestoes);
+        $current = $this->orcCidadeSugestaoIndex < 0 ? 0 : $this->orcCidadeSugestaoIndex;
+        $this->orcCidadeSugestaoIndex = ($current + $delta + $count) % $count;
+        $this->dispatch('orc-cidade-scroll-selected');
+    }
+
+    public function fecharOrcCidadeSugestoes(): void
+    {
+        $this->orcCidadeSugestoes = [];
+        $this->orcCidadeSugestoesOpen = false;
+        $this->orcCidadeSugestaoIndex = -1;
+    }
+
+    public function buscarCepOrcamento(bool $silentIncompleteCep = false): void
+    {
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            return;
+        }
+
+        $cep = (string) $this->clienteCep;
+
+        if (strlen(preg_replace('/\D/', '', $cep) ?? '') !== 8) {
+            if (! $silentIncompleteCep) {
+                Notification::make()
+                    ->title('Informe um CEP completo.')
+                    ->warning()
+                    ->send();
+            }
+
+            return;
+        }
+
+        try {
+            $fields = app(CepLookupService::class)->lookup($cep);
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Consulta de CEP')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->clienteCep = $fields['cep'];
+
+        if (filled($fields['endereco'])) {
+            $this->clienteEndereco = $fields['endereco'];
+        }
+
+        if (filled($fields['bairro'])) {
+            $this->clienteBairro = $fields['bairro'];
+        }
+
+        $this->clienteCidade = $fields['cidade_nome'];
+        $this->clienteUf = $fields['uf'] !== '' ? $fields['uf'] : $this->clienteUf;
+        $this->fecharOrcCidadeSugestoes();
+        $this->dispatch('erp-orcamento-masks-refresh');
+
+        Notification::make()
+            ->title('Endereço preenchido pelo CEP.')
+            ->body('Confira cidade e número, se necessário.')
+            ->success()
+            ->send();
+    }
+
+    public function handleCepEnter(): void
+    {
+        if (! $this->clienteAvulsoMode || $this->orcamentoReadOnly()) {
+            return;
+        }
+
+        $this->buscarCepOrcamento(silentIncompleteCep: true);
+        // Render completo para mostrar endereço/cidade; depois foca a cidade.
+        $this->dispatch('orc-focus-field', id: 'orc-cidade');
     }
 
     public function applyDescontoFromPercentual(): void
@@ -587,6 +1173,24 @@ trait ErpOrcamentoFormPage
     public function selectItemRow(int $index): void
     {
         $this->selectedItemIndex = $index;
+
+        if (! isset($this->itens[$index])) {
+            return;
+        }
+
+        $row = $this->itens[$index];
+        $this->produtoAtualNome = (string) ($row['descricao'] ?? '');
+        $this->produtoAtualFoto = $row['foto'] ?? null;
+
+        if ($this->produtoAtualFoto === null && filled($row['product_id'] ?? null)) {
+            $product = Product::query()->find((int) $row['product_id']);
+            $this->produtoAtualFoto = $product?->fotoUrl();
+            if ($product && isset($this->itens[$index])) {
+                $itens = $this->itens;
+                $itens[$index]['foto'] = $this->produtoAtualFoto;
+                $this->itens = $itens;
+            }
+        }
     }
 
     public function updateItemField(int $index, string $field, string $value): void
@@ -646,6 +1250,8 @@ trait ErpOrcamentoFormPage
     {
         $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
         $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
+        $acrescimo = ErpMoney::parseBr($row['acrescimo'] ?? 0);
+        $desconto = ErpMoney::parseBr($row['desconto'] ?? 0);
 
         if ($qtd < 0) {
             $qtd = 0;
@@ -655,9 +1261,22 @@ trait ErpOrcamentoFormPage
             $preco = 0;
         }
 
+        if ($acrescimo < 0) {
+            $acrescimo = 0;
+        }
+
+        if ($desconto < 0) {
+            $desconto = 0;
+        }
+
+        $bruto = round($qtd * $preco, 2);
+        $total = round(max(0, $bruto + $acrescimo - $desconto), 2);
+
         $row['quantidade'] = ErpMoney::formatBr($qtd, 3);
         $row['preco_unitario'] = ErpMoney::formatBr($preco);
-        $row['total'] = ErpMoney::formatBr(round($qtd * $preco, 2));
+        $row['acrescimo'] = ErpMoney::formatBr($acrescimo);
+        $row['desconto'] = ErpMoney::formatBr($desconto);
+        $row['total'] = ErpMoney::formatBr($total);
 
         return $row;
     }
@@ -800,47 +1419,76 @@ trait ErpOrcamentoFormPage
         $this->dispatch('erp-orcamento-focus-item-codigo');
     }
 
-    public function handleItemCodigoEnter(): void
+    public function confirmarCodigoProdutoBar(?string $typed = null): void
     {
         if ($this->orcamentoReadOnly()) {
             return;
         }
 
-        if (blank(trim($this->itemCodigoInput))) {
-            $this->dispatch('erp-orcamento-focus-item-descricao');
+        if (is_string($typed)) {
+            $this->itemProdutoSearch = mb_strtoupper(trim($typed), 'UTF-8');
+        }
+
+        $term = mb_strtoupper(trim($this->itemProdutoSearch), 'UTF-8');
+
+        if ($term === '') {
+            return;
+        }
+
+        $navegouNaLista = $this->produtoLookupOpen
+            && $this->produtoResults !== []
+            && ($this->selectedProdutoIndex ?? 0) > 0;
+
+        if ($navegouNaLista) {
+            $this->selectProdutoResult((int) $this->selectedProdutoIndex);
 
             return;
         }
 
-        $this->submitItemByCodigo();
+        $product = $this->findProductByCodigo($term);
+
+        if ($product) {
+            $this->stageProductForEntry($product);
+
+            return;
+        }
+
+        if ($this->produtoLookupOpen && $this->produtoResults !== []) {
+            $this->selectProdutoResult($this->selectedProdutoIndex ?? 0);
+
+            return;
+        }
+
+        $product = $this->findProductByTerm($term);
+
+        if ($product) {
+            $this->stageProductForEntry($product);
+
+            return;
+        }
+
+        $this->submitItemProdutoSearch($term);
     }
 
-    public function submitItemByCodigo(): void
+    public function updatedItemProdutoSearch(): void
     {
-        if ($this->orcamentoReadOnly()) {
+        if ($this->orcamentoReadOnly() || $this->itemPendingProductId !== null) {
             return;
         }
 
-        $codigo = mb_strtoupper(trim($this->itemCodigoInput), 'UTF-8');
+        $upper = mb_strtoupper($this->itemProdutoSearch, 'UTF-8');
 
-        if ($codigo === '') {
-            return;
+        if ($this->itemProdutoSearch !== $upper) {
+            $this->itemProdutoSearch = $upper;
         }
 
-        $product = $this->findProductByCodigo($codigo);
+        $this->produtoLookupOpen = filled(trim($this->itemProdutoSearch));
+        $this->refreshProdutoResults();
+    }
 
-        if (! $product) {
-            Notification::make()
-                ->title('Produto não encontrado.')
-                ->body('Verifique o código informado.')
-                ->warning()
-                ->send();
-            $this->dispatch('erp-orcamento-focus-item-codigo');
-
-            return;
-        }
-
-        $this->stageProductForEntry($product);
+    public function handleItemCodigoEnter(): void
+    {
+        $this->confirmarCodigoProdutoBar();
     }
 
     public function updatedItemQuantidadeInput(): void
@@ -853,15 +1501,20 @@ trait ErpOrcamentoFormPage
         $this->recalcEntryRowFromPending();
     }
 
-    public function handleItemQuantidadeEnter(): void
+    public function focoPrecoAposQtd(): void
     {
-        if ($this->itemPendingPrecoVariavel) {
-            $this->dispatch('erp-orcamento-focus-item-preco');
-
+        if ($this->orcamentoReadOnly() || $this->itemPendingProductId === null) {
             return;
         }
 
-        $this->confirmPendingItemEntry();
+        $this->recalcEntryRowFromPending();
+        $this->dispatch('orc-focus-preco');
+        $this->dispatch('erp-orcamento-focus-item-preco');
+    }
+
+    public function handleItemQuantidadeEnter(): void
+    {
+        $this->focoPrecoAposQtd();
     }
 
     public function confirmPendingItemEntry(): void
@@ -889,31 +1542,36 @@ trait ErpOrcamentoFormPage
                 ->title('Informe a quantidade do item.')
                 ->warning()
                 ->send();
+            $this->dispatch('orc-focus-qtd');
             $this->dispatch('erp-orcamento-focus-item-quantidade');
 
             return;
         }
 
         $preco = ErpMoney::parseBr($this->itemPrecoInput);
-        $precoVariavel = $this->itemPendingPrecoVariavel;
 
-        if ($precoVariavel && $preco <= 0) {
+        if ($preco <= 0) {
             Notification::make()
                 ->title('Informe o preço do item.')
                 ->warning()
                 ->send();
+            $this->dispatch('orc-focus-preco');
             $this->dispatch('erp-orcamento-focus-item-preco');
 
             return;
         }
+
+        $acrescimo = ErpMoney::parseBr($this->itemPendingAcrescimo);
+        $desconto = ErpMoney::parseBr($this->itemPendingDesconto);
 
         $this->isConfirmingPendingItem = true;
 
         try {
             $this->itemPendingProductId = null;
             $this->itemPendingPrecoVariavel = false;
-            $this->appendProductItem($product, $qtd, $precoVariavel ? $preco : null);
+            $this->appendProductItem($product, $qtd, $preco, $acrescimo, $desconto);
             $this->clearItemEntryRow();
+            $this->dispatch('orc-focus-barcode');
             $this->dispatch('erp-orcamento-focus-item-codigo');
         } finally {
             $this->isConfirmingPendingItem = false;
@@ -927,10 +1585,15 @@ trait ErpOrcamentoFormPage
         $this->itemCodigoInput = (string) $product->codigo;
         $this->itemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
         $this->itemQuantidadeInput = ErpMoney::formatBr(1, 3);
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
+        $this->produtoAtualNome = mb_strtoupper($product->descricao, 'UTF-8');
+        $this->produtoAtualFoto = $product->fotoUrl();
         $this->recalcEntryRowFromPending();
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
+        $this->dispatch('orc-focus-qtd');
         $this->dispatch('erp-orcamento-focus-item-quantidade');
     }
 
@@ -957,12 +1620,14 @@ trait ErpOrcamentoFormPage
         $precoService = app(OrcamentoPrecoService::class);
         $precoSugerido = $precoService->resolvePreco($product, $qtd);
 
-        if (! $this->itemPendingPrecoVariavel || ErpMoney::parseBr($this->itemPrecoInput) <= 0) {
+        if (ErpMoney::parseBr($this->itemPrecoInput) <= 0) {
             $this->itemPrecoInput = ErpMoney::formatBr($precoSugerido);
         }
 
         $preco = ErpMoney::parseBr($this->itemPrecoInput);
-        $total = round($qtd * $preco, 2);
+        $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+        $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+        $total = round(max(0, ($qtd * $preco) + $acr - $desc), 2);
 
         $this->itemQuantidadeInput = ErpMoney::formatBr($qtd, 3);
         $this->itemUnidadeDisplay = mb_strtoupper((string) ($product->unidade ?: 'UN'), 'UTF-8');
@@ -979,11 +1644,20 @@ trait ErpOrcamentoFormPage
         $this->itemQuantidadeInput = '1,000';
         $this->itemUnidadeDisplay = '';
         $this->itemPrecoDisplay = '';
-        $this->itemPrecoInput = '';
-        $this->itemTotalEntryDisplay = '';
+        $this->itemPrecoInput = '0,00';
+        $this->itemTotalEntryDisplay = '0,00';
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
+
+        if ($this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $this->selectItemRow($this->selectedItemIndex);
+        } else {
+            $this->produtoAtualFoto = null;
+            $this->produtoAtualNome = '';
+        }
     }
 
     public function searchItemProduto(string $value): void
@@ -993,16 +1667,6 @@ trait ErpOrcamentoFormPage
         }
 
         $this->itemProdutoSearch = mb_strtoupper($value, 'UTF-8');
-        $this->produtoLookupOpen = true;
-        $this->refreshProdutoResults();
-    }
-
-    public function updatedItemProdutoSearch(): void
-    {
-        if ($this->orcamentoReadOnly()) {
-            return;
-        }
-
         $this->produtoLookupOpen = true;
         $this->refreshProdutoResults();
     }
@@ -1032,6 +1696,7 @@ trait ErpOrcamentoFormPage
         }
 
         $like = '%' . $term . '%';
+        $prefix = $term . '%';
 
         $this->produtoResults = Product::query()
             ->where('ativo', true)
@@ -1043,9 +1708,14 @@ trait ErpOrcamentoFormPage
                     ->orWhere('codigo_barras_caixa', 'like', $like);
 
                 if (ctype_digit($term)) {
-                    $query->orWhere('codigo', $term);
+                    $query->orWhere('codigo', $term)
+                        ->orWhereRaw('CAST(codigo AS CHAR) = ?', [$term]);
                 }
             })
+            ->orderByRaw(
+                'CASE WHEN codigo = ? OR CAST(codigo AS CHAR) = ? THEN 0 WHEN CAST(codigo AS CHAR) LIKE ? THEN 1 WHEN codigo_barras = ? OR codigo_barras_caixa = ? THEN 2 WHEN descricao LIKE ? THEN 3 ELSE 4 END',
+                [$term, $term, $prefix, $term, $term, $prefix]
+            )
             ->orderBy('descricao')
             ->limit(50)
             ->get()
@@ -1149,11 +1819,246 @@ trait ErpOrcamentoFormPage
         $this->produtoLookupOpen = false;
     }
 
-    protected function appendProductItem(Product $product, float $qtd = 1.0, ?float $preco = null): void
+    public function abrirModalDescontoItem(): void
     {
+        if ($this->orcamentoReadOnly() || $this->descontoModalOpen) {
+            return;
+        }
+
+        if ($this->itemPendingProductId !== null && ErpMoney::parseBr($this->itemPrecoInput) > 0) {
+            $this->itemAjusteAlvo = 'form';
+        } elseif ($this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $this->itemAjusteAlvo = 'grid';
+        } else {
+            Notification::make()
+                ->title('Informe o produto (ou selecione um item) para desconto/acréscimo.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->itemAjusteTipo = 'desconto';
+        $this->itemAjusteModo = 'percentual';
+        $this->itemAjusteValor = '0,00';
+        $this->descontoModalOpen = true;
+    }
+
+    public function fecharModalDescontoItem(): void
+    {
+        $this->descontoModalOpen = false;
+        $this->itemAjusteAlvo = null;
+    }
+
+    public function setItemAjusteTipo(string $tipo): void
+    {
+        $this->itemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
+    }
+
+    public function setItemAjusteModo(string $modo): void
+    {
+        $this->itemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
+    }
+
+    /**
+     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     */
+    public function getItemAjustePreviewProperty(): array
+    {
+        $ctx = $this->contextoItemAjuste();
+
+        if ($ctx === null) {
+            return [
+                'descricao' => '',
+                'base' => ErpMoney::formatBr(0),
+                'novoPreco' => ErpMoney::formatBr(0),
+                'total' => ErpMoney::formatBr(0),
+                'tipo' => $this->itemAjusteTipo,
+                'temAjuste' => false,
+            ];
+        }
+
+        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+
+        return [
+            'descricao' => $ctx['descricao'],
+            'base' => ErpMoney::formatBr($calc['base']),
+            'novoPreco' => ErpMoney::formatBr($calc['novoPreco']),
+            'total' => ErpMoney::formatBr($calc['total']),
+            'tipo' => $this->itemAjusteTipo,
+            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+        ];
+    }
+
+    public function confirmarItemAjuste(): void
+    {
+        $ctx = $this->contextoItemAjuste();
+
+        if ($ctx === null) {
+            $this->fecharModalDescontoItem();
+
+            return;
+        }
+
+        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+
+        if ($this->itemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
+            Notification::make()->title('Desconto inválido.')->warning()->send();
+
+            return;
+        }
+
+        if ($this->itemAjusteAlvo === 'form') {
+            if ($this->itemAjusteTipo === 'desconto') {
+                $this->itemPendingDesconto = ErpMoney::formatBr($ajusteLinha);
+                $this->itemPendingAcrescimo = '0,00';
+            } else {
+                $this->itemPendingAcrescimo = ErpMoney::formatBr($ajusteLinha);
+                $this->itemPendingDesconto = '0,00';
+            }
+
+            $this->recalcEntryRowFromPending();
+        } else {
+            $index = (int) $this->selectedItemIndex;
+            $itens = $this->itens;
+            $item = $itens[$index];
+
+            if ($this->itemAjusteTipo === 'desconto') {
+                $item['desconto'] = ErpMoney::formatBr($ajusteLinha);
+                $item['acrescimo'] = ErpMoney::formatBr(0);
+            } else {
+                $item['acrescimo'] = ErpMoney::formatBr($ajusteLinha);
+                $item['desconto'] = ErpMoney::formatBr(0);
+            }
+
+            $itens[$index] = $this->recalcItemRowData($item);
+            $this->itens = $itens;
+            $this->recalcHeaderFromItens();
+        }
+
+        $tipo = $this->itemAjusteTipo;
+        $this->fecharModalDescontoItem();
+        Notification::make()
+            ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return array{descricao: string, preco: float, quantidade: float}|null
+     */
+    protected function contextoItemAjuste(): ?array
+    {
+        if ($this->itemAjusteAlvo === 'form' && $this->itemPendingProductId !== null) {
+            return [
+                'descricao' => $this->produtoAtualNome !== '' ? $this->produtoAtualNome : trim($this->itemProdutoSearch),
+                'preco' => ErpMoney::parseBr($this->itemPrecoInput),
+                'quantidade' => max(0.0, ErpMoney::parseBr($this->itemQuantidadeInput, 3)),
+            ];
+        }
+
+        if ($this->itemAjusteAlvo === 'grid' && $this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $item = $this->itens[$this->selectedItemIndex];
+
+            return [
+                'descricao' => (string) ($item['descricao'] ?? ''),
+                'preco' => ErpMoney::parseBr($item['preco_unitario'] ?? 0),
+                'quantidade' => ErpMoney::parseBr($item['quantidade'] ?? 0, 3),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     */
+    protected function calcularItemAjuste(float $base, float $quantidade): array
+    {
+        $valor = ErpMoney::parseBr($this->itemAjusteValor);
+
+        if ($this->itemAjusteModo === 'percentual') {
+            $deltaUnit = round($base * ($valor / 100), 2);
+        } else {
+            $deltaUnit = round($valor, 2);
+        }
+
+        $novoPreco = $this->itemAjusteTipo === 'acrescimo'
+            ? round($base + $deltaUnit, 2)
+            : round($base - $deltaUnit, 2);
+
+        if ($novoPreco < 0) {
+            $novoPreco = 0.0;
+        }
+
+        $total = round(max(0, $novoPreco * $quantidade), 2);
+
+        return [
+            'base' => $base,
+            'deltaUnit' => abs($deltaUnit),
+            'novoPreco' => $novoPreco,
+            'total' => $total,
+        ];
+    }
+
+    public function itensResumoBrutoDisplay(): string
+    {
+        $total = 0.0;
+
+        foreach ($this->itens as $row) {
+            $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
+            $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
+            $total += round($qtd * $preco, 2);
+        }
+
+        return ErpMoney::formatBr($total);
+    }
+
+    public function itensResumoAcrescimosDisplay(): string
+    {
+        $total = 0.0;
+
+        foreach ($this->itens as $row) {
+            $total += ErpMoney::parseBr($row['acrescimo'] ?? 0);
+        }
+
+        return ErpMoney::formatBr($total);
+    }
+
+    public function itensResumoDescontosDisplay(): string
+    {
+        $total = 0.0;
+
+        foreach ($this->itens as $row) {
+            $total += ErpMoney::parseBr($row['desconto'] ?? 0);
+        }
+
+        return ErpMoney::formatBr($total);
+    }
+
+    public function itensResumoLiquidoDisplay(): string
+    {
+        $total = 0.0;
+
+        foreach ($this->itens as $row) {
+            $total += ErpMoney::parseBr($row['total'] ?? 0);
+        }
+
+        return ErpMoney::formatBr($total);
+    }
+
+    protected function appendProductItem(
+        Product $product,
+        float $qtd = 1.0,
+        ?float $preco = null,
+        float $acrescimo = 0.0,
+        float $desconto = 0.0,
+    ): void {
         $precoService = app(OrcamentoPrecoService::class);
         $preco ??= $precoService->resolvePreco($product, $qtd);
-        $total = round($qtd * $preco, 2);
+        $bruto = round($qtd * $preco, 2);
+        $total = round(max(0, $bruto + $acrescimo - $desconto), 2);
 
         $itens = $this->itens;
         $newItem = [
@@ -1166,28 +2071,64 @@ trait ErpOrcamentoFormPage
             'quantidade' => ErpMoney::formatBr($qtd, 3),
             'unidade' => mb_strtoupper((string) ($product->unidade ?: 'UN'), 'UTF-8'),
             'preco_unitario' => ErpMoney::formatBr($preco),
+            'acrescimo' => ErpMoney::formatBr($acrescimo),
+            'desconto' => ErpMoney::formatBr($desconto),
             'total' => ErpMoney::formatBr($total),
             'preco_variavel' => (bool) $product->preco_variavel,
             'product_grade_id' => null,
             'grade_descricao' => '',
+            'foto' => $product->fotoUrl(),
         ];
         array_unshift($itens, $newItem);
         $this->itens = $this->renumberItens($itens);
 
         $this->selectedItemIndex = 0;
+        $this->produtoAtualNome = $newItem['descricao'];
+        $this->produtoAtualFoto = $newItem['foto'];
         $this->recalcHeaderFromItens();
     }
 
     protected function findProductByCodigo(string $codigo): ?Product
     {
-        return Product::query()
-            ->where('ativo', true)
+        $codigo = trim($codigo);
+
+        if ($codigo === '') {
+            return null;
+        }
+
+        $base = Product::query()->where('ativo', true);
+
+        $byCodigo = (clone $base)
+            ->where('codigo', $codigo)
+            ->orderBy('id')
+            ->first();
+
+        if ($byCodigo) {
+            return $byCodigo;
+        }
+
+        if (ctype_digit($codigo)) {
+            $byCast = (clone $base)
+                ->whereRaw('CAST(codigo AS CHAR) = ?', [$codigo])
+                ->orderBy('id')
+                ->first();
+
+            if ($byCast) {
+                return $byCast;
+            }
+        }
+
+        return (clone $base)
             ->where(function ($query) use ($codigo): void {
-                $query->where('codigo', $codigo)
-                    ->orWhere('referencia', $codigo)
-                    ->orWhere('codigo_barras', $codigo)
-                    ->orWhere('codigo_barras_caixa', $codigo);
+                $query->where('codigo_barras', $codigo)
+                    ->orWhere('codigo_barras_caixa', $codigo)
+                    ->orWhere('referencia', $codigo);
             })
+            ->orderByRaw(
+                'CASE WHEN codigo_barras = ? THEN 0 WHEN codigo_barras_caixa = ? THEN 1 ELSE 2 END',
+                [$codigo, $codigo]
+            )
+            ->orderBy('id')
             ->first();
     }
 
@@ -1207,8 +2148,13 @@ trait ErpOrcamentoFormPage
 
     protected function validateBeforeSave(bool $finalizar): bool
     {
-        if ($this->clienteId === null || blank($this->clienteSearch)) {
-            Notification::make()->title('Informe o Cliente!')->warning()->send();
+        if ($this->clienteId === null || blank(trim($this->clienteSearch))) {
+            Notification::make()
+                ->title($this->clienteAvulsoMode
+                    ? 'Informe o nome do cliente no orçamento!'
+                    : 'Informe o Cliente!')
+                ->warning()
+                ->send();
 
             return false;
         }
@@ -1292,6 +2238,7 @@ trait ErpOrcamentoFormPage
                 $attributes = [
                     'data' => $this->data['data'] ?? now()->format('Y-m-d'),
                     'cliente_id' => $this->clienteId,
+                    ...$this->clienteSnapshotAttributes(),
                     'vendedor_id' => $this->vendedorId,
                     'subtotal' => $subtotal,
                     'percentual_desconto' => $percentual,
@@ -1332,7 +2279,7 @@ trait ErpOrcamentoFormPage
                         'preco_unitario' => ErpMoney::parseBr($row['preco_unitario'] ?? 0),
                         'total' => ErpMoney::parseBr($row['total'] ?? 0),
                         'descricao' => mb_strtoupper((string) ($row['descricao'] ?? ''), 'UTF-8'),
-                        'desconto' => 0,
+                        'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),
                     ];
 
                     if (filled($row['id'] ?? null)) {
@@ -1437,10 +2384,21 @@ trait ErpOrcamentoFormPage
     public function applyOverlayProdutoSaved(string $codigo): void
     {
         if (filled($codigo)) {
-            $this->itemCodigoInput = mb_strtoupper(trim($codigo), 'UTF-8');
+            $codigo = mb_strtoupper(trim($codigo), 'UTF-8');
+            $this->itemCodigoInput = $codigo;
+            $this->itemProdutoSearch = $codigo;
+            $product = $this->findProductByCodigo($codigo);
+
+            if ($product) {
+                $this->stageProductForEntry($product);
+                $this->closeProductOverlay();
+
+                return;
+            }
         }
 
         $this->closeProductOverlay();
+        $this->dispatch('orc-focus-barcode');
         $this->dispatch('erp-orcamento-focus-item-codigo');
     }
 
@@ -1451,7 +2409,7 @@ trait ErpOrcamentoFormPage
         if ($person) {
             $this->clienteId = $person->id;
             $this->clienteSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
-            $this->applyClienteFields($person);
+            $this->applyClienteFields($person, enterAvulso: true);
         }
 
         $this->closePersonOverlay();
@@ -1460,6 +2418,18 @@ trait ErpOrcamentoFormPage
 
     public function handleOrcamentoFormEscape(): void
     {
+        if ($this->descontoModalOpen) {
+            $this->fecharModalDescontoItem();
+
+            return;
+        }
+
+        if ($this->produtoLookupOpen) {
+            $this->closeProdutoLookup();
+
+            return;
+        }
+
         if ($this->postSavePromptOpen) {
             $this->sairAposGravarOrcamento();
 

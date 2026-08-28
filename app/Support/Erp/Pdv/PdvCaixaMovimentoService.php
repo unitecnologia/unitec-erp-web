@@ -6,6 +6,7 @@ use App\Models\PdvCaixaMovimento;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaPagamento;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Financeiro\FormaPagamentoDestino;
 use Illuminate\Support\Collection;
 
 final class PdvCaixaMovimentoService
@@ -81,8 +82,8 @@ final class PdvCaixaMovimentoService
                 continue;
             }
 
-            // Cartão com Contas à Receber: conciliação via título, sem entrada no caixa.
-            if ($this->pagamentoVaiParaContasReceberCartao($pagamento, $forma)) {
+            // Só tipo_movimento=caixa entra na sessão PDV (CR / crédito / troca / depósito / nenhum: fora).
+            if (! $this->pagamentoLancaNoCaixaSessao($pagamento, $forma)) {
                 continue;
             }
 
@@ -134,31 +135,58 @@ final class PdvCaixaMovimentoService
     }
 
     /**
-     * @param  array{forma?: string, tipo?: string, aparece_contas_receber?: bool|int|string}  $pagamento
+     * @param  array{forma?: string, tipo?: string, tipo_movimento?: string, aparece_contas_receber?: bool|int|string}  $pagamento
      */
-    private function pagamentoVaiParaContasReceberCartao(array $pagamento, string $forma): bool
+    private function pagamentoLancaNoCaixaSessao(array $pagamento, string $forma): bool
     {
         $tipoMovimento = (string) ($pagamento['tipo_movimento'] ?? '');
         $tipo = (string) ($pagamento['tipo'] ?? '');
         $aparece = $pagamento['aparece_contas_receber'] ?? null;
 
-        if ($tipoMovimento === '' || $tipo === '' || $aparece === null) {
+        if ($tipoMovimento === '') {
             $cadastro = \App\Models\FormaPagamento::query()
                 ->whereRaw('UPPER(TRIM(descricao)) = ?', [$forma])
                 ->first(['tipo', 'aparece_contas_receber', 'tipo_movimento']);
 
             if ($cadastro) {
                 $tipo = $tipo !== '' ? $tipo : (string) ($cadastro->tipo ?? '');
-                $tipoMovimento = $tipoMovimento !== '' ? $tipoMovimento : (string) ($cadastro->tipo_movimento ?? '');
+                $tipoMovimento = (string) ($cadastro->tipo_movimento ?? '');
                 $aparece = $aparece !== null ? $aparece : (bool) $cadastro->aparece_contas_receber;
             }
         }
 
-        return PdvFinalizarPagamentosHelper::cartaoVaiParaContasReceber([
+        $enriched = [
             'forma' => $forma,
             'tipo' => $tipo,
             'aparece_contas_receber' => (bool) $aparece,
             'tipo_movimento' => $tipoMovimento,
-        ], ($this->config ?? PdvConfig::make())->lancarCartaoNoCaixa());
+        ];
+
+        if (FormaPagamentoDestino::lancaNoCaixaSessao($enriched)) {
+            return true;
+        }
+
+        // Legado cartão sem movimento definido: parâmetro empresa pode mandar para o caixa.
+        if (
+            FormaPagamentoDestino::from($enriched) === 'nenhum'
+            && PdvFinalizarPagamentosHelper::isFormaCartao($enriched)
+            && ! PdvFinalizarPagamentosHelper::cartaoVaiParaContasReceber(
+                $enriched,
+                ($this->config ?? PdvConfig::make())->lancarCartaoNoCaixa(),
+            )
+        ) {
+            return true;
+        }
+
+        // Legado dinheiro/PIX sem tipo_movimento: mantém entrada na sessão.
+        if (FormaPagamentoDestino::from($enriched) === 'nenhum') {
+            $tipoLower = mb_strtolower($tipo, 'UTF-8');
+
+            return in_array($tipoLower, ['dinheiro', 'pix'], true)
+                || $forma === 'DINHEIRO'
+                || str_contains($forma, 'PIX');
+        }
+
+        return false;
     }
 }

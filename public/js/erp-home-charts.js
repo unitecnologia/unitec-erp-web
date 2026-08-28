@@ -29,21 +29,26 @@
         const points = payload?.points ?? [];
         const from = parseIsoDate(fromValue);
         const to = parseIsoDate(toValue);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         if (!from || !to) {
-            return points;
+            return points.filter((point) => {
+                const date = parseIsoDate(point.date);
+                return date && date <= today;
+            });
         }
 
         if (from > to) {
             return points.filter((point) => {
                 const date = parseIsoDate(point.date);
-                return date && date >= to && date <= from;
+                return date && date >= to && date <= from && date <= today;
             });
         }
 
         return points.filter((point) => {
             const date = parseIsoDate(point.date);
-            return date && date >= from && date <= to;
+            return date && date >= from && date <= to && date <= today;
         });
     };
 
@@ -71,10 +76,56 @@
         displayColors: false,
     };
 
-    const init = () => {
+    const CHART_CANVAS_IDS = [
+        'erp-dash-sales-chart',
+        'erp-dash-cashflow-chart',
+        'erp-dash-mix-chart',
+        'erp-dash-fiscal-chart',
+        'erp-dash-payments-chart',
+    ];
+
+    let resizeChartsHandler = null;
+    let chartsResizeObserver = null;
+    let reinitTimer = null;
+
+    const destroyCharts = () => {
         if (typeof Chart === 'undefined') {
             return;
         }
+
+        CHART_CANVAS_IDS.forEach((id) => {
+            const canvas = document.getElementById(id);
+            if (!canvas) {
+                return;
+            }
+
+            const existing = typeof Chart.getChart === 'function' ? Chart.getChart(canvas) : null;
+            if (existing) {
+                existing.destroy();
+            }
+        });
+
+        if (resizeChartsHandler) {
+            window.removeEventListener('resize', resizeChartsHandler);
+            resizeChartsHandler = null;
+        }
+
+        if (chartsResizeObserver) {
+            chartsResizeObserver.disconnect();
+            chartsResizeObserver = null;
+        }
+    };
+
+    const init = () => {
+        if (!document.querySelector('.erp-dash')) {
+            return;
+        }
+
+        if (typeof Chart === 'undefined') {
+            return;
+        }
+
+        destroyCharts();
 
         const charts = [];
         const salesPayload = readJson('erp-dash-sales-data');
@@ -180,7 +231,7 @@
             toInput?.addEventListener('input', onDateChange);
         }
 
-        if (cashflowCanvas && cashflowData) {
+        if (cashflowCanvas && cashflowData && !cashflowData.empty) {
             charts.push(new Chart(cashflowCanvas, {
                 type: 'bar',
                 data: {
@@ -307,7 +358,7 @@
         const fiscalCanvas = document.getElementById('erp-dash-fiscal-chart');
         const fiscalData = readJson('erp-dash-fiscal-data');
 
-        if (fiscalCanvas && fiscalData?.labels?.length) {
+        if (fiscalCanvas && fiscalData?.labels?.length && !fiscalData.empty) {
             charts.push(new Chart(fiscalCanvas, {
                 type: 'doughnut',
                 data: {
@@ -411,18 +462,29 @@
             }));
         }
 
-        const resizeCharts = () => charts.forEach((chart) => chart.resize());
-
-        window.addEventListener('resize', resizeCharts);
+        resizeChartsHandler = () => charts.forEach((chart) => chart.resize());
+        window.addEventListener('resize', resizeChartsHandler);
 
         if (typeof ResizeObserver !== 'undefined') {
             const dash = document.querySelector('.erp-dash__charts');
             if (dash) {
-                new ResizeObserver(resizeCharts).observe(dash);
+                chartsResizeObserver = new ResizeObserver(resizeChartsHandler);
+                chartsResizeObserver.observe(dash);
             }
         }
 
         initGauges();
+    };
+
+    const refreshCharts = () => {
+        if (reinitTimer) {
+            clearTimeout(reinitTimer);
+        }
+
+        reinitTimer = setTimeout(() => {
+            reinitTimer = null;
+            init();
+        }, 40);
     };
 
     const toneColor = (tone) => {
@@ -594,10 +656,44 @@
     };
 
     window.erpDashRefreshGauges = initGauges;
+    window.erpDashRefreshCharts = refreshCharts;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
+    }
+
+    document.addEventListener('livewire:navigated', refreshCharts);
+    document.addEventListener('erp-dash-refresh', refreshCharts);
+
+    const bindLivewireHooks = () => {
+        if (!window.Livewire?.hook) {
+            return;
+        }
+
+        window.Livewire.hook('morph.updated', ({ el }) => {
+            if (!el) {
+                return;
+            }
+
+            if (el.classList?.contains('erp-dash')
+                || el.querySelector?.('.erp-dash')
+                || el.closest?.('.erp-dash')
+                || el.id === 'erp-dash-sales-data'
+                || (typeof el.querySelector === 'function' && el.querySelector('#erp-dash-sales-data'))) {
+                refreshCharts();
+            }
+        });
+
+        if (typeof window.Livewire.on === 'function') {
+            window.Livewire.on('erp-dash-refresh', refreshCharts);
+        }
+    };
+
+    if (window.Livewire) {
+        bindLivewireHooks();
+    } else {
+        document.addEventListener('livewire:init', bindLivewireHooks);
     }
 })();

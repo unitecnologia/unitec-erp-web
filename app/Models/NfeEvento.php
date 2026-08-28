@@ -27,6 +27,8 @@ class NfeEvento extends Model
 
     public const TIPO_IMPRESSAO = 'impressao';
 
+    public const TIPO_ERRO_TRANSMISSAO = 'erro_transmissao';
+
     protected $table = 'nfe_eventos';
 
     public $timestamps = false;
@@ -60,6 +62,7 @@ class NfeEvento extends Model
             self::TIPO_EMAIL => 'E-mail',
             self::TIPO_BOLETO => 'Boleto',
             self::TIPO_IMPRESSAO => 'Impressão',
+            self::TIPO_ERRO_TRANSMISSAO => 'Erro na transmissão',
         ];
     }
 

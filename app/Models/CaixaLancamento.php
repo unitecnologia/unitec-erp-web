@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
+    'empresa_id',
     'codigo',
     'emissao',
     'documento',
@@ -24,6 +25,11 @@ class CaixaLancamento extends Model
     public static function nextCodigo(): int
     {
         return ((int) static::query()->max('codigo')) + 1;
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
     }
 
     public function conta(): BelongsTo

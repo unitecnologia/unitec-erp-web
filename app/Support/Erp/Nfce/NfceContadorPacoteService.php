@@ -92,32 +92,14 @@ class NfceContadorPacoteService
 
     public function resolveContadorEmail(Empresa $empresa): string
     {
-        $config = ContadorCloudConfig::fromEmpresa($empresa);
+        $contador = \App\Models\Contador::paraEnvioEmail();
 
-        if ($config->email !== '') {
-            return $config->email;
-        }
-
-        if ($config->contadorId) {
-            $contador = \App\Models\Contador::query()->find($config->contadorId);
-
-            if (filled($contador?->email)) {
-                return trim((string) $contador->email);
-            }
-        }
-
-        return '';
+        return trim((string) ($contador?->email ?? ''));
     }
 
     public function resolveContadorPhone(Empresa $empresa): string
     {
-        $config = ContadorCloudConfig::fromEmpresa($empresa);
-
-        if (! $config->contadorId) {
-            return '';
-        }
-
-        $contador = \App\Models\Contador::query()->find($config->contadorId);
+        $contador = \App\Models\Contador::paraEnvioEmail();
 
         return trim((string) ($contador?->fone ?? ''));
     }

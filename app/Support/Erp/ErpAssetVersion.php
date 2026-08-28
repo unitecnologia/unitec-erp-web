@@ -16,7 +16,7 @@ class ErpAssetVersion
             return $version;
         }
 
-        $appVersion = (string) config('unitec.versao', '0');
+        $appVersion = ErpUpdateService::readInstalledVersion() ?: '0';
 
         // Produção: versão do app + cache em disco (recalcula no máximo a cada 60s).
         if (! config('app.debug') && ! app()->environment(['local', 'testing'])) {

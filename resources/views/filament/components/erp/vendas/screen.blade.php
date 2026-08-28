@@ -1,4 +1,10 @@
-<div class="erp-vendas" wire:ignore.self>
+<div
+    class="erp-vendas"
+    wire:ignore.self
+    @if ($this->erpListSyncPollEnabled())
+        wire:poll.{{ $this->erpListSyncPollIntervalSeconds() }}s.visible="pollErpListSync"
+    @endif
+>
     @php
         $pageSizeOptions = [25, 50, 100];
     @endphp

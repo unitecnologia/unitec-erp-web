@@ -47,7 +47,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'usar_numero_inicial',
     'tipo_impressora',
     'tipo_fechamento',
-    'meia_folha',
     'impressora_nome',
     'pagina_codigo',
     'margem_superior',
@@ -64,9 +63,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'balanca_stopbits',
     'balanca_handshaking',
     'qtd_tentativa_conect_bal',
-    'caminho_sat_dll',
-    'modelo_sat_dll',
-    'tipo_sat_dll',
     'modelo_tef',
     'tef_gerenciador',
     'ip_servidor_tef',
@@ -80,6 +76,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'caminho_bar',
     'impressora_extra',
     'tef_extra',
+    'categoria_licenca',
+    'origens_dispositivo',
+    'device_uuid',
+    'device_name',
+    'device_platform',
+    'device_registered_at',
+    'device_last_seen_at',
 ])]
 class Terminal extends Model
 {
@@ -109,7 +112,6 @@ class Terminal extends Model
             'usa_gaveta' => 'boolean',
             'usar_device_service' => 'boolean',
             'usar_numero_inicial' => 'boolean',
-            'meia_folha' => 'boolean',
             'tef_via_reduzida' => 'boolean',
             'tef_multiplos_cartoes' => 'boolean',
             'margem_superior' => 'decimal:2',
@@ -119,6 +121,9 @@ class Terminal extends Model
             'tef_troco_maximo' => 'decimal:2',
             'impressora_extra' => 'array',
             'tef_extra' => 'array',
+            'origens_dispositivo' => 'array',
+            'device_registered_at' => 'datetime',
+            'device_last_seen_at' => 'datetime',
         ];
     }
 
@@ -151,7 +156,17 @@ class Terminal extends Model
             'pdv' => true,
             'ativo' => true,
             'imprime' => true,
+            'usar_device_service' => true,
             'busca_balanca_barras' => true,
+            // Defaults de balança serial (PDV); leitura no PDV fica desligada até o cliente habilitar.
+            'balanca_marca' => 'balToledo',
+            'balanca_porta' => 'COM3',
+            'balanca_velocidade' => '9600',
+            'balanca_databits' => '8',
+            'balanca_paridade' => 'None',
+            'balanca_stopbits' => '1',
+            'balanca_handshaking' => 'None',
+            'ler_peso' => false,
         ];
     }
 }

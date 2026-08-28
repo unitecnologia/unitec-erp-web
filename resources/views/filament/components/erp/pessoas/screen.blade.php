@@ -11,7 +11,13 @@
     $pageSizeOptions = [25, 50, 100];
 @endphp
 
-<div class="erp-pessoas" wire:ignore.self>
+<div
+    class="erp-pessoas"
+    wire:ignore.self
+    @if ($this->erpListSyncPollEnabled())
+        wire:poll.{{ $this->erpListSyncPollIntervalSeconds() }}s.visible="pollErpListSync"
+    @endif
+>
     <div class="erp-pessoas__filters">
         <div class="erp-pessoas__filters-row">
             <div class="erp-pessoas__search-group">

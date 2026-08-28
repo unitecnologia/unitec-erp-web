@@ -177,7 +177,9 @@ class ListFormasPagamento extends ListRecords
             'max_parcelas' => $record->max_parcelas,
             'intervalo_parcelas' => $record->intervalo_parcelas,
             'atalho' => $record->atalho,
-            'tipo_movimento' => $record->tipo_movimento ?: 'nenhum',
+            'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
+                (string) ($record->tipo_movimento ?: 'nenhum')
+            ),
             'ativo' => $record->ativo,
             'usa_tef' => $record->usa_tef,
             'usa_super_tef' => $record->usa_super_tef,
@@ -238,7 +240,9 @@ class ListFormasPagamento extends ListRecords
             'max_parcelas' => (int) ($data['max_parcelas'] ?? 0),
             'intervalo_parcelas' => (int) ($data['intervalo_parcelas'] ?? 0),
             'atalho' => $data['atalho'] ? mb_strtoupper(trim($data['atalho']), 'UTF-8') : null,
-            'tipo_movimento' => $data['tipo_movimento'],
+            'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
+                (string) ($data['tipo_movimento'] ?? 'nenhum')
+            ),
             'ativo' => (bool) ($this->form['ativo'] ?? false),
             'usa_tef' => (bool) ($this->form['usa_tef'] ?? false),
             'usa_super_tef' => (bool) ($this->form['usa_super_tef'] ?? false),
@@ -275,6 +279,15 @@ class ListFormasPagamento extends ListRecords
             ->title('Forma de pagamento gravada.')
             ->success()
             ->send();
+    }
+
+    public function updatedFormTipo(mixed $value): void
+    {
+        $tipo = is_string($value) ? mb_strtolower(trim($value), 'UTF-8') : '';
+
+        $this->form['tipo_movimento'] = $tipo !== ''
+            ? FormaPagamento::defaultTipoMovimento($tipo)
+            : ($this->form['tipo_movimento'] ?? 'nenhum');
     }
 
     public function closeForm(): void

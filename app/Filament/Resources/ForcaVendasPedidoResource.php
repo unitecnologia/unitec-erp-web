@@ -29,7 +29,7 @@ class ForcaVendasPedidoResource extends Resource
 
     public static function canAccess(): bool
     {
-        return ErpAccess::currentCan('forca_vendas.access');
+        return false;
     }
 
     /**

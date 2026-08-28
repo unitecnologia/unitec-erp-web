@@ -1,7 +1,41 @@
+@php
+    $status = mb_strtoupper((string) ($this->lancamentoModalStatus ?: '—'), 'UTF-8');
+    $isFechada = $status === 'FECHADA';
+    $isCancelada = $status === 'CANCELADA';
+    $isAlterando = $status === 'ALTERANDO';
+    $canFinalize = $isAlterando || (! $isFechada && ! $isCancelada);
+@endphp
+
 @if ($this->lancamentoModalOpen)
     <div
         class="erp-lookup-modal erp-compras-lancamento-modal"
-        wire:keydown.escape.window="closeCompraLancamento"
+        x-on:erp-compra-romaneio-focus-qtd.window="
+            const input = document.getElementById('erp-compra-romaneio-qtd');
+            input?.removeAttribute('readonly');
+            input?.focus();
+            input?.select();
+        "
+        x-on:erp-compra-romaneio-focus-valor.window="
+            const input = document.getElementById('erp-compra-romaneio-valor');
+            input?.removeAttribute('readonly');
+            input?.focus();
+            input?.select();
+        "
+        x-on:erp-compra-romaneio-focus-produto.window="
+            const input = document.getElementById('erp-compra-romaneio-produto');
+            input?.removeAttribute('readonly');
+            input?.focus();
+        "
+        x-on:erp-compra-romaneio-focus-fornecedor.window="
+            $nextTick(() => {
+                const input = document.getElementById('erp-compra-romaneio-fornecedor');
+                input?.removeAttribute('readonly');
+                input?.focus();
+            });
+        "
+        @if (! $this->productPrecificacaoOpen)
+            wire:keydown.escape.window="closeCompraLancamento"
+        @endif
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeCompraLancamento"></div>
 
@@ -10,6 +44,7 @@
             role="dialog"
             aria-modal="true"
             aria-labelledby="erp-compras-lancamento-title"
+            wire:click.stop
         >
             <div class="erp-lookup-modal__titlebar erp-compras-lancamento-modal__titlebar">
                 <span id="erp-compras-lancamento-title">Lançamento de Compras</span>
@@ -22,231 +57,996 @@
             </div>
 
             <div class="erp-lookup-modal__body erp-compras-lancamento-modal__body">
-                <div class="erp-compras-lancamento-modal__toolbar">
-                    <div class="erp-compras-lancamento-modal__toolbar-actions">
-                        @if ($this->lancamentoModalCompraId)
+                <section class="erp-compras-lancamento-modal__panel erp-compras-lancamento-modal__panel--topo">
+                    <div class="erp-compras-lancamento-modal__toolbar">
+                        <div class="erp-compras-lancamento-modal__tool-group">
                             <button
                                 type="button"
-                                wire:click.stop="printCompraDanfe"
-                                data-erp-print-nota
-                                class="erp-compras-lancamento-modal__tool-btn"
-                                title="Imprimir Nota"
+                                class="erp-compras-lancamento-modal__tool-btn erp-compras-lancamento-modal__tool-btn--ok"
+                                wire:click="finalizarCompraLancamento"
+                                wire:loading.attr="disabled"
+                                @disabled(! $canFinalize)
+                                title="{{ $canFinalize ? 'Finalizar alteração' : 'Compra já finalizada' }}"
                             >
-                                <span class="erp-compras-lancamento-modal__tool-icon">🖨</span>
-                                <span class="erp-compras-lancamento-modal__tool-label"><kbd>F5</kbd> | Imprimir Nota</span>
+                                <span class="erp-compras-lancamento-modal__tool-icon">✓</span>
+                                <span>Finalizar</span>
                             </button>
-                        @else
+                            @if ($this->lancamentoModalCompraId)
+                                <button
+                                    type="button"
+                                    wire:click.stop="printCompraDanfe"
+                                    data-erp-print-nota
+                                    class="erp-compras-lancamento-modal__tool-btn"
+                                    title="Imprimir DANFE"
+                                >
+                                    <span class="erp-compras-lancamento-modal__tool-icon">🖨</span>
+                                    <span>DANFE</span>
+                                </button>
+                            @endif
                             <button
                                 type="button"
-                                class="erp-compras-lancamento-modal__tool-btn"
-                                disabled
-                                title="Imprimir Nota"
+                                class="erp-compras-lancamento-modal__tool-btn erp-compras-lancamento-modal__tool-btn--exit"
+                                wire:click="closeCompraLancamento"
+                                title="Sair"
                             >
-                                <span class="erp-compras-lancamento-modal__tool-icon">🖨</span>
-                                <span class="erp-compras-lancamento-modal__tool-label"><kbd>F5</kbd> | Imprimir Nota</span>
+                                <span class="erp-compras-lancamento-modal__tool-icon">✕</span>
+                                <span>Sair</span>
                             </button>
-                        @endif
-                        <button
-                            type="button"
-                            class="erp-compras-lancamento-modal__tool-btn erp-compras-lancamento-modal__tool-btn--exit"
-                            wire:click="closeCompraLancamento"
-                            title="Sair"
+                        </div>
+
+                        <div class="erp-compras-lancamento-modal__fields">
+                            <div class="erp-compras-lancamento-modal__fields-row">
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--xs">
+                                    <span>Número</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['numero'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--empresa">
+                                    <span>Empresa</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['empresa'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--grow">
+                                    <div class="erp-compras-lancamento-modal__field-label-row">
+                                        <span>Fornecedor</span>
+                                        <span @class([
+                                            'erp-compras-lancamento-modal__status-badge',
+                                            'is-fechada' => $isFechada,
+                                            'is-cancelada' => $isCancelada,
+                                            'is-alterando' => $isAlterando,
+                                            'is-aberta' => ! $isFechada && ! $isCancelada && ! $isAlterando,
+                                        ])>{{ $status }}</span>
+                                    </div>
+                                    <div class="erp-compras-lancamento-modal__info" title="{{ $this->lancamentoModalHeader['fornecedor'] ?? '' }}">{{ $this->lancamentoModalHeader['fornecedor'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--uf">
+                                    <span>UF</span>
+                                    <div class="erp-compras-lancamento-modal__info erp-compras-lancamento-modal__info--center">{{ $this->lancamentoModalHeader['uf'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--doc">
+                                    <span>CNPJ</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['cnpj'] ?? '—' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="erp-compras-lancamento-modal__fields-row">
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--chave">
+                                    <span>Chave NFe</span>
+                                    <div class="erp-compras-lancamento-modal__info erp-compras-lancamento-modal__info--mono" title="{{ $this->lancamentoModalHeader['chave'] ?? '' }}">{{ $this->lancamentoModalHeader['chave'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--sm">
+                                    <span>Nota</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['nota'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--xs">
+                                    <span>Modelo</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['modelo'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--xs">
+                                    <span>Série</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['serie'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--date">
+                                    <span>Dt. Emissão</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['data_emissao'] ?? '—' }}</div>
+                                </div>
+                                <div class="erp-compras-lancamento-modal__field erp-compras-lancamento-modal__field--date">
+                                    <span>Dt. Entrada</span>
+                                    <div class="erp-compras-lancamento-modal__info">{{ $this->lancamentoModalHeader['data_entrada'] ?? '—' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="erp-compras-lancamento-modal__panel erp-compras-lancamento-modal__panel--itens">
+                    @if ($this->lancamentoRomaneio)
+                        <div class="erp-compras-lancamento-modal__romaneio-bar">
+                            <div class="erp-compras-lancamento-modal__romaneio-group" @if ($this->lancamentoRomaneioFornecedores !== []) data-lookup-open="1" @endif>
+                                <label for="erp-compra-romaneio-fornecedor">Fornecedor</label>
+                                <div class="erp-compras-lancamento-modal__romaneio-fornecedor-wrap">
+                                    <input
+                                        id="erp-compra-romaneio-fornecedor"
+                                        type="search"
+                                        wire:model.live.debounce.250ms="lancamentoRomaneioFornecedorBusca"
+                                        wire:keydown.enter.prevent="confirmarLancamentoRomaneioFornecedor($event.target.value)"
+                                        wire:keydown.arrow-up.prevent="moveLancamentoRomaneioFornecedorSelecionado(-1)"
+                                        wire:keydown.arrow-down.prevent="moveLancamentoRomaneioFornecedorSelecionado(1)"
+                                        placeholder="Código, nome ou CNPJ — Enter"
+                                        autocomplete="off"
+                                        role="combobox"
+                                        aria-expanded="{{ $this->lancamentoRomaneioFornecedores !== [] ? 'true' : 'false' }}"
+                                    >
+                                    @if ($this->lancamentoRomaneioFornecedores !== [])
+                                        <div class="erp-compras-lancamento-modal__romaneio-lookup" role="listbox" aria-label="Fornecedores encontrados">
+                                            @foreach ($this->lancamentoRomaneioFornecedores as $index => $fornecedor)
+                                                <button
+                                                    type="button"
+                                                    wire:key="compra-romaneio-fornecedor-{{ $fornecedor['id'] }}"
+                                                    wire:click="selectLancamentoRomaneioFornecedor({{ $fornecedor['id'] }})"
+                                                    @class(['is-selected' => $this->lancamentoRomaneioFornecedorSelecionado === $index])
+                                                >
+                                                    <strong>{{ $fornecedor['codigo'] !== '' ? $fornecedor['codigo'] : '—' }}</strong>
+                                                    <span>{{ $fornecedor['nome'] }}</span>
+                                                    <em>{{ $fornecedor['cnpj'] !== '' ? $fornecedor['cnpj'] : '—' }}</em>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <section class="erp-nfe-inclusao erp-compras-inclusao" @if ($this->lancamentoRomaneioProdutos !== []) data-lookup-open="1" @endif>
+                                <div class="erp-nfe-inclusao__box">
+                                    <span class="erp-nfe-inclusao__legend">Produto</span>
+                                    <div class="erp-nfe-inclusao__row">
+                                        <label class="erp-nfe-inclusao__field erp-nfe-inclusao__field--barcode">
+                                            <span>Código / barras / nome</span>
+                                            <div class="erp-nfe-inclusao__barcode-wrap">
+                                                <input
+                                                    id="erp-compra-romaneio-produto"
+                                                    class="erp-nfe-inclusao__input erp-nfe-inclusao__input--barcode"
+                                                    type="text"
+                                                    wire:model.live.debounce.200ms="lancamentoRomaneioProdutoBusca"
+                                                    wire:keydown.enter.prevent="confirmarLancamentoRomaneioProduto($event.target.value)"
+                                                    wire:keydown.arrow-up.prevent="moveLancamentoRomaneioProdutoSelecionado(-1)"
+                                                    wire:keydown.arrow-down.prevent="moveLancamentoRomaneioProdutoSelecionado(1)"
+                                                    data-erp-uppercase
+                                                    autocomplete="off"
+                                                    placeholder="Código exato, barras ou nome — Enter"
+                                                    role="combobox"
+                                                    aria-expanded="{{ $this->lancamentoRomaneioProdutos !== [] ? 'true' : 'false' }}"
+                                                >
+                                                @if ($this->lancamentoRomaneioProdutos !== [])
+                                                    <div class="erp-nfe-inclusao__suggest-wrap">
+                                                        <ul class="erp-nfe-inclusao__suggest" role="listbox" aria-label="Produtos encontrados">
+                                                            @foreach ($this->lancamentoRomaneioProdutos as $index => $produto)
+                                                                <li wire:key="compra-romaneio-produto-{{ $produto['id'] }}">
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="selectLancamentoRomaneioProduto({{ $produto['id'] }})"
+                                                                        @class(['is-selected' => $this->lancamentoRomaneioProdutoSelecionado === $index])
+                                                                    >
+                                                                        <span class="erp-nfe-inclusao__suggest-code">{{ $produto['codigo'] ?: '—' }}</span>
+                                                                        <span class="erp-nfe-inclusao__suggest-nome">{{ $produto['descricao'] }}</span>
+                                                                        <span class="erp-nfe-inclusao__suggest-preco">R$ {{ number_format($produto['preco_compra'] ?? 0, 2, ',', '.') }}</span>
+                                                                    </button>
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </label>
+                                        <label class="erp-nfe-inclusao__field erp-nfe-inclusao__field--qtd">
+                                            <span>Qtde</span>
+                                            <input id="erp-compra-romaneio-qtd" class="erp-nfe-inclusao__input" type="text" wire:model.live.debounce.200ms="lancamentoRomaneioQtd" wire:keydown.enter.prevent="focarLancamentoRomaneioValorAposQtd($event.target.value)" data-mask="quantity3" autocomplete="off">
+                                        </label>
+                                        <label class="erp-nfe-inclusao__field erp-nfe-inclusao__field--preco">
+                                            <span>Vlr. compra</span>
+                                            <input id="erp-compra-romaneio-valor" class="erp-nfe-inclusao__input" type="text" wire:model.live.debounce.200ms="lancamentoRomaneioValorUnitario" wire:keydown.enter.prevent="confirmarLancamentoRomaneioValor($event.target.value)" data-mask="money-br" autocomplete="off">
+                                        </label>
+                                        <label class="erp-nfe-inclusao__field erp-nfe-inclusao__field--total">
+                                            <span>Total item</span>
+                                            <input class="erp-nfe-inclusao__input erp-nfe-inclusao__input--total" type="text" value="{{ $this->lancamentoRomaneioTotalItem }}" readonly tabindex="-1">
+                                        </label>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    @endif
+
+                    <div class="erp-compras-lancamento-modal__main">
+                        <div
+                            class="erp-compras-lancamento-modal__grid-wrap"
+                            x-data="{
+                                marcarLinha(tr) {
+                                    if (! tr) return;
+                                    const body = tr.closest('tbody');
+                                    if (! body) return;
+                                    body.querySelectorAll('.erp-compras-lancamento-modal__row--selected')
+                                        .forEach((r) => r.classList.remove('erp-compras-lancamento-modal__row--selected'));
+                                    tr.classList.add('erp-compras-lancamento-modal__row--selected');
+                                }
+                            }"
                         >
-                            <span class="erp-compras-lancamento-modal__tool-icon erp-compras-lancamento-modal__tool-icon--exit">✕</span>
-                            <span class="erp-compras-lancamento-modal__tool-label"><kbd>ESC</kbd> | Sair</span>
-                        </button>
+                            <table class="erp-compras-lancamento-modal__grid">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Código</th>
+                                        <th>Referência</th>
+                                        <th>Produto</th>
+                                        <th>Qtd.Compra</th>
+                                        <th title="Lotes e validades">Lotes</th>
+                                        <th title="Valor cheio da nota">Preço. Comp.</th>
+                                        <th>V. Custo</th>
+                                        <th title="Margem % sobre o V. Custo">Mg%</th>
+                                        <th title="Preço varejo">Varejo</th>
+                                        <th title="Margem % sobre o Varejo (não sobre o custo)">Mg%</th>
+                                        <th title="Preço atacado">Atacado</th>
+                                        <th title="Margem % sobre o Varejo (não sobre o custo)">Mg%</th>
+                                        <th title="Preço especial">Especial</th>
+                                        <th title="Precificar">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody wire:key="lanc-grid-body-{{ $this->lancamentoGridEpoch }}">
+                                    @forelse ($this->lancamentoModalRows as $index => $row)
+                                        <tr
+                                            wire:key="lancamento-row-{{ $index }}"
+                                            class="erp-compras-lancamento-modal__row{{ $this->lancamentoModalItemIndex === $index ? ' erp-compras-lancamento-modal__row--selected' : '' }}"
+                                            x-on:click="
+                                                marcarLinha($el);
+                                                $wire.selectLancamentoItem({{ $index }});
+                                            "
+                                        >
+                                            <td>
+                                                <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--center">
+                                                    {{ $row['item'] }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div
+                                                    class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--codigo"
+                                                    title="{{ $row['codigo'] }}"
+                                                >{{ $row['codigo'] }}</div>
+                                            </td>
+                                            <td>
+                                                <div
+                                                    class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--center"
+                                                    title="{{ $row['referencia'] !== '' ? $row['referencia'] : '—' }}"
+                                                >{{ $row['referencia'] !== '' ? $row['referencia'] : '—' }}</div>
+                                            </td>
+                                            <td>
+                                                <div
+                                                    class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--desc"
+                                                    title="{{ $row['produto'] }}"
+                                                >{{ $row['produto'] }}</div>
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <input
+                                                        type="text"
+                                                        wire:key="lancamento-qtd-{{ $index }}-e{{ $this->lancamentoGridEpoch }}"
+                                                        value="{{ $row['qtd'] }}"
+                                                        wire:click.stop
+                                                        data-erp-lanc-enter="qtd"
+                                                        data-row-index="{{ $index }}"
+                                                        data-mask="quantity3"
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num"
+                                                        autocomplete="off"
+                                                        title="Quantidade de compra — Enter recalcula V. Custo"
+                                                        x-on:focus="
+                                                            $el.removeAttribute('readonly');
+                                                            marcarLinha($el.closest('tr'));
+                                                            if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                $wire.selectLancamentoItem({{ $index }});
+                                                            }
+                                                            $el.select();
+                                                        "
+                                                        x-on:click.stop="$el.select()"
+                                                        x-on:keydown.enter.capture.prevent="
+                                                            $el.removeAttribute('readonly');
+                                                            window.__erpLancFocusUntil = Date.now() + 3000;
+                                                            $wire.lancamentoGridEnter({{ $index }}, 'qtd', $el.value);
+                                                        "
+                                                        x-on:blur="
+                                                            if (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating()) {
+                                                                return;
+                                                            }
+                                                            $wire.commitQtdAndGoNext({{ $index }}, $el.value);
+                                                        "
+                                                        @mouseup.prevent
+                                                    >
+                                                @else
+                                                    <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--num">
+                                                        {{ $row['qtd'] }}
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="erp-compras-lancamento-modal__cell--lotes">
+                                                @if (! empty($row['controla_lote_validade']))
+                                                    <button
+                                                        type="button"
+                                                        class="erp-compras-lancamento-modal__lotes-btn"
+                                                        wire:click.stop="abrirLancamentoLotesModal({{ $index }})"
+                                                        title="Informar lotes e validades"
+                                                        @disabled(! $canFinalize)
+                                                    >
+                                                        @php
+                                                            $lotesCount = is_array($row['lotes'] ?? null) ? count($row['lotes']) : 0;
+                                                        @endphp
+                                                        {{ $lotesCount > 0 ? $lotesCount.' lote(s)' : 'Informar' }}
+                                                    </button>
+                                                @elseif ((int) ($row['product_id'] ?? 0) > 0)
+                                                    <button
+                                                        type="button"
+                                                        class="erp-compras-lancamento-modal__lotes-btn"
+                                                        wire:click.stop="habilitarLancamentoLoteProduto({{ $index }})"
+                                                        title="Habilitar controle de lote/validade neste produto"
+                                                        @disabled(! $canFinalize)
+                                                    >Habilitar</button>
+                                                @else
+                                                    <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--center">—</div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <div
+                                                    class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__money"
+                                                    title="Valor cheio da nota"
+                                                >
+                                                    <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                    <span class="erp-compras-lancamento-modal__money-val">{{ $row['preco'] }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div
+                                                    class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__money"
+                                                    title="V. Custo = Preço ÷ Qtd.Compra"
+                                                    data-erp-lanc-custo="{{ $row['vl_custo'] }}"
+                                                >
+                                                    <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                    <span class="erp-compras-lancamento-modal__money-val">{{ $row['vl_custo'] }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <input
+                                                        type="text"
+                                                        wire:key="lancamento-mg-venda-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['margem_varejo'] ?? '0' }}"
+                                                        value="{{ $row['margem_varejo'] ?? $this->lancamentoMargemPctLabel($row['preco_venda'] ?? 0, $row['vl_custo'] ?? 0) }}"
+                                                        wire:click.stop
+                                                        data-erp-lanc-enter="mg_venda"
+                                                        data-row-index="{{ $index }}"
+                                                        wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'mg_venda', $event.target.value)"
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num"
+                                                        autocomplete="off"
+                                                        data-mask="percent-br"
+                                                        title="Margem % varejo — editar recalcula o Varejo"
+                                                        x-on:focus="
+                                                            marcarLinha($el.closest('tr'));
+                                                            if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                $wire.selectLancamentoItem({{ $index }});
+                                                            }
+                                                            $el.select();
+                                                        "
+                                                        x-on:click.stop="$el.select()"
+                                                        @mouseup.prevent
+                                                    >
+                                                @else
+                                                    <div
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--num"
+                                                        title="Margem % = (Varejo ÷ V. Custo × 100) − 100"
+                                                    >{{ $row['margem_varejo'] ?? $this->lancamentoMargemPctLabel($row['preco_venda'] ?? 0, $row['vl_custo'] ?? 0) }}</div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <div class="erp-compras-lancamento-modal__money erp-compras-lancamento-modal__money--field">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <input
+                                                            type="text"
+                                                            wire:key="lancamento-venda-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['preco_venda'] ?? '0' }}"
+                                                            value="{{ $row['preco_venda'] }}"
+                                                            wire:click.stop
+                                                            data-erp-lanc-enter="venda"
+                                                            data-row-index="{{ $index }}"
+                                                            wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'venda', $event.target.value)"
+                                                            class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num erp-compras-lancamento-modal__money-input"
+                                                            autocomplete="off"
+                                                            data-mask="money-br"
+                                                            title="Preço varejo"
+                                                            x-on:focus="
+                                                                marcarLinha($el.closest('tr'));
+                                                                if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                    $wire.selectLancamentoItem({{ $index }});
+                                                                }
+                                                                $el.select();
+                                                            "
+                                                            x-on:click.stop="$el.select()"
+                                                            @mouseup.prevent
+                                                        >
+                                                    </div>
+                                                @else
+                                                    <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__money">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <span class="erp-compras-lancamento-modal__money-val">{{ $row['preco_venda'] }}</span>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <input
+                                                        type="text"
+                                                        wire:key="lancamento-mg-atacado-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['margem_atacado'] ?? '0' }}"
+                                                        value="{{ $row['margem_atacado'] ?? '0,00' }}"
+                                                        wire:click.stop
+                                                        data-erp-lanc-enter="mg_atacado"
+                                                        data-row-index="{{ $index }}"
+                                                        wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'mg_atacado', $event.target.value)"
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num"
+                                                        autocomplete="off"
+                                                        data-mask="percent-br"
+                                                        title="Margem % atacado sobre o Varejo — 0% = mesmo preço do Varejo"
+                                                        x-on:focus="
+                                                            marcarLinha($el.closest('tr'));
+                                                            if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                $wire.selectLancamentoItem({{ $index }});
+                                                            }
+                                                            $el.select();
+                                                        "
+                                                        x-on:click.stop="$el.select()"
+                                                        @mouseup.prevent
+                                                    >
+                                                @else
+                                                    <div
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--num"
+                                                        title="Margem % = (Atacado ÷ Varejo × 100) − 100"
+                                                    >{{ $row['margem_atacado'] ?? $this->lancamentoMargemPctLabel($row['preco_atacado'] ?? 0, $row['vl_custo'] ?? 0) }}</div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <div class="erp-compras-lancamento-modal__money erp-compras-lancamento-modal__money--field">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <input
+                                                            type="text"
+                                                            wire:key="lancamento-atacado-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['preco_atacado'] ?? '0' }}"
+                                                            value="{{ $row['preco_atacado'] ?? '0,00' }}"
+                                                            wire:click.stop
+                                                            data-erp-lanc-enter="atacado"
+                                                            data-row-index="{{ $index }}"
+                                                            wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'atacado', $event.target.value)"
+                                                            class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num erp-compras-lancamento-modal__money-input"
+                                                            autocomplete="off"
+                                                            data-mask="money-br"
+                                                            title="Preço atacado"
+                                                            x-on:focus="
+                                                                marcarLinha($el.closest('tr'));
+                                                                if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                    $wire.selectLancamentoItem({{ $index }});
+                                                                }
+                                                                $el.select();
+                                                            "
+                                                            x-on:click.stop="$el.select()"
+                                                            @mouseup.prevent
+                                                        >
+                                                    </div>
+                                                @else
+                                                    <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__money">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <span class="erp-compras-lancamento-modal__money-val">{{ $row['preco_atacado'] ?? '0,00' }}</span>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <input
+                                                        type="text"
+                                                        wire:key="lancamento-mg-especial-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['margem_especial'] ?? '0' }}"
+                                                        value="{{ $row['margem_especial'] ?? '0,00' }}"
+                                                        wire:click.stop
+                                                        data-erp-lanc-enter="mg_especial"
+                                                        data-row-index="{{ $index }}"
+                                                        wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'mg_especial', $event.target.value)"
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num"
+                                                        autocomplete="off"
+                                                        data-mask="percent-br"
+                                                        title="Margem % especial sobre o Varejo — 0% = mesmo preço do Varejo"
+                                                        x-on:focus="
+                                                            marcarLinha($el.closest('tr'));
+                                                            if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                $wire.selectLancamentoItem({{ $index }});
+                                                            }
+                                                            $el.select();
+                                                        "
+                                                        x-on:click.stop="$el.select()"
+                                                        @mouseup.prevent
+                                                    >
+                                                @else
+                                                    <div
+                                                        class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__cell-input--num"
+                                                        title="Margem % = (Especial ÷ Varejo × 100) − 100"
+                                                    >{{ $row['margem_especial'] ?? $this->lancamentoMargemPctLabel($row['preco_especial'] ?? 0, $row['vl_custo'] ?? 0) }}</div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($canFinalize)
+                                                    <div class="erp-compras-lancamento-modal__money erp-compras-lancamento-modal__money--field">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <input
+                                                            type="text"
+                                                            wire:key="lancamento-especial-{{ $index }}-r{{ $this->lancamentoGridRevision }}-{{ $row['preco_especial'] ?? '0' }}"
+                                                            value="{{ $row['preco_especial'] ?? '0,00' }}"
+                                                            wire:click.stop
+                                                            data-erp-lanc-enter="especial"
+                                                            data-row-index="{{ $index }}"
+                                                            wire:keydown.enter.prevent="lancamentoGridEnter({{ $index }}, 'especial', $event.target.value)"
+                                                            class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--num erp-compras-lancamento-modal__money-input"
+                                                            autocomplete="off"
+                                                            data-mask="money-br"
+                                                            title="Preço especial"
+                                                            x-on:focus="
+                                                                marcarLinha($el.closest('tr'));
+                                                                if (! (window.ErpComprasLancEnter && window.ErpComprasLancEnter.isNavigating && window.ErpComprasLancEnter.isNavigating())) {
+                                                                    $wire.selectLancamentoItem({{ $index }});
+                                                                }
+                                                                $el.select();
+                                                            "
+                                                            x-on:click.stop="$el.select()"
+                                                            @mouseup.prevent
+                                                        >
+                                                    </div>
+                                                @else
+                                                    <div class="erp-compras-lancamento-modal__cell-input erp-compras-lancamento-modal__cell-input--readonly erp-compras-lancamento-modal__money">
+                                                        <span class="erp-compras-lancamento-modal__money-rs">R$</span>
+                                                        <span class="erp-compras-lancamento-modal__money-val">{{ $row['preco_especial'] ?? '0,00' }}</span>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    class="erp-compras-lancamento-modal__pct-btn"
+                                                    title="Precificar produto"
+                                                    wire:click.stop="openLancamentoPrecificacao({{ $index }})"
+                                                    @disabled(! $canFinalize)
+                                                >%</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="15" class="erp-compras-lancamento-modal__empty">Nenhum item encontrado para esta compra.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+                </section>
 
-                    <div class="erp-compras-lancamento-modal__status-box">
-                        {{ $this->lancamentoModalStatus }}
+                <section class="erp-compras-lancamento-modal__panel erp-compras-lancamento-modal__panel--rodape">
+                    <div class="erp-compras-lancamento-modal__rodape-grid">
+                        <div class="erp-compras-lancamento-modal__margens">
+                            <div class="erp-compras-lancamento-modal__margens-grid">
+                                <div class="erp-compras-lancamento-modal__box erp-compras-lancamento-modal__box--varejo">
+                                    <h3>Margem Varejo</h3>
+                                    <div class="erp-compras-lancamento-modal__margem-row">
+                                        <input
+                                            type="text"
+                                            wire:model.blur="lancamentoMargemPercentVarejo"
+                                            inputmode="decimal"
+                                            data-mask="percent-br"
+                                            placeholder="0,00"
+                                            @disabled(! $canFinalize)
+                                        >
+                                        <span>%</span>
+                                        <div class="erp-compras-lancamento-modal__radio-row erp-compras-lancamento-modal__radio-row--inline">
+                                            <span>Em:</span>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="item">
+                                                Item
+                                            </label>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="todos">
+                                                Todos
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <p class="erp-compras-lancamento-modal__formula">
+                                        Compra <strong>{{ $this->lancamentoModalValorCompra }}</strong>
+                                        + Margem <strong>{{ $this->lancamentoModalValorMargemVarejo }}%</strong>
+                                        = Varejo <strong>{{ $this->lancamentoModalValorVarejo }}</strong>
+                                    </p>
+                                    <button
+                                        type="button"
+                                        class="erp-compras-lancamento-modal__margem-btn"
+                                        wire:click="aplicarLancamentoMargem('varejo')"
+                                        title="Aplicar margem varejo"
+                                        @disabled(! $canFinalize)
+                                    >Aplicar Varejo</button>
+                                </div>
+
+                                <div class="erp-compras-lancamento-modal__box erp-compras-lancamento-modal__box--atacado">
+                                    <h3>Margem Atacado</h3>
+                                    <div class="erp-compras-lancamento-modal__margem-row">
+                                        <input
+                                            type="text"
+                                            wire:model.blur="lancamentoMargemPercentAtacado"
+                                            inputmode="decimal"
+                                            data-mask="percent-br"
+                                            placeholder="0,00"
+                                            @disabled(! $canFinalize)
+                                        >
+                                        <span>%</span>
+                                        <div class="erp-compras-lancamento-modal__radio-row erp-compras-lancamento-modal__radio-row--inline">
+                                            <span>Em:</span>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="item">
+                                                Item
+                                            </label>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="todos">
+                                                Todos
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <p class="erp-compras-lancamento-modal__formula">
+                                        Varejo <strong>{{ $this->lancamentoModalValorVarejo }}</strong>
+                                        + Margem <strong>{{ $this->lancamentoModalValorMargemAtacado }}%</strong>
+                                        = Atacado <strong>{{ $this->lancamentoModalValorAtacado }}</strong>
+                                    </p>
+                                    <button
+                                        type="button"
+                                        class="erp-compras-lancamento-modal__margem-btn"
+                                        wire:click="aplicarLancamentoMargem('atacado')"
+                                        title="Aplicar margem atacado"
+                                        @disabled(! $canFinalize)
+                                    >Aplicar Atacado</button>
+                                </div>
+
+                                <div class="erp-compras-lancamento-modal__box erp-compras-lancamento-modal__box--especial">
+                                    <h3>Margem Especial</h3>
+                                    <div class="erp-compras-lancamento-modal__margem-row">
+                                        <input
+                                            type="text"
+                                            wire:model.blur="lancamentoMargemPercentEspecial"
+                                            inputmode="decimal"
+                                            data-mask="percent-br"
+                                            placeholder="0,00"
+                                            @disabled(! $canFinalize)
+                                        >
+                                        <span>%</span>
+                                        <div class="erp-compras-lancamento-modal__radio-row erp-compras-lancamento-modal__radio-row--inline">
+                                            <span>Em:</span>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="item">
+                                                Item
+                                            </label>
+                                            <label>
+                                                <input type="radio" wire:model.live="lancamentoMargemEscopo" value="todos">
+                                                Todos
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <p class="erp-compras-lancamento-modal__formula">
+                                        Varejo <strong>{{ $this->lancamentoModalValorVarejo }}</strong>
+                                        + Margem <strong>{{ $this->lancamentoModalValorMargemEspecial }}%</strong>
+                                        = Especial <strong>{{ $this->lancamentoModalValorEspecial }}</strong>
+                                    </p>
+                                    <button
+                                        type="button"
+                                        class="erp-compras-lancamento-modal__margem-btn"
+                                        wire:click="aplicarLancamentoMargem('especial')"
+                                        title="Aplicar margem especial"
+                                        @disabled(! $canFinalize)
+                                    >Aplicar Especial</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="erp-compras-lancamento-modal__box">
+                            <h3>Parâmetros</h3>
+                            <label class="erp-compras-lancamento-modal__check">
+                                <input type="checkbox" wire:model.live="lancamentoParamAjustaPreco">
+                                Ajusta Preço de Venda
+                            </label>
+                            <label class="erp-compras-lancamento-modal__check">
+                                <input type="checkbox" wire:model.live="lancamentoParamGerarFinanceiro">
+                                Gerar Financeiro
+                            </label>
+                            <label class="erp-compras-lancamento-modal__check">
+                                <input type="checkbox" wire:model.live="lancamentoParamGeraEstoque">
+                                Gera Estoque
+                            </label>
+                        </div>
+
+                        <div class="erp-compras-lancamento-modal__box erp-compras-lancamento-modal__box--totais">
+                            <h3>Totais</h3>
+                            @php
+                                $totais = $this->lancamentoModalTotais;
+                                $totaisLabels = [
+                                    ['key' => 'subtotal', 'label' => 'SubTotal'],
+                                    ['key' => 'frete', 'label' => 'Frete'],
+                                    ['key' => 'seguro', 'label' => 'Seguro'],
+                                    ['key' => 'outras', 'label' => 'Outras'],
+                                    ['key' => 'desconto', 'label' => 'Desconto'],
+                                    ['key' => 'base_icms', 'label' => 'Base ICMS'],
+                                    ['key' => 'valor_icms', 'label' => 'Valor ICMS'],
+                                    ['key' => 'base_ipi', 'label' => 'Base IPI'],
+                                    ['key' => 'valor_ipi', 'label' => 'Valor IPI'],
+                                    ['key' => 'base_pis', 'label' => 'Base PIS'],
+                                    ['key' => 'valor_pis', 'label' => 'Valor PIS'],
+                                    ['key' => 'base_cofins', 'label' => 'Base Cofins'],
+                                    ['key' => 'valor_cofins', 'label' => 'Valor Cofins'],
+                                    ['key' => 'base_st', 'label' => 'Base ST'],
+                                    ['key' => 'valor_st', 'label' => 'Valor ST'],
+                                    ['key' => 'total', 'label' => 'Total'],
+                                ];
+                            @endphp
+                            <div class="erp-compras-lancamento-modal__totais-grid">
+                                @foreach ($totaisLabels as $item)
+                                    @php
+                                        $isExtraEditavel = in_array($item['key'], ['frete', 'seguro', 'outras'], true);
+                                        $canEditExtra = $isExtraEditavel && $canFinalize;
+                                        $totalVal = (string) ($totais[$item['key']] ?? '0,00');
+                                        $stHighlight = in_array($item['key'], ['base_st', 'valor_st'], true)
+                                            && \App\Support\Erp\BrDecimal::parse($totalVal, 2) > 0;
+                                    @endphp
+                                    <label @class([
+                                        'erp-compras-lancamento-modal__total-field',
+                                        'erp-compras-lancamento-modal__total-field--st' => $stHighlight,
+                                    ])>
+                                        <span>{{ $item['label'] }}</span>
+                                        @if ($canEditExtra)
+                                            <input
+                                                type="text"
+                                                inputmode="decimal"
+                                                value="{{ $totalVal }}"
+                                                class="is-editable"
+                                                data-erp-lanc-totais="{{ $item['key'] }}"
+                                                wire:keydown.enter.prevent="lancamentoTotaisEnter('{{ $item['key'] }}', $event.target.value)"
+                                                wire:blur="lancamentoTotaisBlur('{{ $item['key'] }}', $event.target.value)"
+                                                autocomplete="off"
+                                                title="Rateia no V. Custo: frete, seguro, outras, ST, IPI e desconto"
+                                            >
+                                        @else
+                                            <input
+                                                type="text"
+                                                readonly
+                                                tabindex="-1"
+                                                value="{{ $totalVal }}"
+                                                @class(['is-total' => $item['key'] === 'total'])
+                                            >
+                                        @endif
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
+                </section>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if ($this->lancamentoLotesModalOpen)
+    <div class="erp-lookup-modal erp-compras-lotes-modal" style="z-index:100050;">
+        <div class="erp-lookup-modal__backdrop" wire:click="fecharLancamentoLotesModal"></div>
+        <div
+            class="erp-compras-lotes-modal__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="erp-compras-lotes-title"
+            wire:click.stop
+        >
+            <header class="erp-compras-lotes-modal__titlebar">
+                <div class="erp-compras-lotes-modal__title-block">
+                    <span id="erp-compras-lotes-title" class="erp-compras-lotes-modal__title">Lotes e validade</span>
+                    <span class="erp-compras-lotes-modal__subtitle" title="{{ $this->lancamentoLotesProdutoLabel }}">
+                        {{ $this->lancamentoLotesProdutoLabel }}
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    class="erp-compras-lotes-modal__close"
+                    wire:click="fecharLancamentoLotesModal"
+                    title="Fechar"
+                    aria-label="Fechar"
+                >✕</button>
+            </header>
+
+            <div class="erp-compras-lotes-modal__body">
+                <div class="erp-compras-lotes-modal__summary">
+                    <div class="erp-compras-lotes-modal__summary-qtd">
+                        <span class="erp-compras-lotes-modal__summary-label">Qtd. da entrada</span>
+                        <strong class="erp-compras-lotes-modal__summary-value">{{ $this->lancamentoLotesQtdEsperada }}</strong>
+                    </div>
+                    <p class="erp-compras-lotes-modal__summary-note">
+                        Informe um ou mais lotes. A soma das quantidades deve bater exatamente com a entrada.
+                    </p>
                 </div>
 
-                <div class="erp-compras-lancamento-modal__header">
-                    <div class="erp-compras-lancamento-modal__form-row">
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Número</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--xs">{{ $this->lancamentoModalHeader['numero'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Empresa</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--empresa">{{ $this->lancamentoModalHeader['empresa'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group erp-compras-lancamento-modal__form-group--grow">
-                            <label class="erp-compras-lancamento-modal__form-label">Fornecedor</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--fornecedor">{{ $this->lancamentoModalHeader['fornecedor'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">UF</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--uf">{{ $this->lancamentoModalHeader['uf'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">CNPJ</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--doc">{{ $this->lancamentoModalHeader['cnpj'] ?? '—' }}</span>
-                        </div>
-                    </div>
-
-                    <div class="erp-compras-lancamento-modal__form-row">
-                        <div class="erp-compras-lancamento-modal__form-group erp-compras-lancamento-modal__form-group--grow">
-                            <label class="erp-compras-lancamento-modal__form-label">Chave</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--chave">{{ $this->lancamentoModalHeader['chave'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Nota</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--sm">{{ $this->lancamentoModalHeader['nota'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Modelo</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--xs">{{ $this->lancamentoModalHeader['modelo'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Série</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--xs">{{ $this->lancamentoModalHeader['serie'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Dt. Emissão</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--date">{{ $this->lancamentoModalHeader['data_emissao'] ?? '—' }}</span>
-                        </div>
-
-                        <div class="erp-compras-lancamento-modal__form-group">
-                            <label class="erp-compras-lancamento-modal__form-label">Dt. Entrada</label>
-                            <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--date">{{ $this->lancamentoModalHeader['data_entrada'] ?? '—' }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <p class="erp-compras-lancamento-modal__grid-hint">
-                    Clique nas teclas <strong>CTRL + Delete</strong> para excluir ITEM
-                </p>
-
-                <div class="erp-lookup-modal__grid-wrap erp-compras-lancamento-modal__grid-wrap">
-                    <table class="erp-lookup-modal__grid erp-compras-lancamento-modal__grid">
+                <div class="erp-compras-lotes-modal__grid-wrap">
+                    <table class="erp-compras-lotes-modal__grid">
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th>Código</th>
-                                <th>Referência</th>
-                                <th>Produto</th>
-                                <th class="erp-compras-lancamento-modal__num">Qtd.Compra</th>
-                                <th class="erp-compras-lancamento-modal__num">Preço</th>
-                                <th class="erp-compras-lancamento-modal__num">Total</th>
-                                <th class="erp-compras-lancamento-modal__num">Pr.Venda</th>
+                                <th scope="col">Lote</th>
+                                <th scope="col">Validade</th>
+                                <th scope="col" class="is-num">Qtd</th>
+                                <th scope="col" class="is-action"><span class="sr-only">Ações</span></th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($this->lancamentoModalRows as $row)
-                                <tr @class(['erp-lookup-modal__row--selected' => $loop->first])>
-                                    <td class="erp-compras-lancamento-modal__center">{{ $row['item'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__center">{{ $row['codigo'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__center">{{ $row['referencia'] }}</td>
-                                    <td>{{ $row['produto'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__num">{{ $row['qtd'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__num">{{ $row['preco'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__num">{{ $row['total'] }}</td>
-                                    <td class="erp-compras-lancamento-modal__num">{{ $row['preco_venda'] }}</td>
+                            @forelse ($this->lancamentoLotesDraft as $li => $loteRow)
+                                <tr wire:key="lanc-lote-{{ $li }}">
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="erp-compras-lotes-modal__input"
+                                            wire:model="lancamentoLotesDraft.{{ $li }}.lote"
+                                            maxlength="60"
+                                            placeholder="Código do lote"
+                                            autocomplete="off"
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="erp-compras-lotes-modal__input"
+                                            wire:model="lancamentoLotesDraft.{{ $li }}.data_validade"
+                                            placeholder="dd/mm/aaaa"
+                                            data-mask="date-br"
+                                            autocomplete="off"
+                                        >
+                                    </td>
+                                    <td class="is-num">
+                                        <input
+                                            type="text"
+                                            class="erp-compras-lotes-modal__input erp-compras-lotes-modal__input--num"
+                                            wire:model="lancamentoLotesDraft.{{ $li }}.quantidade"
+                                            data-mask="quantity3"
+                                            autocomplete="off"
+                                        >
+                                    </td>
+                                    <td class="is-action">
+                                        <button
+                                            type="button"
+                                            class="erp-compras-lotes-modal__remove"
+                                            wire:click="removerLancamentoLoteLinha({{ $li }})"
+                                            title="Remover linha"
+                                            aria-label="Remover linha"
+                                        >✕</button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="erp-lookup-modal__empty">Nenhum item encontrado para esta compra.</td>
+                                    <td colspan="4" class="erp-compras-lotes-modal__empty">
+                                        Nenhum lote informado. Use <strong>+ Lote</strong> para adicionar.
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                <div class="erp-compras-lancamento-modal__footer">
-                    <div class="erp-compras-lancamento-modal__footer-top">
-                        <fieldset class="erp-compras-lancamento-modal__fieldset erp-compras-lancamento-modal__fieldset--aplicar">
-                            <legend class="erp-compras-lancamento-modal__legend">Aplicar</legend>
-                            <label class="erp-compras-lancamento-modal__radio">
-                                <input type="radio" name="lancamento-aplicar" checked disabled>
-                                <span>Item Selecionado</span>
-                            </label>
-                            <label class="erp-compras-lancamento-modal__radio">
-                                <input type="radio" name="lancamento-aplicar" disabled>
-                                <span>Todos</span>
-                            </label>
-                        </fieldset>
-
-                        <fieldset class="erp-compras-lancamento-modal__fieldset erp-compras-lancamento-modal__fieldset--margem">
-                            <legend class="erp-compras-lancamento-modal__legend">Margem de Lucro</legend>
-                            <div class="erp-compras-lancamento-modal__margem-row">
-                                <span class="erp-compras-lancamento-modal__form-input erp-compras-lancamento-modal__form-input--margem" aria-readonly="true"></span>
-                                <span class="erp-compras-lancamento-modal__percent">%</span>
-                                <button type="button" class="erp-compras-lancamento-modal__apply-btn" disabled>Aplicar Margem</button>
-                            </div>
-                        </fieldset>
-
-                        <p class="erp-compras-lancamento-modal__formula">
-                            Valor Compra <strong>{{ $this->lancamentoModalValorCompra }}</strong>
-                            + Valor Margem <strong>{{ $this->lancamentoModalValorMargem }}</strong>
-                            = Valor Venda <strong>{{ $this->lancamentoModalValorVenda }}</strong>
-                        </p>
+                <footer class="erp-compras-lotes-modal__footer">
+                    <button
+                        type="button"
+                        class="erp-compras-lotes-modal__btn erp-compras-lotes-modal__btn--ghost"
+                        wire:click="adicionarLancamentoLoteLinha"
+                    >+ Lote</button>
+                    <div class="erp-compras-lotes-modal__footer-actions">
+                        @if ($this->lancamentoLotesPodeDesabilitarAtual())
+                            <button
+                                type="button"
+                                class="erp-compras-lotes-modal__btn erp-compras-lotes-modal__btn--ghost"
+                                wire:click="desabilitarLancamentoLoteProduto"
+                                title="Desfaz o Habilitar se clicou sem querer"
+                            >Desabilitar controle</button>
+                        @endif
+                        <button
+                            type="button"
+                            class="erp-compras-lotes-modal__btn erp-compras-lotes-modal__btn--danger"
+                            wire:click="fecharLancamentoLotesModal"
+                        >Cancelar</button>
+                        <button
+                            type="button"
+                            class="erp-compras-lotes-modal__btn erp-compras-lotes-modal__btn--primary"
+                            wire:click="salvarLancamentoLotesModal"
+                        >Salvar</button>
                     </div>
-
-                    <div class="erp-compras-lancamento-modal__footer-bottom">
-                        <fieldset class="erp-compras-lancamento-modal__fieldset erp-compras-lancamento-modal__fieldset--parametros">
-                            <legend class="erp-compras-lancamento-modal__legend">Parâmetros</legend>
-                            <label class="erp-compras-lancamento-modal__check">
-                                <input type="checkbox" checked disabled>
-                                <span>Ajusta Preço de Venda</span>
-                            </label>
-                            <label class="erp-compras-lancamento-modal__check">
-                                <input type="checkbox" disabled>
-                                <span>Gerar Financeiro</span>
-                            </label>
-                            <label class="erp-compras-lancamento-modal__check erp-compras-lancamento-modal__check--disabled">
-                                <input type="checkbox" checked disabled>
-                                <span>Gera Estoque</span>
-                            </label>
-                        </fieldset>
-
-                        <fieldset class="erp-compras-lancamento-modal__fieldset erp-compras-lancamento-modal__fieldset--totais">
-                            <legend class="erp-compras-lancamento-modal__legend">Totais</legend>
-                            @php
-                                $totais = $this->lancamentoModalTotais;
-                                $totaisLabels = [
-                                    ['key' => 'subtotal', 'label' => 'SubTotal'],
-                                    ['key' => 'base_icms', 'label' => 'Base de ICMS'],
-                                    ['key' => 'valor_icms', 'label' => 'Valor de ICMS'],
-                                    ['key' => 'base_ipi', 'label' => 'Base de IPI'],
-                                    ['key' => 'valor_ipi', 'label' => 'Valor de IPI'],
-                                    ['key' => 'base_cofins', 'label' => 'Base Cofins'],
-                                    ['key' => 'valor_cofins', 'label' => 'Valor Cofins'],
-                                    ['key' => 'base_pis', 'label' => 'Base PIS'],
-                                    ['key' => 'valor_pis', 'label' => 'Valor PIS'],
-                                    ['key' => 'base_st', 'label' => 'Base ST'],
-                                    ['key' => 'valor_st', 'label' => 'Valor ST'],
-                                    ['key' => 'desconto', 'label' => 'Desconto'],
-                                    ['key' => 'frete', 'label' => 'Frete'],
-                                    ['key' => 'seguro', 'label' => 'Seguro'],
-                                    ['key' => 'outras', 'label' => 'Outras'],
-                                    ['key' => 'total', 'label' => 'Total'],
-                                ];
-                            @endphp
-                            <div class="erp-compras-lancamento-modal__totais-grid">
-                                @foreach ($totaisLabels as $item)
-                                    <div class="erp-compras-lancamento-modal__total-field">
-                                        <span class="erp-compras-lancamento-modal__total-label">{{ $item['label'] }}</span>
-                                        <span @class([
-                                            'erp-compras-lancamento-modal__total-value',
-                                            'erp-compras-lancamento-modal__total-value--strong' => $item['key'] === 'total',
-                                        ])>{{ $totais[$item['key']] ?? '0,00' }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </fieldset>
-                    </div>
-                </div>
+                </footer>
             </div>
         </div>
     </div>
 @endif
+
+<script>
+    (function () {
+        if (window.__erpLancGridEnterV4) {
+            return;
+        }
+        window.__erpLancGridEnterV4 = true;
+        window.__erpLancFocusUntil = 0;
+
+        function findInput(modal, col, index) {
+            return modal.querySelector(
+                'input[data-erp-lanc-enter="' + col + '"][data-row-index="' + String(index) + '"]'
+            );
+        }
+
+        function proximo(modal, col, rowIndex) {
+            const existe = (c, i) => !! findInput(modal, c, i);
+            if (col === 'qtd') return { col: 'mg_venda', index: rowIndex };
+            if (col === 'mg_venda') return { col: 'venda', index: rowIndex };
+            if (col === 'venda') {
+                if (existe('mg_venda', rowIndex + 1)) return { col: 'mg_venda', index: rowIndex + 1 };
+                return existe('mg_atacado', 0) ? { col: 'mg_atacado', index: 0 } : null;
+            }
+            if (col === 'mg_atacado') return { col: 'atacado', index: rowIndex };
+            if (col === 'atacado') {
+                if (existe('mg_atacado', rowIndex + 1)) return { col: 'mg_atacado', index: rowIndex + 1 };
+                return existe('mg_especial', 0) ? { col: 'mg_especial', index: 0 } : null;
+            }
+            if (col === 'mg_especial') return { col: 'especial', index: rowIndex };
+            if (col === 'especial') {
+                return existe('mg_especial', rowIndex + 1) ? { col: 'mg_especial', index: rowIndex + 1 } : null;
+            }
+            return null;
+        }
+
+        function focar(modal, col, index) {
+            const input = findInput(modal, col, index);
+            if (! input || input.disabled) return;
+            const tr = input.closest('tr');
+            const body = tr && tr.closest('tbody');
+            if (body) {
+                body.querySelectorAll('.erp-compras-lancamento-modal__row--selected').forEach(function (r) {
+                    r.classList.remove('erp-compras-lancamento-modal__row--selected');
+                });
+                tr.classList.add('erp-compras-lancamento-modal__row--selected');
+            }
+            try {
+                input.focus({ preventScroll: true });
+                input.select();
+            } catch (e) {
+                try { input.focus(); input.select(); } catch (e2) {}
+            }
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== 'NumpadEnter') return;
+            var el = event.target;
+            if (! el || el.tagName !== 'INPUT') return;
+            if (! el.getAttribute('data-erp-lanc-enter')) return;
+            var modal = el.closest('.erp-compras-lancamento-modal');
+            if (! modal) return;
+
+            event.preventDefault();
+
+            var col = el.getAttribute('data-erp-lanc-enter');
+            var rowIndex = Number(el.getAttribute('data-row-index'));
+            if (! col || isNaN(rowIndex)) return;
+
+            window.__erpLancFocusUntil = Date.now() + 2000;
+
+            if (window.ErpMasks && el.dataset && el.dataset.mask) {
+                try {
+                    el.value = window.ErpMasks.finalizeMaskValue(el);
+                } catch (e) {}
+            }
+
+            var next = proximo(modal, col, rowIndex);
+            if (next) {
+                focar(modal, next.col, next.index);
+                setTimeout(function () { focar(modal, next.col, next.index); }, 0);
+                setTimeout(function () { focar(modal, next.col, next.index); }, 80);
+            }
+        }, true);
+
+        window.ErpComprasLancEnter = window.ErpComprasLancEnter || {};
+        window.ErpComprasLancEnter.isNavigating = function () {
+            return Date.now() < (window.__erpLancFocusUntil || 0);
+        };
+        window.ErpComprasLancEnter.version = 'v4-inline';
+    })();
+</script>

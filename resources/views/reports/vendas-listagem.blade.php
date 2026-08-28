@@ -40,17 +40,19 @@
         .viewer__btn { min-width: 5.5rem; padding: 0.28rem 0.65rem; border: 1px solid #94a3b8; border-radius: 4px; background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%); color: #0f172a; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
         .viewer__btn:hover { border-color: #1e5a9e; background: #ffffff; }
         .viewer__btn--close { background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%); border-color: #fca5a5; }
-        .viewer__layout { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); flex: 1; min-height: 0; }
-        .viewer__filters { overflow: auto; padding: 0.85rem; background: #eef4fb; border-right: 1px solid #94a3b8; }
-        .viewer__filters h2 { margin: 0 0 0.75rem; font-size: 0.9rem; color: #0f2847; }
-        .viewer__field { margin-bottom: 0.65rem; }
-        .viewer__field label { display: block; margin-bottom: 0.2rem; font-size: 0.72rem; font-weight: 700; color: #334155; }
-        .viewer__field select, .viewer__field input[type="text"], .viewer__field input[type="date"], .viewer__field input[type="time"] { width: 100%; padding: 0.35rem 0.45rem; border: 1px solid #94a3b8; border-radius: 4px; font-size: 0.78rem; }
-        .viewer__field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
-        .viewer__columns { display: grid; gap: 0.25rem; margin-top: 0.35rem; }
-        .viewer__columns label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; color: #334155; }
-        .viewer__actions { display: grid; gap: 0.45rem; margin-top: 0.85rem; }
-        .viewer__actions .viewer__btn { width: 100%; }
+        .viewer__layout { display: grid; grid-template-columns: minmax(260px, 300px) minmax(0, 1fr); flex: 1; min-height: 0; }
+        .viewer__filters { overflow: auto; padding: 0.45rem 0.55rem 0.55rem; background: #eef4fb; border-right: 1px solid #94a3b8; }
+        .viewer__filters h2 { margin: 0 0 0.4rem; font-size: 0.78rem; color: #0f2847; }
+        .viewer__field { margin-bottom: 0.32rem; }
+        .viewer__field label { display: block; margin-bottom: 0.1rem; font-size: 0.65rem; font-weight: 700; color: #334155; line-height: 1.15; }
+        .viewer__field select, .viewer__field input[type="text"], .viewer__field input[type="date"], .viewer__field input[type="time"] { width: 100%; padding: 0.18rem 0.3rem; border: 1px solid #94a3b8; border-radius: 3px; font-size: 0.7rem; line-height: 1.2; height: 1.65rem; }
+        .viewer__field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; margin-bottom: 0.32rem; }
+        .viewer__field-row > .viewer__field { margin-bottom: 0; }
+        .viewer__columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.08rem 0.35rem; margin-top: 0.15rem; }
+        .viewer__columns label { display: flex; align-items: center; gap: 0.22rem; font-size: 0.62rem; font-weight: 600; color: #334155; line-height: 1.2; margin: 0; }
+        .viewer__columns input[type="checkbox"] { width: 0.78rem; height: 0.78rem; margin: 0; flex-shrink: 0; }
+        .viewer__actions { display: grid; gap: 0.3rem; margin-top: 0.45rem; }
+        .viewer__actions .viewer__btn { width: 100%; padding: 0.32rem 0.5rem; font-size: 0.72rem; min-width: 0; }
         .viewer__canvas { overflow: auto; padding: 1rem; }
         .viewer__paper { width: min(297mm, 100%); margin: 0 auto; }
         .viewer__search-panel[hidden] { display: none; }
@@ -79,39 +81,41 @@
             <aside class="viewer__filters">
                 <h2>Filtros do relatório</h2>
                 <form method="get" action="{{ $reportUrl }}" id="report-filters-form">
-                    <div class="viewer__field">
-                        <label for="status">Situação</label>
-                        <select id="status" name="status">
-                            @foreach ($filterOptions['status'] as $value => $label)
-                                <option value="{{ $value }}" @selected(($filters['status'] ?? 'todos') === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
+                    <div class="viewer__field-row">
+                        <div class="viewer__field">
+                            <label for="status">Situação</label>
+                            <select id="status" name="status">
+                                @foreach ($filterOptions['status'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['status'] ?? 'todos') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="viewer__field">
+                            <label for="tipo">Tipo</label>
+                            <select id="tipo" name="tipo">
+                                @foreach ($filterOptions['tipo'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['tipo'] ?? 'todos') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="viewer__field">
-                        <label for="tipo">Tipo</label>
-                        <select id="tipo" name="tipo">
-                            @foreach ($filterOptions['tipo'] as $value => $label)
-                                <option value="{{ $value }}" @selected(($filters['tipo'] ?? 'todos') === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="viewer__field">
-                        <label for="ordenar">Ordenar por</label>
-                        <select id="ordenar" name="ordenar">
-                            @foreach ($filterOptions['ordenar'] as $value => $label)
-                                <option value="{{ $value }}" @selected(($filters['ordenar'] ?? 'numero') === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="viewer__field">
-                        <label for="dir">Ordem</label>
-                        <select id="dir" name="dir">
-                            <option value="desc" @selected(($filters['dir'] ?? 'desc') === 'desc')>Decrescente</option>
-                            <option value="asc" @selected(($filters['dir'] ?? 'desc') === 'asc')>Crescente</option>
-                        </select>
+                    <div class="viewer__field-row">
+                        <div class="viewer__field">
+                            <label for="ordenar">Ordenar por</label>
+                            <select id="ordenar" name="ordenar">
+                                @foreach ($filterOptions['ordenar'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['ordenar'] ?? 'numero') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="viewer__field">
+                            <label for="dir">Ordem</label>
+                            <select id="dir" name="dir">
+                                <option value="desc" @selected(($filters['dir'] ?? 'desc') === 'desc')>Decrescente</option>
+                                <option value="asc" @selected(($filters['dir'] ?? 'desc') === 'asc')>Crescente</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="viewer__field">
@@ -143,15 +147,15 @@
                         </div>
                     </div>
 
-                    <div id="search-time-panel" class="viewer__search-panel" @if ($campoAtual !== 'hora') hidden @endif>
+                    <div id="search-time-panel" class="viewer__search-panel" @if ($campoAtual !== 'data' && $campoAtual !== 'hora') hidden @endif>
                         <div class="viewer__field-row">
                             <div class="viewer__field">
                                 <label for="hora_de">Hora de</label>
-                                <input id="hora_de" type="time" name="hora_de" value="{{ $filters['hora_de'] ?? '' }}">
+                                <input id="hora_de" type="time" name="hora_de" step="1" value="{{ $filters['hora_de'] ?? '' }}">
                             </div>
                             <div class="viewer__field">
                                 <label for="hora_ate">Hora até</label>
-                                <input id="hora_ate" type="time" name="hora_ate" value="{{ $filters['hora_ate'] ?? '' }}">
+                                <input id="hora_ate" type="time" name="hora_ate" step="1" value="{{ $filters['hora_ate'] ?? '' }}">
                             </div>
                         </div>
                     </div>
@@ -197,7 +201,7 @@
 
             if (textPanel) textPanel.hidden = campo === 'data' || campo === 'hora';
             if (datePanel) datePanel.hidden = campo !== 'data';
-            if (timePanel) timePanel.hidden = campo !== 'hora';
+            if (timePanel) timePanel.hidden = campo !== 'data' && campo !== 'hora';
         }
 
         if (campoSelect) {
@@ -215,7 +219,8 @@
                 new FormData(reportFiltersForm).forEach(function (value, key) {
                     if (String(value).trim() === '') return;
                     if (campo !== 'data' && (key === 'de' || key === 'ate')) return;
-                    if (campo !== 'hora' && (key === 'hora_de' || key === 'hora_ate')) return;
+                    // Hora pode acompanhar a data (periodo do dia) ou ser o unico criterio.
+                    if (campo !== 'data' && campo !== 'hora' && (key === 'hora_de' || key === 'hora_ate')) return;
                     if (campo === 'data' && key === 'q') return;
                     if (campo === 'hora' && key === 'q') return;
                     params.append(key, value);

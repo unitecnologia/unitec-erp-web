@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpTimezone;
 use App\Filament\Resources\NfceResource\Pages;
 use App\Models\PdvVendaNfce;
 use BackedEnum;
@@ -54,7 +55,9 @@ class NfceResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.fechado_em')
                     ->label('Dt.Emissão')
-                    ->dateTime('d/m/Y H:i')
+                    ->formatStateUsing(fn ($state): string => filled($state)
+                        ? ErpTimezone::toLocal($state)->format('d/m/Y H:i')
+                        : '—')
                     ->sortable()
                     ->alignCenter()
                     ->placeholder('—')
@@ -75,18 +78,20 @@ class NfceResource extends Resource
                     ->label('CPF')
                     ->placeholder('—')
                     ->alignCenter()
-                    ->formatStateUsing(function (?string $state): string {
-                        if (! filled($state)) {
+                    ->formatStateUsing(function (?string $state, $record): string {
+                        $raw = filled($state) ? $state : ($record?->pdvVenda?->person?->cpf_cnpj ?? null);
+
+                        if (! filled($raw)) {
                             return '—';
                         }
 
-                        $digits = preg_replace('/\D/', '', $state) ?? '';
+                        $digits = preg_replace('/\D/', '', (string) $raw) ?? '';
 
                         if (strlen($digits) === 11) {
                             return substr($digits, 0, 3).'.'.substr($digits, 3, 3).'.'.substr($digits, 6, 3).'-'.substr($digits, 9, 2);
                         }
 
-                        return $state;
+                        return (string) $raw;
                     })
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.sessao.terminal.nome')
@@ -110,7 +115,7 @@ class NfceResource extends Resource
                     ->alignEnd()
                     ->disabledClick(),
                 TextColumn::make('pdvVenda.venda.numero')
-                    ->label('Nº Pedido')
+                    ->label('Numero')
                     ->alignCenter()
                     ->placeholder('—')
                     ->formatStateUsing(function (?string $state): string {
@@ -124,7 +129,7 @@ class NfceResource extends Resource
                     })
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.numero')
-                    ->label('Nº Caixa')
+                    ->label('Nº Dav')
                     ->alignCenter()
                     ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
                     ->weight(FontWeight::SemiBold),

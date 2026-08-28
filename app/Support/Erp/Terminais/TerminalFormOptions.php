@@ -13,6 +13,19 @@ final class TerminalFormOptions
     }
 
     /**
+     * @return array<string, string>
+     */
+    public static function tiposImpressao(): array
+    {
+        return [
+            '0' => 'Pedido A4',
+            '1' => 'ESC/POS',
+            '2' => 'Gráfico',
+            '3' => 'NFC-e - A4',
+        ];
+    }
+
+    /**
      * Portas fixas (como no Delphi) + impressoras Windows entram como RAW:Nome.
      *
      * @return list<string>
@@ -115,5 +128,95 @@ final class TerminalFormOptions
             'exibe_f5' => 'Botão F5 — Pedido',
             'exibe_f6' => 'Botão F6 — Finalizar',
         ];
+    }
+
+    /**
+     * Marcas/drivers de balança serial no terminal (PDV).
+     *
+     * @return list<string>
+     */
+    public static function marcasBalancaSerial(): array
+    {
+        return [
+            '',
+            'balFilizola',
+            'balToledo',
+            'balUrano',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function portasBalanca(): array
+    {
+        $portas = [];
+        for ($i = 1; $i <= 20; $i++) {
+            $portas[] = 'COM'.$i;
+        }
+
+        return $portas;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function velocidadesBalanca(): array
+    {
+        return ['2400', '4800', '9600', '19200', '38400', '57600', '115200'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dataBitsBalanca(): array
+    {
+        return ['7', '8'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function paridadesBalanca(): array
+    {
+        return ['None', 'Even', 'Odd'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function stopBitsBalanca(): array
+    {
+        return ['1', '2'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function handshakingsBalanca(): array
+    {
+        return ['None', 'XOnXOff', 'RTS'];
+    }
+
+    /**
+     * Garante que o valor já gravado apareça no select (não perde dado).
+     *
+     * @param  list<string>  $options
+     * @return list<string>
+     */
+    public static function withCurrentOption(array $options, ?string $current): array
+    {
+        $current = trim((string) $current);
+        if ($current === '') {
+            return array_values($options);
+        }
+
+        foreach ($options as $option) {
+            if ((string) $option === $current) {
+                return array_values($options);
+            }
+        }
+
+        return array_values([$current, ...$options]);
     }
 }

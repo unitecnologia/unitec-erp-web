@@ -178,6 +178,46 @@
         });
     }
 
+    function applyOrcamentosEnvioModalMasks() {
+        requestAnimationFrame(() => {
+            const modal = document.querySelector('.erp-orc-envio-modal');
+
+            if (! modal || ! window.ErpMasks) {
+                return;
+            }
+
+            window.ErpMasks.init(modal);
+
+            const whatsapp = document.getElementById('erp-orc-whatsapp-to');
+
+            if (whatsapp) {
+                window.ErpMasks.apply(whatsapp, { allowEmptySync: true, live: true });
+            }
+        });
+    }
+
+    function bindOrcamentosEnvioModalMasks() {
+        if (window.__erpOrcamentosEnvioModalMasksBound) {
+            return;
+        }
+
+        window.__erpOrcamentosEnvioModalMasksBound = true;
+
+        const registerLivewireHooks = () => {
+            window.Livewire.on('erp-orc-focus-envio-modal', () => {
+                applyOrcamentosEnvioModalMasks();
+            });
+        };
+
+        if (window.Livewire) {
+            registerLivewireHooks();
+        } else {
+            document.addEventListener('livewire:init', registerLivewireHooks);
+        }
+    }
+
+    bindOrcamentosEnvioModalMasks();
+
     if (window.__erpOrcamentosEmailKeysBound) {
         bindOrcamentosListLayout();
         bindOrcamentosPeriodHydration();
@@ -189,38 +229,7 @@
     window.__erpOrcamentosEmailKeysBound = true;
 
     document.addEventListener('keydown', (event) => {
-        const whatsAppModal = document.querySelector('.erp-orc-whatsapp-modal');
-
-        if (whatsAppModal) {
-            if (event.key === 'F5') {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-
-                const page = whatsAppModal.closest('.erp-orcamentos-page');
-                const componentEl = page?.closest('[wire\\:id]');
-                const componentId = componentEl?.getAttribute('wire:id');
-
-                if (componentId && window.Livewire?.find) {
-                    const wire = window.Livewire.find(componentId);
-                    const messageInput = document.getElementById('erp-orc-whatsapp-message');
-                    const toInput = document.getElementById('erp-orc-whatsapp-to');
-
-                    if (wire && messageInput) {
-                        wire.set('whatsAppMessage', messageInput.value);
-                    }
-
-                    if (wire && toInput) {
-                        wire.set('whatsAppTo', toInput.value);
-                    }
-
-                    wire?.call('sendOrcamentoWhatsApp');
-                }
-            }
-
-            return;
-        }
-
-        const emailModal = document.querySelector('.erp-orc-email-modal');
+        const emailModal = document.querySelector('.erp-orc-envio-modal');
 
         if (! emailModal) {
             return;

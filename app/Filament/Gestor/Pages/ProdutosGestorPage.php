@@ -14,6 +14,7 @@ use App\Support\Erp\ProductEmpresaPrecoService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
@@ -48,6 +49,8 @@ class ProdutosGestorPage extends Page
     public string $ncm = '';
 
     public string $ncmDescricao = '';
+
+    public string $validade = '';
 
     public string $precoVenda = '';
 
@@ -93,7 +96,7 @@ class ProdutosGestorPage extends Page
     }
 
     /**
-     * @return list<array{id: int, codigo: string, descricao: string, estoque: float, preco_venda: float, grupo: string}>
+     * @return list<array{id: int, codigo: string, descricao: string, estoque: float, preco_venda: float, grupo: string, validade: ?string, validade_status: ?string, validade_label: string}>
      */
     public function resultados(): array
     {
@@ -119,6 +122,9 @@ class ProdutosGestorPage extends Page
                     ->orWhere('descricao', 'like', $starts)
                     ->orWhere('descricao', 'like', $word);
             })
+            ->when($empresaId > 0, function ($query) use ($empresaId): void {
+                $query->with(['empresaPrecos' => fn ($q) => $q->where('empresa_id', $empresaId)]);
+            })
             ->orderByRaw(
                 'CASE
                     WHEN codigo = ? THEN 0
@@ -133,8 +139,11 @@ class ProdutosGestorPage extends Page
             )
             ->orderBy('descricao')
             ->limit(40)
-            ->get(['id', 'codigo', 'descricao', 'estoque', 'preco_venda', 'grupo'])
+            ->get(['id', 'codigo', 'descricao', 'estoque', 'preco_venda', 'grupo', 'validade'])
             ->map(function (Product $product) use ($precos, $empresaId): array {
+                $dias = $product->validadeDiasRestantes();
+                $status = $product->validadeStatus();
+
                 return [
                     'id' => (int) $product->id,
                     'codigo' => (string) ($product->codigo ?? ''),
@@ -142,6 +151,9 @@ class ProdutosGestorPage extends Page
                     'grupo' => (string) ($product->grupo ?? ''),
                     'estoque' => round((float) $product->estoque, 3),
                     'preco_venda' => $precos->resolvePrecoVenda($product, $empresaId),
+                    'validade' => $product->validade?->format('d/m/Y'),
+                    'validade_status' => $status,
+                    'validade_label' => $this->formatValidadeResumo($dias, $status),
                 ];
             })
             ->all();
@@ -175,6 +187,7 @@ class ProdutosGestorPage extends Page
         $this->unidade = '';
         $this->ncm = '';
         $this->ncmDescricao = '';
+        $this->validade = '';
         $this->precoVenda = '';
         $this->precoAtacado = '';
         $this->precoEspecial = '';
@@ -235,6 +248,8 @@ class ProdutosGestorPage extends Page
                         $this->ncmDescricao = '';
                     }
 
+                    $validade = $this->normalizeValidade($this->validade);
+
                     $payload = [
                         'descricao' => $nome,
                         'grupo' => $grupo !== '' ? $grupo : 'DIVERSOS',
@@ -242,11 +257,15 @@ class ProdutosGestorPage extends Page
                         'unidade' => $unidade,
                         'ncm' => $ncm !== '' ? $ncm : null,
                         'ncm_descricao' => $ncmDesc !== '' ? $ncmDesc : null,
+                        'validade' => $validade,
                     ];
 
                     $mudouCadastro = false;
                     foreach ($payload as $campo => $valor) {
-                        $atual = $product->{$campo};
+                        $atual = $campo === 'validade'
+                            ? ($product->validade?->format('Y-m-d'))
+                            : $product->{$campo};
+
                         if ((string) ($atual ?? '') !== (string) ($valor ?? '')) {
                             $mudouCadastro = true;
                             break;
@@ -261,6 +280,7 @@ class ProdutosGestorPage extends Page
                         $this->unidade = $unidade;
                         $this->ncm = (string) ($payload['ncm'] ?? '');
                         $this->ncmDescricao = (string) ($payload['ncm_descricao'] ?? '');
+                        $this->validade = (string) ($payload['validade'] ?? '');
                         $mudou = true;
                     }
                 }
@@ -435,6 +455,7 @@ class ProdutosGestorPage extends Page
         $this->unidade = (string) ($product->unidade ?: 'UN');
         $this->ncm = (string) ($product->ncm ?? '');
         $this->ncmDescricao = (string) ($product->ncm_descricao ?? '');
+        $this->validade = $product->validade?->format('Y-m-d') ?? '';
         if ($this->ncm !== '' && $this->ncmDescricao === '') {
             $record = app(NcmCatalogService::class)->findByCodigo(
                 app(NcmCatalogService::class)->normalizeCodigo($this->ncm) ?? $this->ncm
@@ -466,6 +487,68 @@ class ProdutosGestorPage extends Page
     public function formatQtyPublic(float $value): string
     {
         return $this->formatQty($value);
+    }
+
+    public function validadeResumoAtual(): string
+    {
+        if ($this->validade === '') {
+            return '';
+        }
+
+        try {
+            $dias = (int) now()->startOfDay()->diffInDays(
+                Carbon::createFromFormat('Y-m-d', $this->validade)->startOfDay(),
+                false,
+            );
+        } catch (\Throwable) {
+            return '';
+        }
+
+        $status = match (true) {
+            $dias < 0 => 'vencido',
+            $dias <= 30 => 'atencao',
+            default => 'ok',
+        };
+
+        return $this->formatValidadeResumo($dias, $status);
+    }
+
+    private function normalizeValidade(string $value): ?string
+    {
+        $trimmed = trim($value);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed)) {
+            return $trimmed;
+        }
+
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $trimmed)) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $trimmed)->format('Y-m-d');
+            } catch (\Throwable) {
+                throw new \InvalidArgumentException('Data de validade inválida.');
+            }
+        }
+
+        throw new \InvalidArgumentException('Data de validade inválida.');
+    }
+
+    private function formatValidadeResumo(?int $dias, ?string $status): string
+    {
+        if ($dias === null || $status === null) {
+            return '';
+        }
+
+        return match (true) {
+            $dias === 0 => 'vence hoje',
+            $dias === 1 => 'falta 1 dia',
+            $dias > 1 => 'faltam '.$dias.' dias',
+            $dias === -1 => 'vencido há 1 dia',
+            default => 'vencido há '.abs($dias).' dias',
+        };
     }
 
     private function empresaId(): int

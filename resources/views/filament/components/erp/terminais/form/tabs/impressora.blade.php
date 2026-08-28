@@ -25,8 +25,6 @@
         </select>
         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="term-nvias">Vias</label>
         <input id="term-nvias" type="text" wire:model="data.nvias" data-mask="integer" class="erp-pcad-form__input erp-pcad-form__input--xs">
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="term-serie">Série</label>
-        <input id="term-serie" type="text" wire:model="data.serie" class="erp-pcad-form__input erp-pcad-form__input--sm">
     </div>
 
     <div class="erp-pcad-form__row">
@@ -37,7 +35,5 @@
     <fieldset class="erp-terminais-form__checks">
         <label class="erp-pcad__check"><input type="checkbox" wire:model="data.imprime"> Imprime cupom</label>
         <label class="erp-pcad__check"><input type="checkbox" wire:model="data.usa_gaveta"> Usa gaveta</label>
-        <label class="erp-pcad__check"><input type="checkbox" wire:model="data.usar_numero_inicial"> Usar numeração inicial</label>
-        <label class="erp-pcad__check"><input type="checkbox" wire:model="data.meia_folha"> Meia folha</label>
     </fieldset>
 </div>

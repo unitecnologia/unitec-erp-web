@@ -5,20 +5,20 @@
 
     @if ($this->isNewTerminal)
         <div class="erp-terminais-master__sidebar-new">
-            <label class="erp-terminais-master__sidebar-new-label" for="term-novo-nome">Nome do novo terminal (PDV)</label>
+            <label class="erp-terminais-master__sidebar-new-label" for="term-novo-nome">Nome do terminal (ex.: PDV1, ERP)</label>
             <input
                 id="term-novo-nome"
                 type="text"
                 wire:model="data.nome"
                 class="erp-terminais-master__nome-input"
-                placeholder="Ex.: pdv1"
+                placeholder="Ex.: PDV1"
                 autocomplete="off"
             >
         </div>
     @endif
 
     <div class="erp-terminais-master__grid-head" role="row">
-        <span class="erp-terminais-master__col erp-terminais-master__col--nome">Nome PDV</span>
+        <span class="erp-terminais-master__col erp-terminais-master__col--nome">Dispositivo</span>
         <span class="erp-terminais-master__col erp-terminais-master__col--ativo" title="Marcado = liberado / Desmarcado = bloqueado">Ativo</span>
         <span class="erp-terminais-master__col erp-terminais-master__col--info">Info</span>
     </div>
@@ -35,7 +35,8 @@
                     @class([
                         'erp-terminais-master__item',
                         'erp-terminais-master__item--selected' => $selected,
-                        'erp-terminais-master__item--machine' => strtoupper((string) $terminal->nome) === $machineName,
+                        'erp-terminais-master__item--machine' => strtoupper((string) $terminal->nome) === $machineName
+                            || strtoupper((string) ($terminal->device_name ?? '')) === $machineName,
                         'erp-terminais-master__item--inactive' => ! $ativo,
                     ])
                     role="option"
@@ -49,6 +50,14 @@
                     >
                         <span class="erp-terminais-master__col erp-terminais-master__col--nome">
                             {{ $terminal->nome }}
+                            @if ($terminal->categoria_licenca === 'telefone')
+                                <small class="erp-terminais-master__item-num">Telefone</small>
+                            @elseif ($terminal->categoria_licenca === 'computador')
+                                <small class="erp-terminais-master__item-num">Computador</small>
+                            @endif
+                            @if (filled($terminal->device_name) && strtoupper((string) $terminal->nome) !== strtoupper((string) $terminal->device_name))
+                                <small class="erp-terminais-master__item-num" title="Hostname do PC">{{ $terminal->device_name }}</small>
+                            @endif
                             @if (filled($terminal->numero_logico_terminal))
                                 <small class="erp-terminais-master__item-num">Nº {{ $terminal->numero_logico_terminal }}</small>
                             @endif
@@ -106,6 +115,23 @@
                                 <span class="erp-terminais-master__info-label">Status</span>
                                 <strong>{{ $ativo ? 'Liberado' : 'Bloqueado' }}</strong>
                             </div>
+                            @if (filled($terminal->device_uuid) || filled($terminal->origens_dispositivo) || filled($terminal->device_last_seen_at))
+                                <div>
+                                    <span class="erp-terminais-master__info-label">Origem</span>
+                                    <strong>{{ collect($terminal->origens_dispositivo ?? [])->map(fn ($o) => match ($o) {
+                                        'pdv_offline' => 'PDV offline',
+                                        'erp_web' => 'ERP web',
+                                        'gestor_web' => 'Gestor',
+                                        'forca_vendas' => 'Força de Vendas',
+                                        'vendas_internas' => 'Vendas Internas',
+                                        default => $o,
+                                    })->implode(', ') ?: '—' }}</strong>
+                                </div>
+                                <div>
+                                    <span class="erp-terminais-master__info-label">Último acesso</span>
+                                    <strong>{{ $terminal->device_last_seen_at?->format('d/m/Y H:i') ?: '—' }}</strong>
+                                </div>
+                            @endif
                         </div>
                         <button type="button" class="erp-terminais-master__info-close" wire:click="closeTerminalInfo" title="Fechar">✕</button>
                     </div>

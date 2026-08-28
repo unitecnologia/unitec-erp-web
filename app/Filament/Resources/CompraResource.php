@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Support\Erp\ErpAccess;
 use App\Filament\Resources\CompraResource\Pages;
 use App\Models\Compra;
+use App\Models\DevolucaoCompra;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -79,11 +80,20 @@ class CompraResource extends Resource
                     ->placeholder('—')
                     ->wrap(false)
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('total')
+                ViewColumn::make('status')
+                    ->label('Situação')
+                    ->state(function (Compra $record): string {
+                        return $record->has_devolucao_finalizada
+                            ? 'devolvida'
+                            : (string) $record->status;
+                    })
+                    ->view('filament.components.erp.compras.columns.status')
+                    ->alignCenter()
+                    ->disabledClick(),
+                ViewColumn::make('total')
                     ->label('Total')
-                    ->formatStateUsing(fn ($state): string => 'R$ ' . number_format((float) $state, 2, ',', '.'))
-                    ->alignEnd()
-                    ->weight(FontWeight::SemiBold),
+                    ->view('filament.components.erp.compras.columns.total')
+                    ->disabledClick(),
                 ViewColumn::make('ver_itens')
                     ->label('')
                     ->state(fn (): bool => true)

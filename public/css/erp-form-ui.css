@@ -490,6 +490,18 @@
     background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%) !important;
 }
 
+.erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-pcad-actions__btn--whatsapp {
+    background: linear-gradient(180deg, #25d366 0%, #128c7e 100%) !important;
+    border-color: #86efac !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-pcad-actions__btn[data-erp-key="WhatsApp"]:hover,
+.erp-pcad-actions__btn--whatsapp:hover {
+    background: linear-gradient(180deg, #2fe576 0%, #25d366 100%) !important;
+}
+
 .erp-pcad-actions__btn[data-erp-key="Escape"] {
     background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
     border-color: #fca5a5 !important;
@@ -504,12 +516,23 @@
     background: rgba(255, 255, 255, 0.25) !important;
 }
 
+.erp-pcad-actions__icon--whatsapp {
+    background: rgba(255, 255, 255, 0.25) !important;
+    font-weight: 800;
+    font-size: 0.72rem !important;
+    letter-spacing: -0.02em;
+}
+
 .erp-pcad-actions__icon--exit {
     background: rgba(255, 255, 255, 0.25) !important;
 }
 
 .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
 .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__icon,
+.erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-pcad-actions__btn--whatsapp .erp-pcad-actions__icon,
 .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
 .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
     color: var(--erp-text-inverse, #fff) !important;
@@ -523,7 +546,7 @@
     font-weight: 700;
 }
 
-.erp-pcad-actions__btn:not([data-erp-key="F5"]):not([data-erp-key="Escape"]) .erp-pcad-actions__label kbd {
+.erp-pcad-actions__btn:not([data-erp-key="F5"]):not([data-erp-key="Escape"]):not([data-erp-key="WhatsApp"]):not(.erp-pcad-actions__btn--whatsapp) .erp-pcad-actions__label kbd {
     background: var(--erp-bg-muted, #e2eaf4);
     border-color: var(--erp-border-light, #c7d5e8);
     color: var(--erp-brand-primary, #1e5a9e);

@@ -2,10 +2,10 @@
 
 namespace App\Support\Erp\Pdv;
 
-use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductPriceTableItem;
 use App\Support\Erp\ProductEmpresaPrecoService;
+use App\Support\Erp\Promocao\PromocaoPrecoService;
 use Carbon\Carbon;
 
 final class PdvProductPriceService
@@ -70,8 +70,18 @@ final class PdvProductPriceService
     public function emPromocao(Product $product, ?Carbon $data = null): bool
     {
         $data ??= Carbon::today();
+        $empresaId = (int) (session('erp_empresa_id') ?? 0);
 
+        if ($empresaId > 0 && app(PromocaoPrecoService::class)->emPromocaoCampanha($product, $empresaId, $data)) {
+            return true;
+        }
+
+        // Fallback legado (colunas no produto) — só varejo.
         if (blank($product->promo_data_inicio) || blank($product->promo_data_fim)) {
+            return false;
+        }
+
+        if ((float) ($product->promo_preco_venda ?? 0) <= 0) {
             return false;
         }
 
@@ -121,27 +131,41 @@ final class PdvProductPriceService
             $empresaId > 0 ? $empresaId : null
         );
 
-        if ($this->emPromocao($product, $hoje)) {
-            $preco = (float) ($product->promo_preco_venda ?? $precosEmpresa['preco_venda']);
-
-            if ($this->aplicaAtacado($product, $quantidade, $precosEmpresa['preco_atacado'])) {
-                $precoAtacado = (float) ($product->promo_preco_atacado ?? 0);
-
-                if ($precoAtacado > 0) {
-                    return $precoAtacado;
-                }
-            }
-
-            return $preco;
-        }
-
-        $preco = (float) $precosEmpresa['preco_venda'];
-
+        // Atacado: sempre preço atacado normal (promoção é só varejo).
         if ($this->aplicaAtacado($product, $quantidade, $precosEmpresa['preco_atacado'])) {
             return (float) $precosEmpresa['preco_atacado'];
         }
 
-        return $preco;
+        $campanha = $empresaId > 0
+            ? app(PromocaoPrecoService::class)->precoVarejoAtivo($product, $empresaId, $hoje)
+            : null;
+
+        if ($campanha !== null) {
+            return $campanha;
+        }
+
+        // Fallback legado: promo_preco_venda nas datas do produto.
+        if ($this->emPromocaoLegado($product, $hoje)) {
+            return (float) $product->promo_preco_venda;
+        }
+
+        return (float) $precosEmpresa['preco_venda'];
+    }
+
+    private function emPromocaoLegado(Product $product, Carbon $data): bool
+    {
+        if (blank($product->promo_data_inicio) || blank($product->promo_data_fim)) {
+            return false;
+        }
+
+        if ((float) ($product->promo_preco_venda ?? 0) <= 0) {
+            return false;
+        }
+
+        return $data->between(
+            Carbon::parse($product->promo_data_inicio)->startOfDay(),
+            Carbon::parse($product->promo_data_fim)->endOfDay(),
+        );
     }
 
     private function aplicaAtacado(Product $product, float $quantidade, ?float $precoAtacadoOverride = null): bool

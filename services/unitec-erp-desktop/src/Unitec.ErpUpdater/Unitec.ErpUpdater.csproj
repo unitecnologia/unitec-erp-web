@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Unitec.ErpUpdater</RootNamespace>
+    <AssemblyName>Unitec Atualizador</AssemblyName>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Product>Unitec Atualizador</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Unitec.ErpCommon\Unitec.ErpCommon.csproj" />
+  </ItemGroup>
+</Project>

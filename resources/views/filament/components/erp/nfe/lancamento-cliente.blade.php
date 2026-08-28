@@ -33,6 +33,8 @@
                     id="nfe-cliente-busca"
                     class="erp-nfe-cliente__input erp-nfe-cliente__input--editable"
                     type="text"
+                    data-erp-uppercase
+                    autocapitalize="characters"
                     wire:model.live.debounce.250ms="nfeClienteBusca"
                     wire:keydown.enter.prevent="confirmarNfeClienteBusca"
                     wire:keydown.escape.prevent="fecharNfeSugestoesCliente"
@@ -60,7 +62,11 @@
                                     <span class="erp-nfe-cliente__suggest-code">{{ $sug['codigo'] ?: '—' }}</span>
                                     <span class="erp-nfe-cliente__suggest-nome">{{ $sug['nome'] }}</span>
                                     @if (filled($sug['cpf_cnpj'] ?? null))
-                                        <span class="erp-nfe-cliente__suggest-doc">{{ $sug['cpf_cnpj'] }}</span>
+                                        <span @class([
+                                            'erp-nfe-cliente__suggest-doc',
+                                            'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
+                                            'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
+                                        ])>{{ $sug['cpf_cnpj'] }}</span>
                                     @endif
                                 </button>
                             </li>

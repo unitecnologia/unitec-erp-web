@@ -1,8 +1,9 @@
 @if ($this->contadorModalOpen)
     <div
         class="erp-lookup-modal erp-contador-form-modal"
-        wire:keydown.escape.window="closeContadorModal"
+        wire:keydown.escape.window="handleContadorModalEscape"
         wire:keydown.f5.window.prevent="saveContador"
+        @if ($this->contadorCidadeSugestoesOpen && $this->contadorCidadeSugestoes !== []) data-lookup-open="1" @endif
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeContadorModal"></div>
 
@@ -23,7 +24,25 @@
             </div>
 
             <div class="erp-lookup-modal__body erp-contador-form-modal__body">
-                <div class="erp-pcad-form erp-contador-form-modal__form">
+                <div
+                    class="erp-pcad-form erp-contador-form-modal__form"
+                    data-erp-form
+                    autocomplete="off"
+                    x-data
+                    x-on:input.capture="
+                        const t = $event.target;
+                        if (!t || t.disabled) return;
+                        if (t.dataset.mask) return;
+                        if (!(t.matches('input[type=text], input:not([type]), textarea'))) return;
+                        const u = String(t.value || '').toLocaleUpperCase('pt-BR');
+                        if (t.value === u) return;
+                        const s = t.selectionStart, e = t.selectionEnd;
+                        t.value = u;
+                        if (document.activeElement === t && s != null && e != null) {
+                            try { t.setSelectionRange(s, e); } catch (_) {}
+                        }
+                    "
+                >
                     <div class="erp-pcad-form__row">
                         <label class="erp-pcad-form__label" for="contador-codigo">Código</label>
                         <input
@@ -36,7 +55,7 @@
                     </div>
 
                     <div class="erp-pcad-form__row">
-                        <label class="erp-pcad-form__label" for="contador-nome">Nome</label>
+                        <label class="erp-pcad-form__label" for="contador-nome">Nome *</label>
                         <input
                             id="contador-nome"
                             type="text"
@@ -44,13 +63,13 @@
                             class="erp-pcad-form__input erp-pcad-form__input--grow"
                             autofocus
                         >
-                        @error('contadorForm.nome')
-                            <span class="erp-contador-form-modal__error">{{ $message }}</span>
-                        @enderror
                     </div>
+                    @error('contadorForm.nome')
+                        <span class="erp-contador-form-modal__error">{{ $message }}</span>
+                    @enderror
 
                     <div class="erp-pcad-form__row">
-                        <label class="erp-pcad-form__label" for="contador-cnpj">CNPJ/CPF</label>
+                        <label class="erp-pcad-form__label" for="contador-cnpj">CNPJ/CPF *</label>
                         <input
                             id="contador-cnpj"
                             type="text"
@@ -58,9 +77,6 @@
                             data-mask="cpf-cnpj"
                             class="erp-pcad-form__input erp-pcad-form__input--doc"
                         >
-                        @error('contadorForm.cnpj_cpf')
-                            <span class="erp-contador-form-modal__error">{{ $message }}</span>
-                        @enderror
                         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="contador-crc">CRC</label>
                         <input
                             id="contador-crc"
@@ -69,6 +85,9 @@
                             class="erp-pcad-form__input erp-pcad-form__input--md"
                         >
                     </div>
+                    @error('contadorForm.cnpj_cpf')
+                        <span class="erp-contador-form-modal__error">{{ $message }}</span>
+                    @enderror
 
                     <div class="erp-pcad-form__row">
                         <label class="erp-pcad-form__label" for="contador-cep">CEP</label>
@@ -77,8 +96,19 @@
                             type="text"
                             wire:model="contadorForm.cep"
                             data-mask="cep"
+                            x-on:blur="$wire.buscarCepContador(true)"
                             class="erp-pcad-form__input erp-pcad-form__input--cep"
                         >
+                        <button
+                            type="button"
+                            wire:click="buscarCepContador"
+                            wire:loading.attr="disabled"
+                            wire:target="buscarCepContador"
+                            class="erp-pcad-form__btn"
+                        >
+                            <span class="erp-pcad-form__btn-icon" aria-hidden="true">🔍</span>
+                            Pesquisar CEP
+                        </button>
                     </div>
 
                     <div class="erp-pcad-form__row">
@@ -110,21 +140,48 @@
 
                     <div class="erp-pcad-form__row">
                         <label class="erp-pcad-form__label" for="contador-cidade">Cidade</label>
-                        <input
-                            id="contador-cidade"
-                            type="text"
-                            wire:model="contadorForm.cidade"
-                            class="erp-pcad-form__input erp-pcad-form__input--city"
-                            list="contador-cidades"
+                        <div
+                            class="erp-pcad-form__city-wrap"
+                            @if ($this->contadorCidadeSugestoesOpen && $this->contadorCidadeSugestoes !== []) data-lookup-open="1" @endif
                         >
-                        <datalist id="contador-cidades">
-                            <option value="BALNEÁRIO CAMBORIÚ">
-                            <option value="CAMBORIÚ">
-                            <option value="FLORIANÓPOLIS">
-                            <option value="ITAJAÍ">
-                        </datalist>
+                            <input
+                                id="contador-cidade"
+                                type="text"
+                                wire:model.live.debounce.250ms="contadorForm.cidade"
+                                wire:keydown.enter.prevent="confirmarContadorCidadeSugestao"
+                                wire:keydown.escape.prevent="fecharContadorCidadeSugestoes"
+                                wire:keydown.arrow-up.prevent="moverContadorCidadeSugestao(-1)"
+                                wire:keydown.arrow-down.prevent="moverContadorCidadeSugestao(1)"
+                                class="erp-pcad-form__input erp-pcad-form__input--city"
+                                autocomplete="off"
+                                placeholder="Digite a cidade"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded="{{ $this->contadorCidadeSugestoesOpen && $this->contadorCidadeSugestoes !== [] ? 'true' : 'false' }}"
+                                aria-controls="contador-cidade-sugestoes"
+                            >
+                            @if ($this->contadorCidadeSugestoesOpen && $this->contadorCidadeSugestoes !== [])
+                                <ul id="contador-cidade-sugestoes" class="erp-pcad-form__city-suggest" role="listbox" aria-label="Cidades encontradas">
+                                    @foreach ($this->contadorCidadeSugestoes as $index => $sug)
+                                        <li wire:key="contador-cid-sug-{{ $sug['codigo'] }}-{{ $index }}" role="presentation">
+                                            <button
+                                                type="button"
+                                                role="option"
+                                                aria-selected="{{ (int) $this->contadorCidadeSugestaoIndex === (int) $index ? 'true' : 'false' }}"
+                                                wire:mousedown.prevent="selecionarContadorCidade(@js($sug['nome']), '{{ $sug['uf'] }}')"
+                                                @class(['is-selected' => (int) $this->contadorCidadeSugestaoIndex === (int) $index])
+                                            >
+                                                <span class="erp-pcad-form__city-suggest-code">{{ $sug['codigo'] }}</span>
+                                                <span class="erp-pcad-form__city-suggest-nome">{{ $sug['nome'] }}</span>
+                                                <span class="erp-pcad-form__city-suggest-uf">{{ $sug['uf'] }}</span>
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
                         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="contador-uf">UF</label>
-                        <select id="contador-uf" wire:model="contadorForm.uf" class="erp-pcad-form__select erp-pcad-form__select--uf">
+                        <select id="contador-uf" wire:model.live="contadorForm.uf" class="erp-pcad-form__select erp-pcad-form__select--uf">
                             @foreach ($this->contadorUfOptions() as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
@@ -132,17 +189,22 @@
                     </div>
 
                     <div class="erp-pcad-form__row">
-                        <label class="erp-pcad-form__label" for="contador-email">Email</label>
+                        <label class="erp-pcad-form__label" for="contador-email">Email *</label>
                         <input
                             id="contador-email"
-                            type="email"
+                            type="text"
                             wire:model="contadorForm.email"
                             class="erp-pcad-form__input erp-pcad-form__input--grow"
+                            inputmode="email"
+                            autocomplete="off"
                         >
                     </div>
+                    @error('contadorForm.email')
+                        <span class="erp-contador-form-modal__error">{{ $message }}</span>
+                    @enderror
 
                     <div class="erp-pcad-form__row">
-                        <label class="erp-pcad-form__label" for="contador-fone">Fone</label>
+                        <label class="erp-pcad-form__label" for="contador-fone">Fone *</label>
                         <input
                             id="contador-fone"
                             type="text"
@@ -151,6 +213,9 @@
                             class="erp-pcad-form__input erp-pcad-form__input--phone"
                         >
                     </div>
+                    @error('contadorForm.fone')
+                        <span class="erp-contador-form-modal__error">{{ $message }}</span>
+                    @enderror
                 </div>
             </div>
 

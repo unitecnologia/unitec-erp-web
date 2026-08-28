@@ -86,8 +86,9 @@ body,
 .erp-title-bar__brand {
     display: flex;
     align-items: center;
+    gap: 0.65rem;
     min-width: 0;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
 }
 
 .erp-title-bar__app {
@@ -96,6 +97,53 @@ body,
     letter-spacing: 0.03em;
     line-height: 1.1;
     white-space: nowrap;
+}
+
+.erp-title-bar__cloud {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+.erp-title-bar__cloud-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.erp-title-bar__cloud-dot--online {
+    background: #4ade80;
+}
+
+.erp-title-bar__cloud-dot--offline {
+    background: #f87171;
+}
+
+.erp-title-bar__cloud-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.erp-title-bar__cloud-detail {
+    font-size: 0.66rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+@media (max-width: 1100px) {
+    .erp-title-bar__cloud-detail {
+        display: none;
+    }
 }
 
 .erp-title-bar__status {
@@ -182,11 +230,11 @@ body,
 
 .erp-menu-bar__trigger {
     display: block;
-    padding: calc(0.28rem - 0.04cm) 0.55rem;
-    font-size: calc(0.78rem + 0.02cm);
+    padding: calc(0.34rem - 0.04cm) 0.6rem;
+    font-size: calc(0.82rem + 0.02cm);
     font-weight: 600;
     letter-spacing: 0.01em;
-    line-height: 1.2;
+    line-height: 1.25;
     color: var(--erp-brand-primary-dark, #0f3460);
     cursor: pointer;
     white-space: nowrap;
@@ -215,7 +263,7 @@ body,
     min-width: 12.5rem;
     max-height: none;
     overflow: visible;
-    padding: 0.2rem 0;
+    padding: 0.28rem 0;
     background: #fff;
     border: 1px solid #c5d0e0;
     border-radius: 0 0 6px 6px;
@@ -232,14 +280,16 @@ body,
 }
 
 .erp-menu-bar__link--submenu {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     cursor: default;
 }
 
 .erp-menu-bar__link--submenu::after {
     content: '›';
-    float: right;
-    margin-left: 0.45rem;
+    margin-left: auto;
+    padding-left: 0.45rem;
     color: #64748b;
     font-size: 0.85rem;
     font-weight: 700;
@@ -255,8 +305,8 @@ body,
     z-index: 230;
     min-width: 15rem;
     max-height: none;
-    margin: 0 0 0 -1px;
-    padding: 0.2rem 0;
+    margin: 0 0 0 -2px;
+    padding: 0.28rem 0;
     border: 1px solid #c5d0e0;
     border-radius: 6px;
     background: #fff;
@@ -283,10 +333,11 @@ body,
 .erp-menu-bar__link {
     display: block;
     width: 100%;
-    padding: 0.22rem 0.7rem;
-    font-size: 0.74rem;
+    box-sizing: border-box;
+    padding: 0.38rem 0.75rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    line-height: 1.25;
+    line-height: 1.35;
     text-align: left;
     color: #1e293b;
     text-decoration: none;
@@ -296,11 +347,65 @@ body,
     white-space: nowrap;
 }
 
+.erp-menu-bar__link--with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.erp-menu-bar__icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: #64748b;
+}
+
+.erp-menu-bar__icon--blue {
+    color: #1e5a9e;
+}
+
+.erp-menu-bar__icon--teal {
+    color: #0d9488;
+}
+
+.erp-menu-bar__icon--indigo {
+    color: #4f46e5;
+}
+
+.erp-menu-bar__icon--amber {
+    color: #d97706;
+}
+
+.erp-menu-bar__icon--green {
+    color: #16a34a;
+}
+
+.erp-menu-bar__icon--red {
+    color: #dc2626;
+}
+
+.erp-menu-bar__icon--orange {
+    color: #ea580c;
+}
+
+.erp-menu-bar__icon--slate {
+    color: #64748b;
+}
+
+.erp-menu-bar__icon--purple {
+    color: #9333ea;
+}
+
 .erp-menu-bar__link:hover,
 .erp-menu-bar__link:focus-visible {
     background: #1e5a9e;
     color: #ffffff;
     outline: none;
+}
+
+.erp-menu-bar__link:hover .erp-menu-bar__icon,
+.erp-menu-bar__link:focus-visible .erp-menu-bar__icon {
+    color: #bfdbfe;
 }
 
 .erp-menu-bar__link:hover .erp-kbd,
@@ -495,7 +600,7 @@ body,
 
 /* ── Filament content area ───────────────────────────────────────── */
 
-.fi-main .fi-page:not(.erp-list-page):not(.erp-pdv-page):not(.erp-empresas-form-page):not(.erp-terminais-form-page):not(.erp-produtos-form-page):not(.erp-orcamentos-form-page) {
+.fi-main .fi-page:not(.erp-list-page):not(.erp-pdv-page):not(.erp-empresas-form-page):not(.erp-terminais-form-page):not(.erp-produtos-form-page):not(.erp-orcamentos-form-page):not(.erp-licenca-bloqueada-page):not(.erp-licenca-sistema-page) {
     background: var(--erp-bg-panel, #fff);
     border: 1px solid var(--erp-border-light, #cbd5e1);
     min-height: calc(100vh - 170px);
@@ -734,6 +839,51 @@ body,
 
 .erp-update-modal__package-status.is-error {
     color: #b91c1c;
+}
+
+.erp-update-modal__download-progress {
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #c7d7ea;
+    border-radius: 8px;
+    background: #f8fbff;
+}
+
+.erp-update-modal__success {
+    margin: 0 0 1rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    background: #f0fdf4;
+}
+
+.erp-update-modal__success-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #15803d;
+}
+
+.erp-update-modal__success-body {
+    margin: 0 0 0.45rem;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: #166534;
+}
+
+.erp-update-modal__success-path {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #3f6212;
+    word-break: break-all;
+}
+
+.erp-update-modal__success-path code,
+.erp-update-modal__list code {
+    font-size: 0.78rem;
+    background: rgba(15, 52, 96, 0.06);
+    padding: 0.05rem 0.25rem;
+    border-radius: 4px;
 }
 
 .erp-update-modal__list {

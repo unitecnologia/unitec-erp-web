@@ -1,9 +1,9 @@
 <div class="erp-receber-actions">
-    <button type="button" class="erp-receber-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="createConta" class="erp-receber-actions__btn" data-erp-key="F2">
         <span class="erp-receber-actions__icon erp-receber-actions__icon--new">+</span>
         <span class="erp-receber-actions__label"><kbd>F2</kbd> | Novo</span>
     </button>
-    <button type="button" class="erp-receber-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="editConta" class="erp-receber-actions__btn" data-erp-key="F3">
         <span class="erp-receber-actions__icon">✎</span>
         <span class="erp-receber-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>

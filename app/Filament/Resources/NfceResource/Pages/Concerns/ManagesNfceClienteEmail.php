@@ -166,7 +166,7 @@ trait ManagesNfceClienteEmail
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
+                ->body('Verifique a configuração de e-mail em Empresa → Parâmetros → E-mail.')
                 ->danger()
                 ->send();
         }

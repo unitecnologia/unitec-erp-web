@@ -24,11 +24,31 @@
     border: 0;
     background: transparent;
     cursor: pointer;
-    z-index: 2;
+    z-index: 5;
+    pointer-events: auto;
+}
+
+.erp-produtos-form .erp-date-field,
+.erp-produtos-pcad .erp-date-field,
+.erp-produtos-promocao .erp-date-field {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-width: 9rem;
+    max-width: 100%;
+}
+
+.erp-produtos-form .erp-date-field__toggle,
+.erp-produtos-pcad .erp-date-field__toggle,
+.erp-produtos-promocao .erp-date-field__toggle {
+    width: 2.5rem;
+    z-index: 30;
+    cursor: pointer;
 }
 
 .erp-date-input,
 .erp-orcamentos__period-input.erp-date-input,
+.erp-recibos__period-input.erp-date-input,
 .erp-pcad-form__input--date.erp-date-input {
     padding-right: 2.25rem !important;
     background-color: var(--erp-bg-panel, #ffffff) !important;

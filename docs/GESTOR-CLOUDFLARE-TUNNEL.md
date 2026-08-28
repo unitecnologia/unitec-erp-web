@@ -5,19 +5,37 @@ permanecendo no **servidor local** da loja. Sem abrir porta no roteador.
 
 ```
 Celular (4G)
-    → https://gestor.seudominio.com.br/gestor/
+    → https://mesavirada.unierp.uk/gestor/
     → Cloudflare
     → Túnel (cloudflared no PC da loja)
-    → http://127.0.0.1:8000  (ERP local)
+    → http://127.0.0.1:8765  (ERP local / produção)
 ```
+
+---
+
+## Fluxo padrão (manual — recomendado)
+
+Cada loja deve ter **subdomínio próprio** (ex.: `mesavirada.unierp.uk` ou qualquer nome que vocês escolherem). Nunca o mesmo host para todos.
+
+1. **Na Cloudflare** — criar o túnel + registro DNS (CNAME) do subdomínio apontando para `{tunnel-id}.cfargotunnel.com` (proxy ligado).
+2. **No PC da loja** — `config.yml` + credencial em `C:\ProgramData\Unitec\cloudflared\` (o `UnitecErpServer` sobe o `cloudflared`).
+3. **No ERP** — Empresa → Parâmetros → **Acesso remoto**:
+   - marcar **Habilitar acesso remoto**
+   - colar **URL pública do ERP** (ex. `https://mesavirada.unierp.uk`)
+   - colar **URL pública do Gestor** (ex. `https://mesavirada.unierp.uk/gestor`)
+   - salvar
+
+O nome do host **não precisa** ser o nome fantasia do cliente — use o que fizer sentido no suporte.
+
+Com a flag desligada, o status Online/Offline some da title-bar/PDV e as URLs públicas não são usadas.
 
 ---
 
 ## Pré-requisitos
 
-1. ERP rodando no PC/servidor da loja (`http://127.0.0.1:8000`)
+1. ERP rodando no PC/servidor da loja (`http://127.0.0.1:8765` em produção)
 2. Conta [Cloudflare](https://dash.cloudflare.com/) (gratuita)
-3. Um domínio na Cloudflare (ex.: `seuloja.com.br`) — **recomendado** para uso diário
+3. Um domínio na Cloudflare (ex.: `unierp.uk` ou domínio da loja)
 4. Windows com PowerShell
 
 ---

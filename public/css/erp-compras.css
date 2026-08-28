@@ -1,4 +1,4 @@
-/* ERP — Compras (layout Delphi + grade compacta; UI base em erp-list-ui.css) */
+/* ERP â€” Compras (layout Delphi + grade compacta; UI base em erp-list-ui.css) */
 
 .erp-compras-page .erp-compras {
     padding: 0.5rem 0.65rem 0;
@@ -198,7 +198,7 @@
     margin-bottom: 0;
 }
 
-/* ── Grade compacta ─────────────────────────────────────────────── */
+/* â”€â”€ Grade compacta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .erp-compras-page .fi-ta-ctn {
     margin: 0 0.65rem !important;
@@ -370,7 +370,7 @@
     font-size: var(--erp-font-size-xs, 0.75rem);
 }
 
-/* ── Rodapé total ───────────────────────────────────────────────── */
+/* â”€â”€ RodapÃ© total â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .erp-compras-page .erp-compras__total {
     margin: 0 0.65rem;
@@ -386,7 +386,7 @@
     content: ' |';
 }
 
-/* ── Action bar (F2–F9) ─────────────────────────────────────────── */
+/* â”€â”€ Action bar (F2â€“F9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .erp-compras-page .erp-compras-actions {
     flex-shrink: 0;
@@ -406,6 +406,17 @@
 
 .erp-compras-page .erp-compras-actions__btn:hover {
     transform: translateY(-1px);
+}
+
+.erp-compras-page .erp-compras-actions__btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: grayscale(0.55);
+    transform: none;
+}
+
+.erp-compras-page .erp-compras-actions__btn:disabled:hover {
+    transform: none;
 }
 
 .erp-compras-page .erp-compras-actions__icon {
@@ -436,7 +447,7 @@
     overflow: hidden;
 }
 
-/* ── Larguras de colunas (Delphi) ───────────────────────────────── */
+/* â”€â”€ Larguras de colunas (Delphi) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .erp-compras-page .fi-ta-header-cell:nth-child(1),
 .erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -492,14 +503,116 @@
 
 .erp-compras-page .fi-ta-header-cell:nth-child(7),
 .erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(7),
-.erp-compras-page .fi-ta-header-cell-total,
-.erp-compras-page .fi-ta-cell-total {
-    width: 6.5rem;
-    max-width: 7.5rem;
+.erp-compras-page .fi-ta-header-cell-status,
+.erp-compras-page .fi-ta-cell-status {
+    width: 5.75rem;
+    max-width: 6.5rem;
+}
+
+.erp-compras-page .fi-ta-cell-status .fi-ta-col {
+    justify-content: center !important;
+}
+
+.erp-compras-page .erp-compras__status-chip {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.15;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    text-align: center;
+}
+
+.erp-compras-page .erp-compras__status-chip--aberta {
+    background: #000000;
+    color: #ffffff;
+    border-color: #000000;
+}
+
+.erp-compras-page .erp-compras__status-chip--fechada {
+    background: #16a34a;
+    color: #ffffff;
+    border-color: #15803d;
+}
+
+.erp-compras-page .erp-compras__status-chip--devolvida {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #1d4ed8;
+}
+
+.erp-compras-page .erp-compras__status-chip--cancelada {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #b91c1c;
 }
 
 .erp-compras-page .fi-ta-header-cell:nth-child(8),
 .erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-compras-page .fi-ta-header-cell-total,
+.erp-compras-page .fi-ta-cell-total {
+    width: 6.5rem !important;
+    min-width: 6.5rem !important;
+    max-width: 7.5rem !important;
+    padding-inline: 0.18rem 0.22rem !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-compras-page .fi-ta-cell-total .fi-ta-col {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+}
+
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col .fi-ta-text,
+.erp-compras-page .fi-ta-cell-total .fi-ta-col .fi-ta-text {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+.erp-compras-page .erp-compras-total-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.2rem;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-page .erp-compras-total-cell__currency {
+    flex: 0 0 auto;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-compras-page .erp-compras-total-cell__amount {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    color: var(--erp-text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected .erp-compras-total-cell__currency,
+.erp-compras-page .fi-ta-row.erp-row-selected .erp-compras-total-cell__amount {
+    color: #fff;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(9),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-compras-page .fi-ta-header-cell-ver-itens,
 .erp-compras-page .fi-ta-cell-ver-itens {
     width: 1.35rem !important;
@@ -509,7 +622,7 @@
     overflow: hidden;
 }
 
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
 .erp-compras-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -525,6 +638,7 @@
     justify-content: center;
     width: 1.35rem;
     height: 1.15rem;
+    margin: 0;
     padding: 0;
     border: 1px solid var(--erp-border-light, #c7d5e8);
     border-radius: 4px;
@@ -533,6 +647,9 @@
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
+    font: inherit;
+    appearance: none;
+    -webkit-appearance: none;
     transition: background var(--erp-transition), border-color var(--erp-transition), transform var(--erp-transition);
 }
 
@@ -565,18 +682,18 @@
 }
 
 .erp-compras-page .fi-ta-header-cell-ver-itens,
-.erp-compras-page .fi-ta-header-cell:nth-child(8) {
+.erp-compras-page .fi-ta-header-cell:nth-child(9) {
     padding: 0 !important;
     box-shadow: var(--erp-compras-scrollbar-size, 17px) 0 0 0 #164a85;
 }
 
 .erp-compras-page .fi-ta-cell-ver-itens,
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) {
     position: relative;
 }
 
 .erp-compras-page .fi-ta-cell-ver-itens::after,
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8)::after {
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9)::after {
     content: '';
     position: absolute;
     top: 0;
@@ -597,20 +714,1991 @@
     padding: 1rem;
 }
 
+/* Precificação acima do Lançamento (380) e do Importar XML (370) */
+.erp-compras-page .erp-lookup-modal.erp-prod-precificacao-modal {
+    z-index: 500;
+    padding: 0.35rem;
+}
+
+/* Inputs/botões iguais ao cadastro de produto (erp-form-ui + produtos-form) */
+.erp-compras-page .erp-prod-precificacao-modal .erp-pcad-form__input {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 0.8rem;
+}
+
+.erp-compras-page .erp-prod-precificacao-modal .erp-pcad-form__input:focus {
+    outline: none !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 22%) !important;
+}
+
 .erp-compras-page .erp-lookup-modal__backdrop {
     position: absolute;
     inset: 0;
     background: rgb(0 0 0 / 35%);
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__window {
+
+
+/* ── Lançamento de Compras — mesmo visual do Importar XML ───────── */
+
+.erp-lookup-modal.erp-compras-lancamento-modal {
+    z-index: 380;
+    padding: 0.25rem;
+}
+
+.erp-compras-lancamento-modal .erp-lookup-modal__backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgb(15 23 42 / 50%);
+}
+
+.erp-lookup-modal.erp-compras-lancamento-modal .erp-compras-lancamento-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(calc(100vw - 0.5rem), calc(78rem + 8cm));
+    height: min(calc(100vh - 0.5rem), calc(52rem + 8cm));
+    max-height: calc(100vh - 0.5rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #8fa8c8;
+    border-radius: 10px;
+    background: linear-gradient(165deg, #c8d9ec 0%, #d4e2f2 40%, #dce8f4 100%);
+    box-shadow:
+        0 24px 48px rgb(15 52 96 / 32%),
+        0 0 0 1px rgb(255 255 255 / 35%) inset;
+}
+
+.erp-compras-lancamento-modal__titlebar {
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    border-bottom: 1px solid #0a2548;
+}
+
+.erp-lookup-modal.erp-compras-lancamento-modal .erp-compras-lancamento-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.55rem 0.65rem 0.7rem;
+    overflow: hidden;
+}
+
+.erp-compras-lancamento-modal__panel {
+    flex-shrink: 0;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset;
+}
+
+.erp-compras-lancamento-modal__panel--itens {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.4rem;
+}
+
+.erp-compras-lancamento-modal__panel--rodape {
+    padding: 0.35rem 0.45rem 0.45rem;
+}
+
+.erp-compras-lancamento-modal__toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__tool-group {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    padding: 0.3rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 8px;
+    background: #d7e4f3;
+}
+
+.erp-compras-lancamento-modal__tool-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.12rem;
+    min-width: 5.4rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #7f98b8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e8f0fa 100%);
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 700;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 80%) inset;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+}
+
+.erp-compras-lancamento-modal__tool-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffffff 0%, #deebf8 100%);
+}
+
+.erp-compras-lancamento-modal__tool-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-compras-lancamento-modal__tool-btn--ok {
+    border-color: #15803d;
+    background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%);
+    color: #14532d;
+}
+
+.erp-compras-lancamento-modal__tool-btn--exit {
+    border-color: #b91c1c;
+    background: linear-gradient(180deg, #fef2f2 0%, #fecaca 100%);
+    color: #7f1d1d;
+}
+
+.erp-compras-lancamento-modal__tool-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.erp-compras-lancamento-modal__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 8px;
+    background: #f4f8fc;
+}
+
+.erp-compras-lancamento-modal__fields-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.5rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__field > span,
+.erp-compras-lancamento-modal__field-label-row > span:first-child {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.erp-compras-lancamento-modal__field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.erp-compras-lancamento-modal__status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid #93c5fd;
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+
+.erp-compras-lancamento-modal__status-badge.is-fechada {
+    border-color: #86efac;
+    background: #dcfce7;
+    color: #166534;
+}
+
+.erp-compras-lancamento-modal__status-badge.is-alterando {
+    border-color: #fcd34d;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.erp-compras-lancamento-modal__status-badge.is-cancelada {
+    border-color: #fca5a5;
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.erp-compras-lancamento-modal__info {
+    display: flex;
+    align-items: center;
+    height: 1.65rem;
+    width: 100%;
+    padding: 0 0.4rem;
+    border: 1px solid #b7c9de;
+    border-radius: 3px;
+    background: #e8eef6;
+    box-shadow: none;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #334155;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: text;
+    cursor: default;
+}
+
+.erp-compras-lancamento-modal__info--center {
+    justify-content: center;
+    text-align: center;
+}
+
+.erp-compras-lancamento-modal__info--mono {
+    font-family: ui-monospace, Consolas, monospace;
+    letter-spacing: 0.02em;
+    font-size: 0.7rem;
+}
+
+.erp-compras-lancamento-modal__field--xs { flex: 0 0 4.2rem; }
+.erp-compras-lancamento-modal__field--sm { flex: 0 0 5.4rem; }
+.erp-compras-lancamento-modal__field--uf { flex: 0 0 2.6rem; }
+.erp-compras-lancamento-modal__field--date { flex: 0 0 7rem; }
+.erp-compras-lancamento-modal__field--doc { flex: 0 0 9.5rem; }
+.erp-compras-lancamento-modal__field--empresa { flex: 0 0 11rem; }
+.erp-compras-lancamento-modal__field--grow { flex: 1 1 14rem; min-width: 12rem; }
+.erp-compras-lancamento-modal__field--chave { flex: 1 1 22rem; min-width: 16rem; }
+
+.erp-compras-lancamento-modal__main {
+    display: flex;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.erp-compras-lancamento-modal__romaneio-bar {
+    position: relative;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(14rem, 0.8fr) minmax(20rem, 1.2fr);
+    gap: 0.55rem;
+    flex-shrink: 0;
+    padding: 0.45rem;
+    border: 1px solid #b7c9de;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #f7fbff 0%, #e8f1fb 100%);
+}
+
+/* Inclusão de romaneio: mesma apresentação da barra de itens da NF-e. */
+.erp-compras-page .erp-compras-inclusao {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 30;
+    margin-top: 0.35rem;
+    padding-top: 0.15rem;
+    overflow: visible;
+}
+
+.erp-compras-page .erp-compras-inclusao[data-lookup-open="1"] {
+    z-index: 60;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__box {
+    position: relative;
+    padding: 0.55rem 0.5rem 0.35rem;
+    border: 1px solid #9eb6d4;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    overflow: visible;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__legend {
+    position: absolute;
+    top: -0.55rem;
+    left: 0.65rem;
+    z-index: 2;
+    padding: 0 0.25rem;
+    background: #e4edf7;
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field > span {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #0f3460;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field--barcode { flex: 1 1 14rem; min-width: 12rem; overflow: visible; }
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field--qtd { flex: 0 0 5.5rem; }
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field--preco { flex: 0 0 8.5rem; }
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__field--total { flex: 0 0 7rem; }
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__barcode-wrap {
+    position: relative;
+    display: block;
+    min-width: 0;
+    overflow: visible;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__input {
+    width: 100%;
+    min-height: 1.85rem;
+    height: 1.85rem;
+    padding: 0.28rem 0.45rem;
+    border: 1px solid #7f9bb8;
+    border-radius: 6px;
+    background: #fff9e8;
+    color: #0f3460;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    line-height: 1.25;
+    box-sizing: border-box;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 5%);
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fffef8;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 16%);
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__input--barcode { text-transform: uppercase; }
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__input--total {
+    border-width: 2px;
+    border-color: #1e5a9e;
+    background: #fff;
+    font-weight: 700;
+    text-align: right;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest-wrap {
+    position: absolute;
+    z-index: 90;
+    top: calc(100% + 2px);
+    left: 0;
+    width: min(42rem, 92vw);
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest {
+    width: 100%;
+    max-height: min(320px, 45vh);
+    margin: 0;
+    padding: 0.2rem;
+    overflow: auto;
+    list-style: none;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgb(15 23 42 / 22%);
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest button {
+    display: grid;
+    grid-template-columns: 3.2rem minmax(0, 1fr) 5.2rem;
+    gap: 0.35rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.3rem 0.45rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #0f172a;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    text-align: left;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest button:hover { background: #eff6ff; }
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest button.is-selected { background: #1e5a9e; color: #fff; box-shadow: inset 0 0 0 1px #0f3460; }
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.35rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest-nome {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest-preco {
+    color: #1e5a9e;
+    font-weight: 800;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest button.is-selected .erp-nfe-inclusao__suggest-code {
+    background: rgb(255 255 255 / 20%);
+    color: #fff;
+}
+
+.erp-compras-page .erp-compras-inclusao .erp-nfe-inclusao__suggest button.is-selected .erp-nfe-inclusao__suggest-preco { color: #fff; }
+
+.erp-compras-lancamento-modal__romaneio-group {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-compras-lancamento-modal__romaneio-group[data-lookup-open="1"] {
+    z-index: 20;
+}
+
+.erp-compras-lancamento-modal__romaneio-fornecedor-wrap {
+    position: relative;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__romaneio-item {
+    display: grid;
+    grid-template-columns: minmax(18rem, 1fr) 3.7rem 4.3rem 5rem 1.8rem;
+    align-items: end;
+    gap: 0.3rem;
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field > span {
+    display: block;
+    margin-bottom: 0.12rem;
+    color: #173b69;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field input {
+    width: 100%;
+    height: 1.7rem;
+    padding: 0.2rem 0.38rem;
+    border: 1px solid #9fb7d4;
+    border-radius: 3px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.72rem;
+    outline: none;
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field input:focus {
+    border-color: #1e5a9e;
+    box-shadow: 0 0 0 2px rgb(30 90 158 / 18%);
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field--qtd input,
+.erp-compras-lancamento-modal__romaneio-item-field--valor input,
+.erp-compras-lancamento-modal__romaneio-item-field--total input {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-lancamento-modal__romaneio-item-field--total input {
+    border-color: #8eb5d9;
+    background: #edf5ff;
+    color: #174b82;
+    font-weight: 800;
+}
+
+.erp-compras-lancamento-modal__romaneio-add {
+    height: 1.7rem;
+    border: 1px solid #147443;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #22a65e 0%, #16834a 100%);
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.erp-compras-lancamento-modal__romaneio-add:hover {
+    background: linear-gradient(180deg, #28b968 0%, #11783f 100%);
+}
+
+.erp-compras-lancamento-modal__romaneio-group label {
+    color: #173b69;
+    font-size: 0.69rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-compras-lancamento-modal__romaneio-group input {
+    width: 100%;
+    min-width: 0;
+    height: 1.7rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid #9fb7d4;
+    border-radius: 3px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.73rem;
+    outline: none;
+}
+
+.erp-compras-lancamento-modal__romaneio-group input:focus {
+    border-color: #1e5a9e;
+    box-shadow: 0 0 0 2px rgb(30 90 158 / 18%);
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 14rem;
+    overflow: auto;
+    border: 1px solid #8faeca;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgb(15 52 96 / 24%);
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.38rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid #dbe7f3;
+    background: #fff;
+    color: #1e293b;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.72rem;
+    text-align: left;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button:hover {
+    background: #e8f2ff;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button.is-selected {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    color: #fff;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button.is-selected strong,
+.erp-compras-lancamento-modal__romaneio-lookup button.is-selected em {
+    color: #dbeafe;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button strong {
+    color: #174b82;
+    font-size: 0.69rem;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button span {
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-compras-lancamento-modal__romaneio-lookup button em {
+    color: #64748b;
+    font-size: 0.66rem;
+    font-style: normal;
+}
+
+.erp-compras-lancamento-modal__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #6b86a8;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: inset 0 1px 3px rgb(15 52 96 / 10%);
+}
+
+.erp-compras-lancamento-modal__grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.72rem;
+}
+
+.erp-compras-lancamento-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.22rem 0.18rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+    border-bottom: 1px solid #0a2548;
+    border-right: 1px solid #2a6bb0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-lancamento-modal__grid th:last-child,
+.erp-compras-lancamento-modal__grid td:last-child {
+    border-right: none;
+}
+
+/* Fixas compactas; Produto (4) cresce e preenche o espaço.
+   Colunas: 1 Item, 2 Código, 3 Ref, 4 Produto, 5 Qtd, 6 Lotes,
+   7 Preço Comp, 8 V.Custo, 9 Mg%, 10 Varejo, 11 Mg%, 12 Atacado, 13 Mg%, 14 Especial, 15 %. */
+.erp-compras-lancamento-modal__grid th:nth-child(1),
+.erp-compras-lancamento-modal__grid td:nth-child(1) { width: 0.75cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(2),
+.erp-compras-lancamento-modal__grid td:nth-child(2) { width: 1.45cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(3),
+.erp-compras-lancamento-modal__grid td:nth-child(3) { width: 1.85cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(4),
+.erp-compras-lancamento-modal__grid td:nth-child(4) {
+    width: auto;
+    min-width: 7cm;
+    text-align: left;
+}
+.erp-compras-lancamento-modal__grid th:nth-child(5),
+.erp-compras-lancamento-modal__grid td:nth-child(5) { width: 1.7cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(6),
+.erp-compras-lancamento-modal__grid td:nth-child(6) { width: 1.85cm; }
+
+.erp-compras-lancamento-modal__cell--lotes {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.erp-compras-lancamento-modal__lotes-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(100% - 0.12rem);
+    max-width: 100%;
+    min-height: 0;
+    height: 1.35rem;
+    margin: 0 auto;
+    padding: 0 0.25rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 2px;
+    background: #fff;
+    color: #0f3460;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 8%);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-compras-lancamento-modal__lotes-btn:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__lotes-btn {
+    border-color: #93c5fd;
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+    box-shadow: none;
+}
+.erp-compras-lancamento-modal__grid th:nth-child(7),
+.erp-compras-lancamento-modal__grid td:nth-child(7) { width: 2.15cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(8),
+.erp-compras-lancamento-modal__grid td:nth-child(8) { width: 1.85cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(9),
+.erp-compras-lancamento-modal__grid td:nth-child(9) { width: 1.35cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(10),
+.erp-compras-lancamento-modal__grid td:nth-child(10) { width: 2.05cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(11),
+.erp-compras-lancamento-modal__grid td:nth-child(11) { width: 1.35cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(12),
+.erp-compras-lancamento-modal__grid td:nth-child(12) { width: 2.05cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(13),
+.erp-compras-lancamento-modal__grid td:nth-child(13) { width: 1.35cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(14),
+.erp-compras-lancamento-modal__grid td:nth-child(14) { width: 2.05cm; }
+.erp-compras-lancamento-modal__grid th:nth-child(15),
+.erp-compras-lancamento-modal__grid td:nth-child(15) { width: 0.95cm; }
+
+/* Pares Mg%/preço por nível — mesma paleta das caixas de margem do rodapé:
+   9-10 varejo (verde), 11-12 atacado (azul), 13-14 especial (laranja). */
+.erp-compras-lancamento-modal__grid th:nth-child(9),
+.erp-compras-lancamento-modal__grid th:nth-child(10) {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    border-right-color: #4ade80;
+}
+
+.erp-compras-lancamento-modal__grid th:nth-child(11),
+.erp-compras-lancamento-modal__grid th:nth-child(12) {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    border-right-color: #60a5fa;
+}
+
+.erp-compras-lancamento-modal__grid th:nth-child(13),
+.erp-compras-lancamento-modal__grid th:nth-child(14) {
+    background: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+    border-right-color: #fb923c;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(9),
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(10) {
+    background: #dcfce7;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(11),
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(12) {
+    background: #dbeafe;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(13),
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(14) {
+    background: #ffedd5;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(9),
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(10) {
+    background: #bbf7d0;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(11),
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(12) {
+    background: #bfdbfe;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(13),
+.erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(14) {
+    background: #fed7aa;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(9) .erp-compras-lancamento-modal__cell-input,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(9) .erp-compras-lancamento-modal__cell-input--readonly,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(10) .erp-compras-lancamento-modal__money--field {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(11) .erp-compras-lancamento-modal__cell-input,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(11) .erp-compras-lancamento-modal__cell-input--readonly,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(12) .erp-compras-lancamento-modal__money--field {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(13) .erp-compras-lancamento-modal__cell-input,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(13) .erp-compras-lancamento-modal__cell-input--readonly,
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(14) .erp-compras-lancamento-modal__money--field {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(10) .erp-compras-lancamento-modal__money-rs {
+    color: #166534;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(12) .erp-compras-lancamento-modal__money-rs {
+    color: #1e40af;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr:not(.erp-compras-lancamento-modal__row--selected) td:nth-child(14) .erp-compras-lancamento-modal__money-rs {
+    color: #9a3412;
+}
+
+.erp-compras-lancamento-modal__pct-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 1.2rem;
+    padding: 0.05rem;
+    border: 1px solid #7f98b8;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    color: #0f3460;
+    font-size: 0.68rem;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
+}
+
+.erp-compras-lancamento-modal__pct-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffffff 0%, #deebf8 100%);
+}
+
+.erp-compras-lancamento-modal__pct-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__pct-btn {
+    border-color: #93c5fd;
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+}
+
+.erp-compras-lancamento-modal__grid td {
+    padding: 0.08rem 0.1rem;
+    border-bottom: 1px solid #c5d4e8;
+    border-right: 1px solid #c5d4e8;
+    vertical-align: middle;
+    background: #e5e7eb;
+    color: #0f172a;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr td {
+    background: #e5e7eb;
+}
+
+.erp-compras-lancamento-modal__cell-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0.1rem 0.18rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 2px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 8%);
+}
+
+.erp-compras-lancamento-modal__cell-input:focus {
+    outline: none;
+    border-color: #93c5fd;
+    background: rgb(255 255 255 / 14%);
+    color: #fff;
+    box-shadow: none;
+}
+
+.erp-compras-lancamento-modal__cell-input--codigo {
+    text-align: left;
+}
+
+.erp-compras-lancamento-modal__cell-input--desc {
+    text-align: left;
+}
+
+.erp-compras-lancamento-modal__cell-input--readonly {
+    cursor: default;
+    background: #f3f4f6;
+    color: inherit;
+    box-shadow: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-compras-lancamento-modal__cell-input--num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-lancamento-modal__cell-input--center {
+    text-align: center;
+}
+
+.erp-compras-lancamento-modal__money {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    justify-content: flex-start;
+    padding-left: 0.18rem;
+    padding-right: 0.18rem;
+}
+
+.erp-compras-lancamento-modal__money-rs {
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    line-height: 1;
+}
+
+.erp-compras-lancamento-modal__money-val {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.erp-compras-lancamento-modal__money--field {
+    min-width: 0;
+    height: auto;
+    padding: 0 0.12rem 0 0.18rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 8%);
+}
+
+.erp-compras-lancamento-modal__money-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0.1rem 0.12rem 0.1rem 0 !important;
+}
+
+.erp-compras-lancamento-modal__money-input:focus {
+    outline: none;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: inherit;
+}
+
+.erp-compras-lancamento-modal__row {
+    cursor: pointer;
+}
+
+.erp-compras-lancamento-modal__row .erp-compras-lancamento-modal__cell-input {
+    cursor: pointer;
+}
+
+.erp-compras-lancamento-modal__row .erp-compras-lancamento-modal__cell-input:not([readonly]):not(.erp-compras-lancamento-modal__cell-input--readonly) {
+    cursor: text;
+}
+
+.erp-compras-lancamento-modal__row:hover:not(.erp-compras-lancamento-modal__row--selected) td {
+    background: #d1d5db;
+}
+
+/* Linha selecionada — azul na linha inteira (incl. Varejo/Atacado/Especial/%), com contorno das células */
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected td {
+    background: #1d4ed8 !important;
+    border-bottom-color: #3b82f6 !important;
+    border-right-color: #3b82f6 !important;
+    color: #fff;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__cell-input {
+    border-color: rgb(255 255 255 / 45%) !important;
+    background: rgb(255 255 255 / 10%) !important;
+    color: #fff !important;
+    box-shadow: none;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__cell-input--readonly {
+    background: rgb(255 255 255 / 8%) !important;
+    color: #fff !important;
+    border-color: rgb(255 255 255 / 40%) !important;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__money-rs {
+    color: #bfdbfe !important;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__money--field {
+    border-color: rgb(255 255 255 / 45%) !important;
+    background: rgb(255 255 255 / 10%) !important;
+    box-shadow: none;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__money-input {
+    color: #fff !important;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__money--field:focus-within {
+    border-color: #93c5fd !important;
+    background: rgb(255 255 255 / 18%) !important;
+}
+
+.erp-compras-lancamento-modal__grid tbody tr.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__pct-btn {
+    border-color: rgb(255 255 255 / 55%) !important;
+    background: rgb(255 255 255 / 16%) !important;
+    color: #fff !important;
+    box-shadow: none;
+}
+
+/* Campo em foco — acompanha a linha azul */
+.erp-compras-lancamento-modal__cell-input:focus,
+.erp-compras-lancamento-modal__cell-input:not(.erp-compras-lancamento-modal__cell-input--readonly):focus,
+.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__cell-input:not(.erp-compras-lancamento-modal__cell-input--readonly):focus {
+    outline: none;
+    border-color: #93c5fd;
+    background: rgb(255 255 255 / 14%);
+    color: #fff;
+    box-shadow: none;
+}
+
+/* Seleção do texto: inverso (fundo branco, número escuro) */
+.erp-compras-lancamento-modal__cell-input::selection,
+.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__cell-input::selection {
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-compras-lancamento-modal__cell-input::-moz-selection,
+.erp-compras-lancamento-modal__row--selected .erp-compras-lancamento-modal__cell-input::-moz-selection {
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-compras-lancamento-modal__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-lancamento-modal__center { text-align: center; }
+
+.erp-compras-lancamento-modal__empty {
+    text-align: center;
+    color: #64748b;
+    padding: 1rem !important;
+    background: #fff !important;
+}
+
+.erp-compras-lancamento-modal__rodape-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) 10.5rem minmax(0, 1fr);
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__margens {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__radio-row--inline {
+    display: inline-flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.18rem;
+    margin: 0;
+    padding: 0 0.25rem;
+    height: 1.4rem;
+    min-height: 1.4rem;
+    max-height: 1.4rem;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid #c5d4e6;
+    border-radius: 3px;
+    background: #f8fafc;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.erp-compras-lancamento-modal__radio-row--inline > span {
+    font-size: 0.58rem !important;
+    font-weight: 700 !important;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    line-height: 1;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.erp-compras-lancamento-modal__radio-row--inline label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin: 0 !important;
+    padding: 0;
+    font-size: 0.62rem !important;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.erp-compras-lancamento-modal__radio-row--inline input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 0.58rem;
+    height: 0.58rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #64748b;
+    border-radius: 50%;
+    background: #fff;
+    flex: 0 0 auto;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.erp-compras-lancamento-modal__radio-row--inline input[type="radio"]:checked {
+    border-color: #1d4ed8;
+    background: radial-gradient(circle at center, #1d4ed8 0 35%, #fff 38% 100%);
+}
+
+.erp-compras-lancamento-modal__margens-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__box {
+    margin: 0;
+    padding: 0.4rem 0.5rem 0.5rem;
+    border: 1px solid #9eb4ce;
+    border-radius: 8px;
+    background: #f4f8fc;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__box--varejo {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.erp-compras-lancamento-modal__box--varejo h3 {
+    color: #166534;
+}
+
+.erp-compras-lancamento-modal__box--varejo .erp-compras-lancamento-modal__margem-btn {
+    border-color: #16a34a;
+    background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%);
+    color: #14532d;
+}
+
+.erp-compras-lancamento-modal__box--atacado {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.erp-compras-lancamento-modal__box--atacado h3 {
+    color: #1e40af;
+}
+
+.erp-compras-lancamento-modal__box--atacado .erp-compras-lancamento-modal__margem-btn {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #eff6ff 0%, #bfdbfe 100%);
+    color: #1e3a8a;
+}
+
+.erp-compras-lancamento-modal__box--especial {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+.erp-compras-lancamento-modal__box--especial h3 {
+    color: #9a3412;
+}
+
+.erp-compras-lancamento-modal__box--especial .erp-compras-lancamento-modal__margem-btn {
+    border-color: #ea580c;
+    background: linear-gradient(180deg, #fff7ed 0%, #fed7aa 100%);
+    color: #7c2d12;
+}
+
+.erp-compras-lancamento-modal__box h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.erp-compras-lancamento-modal__radio-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.74rem;
+    color: #334155;
+}
+
+.erp-compras-lancamento-modal__radio-row label,
+.erp-compras-lancamento-modal__check {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.74rem;
+    color: #334155;
+    margin-top: 0.2rem;
+}
+
+.erp-compras-lancamento-modal__margem-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.2rem;
+    margin-bottom: 0.35rem;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-compras-lancamento-modal__margem-row > input[type="text"] {
+    width: 4.5rem;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
+    height: 1.55rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 3px;
+    padding: 0 0.35rem;
+    background: #fff;
+    font-size: 0.76rem;
+    box-sizing: border-box;
+    flex: 0 0 4.5rem;
+}
+
+.erp-compras-lancamento-modal__margem-row > span {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #0f3460;
+    flex: 0 0 auto;
+}
+
+.erp-compras-lancamento-modal__formula {
+    margin: 0;
+    font-size: 0.7rem;
+    color: #475569;
+    line-height: 1.35;
+}
+
+.erp-compras-lancamento-modal__formula strong {
+    color: #0f3460;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-lancamento-modal__margem-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0.45rem;
+    min-height: 1.85rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #7f98b8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
+}
+
+.erp-compras-lancamento-modal__margem-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #ffffff 0%, #deebf8 100%);
+}
+
+.erp-compras-lancamento-modal__margem-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.erp-compras-lancamento-modal__totais-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.3rem 0.4rem;
+}
+
+.erp-compras-lancamento-modal__total-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    min-width: 0;
+}
+
+.erp-compras-lancamento-modal__total-field span {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-compras-lancamento-modal__total-field input {
+    height: 1.5rem;
+    width: 100%;
+    border: 1px solid #8fa8c8;
+    border-radius: 3px;
+    background: #fff;
+    text-align: right;
+    font-size: 0.74rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    padding: 0 0.3rem;
+    color: #0f172a;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 8%);
+}
+
+.erp-compras-lancamento-modal__total-field input.is-total {
+    background: #dbeafe;
+    border-color: #1e5a9e;
+    font-weight: 800;
+    color: #0f3460;
+}
+
+.erp-compras-lancamento-modal__total-field input.is-editable {
+    background: #fffbeb;
+    border-color: #ca8a04;
+    cursor: text;
+}
+
+.erp-compras-lancamento-modal__total-field input.is-editable:focus {
+    outline: 2px solid #1e5a9e;
+    outline-offset: 0;
+    border-color: #1e5a9e;
+    background: #fff;
+}
+
+.erp-compras-lancamento-modal__total-field--st span {
+    color: #92400e;
+}
+
+.erp-compras-lancamento-modal__total-field--st input {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.fi-body:has(.erp-compras-lancamento-modal) .fi-no {
+    z-index: 700 !important;
+}
+
+/* Confirmação Finalizar Compra */
+.erp-compras-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 860;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-compras-confirm-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.erp-compras-confirm-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(26rem, calc(100vw - 2rem));
+    border: 1px solid #7f96b3;
+    border-radius: 12px;
+    background: #f8fafc;
+    box-shadow: 0 22px 56px rgba(15, 40, 71, 0.42);
+    overflow: hidden;
+}
+
+.erp-compras-confirm-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.erp-compras-confirm-modal__close {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-compras-confirm-modal__close:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.erp-compras-confirm-modal__body {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1.15rem 1.1rem 0.75rem;
+}
+
+.erp-compras-confirm-modal__icon {
+    flex: 0 0 auto;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.erp-compras-confirm-modal__message {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.erp-compras-confirm-modal__message strong {
+    font-weight: 800;
+}
+
+.erp-compras-confirm-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    padding: 0.65rem 1.1rem 1rem;
+}
+
+.erp-compras-confirm-modal__btn {
+    min-width: 5.4rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-compras-confirm-modal__btn--yes {
+    border: 1px solid #1d4ed8;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.erp-compras-confirm-modal__btn--no {
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #0f172a;
+}
+
+/* Contas à Pagar — Parcelas (finalizar compra) */
+.erp-compras-parcelas-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 870;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-compras-parcelas-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+}
+
+.erp-compras-parcelas-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(58rem, calc(100vw - 2rem));
+    max-height: min(36rem, calc(100vh - 2rem));
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #7f96b3;
+    border-radius: 12px;
+    background: #f8fafc;
+    box-shadow: 0 24px 60px rgba(15, 40, 71, 0.4);
+    overflow: hidden;
+}
+
+.erp-compras-parcelas-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.8rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.erp-compras-parcelas-modal__close {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-compras-parcelas-modal__close:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.erp-compras-parcelas-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem 0.9rem 0.5rem;
+    min-height: 0;
+    flex: 1;
+}
+
+.erp-compras-parcelas-modal__params {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.55rem 0.65rem;
+}
+
+.erp-compras-parcelas-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 6.5rem;
+    flex: 1 1 6.5rem;
+}
+
+.erp-compras-parcelas-modal__field--sm {
+    flex: 0 0 4.5rem;
+    min-width: 4.5rem;
+}
+
+.erp-compras-parcelas-modal__field span {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.01em;
+}
+
+.erp-compras-parcelas-modal__field input {
+    height: 2rem;
+    padding: 0 0.5rem;
+    border: 1px solid #94a3b8;
+    border-radius: 7px;
+    background: #fff;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-compras-parcelas-modal__field input[readonly] {
+    background: #e2e8f0;
+    color: #0f3460;
+    font-weight: 800;
+}
+
+.erp-compras-parcelas-modal__field input:focus {
+    outline: 2px solid #1e5a9e;
+    outline-offset: 0;
+    border-color: #1e5a9e;
+}
+
+.erp-compras-parcelas-modal__btn--gerar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #475569 0%, #334155 100%);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-compras-parcelas-modal__btn--gerar:hover {
+    filter: brightness(1.06);
+}
+
+.erp-compras-parcelas-modal__btn-icon {
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.erp-compras-parcelas-modal__grid-wrap {
+    flex: 1;
+    min-height: 10rem;
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.erp-compras-parcelas-modal__grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+
+.erp-compras-parcelas-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.45rem 0.55rem;
+    background: #e2e8f0;
+    border-bottom: 1px solid #94a3b8;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #0f3460;
+}
+
+.erp-compras-parcelas-modal__grid th:nth-child(1) { width: 16%; }
+.erp-compras-parcelas-modal__grid th:nth-child(2) { width: 14%; }
+.erp-compras-parcelas-modal__grid th:nth-child(3) { width: 28%; }
+.erp-compras-parcelas-modal__grid th:nth-child(4) { width: 24%; }
+.erp-compras-parcelas-modal__grid th:nth-child(5) { width: 18%; }
+
+.erp-compras-parcelas-modal__grid th.is-num,
+.erp-compras-parcelas-modal__grid td.is-num {
+    text-align: right;
+}
+
+.erp-compras-parcelas-modal__grid td {
+    padding: 0.2rem 0.35rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-compras-parcelas-modal__grid tbody tr {
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.erp-compras-parcelas-modal__grid tbody tr:hover td {
+    background: #e8f2ff;
+}
+
+.erp-compras-parcelas-modal__grid tr.is-selected td {
+    background: #dbeafe;
+}
+
+.erp-compras-parcelas-modal__grid td input,
+.erp-compras-parcelas-modal__grid td select {
+    width: 100%;
+    height: 1.85rem;
+    padding: 0 0.4rem;
+    border: 1px solid #b8c9dc;
+    border-radius: 5px;
+    background: #fff;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #0f172a;
+    box-shadow: inset 0 1px 1px rgb(15 52 96 / 5%);
+}
+
+.erp-compras-parcelas-modal__grid td select {
+    cursor: pointer;
+    background: #fff;
+    border-color: #cbd5e1;
+}
+
+.erp-compras-parcelas-modal__grid td input.is-num {
+    text-align: right;
+    color: #123d70;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-parcelas-modal__grid td input:focus,
+.erp-compras-parcelas-modal__grid td select:focus {
+    outline: none;
+    border-color: #1e5a9e;
+    background: #fff;
+}
+
+.erp-compras-parcelas-modal__caixa-na {
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+.erp-compras-parcelas-modal__empty {
+    padding: 1.25rem 0.75rem !important;
+    text-align: center;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.erp-compras-parcelas-modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem 0.85rem;
+    border-top: 1px solid #7f96b3;
+    background: linear-gradient(180deg, #d6e4f5 0%, #b8cce8 100%);
+}
+
+.erp-compras-parcelas-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.erp-compras-parcelas-modal__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.35rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #94a3b8;
+    border-radius: 9px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-compras-parcelas-modal__action:hover {
+    background: #f1f5f9;
+}
+
+.erp-compras-parcelas-modal__action--cancel {
+    border-color: #94a3b8;
+}
+
+.erp-compras-parcelas-modal__action--ok {
+    border-color: #15803d;
+    background: linear-gradient(180deg, #86efac 0%, #4ade80 100%);
+    color: #14532d;
+}
+
+.erp-compras-parcelas-modal__action--ok:hover {
+    filter: brightness(1.03);
+}
+
+.erp-compras-parcelas-modal__action:disabled,
+.erp-compras-parcelas-modal__action--ok:disabled {
+    border-color: #cbd5e1;
+    background: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+    filter: grayscale(1);
+    opacity: 1;
+    box-shadow: none;
+}
+
+.erp-compras-parcelas-modal__action:disabled:hover,
+.erp-compras-parcelas-modal__action--ok:disabled:hover {
+    background: #e2e8f0;
+    filter: grayscale(1);
+}
+
+.erp-compras-parcelas-modal__total {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f3460;
+}
+
+.erp-compras-parcelas-modal__total strong {
+    font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+    .erp-compras-lancamento-modal__toolbar {
+        flex-wrap: wrap;
+    }
+
+    .erp-compras-lancamento-modal__rodape-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-compras-lancamento-modal__margens-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-compras-lancamento-modal__totais-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* Modal Fechar Mês / e-mail contador — mesmo padrão NF-e (erp-orc-email-modal) */
+.erp-compras-page .erp-orc-email-modal {
+    z-index: 420;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__backdrop {
+    background: rgb(0 0 0 / 35%);
+    backdrop-filter: none;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy[wire\:loading],
+.erp-compras-page .erp-orc-email-modal__busy[style*="display: flex"] {
+    display: flex !important;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-panel {
+    position: relative;
+    z-index: 1;
+    width: min(22rem, 100%);
+    padding: 1rem 1.1rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #86efac;
+    background: linear-gradient(180deg, #f8fffb 0%, #eefcf3 100%);
+    box-shadow: 0 18px 40px rgba(15, 40, 71, 0.28);
+    text-align: center;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-spinner {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0 auto 0.55rem;
+    border: 2.5px solid #bbf7d0;
+    border-top-color: var(--erp-brand-accent-soft, #16a34a);
+    border-radius: 999px;
+    animation: erp-compras-email-busy-spin 0.7s linear infinite;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-status {
+    margin: 0 0 0.55rem;
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #14532d;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #86efac;
+    background: #ecfdf5;
+    overflow: hidden;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-bar {
+    height: 100%;
+    width: 38%;
+    border-radius: inherit;
+    background: linear-gradient(
+        90deg,
+        var(--erp-brand-accent, #15803d) 0%,
+        var(--erp-brand-accent-soft, #16a34a) 45%,
+        #4ade80 100%
+    );
+    background-size: 200% 100%;
+    animation: erp-compras-email-busy-slide 1.05s ease-in-out infinite;
+}
+
+.erp-compras-page .erp-orc-email-modal__busy-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-pcad-actions__btn.is-busy {
+    opacity: 0.92;
+    cursor: wait;
+}
+
+@keyframes erp-compras-email-busy-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes erp-compras-email-busy-slide {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(280%); }
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__window {
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
-    width: min(92rem, calc(100vw - 1rem));
-    height: min(44rem, calc(100vh - 1.5rem));
-    max-height: calc(100vh - 1.5rem);
+    width: min(34rem, calc(100vw - 2rem));
     border: 1px solid var(--erp-brand-primary-dark, #0f3460);
     border-radius: var(--erp-radius-md, 8px);
     background: var(--erp-bg-app, #e3ecf7);
@@ -618,485 +2706,494 @@
     overflow: hidden;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__titlebar {
-    flex-shrink: 0;
-}
-
-.erp-compras-page .erp-lookup-modal__titlebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
-    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
-    color: var(--erp-text-inverse, #fff);
-    font-size: 0.82rem;
-    font-weight: 700;
-}
-
-.erp-compras-page .erp-lookup-modal__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.15);
-    color: var(--erp-text-inverse, #fff);
-    line-height: 1;
-    cursor: pointer;
-    font-size: 0.72rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__body {
+.erp-compras-page .erp-orc-email-modal__body {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.45rem 0.55rem 0.55rem;
-    min-height: 0;
-    flex: 1;
-    overflow: hidden;
+    gap: 0.55rem;
+    padding: 0.75rem 0.85rem;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__toolbar {
-    display: flex;
-    align-items: stretch;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-shrink: 0;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__toolbar-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-width: 5.4rem;
-    height: 3rem;
-    padding: 0.25rem 0.4rem;
-    border: 1px solid #4a4a4a;
-    border-radius: 4px;
-    background: linear-gradient(180deg, #757575 0%, #5f5f5f 100%);
-    color: #fff;
-    cursor: pointer;
-    font-family: inherit;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%);
-    text-decoration: none;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, #828282 0%, #686868 100%);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-btn--exit {
-    background: linear-gradient(180deg, #8b3a3a 0%, #6d2d2d 100%);
-    border-color: #5a2424;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-icon {
-    font-size: 1rem;
-    line-height: 1;
-    margin-bottom: 0.15rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    line-height: 1.1;
-    text-align: center;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__tool-label kbd {
-    font: inherit;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__status-box {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    min-width: 8.5rem;
-    min-height: 3.2rem;
-    padding: 0.35rem 1rem;
-    border: 1px solid #9aa8b8;
-    border-radius: 4px;
-    background: #fff;
-    color: #000;
-    font-size: 1.05rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__header {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: var(--erp-radius-sm, 6px);
-    background: var(--erp-bg-panel, #fff);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 0.45rem 0.65rem;
-    min-height: 1.65rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.28rem;
-    min-width: 0;
-    flex: 0 0 auto;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-group--grow {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-label {
-    flex-shrink: 0;
-    font-size: calc(0.72rem + 1mm);
-    font-weight: 700;
-    line-height: 1.35rem;
-    color: #000;
-    white-space: nowrap;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.35rem;
-    padding: 0.1rem 0.3rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: 2px;
-    background: #fff;
-    color: #000;
-    font-size: 0.72rem;
-    font-weight: 600;
-    line-height: 1.15;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--xs {
-    width: 3rem;
-    flex: 0 0 auto;
-    justify-content: center;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--sm {
-    width: 5.5rem;
-    flex: 0 0 auto;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--date {
-    width: 6.2rem;
-    flex: 0 0 auto;
-    justify-content: center;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--doc {
-    width: 9.8rem;
-    flex: 0 0 auto;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--uf {
-    width: 2.4rem;
-    flex: 0 0 auto;
-    justify-content: center;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--empresa {
-    width: 12rem;
-    flex: 0 0 auto;
-    max-width: 12rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--fornecedor {
-    flex: 1 1 auto;
-    min-width: 10rem;
-    max-width: 100%;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--chave {
-    flex: 1 1 auto;
-    min-width: 12rem;
-    max-width: 100%;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.01em;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__form-input--margem {
-    width: 4.5rem;
-    min-height: 1.35rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid-hint {
-    margin: 0;
-    flex-shrink: 0;
-    font-size: 0.72rem;
-    color: #000;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid-wrap {
-    flex: 1 1 auto;
-    min-height: 8rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: var(--erp-radius-sm, 6px);
-    overflow: auto;
-    background: var(--erp-bg-panel, #fff);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--erp-font-size-grid, 0.8125rem);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding: 0.28rem 0.35rem;
-    text-align: left;
-    font-weight: 700;
-    color: var(--erp-text-inverse, #fff);
-    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
-    border-right: 1px solid rgb(255 255 255 / 25%);
-    border-bottom: 1px solid rgb(255 255 255 / 20%);
-    white-space: nowrap;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid td {
-    padding: 0.18rem 0.35rem;
-    border-right: 1px solid #b8c8d8;
-    border-bottom: 1px solid var(--erp-border-light, #d4e0ef);
-    vertical-align: middle;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid tbody tr:nth-child(even):not(.erp-lookup-modal__row--selected) td {
-    background: var(--erp-row-zebra, #f8fafc);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid tbody tr:hover:not(.erp-lookup-modal__row--selected) td {
-    background: var(--erp-row-hover, #e8f2ff);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__grid .erp-lookup-modal__row--selected td {
-    background: var(--erp-row-selected, #bfdbfe) !important;
-    color: var(--erp-text, #0f172a);
-    box-shadow: inset 3px 0 0 var(--erp-row-selected-border, #1d4ed8);
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__num {
-    text-align: right;
-    white-space: nowrap;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__center {
-    text-align: center;
-    white-space: nowrap;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__footer {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__footer-top {
+.erp-compras-page .erp-orc-email-modal__field {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
-    gap: 0.45rem 0.65rem;
+    grid-template-columns: 5.25rem minmax(0, 1fr);
+    gap: 0.45rem 0.55rem;
     align-items: center;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__footer-bottom {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.45rem 0.65rem;
+.erp-compras-page .erp-orc-email-modal__field:has(.erp-orc-email-modal__attachments) {
     align-items: start;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__fieldset {
-    margin: 0;
-    padding: 0.35rem 0.5rem 0.45rem;
+.erp-compras-page .erp-orc-email-modal__label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+}
+
+.erp-compras-page .erp-orc-email-modal__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.28rem 0.45rem;
     border: 1px solid var(--erp-border-light, #c7d5e8);
     border-radius: var(--erp-radius-sm, 6px);
-    background: var(--erp-bg-panel, #fff);
+    background: #fff;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.82rem;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__legend {
-    padding: 0 0.3rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: var(--erp-text-muted, #64748b);
+.erp-compras-page .erp-orc-email-modal__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgb(30 90 158 / 18%);
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__fieldset--aplicar {
+.erp-compras-page .erp-orc-email-modal__error {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: var(--erp-action-danger, #dc2626);
+}
+
+.erp-compras-page .erp-orc-email-modal__attachments {
     display: flex;
     flex-direction: column;
-    gap: 0.12rem;
-    min-width: 8.5rem;
+    gap: 0.15rem;
+    min-height: 5.5rem;
+    max-height: 8rem;
+    padding: 0.25rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    overflow: auto;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__radio,
-.erp-compras-page .erp-compras-lancamento-modal__check {
+.erp-compras-page .erp-orc-email-modal__attachment {
+    width: 100%;
+    padding: 0.2rem 0.35rem;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--erp-text, #0f172a);
+    font-family: inherit;
+    font-size: 0.78rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-compras-page .erp-orc-email-modal__attachment:hover {
+    background: rgb(30 90 158 / 8%);
+}
+
+.erp-compras-page .erp-orc-email-modal__attachment.is-selected {
+    background: rgb(30 90 158 / 16%);
+    outline: 1px solid var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-compras-page .erp-orc-email-modal__attachments-empty {
+    padding: 0.35rem;
+    color: var(--erp-text-muted, #64748b);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+.erp-compras-page .erp-orc-email-modal__actions {
+    padding: 0.45rem 0.65rem 0.55rem;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    background: transparent;
+    padding: 0;
+}
+
+/* !important: erp-produtos-form.css força botões compactos brancos em
+   .erp-lookup-modal__actions.erp-pcad-actions e some com o rótulo. */
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    min-width: 6.25rem !important;
+    height: 3rem !important;
+    padding: 0 0.6rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: var(--erp-radius-md, 8px) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: var(--erp-text, #0f172a) !important;
+    box-shadow: var(--erp-shadow-md, 0 4px 14px rgba(30, 90, 158, 0.14)) !important;
+    cursor: pointer;
+    font-family: inherit;
+    transition: filter var(--erp-transition, 0.15s ease), box-shadow var(--erp-transition, 0.15s ease);
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn:hover {
+    filter: brightness(1.06);
+    box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18)) !important;
+    transform: none !important;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
+    border-color: #15803d !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn[data-erp-key="WhatsApp"] {
+    background: linear-gradient(180deg, #25d366 0%, #128c7e 100%) !important;
+    border-color: #128c7e !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
+    border-color: #b91c1c !important;
+    color: var(--erp-text-inverse, #fff) !important;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.45rem !important;
+    height: 1.45rem !important;
+    margin: 0 0 0.15rem !important;
+    border-radius: 50% !important;
+    font-size: 0.85rem !important;
+    line-height: 1 !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: inherit !important;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__label {
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    white-space: nowrap;
+}
+
+.erp-compras-page .erp-orc-email-modal .erp-lookup-modal__actions.erp-pcad-actions .erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.32rem !important;
+    border-radius: 4px !important;
+    font-size: 0.68rem !important;
+    background: rgba(255, 255, 255, 0.22) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    color: var(--erp-text-inverse, #fff) !important;
+    font-weight: 700 !important;
+}
+
+/* Modal Lotes / validade (lancamento de compras) */
+.erp-compras-lotes-modal .erp-compras-lotes-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(34rem, calc(100vw - 1.5rem));
+    max-height: min(32rem, calc(100vh - 2rem));
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 20px 48px rgb(15 23 42 / 28%);
+    overflow: hidden;
+}
+
+.erp-compras-lotes-modal__titlebar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: #0f3460;
+    color: #fff;
+}
+
+.erp-compras-lotes-modal__title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.erp-compras-lotes-modal__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+}
+
+.erp-compras-lotes-modal__subtitle {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: rgb(255 255 255 / 78%);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 28rem;
+}
+
+.erp-compras-lotes-modal__close {
+    flex: 0 0 auto;
+    width: 1.75rem;
+    height: 1.75rem;
     display: inline-flex;
     align-items: center;
-    gap: 0.28rem;
-    font-size: 0.72rem;
-    color: #000;
-    white-space: nowrap;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__fieldset--parametros {
+.erp-compras-lotes-modal__close:hover {
+    background: rgb(255 255 255 / 14%);
+}
+
+.erp-compras-lotes-modal__body {
     display: flex;
     flex-direction: column;
-    gap: 0.12rem;
-    min-width: 11rem;
+    gap: 0.85rem;
+    padding: 1rem;
+    min-height: 0;
+    flex: 1 1 auto;
+    background: #f8fafc;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__check--disabled {
-    opacity: 0.65;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__margem-row {
+.erp-compras-lotes-modal__summary {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.65rem 1rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__percent {
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__apply-btn {
-    min-height: 1.45rem;
-    padding: 0.1rem 0.45rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: 3px;
-    background: #f3f4f6;
-    font-family: inherit;
-    font-size: 0.68rem;
-    font-weight: 700;
-    cursor: not-allowed;
-    opacity: 0.75;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__formula {
-    margin: 0;
-    font-size: calc(0.72rem + 1mm);
-    color: #000;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__fieldset--totais {
-    min-width: 0;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__totais-grid {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 0.28rem 0.35rem;
-}
-
-.erp-compras-page .erp-compras-lancamento-modal__total-field {
+.erp-compras-lotes-modal__summary-qtd {
     display: flex;
     flex-direction: column;
-    gap: 0.05rem;
-    min-width: 0;
+    gap: 0.1rem;
+    min-width: 6.5rem;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__total-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--erp-brand-primary, #1e5a9e);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.erp-compras-lotes-modal__summary-label {
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__total-value {
-    min-height: 1.25rem;
-    padding: 0.08rem 0.3rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: 2px;
+.erp-compras-lotes-modal__summary-value {
+    font-size: 1.05rem;
+    font-weight: 750;
+    color: #0f3460;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-lotes-modal__summary-note {
+    margin: 0;
+    flex: 1 1 12rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #475569;
+}
+
+.erp-compras-lotes-modal__grid-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
     background: #fff;
-    text-align: right;
+    overflow: auto;
+    max-height: min(16rem, 42vh);
+}
+
+.erp-compras-lotes-modal__grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.erp-compras-lotes-modal__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.45rem 0.55rem;
+    background: #f1f5f9;
+    color: #334155;
     font-size: 0.72rem;
-    font-weight: 600;
-    color: #000;
+    font-weight: 700;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
 }
 
-.erp-compras-page .erp-compras-lancamento-modal__total-value--strong {
-    font-weight: 800;
+.erp-compras-lotes-modal__grid th.is-num,
+.erp-compras-lotes-modal__grid td.is-num {
+    text-align: right;
 }
 
-@media (max-width: 1200px) {
-    .erp-compras-page .erp-compras-lancamento-modal__window {
-        width: calc(100vw - 0.75rem);
-        height: calc(100vh - 0.75rem);
-    }
+.erp-compras-lotes-modal__grid th.is-action,
+.erp-compras-lotes-modal__grid td.is-action {
+    width: 2.5rem;
+    text-align: center;
+    padding-left: 0.25rem;
+    padding-right: 0.35rem;
+}
 
-    .erp-compras-page .erp-compras-lancamento-modal__footer-top {
-        grid-template-columns: 1fr;
-    }
+.erp-compras-lotes-modal__grid th:nth-child(1),
+.erp-compras-lotes-modal__grid td:nth-child(1) { width: 42%; }
+.erp-compras-lotes-modal__grid th:nth-child(2),
+.erp-compras-lotes-modal__grid td:nth-child(2) { width: 32%; }
+.erp-compras-lotes-modal__grid th:nth-child(3),
+.erp-compras-lotes-modal__grid td:nth-child(3) { width: 18%; }
 
-    .erp-compras-page .erp-compras-lancamento-modal__footer-bottom {
-        grid-template-columns: 1fr;
-    }
+.erp-compras-lotes-modal__grid td {
+    padding: 0.35rem 0.45rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
 
-    .erp-compras-page .erp-compras-lancamento-modal__totais-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
+.erp-compras-lotes-modal__grid tbody tr:last-child td {
+    border-bottom: 0;
+}
 
-    .erp-compras-page .erp-compras__filters-row {
-        flex-wrap: wrap;
-    }
+.erp-compras-lotes-modal__grid tbody tr:hover td {
+    background: #f8fafc;
+}
 
-    .erp-compras-page .erp-compras__empresa-group,
-    .erp-compras-page .erp-compras__page-size-group {
-        border-right: none;
-        padding-right: 0;
-    }
+.erp-compras-lotes-modal__input {
+    display: block;
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.84rem;
+    line-height: 1.2;
+    box-sizing: border-box;
+}
 
-    .erp-compras-page .erp-compras__locate {
-        padding-left: 0;
-        border-left: none;
-    }
+.erp-compras-lotes-modal__input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 18%);
+}
 
-    .erp-compras-page .erp-compras__page-size-group {
-        margin-left: 0;
-        padding-left: 0;
-        border-left: none;
-    }
+.erp-compras-lotes-modal__input--num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
 
-    .erp-compras-page .erp-compras__search-text {
-        max-width: none;
-    }
+.erp-compras-lotes-modal__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: #fff;
+    color: #b91c1c;
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-compras-lotes-modal__remove:hover {
+    background: #fef2f2;
+    border-color: #f87171;
+}
+
+.erp-compras-lotes-modal__empty {
+    padding: 1.1rem 0.75rem !important;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.84rem;
+}
+
+.erp-compras-lotes-modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding-top: 0.15rem;
+}
+
+.erp-compras-lotes-modal__footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-left: auto;
+}
+
+.erp-compras-lotes-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.95rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 650;
+    cursor: pointer;
+    line-height: 1.1;
+}
+
+.erp-compras-lotes-modal__btn--ghost {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #0f3460;
+}
+
+.erp-compras-lotes-modal__btn--ghost:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.erp-compras-lotes-modal__btn--danger {
+    background: #fff;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.erp-compras-lotes-modal__btn--danger:hover {
+    background: #fef2f2;
+}
+
+.erp-compras-lotes-modal__btn--primary {
+    background: #15803d;
+    border-color: #166534;
+    color: #fff;
+}
+
+.erp-compras-lotes-modal__btn--primary:hover {
+    background: #166534;
+}
+
+.erp-compras-lotes-modal .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

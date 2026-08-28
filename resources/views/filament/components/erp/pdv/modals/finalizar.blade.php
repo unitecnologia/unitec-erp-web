@@ -330,12 +330,15 @@
                             @endif
 
                             <div class="erp-pdv-parcelas__grid-wrap" id="erp-pdv-finalizar-tabela-prazo">
-                                <table class="erp-pdv__grid erp-pdv-parcelas__grid">
+                                <table class="erp-pdv__grid erp-pdv-parcelas__grid @if ($this->finalizarParcelasEhCheque) erp-pdv-parcelas__grid--cheque @endif">
                                     <thead>
                                         <tr>
                                             <th>Documento</th>
                                             <th>Vencimento</th>
                                             <th class="erp-pdv__grid-col-num">Valor</th>
+                                            @if ($this->finalizarParcelasEhCheque)
+                                                <th>Nº Cheque</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -352,10 +355,24 @@
                                                 <td>{{ $row['documento'] ?? '—' }}</td>
                                                 <td>{{ $row['vencimento'] ?? '—' }}</td>
                                                 <td class="erp-pdv__grid-col-num">R$ {{ $row['valor'] ?? '0,00' }}</td>
+                                                @if ($this->finalizarParcelasEhCheque)
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            class="erp-pdv-parcelas__cheque-input"
+                                                            id="erp-pdv-parcela-cheque-{{ $index }}"
+                                                            wire:model.live="finalizarParcelasRows.{{ $index }}.numero_cheque"
+                                                            wire:click.stop
+                                                            autocomplete="off"
+                                                            maxlength="40"
+                                                            placeholder="Nº"
+                                                        >
+                                                    </td>
+                                                @endif
                                             </tr>
                                         @empty
                                             <tr class="erp-pdv__grid-empty">
-                                                <td colspan="3">Avulso: Parcelas/Intervalo + F2 | Gerar — ou F8 | Tabelas pré-definidas.</td>
+                                                <td colspan="{{ $this->finalizarParcelasEhCheque ? 4 : 3 }}">Avulso: Parcelas/Intervalo + F2 | Gerar — ou F8 | Tabelas pré-definidas.</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -368,12 +385,16 @@
                                     <strong>{{ $this->finalizarParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarParcelasTotalLabel : '' }}</strong>
                                 </div>
                                 <div class="erp-pdv-parcelas__footer-actions">
-                                    <button type="button" class="erp-pdv-modal__btn" disabled title="Em breve">
-                                        <kbd>F5</kbd> Boleto
-                                    </button>
-                                    <button type="button" class="erp-pdv-modal__btn" wire:click="abrirCarneImpressao">
-                                        <kbd>F6</kbd> Carnê
-                                    </button>
+                                    @if ($this->finalizarParcelasEhBoleto)
+                                        <button type="button" class="erp-pdv-modal__btn" disabled title="Em breve">
+                                            <kbd>F5</kbd> Boleto
+                                        </button>
+                                    @endif
+                                    @if ($this->finalizarParcelasEhCrediario)
+                                        <button type="button" id="erp-pdv-carne-btn" class="erp-pdv-modal__btn" wire:click="abrirCarneImpressao">
+                                            <kbd>F6</kbd> Carnê
+                                        </button>
+                                    @endif
                                     <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="concluirParcelasCrediario">
                                         <kbd>F7</kbd> Concluir
                                     </button>
@@ -564,6 +585,7 @@
                                     id="erp-pdv-finalizar-cpf"
                                     type="text"
                                     wire:model="finalizarForm.cpf_nota"
+                                    wire:blur="validarCpfNotaFinalizar($event.target.value)"
                                     class="erp-pdv-finalizar__input erp-pdv-finalizar__input--cpf erp-pdv-finalizar__cpf-input"
                                     data-mask="cpf-cnpj"
                                     data-mask-pessoa="fisica"
@@ -578,7 +600,7 @@
                             <div class="erp-pdv-finalizar__informacoes-wrap">
                                 <textarea
                                     id="erp-pdv-finalizar-informacoes"
-                                    wire:model="finalizarForm.informacoes_adicionais"
+                                    wire:model.live.debounce.300ms="finalizarForm.informacoes_adicionais"
                                     class="erp-pdv-finalizar__informacoes"
                                     spellcheck="false"
                                 ></textarea>
@@ -677,7 +699,13 @@
             @endif
 
             @if (filled($this->finalizarAlertaTitulo))
-                <div class="erp-pdv-finalizar-aviso" role="alertdialog" aria-labelledby="erp-pdv-finalizar-aviso-title">
+                <div
+                    class="erp-pdv-finalizar-aviso"
+                    role="alertdialog"
+                    aria-labelledby="erp-pdv-finalizar-aviso-title"
+                    data-opened-at="{{ (int) round(microtime(true) * 1000) }}"
+                    data-foco="{{ $this->finalizarAlertaFoco ?? 'pagamento' }}"
+                >
                     <div class="erp-pdv-naoencontrado__box">
                         <div class="erp-pdv-naoencontrado__icon" aria-hidden="true">!</div>
                         <h2 id="erp-pdv-finalizar-aviso-title" class="erp-pdv-naoencontrado__title">

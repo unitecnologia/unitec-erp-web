@@ -87,7 +87,11 @@
                             <span class="gestor-chart-card__meta">mês</span>
                         </header>
                         <div class="gestor-chart-card__body gestor-chart-card__body--pie">
-                            <canvas id="gestor-fiscal-chart" aria-label="Documentos eletrônicos do mês"></canvas>
+                            @if (! empty($fiscalChart['empty']) || array_sum($fiscalChart['values'] ?? []) <= 0)
+                                <p class="gestor-chart-card__empty">Sem documentos no mês</p>
+                            @else
+                                <canvas id="gestor-fiscal-chart" aria-label="Documentos eletrônicos do mês"></canvas>
+                            @endif
                         </div>
                     </article>
 

@@ -272,6 +272,10 @@
                         <input type="checkbox" wire:model="optCaixa" :disabled="running || $wire.progressActive">
                         <span>Caixa (lançamentos)</span>
                     </label>
+                    <label class="erp-migra-fb__check">
+                        <input type="checkbox" wire:model="optRecibos" :disabled="running || $wire.progressActive">
+                        <span>Recibos</span>
+                    </label>
                 </div>
 
                 <div class="erp-migra-fb__check-group">

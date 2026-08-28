@@ -45,6 +45,19 @@ trait ManagesDevolucaoCompraModal
     /** @var array<int, array<string, mixed>> */
     public array $compraLookupResults = [];
 
+    public bool $compraSelecionarModalOpen = false;
+
+    public string $compraSelecionarBusca = '';
+
+    public int $compraSelecionarPagina = 1;
+
+    public int $compraSelecionarTotal = 0;
+
+    public int $compraSelecionarPorPagina = 15;
+
+    /** @var array<int, array<string, mixed>> */
+    public array $compraSelecionarResults = [];
+
     public ?int $formCompraId = null;
 
     public ?int $formFornecedorId = null;
@@ -144,6 +157,116 @@ trait ManagesDevolucaoCompraModal
         $this->searchCompras();
     }
 
+    public function openCompraSelecionarModal(): void
+    {
+        if ($this->formSituacao !== DevolucaoCompra::SITUACAO_ABERTA) {
+            return;
+        }
+
+        $this->compraLookupOpen = false;
+        $this->compraLookupResults = [];
+        $this->compraSelecionarBusca = '';
+        $this->compraSelecionarPagina = 1;
+        $this->loadCompraSelecionarResults();
+        $this->compraSelecionarModalOpen = true;
+    }
+
+    public function closeCompraSelecionarModal(): void
+    {
+        $this->compraSelecionarModalOpen = false;
+    }
+
+    public function updatedCompraSelecionarBusca(): void
+    {
+        $this->compraSelecionarPagina = 1;
+        $this->loadCompraSelecionarResults();
+    }
+
+    public function compraSelecionarPaginaAnterior(): void
+    {
+        if ($this->compraSelecionarPagina <= 1) {
+            return;
+        }
+
+        $this->compraSelecionarPagina--;
+        $this->loadCompraSelecionarResults();
+    }
+
+    public function compraSelecionarProximaPagina(): void
+    {
+        $totalPages = max(1, (int) ceil($this->compraSelecionarTotal / $this->compraSelecionarPorPagina));
+
+        if ($this->compraSelecionarPagina >= $totalPages) {
+            return;
+        }
+
+        $this->compraSelecionarPagina++;
+        $this->loadCompraSelecionarResults();
+    }
+
+    public function selectCompraFromSelecionarModal(int $id): void
+    {
+        $this->closeCompraSelecionarModal();
+        $this->selectCompra($id);
+    }
+
+    protected function loadCompraSelecionarResults(): void
+    {
+        $term = trim($this->compraSelecionarBusca);
+        $empresaId = ErpContext::currentEmpresaId();
+        $query = Compra::query()
+            ->with('fornecedor')
+            ->where('status', Compra::STATUS_FECHADA)
+            ->whereDoesntHave(
+                'devolucoes',
+                fn ($devolucao) => $devolucao
+                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
+                    ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
+            );
+
+        if ($empresaId) {
+            $query->where('empresa_id', $empresaId);
+        }
+
+        if ($term !== '') {
+            $like = '%'.mb_strtoupper($term, 'UTF-8').'%';
+
+            $query->where(function ($q) use ($term, $like): void {
+                $q->where('numero', 'like', $like)
+                    ->orWhere('numero_nota', 'like', $like)
+                    ->orWhere('chave_nfe', 'like', $like)
+                    ->orWhereHas('fornecedor', fn ($fornecedor) => $fornecedor->where('nome_razao', 'like', $like));
+
+                if (is_numeric($term)) {
+                    $q->orWhere('numero', 'like', '%'.ltrim($term, '0').'%');
+                }
+            });
+        }
+
+        $this->compraSelecionarTotal = (int) $query->count();
+        $totalPages = max(1, (int) ceil($this->compraSelecionarTotal / $this->compraSelecionarPorPagina));
+        $this->compraSelecionarPagina = min(max(1, $this->compraSelecionarPagina), $totalPages);
+
+        $this->compraSelecionarResults = $query
+            ->orderByDesc('data_entrada')
+            ->orderByDesc('data_emissao')
+            ->orderByDesc('id')
+            ->forPage($this->compraSelecionarPagina, $this->compraSelecionarPorPagina)
+            ->get()
+            ->map(fn (Compra $compra): array => [
+                'id' => (int) $compra->id,
+                'numero' => (string) $compra->numero,
+                'numero_nota' => (string) ($compra->numero_nota ?? '—'),
+                'data' => $compra->data_entrada?->format('d/m/Y')
+                    ?? $compra->data_emissao?->format('d/m/Y')
+                    ?? '—',
+                'fornecedor' => (string) ($compra->fornecedor?->nome_razao ?? '—'),
+                'total' => ErpMoney::formatBr((float) $compra->total),
+                'status' => Compra::statusLabels()[$compra->status] ?? mb_strtoupper((string) $compra->status, 'UTF-8'),
+            ])
+            ->all();
+    }
+
     public function searchCompras(): void
     {
         $term = trim($this->compraSearch !== '' ? $this->compraSearch : $this->formCompraNumero);
@@ -160,7 +283,13 @@ trait ManagesDevolucaoCompraModal
 
         $query = Compra::query()
             ->with('fornecedor')
-            ->where('status', '!=', Compra::STATUS_CANCELADA)
+            ->where('status', Compra::STATUS_FECHADA)
+            ->whereDoesntHave(
+                'devolucoes',
+                fn ($devolucao) => $devolucao
+                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
+                    ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
+            )
             ->where(function ($q) use ($like, $term): void {
                 $q->where('numero', 'like', $like);
                 if (is_numeric($term)) {
@@ -193,7 +322,13 @@ trait ManagesDevolucaoCompraModal
 
     public function selectCompra(int $id): void
     {
-        $compra = Compra::query()->find($id);
+        $compra = Compra::query()
+            ->where('id', $id)
+            ->when(
+                ErpContext::currentEmpresaId(),
+                fn ($query, int $empresaId) => $query->where('empresa_id', $empresaId),
+            )
+            ->first();
 
         if (! $compra) {
             Notification::make()->title('Compra não encontrada.')->warning()->send();
@@ -205,6 +340,7 @@ trait ManagesDevolucaoCompraModal
         $this->compraSearch = (string) $compra->numero;
         $this->compraLookupOpen = false;
         $this->compraLookupResults = [];
+        $this->closeCompraSelecionarModal();
         $this->importarCompra($id);
     }
 
@@ -222,7 +358,13 @@ trait ManagesDevolucaoCompraModal
 
             $query = Compra::query()
                 ->with(['itens.product', 'fornecedor', 'empresa'])
-                ->where('status', '!=', Compra::STATUS_CANCELADA)
+                ->where('status', Compra::STATUS_FECHADA)
+                ->whereDoesntHave(
+                    'devolucoes',
+                    fn ($devolucao) => $devolucao
+                        ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
+                        ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
+                )
                 ->where(function ($q) use ($numero): void {
                     $q->where('numero', $numero);
                     if (is_numeric($numero)) {
@@ -620,6 +762,11 @@ trait ManagesDevolucaoCompraModal
         $this->compraSearch = '';
         $this->compraLookupOpen = false;
         $this->compraLookupResults = [];
+        $this->compraSelecionarModalOpen = false;
+        $this->compraSelecionarBusca = '';
+        $this->compraSelecionarPagina = 1;
+        $this->compraSelecionarTotal = 0;
+        $this->compraSelecionarResults = [];
         $this->formCompraId = null;
         $this->formFornecedorId = null;
         $this->formEmpresaId = null;

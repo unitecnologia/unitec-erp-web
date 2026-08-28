@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Nfe;
 
+use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
@@ -43,6 +44,7 @@ class NfeImportacaoService
             NfeImportacaoTipo::VENDA => $this->listarVendas($numero, $cliente, $dataDe, $dataAte, $limit),
             NfeImportacaoTipo::PEDIDO_WEB => $this->listarPedidosWeb($empresaId, $numero, $cliente, $dataDe, $dataAte, $limit),
             NfeImportacaoTipo::NFCE => $this->listarNfce($empresaId, $numero, $cliente, $dataDe, $dataAte, $limit),
+            NfeImportacaoTipo::DEV_COMPRA => $this->listarDevolucoesCompra($empresaId, $numero, $cliente, $dataDe, $dataAte, $limit),
             default => [],
         };
     }
@@ -61,6 +63,7 @@ class NfeImportacaoService
             NfeImportacaoTipo::VENDA => $this->detalheVenda($documentId),
             NfeImportacaoTipo::PEDIDO_WEB => $this->detalhePedidoWeb($documentId),
             NfeImportacaoTipo::NFCE => $this->detalheNfce($documentId),
+            NfeImportacaoTipo::DEV_COMPRA => $this->detalheDevolucaoCompra($documentId),
             default => null,
         };
     }
@@ -138,6 +141,7 @@ class NfeImportacaoService
                 'quantidade' => (float) ($raw['quantidade'] ?? 0),
                 'valor_unitario' => (float) ($raw['valor_unitario'] ?? 0),
                 'desconto' => (float) ($raw['desconto'] ?? 0),
+                'cfop' => filled($raw['cfop'] ?? null) ? (string) $raw['cfop'] : null,
             ];
         }
 
@@ -156,11 +160,12 @@ class NfeImportacaoService
                 'key' => 'import-' . Str::uuid()->toString(),
                 'product_id' => $productId,
                 'codigo' => $product ? (string) $product->codigo : '',
+                'referencia' => $product ? trim((string) ($product->referencia ?? '')) : '',
                 'descricao' => mb_strtoupper((string) ($row['descricao'] ?? $product?->descricao ?? ''), 'UTF-8'),
                 'cfop' => (string) ($row['cfop'] ?? ''),
                 'cst' => (string) (($row['cst'] ?? '') ?: ($row['csosn'] ?? '')),
-                'quantidade' => ErpMoney::formatBr((float) ($row['quantidade'] ?? 0), 4),
-                'valor_unitario' => ErpMoney::formatBr((float) ($row['valor_unitario'] ?? 0), 4),
+                'quantidade' => ErpMoney::formatBr((float) ($row['quantidade'] ?? 0), 3),
+                'valor_unitario' => ErpMoney::formatBr((float) ($row['valor_unitario'] ?? 0), 3),
                 'unidade' => mb_strtoupper((string) ($row['unidade'] ?? $product?->unidade ?: 'UN'), 'UTF-8'),
                 'desconto' => ErpMoney::formatBr((float) ($row['desconto'] ?? 0), 2),
             ];
@@ -390,6 +395,7 @@ class NfeImportacaoService
             'cliente' => $venda->cliente?->nome_razao ?? '—',
             'total' => ErpMoney::formatBr($venda->total),
             'cliente_id' => $venda->cliente_id,
+            'venda_id' => (int) $venda->id,
             'numero_pedido' => $venda->numero,
             'movimento' => 'saida',
             'forma_pgto' => $this->mapFormaPgto($venda->forma_pagamento),
@@ -452,6 +458,8 @@ class NfeImportacaoService
             'cliente' => $pdvVenda->person?->nome_razao ?? 'CONSUMIDOR',
             'total' => ErpMoney::formatBr($pdvVenda->total),
             'cliente_id' => $clienteId,
+            'venda_id' => $pdvVenda->venda_id ? (int) $pdvVenda->venda_id : null,
+            'pdv_venda_id' => (int) $pdvVenda->id,
             'numero_pedido' => $pdvVenda->venda_id
                 ? (string) (Venda::query()->whereKey($pdvVenda->venda_id)->value('numero') ?? '')
                 : null,
@@ -605,6 +613,8 @@ class NfeImportacaoService
             return [
                 'cliente_id' => null,
                 'numero_pedido' => null,
+                'venda_id' => null,
+                'pdv_venda_id' => null,
                 'movimento' => 'saida',
                 'forma_pgto' => 'a_vista',
                 'meio_pgto' => 'dinheiro',
@@ -637,6 +647,8 @@ class NfeImportacaoService
         $formaPgto = 'a_vista';
         $meioPgto = 'dinheiro';
         $movimento = 'saida';
+        $vendaId = null;
+        $pdvVendaId = null;
 
         foreach ($detalhes as $index => $detalhe) {
             $numero = trim((string) ($detalhe['numero'] ?? $detalhe['numero_pedido'] ?? ''));
@@ -650,6 +662,14 @@ class NfeImportacaoService
                 $formaPgto = $detalhe['forma_pgto'] ?? 'a_vista';
                 $meioPgto = $detalhe['meio_pgto'] ?? 'dinheiro';
                 $movimento = $detalhe['movimento'] ?? 'saida';
+            }
+
+            if ($vendaId === null && filled($detalhe['venda_id'] ?? null)) {
+                $vendaId = (int) $detalhe['venda_id'];
+            }
+
+            if ($pdvVendaId === null && filled($detalhe['pdv_venda_id'] ?? null)) {
+                $pdvVendaId = (int) $detalhe['pdv_venda_id'];
             }
 
             foreach ($detalhe['raw_rows'] ?? [] as $raw) {
@@ -681,6 +701,30 @@ class NfeImportacaoService
 
         $numeros = array_values(array_unique($numeros));
         $listaNumeros = implode(', ', $numeros);
+
+        if ($tipo === NfeImportacaoTipo::DEV_COMPRA) {
+            $primeiro = $detalhes[0] ?? [];
+
+            return [
+                'cliente_id' => $clienteId,
+                'numero_pedido' => $listaNumeros !== '' ? $listaNumeros : null,
+                'venda_id' => null,
+                'pdv_venda_id' => null,
+                'devolucao_compra_id' => $primeiro['devolucao_compra_id'] ?? null,
+                'finalidade' => $primeiro['finalidade'] ?? 'devolucao',
+                'natureza_operacao' => $primeiro['natureza_operacao'] ?? null,
+                'data_emissao' => $primeiro['data_emissao'] ?? null,
+                'data_saida' => $primeiro['data_saida'] ?? null,
+                'movimento' => $movimento,
+                'forma_pgto' => $formaPgto,
+                'meio_pgto' => $meioPgto,
+                'obs_contribuinte' => trim((string) ($primeiro['obs_contribuinte'] ?? '')),
+                'referencias' => $referencias,
+                'rows' => $this->montarLinhasItens($rawRows, $empresa, $ufDestino),
+                'numeros' => $numeros,
+            ];
+        }
+
         $obsContribuinte = match (true) {
             count($numeros) > 1 => 'Importado dos pedidos nº ' . $listaNumeros . '.',
             count($numeros) === 1 => 'Importado do pedido nº ' . $listaNumeros . '.',
@@ -694,6 +738,8 @@ class NfeImportacaoService
         return [
             'cliente_id' => $clienteId,
             'numero_pedido' => $listaNumeros !== '' ? $listaNumeros : null,
+            'venda_id' => $vendaId,
+            'pdv_venda_id' => $pdvVendaId,
             'movimento' => $movimento,
             'forma_pgto' => $formaPgto,
             'meio_pgto' => $meioPgto,
@@ -701,6 +747,110 @@ class NfeImportacaoService
             'referencias' => $referencias,
             'rows' => $this->montarLinhasItens($rawRows, $empresa, $ufDestino),
             'numeros' => $numeros,
+            'devolucao_compra_id' => null,
+            'finalidade' => null,
+            'natureza_operacao' => null,
+            'data_emissao' => null,
+            'data_saida' => null,
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function listarDevolucoesCompra(
+        ?int $empresaId,
+        string $numero,
+        string $cliente,
+        ?string $dataDe,
+        ?string $dataAte,
+        int $limit,
+    ): array {
+        $service = app(NfeDevolucaoCompraService::class);
+
+        $query = DevolucaoCompra::query()
+            ->with('fornecedor')
+            ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
+            ->whereDoesntHave('nfe')
+            ->orderByDesc('numero');
+
+        if ($empresaId) {
+            $query->where('empresa_id', $empresaId);
+        }
+
+        $this->applyNumeroFilter($query, 'numero', $numero);
+
+        if ($cliente !== '') {
+            $like = '%'.mb_strtoupper($cliente, 'UTF-8').'%';
+            $query->where(function (Builder $q) use ($like): void {
+                $q->where('fornecedor_nome', 'like', $like)
+                    ->orWhereHas('fornecedor', fn (Builder $p) => $p->where('nome_razao', 'like', $like));
+            });
+        }
+
+        $this->applyDataFilter($query, 'data', $dataDe, $dataAte);
+
+        return $query->limit($limit)->get()->map(function (DevolucaoCompra $devolucao) use ($service): array {
+            $info = 'Finalizada';
+
+            try {
+                $service->validar($devolucao);
+            } catch (\Throwable $exception) {
+                $info = $exception->getMessage();
+            }
+
+            return [
+                'document_id' => $devolucao->id,
+                'numero' => $devolucao->numero,
+                'data' => $devolucao->data?->format('d/m/Y') ?? '—',
+                'cliente' => $devolucao->fornecedorNome(),
+                'total' => ErpMoney::formatBr($devolucao->total),
+                'info' => $info,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function detalheDevolucaoCompra(int $documentId): ?array
+    {
+        $devolucao = DevolucaoCompra::query()
+            ->with(['itens.product', 'compra', 'fornecedor', 'empresa'])
+            ->find($documentId);
+
+        if (! $devolucao) {
+            return null;
+        }
+
+        try {
+            $payload = app(NfeDevolucaoCompraService::class)->montarPayload($devolucao);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return [
+            'document_id' => $devolucao->id,
+            'numero' => $devolucao->numero,
+            'numero_pedido' => $payload['numero_pedido'],
+            'cliente_id' => $payload['cliente_id'],
+            'devolucao_compra_id' => $payload['devolucao_compra_id'],
+            'finalidade' => $payload['finalidade'],
+            'natureza_operacao' => $payload['natureza_operacao'],
+            'data_emissao' => $payload['data_emissao'],
+            'data_saida' => $payload['data_saida'],
+            'movimento' => $payload['movimento'],
+            'forma_pgto' => 'a_vista',
+            'meio_pgto' => 'dinheiro',
+            'obs_contribuinte' => $payload['obs_contribuinte'],
+            'referencias' => $payload['referencias'],
+            'raw_rows' => array_map(static fn (array $row): array => [
+                'product_id' => (int) ($row['product_id'] ?? 0),
+                'quantidade' => (float) ($row['quantidade'] ?? 0),
+                'valor_unitario' => (float) ($row['valor_unitario'] ?? 0),
+                'descricao' => (string) ($row['descricao'] ?? ''),
+                'cfop' => (string) ($row['cfop'] ?? ''),
+            ], $payload['rows']),
         ];
     }
 

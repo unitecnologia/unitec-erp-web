@@ -8,6 +8,7 @@ use App\Models\ProductEstoqueSaldo;
 use App\Models\User;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\ProductEstoqueSaldoService;
 use Illuminate\Support\Facades\Schema;
 
 trait ManagesProductReservas
@@ -70,13 +71,15 @@ trait ManagesProductReservas
             ?? $estoques->first()?->id;
 
         $saldos = $this->productEstoqueSaldosByEstoqueId();
+        $saldosService = app(ProductEstoqueSaldoService::class);
+        $productId = (int) ($this->record?->id ?? $this->data['id'] ?? 0);
 
         return $estoques
             ->values()
-            ->map(function (Estoque $estoque) use ($atualFallback, $reservado, $principalId, $saldos): array {
+            ->map(function (Estoque $estoque) use ($atualFallback, $reservado, $principalId, $saldosService, $productId): array {
                 $isPrincipal = (int) $estoque->id === (int) $principalId;
-                $atual = array_key_exists((int) $estoque->id, $saldos)
-                    ? (float) $saldos[(int) $estoque->id]
+                $atual = $productId > 0
+                    ? $saldosService->fisico($productId, (int) $estoque->id)
                     : ($isPrincipal ? $atualFallback : 0.0);
                 $reservadoPosicao = $isPrincipal ? $reservado : 0.0;
                 $disponivel = $atual - $reservadoPosicao;

@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports\Tabular;
 
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Reports\ReportEmpresaScope;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -174,7 +175,92 @@ abstract class AbstractTabularReport implements TabularReportDefinition
     }
 
     /**
+     * Filtro Empresa / Grupo no topo — null se a empresa da sessão não tem grupo.
+     *
      * @return list<array{key: string, label: string, type: string, options?: array<string, string>}>
+     */
+    protected function empresaFilterFields(): array
+    {
+        $field = ReportEmpresaScope::filterField();
+
+        return $field ? [$field] : [];
+    }
+
+    /**
+     * @param  list<array{key: string, label: string, type: string, options?: array<string, string>}>  $fields
+     * @return list<array{key: string, label: string, type: string, options?: array<string, string>}>
+     */
+    protected function withEmpresaFilter(array $fields): array
+    {
+        return [...$this->empresaFilterFields(), ...$fields];
+    }
+
+    protected function empresaSummaryLine(Request $request): string
+    {
+        return ReportEmpresaScope::summaryLabel($request);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    protected function withEmpresaFilterValue(array $filters, Request $request): array
+    {
+        if (ReportEmpresaScope::shouldShowFilter()) {
+            $filters['empresa'] = ReportEmpresaScope::selectedValue($request);
+        }
+
+        return $filters;
+    }
+
+    /**
+     * @param  list<string>  $summary
+     * @return list<string>
+     */
+    protected function withEmpresaSummary(array $summary, Request $request): array
+    {
+        if (ReportEmpresaScope::shouldShowFilter()) {
+            array_unshift($summary, $this->empresaSummaryLine($request));
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Inclui coluna EMPRESA quando o escopo é multi-empresa; remove quando não for.
+     *
+     * @param  list<string>  $columns
+     * @return list<string>
+     */
+    protected function columnsForEmpresaScope(array $columns, Request $request, string $after = 'data'): array
+    {
+        $multi = ReportEmpresaScope::shouldShowFilter()
+            && ReportEmpresaScope::isMultiEmpresa($request);
+
+        if ($multi && ! in_array('empresa', $columns, true)) {
+            $insertAt = array_search($after, $columns, true);
+            if ($insertAt === false) {
+                array_unshift($columns, 'empresa');
+            } else {
+                array_splice($columns, $insertAt + 1, 0, ['empresa']);
+            }
+        }
+
+        if (! $multi) {
+            $columns = array_values(array_filter($columns, static fn (string $c): bool => $c !== 'empresa'));
+        }
+
+        return $columns;
+    }
+
+    protected function isMultiEmpresaScope(Request $request): bool
+    {
+        return ReportEmpresaScope::shouldShowFilter()
+            && ReportEmpresaScope::isMultiEmpresa($request);
+    }
+
+    /**
+     * @return list<string>
      */
     protected function withColumnsField(array $fields): array
     {

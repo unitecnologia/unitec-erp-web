@@ -2,18 +2,77 @@
     use App\Models\Product;
 @endphp
 
-<div class="erp-produtos-form">
+<div
+    class="erp-produtos-form"
+    x-data
+    @keydown.enter="
+        const el = $event.target;
+        if (
+            (! (el instanceof HTMLInputElement) && ! (el instanceof HTMLSelectElement))
+            || el.disabled
+        ) {
+            return;
+        }
+        if (! el.hasAttribute('data-erp-prod-enter')) {
+            return;
+        }
+
+        $event.preventDefault();
+
+        const fields = Array.from($el.querySelectorAll(
+            'input[data-erp-prod-enter]:not([disabled]), select[data-erp-prod-enter]:not([disabled])'
+        )).filter((field) => field.offsetParent !== null);
+
+        const idx = fields.indexOf(el);
+        const next = idx >= 0 ? (fields[idx + 1] ?? null) : null;
+
+        el.blur();
+
+        if (! next) {
+            /* Último campo (CEST): fecha o ciclo no botão Salvar. */
+            const save = document.querySelector('.erp-pcad-actions__btn--primary[data-erp-key=F5]:not([disabled])');
+
+            if (save) {
+                setTimeout(() => save.focus(), 0);
+            }
+
+            return;
+        }
+
+        const tryFocus = (attempt = 0) => {
+            next.focus();
+            if (document.activeElement === next || attempt >= 12) {
+                if (next instanceof HTMLInputElement && ! next.readOnly) {
+                    next.select();
+                }
+                return;
+            }
+            setTimeout(() => tryFocus(attempt + 1), 30 + (attempt * 20));
+        };
+
+        setTimeout(() => tryFocus(0), 0);
+    "
+>
     <section class="erp-produtos-form__section erp-produtos-form__section--id">
         <h3 class="erp-produtos-form__section-title">Identificação</h3>
         <div class="erp-produtos-form__grid erp-produtos-form__grid--r1">
             <div class="erp-produtos-form__cell erp-produtos-form__cell--codigo">
                 <label for="pprod-codigo">Código</label>
-                <input id="pprod-codigo" type="text" wire:model="data.codigo" readonly class="erp-pcad-form__input erp-produtos-form__input--codigo">
+                <input
+                    id="pprod-codigo"
+                    type="text"
+                    value="{{ $this->data['codigo'] ?? '' }}"
+                    disabled
+                    tabindex="-1"
+                    aria-readonly="true"
+                    class="erp-pcad-form__input erp-produtos-form__input--codigo erp-produtos-form__input--info"
+                >
+                <input type="hidden" wire:model="data.codigo">
             </div>
 
             <div class="erp-produtos-form__cell erp-produtos-form__cell--required erp-produtos-form__cell--descricao">
                 <label for="pprod-descricao">Descrição</label>
-                <input id="pprod-descricao" type="text" wire:model="data.descricao" class="erp-pcad-form__input">
+                <input id="pprod-descricao" type="text" wire:model="data.descricao" data-erp-prod-enter class="erp-pcad-form__input">
             </div>
 
             <div class="erp-produtos-form__cell erp-produtos-form__cell--barras">
@@ -35,6 +94,7 @@
                         data-1p-ignore="true"
                         data-form-type="other"
                         data-bwignore="true"
+                        data-erp-prod-enter
                         readonly
                         onfocus="this.removeAttribute('readonly')"
                     >
@@ -70,6 +130,7 @@
                     data-1p-ignore="true"
                     data-form-type="other"
                     data-bwignore="true"
+                    data-erp-prod-enter
                     readonly
                     onfocus="this.removeAttribute('readonly')"
                 >
@@ -77,7 +138,7 @@
 
             <div class="erp-produtos-form__cell erp-produtos-form__cell--referencia">
                 <label for="pprod-referencia">Referência</label>
-                <input id="pprod-referencia" type="text" wire:model="data.referencia" class="erp-pcad-form__input">
+                <input id="pprod-referencia" type="text" wire:model="data.referencia" data-erp-prod-enter class="erp-pcad-form__input">
             </div>
         </div>
     </section>
@@ -120,10 +181,8 @@
             <div class="erp-produtos-form__cell erp-produtos-form__cell--r2-grupo">
                 <label for="pprod-grupo">F2 | Grupo</label>
                 <div class="erp-produtos-form__control erp-produtos-form__control--lookup">
-                    @include('filament.components.erp.produtos.form.compact-select', [
+                    @include('filament.components.erp.produtos.form.grupo-select', [
                         'id' => 'pprod-grupo',
-                        'field' => 'grupo',
-                        'options' => $this->grupoOptions,
                     ])
                     <button
                         type="button"
@@ -146,7 +205,9 @@
                         'id' => 'pprod-unidade',
                         'field' => 'unidade',
                         'options' => collect($this->unidadeOptions)
-                            ->mapWithKeys(fn (string $label, string $sigla): array => [$sigla => $sigla.' — '.$label])
+                            ->mapWithKeys(fn (string $label, string $sigla): array => [
+                                $sigla => \App\Models\Unidade::optionLabel($sigla, $label),
+                            ])
                             ->all(),
                     ])
                     <button
@@ -165,6 +226,7 @@
         </div>
     </section>
 
+    <div class="erp-produtos-form__row-precos-info">
     <section class="erp-produtos-form__section erp-produtos-form__section--precos">
         <div class="erp-produtos-form__section-head">
             <h3 class="erp-produtos-form__section-title">Preços e logística</h3>
@@ -189,6 +251,7 @@
                     type="text"
                     wire:model.blur="data.preco_venda"
                     data-mask="money-br"
+                    data-erp-prod-enter
                     class="erp-pcad-form__input erp-produtos-form__input--num erp-produtos-form__input--preco-venda"
                     title="Preço varejo (nível 1) — use Precificar para custo e margens"
                 >
@@ -200,6 +263,7 @@
                     type="text"
                     wire:model="data.preco_atacado"
                     data-mask="money-br"
+                    data-erp-prod-enter
                     class="erp-pcad-form__input erp-produtos-form__input--num"
                     title="Preço atacado (nível 2)"
                 >
@@ -211,39 +275,48 @@
                     type="text"
                     wire:model="data.preco_especial"
                     data-mask="money-br"
+                    data-erp-prod-enter
                     class="erp-pcad-form__input erp-produtos-form__input--num"
                     title="Preço especial (nível 3)"
                 >
             </div>
             <div class="erp-produtos-form__cell">
                 <label for="pprod-qtd-atacado">Qtd. Atacado</label>
-                <input id="pprod-qtd-atacado" type="text" wire:model="data.qtd_atacado" data-mask="integer" inputmode="numeric" class="erp-pcad-form__input erp-produtos-form__input--num">
-            </div>
-            <div class="erp-produtos-form__cell">
-                <label for="pprod-validade">Validade</label>
-                <input id="pprod-validade" type="text" wire:model.blur="data.validade" data-wire-field="data.validade" data-mask="date-br" placeholder="dd/mm/aaaa" class="erp-pcad-form__input erp-produtos-form__input--validade">
+                <input id="pprod-qtd-atacado" type="text" wire:model="data.qtd_atacado" data-mask="integer" inputmode="numeric" data-erp-prod-enter class="erp-pcad-form__input erp-produtos-form__input--num">
             </div>
         </div>
     </section>
+
+    <section class="erp-produtos-form__section erp-produtos-form__section--info-adic">
+        <h3 class="erp-produtos-form__section-title">Informações adicionais</h3>
+        <div class="erp-produtos-form__cell erp-produtos-form__cell--info-adic">
+            <textarea
+                id="pprod-info-adicionais"
+                wire:model.blur="data.info_adicionais"
+                rows="2"
+                maxlength="100"
+                aria-label="Informações adicionais"
+                class="erp-pcad-form__textarea erp-produtos-form__textarea--info-adic"
+                autocomplete="off"
+            ></textarea>
+        </div>
+    </section>
+    </div>
 
     <section class="erp-produtos-form__section erp-produtos-form__section--estoque">
         <h3 class="erp-produtos-form__section-title">Cadastro e fiscal</h3>
         <div class="erp-produtos-form__grid erp-produtos-form__grid--r5">
             <div class="erp-produtos-form__cell erp-produtos-form__cell--est-min">
                 <label for="pprod-est-min">Estoque Mínimo</label>
-                <input id="pprod-est-min" type="text" wire:model="data.estoque_minimo" data-mask="integer" inputmode="numeric" class="erp-pcad-form__input erp-produtos-form__input--num">
-            </div>
-            <div class="erp-produtos-form__cell erp-produtos-form__cell--est-inicial">
-                <label for="pprod-est-inicial">Estoque Inicial</label>
-                <input id="pprod-est-inicial" type="text" wire:model="data.estoque_inicial" wire:blur="syncEstoqueFromInicialOnBlur" data-mask="integer" inputmode="numeric" class="erp-pcad-form__input erp-produtos-form__input--num">
+                <input id="pprod-est-min" type="text" wire:model="data.estoque_minimo" data-mask="integer" inputmode="numeric" data-erp-prod-enter class="erp-pcad-form__input erp-produtos-form__input--num">
             </div>
             <div class="erp-produtos-form__cell erp-produtos-form__cell--peso">
                 <label for="pprod-peso">Peso (KG)</label>
-                <input id="pprod-peso" type="text" wire:model="data.peso_kg" data-mask="decimal3" class="erp-pcad-form__input erp-produtos-form__input--num">
+                <input id="pprod-peso" type="text" wire:model="data.peso_kg" data-mask="decimal3" data-erp-prod-enter class="erp-pcad-form__input erp-produtos-form__input--num">
             </div>
             <div class="erp-produtos-form__cell erp-produtos-form__cell--ncm">
                 <label for="pprod-ncm">NCM</label>
-                <input id="pprod-ncm" type="text" wire:model="data.ncm" wire:blur="syncNcmDescricaoFromCodigo" data-mask="digits" data-max-digits="8" maxlength="8" class="erp-pcad-form__input erp-produtos-form__input--ncm">
+                <input id="pprod-ncm" type="text" wire:model="data.ncm" wire:blur="syncNcmDescricaoFromCodigo" data-mask="digits" data-max-digits="8" maxlength="8" data-erp-prod-enter class="erp-pcad-form__input erp-produtos-form__input--ncm">
             </div>
             <div class="erp-produtos-form__cell erp-produtos-form__cell--ncm-desc">
                 <label for="pprod-ncm-desc" class="erp-produtos-form__label--blank">&nbsp;</label>
@@ -256,7 +329,7 @@
             </div>
             <div class="erp-produtos-form__cell erp-produtos-form__cell--cest">
                 <label for="pprod-cest">CEST</label>
-                <input id="pprod-cest" type="text" wire:model="data.cest" data-mask="digits" data-max-digits="7" maxlength="7" class="erp-pcad-form__input erp-produtos-form__input--cest">
+                <input id="pprod-cest" type="text" wire:model="data.cest" data-mask="digits" data-max-digits="7" maxlength="7" data-erp-prod-enter class="erp-pcad-form__input erp-produtos-form__input--cest">
             </div>
         </div>
     </section>

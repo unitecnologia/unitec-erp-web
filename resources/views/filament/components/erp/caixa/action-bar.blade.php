@@ -1,9 +1,9 @@
 <div class="erp-caixa-actions">
-    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="createLancamento" class="erp-caixa-actions__btn" data-erp-key="F2" title="Novo lançamento de caixa">
         <span class="erp-caixa-actions__icon erp-caixa-actions__icon--new">+</span>
         <span class="erp-caixa-actions__label"><kbd>F2</kbd> | Novo</span>
     </button>
-    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="editLancamento" class="erp-caixa-actions__btn" data-erp-key="F3" title="Alterar lançamento manual selecionado">
         <span class="erp-caixa-actions__icon">✎</span>
         <span class="erp-caixa-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
@@ -15,7 +15,7 @@
         <span class="erp-caixa-actions__icon">↻</span>
         <span class="erp-caixa-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    <button type="button" class="erp-caixa-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="imprimirMovimentoCaixa" class="erp-caixa-actions__btn" data-erp-key="F6" title="Imprimir movimento de caixa do período filtrado">
         <span class="erp-caixa-actions__icon">🖨</span>
         <span class="erp-caixa-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>

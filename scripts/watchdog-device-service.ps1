@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
   Garante que o Unitecnologia Device Service esteja sempre rodando (watchdog).
@@ -8,6 +8,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root 'services\unitec-device-service\dist'
 $exe = Join-Path $dist 'Unitec.DeviceService.exe'
 $log = Join-Path $dist 'watchdog.log'
+$serviceName = 'UnitecDeviceService'
 
 function Write-Log([string]$msg) {
     $line = '{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $msg
@@ -32,12 +33,13 @@ if (Test-Online) {
     exit 0
 }
 
-# Mata processos mortos / travados sem API
-Get-Process -Name 'Unitec.DeviceService' -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Sleep -Seconds 1
+if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
+    Write-Log "Serviço Windows ausente: $serviceName"
+    exit 1
+}
 
-Write-Log 'Iniciando Unitec.DeviceService.exe (API offline).'
-Start-Process -FilePath $exe -WorkingDirectory $dist -WindowStyle Hidden
+Write-Log 'Iniciando serviço Unitec Device Service (API offline).'
+Start-Service -Name $serviceName -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
 
 if (Test-Online) {

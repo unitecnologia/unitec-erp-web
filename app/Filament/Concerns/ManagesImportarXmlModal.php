@@ -4,6 +4,7 @@ namespace App\Filament\Concerns;
 
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\Concerns\ErpProductFormPage;
+use App\Filament\Resources\CompraResource;
 use App\Models\Cfop;
 use App\Models\Compra;
 use App\Models\Empresa;
@@ -47,6 +48,10 @@ trait ManagesImportarXmlModal
     public array $importarXmlTotais = [];
 
     public ?int $importarXmlItemIndex = null;
+
+    public ?int $importarXmlDescricaoEditIndex = null;
+
+    public string $importarXmlDescricaoEditValor = '';
 
     public string $importarXmlTab = 'detalhes';
 
@@ -105,6 +110,12 @@ trait ManagesImportarXmlModal
 
     public bool $importarXmlFecharConfirmOpen = false;
 
+    public bool $importarXmlEmpresaConfirmOpen = false;
+
+    public string $importarXmlEmpresaConfirmNome = '';
+
+    public string $importarXmlEmpresaConfirmCnpj = '';
+
     #[Computed]
     public function importarXmlGruposOptions(): array
     {
@@ -113,6 +124,26 @@ trait ManagesImportarXmlModal
             ->orderBy('nome')
             ->pluck('nome', 'nome')
             ->all();
+    }
+
+    /**
+     * Unidades ativas do cadastro (sigla => descrição) para o combo Und.
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function importarXmlUnidadesOptions(): array
+    {
+        $unidades = Product::unidades();
+
+        if (! array_key_exists('UN', $unidades)) {
+            return $unidades;
+        }
+
+        $un = ['UN' => $unidades['UN']];
+        unset($unidades['UN']);
+
+        return $un + $unidades;
     }
 
     /**
@@ -135,42 +166,22 @@ trait ManagesImportarXmlModal
 
     public function openLerXmlSelecionada(): void
     {
-        $id = $this->highlightedRecordIdOrNotify('ler o XML');
+        $id = $this->highlightedRecordId ?? null;
 
-        if (! $id) {
+        if ($id) {
+            $this->openLerXml((int) $id);
+
             return;
         }
 
-        $this->openLerXml((int) $id);
+        // Sem nota na lista (ex.: XML recebido por e-mail): abre tela para buscar arquivo.
+        $this->openImportarXmlModalVazio();
     }
 
     public function openLerXmlFromCompraSelecionada(): void
     {
-        $recordId = method_exists($this, 'highlightedRecordIdOrNotify')
-            ? $this->highlightedRecordIdOrNotify('ler o XML')
-            : null;
-
-        if (! $recordId) {
-            return;
-        }
-
-        $compra = Compra::query()->find($recordId);
-
-        if (! $compra) {
-            Notification::make()->title('Compra não encontrada.')->warning()->send();
-
-            return;
-        }
-
-        $nota = $this->resolveNotaFornecedorFromCompra($compra);
-
-        if ($nota) {
-            $this->openLerXml((int) $nota->id);
-
-            return;
-        }
-
-        // Sem nota vinculada: abre modal vazio para buscar/importar o XML.
+        // Em Compras, F6 sempre abre importação manual (XML do e-mail/pasta).
+        // Compra já listada = entrada concluída; para refazer, use Cancelar (F4).
         $this->openImportarXmlModalVazio();
     }
 
@@ -188,6 +199,7 @@ trait ManagesImportarXmlModal
             'numero' => '—',
             'fornecedor_status' => '',
             'fornecedor_status_label' => '',
+            'tem_st' => false,
         ];
         $this->importarXmlItens = [];
         $this->importarXmlTotais = [];
@@ -242,12 +254,18 @@ trait ManagesImportarXmlModal
                 return;
             }
 
+            $nomeArquivo = (string) $this->importarXmlUpload->getClientOriginalName();
+            $this->importarXmlUpload = null;
+
             session([
                 'erp_importar_xml_pending' => $xml,
-                'erp_importar_xml_pending_name' => (string) $this->importarXmlUpload->getClientOriginalName(),
+                'erp_importar_xml_pending_name' => $nomeArquivo,
             ]);
 
-            $this->importarXmlUpload = null;
+            if ($this->precisaConfirmarEmpresaDoXml($xml)) {
+                return;
+            }
+
             $this->iniciarProgressoImportXml();
         } catch (\Throwable $exception) {
             $this->importarXmlUpload = null;
@@ -257,6 +275,77 @@ trait ManagesImportarXmlModal
                 'error',
             );
         }
+    }
+
+    /**
+     * Se o destinatário do XML não for a empresa logada, abre confirmação e retorna true.
+     */
+    protected function precisaConfirmarEmpresaDoXml(string $xml): bool
+    {
+        $parsed = (new NotaFornecedorDanfeReportService())->parseXml($xml);
+
+        if ($parsed === null) {
+            return false;
+        }
+
+        $destinatario = is_array($parsed['destinatario'] ?? null) ? $parsed['destinatario'] : [];
+        $cnpjXml = preg_replace('/\D/', '', (string) ($destinatario['cnpj'] ?? '')) ?? '';
+
+        if (strlen($cnpjXml) !== 14 && strlen($cnpjXml) !== 11) {
+            return false;
+        }
+
+        $empresa = $this->resolveEmpresaAtivaForImportarXml();
+        $cnpjEmpresa = preg_replace('/\D/', '', (string) ($empresa?->cnpj ?? '')) ?? '';
+
+        if ($cnpjEmpresa === '' || $cnpjEmpresa === $cnpjXml) {
+            return false;
+        }
+
+        $nomeXml = trim((string) ($destinatario['nome'] ?? ''));
+        if ($nomeXml === '') {
+            $nomeXml = trim((string) ($destinatario['fantasia'] ?? ''));
+        }
+        if ($nomeXml === '') {
+            $nomeXml = 'Empresa não identificada';
+        }
+
+        $this->importarXmlEmpresaConfirmNome = $nomeXml;
+        $this->importarXmlEmpresaConfirmCnpj = $this->formatCnpjDisplayForImportarXml($cnpjXml);
+        $this->importarXmlEmpresaConfirmOpen = true;
+
+        return true;
+    }
+
+    public function confirmarImportXmlOutraEmpresa(): void
+    {
+        if (! $this->importarXmlEmpresaConfirmOpen) {
+            return;
+        }
+
+        $this->importarXmlEmpresaConfirmOpen = false;
+        $this->importarXmlEmpresaConfirmNome = '';
+        $this->importarXmlEmpresaConfirmCnpj = '';
+
+        if (! is_string(session('erp_importar_xml_pending')) || trim((string) session('erp_importar_xml_pending')) === '') {
+            $this->showImportarXmlAviso(
+                'Arquivo XML inválido',
+                'O conteúdo do XML não está mais disponível. Selecione o arquivo novamente.',
+                'warning',
+            );
+
+            return;
+        }
+
+        $this->iniciarProgressoImportXml();
+    }
+
+    public function cancelarImportXmlOutraEmpresa(): void
+    {
+        $this->importarXmlEmpresaConfirmOpen = false;
+        $this->importarXmlEmpresaConfirmNome = '';
+        $this->importarXmlEmpresaConfirmCnpj = '';
+        $this->limparSessaoImportXmlPendente();
     }
 
     protected function iniciarProgressoImportXml(): void
@@ -524,17 +613,17 @@ trait ManagesImportarXmlModal
         $nota = NotaFornecedor::query()->find($notaId);
 
         if (! $nota) {
-            Notification::make()->title('Nota não encontrada.')->danger()->send();
+            $this->flashImportarXml('Nota não encontrada.', '', 'error');
 
             return;
         }
 
         if ($requireAceita && ! in_array($nota->status, [NotaFornecedor::STATUS_ACEITA, NotaFornecedor::STATUS_GEROU_COMPRAS], true)) {
-            Notification::make()
-                ->title('Ler XML disponível apenas para notas aceitas')
-                ->body('Confirme a nota com F4 | Confirmar (Ciência da Operação) antes de ler o XML.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Ler XML disponível apenas para notas aceitas',
+                'Confirme a nota com F4 | Confirmar (Ciência da Operação) antes de ler o XML.',
+                'warning',
+            );
 
             return;
         }
@@ -581,6 +670,9 @@ trait ManagesImportarXmlModal
     public function closeImportarXmlModal(): void
     {
         $this->importarXmlFecharConfirmOpen = false;
+        $this->importarXmlEmpresaConfirmOpen = false;
+        $this->importarXmlEmpresaConfirmNome = '';
+        $this->importarXmlEmpresaConfirmCnpj = '';
         $this->importarXmlModalOpen = false;
         $this->importarXmlNotaId = null;
         $this->importarXmlHeader = [];
@@ -601,6 +693,12 @@ trait ManagesImportarXmlModal
     public function requestCloseImportarXmlModal(): void
     {
         if ($this->importarXmlImportProgressOpen || $this->importarXmlCadastroProgressOpen) {
+            return;
+        }
+
+        if ($this->importarXmlEmpresaConfirmOpen) {
+            $this->cancelarImportXmlOutraEmpresa();
+
             return;
         }
 
@@ -631,16 +729,13 @@ trait ManagesImportarXmlModal
     }
 
     /**
-     * Finaliza a leitura do XML: gera Compra + itens e lança entrada de estoque.
-     * Só então a nota passa para "Gerou Compras".
+     * Finaliza a leitura do XML: gera Compra + itens e abre o Lançamento.
+     * Se a nota já tiver compra ativa, reabre o Lançamento dessa compra.
      */
     public function finalizarImportarXml(): void
     {
         if (! $this->importarXmlNotaId) {
-            Notification::make()
-                ->title('Nenhuma nota carregada no modal.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml('Nenhuma nota carregada no modal.', '', 'warning');
 
             return;
         }
@@ -648,35 +743,27 @@ trait ManagesImportarXmlModal
         $nota = NotaFornecedor::query()->find($this->importarXmlNotaId);
 
         if (! $nota) {
-            Notification::make()->title('Nota não encontrada.')->danger()->send();
             $this->closeImportarXmlModal();
+            $this->flashImportarXml('Nota não encontrada.', '', 'error');
 
             return;
         }
 
+        // Nota já gerou compra: segue o fluxo e abre o Lançamento existente.
         if ($nota->status === NotaFornecedor::STATUS_GEROU_COMPRAS) {
             $compraExistente = $nota->compra_id
                 ? Compra::query()->find($nota->compra_id)
                 : null;
 
             if ($compraExistente && $compraExistente->status !== Compra::STATUS_CANCELADA) {
-                Notification::make()
-                    ->title('Esta nota já gerou compra.')
-                    ->body('Compra #'.$compraExistente->numero.' — estoque já foi lançado. Para refazer, cancele a compra primeiro.')
-                    ->info()
-                    ->send();
-
-                $this->closeImportarXmlModal();
+                $this->abrirLancamentoAposImportarXml((int) $compraExistente->id);
 
                 return;
             }
         }
 
         if ($this->importarXmlItens === []) {
-            Notification::make()
-                ->title('Não há itens do XML para gerar a compra.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml('Não há itens do XML para gerar a compra.', '', 'warning');
 
             return;
         }
@@ -684,11 +771,7 @@ trait ManagesImportarXmlModal
         $cfopInvalido = $this->normalizarTodosCfopImportarXml();
 
         if ($cfopInvalido !== null) {
-            Notification::make()
-                ->title('CFOP de entrada inválido.')
-                ->body($cfopInvalido)
-                ->warning()
-                ->send();
+            $this->flashImportarXml('CFOP de entrada inválido.', $cfopInvalido, 'warning');
 
             return;
         }
@@ -700,36 +783,52 @@ trait ManagesImportarXmlModal
         try {
             $compra = (new GerarCompraFromNotaService())->gerar($nota, $this->importarXmlItens);
         } catch (DomainException $exception) {
-            Notification::make()
-                ->title('Não foi possível gerar a compra.')
-                ->body($exception->getMessage())
-                ->warning()
-                ->send();
+            // Se já existia compra, ainda assim abre o Lançamento.
+            $compraExistente = $nota->compra_id
+                ? Compra::query()->find($nota->compra_id)
+                : null;
+
+            if ($compraExistente && $compraExistente->status !== Compra::STATUS_CANCELADA) {
+                $this->abrirLancamentoAposImportarXml((int) $compraExistente->id);
+
+                return;
+            }
+
+            $this->flashImportarXml('Não foi possível gerar a compra.', $exception->getMessage(), 'warning');
 
             return;
         } catch (\Throwable $exception) {
             report($exception);
 
-            Notification::make()
-                ->title('Erro ao gerar a compra.')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            $this->flashImportarXml('Erro ao gerar a compra.', $exception->getMessage(), 'error');
 
             return;
         }
 
-        $this->closeImportarXmlModal();
+        $this->abrirLancamentoAposImportarXml((int) $compra->id);
+    }
 
-        Notification::make()
-            ->title('Compra gerada com entrada de estoque.')
-            ->body('Compra #'.$compra->numero.' — nota marcada como Gerou Compras.')
-            ->success()
-            ->send();
+    /**
+     * Fecha o Importar XML e abre o Lançamento de Compras (sempre).
+     */
+    protected function abrirLancamentoAposImportarXml(int $compraId): void
+    {
+        $this->closeImportarXmlModal();
 
         if (method_exists($this, 'resetTable')) {
             $this->resetTable();
         }
+
+        if (method_exists($this, 'openCompraLancamento')) {
+            $this->openCompraLancamento($compraId, 'alterando');
+
+            return;
+        }
+
+        $this->redirect(
+            CompraResource::getUrl('index').'?abrir_lancamento='.$compraId.'&modo_lancamento=alterando',
+            navigate: true,
+        );
     }
 
     public function selectImportarXmlItem(int $index): void
@@ -738,17 +837,98 @@ trait ManagesImportarXmlModal
             return;
         }
 
+        if ($this->importarXmlDescricaoEditIndex !== null && $this->importarXmlDescricaoEditIndex !== $index) {
+            $this->cancelarEdicaoDescricaoXml();
+        }
+
         $this->importarXmlItemIndex = $index;
+    }
+
+    public function iniciarEdicaoDescricaoXml(int $index): void
+    {
+        if ($index < 0 || $index >= count($this->importarXmlItens)) {
+            return;
+        }
+
+        $item = $this->importarXmlItens[$index] ?? null;
+
+        if (! is_array($item)) {
+            return;
+        }
+
+        $descricaoSistema = trim((string) ($item['produto_descricao'] ?? ''));
+        $descricaoXml = trim((string) ($item['descricao'] ?? ''));
+        $descricaoExibir = $descricaoSistema !== '' ? $descricaoSistema : $descricaoXml;
+
+        $this->importarXmlItemIndex = $index;
+        $this->importarXmlDescricaoEditIndex = $index;
+        $this->importarXmlDescricaoEditValor = $descricaoExibir;
+    }
+
+    public function salvarDescricaoItemXml(int $index): void
+    {
+        if ($this->importarXmlDescricaoEditIndex !== $index) {
+            return;
+        }
+
+        if ($index < 0 || $index >= count($this->importarXmlItens)) {
+            $this->cancelarEdicaoDescricaoXml();
+
+            return;
+        }
+
+        $nova = mb_strtoupper(trim($this->importarXmlDescricaoEditValor), 'UTF-8');
+
+        if ($nova === '' || $nova === '—') {
+            $this->flashImportarXml(
+                'Descrição inválida',
+                'Informe uma descrição para o produto.',
+                'warning',
+            );
+
+            return;
+        }
+
+        $itens = $this->importarXmlItens;
+        $item = $itens[$index] ?? null;
+
+        if (! is_array($item)) {
+            $this->cancelarEdicaoDescricaoXml();
+
+            return;
+        }
+
+        $itens[$index]['descricao'] = $nova;
+
+        $productId = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+
+        if ($productId > 0 || ! empty($item['vinculado'])) {
+            $itens[$index]['produto_descricao'] = $nova;
+
+            if ($productId > 0) {
+                Product::query()->whereKey($productId)->update(['descricao' => $nova]);
+            }
+        }
+
+        $this->importarXmlItens = $itens;
+        $this->importarXmlDescricaoEditIndex = null;
+        $this->importarXmlDescricaoEditValor = '';
+    }
+
+    public function cancelarEdicaoDescricaoXml(): void
+    {
+        $this->importarXmlDescricaoEditIndex = null;
+        $this->importarXmlDescricaoEditValor = '';
     }
 
     public function cadastrarProdutoXmlSelecionado(): void
     {
         if ($this->importarXmlItemIndex === null) {
-            Notification::make()
-                ->title('Selecione um item da grade')
-                ->body('Clique no produto em vermelho antes de cadastrar.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Selecione um item da grade',
+                'Clique no produto em vermelho antes de cadastrar.',
+                'warning',
+            );
 
             return;
         }
@@ -757,17 +937,17 @@ trait ManagesImportarXmlModal
         $item = $this->importarXmlItens[$index] ?? null;
 
         if (! is_array($item)) {
-            Notification::make()->title('Item não encontrado.')->danger()->send();
+            $this->flashImportarXml('Item não encontrado.', '', 'error');
 
             return;
         }
 
         if (($item['vinculado'] ?? false) === true) {
-            Notification::make()
-                ->title('Produto já vinculado')
-                ->body('Este item já possui cadastro/vínculo. Use Desvincular se precisar alterar.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Produto já vinculado',
+                'Este item já possui cadastro/vínculo. Use Desvincular se precisar alterar.',
+                'warning',
+            );
 
             return;
         }
@@ -785,17 +965,22 @@ trait ManagesImportarXmlModal
 
             $this->aplicarProdutoNoItemXml($index, $existente);
 
-            Notification::make()
-                ->title('Produto já cadastrado')
-                ->body('O item foi vinculado ao produto '.$existente->codigo.' — '.$existente->descricao.'.')
-                ->success()
-                ->send();
+            $this->flashImportarXml(
+                'Produto já cadastrado',
+                'O item foi vinculado ao produto '.$existente->codigo.' — '.$existente->descricao.'.',
+                'success',
+            );
 
             return;
         }
 
         $fornecedor = $matcher->resolveFornecedorByCnpj($cnpj);
-        $preco = BrDecimal::parse((string) ($item['prc_unitario'] ?? '0'), 3);
+        $unid = BrDecimal::parse((string) ($item['qtd_unid'] ?? '1'), 3);
+        if ($unid <= 0) {
+            $unid = 1.0;
+        }
+        $precoEmb = BrDecimal::parse((string) ($item['prc_unitario'] ?? '0'), 4);
+        $preco = round($precoEmb / $unid, 3);
 
         NotaFornecedorProductPrefill::store([
             'item_index' => $index,
@@ -868,15 +1053,67 @@ trait ManagesImportarXmlModal
         $this->js(<<<'JS'
             (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const els = () => {
+                    const root = document.querySelector('.erp-nf-forn-import-xml-progress.is-visible');
+                    if (!root) {
+                        return { bar: null, meta: null };
+                    }
+
+                    return {
+                        bar: root.querySelector('[data-erp-xml-progress-bar]'),
+                        meta: root.querySelector('[data-erp-xml-progress-meta]'),
+                    };
+                };
+                let shown = 0;
+                const animateTo = async (target, current, total) => {
+                    target = Math.max(0, Math.min(100, Number(target) || 0));
+                    current = Number(current) || 0;
+                    total = Number(total) || 0;
+                    while (shown !== target) {
+                        shown += shown < target ? 1 : -1;
+                        const { bar, meta } = els();
+                        if (bar) {
+                            bar.style.width = Math.max(4, shown) + '%';
+                        }
+                        if (meta) {
+                            meta.textContent = total > 0
+                                ? (current + ' / ' + total + ' — ' + shown + '%')
+                                : (shown + '%');
+                        }
+                        await wait(18);
+                    }
+                };
                 try {
                     while (await $wire.processarProximoCadastroXml()) {
-                        await wait(90);
+                        await animateTo(
+                            $wire.importarXmlCadastroProgressPercent,
+                            $wire.importarXmlCadastroProgressCurrent,
+                            $wire.importarXmlCadastroProgressTotal,
+                        );
                     }
+                    await animateTo(
+                        100,
+                        $wire.importarXmlCadastroProgressTotal,
+                        $wire.importarXmlCadastroProgressTotal,
+                    );
+                    await $wire.fecharProgressoCadastroXml();
                 } catch (e) {
                     console.error(e);
+                    try {
+                        await $wire.fecharProgressoCadastroXml();
+                    } catch (_) {}
                 }
             })();
         JS);
+    }
+
+    public function fecharProgressoCadastroXml(): void
+    {
+        if (! $this->importarXmlCadastroProgressOpen) {
+            return;
+        }
+
+        $this->finalizarCadastroTodosProgresso();
     }
 
     public function processarProximoCadastroXml(): bool
@@ -946,15 +1183,19 @@ trait ManagesImportarXmlModal
             $this->importarXmlCadastroProgressLabel = 'Falha no item '.$this->importarXmlCadastroProgressCurrent;
             $this->importarXmlCadastroProgressDetail = $exception->getMessage();
 
-            Notification::make()
-                ->title('Falha ao cadastrar item '.($index + 1))
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            $this->flashImportarXml(
+                'Falha ao cadastrar item '.($index + 1),
+                $exception->getMessage(),
+                'error',
+            );
         }
 
         if ($this->importarXmlCadastroProgressFila === []) {
-            $this->finalizarCadastroTodosProgresso();
+            $cadastrados = $this->importarXmlCadastroProgressCadastrados;
+            $jaExistentes = $this->importarXmlCadastroProgressJaExistentes;
+            $this->importarXmlCadastroProgressPercent = 100;
+            $this->importarXmlCadastroProgressLabel = 'Concluído';
+            $this->importarXmlCadastroProgressDetail = "{$cadastrados} cadastrado(s), {$jaExistentes} já existia(m)";
 
             return false;
         }
@@ -1030,10 +1271,16 @@ trait ManagesImportarXmlModal
     protected function criarProdutoAutomaticoDoItemXml(array $item, ?Person $fornecedor, ?Empresa $empresa): Product
     {
         $defaults = ErpProductFormPage::defaultProductFormData($empresa);
-        $preco = BrDecimal::parse((string) ($item['prc_unitario'] ?? '0'), 3);
-        $precoVenda = BrDecimal::parse((string) ($item['pr_venda'] ?? $item['prc_unitario'] ?? '0'), 3);
+        $unid = BrDecimal::parse((string) ($item['qtd_unid'] ?? '1'), 3);
+        if ($unid <= 0) {
+            $unid = 1.0;
+        }
+        $precoEmb = BrDecimal::parse((string) ($item['prc_unitario'] ?? '0'), 4);
+        $preco = round($precoEmb / $unid, 3);
+        $precoVenda = BrDecimal::parse((string) ($item['pr_venda'] ?? '0'), 3);
         $ean = preg_replace('/\D/', '', (string) ($item['ean'] ?? '')) ?? '';
         $ncm = preg_replace('/\D/', '', (string) ($item['ncm'] ?? '')) ?? '';
+        $cest = preg_replace('/\D/', '', (string) ($item['cest'] ?? '')) ?? '';
         $unidade = mb_strtoupper(trim((string) ($item['und'] ?? 'UN')), 'UTF-8');
         $descricao = mb_strtoupper(trim((string) ($item['descricao'] ?? '')), 'UTF-8');
         $referencia = trim((string) ($item['codigo'] ?? ''));
@@ -1059,13 +1306,32 @@ trait ManagesImportarXmlModal
             'referencia' => $referencia !== '' && $referencia !== '—' ? $referencia : null,
             'codigo_barras' => strlen($ean) >= 8 ? $ean : null,
             'ncm' => strlen($ncm) >= 8 ? substr($ncm, 0, 8) : ($defaults['ncm'] ?? '00000000'),
+            'cest' => strlen($cest) >= 7 ? substr($cest, 0, 7) : ($defaults['cest'] ?? null),
             'preco_compra' => $preco,
             'preco_custo' => $preco,
             'ult_compra' => $preco,
-            'preco_venda' => $precoVenda > 0 ? $precoVenda : $preco,
+            'preco_venda' => $precoVenda,
             'ult_fornecedor_id' => $fornecedor?->id,
             'ativo' => true,
         ]);
+
+        if (($item['tem_st'] ?? false) === true) {
+            $cfopXml = (new CfopEntradaResolver())->normalize((string) ($item['cfop_xml'] ?? ''));
+            $cfopInternoDefault = trim((string) ($empresa?->param_imp_cfop_venda ?? ($defaults['cfop_interno'] ?? '5102')));
+            $cfopExternoDefault = trim((string) ($empresa?->param_imp_cfop_externo ?? ($defaults['cfop_externo'] ?? '6102')));
+
+            if (strlen($cfopXml) === 4 && str_starts_with($cfopXml, '5')) {
+                $payload['cfop_interno'] = $cfopXml;
+            } else {
+                $payload['cfop_interno'] = $cfopInternoDefault !== '' ? $cfopInternoDefault : '5102';
+            }
+
+            if (strlen($cfopXml) === 4 && str_starts_with($cfopXml, '6')) {
+                $payload['cfop_externo'] = $cfopXml;
+            } else {
+                $payload['cfop_externo'] = $cfopExternoDefault !== '' ? $cfopExternoDefault : '6102';
+            }
+        }
 
         return Product::query()->create($payload);
     }
@@ -1073,11 +1339,11 @@ trait ManagesImportarXmlModal
     public function openPesquisarProdutoXml(): void
     {
         if ($this->importarXmlItemIndex === null) {
-            Notification::make()
-                ->title('Selecione um item da grade')
-                ->body('Clique no item antes de pesquisar o produto.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Selecione um item da grade',
+                'Clique no item antes de pesquisar o produto.',
+                'warning',
+            );
 
             return;
         }
@@ -1168,7 +1434,7 @@ trait ManagesImportarXmlModal
         $itemIndex = $this->importarXmlItemIndex;
 
         if ($index === null || $itemIndex === null) {
-            Notification::make()->title('Selecione um produto na lista.')->warning()->send();
+            $this->flashImportarXml('Selecione um produto na lista.', '', 'warning');
 
             return;
         }
@@ -1177,7 +1443,7 @@ trait ManagesImportarXmlModal
         $product = isset($row['id']) ? Product::query()->find((int) $row['id']) : null;
 
         if (! $product) {
-            Notification::make()->title('Produto não encontrado.')->danger()->send();
+            $this->flashImportarXml('Produto não encontrado.', '', 'error');
 
             return;
         }
@@ -1194,30 +1460,24 @@ trait ManagesImportarXmlModal
         $this->aplicarProdutoNoItemXml($itemIndex, $product);
         $this->closePesquisarProdutoXml();
 
-        Notification::make()
-            ->title('Produto vinculado')
-            ->body($product->codigo.' — '.$product->descricao)
-            ->success()
-            ->send();
+        $this->flashImportarXml(
+            'Produto vinculado',
+            $product->codigo.' — '.$product->descricao,
+            'success',
+        );
     }
 
     public function desvincularProdutoXmlSelecionado(): void
     {
         if ($this->importarXmlItemIndex === null) {
-            Notification::make()
-                ->title('Selecione um item da grade')
-                ->warning()
-                ->send();
+            $this->flashImportarXml('Selecione um item da grade', '', 'warning');
 
             return;
         }
 
         $this->limparVinculoItemXml($this->importarXmlItemIndex);
 
-        Notification::make()
-            ->title('Item desvinculado')
-            ->success()
-            ->send();
+        $this->flashImportarXml('Item desvinculado', '', 'success');
     }
 
     public function desvincularTodosProdutosXml(): void
@@ -1231,20 +1491,21 @@ trait ManagesImportarXmlModal
             }
         }
 
-        Notification::make()
-            ->title($qtd > 0 ? "{$qtd} item(ns) desvinculado(s)" : 'Nenhum vínculo para remover')
-            ->success()
-            ->send();
+        $this->flashImportarXml(
+            $qtd > 0 ? "{$qtd} item(ns) desvinculado(s)" : 'Nenhum vínculo para remover',
+            '',
+            'success',
+        );
     }
 
     public function aplicarGrupoXmlSelecionado(): void
     {
         if ($this->importarXmlItemIndex === null) {
-            Notification::make()
-                ->title('Selecione um item da grade')
-                ->body('Escolha o item com o grupo desejado e clique em Grupo para aplicar a todos.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Selecione um item da grade',
+                'Escolha o item com o grupo desejado e clique em Grupo para aplicar a todos.',
+                'warning',
+            );
 
             return;
         }
@@ -1252,11 +1513,11 @@ trait ManagesImportarXmlModal
         $grupo = trim((string) ($this->importarXmlItens[$this->importarXmlItemIndex]['grupo'] ?? ''));
 
         if ($grupo === '') {
-            Notification::make()
-                ->title('Informe o grupo no item selecionado')
-                ->body('Selecione um grupo na coluna Grupo e depois clique em Grupo para replicar.')
-                ->warning()
-                ->send();
+            $this->flashImportarXml(
+                'Informe o grupo no item selecionado',
+                'Selecione um grupo na coluna Grupo e depois clique em Grupo para replicar.',
+                'warning',
+            );
 
             return;
         }
@@ -1269,11 +1530,7 @@ trait ManagesImportarXmlModal
 
         $this->importarXmlItens = $itens;
 
-        Notification::make()
-            ->title('Grupo aplicado a todos os itens')
-            ->body($grupo)
-            ->success()
-            ->send();
+        $this->flashImportarXml('Grupo aplicado a todos os itens', $grupo, 'success');
     }
 
     protected function limparVinculoItemXml(int $index): void
@@ -1364,7 +1621,9 @@ trait ManagesImportarXmlModal
 
         $resolver = new CfopEntradaResolver();
         $fallback = trim((string) ($this->resolveEmpresaAtivaForImportarXml()?->param_imp_cfop_compra ?? '1102'));
-        $entrada = $resolver->resolve((string) ($this->importarXmlItens[$index]['cfop'] ?? ''), $fallback);
+        $temSt = ($this->importarXmlItens[$index]['tem_st'] ?? false) === true;
+        $origem = (string) ($this->importarXmlItens[$index]['cfop_xml'] ?? $this->importarXmlItens[$index]['cfop'] ?? '');
+        $entrada = $resolver->resolveParaItem($origem, $fallback, $temSt);
 
         $this->importarXmlItens[$index]['cfop'] = $entrada;
 
@@ -1376,6 +1635,19 @@ trait ManagesImportarXmlModal
     public function selecionarCfopXml(string $codigo, ?int $itemIndex = null): void
     {
         $this->aplicarCfopCodigoXml($codigo, $itemIndex);
+    }
+
+    public function selecionarCampoItemXml(string $campo, string $valor, int $itemIndex): void
+    {
+        if (! isset($this->importarXmlItens[$itemIndex])) {
+            return;
+        }
+
+        if (! in_array($campo, ['grupo', 'und'], true)) {
+            return;
+        }
+
+        $this->importarXmlItens[$itemIndex][$campo] = trim($valor);
     }
 
     public function recalcularQtdTotalItemXml(int $index): void
@@ -1413,44 +1685,47 @@ trait ManagesImportarXmlModal
         $this->importarXmlItens[$index]['qtd_total'] = number_format($totalQtd, 3, ',', '.');
         $this->importarXmlItens[$index]['prc_unitario'] = number_format($preco, 3, ',', '.');
         $this->importarXmlItens[$index]['valor_total'] = number_format($totalValor, 2, ',', '.');
+        // Pr. Venda não é recalculado aqui (custo unitário = prc ÷ qtd_unid fica no custo ao gerar/cadastrar).
     }
 
     public function aplicarCfopXmlSelecionado(): void
     {
         if ($this->importarXmlItemIndex === null) {
-            Notification::make()
-                ->title('Selecione um item da grade')
-                ->body('Escolha o item com o CFOP desejado e clique em Aplicar CFOP.')
-                ->warning()
-                ->send();
+            $this->showImportarXmlAviso(
+                'Selecione um item da grade',
+                'Escolha o item com o CFOP desejado e clique em Aplicar CFOP.',
+                'warning',
+            );
 
             return;
         }
 
         $cfop = trim((string) ($this->importarXmlItens[$this->importarXmlItemIndex]['cfop'] ?? ''));
         $resolver = new CfopEntradaResolver();
-        $cfop = $resolver->resolve(
+        $temSt = ($this->importarXmlItens[$this->importarXmlItemIndex]['tem_st'] ?? false) === true;
+        $cfop = $resolver->resolveParaItem(
             $cfop,
             trim((string) ($this->resolveEmpresaAtivaForImportarXml()?->param_imp_cfop_compra ?? '1102')),
+            $temSt,
         );
 
         if (! $resolver->isEntrada($cfop)) {
-            Notification::make()
-                ->title('CFOP de entrada inválido no item selecionado')
-                ->body('Informe um CFOP iniciado em 1, 2 ou 3 antes de aplicar a todos.')
-                ->warning()
-                ->send();
+            $this->showImportarXmlAviso(
+                'CFOP de entrada inválido no item selecionado',
+                'Informe um CFOP iniciado em 1, 2 ou 3 antes de aplicar a todos.',
+                'warning',
+            );
 
             return;
         }
 
         $this->aplicarCfopCodigoXml($cfop, null, aplicarTodos: true);
 
-        Notification::make()
-            ->title('CFOP aplicado a todos os itens')
-            ->body($cfop)
-            ->success()
-            ->send();
+        $this->showImportarXmlAviso(
+            'CFOP aplicado a todos os itens',
+            $cfop,
+            'success',
+        );
     }
 
     public function aplicarCfopHeaderEmTodosXml(): void
@@ -1463,22 +1738,22 @@ trait ManagesImportarXmlModal
         );
 
         if (! $resolver->isEntrada($cfop) || $this->importarXmlItens === []) {
-            Notification::make()
-                ->title('Informe um CFOP de entrada')
-                ->body('Escolha um CFOP na lista e depois aplique a todos.')
-                ->warning()
-                ->send();
+            $this->showImportarXmlAviso(
+                'Informe um CFOP de entrada',
+                'Escolha um CFOP na lista e depois aplique a todos.',
+                'warning',
+            );
 
             return;
         }
 
         $this->aplicarCfopCodigoXml($cfop, null, aplicarTodos: true);
 
-        Notification::make()
-            ->title('CFOP aplicado a todos os itens')
-            ->body($cfop)
-            ->success()
-            ->send();
+        $this->showImportarXmlAviso(
+            'CFOP aplicado a todos os itens',
+            $cfop,
+            'success',
+        );
     }
 
     protected function aplicarCfopCodigoXml(string $codigo, ?int $itemIndex = null, bool $aplicarTodos = false): void
@@ -1525,7 +1800,9 @@ trait ManagesImportarXmlModal
         $itens = $this->importarXmlItens;
 
         foreach ($itens as $index => $item) {
-            $entrada = $resolver->resolve((string) ($item['cfop'] ?? ''), $fallback);
+            $temSt = ($item['tem_st'] ?? false) === true;
+            $origem = (string) ($item['cfop_xml'] ?? $item['cfop'] ?? '');
+            $entrada = $resolver->resolveParaItem($origem, $fallback, $temSt);
             $itens[$index]['cfop'] = $entrada;
 
             if (! $resolver->isEntrada($entrada)) {
@@ -1561,9 +1838,46 @@ trait ManagesImportarXmlModal
         $itens[$index]['produto_codigo'] = (string) $product->codigo;
         $itens[$index]['produto_descricao'] = (string) $product->descricao;
         $itens[$index]['grupo'] = filled($product->grupo) ? (string) $product->grupo : '';
-        $itens[$index]['pr_venda'] = number_format((float) ($product->preco_venda ?? 0), 3, ',', '.');
+        $itens[$index]['pr_venda'] = '0,000';
+        $unidadeProduto = mb_strtoupper(trim((string) ($product->unidade ?? '')), 'UTF-8');
+        $unidadesCadastradas = Product::unidades();
+        if ($unidadeProduto !== '' && array_key_exists($unidadeProduto, $unidadesCadastradas)) {
+            $itens[$index]['und'] = $unidadeProduto;
+        } else {
+            $undXml = mb_strtoupper(trim((string) ($itens[$index]['und'] ?? '')), 'UTF-8');
+            $itens[$index]['und'] = ($undXml !== '' && array_key_exists($undXml, $unidadesCadastradas))
+                ? $undXml
+                : '';
+        }
+
+        $this->atualizarNcmCestProdutoDoXml($product, $itens[$index] ?? []);
+
         $this->importarXmlItens = $itens;
         $this->importarXmlItemIndex = $index;
+    }
+
+    /**
+     * @param  array<string, mixed>  $itemXml
+     */
+    protected function atualizarNcmCestProdutoDoXml(Product $product, array $itemXml): void
+    {
+        $ncm = preg_replace('/\D/', '', (string) ($itemXml['ncm'] ?? '')) ?? '';
+        $cest = preg_replace('/\D/', '', (string) ($itemXml['cest'] ?? '')) ?? '';
+        $updates = [];
+
+        if (strlen($ncm) >= 8) {
+            $updates['ncm'] = substr($ncm, 0, 8);
+        }
+
+        if (strlen($cest) >= 7) {
+            $updates['cest'] = substr($cest, 0, 7);
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $product->forceFill($updates)->save();
     }
 
     protected function populateImportarXmlModal(NotaFornecedor $nota): void
@@ -1588,7 +1902,13 @@ trait ManagesImportarXmlModal
         $emitente = $parsed['emitente'] ?? [];
         $cfopResolver = new CfopEntradaResolver();
         $cfopFallback = trim((string) ($this->resolveEmpresaAtivaForImportarXml()?->param_imp_cfop_compra ?? '1102'));
-        $cfop = $cfopResolver->resolve((string) (($parsed['itens'][0]['cfop'] ?? '') ?: ''), $cfopFallback);
+        $primeiroItem = $parsed['itens'][0] ?? [];
+        $primeiroTemSt = ($primeiroItem['tem_st'] ?? false) === true;
+        $cfop = $cfopResolver->resolveParaItem(
+            (string) (($primeiroItem['cfop'] ?? '') ?: ''),
+            $cfopFallback,
+            $primeiroTemSt,
+        );
         $cnpjFornecedor = (string) ($nota->cnpj ?: ($emitente['cnpj'] ?? ''));
 
         $cadastro = (new NotaFornecedorFornecedorCadastro())->ensure($emitente);
@@ -1598,6 +1918,12 @@ trait ManagesImportarXmlModal
         if (strlen($chaveNota) !== 44) {
             $chaveNota = preg_replace('/\D/', '', (string) ($parsed['chave'] ?? '')) ?? '';
         }
+
+        $totaisParsed = $parsed['totais'] ?? [];
+        $notaTemSt = $primeiroTemSt
+            || collect($parsed['itens'] ?? [])->contains(fn ($row) => ($row['tem_st'] ?? false) === true)
+            || BrDecimal::parse((string) ($totaisParsed['total_st'] ?? '0'), 2) > 0
+            || BrDecimal::parse((string) ($totaisParsed['base_st'] ?? '0'), 2) > 0;
 
         $this->importarXmlHeader = [
             'chave' => $chaveNota,
@@ -1610,18 +1936,27 @@ trait ManagesImportarXmlModal
             'numero' => (string) ($nota->numero ?: ($parsed['numero'] ?? '—')),
             'fornecedor_status' => $cadastro['status'],
             'fornecedor_status_label' => $cadastro['label'],
+            'tem_st' => $notaTemSt,
         ];
 
-        $itensBase = array_values(array_map(static function (array $item) use ($cfopResolver, $cfopFallback): array {
+        $unidadesCadastradas = Product::unidades();
+
+        $itensBase = array_values(array_map(static function (array $item) use ($cfopResolver, $cfopFallback, $unidadesCadastradas): array {
             $preco = number_format(BrDecimal::parse((string) ($item['valor_unit'] ?? '0'), 3), 3, ',', '.');
             // qCom do XML = quantidade comercial da nota → Qtd. Emb.
             $qtdEmbNum = BrDecimal::parse((string) ($item['quant'] ?? '0'), 3);
             $precoNum = BrDecimal::parse((string) ($item['valor_unit'] ?? '0'), 4);
+            $qtdUnidNum = 1.0;
             $qtdEmb = number_format($qtdEmbNum, 3, ',', '.');
-            $qtdUnid = '1,000';
+            $qtdUnid = number_format($qtdUnidNum, 3, ',', '.');
             $qtdTotal = $qtdEmb;
             $cfopXml = (string) ($item['cfop'] ?? '');
+            $temSt = ($item['tem_st'] ?? false) === true;
             $valorTotal = number_format(round($qtdEmbNum * $precoNum, 2), 2, ',', '.');
+            $prVenda = '0,000';
+            $undXml = mb_strtoupper(trim((string) ($item['un'] ?? '')), 'UTF-8');
+            // Só aceita unidade existente no cadastro; senão fica em branco.
+            $und = ($undXml !== '' && array_key_exists($undXml, $unidadesCadastradas)) ? $undXml : '';
 
             return [
                 'codigo' => (string) ($item['codigo'] ?? '—'),
@@ -1631,13 +1966,24 @@ trait ManagesImportarXmlModal
                 'qtd_emb' => $qtdEmb,
                 'qtd_unid' => $qtdUnid,
                 'qtd_total' => $qtdTotal,
-                'und' => (string) ($item['un'] ?? 'UN'),
+                'und' => $und,
                 'prc_unitario' => $preco,
-                'pr_venda' => $preco,
+                'pr_venda' => $prVenda,
                 'cfop_xml' => $cfopXml,
-                'cfop' => $cfopResolver->resolve($cfopXml, $cfopFallback),
+                'cfop' => $cfopResolver->resolveParaItem($cfopXml, $cfopFallback, $temSt),
                 'ncm' => (string) ($item['ncm'] ?? ''),
+                'cest' => (string) ($item['cest'] ?? ''),
                 'cst' => (string) ($item['cst'] ?? ''),
+                'tipo_icms' => (string) ($item['tipo_icms'] ?? ($temSt ? 'st' : 'normal')),
+                'base_icms_st' => (string) ($item['base_icms_st'] ?? '0,00'),
+                'valor_icms_st' => (string) ($item['valor_icms_st'] ?? '0,00'),
+                'valor_ipi' => (string) ($item['valor_ipi'] ?? '0,00'),
+                'valor_pis' => (string) ($item['valor_pis'] ?? '0,00'),
+                'valor_cofins' => (string) ($item['valor_cofins'] ?? '0,00'),
+                'base_ibs_cbs' => (string) ($item['base_ibs_cbs'] ?? '0,00'),
+                'valor_ibs' => (string) ($item['valor_ibs'] ?? '0,00'),
+                'valor_cbs' => (string) ($item['valor_cbs'] ?? '0,00'),
+                'tem_st' => $temSt,
                 'valor_total' => $valorTotal,
                 'vinculado' => false,
                 'product_id' => null,
@@ -1647,6 +1993,19 @@ trait ManagesImportarXmlModal
         }, $parsed['itens']));
 
         $this->importarXmlItens = (new NotaFornecedorXmlProdutoMatcher())->matchItens($itensBase, $cnpjFornecedor);
+
+        foreach ($this->importarXmlItens as $matchedIndex => $matchedItem) {
+            $productId = (int) ($matchedItem['product_id'] ?? 0);
+            if ($productId <= 0) {
+                continue;
+            }
+
+            $product = Product::query()->find($productId);
+            if ($product) {
+                $this->atualizarNcmCestProdutoDoXml($product, $matchedItem);
+            }
+        }
+
         $this->importarXmlTotais = $parsed['totais'] ?? [];
         $this->importarXmlItemIndex = null;
         $this->importarXmlTab = 'detalhes';
@@ -1707,15 +2066,22 @@ trait ManagesImportarXmlModal
     {
         $digits = preg_replace('/\D/', '', $cnpj) ?? '';
 
-        if (strlen($digits) !== 14) {
-            return $cnpj !== '' ? $cnpj : '—';
+        if (strlen($digits) === 14) {
+            return substr($digits, 0, 2).'.'
+                .substr($digits, 2, 3).'.'
+                .substr($digits, 5, 3).'/'
+                .substr($digits, 8, 4).'-'
+                .substr($digits, 12, 2);
         }
 
-        return substr($digits, 0, 2).'.'
-            .substr($digits, 2, 3).'.'
-            .substr($digits, 5, 3).'/'
-            .substr($digits, 8, 4).'-'
-            .substr($digits, 12, 2);
+        if (strlen($digits) === 11) {
+            return substr($digits, 0, 3).'.'
+                .substr($digits, 3, 3).'.'
+                .substr($digits, 6, 3).'-'
+                .substr($digits, 9, 2);
+        }
+
+        return $cnpj !== '' ? $cnpj : '—';
     }
 
     protected function resolveEmpresaAtivaForImportarXml(): ?Empresa
@@ -1739,12 +2105,49 @@ trait ManagesImportarXmlModal
         return 'Notas de Fornecedores';
     }
 
+    protected function flashImportarXml(string $titulo, string $mensagem = '', string $tone = 'info'): void
+    {
+        if ($this->importarXmlModalOpen) {
+            $this->showImportarXmlAviso($titulo, $mensagem, $tone);
+
+            return;
+        }
+
+        $notification = Notification::make()->title($titulo);
+
+        if ($mensagem !== '') {
+            $notification->body($mensagem);
+        }
+
+        match ($tone) {
+            'warning' => $notification->warning()->send(),
+            'success' => $notification->success()->send(),
+            'error' => $notification->danger()->send(),
+            default => $notification->info()->send(),
+        };
+    }
+
     protected function notifyImportarXml(
         string $titulo,
         string $mensagem,
         ?string $codigo = null,
         string $tone = 'error',
     ): void {
+        if ($this->importarXmlModalOpen) {
+            $this->showImportarXmlAviso(
+                $titulo,
+                filled($codigo) ? "[{$codigo}] {$mensagem}" : $mensagem,
+                match ($tone) {
+                    'warning' => 'warning',
+                    'info' => 'info',
+                    'success' => 'success',
+                    default => 'error',
+                },
+            );
+
+            return;
+        }
+
         if (method_exists($this, 'showNfFornFiscalOverlay')) {
             $this->showNfFornFiscalOverlay(
                 $titulo,

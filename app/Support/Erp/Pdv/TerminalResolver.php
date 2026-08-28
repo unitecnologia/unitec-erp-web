@@ -178,103 +178,132 @@ final class TerminalResolver
 
         $remembered = $this->findRememberedTerminal($empresaId);
 
-
-
         if ($remembered) {
-
-            return $this->touchMachineMetadata($remembered);
-
+            return $this->touchMachineMetadata(
+                $this->ensureFriendlyWebTerminalName($remembered, $this->resolveMachineName())
+            );
         }
-
-
 
         $machineName = $this->resolveMachineName();
 
-
-
+        // Legado: terminal criado com hostname do PC.
         $terminal = Terminal::query()
-
             ->where('empresa_id', $empresaId)
-
             ->where('nome', $machineName)
-
             ->first();
 
-
-
         if ($terminal) {
-
-            return $this->touchMachineMetadata($terminal);
-
+            return $this->touchMachineMetadata($this->ensureFriendlyWebTerminalName($terminal, $machineName));
         }
 
+        // Após renomear para ERP1, o hostname fica em device_name.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('terminais', 'device_name')) {
+            $terminal = Terminal::query()
+                ->where('empresa_id', $empresaId)
+                ->where('device_name', $machineName)
+                ->first();
 
+            if ($terminal) {
+                return $this->touchMachineMetadata($terminal);
+            }
+        }
 
         $nextNumero = (int) (Terminal::query()
             ->where('empresa_id', $empresaId)
             ->max('numero_logico_terminal') ?? 0) + 1;
 
-        $terminal = Terminal::query()->firstOrCreate(
-            [
-                'empresa_id' => $empresaId,
-                'nome' => $machineName,
-            ],
-            [
-                ...Terminal::defaultAttributes($empresaId),
-                'nome' => $machineName,
-                'ip' => $this->resolveClientIp(),
-                'velocidade' => 9600,
-                'numero_logico_terminal' => $nextNumero,
-                'ativo' => true,
-            ],
-        );
+        $friendlyName = $this->nextErpTerminalName($empresaId);
 
-        if ($terminal->numero_logico_terminal === null) {
-            $terminal->forceFill([
-                'numero_logico_terminal' => $nextNumero,
-                'ativo' => $terminal->ativo ?? true,
-            ])->saveQuietly();
-            $terminal = $terminal->fresh() ?? $terminal;
+        $attrs = [
+            ...Terminal::defaultAttributes($empresaId),
+            'nome' => $friendlyName,
+            'ip' => $this->resolveClientIp(),
+            'velocidade' => 9600,
+            'numero_logico_terminal' => $nextNumero,
+            'ativo' => true,
+        ];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('terminais', 'device_name')) {
+            $attrs['device_name'] = $machineName;
         }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('terminais', 'categoria_licenca')) {
+            $attrs['categoria_licenca'] = 'computador';
+            $attrs['origens_dispositivo'] = ['erp_web'];
+        }
+
+        $terminal = Terminal::query()->create($attrs);
 
         return $this->touchMachineMetadata($terminal);
-
     }
 
-
-
-    public function touchMachineMetadata(Terminal $terminal): Terminal
-
+    /**
+     * Próximo nome amigável ERP1, ERP2… (não usa hostname do Windows).
+     */
+    public function nextErpTerminalName(int $empresaId): string
     {
+        $max = 0;
 
-        $ip = $this->resolveClientIp();
-
-
-
-        if ($ip !== null && $terminal->ip !== $ip) {
-
-            $terminal->forceFill(['ip' => $ip])->saveQuietly();
-
-            $terminal = $terminal->fresh() ?? $terminal;
-
+        foreach (
+            Terminal::query()
+                ->where('empresa_id', $empresaId)
+                ->where('nome', 'like', 'ERP%')
+                ->pluck('nome') as $nome
+        ) {
+            if (preg_match('/^ERP(\d+)$/i', trim((string) $nome), $m) === 1) {
+                $max = max($max, (int) $m[1]);
+            }
         }
 
+        return 'ERP'.($max + 1);
+    }
 
+    /**
+     * Se o terminal ainda está com nome de PC (DESKTOP-…), troca para ERP1/ERP2
+     * e guarda o hostname em device_name.
+     */
+    public function ensureFriendlyWebTerminalName(Terminal $terminal, ?string $machineName = null): Terminal
+    {
+        $machineName = $machineName ?: $this->resolveMachineName();
+        $nome = trim((string) $terminal->nome);
+
+        $isHostnameStyle = strtoupper($nome) === strtoupper($machineName)
+            || str_starts_with(strtoupper($nome), 'DESKTOP-')
+            || str_starts_with(strtoupper($nome), 'NOTEBOOK-')
+            || str_starts_with(strtoupper($nome), 'WIN-');
+
+        if (! $isHostnameStyle) {
+            return $terminal;
+        }
+
+        $friendly = $this->nextErpTerminalName((int) $terminal->empresa_id);
+        $fill = ['nome' => $friendly];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('terminais', 'device_name')) {
+            $fill['device_name'] = $terminal->device_name ?: $machineName;
+        }
+
+        $terminal->forceFill($fill)->saveQuietly();
+
+        return $terminal->fresh() ?? $terminal;
+    }
+
+    public function touchMachineMetadata(Terminal $terminal): Terminal
+    {
+        $ip = $this->resolveClientIp();
+
+        if ($ip !== null && $terminal->ip !== $ip) {
+            $terminal->forceFill(['ip' => $ip])->saveQuietly();
+            $terminal = $terminal->fresh() ?? $terminal;
+        }
 
         $this->remember($terminal);
 
-
-
         return $terminal;
-
     }
 
-
-
     protected function findRememberedTerminal(?int $empresaId = null): ?Terminal
-
     {
-
         $empresaId ??= $this->resolveEmpresaId();
 
 

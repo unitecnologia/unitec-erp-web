@@ -191,40 +191,59 @@ class WhatsAppClient
         try {
 
             $response = $this->requestFor($empresa)
-
-                ->timeout($this->httpTimeout($config, 20, 45))
-
-                ->post('/sessions/' . $empresa->id . '/start');
-
-
+                ->timeout($this->httpTimeout($config, 25, 60))
+                ->post('/sessions/'.$empresa->id.'/start');
 
             if (! $response->successful()) {
-
                 return $this->failureFromResponse($response, 'iniciar a conexão');
-
             }
 
-
-
             /** @var array<string, mixed> $payload */
+            $payload = $response->json() ?? [];
 
-            $payload = $response->json();
-
-
-
-            return [
-
+            $result = [
                 'ok' => true,
-
                 'message' => (string) ($payload['message'] ?? 'Conexão iniciada.'),
-
                 'status' => (string) ($payload['status'] ?? WhatsAppConfig::STATUS_AGUARDANDO_QR),
-
                 'number' => (string) ($payload['number'] ?? ''),
-
-                'qr' => isset($payload['qr']) ? (string) $payload['qr'] : null,
-
+                'qr' => isset($payload['qr']) && is_string($payload['qr']) && $payload['qr'] !== ''
+                    ? $payload['qr']
+                    : null,
             ];
+
+            // Fallback: se o /start voltar sem QR, consulta o status algumas vezes.
+            if (
+                ($result['status'] ?? '') === WhatsAppConfig::STATUS_AGUARDANDO_QR
+                && empty($result['qr'])
+            ) {
+                for ($i = 0; $i < 8; $i++) {
+                    usleep(400_000);
+                    $status = $this->fetchSessionStatus($empresa, lightweight: true);
+
+                    if (! ($status['ok'] ?? false)) {
+                        continue;
+                    }
+
+                    $result['status'] = (string) ($status['status'] ?? $result['status']);
+                    $result['number'] = (string) ($status['number'] ?? $result['number']);
+
+                    if (! empty($status['qr'])) {
+                        $result['qr'] = (string) $status['qr'];
+                        $result['message'] = 'Leia o QR Code no ERP para conectar.';
+
+                        break;
+                    }
+
+                    if (($status['status'] ?? '') === WhatsAppConfig::STATUS_CONECTADO) {
+                        $result['qr'] = null;
+                        $result['message'] = (string) ($status['message'] ?? 'WhatsApp já conectado.');
+
+                        break;
+                    }
+                }
+            }
+
+            return $result;
 
         } catch (\Throwable $exception) {
 

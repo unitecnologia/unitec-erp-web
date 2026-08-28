@@ -53,16 +53,45 @@ function bindErpNfeLancamentoLivewireEvents() {
     });
 
     window.Livewire.on('erp-nfe-focus-fiscal-overlay', () => {
+        // Conteúdo vem do $this->js(...payload); aqui só garante foco/progresso se o js atrasar.
         hideNfeFiscalTransmitProgress();
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             document.getElementById('erp-nfe-fiscal-overlay-entendido')?.focus();
         });
     });
 
     window.Livewire.on('erp-nfe-focus-fiscal-sucesso', () => {
         hideNfeFiscalTransmitProgress();
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             document.getElementById('erp-nfe-fiscal-sucesso-imprimir')?.focus();
+        });
+    });
+
+    window.Livewire.on('erp-nfe-hide-fiscal-progress', () => {
+        hideNfeFiscalTransmitProgress();
+        syncNfeTransmitButtonState();
+    });
+
+    window.Livewire.on('erp-nfe-sync-transmit-btn', () => {
+        window.requestAnimationFrame(() => syncNfeTransmitButtonState(true));
+    });
+
+    // Sempre esconder progresso ao terminar o request (sucesso, erro ou falha de rede).
+    window.Livewire.hook('commit', ({ succeed, fail }) => {
+        succeed(() => {
+            hideNfeFiscalTransmitProgress();
+            syncNfeTransmitButtonState();
+        });
+        fail(() => {
+            hideNfeFiscalTransmitProgress();
+            syncNfeTransmitButtonState();
+        });
+    });
+
+    window.Livewire.hook('request', ({ respond }) => {
+        respond(() => {
+            hideNfeFiscalTransmitProgress();
+            syncNfeTransmitButtonState();
         });
     });
 
@@ -327,9 +356,21 @@ function bindErpNfeTotaisEnter() {
     }, true);
 }
 
-let nfeFiscalProgressTimer = null;
 let nfeFiscalProgressStepIndex = 0;
 let nfeFiscalProgressActive = false;
+let nfeFiscalStreamObserver = null;
+let nfeFiscalProgressWatchdogTimer = null;
+let nfeFiscalProgressStepTimer = null;
+const NFE_FISCAL_PROGRESS_WATCHDOG_MS = 90000;
+const NFE_FISCAL_PROGRESS_STEP_MS = 800;
+const NFE_FISCAL_PROGRESS_HOLD_STEP = 3; // Enviando à SEFAZ — etapa longa real
+const NFE_FISCAL_PROGRESS_STEP_LABELS = [
+    'Validando dados da NF-e',
+    'Montando XML do documento',
+    'Assinando digitalmente',
+    'Enviando à SEFAZ (aguardando resposta)',
+    'Processando autorização',
+];
 
 function bindNfeFiscalTransmitTriggers() {
     if (window.__erpNfeFiscalTransmitTriggersBound) {
@@ -365,6 +406,8 @@ function bindNfeFiscalTransmitTriggers() {
 
         window.setTimeout(startNfeFiscalTransmitProgress, 30);
     }, true);
+
+    bindNfeFiscalProgressStreamObserver();
 }
 
 function getNfeFiscalTransmitProgressOverlay() {
@@ -397,40 +440,165 @@ function resetNfeFiscalTransmitProgressUi(overlay) {
     }
 }
 
-function advanceNfeFiscalTransmitProgress(overlay) {
+/**
+ * Avança para a etapa informada pelo servidor (0..4). Não usa timer.
+ */
+function setNfeFiscalTransmitProgressStep(stepIndex, label) {
+    const overlay = getNfeFiscalTransmitProgressOverlay();
+
+    if (! overlay) {
+        return;
+    }
+
+    if (! nfeFiscalProgressActive) {
+        nfeFiscalProgressActive = true;
+        overlay.classList.add('is-visible');
+        overlay.setAttribute('aria-busy', 'true');
+    }
+
     const panel = overlay.querySelector('[data-erp-nfe-fiscal-progress-panel]') ?? overlay;
     const steps = Array.from(panel.querySelectorAll('[data-erp-nfe-fiscal-step]'));
     const statusEl = panel.querySelector('[data-erp-nfe-fiscal-step-status]');
     const barEl = panel.querySelector('[data-erp-nfe-fiscal-step-bar]');
+    const target = Math.max(0, Math.min(steps.length - 1, Number(stepIndex) || 0));
 
-    if (steps.length === 0) {
-        return;
+    nfeFiscalProgressStepIndex = target;
+
+    steps.forEach((step, index) => {
+        step.classList.toggle('is-done', index < target);
+        step.classList.toggle('is-active', index === target);
+    });
+
+    const text = (label && String(label).trim()) || (steps[target] ? steps[target].textContent.trim() : '');
+
+    if (statusEl && text) {
+        statusEl.textContent = text.endsWith('…') || text.endsWith('...') ? text : `${text}…`;
     }
 
-    if (nfeFiscalProgressStepIndex < steps.length - 1) {
-        steps[nfeFiscalProgressStepIndex].classList.remove('is-active');
-        steps[nfeFiscalProgressStepIndex].classList.add('is-done');
-        nfeFiscalProgressStepIndex += 1;
-        steps[nfeFiscalProgressStepIndex].classList.add('is-active');
-    }
-
-    if (statusEl && steps[nfeFiscalProgressStepIndex]) {
-        statusEl.textContent = `${steps[nfeFiscalProgressStepIndex].textContent.trim()}…`;
-    }
-
-    if (barEl) {
-        const percent = Math.min(100, Math.round(((nfeFiscalProgressStepIndex + 1) / steps.length) * 100));
+    if (barEl && steps.length > 0) {
+        const percent = Math.min(100, Math.round(((target + 1) / steps.length) * 100));
         barEl.style.width = `${percent}%`;
     }
 }
 
+window.__erpNfeSetFiscalStep = setNfeFiscalTransmitProgressStep;
+
+function applyNfeFiscalProgressStreamPayload(raw) {
+    const text = String(raw || '').trim();
+
+    if (! text) {
+        return;
+    }
+
+    try {
+        const data = JSON.parse(text);
+        setNfeFiscalTransmitProgressStep(data.step, data.label);
+    } catch (e) {
+        // ignore non-JSON chunks
+    }
+}
+
+function bindNfeFiscalProgressStreamObserver() {
+    const streamEl = document.querySelector('[data-erp-nfe-fiscal-progress-stream]');
+
+    if (! streamEl || nfeFiscalStreamObserver) {
+        return;
+    }
+
+    nfeFiscalStreamObserver = new MutationObserver(() => {
+        applyNfeFiscalProgressStreamPayload(streamEl.textContent);
+    });
+
+    nfeFiscalStreamObserver.observe(streamEl, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+    });
+}
+
+function clearNfeFiscalTransmitWatchdog() {
+    if (nfeFiscalProgressWatchdogTimer) {
+        window.clearTimeout(nfeFiscalProgressWatchdogTimer);
+        nfeFiscalProgressWatchdogTimer = null;
+    }
+}
+
+function clearNfeFiscalProgressStepTimer() {
+    if (nfeFiscalProgressStepTimer) {
+        window.clearInterval(nfeFiscalProgressStepTimer);
+        nfeFiscalProgressStepTimer = null;
+    }
+}
+
+/**
+ * Avanço cosmético 0→1→2→3 (1 a 1). Para na etapa SEFAZ até o request terminar.
+ * Sem stream Livewire — evita corromper o overlay de erro.
+ */
+function startNfeFiscalProgressStepTimer() {
+    clearNfeFiscalProgressStepTimer();
+
+    nfeFiscalProgressStepTimer = window.setInterval(() => {
+        if (! nfeFiscalProgressActive) {
+            clearNfeFiscalProgressStepTimer();
+
+            return;
+        }
+
+        if (nfeFiscalProgressStepIndex >= NFE_FISCAL_PROGRESS_HOLD_STEP) {
+            clearNfeFiscalProgressStepTimer();
+
+            return;
+        }
+
+        const next = nfeFiscalProgressStepIndex + 1;
+        const label = NFE_FISCAL_PROGRESS_STEP_LABELS[next] || '';
+        setNfeFiscalTransmitProgressStep(next, label);
+
+        if (next >= NFE_FISCAL_PROGRESS_HOLD_STEP) {
+            clearNfeFiscalProgressStepTimer();
+        }
+    }, NFE_FISCAL_PROGRESS_STEP_MS);
+}
+
 function stopNfeFiscalTransmitProgress() {
     nfeFiscalProgressActive = false;
+    clearNfeFiscalTransmitWatchdog();
+    clearNfeFiscalProgressStepTimer();
+}
 
-    if (nfeFiscalProgressTimer) {
-        window.clearInterval(nfeFiscalProgressTimer);
-        nfeFiscalProgressTimer = null;
+function notifyNfeFiscalProgressStuck(message) {
+    try {
+        if (typeof FilamentNotification !== 'undefined') {
+            new FilamentNotification()
+                .title('NF-e — atenção')
+                .body(message)
+                .warning()
+                .persistent()
+                .send();
+
+            return;
+        }
+    } catch (_e) {
+        // fallback
     }
+
+    window.alert(message);
+}
+
+function forceHideNfeFiscalTransmitProgressStuck(reason) {
+    if (! nfeFiscalProgressActive) {
+        const overlay = getNfeFiscalTransmitProgressOverlay();
+
+        if (! overlay?.classList.contains('is-visible')) {
+            return;
+        }
+    }
+
+    hideNfeFiscalTransmitProgress();
+    notifyNfeFiscalProgressStuck(
+        reason
+        || 'A transmissão da NF-e demorou demais ou a conexão caiu. Tente novamente; se o erro persistir, confira o histórico da nota.'
+    );
 }
 
 function startNfeFiscalTransmitProgress() {
@@ -440,31 +608,22 @@ function startNfeFiscalTransmitProgress() {
         return;
     }
 
-    stopNfeFiscalTransmitProgress();
+    clearNfeFiscalTransmitWatchdog();
+    clearNfeFiscalProgressStepTimer();
+    bindNfeFiscalProgressStreamObserver();
     nfeFiscalProgressActive = true;
     overlay.classList.add('is-visible');
     overlay.setAttribute('aria-busy', 'true');
     resetNfeFiscalTransmitProgressUi(overlay);
+    setNfeFiscalTransmitProgressStep(0, NFE_FISCAL_PROGRESS_STEP_LABELS[0]);
+    startNfeFiscalProgressStepTimer();
 
-    window.setTimeout(() => {
-        if (! nfeFiscalProgressActive) {
-            return;
-        }
-
-        advanceNfeFiscalTransmitProgress(overlay);
-    }, 700);
-
-    nfeFiscalProgressTimer = window.setInterval(() => {
-        const currentOverlay = getNfeFiscalTransmitProgressOverlay();
-
-        if (! nfeFiscalProgressActive || ! currentOverlay) {
-            stopNfeFiscalTransmitProgress();
-
-            return;
-        }
-
-        advanceNfeFiscalTransmitProgress(currentOverlay);
-    }, 850);
+    nfeFiscalProgressWatchdogTimer = window.setTimeout(() => {
+        nfeFiscalProgressWatchdogTimer = null;
+        forceHideNfeFiscalTransmitProgressStuck(
+            'A transmissão da NF-e demorou demais ou a conexão caiu. Tente novamente; se o erro persistir, confira o histórico da nota.'
+        );
+    }, NFE_FISCAL_PROGRESS_WATCHDOG_MS);
 }
 
 function hideNfeFiscalTransmitProgress() {
@@ -476,6 +635,117 @@ function hideNfeFiscalTransmitProgress() {
     });
 
     resetNfeFiscalTransmitProgressUi(getNfeFiscalTransmitProgressOverlay());
+}
+
+/** Força o overlay vermelho padrão e preenche título/corpo (morph às vezes deixa vazio). */
+function showNfeFiscalErroOverlayUi(payload) {
+    hideNfeFiscalTransmitProgress();
+
+    const data = payload && typeof payload === 'object' ? payload : {};
+    const overlay = document.querySelector('[data-erp-nfe-fiscal-erro-overlay]')
+        || document.getElementById('erp-nfe-fiscal-erro-overlay');
+
+    if (! overlay) {
+        return;
+    }
+
+    const titulo = String(data.titulo ?? '').trim();
+    const mensagem = String(data.mensagem ?? '').trim();
+    const codigo = String(data.codigo ?? '').trim();
+
+    const titleEl = overlay.querySelector('#erp-nfe-fiscal-overlay-title');
+    const codigoEl = overlay.querySelector('.erp-nfe-fiscal-overlay__codigo');
+    const textEl = overlay.querySelector('.erp-nfe-fiscal-overlay__text');
+    const origemEl = overlay.querySelector('.erp-nfe-fiscal-overlay__origem');
+
+    if (titleEl) {
+        titleEl.textContent = titulo;
+    }
+
+    if (codigoEl) {
+        const strong = codigoEl.querySelector('strong');
+
+        if (strong) {
+            strong.textContent = codigo;
+        }
+
+        codigoEl.style.display = codigo !== '' ? 'block' : 'none';
+    }
+
+    if (textEl) {
+        textEl.textContent = '';
+
+        if (mensagem !== '') {
+            mensagem.split(/\n/).forEach((line, index) => {
+                if (index > 0) {
+                    textEl.appendChild(document.createElement('br'));
+                }
+
+                textEl.appendChild(document.createTextNode(line));
+            });
+            textEl.style.display = 'block';
+        } else {
+            textEl.style.display = 'none';
+        }
+    }
+
+    if (origemEl) {
+        // Só marca como SEFAZ quando há cStat; validação local (NCM etc.) não é SEFAZ.
+        origemEl.style.display = codigo !== '' ? 'block' : 'none';
+    }
+
+    overlay.style.display = 'grid';
+    overlay.classList.add('is-visible');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.removeAttribute('hidden');
+
+    window.requestAnimationFrame(() => {
+        document.getElementById('erp-nfe-fiscal-overlay-entendido')?.focus();
+    });
+}
+
+function showNfeFiscalSucessoOverlayUi(payload) {
+    hideNfeFiscalTransmitProgress();
+
+    const data = payload && typeof payload === 'object' ? payload : {};
+    const overlay = document.querySelector('[data-erp-nfe-fiscal-sucesso-overlay]')
+        || document.getElementById('erp-nfe-fiscal-sucesso-overlay');
+
+    if (! overlay) {
+        return;
+    }
+
+    const detalhe = String(data.detalhe ?? '').trim();
+    const detalheEl = overlay.querySelector('.erp-nfe-fiscal-overlay__codigo');
+
+    if (detalheEl && detalhe !== '') {
+        detalheEl.textContent = detalhe;
+    }
+
+    overlay.style.display = 'grid';
+    overlay.classList.add('is-visible');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.removeAttribute('hidden');
+
+    window.requestAnimationFrame(() => {
+        document.getElementById('erp-nfe-fiscal-sucesso-imprimir')?.focus();
+    });
+}
+
+window.__erpNfeShowFiscalErroOverlay = showNfeFiscalErroOverlayUi;
+window.__erpNfeShowFiscalSucessoOverlay = showNfeFiscalSucessoOverlayUi;
+
+/** Remove disabled residual do F3 (ex.: loading antigo). Após F2 o evento força liberar. */
+function syncNfeTransmitButtonState(forceEnable = false) {
+    const btn = document.querySelector('[data-erp-nfe-transmit-btn]');
+
+    if (! btn) {
+        return;
+    }
+
+    if (forceEnable) {
+        btn.removeAttribute('disabled');
+    }
 }
 
 let nfeDanfePrintInFlight = false;

@@ -1,5 +1,8 @@
 <header class="erp-recibos-window__titlebar">
-    <span class="erp-recibos-window__title">Impressão de Recibos</span>
+    <div class="erp-recibos-window__title-wrap">
+        <span class="erp-recibos-window__eyebrow">Financeiro</span>
+        <span class="erp-recibos-window__title">Impressão de Recibos</span>
+    </div>
     <button
         type="button"
         class="erp-recibos-window__close"

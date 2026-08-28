@@ -473,6 +473,48 @@
     color: #991b1b !important;
 }
 
+.erp-produtos-page .erp-prod-validade {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-weight: 700;
+    color: #0f3460;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.erp-produtos-page .erp-prod-validade.is-vencida {
+    color: #c00000 !important;
+    font-weight: 800 !important;
+}
+
+.erp-produtos-page .fi-ta-row.erp-row-selected .erp-prod-validade.is-vencida {
+    color: #991b1b !important;
+}
+
+.erp-produtos-page .erp-prod-validade__dot {
+    flex: 0 0 auto;
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 999px;
+    box-shadow:
+        inset 0 1px 1px rgb(255 255 255 / 55%),
+        0 1px 2px rgb(15 23 42 / 28%);
+}
+
+.erp-produtos-page .erp-prod-validade__dot--ok {
+    background: radial-gradient(circle at 30% 28%, #bbf7d0 0%, #4ade80 42%, #16a34a 100%);
+}
+
+.erp-produtos-page .erp-prod-validade__dot--atencao {
+    background: radial-gradient(circle at 30% 28%, #fef08a 0%, #facc15 42%, #ca8a04 100%);
+}
+
+.erp-produtos-page .erp-prod-validade__dot--vencido {
+    background: radial-gradient(circle at 30% 28%, #fca5a5 0%, #ef4444 42%, #b91c1c 100%);
+}
+
 .erp-produtos-page .fi-pagination {
     padding: 0.05rem 0.45rem !important;
     min-height: 1.55rem !important;

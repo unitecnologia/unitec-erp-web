@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpDataSyncVersion;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'data',
     'hora',
     'cliente_id',
+    'cliente_nome',
+    'cliente_cpf_cnpj',
+    'cliente_endereco',
+    'cliente_numero',
+    'cliente_bairro',
+    'cliente_cep',
+    'cliente_cidade',
+    'cliente_uf',
+    'cliente_fone',
+    'cliente_whatsapp',
     'vendedor_id',
     'subtotal',
     'percentual_desconto',
@@ -42,6 +53,17 @@ class Orcamento extends Model
     public const PLATAFORMA_VI = 'vi';
 
     public const PLATAFORMA_MELI = 'meli';
+
+    protected static function booted(): void
+    {
+        static::saved(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_QUOTES);
+        });
+
+        static::deleted(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_QUOTES);
+        });
+    }
 
     /**
      * @return array<string, string>
@@ -136,6 +158,80 @@ class Orcamento extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'cliente_id');
+    }
+
+    public function clienteDisplayNome(): string
+    {
+        if (filled($this->cliente_nome)) {
+            return mb_strtoupper(trim((string) $this->cliente_nome), 'UTF-8');
+        }
+
+        return mb_strtoupper((string) ($this->cliente?->nome_razao ?? ''), 'UTF-8');
+    }
+
+    public function clienteDisplayCpfCnpj(): string
+    {
+        return filled($this->cliente_cpf_cnpj)
+            ? (string) $this->cliente_cpf_cnpj
+            : (string) ($this->cliente?->cpf_cnpj ?? '');
+    }
+
+    public function clienteDisplayEndereco(): string
+    {
+        return filled($this->cliente_endereco)
+            ? mb_strtoupper(trim((string) $this->cliente_endereco), 'UTF-8')
+            : mb_strtoupper((string) ($this->cliente?->endereco ?? ''), 'UTF-8');
+    }
+
+    public function clienteDisplayNumero(): string
+    {
+        return filled($this->cliente_numero)
+            ? (string) $this->cliente_numero
+            : (string) ($this->cliente?->numero ?? '');
+    }
+
+    public function clienteDisplayBairro(): string
+    {
+        return filled($this->cliente_bairro)
+            ? mb_strtoupper(trim((string) $this->cliente_bairro), 'UTF-8')
+            : mb_strtoupper((string) ($this->cliente?->bairro ?? ''), 'UTF-8');
+    }
+
+    public function clienteDisplayCep(): string
+    {
+        return filled($this->cliente_cep)
+            ? (string) $this->cliente_cep
+            : (string) ($this->cliente?->cep ?? '');
+    }
+
+    public function clienteDisplayCidade(): string
+    {
+        return filled($this->cliente_cidade)
+            ? mb_strtoupper(trim((string) $this->cliente_cidade), 'UTF-8')
+            : mb_strtoupper((string) ($this->cliente?->cidade_nome ?? ''), 'UTF-8');
+    }
+
+    public function clienteDisplayUf(): string
+    {
+        return filled($this->cliente_uf)
+            ? mb_strtoupper(trim((string) $this->cliente_uf), 'UTF-8')
+            : mb_strtoupper((string) ($this->cliente?->uf ?? ''), 'UTF-8');
+    }
+
+    public function clienteDisplayFone(): string
+    {
+        return filled($this->cliente_fone)
+            ? (string) $this->cliente_fone
+            : (string) ($this->cliente?->fone1 ?? '');
+    }
+
+    public function clienteDisplayWhatsapp(): string
+    {
+        if (filled($this->cliente_whatsapp)) {
+            return (string) $this->cliente_whatsapp;
+        }
+
+        return (string) ($this->cliente?->celular1 ?: ($this->cliente?->whatsapp ?? ''));
     }
 
     public function vendedor(): BelongsTo

@@ -382,6 +382,9 @@ class ForcaVendasSyncService
                 'codigo' => $f->codigo,
                 'descricao' => $f->descricao,
                 'tipo' => $f->tipo,
+                'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
+                    (string) ($f->tipo_movimento ?? '')
+                ),
                 'nfce' => (bool) $f->nfce,
                 'max_parcelas' => $f->max_parcelas,
                 'tabelas_prazo' => $f->tabelasPrazo

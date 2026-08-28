@@ -18,6 +18,7 @@ class PdvCaixaSessao extends Model
         'valor_fechamento',
         'aberto_em',
         'fechado_em',
+        'itens_cancelados',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class PdvCaixaSessao extends Model
             'valor_fechamento' => 'decimal:2',
             'aberto_em' => 'datetime',
             'fechado_em' => 'datetime',
+            'itens_cancelados' => 'array',
         ];
     }
 
@@ -88,6 +90,21 @@ class PdvCaixaSessao extends Model
             - (float) $this->movimentos()
                 ->where('forma_pagamento', 'DINHEIRO')
                 ->sum('saida'),
+            2
+        );
+    }
+
+    public function saldoPorForma(string $forma): float
+    {
+        $forma = mb_strtoupper(trim($forma), 'UTF-8');
+
+        if ($forma === '' || $forma === 'DINHEIRO') {
+            return $this->saldoDinheiro();
+        }
+
+        return round(
+            (float) $this->movimentos()->where('forma_pagamento', $forma)->sum('entrada')
+            - (float) $this->movimentos()->where('forma_pagamento', $forma)->sum('saida'),
             2
         );
     }

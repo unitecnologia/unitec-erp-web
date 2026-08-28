@@ -1,374 +1,564 @@
-/* Campos — layout Delphi uTerminais.pas */
-
-
+/* Layout compacto — aba Configurações (Terminais) */
 
 .erp-terminais-form--config {
-
     display: flex;
-
     flex-direction: column;
-
-    gap: 0.35rem;
-
+    gap: 0.3rem;
 }
 
+.erp-terminais-form--config.erp-pcad-form .erp-pcad__group,
+.erp-terminais-form-page .erp-terminais-form--config .erp-pcad__group {
+    padding: 0.28rem 0.4rem 0.32rem !important;
+    margin: 0 !important;
+}
 
+.erp-terminais-form-page .erp-terminais-form--config .erp-pcad__group-title {
+    margin-bottom: 0.18rem;
+    padding: 0 0.2rem;
+    font-size: 0.76rem !important;
+    line-height: 1.2;
+}
+
+.erp-terminais-form__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.erp-terminais-form__field--nome {
+    max-width: 14rem;
+}
+
+.erp-terminais-form__field--narrow {
+    max-width: 4.75rem;
+}
 
 .erp-terminais-form__checks {
-
     display: flex;
-
     flex-wrap: wrap;
-
-    gap: 0.45rem 1rem;
-
-    margin-top: 0.25rem;
-
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.1rem;
 }
-
-
 
 .erp-terminais-form__checks--stack {
-
     flex-direction: column;
-
     flex-wrap: nowrap;
-
     align-items: flex-start;
-
-    gap: 0.2rem;
-
+    gap: 0.18rem;
 }
 
-
+.erp-terminais-form__checks--compact {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.65rem;
+    align-items: start;
+}
 
 .erp-terminais-form__radios {
-
     display: flex;
-
     flex-wrap: wrap;
-
-    gap: 0.55rem 0.85rem;
-
+    gap: 0.2rem 0.7rem;
+    align-items: center;
 }
 
-
+.erp-terminais-form__radios--2x2 {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 0.12rem 0.9rem;
+    align-items: center;
+}
 
 .erp-terminais-form__stub,
-
 .erp-terminais-form__hint {
-
-    margin: 0.75rem 0 0;
-
-    font-size: 0.78rem;
-
+    margin: 0.2rem 0 0;
+    font-size: 0.68rem;
+    line-height: 1.3;
     color: var(--erp-text-muted, #64748b);
-
 }
 
-
+.erp-terminais-form__hint--inline {
+    margin: 0;
+    white-space: nowrap;
+    padding-bottom: 0.28rem;
+}
 
 .erp-terminais-form__actions {
-
-    margin-top: 0.75rem;
-
+    margin-top: 0.4rem;
 }
-
-
 
 .erp-terminais-form__test-btn {
-
     border: 1px solid var(--erp-border-light, #c7d5e8);
-
     background: #fff;
-
-    padding: 0.35rem 0.85rem;
-
-    font-size: 0.78rem;
-
+    padding: 0.28rem 0.7rem;
+    font-size: 0.76rem;
     font-weight: 700;
-
     cursor: pointer;
-
     border-radius: var(--erp-radius-sm, 6px);
-
 }
-
-
 
 .erp-terminais-form__usa-tef {
-
     display: inline-flex;
-
-    margin-bottom: 0.65rem;
-
+    margin-bottom: 0.4rem;
     font-weight: 700;
-
 }
-
-
 
 .erp-terminais-form-page .erp-pcad__group {
-
     margin-bottom: 0;
-
 }
-
-
 
 .erp-terminais-form-page .erp-pcad__group-title {
-
-    margin-bottom: 0.35rem;
-
+    margin-bottom: 0.25rem;
 }
-
-
 
 .erp-pcad__check--inline {
-
     margin-left: 0.35rem;
-
 }
 
-
-
-.erp-terminais-form__printer-row {
-
-    display: grid;
-
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
-
-    gap: 0.65rem 1rem;
-
-    align-items: center;
-
-}
-
-
-
-.erp-terminais-form__inline-fields {
-
+.erp-terminais-form__printer-compact {
     display: flex;
-
-    flex-wrap: wrap;
-
-    align-items: center;
-
-    gap: 0.28rem 0.55rem;
-
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 0.35rem 0.7rem;
 }
 
+.erp-terminais-form__printer-compact .erp-terminais-form__radios {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
 
+.erp-terminais-form__printer-compact .erp-terminais-form__radios--2x2 {
+    white-space: normal;
+}
 
-.erp-terminais-form__escpos-row {
+.erp-terminais-form__printer--readonly .erp-pcad-form__input,
+.erp-terminais-form__printer--readonly .erp-pcad-form__select {
+    background: var(--erp-bg-muted, #e8eef5);
+    color: var(--erp-text, #0f172a);
+    cursor: default;
+}
 
+.erp-terminais-form__printer--readonly .erp-pcad__check {
+    cursor: default;
+    opacity: 0.88;
+}
+
+.erp-terminais-form__field--nvias {
+    width: 3.6rem;
+    flex: 0 0 3.6rem;
+}
+
+.erp-terminais-form__field--modelo {
+    width: 7.5rem;
+    flex: 0 0 7.5rem;
+}
+
+.erp-terminais-form__field--caminho {
+    flex: 1 1 auto;
+    min-width: 8rem;
+}
+
+.erp-terminais-form__num-grid {
     display: grid;
-
-    grid-template-columns: auto minmax(8rem, 1fr) auto minmax(7rem, 0.85fr) auto;
-
-    gap: 0.35rem 0.55rem;
-
-    align-items: center;
-
+    grid-template-columns: 4.6rem;
+    gap: 0.25rem 0.45rem;
+    align-items: end;
+    margin-top: 0;
 }
 
-
-
-.erp-terminais-form__porta-wrap {
-
+.erp-terminais-form__check-end {
     display: inline-flex;
-
     align-items: center;
-
-    gap: 0.25rem;
-
+    min-height: 1.45rem;
+    white-space: nowrap;
 }
-
-
 
 .erp-terminais-form__porta-btn {
-
     border: 1px solid var(--erp-border-light, #c7d5e8);
-
     background: var(--erp-bg-panel, #fff);
-
     border-radius: var(--erp-radius-sm, 6px);
-
-    width: 1.85rem;
-
-    height: 1.85rem;
-
+    width: 1.7rem;
+    height: 1.7rem;
     cursor: pointer;
-
-    font-size: 0.85rem;
-
+    font-size: 0.8rem;
     line-height: 1;
-
 }
 
+.erp-terminais-form__escpos-grid {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) minmax(8rem, 1fr);
+    gap: 0.25rem 0.65rem;
+    align-items: end;
+    margin-top: 0.55rem;
+}
 
+.erp-terminais-form__porta-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.25rem;
+}
 
 .erp-terminais-form__path-row {
-
     display: grid;
-
     grid-template-columns: minmax(0, 1fr) auto;
-
     gap: 0.35rem;
-
     align-items: center;
-
 }
-
-
 
 .erp-terminais-form__browse-btn {
-
     border: 1px solid var(--erp-border-light, #94a3b8);
-
     background: var(--erp-bg-panel, #fff);
-
     border-radius: var(--erp-radius-sm, 6px);
-
-    width: 1.85rem;
-
-    height: 1.85rem;
-
+    width: 1.7rem;
+    height: 1.7rem;
     cursor: pointer;
-
 }
 
-
-
-.erp-terminais-form__meia-folha {
-
-    display: inline-flex;
-
-    margin-top: 0.35rem;
-
+.erp-terminais-form__fechamento-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.85rem;
 }
-
-
 
 .erp-terminais-form__bottom {
-
     display: grid;
-
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-
-    gap: 0.55rem;
-
-    align-items: start;
-
+    grid-template-columns: minmax(0, 1.25fr) minmax(13rem, 0.75fr);
+    gap: 0.3rem;
+    align-items: stretch;
 }
-
-
 
 .erp-terminais-form__bottom-right {
-
     display: flex;
-
     flex-direction: column;
-
-    gap: 0.35rem;
-
+    gap: 0.3rem;
     min-width: 0;
-
 }
-
-
 
 .erp-terminais-form__operacao-grid {
-
     display: grid;
-
-    grid-template-columns: minmax(10rem, 12.5rem) minmax(0, 1fr);
-
-    gap: 0.55rem;
-
+    grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
+    gap: 0.45rem;
     align-items: start;
-
 }
 
-
-
-.erp-terminais-form__operacao-select .erp-pcad-form__select {
-
+.erp-terminais-form__operacao-grid .erp-pcad-form__select {
     width: 100%;
-
 }
-
-
 
 .erp-terminais-form__operacao-list {
-
-    margin: 1.15rem 0 0;
-
-    padding: 0.25rem 0.35rem;
-
+    margin: 0;
+    padding: 0.2rem 0.35rem;
     list-style: none;
-
     border: 1px solid var(--erp-border-light, #cbd5e1);
-
+    border-radius: 0.35rem;
     background: var(--erp-bg-panel, #fff);
-
-    min-height: 6.25rem;
-
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
 }
-
-
 
 .erp-terminais-form__operacao-list li {
-
-    padding: 0.1rem 0.15rem;
-
+    padding: 0.05rem 0;
 }
-
-
 
 .erp-terminais-form__operacao-list .erp-pcad__check {
-
     display: flex;
-
     align-items: center;
-
-    gap: 0.35rem;
-
+    gap: 0.3rem;
     margin: 0;
-
     font-weight: 600;
-
+    font-size: 0.76rem;
 }
-
-
 
 @media (max-width: 980px) {
+    .erp-terminais-form__printer-compact {
+        flex-wrap: wrap;
+    }
 
-    .erp-terminais-form__printer-row,
+    .erp-terminais-form__printer-compact .erp-terminais-form__radios {
+        white-space: normal;
+    }
 
+    .erp-terminais-form__field--nvias,
+    .erp-terminais-form__field--modelo,
+    .erp-terminais-form__field--caminho {
+        width: auto;
+        flex: 1 1 8rem;
+        min-width: 0;
+    }
+
+    .erp-terminais-form__num-grid,
+    .erp-terminais-form__escpos-grid,
     .erp-terminais-form__bottom,
-
-    .erp-terminais-form__operacao-grid {
-
+    .erp-terminais-form__operacao-grid,
+    .erp-terminais-form__checks--compact {
         grid-template-columns: 1fr;
-
     }
 
-
-
-    .erp-terminais-form__operacao-list {
-
-        margin-top: 0.35rem;
-
+    .erp-terminais-form__field--nome,
+    .erp-terminais-form__field--narrow {
+        max-width: none;
     }
 
-
-
-    .erp-terminais-form__escpos-row {
-
-        grid-template-columns: 1fr 1fr;
-
+    .erp-terminais-form__ativo-grid {
+        grid-template-columns: 1fr !important;
     }
 
+    .erp-terminais-form__hint--inline {
+        white-space: normal;
+        padding-bottom: 0;
+    }
+}
+.erp-terminais-form--balanca {
+    max-width: 22rem;
 }
 
+.erp-terminais-balanca__stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.erp-terminais-balanca__field {
+    display: grid !important;
+    grid-template-columns: 7.5rem minmax(0, 1fr) !important;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-terminais-balanca__field .erp-pcad-form__label {
+    text-align: right;
+    margin: 0;
+}
+
+.erp-terminais-balanca__field .erp-pcad-form__select {
+    width: 100%;
+    min-height: 1.6rem;
+}
+
+.erp-terminais-balanca__checks {
+    margin-top: 0.65rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.erp-terminais-balanca__test {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+}
+
+.erp-terminais-balanca__test-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.15rem;
+    padding: 0.45rem 1.15rem;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.28);
+    transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.erp-terminais-balanca__test-btn:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow: 0 2px 8px rgba(15, 52, 96, 0.32);
+}
+
+.erp-terminais-balanca__test-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.erp-terminais-balanca__test-btn:focus-visible {
+    outline: 2px solid var(--erp-brand-primary, #1e5a9e);
+    outline-offset: 2px;
+}
+
+.erp-terminais-balanca__test-btn:disabled,
+.erp-terminais-balanca__test-btn.is-busy {
+    cursor: wait;
+    opacity: 0.78;
+    filter: none;
+}
+
+.erp-terminais-balanca__test-status {
+    margin: 0;
+    max-width: 22rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.erp-terminais-balanca__test-status[data-state="busy"] {
+    background: #eff6ff;
+    color: #1e3a8a;
+    border: 1px solid #bfdbfe;
+}
+
+.erp-terminais-balanca__test-status[data-state="ok"] {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.erp-terminais-balanca__test-status[data-state="error"] {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.erp-terminais-balanca__test-help {
+    margin: 0;
+    max-width: 26rem;
+    color: #475569;
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+
+.erp-terminais-aparelhos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-height: 100%;
+    padding: 0.25rem 0.15rem 0.5rem;
+}
+
+.erp-terminais-aparelhos__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem 1.25rem;
+}
+
+.erp-terminais-aparelhos__filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.erp-terminais-aparelhos__filter select {
+    min-width: 10rem;
+    height: 2rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.45rem;
+    padding: 0 0.55rem;
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-terminais-aparelhos__hint {
+    margin: 0;
+    max-width: 40rem;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.erp-terminais-aparelhos__hint kbd {
+    display: inline-block;
+    padding: 0.05rem 0.35rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.3rem;
+    background: #f8fafc;
+    font-size: 0.72rem;
+}
+
+.erp-terminais-aparelhos__table-wrap {
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background: #fff;
+}
+
+.erp-terminais-aparelhos__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.erp-terminais-aparelhos__table th,
+.erp-terminais-aparelhos__table td {
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #eef2f7;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.erp-terminais-aparelhos__table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-terminais-aparelhos__row {
+    cursor: pointer;
+}
+
+.erp-terminais-aparelhos__row:hover {
+    background: #f8fafc;
+}
+
+.erp-terminais-aparelhos__row--selected {
+    background: #eff6ff !important;
+}
+
+.erp-terminais-aparelhos__code {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #1d4ed8;
+}
+
+.erp-terminais-aparelhos__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-terminais-aparelhos__badge--pendente {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.erp-terminais-aparelhos__badge--ativo {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.erp-terminais-aparelhos__badge--revogado {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.erp-terminais-aparelhos__empty {
+    text-align: center !important;
+    color: #64748b;
+    padding: 1.5rem 0.75rem !important;
+}

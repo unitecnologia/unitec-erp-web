@@ -10,13 +10,13 @@
     "
 >
     @include('filament.components.erp.shared.cadastro-list-screen', [
-        'pageClass' => 'erp-unidades',
+        'pageClass' => 'erp-contas-caixa',
         'searchFields' => [
-            'codigo' => 'CÓDIGO',
-            'nome' => 'DESCRIÇÃO',
+            'codigo' => 'Código',
+            'nome' => 'Descrição',
         ],
         'uppercaseColumns' => 'nome',
         'wireKeyPrefix' => 'contas-caixa',
-        'hint' => 'Pressione Enter ou clique em Pesquisa. Use as setas para navegar na lista.',
+        'hint' => 'Enter pesquisa · setas navegam na lista · F2 novo · F3 alterar',
     ])
 </div>

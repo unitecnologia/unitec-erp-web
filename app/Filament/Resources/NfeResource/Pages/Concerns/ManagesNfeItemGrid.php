@@ -2,13 +2,18 @@
 
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
+use Unitec\FiscalEngine\Util\XmlHelper;
+
 use App\Models\Cfop;
 use App\Models\Empresa;
+use App\Models\Estoque;
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Nfe\NfeCalculoService;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 trait ManagesNfeItemGrid
@@ -25,7 +30,7 @@ trait ManagesNfeItemGrid
 
     public string $nfeItemEntryPreco = '';
 
-    public string $nfeItemEntryQtd = '1,0000';
+    public string $nfeItemEntryQtd = '1,000';
 
     public string $nfeItemEntryUnidade = 'UN';
 
@@ -37,8 +42,19 @@ trait ManagesNfeItemGrid
 
     public bool $nfeDescontoModalOpen = false;
 
+    public bool $nfeInfoAdicionaisModalOpen = false;
+
+    public ?int $nfeInfoAdicionaisRowIndex = null;
+
+    public string $nfeInfoAdicionaisDraft = '';
+
+    /** @var array{index: int, field: string}|null */
+    public ?array $nfeImpostoCalcHint = null;
+
     /** @var 'form'|'grid'|null */
     public ?string $nfeItemAjusteAlvo = null;
+
+    public ?int $nfeItemAjusteRowIndex = null;
 
     /** @var 'desconto'|'acrescimo' */
     public string $nfeItemAjusteTipo = 'desconto';
@@ -57,11 +73,84 @@ trait ManagesNfeItemGrid
 
     public ?string $nfeProdutoPreviewFotoUrl = null;
 
+    public ?string $nfeSelectedRowFotoUrl = null;
+
+    public ?int $nfeItemDeleteConfirmIndex = null;
+
     public function selectNfeRow(int $index): void
     {
         if ($index >= 0 && $index < count($this->nfeModalRows)) {
             $this->nfeSelectedRowIndex = $index;
+            $this->syncNfeSelectedRowFotoFromGrid();
         }
+    }
+
+    public function moveNfeSelectedRow(int $delta): void
+    {
+        if ($this->nfeModalRows === [] || $delta === 0) {
+            return;
+        }
+
+        $count = count($this->nfeModalRows);
+        $index = min(max(0, (int) $this->nfeSelectedRowIndex), $count - 1);
+        $newIndex = max(0, min($count - 1, $index + $delta));
+
+        if ($newIndex === $index) {
+            return;
+        }
+
+        $this->selectNfeRow($newIndex);
+        $this->dispatch('erp-nfe-scroll-item-selection');
+    }
+
+    public function updatedNfeSelectedRowIndex(): void
+    {
+        $this->syncNfeSelectedRowFotoFromGrid();
+    }
+
+    public function requestDeleteNfeSelectedItem(): void
+    {
+        if ($this->nfeModalRows === []) {
+            return;
+        }
+
+        $index = min(max(0, (int) $this->nfeSelectedRowIndex), count($this->nfeModalRows) - 1);
+        $this->requestDeleteNfeItem($index);
+    }
+
+    public function requestDeleteNfeItem(int $index): void
+    {
+        if (! isset($this->nfeModalRows[$index])) {
+            Notification::make()
+                ->title('Selecione um item para excluir.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->nfeSelectedRowIndex = $index;
+        $this->nfeItemDeleteConfirmIndex = $index;
+        $this->dispatch('erp-nfe-item-delete-opened');
+    }
+
+    public function confirmDeleteNfeItem(): void
+    {
+        if ($this->nfeItemDeleteConfirmIndex === null || ! isset($this->nfeModalRows[$this->nfeItemDeleteConfirmIndex])) {
+            $this->nfeItemDeleteConfirmIndex = null;
+
+            return;
+        }
+
+        $this->nfeSelectedRowIndex = $this->nfeItemDeleteConfirmIndex;
+        $this->nfeItemDeleteConfirmIndex = null;
+        $this->deleteNfeSelectedItem();
+        $this->dispatch('erp-nfe-focus-item-produto');
+    }
+
+    public function cancelDeleteNfeItem(): void
+    {
+        $this->nfeItemDeleteConfirmIndex = null;
     }
 
     public function handleNfeItemCodigoEnter(): void
@@ -185,15 +274,16 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 4);
+        $qtd = ErpMoney::tryParseBr($this->nfeItemEntryQtd, 3);
 
-        if ($qtd <= 0) {
+        if ($qtd === null || $qtd <= 0) {
             Notification::make()->title('Quantidade inválida.')->warning()->send();
             $this->dispatch('erp-nfe-focus-item-quantidade');
 
             return;
         }
 
+        $this->nfeItemEntryQtd = ErpMoney::formatBr($qtd, 3);
         $this->recalcNfeEntryRowPreview();
         $this->dispatch('erp-nfe-focus-item-preco');
     }
@@ -210,30 +300,57 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+        $preco = ErpMoney::tryParseBr($this->nfeItemEntryPreco, 3);
 
-        if ($preco <= 0) {
+        if ($preco === null || $preco <= 0) {
             Notification::make()->title('Informe o valor unitário.')->warning()->send();
             $this->dispatch('erp-nfe-focus-item-preco');
 
             return;
         }
 
+        $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 3);
         $this->confirmPendingNfeItemEntry();
     }
 
-    public function abrirNfeModalDescontoItem(): void
+    public function abrirNfeModalDescontoItem(?string $origem = null): void
     {
         if ($this->nfeDescontoModalOpen) {
             return;
         }
 
-        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+        $precoForm = ErpMoney::parseBr($this->nfeItemEntryPreco, 3);
+        $temForm = $this->nfeItemPendingProductId !== null && $precoForm > 0;
+        $temGrid = $this->nfeModalRows !== []
+            && array_key_exists((int) $this->nfeSelectedRowIndex, $this->nfeModalRows);
 
-        if ($this->nfeItemPendingProductId && $preco > 0) {
-            $this->nfeItemAjusteAlvo = 'form';
-        } elseif ($this->nfeModalRows !== [] && isset($this->nfeModalRows[$this->nfeSelectedRowIndex])) {
+        // Ao lançar (produto na barra) → sempre o item em digitação.
+        // Sem pendência → item selecionado na grade.
+        if ($origem === 'grid') {
+            if (! $temGrid) {
+                Notification::make()
+                    ->title('Selecione um item na grade para desconto/acréscimo.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
             $this->nfeItemAjusteAlvo = 'grid';
+            $this->nfeItemAjusteRowIndex = (int) $this->nfeSelectedRowIndex;
+        } elseif ($origem === 'form' || $temForm) {
+            if (! $temForm) {
+                Notification::make()
+                    ->title('Informe o produto na barra de inclusão para aplicar desconto.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+            $this->nfeItemAjusteAlvo = 'form';
+            $this->nfeItemAjusteRowIndex = null;
+        } elseif ($temGrid) {
+            $this->nfeItemAjusteAlvo = 'grid';
+            $this->nfeItemAjusteRowIndex = (int) $this->nfeSelectedRowIndex;
         } else {
             Notification::make()
                 ->title('Informe o produto (ou selecione um item) para desconto/acréscimo.')
@@ -254,10 +371,103 @@ trait ManagesNfeItemGrid
     {
         $this->nfeDescontoModalOpen = false;
         $this->nfeItemAjusteAlvo = null;
+        $this->nfeItemAjusteRowIndex = null;
+    }
+
+    public function abrirNfeInfoAdicionaisModal(int $index): void
+    {
+        if (! array_key_exists($index, $this->nfeModalRows)) {
+            return;
+        }
+
+        $this->nfeInfoAdicionaisRowIndex = $index;
+        $this->nfeInfoAdicionaisDraft = (string) ($this->nfeModalRows[$index]['info_adicionais'] ?? '');
+        $this->nfeInfoAdicionaisModalOpen = true;
+        $this->dispatch('erp-nfe-focus-info-adicionais');
+    }
+
+    public function fecharNfeInfoAdicionaisModal(): void
+    {
+        $this->nfeInfoAdicionaisModalOpen = false;
+        $this->nfeInfoAdicionaisRowIndex = null;
+        $this->nfeInfoAdicionaisDraft = '';
+    }
+
+    public function confirmarNfeInfoAdicionaisModal(): void
+    {
+        $index = $this->nfeInfoAdicionaisRowIndex;
+
+        if ($index !== null && array_key_exists($index, $this->nfeModalRows)) {
+            $original = trim($this->nfeInfoAdicionaisDraft);
+            $sanitized = XmlHelper::sanitizeInfAdProd($original, 100);
+
+            if ($original !== '' && $sanitized === '') {
+                Notification::make()
+                    ->title('Texto inválido para a SEFAZ.')
+                    ->body('Remova quebras de linha e caracteres especiais (<, >, &, aspas, barra). Use texto corrido.')
+                    ->warning()
+                    ->send();
+            }
+
+            $this->nfeModalRows[$index]['info_adicionais'] = $sanitized;
+        }
+
+        $this->fecharNfeInfoAdicionaisModal();
+    }
+
+    public function carregarNfeInfoAdicionaisDoProduto(): void
+    {
+        $index = $this->nfeInfoAdicionaisRowIndex;
+
+        if ($index === null || ! array_key_exists($index, $this->nfeModalRows)) {
+            return;
+        }
+
+        $productId = (int) ($this->nfeModalRows[$index]['product_id'] ?? 0);
+
+        if ($productId <= 0) {
+            Notification::make()
+                ->title('Item sem produto vinculado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $product = Product::query()->find($productId);
+
+        if (! $product) {
+            Notification::make()
+                ->title('Produto não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $texto = XmlHelper::sanitizeInfAdProd(trim((string) ($product->info_adicionais ?? '')), 100);
+
+        if ($texto === '') {
+            Notification::make()
+                ->title('O cadastro deste produto não possui informações adicionais.')
+                ->info()
+                ->send();
+
+            return;
+        }
+
+        $this->nfeInfoAdicionaisDraft = mb_substr($texto, 0, 100);
+        $this->dispatch('erp-nfe-focus-info-adicionais');
     }
 
     public function handleNfeModalEscape(): void
     {
+        if ($this->nfeInfoAdicionaisModalOpen) {
+            $this->fecharNfeInfoAdicionaisModal();
+
+            return;
+        }
+
         if ($this->nfeDescontoModalOpen) {
             $this->fecharNfeModalDescontoItem();
 
@@ -296,7 +506,7 @@ trait ManagesNfeItemGrid
     }
 
     /**
-     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     * @return array{descricao: string, base: string, novoPreco: string, total: string, ajuste: string, tipo: string, temAjuste: bool}
      */
     public function getNfeItemAjustePreviewProperty(): array
     {
@@ -307,7 +517,8 @@ trait ManagesNfeItemGrid
                 'descricao' => '',
                 'base' => ErpMoney::formatBr(0, 2),
                 'novoPreco' => ErpMoney::formatBr(0, 2),
-                'total' => ErpMoney::formatBr(0, 2),
+                'total' => ErpMoney::formatBr(0, 3),
+                'ajuste' => ErpMoney::formatBr(0, 2),
                 'tipo' => $this->nfeItemAjusteTipo,
                 'temAjuste' => false,
             ];
@@ -319,9 +530,10 @@ trait ManagesNfeItemGrid
             'descricao' => $ctx['descricao'],
             'base' => ErpMoney::formatBr($calc['base'], 2),
             'novoPreco' => ErpMoney::formatBr($calc['novoPreco'], 2),
-            'total' => ErpMoney::formatBr($calc['total'], 2),
+            'total' => ErpMoney::formatBr($calc['total'], 3),
+            'ajuste' => ErpMoney::formatBr($calc['ajusteLinha'], 2),
             'tipo' => $this->nfeItemAjusteTipo,
-            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+            'temAjuste' => abs($calc['ajusteLinha']) > 0.0001,
         ];
     }
 
@@ -336,7 +548,7 @@ trait ManagesNfeItemGrid
         }
 
         $calc = $this->calcularNfeItemAjuste($ctx['preco'], $ctx['quantidade']);
-        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+        $ajusteLinha = (float) $calc['ajusteLinha'];
 
         if ($this->nfeItemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
             Notification::make()->title('Desconto inválido.')->warning()->send();
@@ -344,8 +556,17 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        if ($this->nfeItemAjusteAlvo === 'form') {
-            if ($this->nfeItemAjusteTipo === 'desconto') {
+        if (abs($ajusteLinha) < 0.005) {
+            Notification::make()->title('Informe um valor de desconto/acréscimo.')->warning()->send();
+
+            return;
+        }
+
+        $alvo = $this->nfeItemAjusteAlvo;
+        $tipo = $this->nfeItemAjusteTipo;
+
+        if ($alvo === 'form') {
+            if ($tipo === 'desconto') {
                 $this->nfeItemEntryDesconto = ErpMoney::formatBr($ajusteLinha, 2);
                 $this->nfeItemEntryOutros = '0,00';
             } else {
@@ -354,8 +575,13 @@ trait ManagesNfeItemGrid
             }
 
             $this->recalcNfeEntryRowPreview();
+            $this->fecharNfeModalDescontoItem();
+            // Lança na grade com DESC./ACRE. (não unifica linha com ajuste).
+            $this->confirmPendingNfeItemEntry();
         } else {
-            $index = (int) $this->nfeSelectedRowIndex;
+            $index = $this->nfeItemAjusteRowIndex !== null
+                ? (int) $this->nfeItemAjusteRowIndex
+                : (int) $this->nfeSelectedRowIndex;
 
             if (! isset($this->nfeModalRows[$index])) {
                 $this->fecharNfeModalDescontoItem();
@@ -363,21 +589,21 @@ trait ManagesNfeItemGrid
                 return;
             }
 
-            if ($this->nfeItemAjusteTipo === 'desconto') {
-                $this->nfeModalRows[$index]['desconto'] = $ajusteLinha;
-                $this->nfeModalRows[$index]['outros'] = 0.0;
+            if ($tipo === 'desconto') {
+                $this->nfeModalRows[$index]['desconto'] = ErpMoney::formatBr($ajusteLinha, 2);
+                $this->nfeModalRows[$index]['outros'] = ErpMoney::formatBr(0, 2);
             } else {
-                $this->nfeModalRows[$index]['outros'] = $ajusteLinha;
-                $this->nfeModalRows[$index]['desconto'] = 0.0;
+                $this->nfeModalRows[$index]['outros'] = ErpMoney::formatBr($ajusteLinha, 2);
+                $this->nfeModalRows[$index]['desconto'] = ErpMoney::formatBr(0, 2);
             }
 
             $this->recalculateNfeTotais();
+            $this->fecharNfeModalDescontoItem();
         }
 
-        $tipo = $this->nfeItemAjusteTipo;
-        $this->fecharNfeModalDescontoItem();
         Notification::make()
             ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+            ->body('Valor: R$ '.ErpMoney::formatBr($ajusteLinha, 2))
             ->success()
             ->send();
     }
@@ -390,18 +616,26 @@ trait ManagesNfeItemGrid
         if ($this->nfeItemAjusteAlvo === 'form' && $this->nfeItemPendingProductId) {
             return [
                 'descricao' => (string) $this->nfeItemProdutoSearch,
-                'preco' => ErpMoney::parseBr($this->nfeItemEntryPreco, 4),
-                'quantidade' => max(0.0, ErpMoney::parseBr($this->nfeItemEntryQtd, 4)),
+                'preco' => ErpMoney::parseBr($this->nfeItemEntryPreco, 3),
+                'quantidade' => max(0.0, ErpMoney::parseBr($this->nfeItemEntryQtd, 3)),
             ];
         }
 
-        if ($this->nfeItemAjusteAlvo === 'grid' && isset($this->nfeModalRows[$this->nfeSelectedRowIndex])) {
-            $item = $this->nfeModalRows[$this->nfeSelectedRowIndex];
+        if ($this->nfeItemAjusteAlvo === 'grid') {
+            $index = $this->nfeItemAjusteRowIndex !== null
+                ? (int) $this->nfeItemAjusteRowIndex
+                : (int) $this->nfeSelectedRowIndex;
+
+            if (! isset($this->nfeModalRows[$index])) {
+                return null;
+            }
+
+            $item = $this->nfeModalRows[$index];
 
             return [
                 'descricao' => (string) ($item['descricao'] ?? ''),
-                'preco' => ErpMoney::parseBr($item['valor_unitario'] ?? 0, 4),
-                'quantidade' => ErpMoney::parseBr($item['quantidade'] ?? 0, 4),
+                'preco' => ErpMoney::parseBr($item['valor_unitario'] ?? 0, 3),
+                'quantidade' => ErpMoney::parseBr($item['quantidade'] ?? 0, 3),
             ];
         }
 
@@ -409,16 +643,21 @@ trait ManagesNfeItemGrid
     }
 
     /**
-     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     * @return array{base: float, deltaUnit: float, ajusteLinha: float, novoPreco: float, total: float}
      */
     protected function calcularNfeItemAjuste(float $base, float $quantidade): array
     {
         $valor = ErpMoney::parseBr($this->nfeItemAjusteValor, 2);
+        $qtd = max(0.0, $quantidade);
 
         if ($this->nfeItemAjusteModo === 'percentual') {
+            // % sobre o preço unitário → valor da linha = delta × qtd
             $deltaUnit = round($base * ($valor / 100), 2);
+            $ajusteLinha = round($deltaUnit * $qtd, 2);
         } else {
-            $deltaUnit = round($valor, 2);
+            // R$ = valor absoluto na linha (vDesc / vOutro da NF-e)
+            $ajusteLinha = round($valor, 2);
+            $deltaUnit = $qtd > 0 ? round($ajusteLinha / $qtd, 2) : $ajusteLinha;
         }
 
         $novoPreco = $this->nfeItemAjusteTipo === 'acrescimo'
@@ -429,11 +668,17 @@ trait ManagesNfeItemGrid
             $novoPreco = 0.0;
         }
 
+        $subtotal = round($qtd * $base, 3);
+        $total = $this->nfeItemAjusteTipo === 'acrescimo'
+            ? round($subtotal + $ajusteLinha, 3)
+            : round(max(0, $subtotal - $ajusteLinha), 3);
+
         return [
             'base' => $base,
             'deltaUnit' => $deltaUnit,
+            'ajusteLinha' => $ajusteLinha,
             'novoPreco' => $novoPreco,
-            'total' => round($quantidade * $novoPreco, 2),
+            'total' => $total,
         ];
     }
 
@@ -582,11 +827,11 @@ trait ManagesNfeItemGrid
         $this->nfeItemEntryCfop = '';
         $this->nfeItemEntryCst = '';
         $this->nfeItemEntryPreco = '';
-        $this->nfeItemEntryQtd = '1,0000';
+        $this->nfeItemEntryQtd = '1,000';
         $this->nfeItemEntryUnidade = 'UN';
         $this->nfeItemEntryDesconto = '0,00';
         $this->nfeItemEntryOutros = '0,00';
-        $this->nfeItemEntryTotalDisplay = '0,00';
+        $this->nfeItemEntryTotalDisplay = '0,000';
     }
 
     protected function nfePendingProductNome(): string
@@ -844,7 +1089,7 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 4);
+        $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 3);
 
         if ($qtd <= 0) {
             Notification::make()->title('Informe a quantidade do item.')->warning()->send();
@@ -853,13 +1098,19 @@ trait ManagesNfeItemGrid
             return;
         }
 
+        if ($this->nfeBloqueiaLancamentoPorEstoque($product, $qtd)) {
+            $this->dispatch('erp-nfe-focus-item-quantidade');
+
+            return;
+        }
+
         $cfop = trim($this->nfeItemEntryCfop);
-        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
+        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 3);
         $existingIndex = $this->findNfeModalRowIndexToUnify((int) $product->id, $cfop, $preco);
 
         if ($existingIndex !== null) {
-            $existingQtd = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['quantidade'] ?? '0', 4);
-            $this->nfeModalRows[$existingIndex]['quantidade'] = ErpMoney::formatBr($existingQtd + $qtd, 4);
+            $existingQtd = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['quantidade'] ?? '0', 3);
+            $this->nfeModalRows[$existingIndex]['quantidade'] = ErpMoney::formatBr($existingQtd + $qtd, 3);
 
             $existingDesconto = ErpMoney::parseBr($this->nfeModalRows[$existingIndex]['desconto'] ?? '0', 2);
             $entryDesconto = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
@@ -881,24 +1132,92 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $this->nfeModalRows[] = [
+        // Último lançado fica no topo (item 1), logo abaixo da barra de inclusão.
+        array_unshift($this->nfeModalRows, [
             'key' => 'new-' . Str::uuid()->toString(),
             'product_id' => $product->id,
             'codigo' => (string) $product->codigo,
+            'referencia' => trim((string) ($product->referencia ?? '')),
             'descricao' => mb_strtoupper(trim($this->nfeItemProdutoSearch), 'UTF-8'),
             'cfop' => $cfop,
-            'cst' => trim($this->nfeItemEntryCst),
-            'quantidade' => ErpMoney::formatBr($qtd, 4),
-            'valor_unitario' => ErpMoney::formatBr($preco, 4),
+            'quantidade' => ErpMoney::formatBr($qtd, 3),
+            'valor_unitario' => ErpMoney::formatBr($preco, 3),
             'unidade' => mb_strtoupper(trim($this->nfeItemEntryUnidade) ?: 'UN', 'UTF-8'),
-            'desconto' => ErpMoney::parseBr($this->nfeItemEntryDesconto, 2),
-            'outros' => ErpMoney::parseBr($this->nfeItemEntryOutros, 2),
-        ];
+            'desconto' => ErpMoney::formatBr(ErpMoney::parseBr($this->nfeItemEntryDesconto, 2), 2),
+            'outros' => ErpMoney::formatBr(ErpMoney::parseBr($this->nfeItemEntryOutros, 2), 2),
+            'info_adicionais' => '',
+        ]);
 
-        $this->nfeSelectedRowIndex = count($this->nfeModalRows) - 1;
+        $this->nfeModalRows = array_values($this->nfeModalRows);
+        $this->nfeSelectedRowIndex = 0;
+        $this->syncNfeSelectedRowFotoFromGrid();
         $this->clearNfeItemEntryRow();
         $this->recalculateNfeTotais();
         $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    /**
+     * Crítica no lançamento (igual Tela de Venda), quando bloqueio + NF-e baixa estoque.
+     * Retorna true se bloqueou o lançamento.
+     */
+    protected function nfeBloqueiaLancamentoPorEstoque(Product $product, float $qtdAdicional): bool
+    {
+        if ($qtdAdicional <= 0 || $product->is_servico) {
+            return false;
+        }
+
+        if (($this->nfeForm['movimento'] ?? 'saida') === 'entrada') {
+            return false;
+        }
+
+        if (! EstoqueNegativoPolicy::ativo()) {
+            return false;
+        }
+
+        $empresaId = $this->resolveEmpresaId();
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        if (
+            $empresa
+            && Schema::hasColumn('empresas', 'param_fiscal_nfe_baixa_estoque')
+            && ! (bool) ($empresa->param_fiscal_nfe_baixa_estoque ?? true)
+        ) {
+            return false;
+        }
+
+        $jaNaNota = 0.0;
+        foreach ($this->nfeModalRows as $row) {
+            if ((int) ($row['product_id'] ?? 0) === (int) $product->id) {
+                $jaNaNota += ErpMoney::parseBr($row['quantidade'] ?? '0', 3);
+            }
+        }
+
+        $estoqueId = null;
+        if ($empresaId) {
+            $estoqueId = Estoque::query()
+                ->where('empresa_id', $empresaId)
+                ->where('ativo', true)
+                ->orderBy('codigo')
+                ->value('id');
+            $estoqueId = $estoqueId ? (int) $estoqueId : null;
+        }
+
+        $disponivel = app(EstoqueReservaService::class)->disponivel($product, null, $estoqueId);
+
+        if ($disponivel >= ($jaNaNota + $qtdAdicional)) {
+            return false;
+        }
+
+        Notification::make()
+            ->title(
+                'Estoque insuficiente para '.$product->descricao
+                .' (disponível: '.ErpMoney::formatBr($disponivel, 3).').'
+                .' Bloqueio de estoque negativo está ativo.'
+            )
+            ->danger()
+            ->send();
+
+        return true;
     }
 
     /**
@@ -910,11 +1229,25 @@ trait ManagesNfeItemGrid
             return null;
         }
 
+        // Com desconto/acréscimo na inclusão, nunca unifica: o valor é da linha,
+        // e somar qty+DESC. em item já lançado distorce o total.
+        $entryDesconto = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
+        $entryOutros = ErpMoney::parseBr($this->nfeItemEntryOutros, 2);
+        if ($entryDesconto > 0.0005 || $entryOutros > 0.0005) {
+            return null;
+        }
+
         $cfopNorm = preg_replace('/\D/', '', $cfop) ?: '';
-        $precoNorm = round($preco, 4);
+        $precoNorm = round($preco, 3);
 
         foreach ($this->nfeModalRows as $index => $row) {
             if ((int) ($row['product_id'] ?? 0) !== $productId) {
+                continue;
+            }
+
+            $rowDesconto = ErpMoney::parseBr($row['desconto'] ?? '0', 2);
+            $rowOutros = ErpMoney::parseBr($row['outros'] ?? '0', 2);
+            if ($rowDesconto > 0.0005 || $rowOutros > 0.0005) {
                 continue;
             }
 
@@ -923,8 +1256,8 @@ trait ManagesNfeItemGrid
                 continue;
             }
 
-            $rowPreco = round(ErpMoney::parseBr($row['valor_unitario'] ?? '0', 4), 4);
-            if (abs($rowPreco - $precoNorm) > 0.00005) {
+            $rowPreco = round(ErpMoney::parseBr($row['valor_unitario'] ?? '0', 3), 3);
+            if (abs($rowPreco - $precoNorm) > 0.0005) {
                 continue;
             }
 
@@ -954,8 +1287,47 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $qtd = ErpMoney::parseBr($this->nfeModalRows[$index]['quantidade'] ?? '1', 4);
+        $qtd = ErpMoney::parseBr($this->nfeModalRows[$index]['quantidade'] ?? '1', 3);
         $this->applyProductToNfeRow($index, $product, max(0.0001, $qtd));
+        $this->recalculateNfeTotais();
+    }
+
+    public function nfeItemGridEnter(int $index, string $field, mixed $value): void
+    {
+        $this->commitNfeItemGridField($index, $field, $value);
+    }
+
+    public function nfeItemGridBlur(int $index, string $field, mixed $value): void
+    {
+        $this->commitNfeItemGridField($index, $field, $value);
+    }
+
+    protected function commitNfeItemGridField(int $index, string $field, mixed $value): void
+    {
+        if ($this->nfeModalStatus !== 'ABERTA' || ! isset($this->nfeModalRows[$index])) {
+            return;
+        }
+
+        $allowed = [
+            'cfop', 'cst', 'valor_unitario', 'desconto', 'outros', 'quantidade', 'unidade',
+        ];
+
+        if (! in_array($field, $allowed, true)) {
+            return;
+        }
+
+        $raw = trim((string) $value);
+
+        if (in_array($field, ['valor_unitario', 'quantidade'], true)) {
+            $this->nfeModalRows[$index][$field] = ErpMoney::formatBr(ErpMoney::parseBr($raw, 3), 3);
+        } elseif (in_array($field, ['desconto', 'outros'], true)) {
+            $this->nfeModalRows[$index][$field] = ErpMoney::formatBr(ErpMoney::parseBr($raw, 2), 2);
+        } elseif ($field === 'unidade') {
+            $this->nfeModalRows[$index][$field] = mb_strtoupper($raw !== '' ? $raw : 'UN', 'UTF-8');
+        } else {
+            $this->nfeModalRows[$index][$field] = $raw;
+        }
+
         $this->recalculateNfeTotais();
     }
 
@@ -1002,6 +1374,18 @@ trait ManagesNfeItemGrid
         $this->recalculateNfeTotais();
     }
 
+    public function updating($property, $value): void
+    {
+        if (! preg_match('/^nfeModalRows\.(\d+)\.(base_icms|aliq_icms|valor_icms|aliq_ipi|valor_ipi|aliq_pis_icms|valor_pis_icms|aliq_cofins_icms|valor_cofins_icms)$/', (string) $property, $matches)) {
+            return;
+        }
+
+        $this->nfeImpostoCalcHint = [
+            'index' => (int) $matches[1],
+            'field' => $matches[2],
+        ];
+    }
+
     public function updatedNfeModalRows(): void
     {
         foreach (array_keys($this->nfeModalRows) as $index) {
@@ -1029,8 +1413,9 @@ trait ManagesNfeItemGrid
             return;
         }
 
-        $index = min($this->nfeSelectedRowIndex, count($this->nfeModalRows) - 1);
+        $index = min(max(0, (int) $this->nfeSelectedRowIndex), count($this->nfeModalRows) - 1);
         array_splice($this->nfeModalRows, $index, 1);
+        $this->nfeModalRows = array_values($this->nfeModalRows);
         $this->nfeSelectedRowIndex = max(0, $index - 1);
 
         if ($this->nfeModalRows === []) {
@@ -1038,6 +1423,52 @@ trait ManagesNfeItemGrid
         }
 
         $this->recalculateNfeTotais();
+        $this->syncNfeSelectedRowFotoFromGrid();
+    }
+
+    /**
+     * Duplo clique no nome do produto: remove da grade e recoloca na barra de inclusão.
+     */
+    public function puxarNfeItemParaInclusao(int $index): void
+    {
+        if (! isset($this->nfeModalRows[$index])) {
+            return;
+        }
+
+        $row = $this->nfeModalRows[$index];
+        $productId = (int) ($row['product_id'] ?? 0);
+        $product = $productId > 0 ? Product::query()->find($productId) : null;
+
+        $this->nfeItemPendingProductId = $product?->id;
+        $this->nfeItemCodigoInput = (string) ($row['codigo'] ?? ($product?->codigo ?? ''));
+        $this->nfeItemProdutoSearch = mb_strtoupper(
+            trim((string) ($row['descricao'] ?? ($product?->descricao ?? ''))),
+            'UTF-8',
+        );
+        $this->nfeItemEntryCfop = trim((string) ($row['cfop'] ?? ''));
+        $this->nfeItemEntryCst = trim((string) (($row['csosn'] ?? '') ?: ($row['cst'] ?? '')));
+        $this->nfeItemEntryPreco = ErpMoney::formatBr(ErpMoney::parseBr($row['valor_unitario'] ?? '0', 3), 3);
+        $this->nfeItemEntryQtd = ErpMoney::formatBr(ErpMoney::parseBr($row['quantidade'] ?? '1', 3), 3);
+        $this->nfeItemEntryUnidade = mb_strtoupper(
+            trim((string) ($row['unidade'] ?? ($product?->unidade ?: 'UN'))) ?: 'UN',
+            'UTF-8',
+        );
+        $this->nfeItemEntryDesconto = ErpMoney::formatBr(ErpMoney::parseBr($row['desconto'] ?? '0', 2), 2);
+        $this->nfeItemEntryOutros = ErpMoney::formatBr(ErpMoney::parseBr($row['outros'] ?? '0', 2), 2);
+        $this->recalcNfeEntryRowPreview();
+        $this->nfeProdutoLookupOpen = false;
+        $this->nfeProdutoResults = [];
+        $this->nfeSelectedProdutoIndex = null;
+        $this->clearNfeProdutoPreviewFoto();
+
+        array_splice($this->nfeModalRows, $index, 1);
+        $this->nfeModalRows = array_values($this->nfeModalRows);
+        $this->nfeSelectedRowIndex = $this->nfeModalRows === []
+            ? 0
+            : min($index, count($this->nfeModalRows) - 1);
+
+        $this->recalculateNfeTotais();
+        $this->dispatch('erp-nfe-focus-item-quantidade');
     }
 
     protected function stageNfeProductForEntry(Product $product, bool $advanceToCfop = false): void
@@ -1048,13 +1479,13 @@ trait ManagesNfeItemGrid
         $this->nfeItemCodigoInput = (string) $product->codigo;
         $this->nfeItemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
         $this->nfeItemEntryCfop = (string) ($preview['cfop'] ?? '');
-        $this->nfeItemEntryCst = (string) (($preview['cst'] ?? '') ?: ($preview['csosn'] ?? ''));
+        $this->nfeItemEntryCst = (string) (($preview['csosn'] ?? '') ?: ($preview['cst'] ?? ''));
         $preco = (float) ($preview['valor_unitario'] ?? 0);
         if ($preco <= 0) {
             $preco = (float) ($product->preco_venda ?? 0);
         }
-        $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 4);
-        $this->nfeItemEntryQtd = ErpMoney::formatBr(1, 4);
+        $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 3);
+        $this->nfeItemEntryQtd = ErpMoney::formatBr(1, 3);
         $this->nfeItemEntryUnidade = mb_strtoupper((string) ($preview['unidade'] ?? $product->unidade ?: 'UN'), 'UTF-8');
         $this->nfeItemEntryDesconto = '0,00';
         $this->nfeItemEntryOutros = '0,00';
@@ -1072,11 +1503,12 @@ trait ManagesNfeItemGrid
 
         $this->nfeModalRows[$index]['product_id'] = $product->id;
         $this->nfeModalRows[$index]['codigo'] = (string) $product->codigo;
+        $this->nfeModalRows[$index]['referencia'] = trim((string) ($product->referencia ?? ''));
         $this->nfeModalRows[$index]['descricao'] = mb_strtoupper($product->descricao, 'UTF-8');
         $this->nfeModalRows[$index]['cfop'] = (string) ($preview['cfop'] ?? '');
-        $this->nfeModalRows[$index]['cst'] = (string) (($preview['cst'] ?? '') ?: ($preview['csosn'] ?? ''));
-        $this->nfeModalRows[$index]['quantidade'] = ErpMoney::formatBr($qtd, 4);
-        $this->nfeModalRows[$index]['valor_unitario'] = ErpMoney::formatBr((float) ($preview['valor_unitario'] ?? $product->preco_venda), 4);
+        unset($this->nfeModalRows[$index]['cst'], $this->nfeModalRows[$index]['csosn']);
+        $this->nfeModalRows[$index]['quantidade'] = ErpMoney::formatBr($qtd, 3);
+        $this->nfeModalRows[$index]['valor_unitario'] = ErpMoney::formatBr((float) ($preview['valor_unitario'] ?? $product->preco_venda), 3);
         $this->nfeModalRows[$index]['unidade'] = mb_strtoupper((string) ($preview['unidade'] ?? $product->unidade ?: 'UN'), 'UTF-8');
     }
 
@@ -1103,34 +1535,19 @@ trait ManagesNfeItemGrid
 
     protected function recalcNfeEntryRowPreview(): void
     {
-        $qtd = ErpMoney::parseBr($this->nfeItemEntryQtd, 4);
-        $preco = ErpMoney::parseBr($this->nfeItemEntryPreco, 4);
-        $desconto = ErpMoney::parseBr($this->nfeItemEntryDesconto, 2);
-        $outros = ErpMoney::parseBr($this->nfeItemEntryOutros, 2);
+        // Não reescreve Qtde/Vlr. unit. enquanto o usuário digita/apaga —
+        // só atualiza o total. A formatação ocorre na confirmação (Enter).
+        $qtd = ErpMoney::tryParseBr($this->nfeItemEntryQtd, 3);
+        $preco = ErpMoney::tryParseBr($this->nfeItemEntryPreco, 3);
+        $desconto = max(0.0, ErpMoney::parseBr($this->nfeItemEntryDesconto, 2));
+        $outros = max(0.0, ErpMoney::parseBr($this->nfeItemEntryOutros, 2));
 
-        if ($qtd <= 0) {
-            $qtd = 1;
-        }
+        $qtdCalc = ($qtd !== null && $qtd > 0) ? $qtd : 0.0;
+        $precoCalc = ($preco !== null && $preco > 0) ? $preco : 0.0;
 
-        if ($preco < 0) {
-            $preco = 0;
-        }
-
-        if ($desconto < 0) {
-            $desconto = 0;
-        }
-
-        if ($outros < 0) {
-            $outros = 0;
-        }
-
-        $this->nfeItemEntryQtd = ErpMoney::formatBr($qtd, 4);
-        $this->nfeItemEntryPreco = ErpMoney::formatBr($preco, 4);
-        $this->nfeItemEntryDesconto = ErpMoney::formatBr($desconto, 2);
-        $this->nfeItemEntryOutros = ErpMoney::formatBr($outros, 2);
         $this->nfeItemEntryTotalDisplay = ErpMoney::formatBr(
-            round(($qtd * $preco) + $outros - $desconto, 2),
-            2,
+            round(($qtdCalc * $precoCalc) + $outros - $desconto, 3),
+            3,
         );
     }
 
@@ -1142,11 +1559,11 @@ trait ManagesNfeItemGrid
         $this->nfeItemEntryCfop = '';
         $this->nfeItemEntryCst = '';
         $this->nfeItemEntryPreco = '';
-        $this->nfeItemEntryQtd = '1,0000';
+        $this->nfeItemEntryQtd = '1,000';
         $this->nfeItemEntryUnidade = 'UN';
         $this->nfeItemEntryDesconto = '0,00';
         $this->nfeItemEntryOutros = '0,00';
-        $this->nfeItemEntryTotalDisplay = '0,00';
+        $this->nfeItemEntryTotalDisplay = '0,000';
         $this->nfeDescontoModalOpen = false;
         $this->nfeItemAjusteAlvo = null;
         $this->nfeProdutoLookupOpen = false;
@@ -1172,6 +1589,31 @@ trait ManagesNfeItemGrid
     protected function clearNfeProdutoPreviewFoto(): void
     {
         $this->nfeProdutoPreviewFotoUrl = null;
+    }
+
+    protected function syncNfeSelectedRowFotoFromGrid(): void
+    {
+        if ($this->nfeModalRows === []) {
+            $this->clearNfeSelectedRowFoto();
+
+            return;
+        }
+
+        $index = min(max(0, (int) $this->nfeSelectedRowIndex), count($this->nfeModalRows) - 1);
+        $productId = (int) ($this->nfeModalRows[$index]['product_id'] ?? 0);
+
+        if ($productId <= 0) {
+            $this->clearNfeSelectedRowFoto();
+
+            return;
+        }
+
+        $this->nfeSelectedRowFotoUrl = Product::query()->find($productId)?->fotoUrl();
+    }
+
+    protected function clearNfeSelectedRowFoto(): void
+    {
+        $this->nfeSelectedRowFotoUrl = null;
     }
 
     protected function findNfeProductByCodigo(string $codigo): ?Product
@@ -1202,30 +1644,42 @@ trait ManagesNfeItemGrid
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
      */
-    protected function formatNfeModalRowsForDisplay(array $rows): array
+    protected function formatNfeModalRowsForDisplay(array $rows, ?\App\Models\Empresa $empresa = null): array
     {
+        $isSimples = $empresa === null
+            || strtolower((string) ($empresa->regime_tributario ?? 'simples')) === 'simples';
+
         $money2 = [
-            'total', 'desconto', 'frete', 'seguro', 'outros',
+            'desconto', 'frete', 'seguro', 'outros',
             'base_icms', 'valor_icms', 'base_desoneracao', 'desc_desoneracao', 'valor_desoneracao',
             'base_ipi', 'valor_ipi', 'base_pis_icms', 'valor_pis_icms', 'base_cofins_icms', 'valor_cofins_icms',
             'v_ibs_mun', 'v_ibs_uf', 'v_cbs', 'bc_ibs',
+            'aliq_pis_icms', 'aliq_ipi', 'aliq_cofins_icms', 'aliq_icms',
+        ];
+        $money3 = [
+            'total', 'quantidade', 'valor_unitario',
         ];
         $money4 = [
-            'quantidade', 'valor_unitario', 'aliq_icms', 'aliq_ipi', 'aliq_pis_icms', 'aliq_cofins_icms',
             'alq_cbs', 'alq_ibs_mun', 'alq_ibs_uf',
         ];
 
-        return array_map(function (array $row) use ($money2, $money4): array {
+        return array_map(function (array $row) use ($money2, $money3, $money4, $isSimples): array {
             foreach ($money2 as $field) {
-                $row[$field] = ErpMoney::formatBr((float) ($row[$field] ?? 0), 2);
+                $row[$field] = ErpMoney::formatBr(ErpMoney::parseBr($row[$field] ?? 0, 2), 2);
+            }
+
+            foreach ($money3 as $field) {
+                $row[$field] = ErpMoney::formatBr(ErpMoney::parseBr($row[$field] ?? 0, 3), 3);
             }
 
             foreach ($money4 as $field) {
-                $row[$field] = ErpMoney::formatBr((float) ($row[$field] ?? 0), 4);
+                $row[$field] = ErpMoney::formatBr(ErpMoney::parseBr($row[$field] ?? 0, 4), 4);
             }
 
-            $row['cst'] = (string) (($row['cst'] ?? '') ?: ($row['csosn'] ?? ''));
-            $row['info_adicionais'] = (string) ($row['info_adicionais'] ?? '');
+            $row['cst'] = $isSimples
+                ? (string) ($row['csosn'] ?? '')
+                : (string) (($row['cst'] ?? '') ?: ($row['csosn'] ?? ''));
+            $row['info_adicionais'] = XmlHelper::sanitizeInfAdProd((string) ($row['info_adicionais'] ?? ''), 100);
             $row['motivo_desoneracao'] = (string) ($row['motivo_desoneracao'] ?? '');
             $row['class_trib'] = (string) ($row['class_trib'] ?? '');
             $row['cst_ibs_cbs'] = (string) ($row['cst_ibs_cbs'] ?? '');

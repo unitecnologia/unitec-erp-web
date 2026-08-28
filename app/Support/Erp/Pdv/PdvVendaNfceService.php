@@ -17,7 +17,10 @@ final class PdvVendaNfceService
         private readonly PdvNfceEmissionService $emissionService = new PdvNfceEmissionService(),
     ) {}
 
-    public function registrar(PdvVenda $venda, ?Empresa $empresa, string $operacao): PdvVendaNfce
+    /**
+     * @param  (callable(int, string): void)|null  $onProgress
+     */
+    public function registrar(PdvVenda $venda, ?Empresa $empresa, string $operacao, ?callable $onProgress = null): PdvVendaNfce
     {
         if ($empresa === null) {
             throw new FiscalEngineException('Empresa não configurada para emissão fiscal.');
@@ -41,6 +44,6 @@ final class PdvVendaNfceService
             return $this->emissionService->emitirContingencia($venda, $empresa, $parametros, $operacao);
         }
 
-        return $this->emissionService->emitir($venda, $empresa, $parametros, $operacao);
+        return $this->emissionService->emitir($venda, $empresa, $parametros, $operacao, $onProgress);
     }
 }

@@ -1,9 +1,27 @@
+@php
+    $gestorPwaVersion = '8';
+@endphp
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0d2f57">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Unitec Executivo">
-<link rel="manifest" href="{{ asset('manifest-gestor.webmanifest') }}?v=6">
-<link rel="apple-touch-icon" href="{{ asset('pwa-gestor/icons/icon-192.png') }}">
+<link rel="manifest" href="{{ asset('manifest-gestor.webmanifest') }}?v={{ $gestorPwaVersion }}">
+<link rel="apple-touch-icon" href="{{ asset('pwa-gestor/icons/icon-192.png') }}?v={{ $gestorPwaVersion }}">
 <title>Unitec Executivo</title>
+
+{{-- Captura beforeinstallprompt o mais cedo possível (antes do JS defer). --}}
+<script>
+    window.__unitecGestorBip = window.__unitecGestorBip || null;
+    window.addEventListener('beforeinstallprompt', function (event) {
+        try { event.preventDefault(); } catch (e) {}
+        window.__unitecGestorBip = event;
+    });
+</script>
+
+<link rel="stylesheet" href="{{ asset('css/gestor-pwa-install.css') }}?v={{ $gestorPwaVersion }}">
+<script src="{{ asset('js/gestor-pwa-install.js') }}?v={{ $gestorPwaVersion }}" defer></script>
 
 <script>
     (function () {
@@ -11,15 +29,43 @@
             return;
         }
 
+        var swUrl = @json(asset('sw-gestor.js'));
+        swUrl += (swUrl.indexOf('?') >= 0 ? '&' : '?') + 'v={{ $gestorPwaVersion }}';
+
         window.addEventListener('load', function () {
-            navigator.serviceWorker
-                .register('/sw-gestor.js', { scope: '/gestor/', updateViaCache: 'none' })
-                .then(function (reg) {
-                    try { reg.update(); } catch (e) {}
-                })
-                .catch(function () {
-                    // Falha silenciosa (ex.: contexto não seguro fora de localhost).
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map(function (reg) {
+                    var url = (reg.active && reg.active.scriptURL)
+                        || (reg.installing && reg.installing.scriptURL)
+                        || (reg.waiting && reg.waiting.scriptURL)
+                        || '';
+
+                    // Remove SW antigo/conflitante só no escopo do gestor.
+                    if (url && url.indexOf('/sw-gestor.js') === -1) {
+                        var scope = String(reg.scope || '');
+                        if (scope.indexOf('/gestor') !== -1) {
+                            return reg.unregister();
+                        }
+                    }
+
+                    return Promise.resolve();
+                }));
+            }).then(function () {
+                if (! window.isSecureContext
+                    && ! /^(localhost|127\.0\.0\.1|::1)$/i.test(location.hostname || '')) {
+                    // HTTP em IP da rede: navegador bloqueia SW — PWA não instala.
+                    return null;
+                }
+
+                return navigator.serviceWorker.register(swUrl, {
+                    scope: '/gestor/',
+                    updateViaCache: 'none',
                 });
+            }).then(function (reg) {
+                if (reg) {
+                    try { reg.update(); } catch (e) {}
+                }
+            }).catch(function () {});
         });
     })();
 </script>

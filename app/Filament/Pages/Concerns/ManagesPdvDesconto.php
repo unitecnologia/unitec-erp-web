@@ -16,6 +16,7 @@ trait ManagesPdvDesconto
 
     public string $descontoItemValor = '0,00';
 
+    #[\Livewire\Attributes\On('erp-pdv-open-desconto')]
     public function openDescontoItemModal(): void
     {
         if (! $this->pdvConfig()->permitirDescontoItem()) {
@@ -28,6 +29,20 @@ trait ManagesPdvDesconto
             $this->notifyPdvError('Caixa fechado.');
 
             return;
+        }
+
+        if ($this->cupomItens === []) {
+            $this->notifyPdvError('Selecione um item do cupom para desconto/acréscimo.');
+
+            return;
+        }
+
+        // Após lançar, limparPainelAposLancamento zera a seleção — usar o último item
+        // (mesmo critério do PDV offline) para Ctrl+Q / botão Opções funcionarem sem clicar na grade.
+        if ($this->selectedCupomIndex === null || ! isset($this->cupomItens[$this->selectedCupomIndex])) {
+            $last = array_key_last($this->cupomItens);
+            $this->selectedCupomIndex = is_int($last) ? $last : (int) $last;
+            $this->pdvMostrarDetalheItem = true;
         }
 
         $item = $this->cupomItemSelecionado;

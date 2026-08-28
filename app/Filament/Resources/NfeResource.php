@@ -76,6 +76,13 @@ class NfeResource extends Resource
                     ->wrap(false)
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('finalidade')
+                    ->label('Finalidade')
+                    ->formatStateUsing(fn (?string $state): string => Nfe::finalidadeLabel($state))
+                    ->placeholder('NORMAL')
+                    ->wrap(false)
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
                 ViewColumn::make('status')
                     ->label('Situação')
                     ->view('filament.components.erp.nfe.columns.status')

@@ -40,20 +40,24 @@ abstract class AbstractRankingVendasReport extends AbstractTabularReport
 
     public function filterFields(): array
     {
-        return $this->withColumnsField($this->periodFilterFields());
+        return $this->withColumnsField($this->withEmpresaFilter($this->periodFilterFields()));
     }
 
     public function build(Request $request): array
     {
         [$de, $ate] = $this->periodFromRequest($request);
         $columns = $this->resolveColumns($request->query('cols'));
-        $rows = $this->mapRankingRows($this->productSalesAggregate($de, $ate), $this->sortOrder());
+        $rows = $this->mapRankingRows($this->productSalesAggregate($de, $ate, $request), $this->sortOrder());
 
         return $this->result(
-            ['de' => $de->toDateString(), 'ate' => $ate->toDateString(), 'cols' => $columns],
+            $this->withEmpresaFilterValue([
+                'de' => $de->toDateString(),
+                'ate' => $ate->toDateString(),
+                'cols' => $columns,
+            ], $request),
             $columns,
             $rows,
-            ['PERÍODO: ' . $this->periodLabel($de, $ate)],
+            $this->withEmpresaSummary(['PERÍODO: '.$this->periodLabel($de, $ate)], $request),
         );
     }
 }

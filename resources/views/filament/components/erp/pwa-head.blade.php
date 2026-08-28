@@ -1,7 +1,7 @@
-{{-- PWA do ERP: manifesto + SW + instalar no Windows --}}
+{{-- PWA do ERP: manifesto + SW (sem UI de instalação) --}}
 @php
     use App\Support\Erp\ErpAssetVersion;
-    $pwaVersion = ErpAssetVersion::bundle().'-pwa5';
+    $pwaVersion = ErpAssetVersion::bundle().'-pwa6';
 @endphp
 
 <link rel="manifest" href="{{ asset('manifest-erp.webmanifest') }}?v={{ $pwaVersion }}">
@@ -10,9 +10,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Unitec ERP">
 <link rel="apple-touch-icon" href="{{ asset('images/pwa/icon-192.png') }}?v={{ $pwaVersion }}">
-
-<link rel="stylesheet" href="{{ asset('css/erp-pwa-install.css') }}?v={{ $pwaVersion }}">
-<script src="{{ asset('js/erp-pwa-install.js') }}?v={{ $pwaVersion }}" defer></script>
 
 <script>
     (function () {

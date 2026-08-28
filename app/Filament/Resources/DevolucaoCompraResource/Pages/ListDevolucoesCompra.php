@@ -5,10 +5,14 @@ namespace App\Filament\Resources\DevolucaoCompraResource\Pages;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\DevolucaoCompraResource;
 use App\Filament\Resources\DevolucaoCompraResource\Pages\Concerns\ManagesDevolucaoCompraModal;
+use App\Filament\Resources\NfeResource;
 use App\Models\DevolucaoCompra;
+use App\Support\Erp\Compras\ReabrirDevolucaoCompraService;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
+use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -47,6 +51,10 @@ class ListDevolucoesCompra extends ListRecords
 
     public string $periodoAteApplied = '';
 
+    public bool $reabrirConfirmOpen = false;
+
+    public ?int $reabrirConfirmId = null;
+
     public function mount(): void
     {
         parent::mount();
@@ -78,7 +86,7 @@ class ListDevolucoesCompra extends ListRecords
 
     protected static function erpListPageClass(): string
     {
-        return 'erp-orcamentos-page erp-devolucao-compra-page';
+        return 'erp-devolucao-compra-page';
     }
 
     protected function erpListEntityName(): string
@@ -95,8 +103,67 @@ class ListDevolucoesCompra extends ListRecords
             'delete' => 'cancelDevolucao',
             'extraKeys' => [
                 'F6' => ['method' => 'modulePending', 'params' => ['Imprimir devolução']],
+                'F7' => ['method' => 'emitirNfeDevolucaoCompra'],
+                'F8' => ['method' => 'reabrirDevolucao'],
             ],
         ];
+    }
+
+    public function emitirNfeDevolucaoCompra(): void
+    {
+        $id = $this->highlightedRecordIdOrNotify('emitir NF-e');
+
+        if (! $id) {
+            return;
+        }
+
+        if (! ErpAccess::currentCan('nfe.access')) {
+            Notification::make()
+                ->title('Sem permissão para acessar NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! ErpAccess::currentCan('nfe.emit')) {
+            Notification::make()
+                ->title('Sem permissão para emitir NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        $devolucao = DevolucaoCompra::query()
+            ->with(['compra', 'fornecedor', 'itens'])
+            ->when($empresaId, fn (Builder $query, int $eid) => $query->where('empresa_id', $eid))
+            ->find($id);
+
+        if (! $devolucao) {
+            Notification::make()
+                ->title('Devolução de compra não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            app(NfeDevolucaoCompraService::class)->validar($devolucao);
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Não foi possível emitir a NF-e de devolução.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirect(NfeResource::getUrl('index').'?devolucao_compra_id='.$devolucao->id);
     }
 
     public function table(Table $table): Table
@@ -183,6 +250,7 @@ class ListDevolucoesCompra extends ListRecords
                 View::make('filament.components.erp.devolucoes-compra.footer-total'),
                 View::make('filament.components.erp.devolucoes-compra.action-bar'),
                 View::make('filament.components.erp.devolucoes-compra.lancamento-modal'),
+                View::make('filament.components.erp.devolucoes-compra.reabrir-confirm-modal'),
             ]);
     }
 
@@ -345,7 +413,7 @@ class ListDevolucoesCompra extends ListRecords
         if ($record->situacao === DevolucaoCompra::SITUACAO_FINALIZADA) {
             Notification::make()
                 ->title('Não é possível cancelar uma devolução finalizada.')
-                ->body('Estoque já foi baixado. Use um estorno específico se necessário.')
+                ->body('Estoque já foi baixado. Use Reabrir (F8) para estornar e voltar à situação Aberta.')
                 ->warning()
                 ->send();
 
@@ -358,5 +426,128 @@ class ListDevolucoesCompra extends ListRecords
         $this->resetTable();
 
         Notification::make()->title('Devolução cancelada.')->success()->send();
+    }
+
+    public function reabrirDevolucao(): void
+    {
+        $id = $this->highlightedRecordIdOrNotify('reabrir');
+
+        if (! $id) {
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'devolucoes_compra.update')) {
+            return;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        $record = DevolucaoCompra::query()
+            ->when($empresaId, fn (Builder $query, int $eid) => $query->where('empresa_id', $eid))
+            ->find($id);
+
+        if (! $record) {
+            Notification::make()
+                ->title('Devolução de compra não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($record->situacao === DevolucaoCompra::SITUACAO_ABERTA) {
+            Notification::make()
+                ->title('Devolução já está aberta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($record->situacao === DevolucaoCompra::SITUACAO_CANCELADA) {
+            Notification::make()
+                ->title('Devolução cancelada não pode ser reaberta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($record->situacao !== DevolucaoCompra::SITUACAO_FINALIZADA) {
+            Notification::make()
+                ->title('Só é possível reabrir devolução finalizada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->reabrirConfirmId = (int) $record->id;
+        $this->reabrirConfirmOpen = true;
+    }
+
+    public function cancelReabrirDevolucao(): void
+    {
+        $this->reabrirConfirmOpen = false;
+        $this->reabrirConfirmId = null;
+    }
+
+    public function confirmReabrirDevolucao(): void
+    {
+        $id = $this->reabrirConfirmId;
+        $this->cancelReabrirDevolucao();
+
+        if (! $id) {
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'devolucoes_compra.update')) {
+            return;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        $record = DevolucaoCompra::query()
+            ->when($empresaId, fn (Builder $query, int $eid) => $query->where('empresa_id', $eid))
+            ->find($id);
+
+        if (! $record) {
+            Notification::make()
+                ->title('Devolução de compra não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            (new ReabrirDevolucaoCompraService())->reabrir($record);
+        } catch (DomainException $exception) {
+            Notification::make()
+                ->title($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível reabrir a devolução.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->clearListSelection();
+        $this->resetTable();
+
+        Notification::make()
+            ->title('Devolução reaberta')
+            ->body('O estoque baixado na finalização foi estornado. Use Alterar (F3) para editar.')
+            ->success()
+            ->send();
     }
 }

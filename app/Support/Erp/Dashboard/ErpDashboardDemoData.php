@@ -177,9 +177,9 @@ class ErpDashboardDemoData
     public static function salesMixChart(): array
     {
         return [
-            'labels' => ['PDV', 'Pedidos', 'Orçamentos'],
-            'values' => [42850.0, 91240.0, 18630.0],
-            'colors' => ['#1e5a9e', '#0d9488', '#d97706'],
+            'labels' => ['PDV', 'Pedidos'],
+            'values' => [42850.0, 91240.0],
+            'colors' => ['#1e5a9e', '#0d9488'],
             'unit' => 'money',
         ];
     }

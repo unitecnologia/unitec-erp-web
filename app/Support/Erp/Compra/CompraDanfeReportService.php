@@ -6,7 +6,9 @@ use App\Models\Compra;
 use App\Models\CompraItem;
 use App\Models\Empresa;
 use App\Models\Person;
+use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class CompraDanfeReportService
 {
@@ -71,7 +73,8 @@ class CompraDanfeReportService
             'fatura' => ['numero' => '', 'valor_original' => '', 'valor_desconto' => '', 'valor_liquido' => ''],
             'informacoesComplementares' => $this->buildInformacoesComplementares($compra, $empresa),
             'informacoesFisco' => '',
-            'printedAt' => now(),
+            'printedAt' => ErpTimezone::toLocal(),
+            'printedBy' => trim((string) (Auth::user()?->name ?? '')),
         ];
     }
 
@@ -336,5 +339,21 @@ class CompraDanfeReportService
     protected function onlyDigits(?string $value): string
     {
         return preg_replace('/\D/', '', (string) $value) ?? '';
+    }
+
+    public function logoDataUri(?Empresa $empresa): ?string
+    {
+        if (! extension_loaded('gd') || ! $empresa || blank($empresa->logo_path)) {
+            return null;
+        }
+
+        if (! Storage::disk('public')->exists($empresa->logo_path)) {
+            return null;
+        }
+
+        $contents = Storage::disk('public')->get($empresa->logo_path);
+        $mime = Storage::disk('public')->mimeType($empresa->logo_path) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode($contents);
     }
 }

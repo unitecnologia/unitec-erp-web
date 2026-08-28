@@ -10,11 +10,17 @@ class WhatsAppSender
 {
     public const TIPO_ORCAMENTO = 'orcamento';
 
+    public const TIPO_RECIBO = 'recibo';
+
     public const TIPO_COBRANCA = 'cobranca';
 
     public const TIPO_NFE = 'nfe';
 
+    public const TIPO_NFE_CONTADOR = 'nfe_contador';
+
     public const TIPO_NFCE_CONTADOR = 'nfce_contador';
+
+    public const TIPO_COMPRA_CONTADOR = 'compra_contador';
 
     public function __construct(
         protected WhatsAppClient $client,
@@ -141,6 +147,72 @@ class WhatsAppSender
     }
 
     /**
+     * @param  list<array{path: string, name: string, mimetype?: string, caption?: string|null}>  $documents
+     * @return array{ok: bool, message: string, sent: int}
+     */
+    public function sendDocumentMessages(
+        Empresa $empresa,
+        string $tipo,
+        string $number,
+        string $text,
+        array $documents,
+    ): array {
+        if ($documents === []) {
+            return [
+                'ok' => false,
+                'message' => 'Nenhum documento para envio.',
+                'sent' => 0,
+            ];
+        }
+
+        $sent = 0;
+        $total = count($documents);
+
+        foreach ($documents as $index => $document) {
+            $path = (string) ($document['path'] ?? '');
+            $name = (string) ($document['name'] ?? 'documento');
+            $mimetype = (string) ($document['mimetype'] ?? 'application/pdf');
+            $caption = $index === 0
+                ? $text
+                : (string) ($document['caption'] ?? '');
+
+            $result = $this->sendDocumentMessage(
+                empresa: $empresa,
+                tipo: $tipo,
+                number: $number,
+                text: $caption,
+                documentPath: $path,
+                documentName: $name !== '' ? $name : 'documento',
+                mimetype: $mimetype !== '' ? $mimetype : 'application/pdf',
+            );
+
+            if (! $result['ok']) {
+                if ($sent > 0) {
+                    return [
+                        'ok' => false,
+                        'message' => $result['message'].' ('.$sent.' de '.$total.' anexos enviados.)',
+                        'sent' => $sent,
+                    ];
+                }
+
+                return [
+                    'ok' => false,
+                    'message' => $result['message'],
+                    'sent' => 0,
+                ];
+            }
+
+            $sent++;
+        }
+
+        return [
+            'ok' => true,
+            'message' => '',
+            'sent' => $sent,
+        ];
+    }
+
+    /**
      * @return array{ok: bool, message: string}
      */
     protected function validateBeforeSend(Empresa $empresa, WhatsAppConfig $config, string $tipo, string $number): array
@@ -181,7 +253,7 @@ class WhatsAppSender
         if ($tipo === self::TIPO_NFE && ! $config->enviarNfe) {
             return [
                 'ok' => false,
-                'message' => 'Envio de NF-e por WhatsApp está desabilitado. Use e-mail.',
+                'message' => 'Envio de NF-e por WhatsApp está desabilitado em Empresa → Parâmetros → WhatsApp. Use e-mail ou ative “Permitir envio de NF-e”.',
             ];
         }
 

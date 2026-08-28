@@ -29,9 +29,14 @@
         const points = payload?.points ?? [];
         const from = parseIsoDate(fromValue);
         const to = parseIsoDate(toValue);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         if (!from || !to) {
-            return points;
+            return points.filter((point) => {
+                const date = parseIsoDate(point.date);
+                return date && date <= today;
+            });
         }
 
         const lo = from <= to ? from : to;
@@ -39,7 +44,7 @@
 
         return points.filter((point) => {
             const date = parseIsoDate(point.date);
-            return date && date >= lo && date <= hi;
+            return date && date >= lo && date <= hi && date <= today;
         });
     };
 
@@ -236,7 +241,7 @@
 
         const fiscalData = readJson('gestor-fiscal-data');
         const fiscalCanvas = document.getElementById('gestor-fiscal-chart');
-        if (fiscalCanvas && fiscalData?.labels?.length) {
+        if (fiscalCanvas && fiscalData?.labels?.length && !fiscalData.empty) {
             charts.push(new Chart(fiscalCanvas, doughnutBase(
                 fiscalData.labels,
                 fiscalData.values,

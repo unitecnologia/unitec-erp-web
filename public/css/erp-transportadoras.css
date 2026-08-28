@@ -13,11 +13,10 @@
 
 .erp-transportadoras-page .erp-transportadoras__filters {
     flex-shrink: 0;
-    padding: 0.35rem 0.75rem !important;
-    margin: 0 0 0.35rem !important;
+    padding: calc(0.35rem - 0.15cm) 0.75rem !important;
+    margin: 0 0 0.25rem !important;
     background: var(--erp-bg-toolbar) !important;
     border: 1px solid var(--erp-border-light) !important;
-    border-left: 4px solid var(--erp-brand-primary) !important;
     border-top: none !important;
     border-radius: var(--erp-radius-md) !important;
     box-shadow: var(--erp-shadow-md) !important;
@@ -99,8 +98,16 @@
 }
 
 .erp-transportadoras-page .erp-transportadoras__btn--secondary {
-    background: var(--erp-bg-muted);
+    background: linear-gradient(180deg, #fff 0%, var(--erp-bg-muted) 100%);
     color: var(--erp-text);
+    border-color: var(--erp-border-strong, #94a3b8);
+    box-shadow: none;
+}
+
+.erp-transportadoras-page .erp-transportadoras__btn--secondary:hover {
+    background: #fff;
+    color: var(--erp-brand-primary);
+    border-color: var(--erp-brand-primary);
 }
 
 .erp-transportadoras-page .erp-transportadoras__hint {
@@ -333,10 +340,19 @@
 }
 
 .erp-transportadoras-page .erp-transportadoras-actions__icon {
-    width: 1.3rem;
-    height: 1.3rem;
-    font-size: 0.875rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.9rem;
     margin-bottom: 0.12rem;
+    font-weight: 800;
+}
+
+.erp-transportadoras-page .erp-transportadoras-actions__btn[data-erp-key="F2"] .erp-transportadoras-actions__icon,
+.erp-transportadoras-page .erp-transportadoras-actions__icon--new {
+    background: rgba(255, 255, 255, 0.3) !important;
+    color: #fff !important;
+    font-weight: 900;
+    text-shadow: 0 1px 1px rgb(15 40 71 / 35%);
 }
 
 .erp-transportadoras-page .erp-transportadoras-actions__label {
@@ -666,280 +682,242 @@
     line-height: 1.1;
 }
 
-/* ── Modal transportadora (mais largo + motoristas) ─────────────── */
+/* ── Modal transportadora (layout moderno) ─────────────────────── */
 
-.erp-transportadoras-page .erp-transportadora-form-modal__body.erp-contador-form-modal__body {
-    padding: 0.55rem 0.65rem 0.5rem;
-    background: linear-gradient(180deg, #d9e6f5 0%, #e8f0fa 42%, #eef4fb 100%);
+.erp-transportadoras-page .erp-transportadora-form-modal__window {
+    width: min(52rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    border: 1px solid #1e5a9e;
+    border-radius: 12px;
+    background: #e8eef6;
+    box-shadow: 0 22px 52px rgb(15 40 71 / 38%);
 }
 
-.erp-transportadoras-page .erp-transportadora-form-modal__form.erp-contador-form-modal__form {
+.erp-transportadoras-page .erp-transportadora-form-modal__titlebar {
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 0.95rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    border-bottom: 1px solid #0b2748;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__subtitle {
+    margin: 0.18rem 0 0;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #bfdbfe;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__body {
+    padding: 0.85rem 0.95rem;
+    overflow: auto;
+    background: linear-gradient(180deg, #dce7f4 0%, #e8eef6 55%, #eef3f9 100%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: 0.8rem;
 }
 
-.erp-transportadoras-page .erp-transportadora-form__section {
+.erp-transportadoras-page .erp-transportadora-form__card {
     margin: 0;
-    padding: 0.45rem 0.55rem 0.55rem;
-    border: 1px solid #a8bdd4;
-    border-left: 4px solid var(--erp-brand-primary, #1e5a9e);
-    border-radius: var(--erp-radius-md, 8px);
-    background: linear-gradient(180deg, #f7fafd 0%, #fff 18%, #fff 100%);
+    padding: 0.85rem 0.95rem 0.95rem;
+    border: 1px solid #9eb4cf;
+    border-radius: 10px;
+    background: #fff;
     box-shadow:
-        0 1px 0 rgb(255 255 255 / 80%) inset,
-        0 2px 8px rgb(15 52 96 / 8%);
+        0 1px 0 rgb(255 255 255 / 85%) inset,
+        0 4px 14px rgb(15 52 96 / 10%);
 }
 
-.erp-transportadoras-page .erp-transportadora-form__section--motoristas {
+.erp-transportadoras-page .erp-transportadora-form__card-head {
+    margin: 0 0 0.75rem;
     padding-bottom: 0.45rem;
+    border-bottom: 1px solid #d7e3f2;
 }
 
-.erp-transportadoras-page .erp-transportadora-form__section-title {
-    margin: 0 0 0.45rem;
-    padding: 0 0 0.3rem;
-    border-bottom: 1px solid #d4e0ef;
-    font-size: 0.76rem;
+.erp-transportadoras-page .erp-transportadora-form__card-head strong {
+    display: block;
+    font-size: 0.88rem;
     font-weight: 800;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--erp-brand-primary-dark, #0f3460);
+    letter-spacing: 0.01em;
+    color: #0f3460;
 }
 
-.erp-transportadoras-page .erp-transportadora-form__section-grid {
+.erp-transportadoras-page .erp-transportadora-form__card-head p {
+    margin: 0.2rem 0 0;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: #475569;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__card-head--row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 0.7rem 0.75rem;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field {
     display: flex;
     flex-direction: column;
-    gap: 0.28rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row.erp-pcad-form__row {
-    display: grid;
-    grid-template-columns: 5.8rem minmax(0, 1fr);
-    align-items: center;
-    gap: 0.35rem 0.45rem;
-    min-height: 1.9rem;
-    padding: 0.18rem 0.35rem;
-    border-radius: var(--erp-radius-sm, 4px);
-    background: rgb(227 236 247 / 42%);
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row.erp-pcad-form__row:nth-child(even) {
-    background: rgb(227 236 247 / 68%);
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row--single {
-    grid-template-columns: 5.8rem minmax(0, 1fr);
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row--duo {
-    grid-template-columns: 5.8rem minmax(5rem, 7rem) auto minmax(0, 1fr);
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row--doc {
-    grid-template-columns: 5.8rem minmax(8rem, 11.5rem) auto auto minmax(0, 1fr);
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row--full {
-    grid-template-columns: 5.8rem minmax(0, 1fr) auto minmax(4rem, 5.5rem);
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--xs,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--md,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--cep,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--doc,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--phone,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--city,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--city-code,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input--grow,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__select--sm,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__select--uf {
-    width: 100%;
-    max-width: none;
-    flex: unset;
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row--duo .erp-pcad-form__input--doc,
-.erp-transportadoras-page .erp-transportadora-form__row--doc .erp-pcad-form__input--doc {
-    max-width: 11.5rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row:not(.erp-transportadora-form__row--duo):not(.erp-transportadora-form__row--full):not(.erp-transportadora-form__row--doc) .erp-pcad-form__input--phone {
-    max-width: 10.5rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form__btn-search.erp-pcad-form__btn {
-    display: inline-flex;
-    align-items: center;
     gap: 0.3rem;
-    white-space: nowrap;
-    padding: 0.25rem 0.55rem;
-    min-height: 1.65rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    border: 1px solid var(--erp-brand-primary, #1e5a9e);
-    border-radius: 4px;
-    background: linear-gradient(180deg, #fff 0%, #e8f0fa 100%);
-    color: var(--erp-brand-primary, #1e5a9e);
+    min-width: 0;
+    grid-column: span 3;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field > span {
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: #0f3460;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field input,
+.erp-transportadoras-page .erp-transportadora-form__field select {
+    width: 100%;
+    min-height: 2.3rem;
+    padding: 0.42rem 0.65rem;
+    border: 1px solid #7f9db9;
+    border-radius: 8px;
+    background: #fff;
+    color: #0b1220;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 6%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field input:focus,
+.erp-transportadoras-page .erp-transportadora-form__field select:focus {
+    outline: none;
+    border-color: #1e5a9e;
+    box-shadow:
+        inset 0 1px 2px rgb(15 52 96 / 6%),
+        0 0 0 3px rgb(30 90 158 / 22%);
+    background: #fff;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field input[readonly] {
+    background: #e8eef6;
+    color: #334155;
+    border-color: #9eb4cf;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__field--codigo { grid-column: span 2; }
+.erp-transportadoras-page .erp-transportadora-form__field--pessoa { grid-column: span 3; }
+.erp-transportadoras-page .erp-transportadora-form__field--doc { grid-column: span 5; }
+.erp-transportadoras-page .erp-transportadora-form__field--rg { grid-column: span 2; }
+.erp-transportadoras-page .erp-transportadora-form__field--full { grid-column: span 12; }
+.erp-transportadoras-page .erp-transportadora-form__field--apelido { grid-column: span 8; }
+.erp-transportadoras-page .erp-transportadora-form__field--whatsapp { grid-column: span 4; }
+.erp-transportadoras-page .erp-transportadora-form__field--cep { grid-column: span 2; }
+.erp-transportadoras-page .erp-transportadora-form__field--endereco { grid-column: span 8; }
+.erp-transportadoras-page .erp-transportadora-form__field--numero { grid-column: span 2; }
+.erp-transportadoras-page .erp-transportadora-form__field--bairro { grid-column: span 4; }
+.erp-transportadoras-page .erp-transportadora-form__field--ibge { grid-column: span 2; }
+.erp-transportadoras-page .erp-transportadora-form__field--cidade { grid-column: span 4; }
+.erp-transportadoras-page .erp-transportadora-form__field--uf { grid-column: span 2; }
+
+.erp-transportadoras-page .erp-transportadora-form__doc {
+    display: flex;
+    gap: 0.4rem;
+    align-items: stretch;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__doc input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-transportadoras-page .erp-transportadora-form__search-btn {
+    flex: 0 0 auto;
+    min-height: 2.3rem;
+    padding: 0 0.85rem;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 800;
     cursor: pointer;
-    font-family: inherit;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgb(15 52 96 / 22%);
 }
 
-.erp-transportadoras-page .erp-transportadora-form__btn-search.erp-pcad-form__btn:hover:not(:disabled) {
-    background: #dbeafe;
+.erp-transportadoras-page .erp-transportadora-form__search-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #1d4ed8 0%, #164a82 100%);
 }
 
-.erp-transportadoras-page .erp-transportadora-form__btn-search.erp-pcad-form__btn:disabled {
+.erp-transportadoras-page .erp-transportadora-form__search-btn:disabled {
     opacity: 0.7;
     cursor: wait;
 }
 
-.erp-transportadoras-page .erp-transportadora-form__row--duo .erp-pcad-form__select--sm {
-    max-width: 9rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form__row:not(.erp-transportadora-form__row--duo):not(.erp-transportadora-form__row--full) .erp-pcad-form__input--cep,
-.erp-transportadoras-page .erp-transportadora-form__row:not(.erp-transportadora-form__row--duo):not(.erp-transportadora-form__row--full) .erp-pcad-form__input--city-code {
-    max-width: 9.5rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__label {
-    width: auto;
-    min-width: 0;
-    text-align: right;
-    font-size: 0.74rem;
-    font-weight: 700;
-    color: var(--erp-brand-primary-dark, #0f3460);
-    padding-right: 0;
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__label--inline {
-    justify-self: end;
-    min-width: 0;
-    padding-left: 0.35rem;
-    text-align: right;
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__select {
-    min-height: 1.65rem;
-    padding: 0.2rem 0.4rem;
-    font-size: 0.78rem;
-    border: 1px solid #9eb4cf;
-    border-radius: 4px;
-    background: #fff;
-    box-shadow: inset 0 1px 2px rgb(15 52 96 / 7%);
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input:focus,
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__select:focus {
-    outline: none;
-    border-color: var(--erp-brand-primary, #1e5a9e);
-    box-shadow:
-        inset 0 1px 2px rgb(15 52 96 / 7%),
-        0 0 0 2px rgb(30 90 158 / 18%);
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__form .erp-pcad-form__input[readonly] {
-    background: #edf2f8;
-    color: #475569;
-}
-
-.erp-transportadoras-page .erp-contador-form-modal--transportadora.erp-contador-form-modal__window {
-    width: min(calc(40rem + var(--erp-contador-modal-bump)), calc(100vw - 2rem));
-}
-
-.erp-transportadoras-page .erp-contador-form-modal--transportadora .erp-contador-form-modal__form.erp-pcad-form {
-    gap: 0.42rem;
-}
-
-.erp-transportadoras-page .erp-contador-form-modal__form .erp-pcad-form__input--city-code {
-    width: 100%;
-    max-width: 9rem;
-}
-
-.erp-transportadoras-page .erp-contador-form-modal__form .erp-pcad-form__select--sm {
-    width: 100%;
-    max-width: 8.5rem;
-}
-
-.erp-transportadoras-page .erp-contador-form-modal__error--row {
-    grid-column: 1 / -1;
-    margin: 0 0 0 5.8rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-form-modal__actions {
-    border-top: 1px solid #a8bdd4;
-    background: linear-gradient(180deg, #dce8f6 0%, #d2e0f0 100%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
-}
-
-.erp-transportadoras-page .erp-transportadora-motoristas {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-}
-
-.erp-transportadoras-page .erp-transportadora-motoristas__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
-}
-
-.erp-transportadoras-page .erp-transportadora-motoristas__title {
-    font-size: 0.76rem;
-    font-weight: 700;
-    color: var(--erp-brand-primary, #1e5a9e);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.erp-transportadoras-page .erp-transportadora-motoristas__btn {
-    padding: 0.2rem 0.65rem;
-    border: 1px solid var(--erp-brand-primary, #1e5a9e);
-    border-radius: var(--erp-radius-sm, 4px);
-    background: linear-gradient(180deg, #fff 0%, #e8f0fa 100%);
-    color: var(--erp-brand-primary, #1e5a9e);
+.erp-transportadoras-page .erp-transportadora-form__error {
     font-size: 0.72rem;
+    font-style: normal;
     font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
+    color: #b91c1c;
 }
 
-.erp-transportadoras-page .erp-transportadora-motoristas__btn:hover {
-    background: #dbeafe;
+.erp-transportadoras-page .erp-transportadora-form__add-btn {
+    flex-shrink: 0;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(15 52 96 / 18%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form__add-btn:hover {
+    background: linear-gradient(180deg, #1d4ed8 0%, #164a82 100%);
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__wrap {
     border: 1px solid #9eb4cf;
-    border-radius: var(--erp-radius-sm, 4px);
+    border-radius: 8px;
     background: #fff;
     overflow: auto;
-    max-height: 9.5rem;
-    box-shadow: inset 0 1px 3px rgb(15 52 96 / 6%);
+    max-height: 11rem;
+    box-shadow: inset 0 1px 2px rgb(15 52 96 / 6%);
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.74rem;
+    font-size: 0.82rem;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__table th {
-    padding: 0.3rem 0.45rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.5rem 0.6rem;
     text-align: left;
-    font-weight: 700;
-    color: var(--erp-text-on-brand, #fff);
-    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
-    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    border-bottom: 1px solid #0f3460;
     white-space: nowrap;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__table td {
-    padding: 0.28rem 0.4rem;
-    vertical-align: top;
-    border-bottom: 1px solid #dbe4f0;
+    padding: 0.45rem 0.55rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #d7e3f2;
     background: #fff;
 }
 
@@ -958,49 +936,169 @@
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__col-action {
-    width: 2.25rem;
+    width: 2.4rem;
     text-align: center;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__input {
     width: 100%;
     min-width: 0;
+    min-height: 2.15rem;
     box-sizing: border-box;
-    border: 1px solid #b8c8d8;
-    border-radius: 3px;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #7f9db9;
+    border-radius: 7px;
     background: #fff;
-    box-shadow: inset 0 1px 1px rgb(15 52 96 / 5%);
+    color: #0b1220;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__input--cpf {
-    max-width: 9.5rem;
+    max-width: 10rem;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__remove {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.35rem;
-    height: 1.35rem;
-    border: 1px solid #fca5a5;
-    border-radius: 50%;
-    background: #fef2f2;
-    color: #b91c1c;
-    font-size: 0.68rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-size: 0.78rem;
+    font-weight: 800;
     line-height: 1;
     cursor: pointer;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__remove:hover {
-    background: #fee2e2;
+    background: #fecaca;
 }
 
 .erp-transportadoras-page .erp-transportadora-motoristas__empty {
-    padding: 0.75rem 0.5rem;
+    padding: 1.15rem 0.85rem;
     text-align: center;
-    color: var(--erp-text-muted, #64748b);
-    font-style: italic;
-    background: #fff;
+    color: #334155;
+    font-weight: 600;
+    background: #f8fafc;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.7rem 0.95rem;
+    border-top: 1px solid #9eb4cf;
+    background: linear-gradient(180deg, #dce7f4 0%, #cfdced 100%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.55rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgb(15 23 42 / 16%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn kbd {
+    font-family: inherit;
+    font-weight: 800;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 24%);
+    font-size: 0.85rem;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn--save {
+    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+    border-color: #86efac;
+    color: #fff;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn--save:hover {
+    background: linear-gradient(180deg, #16a34a 0%, #166534 100%);
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn--exit {
+    margin-left: auto;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+    border-color: #fecaca;
+    color: #fff;
+}
+
+.erp-transportadoras-page .erp-transportadora-form-modal__btn--exit:hover {
+    background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+}
+
+@media (max-width: 900px) {
+    .erp-transportadoras-page .erp-transportadora-form__field,
+    .erp-transportadoras-page .erp-transportadora-form__field--codigo,
+    .erp-transportadoras-page .erp-transportadora-form__field--pessoa,
+    .erp-transportadoras-page .erp-transportadora-form__field--doc,
+    .erp-transportadoras-page .erp-transportadora-form__field--rg,
+    .erp-transportadoras-page .erp-transportadora-form__field--apelido,
+    .erp-transportadoras-page .erp-transportadora-form__field--whatsapp,
+    .erp-transportadoras-page .erp-transportadora-form__field--cep,
+    .erp-transportadoras-page .erp-transportadora-form__field--endereco,
+    .erp-transportadoras-page .erp-transportadora-form__field--numero,
+    .erp-transportadoras-page .erp-transportadora-form__field--bairro,
+    .erp-transportadoras-page .erp-transportadora-form__field--ibge,
+    .erp-transportadoras-page .erp-transportadora-form__field--cidade,
+    .erp-transportadoras-page .erp-transportadora-form__field--uf {
+        grid-column: span 6;
+    }
+
+    .erp-transportadoras-page .erp-transportadora-form__field--full {
+        grid-column: span 12;
+    }
+}
+
+@media (max-width: 640px) {
+    .erp-transportadoras-page .erp-transportadora-form__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-transportadoras-page .erp-transportadora-form__field,
+    .erp-transportadoras-page .erp-transportadora-form__field--codigo,
+    .erp-transportadoras-page .erp-transportadora-form__field--pessoa,
+    .erp-transportadoras-page .erp-transportadora-form__field--doc,
+    .erp-transportadoras-page .erp-transportadora-form__field--rg,
+    .erp-transportadoras-page .erp-transportadora-form__field--apelido,
+    .erp-transportadoras-page .erp-transportadora-form__field--whatsapp,
+    .erp-transportadoras-page .erp-transportadora-form__field--cep,
+    .erp-transportadoras-page .erp-transportadora-form__field--endereco,
+    .erp-transportadoras-page .erp-transportadora-form__field--numero,
+    .erp-transportadoras-page .erp-transportadora-form__field--bairro,
+    .erp-transportadoras-page .erp-transportadora-form__field--ibge,
+    .erp-transportadoras-page .erp-transportadora-form__field--cidade,
+    .erp-transportadoras-page .erp-transportadora-form__field--uf,
+    .erp-transportadoras-page .erp-transportadora-form__field--full {
+        grid-column: auto;
+    }
+
+    .erp-transportadoras-page .erp-transportadora-form-modal__btn--exit {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .erp-transportadoras-page .erp-contador-delete-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,

@@ -5,6 +5,8 @@ namespace App\Support\Gestor;
 use App\Models\ForcaVendasDevice;
 use App\Models\ForcaVendasOrder;
 use App\Models\VendasInternasDevice;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +43,75 @@ final class GestorAprovacaoService
 
     public function countPendencias(?int $empresaId = null): int
     {
-        return $this->pendencias($empresaId)['total'];
+        $empresaId = $empresaId ?: app(GestorExecutivoService::class)->empresaId();
+
+        return $this->countPedidosPendentes($empresaId) + $this->countAparelhosPendentes($empresaId);
+    }
+
+    private function countPedidosPendentes(int $empresaId): int
+    {
+        try {
+            if (! Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+                return 0;
+            }
+
+            $q = ForcaVendasOrder::query()
+                ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
+                ->where('situacao', ForcaVendasOrder::SITUACAO_FINANCEIRO);
+
+            if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
+                $q->where(function ($builder) use ($empresaId): void {
+                    $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                });
+            }
+
+            return (int) $q->count();
+        } catch (Throwable) {
+            return 0;
+        }
+    }
+
+    private function countAparelhosPendentes(int $empresaId): int
+    {
+        $total = 0;
+
+        try {
+            if (Schema::hasTable((new ForcaVendasDevice)->getTable())) {
+                $q = ForcaVendasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', ForcaVendasDevice::STATUS_APROVADO);
+
+                if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
+                    $q->where(function ($builder) use ($empresaId): void {
+                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    });
+                }
+
+                $total += (int) $q->count();
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
+        try {
+            if (Schema::hasTable((new VendasInternasDevice)->getTable())) {
+                $q = VendasInternasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', VendasInternasDevice::STATUS_APROVADO);
+
+                if ($empresaId > 0 && Schema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
+                    $q->where(function ($builder) use ($empresaId): void {
+                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    });
+                }
+
+                $total += (int) $q->count();
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
+        return $total;
     }
 
     public function aprovarPedido(int $orderId): void
@@ -84,7 +154,22 @@ final class GestorAprovacaoService
             throw new \RuntimeException('Aparelho já autorizado.');
         }
 
+        $empresaId = (int) ($device->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
+        $devices = app(DeviceLicenseService::class);
+
+        if ($empresaId > 0 && $devices->isAvailable()) {
+            $devices->register(
+                empresaId: $empresaId,
+                deviceUuid: (string) $device->device_uuid,
+                category: DeviceLicenseService::CATEGORY_TELEFONE,
+                origin: $device instanceof ForcaVendasDevice ? 'forca_vendas' : 'vendas_internas',
+                deviceName: $device->device_name,
+                platform: $device->platform,
+            );
+        }
+
         $device->forceFill([
+            'empresa_id' => $empresaId ?: $device->empresa_id,
             'status' => $device::STATUS_APROVADO,
             'revoked_at' => null,
             'approved_at' => now(),

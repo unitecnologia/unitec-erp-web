@@ -19,30 +19,34 @@ use Throwable;
 final class ErpDashboardKpis
 {
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return list<array<string, mixed>>
      */
-    public static function build(?int $empresaId = null): array
+    public static function build(?int $empresaId = null, int|array|null $empresaScope = null): array
     {
+        $scope = $empresaScope ?? $empresaId;
+
         return [
-            static::faturamentoHoje(),
-            static::vendasMes(),
-            static::saldoCaixa(),
-            static::contasVencidas(),
-            static::contasPagarVencidas(),
+            static::faturamentoHoje($scope),
+            static::vendasMes($scope),
+            static::saldoCaixa($scope),
+            static::contasVencidas($scope),
+            static::contasPagarVencidas($scope),
             static::estoqueCritico(),
-            static::notasRejeitadas($empresaId),
+            static::notasRejeitadas($scope),
             ErpDashboardLicense::kpi(),
         ];
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function faturamentoHoje(): array
+    private static function faturamentoHoje(int|array|null $empresaScope = null): array
     {
         $dia = ErpFinanceiroMetricas::hoje();
-        $hoje = ErpDashboardSalesMetrics::faturamentoDia($dia);
-        $ontem = ErpDashboardSalesMetrics::faturamentoDia($dia->copy()->subDay());
+        $hoje = ErpDashboardSalesMetrics::faturamentoDia($dia, $empresaScope);
+        $ontem = ErpDashboardSalesMetrics::faturamentoDia($dia->copy()->subDay(), $empresaScope);
 
         return [
             'key' => 'faturamento_hoje',
@@ -55,13 +59,14 @@ final class ErpDashboardKpis
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function vendasMes(): array
+    private static function vendasMes(int|array|null $empresaScope = null): array
     {
         $fimMes = ErpFinanceiroMetricas::hoje();
         $inicioMes = $fimMes->copy()->startOfMonth();
-        $totalMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $fimMes);
+        $totalMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $fimMes, $empresaScope);
         $diasNoMes = max(1, (int) $inicioMes->diffInDays($fimMes) + 1);
         $mediaDia = round($totalMes / $diasNoMes, 2);
 
@@ -78,12 +83,13 @@ final class ErpDashboardKpis
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function saldoCaixa(): array
+    private static function saldoCaixa(int|array|null $empresaScope = null): array
     {
-        $saldo = ErpFinanceiroMetricas::saldoCaixa();
-        $hoje = ErpFinanceiroMetricas::movimentosCaixaNoDia(ErpFinanceiroMetricas::hoje());
+        $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
+        $hoje = ErpFinanceiroMetricas::movimentosCaixaNoDia(ErpFinanceiroMetricas::hoje(), $empresaScope);
 
         return [
             'key' => 'saldo_caixa',
@@ -97,11 +103,12 @@ final class ErpDashboardKpis
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function contasVencidas(): array
+    private static function contasVencidas(int|array|null $empresaScope = null): array
     {
-        $base = ErpFinanceiroMetricas::receberVencido();
+        $base = ErpFinanceiroMetricas::receberVencido(null, $empresaScope);
         $total = (float) $base['valor'];
         $titulos = (int) $base['qtd'];
 
@@ -118,11 +125,12 @@ final class ErpDashboardKpis
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function contasPagarVencidas(): array
+    private static function contasPagarVencidas(int|array|null $empresaScope = null): array
     {
-        $base = ErpFinanceiroMetricas::pagarVencido();
+        $base = ErpFinanceiroMetricas::pagarVencido(null, $empresaScope);
         $total = (float) $base['valor'];
         $titulos = (int) $base['qtd'];
 
@@ -169,11 +177,12 @@ final class ErpDashboardKpis
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array<string, mixed>
      */
-    private static function notasRejeitadas(?int $empresaId): array
+    private static function notasRejeitadas(int|array|null $empresaScope = null): array
     {
-        $count = static::countNotasRejeitadas($empresaId);
+        $count = static::countNotasRejeitadas($empresaScope);
 
         return [
             'key' => 'notas_rejeitadas',
@@ -200,7 +209,10 @@ final class ErpDashboardKpis
         }
     }
 
-    private static function countNotasRejeitadas(?int $empresaId): int
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function countNotasRejeitadas(int|array|null $empresaScope = null): int
     {
         try {
             if (! Schema::hasTable((new Nfe)->getTable())) {
@@ -209,9 +221,7 @@ final class ErpDashboardKpis
 
             $query = Nfe::query()->where('status', Nfe::STATUS_DENEGADA);
 
-            if ($empresaId) {
-                $query->where('empresa_id', $empresaId);
-            }
+            ErpFinanceiroMetricas::applyEmpresaColumn($query, (new Nfe)->getTable(), $empresaScope);
 
             return (int) $query->count();
         } catch (Throwable) {

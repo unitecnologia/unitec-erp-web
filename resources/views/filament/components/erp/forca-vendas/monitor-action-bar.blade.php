@@ -27,7 +27,7 @@
         </span>
         <span class="erp-nfe-actions__label">Tela de Venda</span>
     </button>
-    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
+    <button type="button" wire:click="emitirNfeSelecionado" class="erp-nfe-actions__btn">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>

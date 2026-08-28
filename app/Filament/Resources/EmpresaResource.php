@@ -131,6 +131,24 @@ class EmpresaResource extends Resource
                 ->dehydratedWhenHidden();
         }
 
+        foreach (EmpresaParametros::acessoRemotoFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::acessoRemotoBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::cloudflareAcessoFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
         foreach (EmpresaParametros::whatsAppFields() as $field => $meta) {
             $fields[] = TextInput::make($field)
                 ->hidden()
@@ -162,6 +180,60 @@ class EmpresaResource extends Resource
         }
 
         foreach (EmpresaParametros::expedicaoBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::moduleEnableFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::boletoFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::boletoBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::licencaApiFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::licencaApiBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::mercadoLivreFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::mercadoLivreBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::sistemaFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::sistemaBooleanFields() as $field => $meta) {
             $fields[] = Checkbox::make($field)
                 ->hidden()
                 ->dehydratedWhenHidden();

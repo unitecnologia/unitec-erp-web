@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ForcaVendasMonitorResource\Pages;
 use App\Filament\Pages\ForcaVendasTelaVendaPage;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
+use App\Filament\Resources\NfeResource;
 use App\Models\ContaReceber;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
@@ -12,9 +13,12 @@ use App\Models\Orcamento;
 use App\Models\Person;
 use App\Models\Vendedor;
 use App\Models\Venda;
+use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Vendas\EstornarVendaService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
@@ -77,6 +81,13 @@ class ListForcaVendasMonitor extends ListRecords
         parent::mount();
 
         ErpScreen::set('Monitor de Vendas');
+
+        // Tipo de Pedido: padrão Pendente (flag marcada no dropdown).
+        if ($this->situacaoFilter === ''
+            || $this->situacaoFilter === 'todos'
+            || ! array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
+            $this->situacaoFilter = ForcaVendasOrder::SITUACAO_PENDENTE;
+        }
 
         // Padrão: do dia de hoje até o fim do mês. Usa o fuso local
         // (America/Sao_Paulo); senão as datas saem +1 dia, pois o servidor é UTC.
@@ -828,15 +839,11 @@ class ListForcaVendasMonitor extends ListRecords
     public function plataformaOptions(): array
     {
         return [
-            'mobile' => 'Vendas Mobile (todos)',
+            'mobile' => 'Vendas Mobile',
             'vi' => 'Vendas Internas',
             'fv' => 'Força de Vendas',
             'meli' => 'Mercado Livre',
-            'shopee' => 'Shopee',
-            'magalu' => 'Magalu',
-            'amazon' => 'Amazon Brasil',
-            'ali' => 'AliExpress',
-            'casasbahia' => 'Casas Bahia',
+            'ifood' => 'Ifood',
             'ecommerce' => 'Ecommerce',
         ];
     }
@@ -1165,6 +1172,7 @@ class ListForcaVendasMonitor extends ListRecords
                 : $valorBase;
 
             ContaReceber::query()->create([
+                'empresa_id' => $order->empresa_id ? (int) $order->empresa_id : null,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => Carbon::today(),
                 'historico' => 'PEDIDO APP ' . $numeroPedido
@@ -1250,6 +1258,90 @@ class ListForcaVendasMonitor extends ListRecords
             str_contains($forma, 'cart') || str_contains($forma, 'pos') || str_contains($forma, 'tef') => ContaReceber::FORMA_CARTAO,
             default => ContaReceber::FORMA_CARTEIRA,
         };
+    }
+
+    public function emitirNfeSelecionado(): void
+    {
+        $recordId = $this->highlightedRecordId
+            ?: (int) ($this->selecionados[count($this->selecionados) - 1] ?? 0);
+
+        if ($recordId <= 0) {
+            Notification::make()
+                ->title('Selecione um pedido faturado para emitir NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! ErpAccess::currentCan('nfe.access')) {
+            Notification::make()
+                ->title('Sem permissão para acessar NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! ErpAccess::currentCan('nfe.emit')) {
+            Notification::make()
+                ->title('Sem permissão para emitir NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        $order = ForcaVendasOrder::query()
+            ->with(['venda.itens', 'venda.cliente', 'orcamento'])
+            ->when($empresaId, fn (Builder $query, int $eid) => $query->where('empresa_id', $eid))
+            ->find($recordId);
+
+        if (! $order) {
+            Notification::make()
+                ->title('Pedido não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($order->situacao !== ForcaVendasOrder::SITUACAO_FATURADO || ! $order->venda_id) {
+            Notification::make()
+                ->title('Somente pedido já faturado pode emitir NF-e.')
+                ->body('Fature o pedido no Monitor antes de emitir a nota.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $venda = $order->venda;
+
+        if (! $venda) {
+            Notification::make()
+                ->title('Venda da retaguarda não encontrada para este pedido.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            app(NfeVendaMercadoriaService::class)->validar($venda);
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Não foi possível emitir a NF-e.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirect(NfeResource::getUrl('index').'?venda_id='.$venda->id);
     }
 
     public function telaVenda(): void

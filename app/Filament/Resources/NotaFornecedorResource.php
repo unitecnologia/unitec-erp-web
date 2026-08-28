@@ -12,6 +12,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
+use Livewire\Livewire;
 
 class NotaFornecedorResource extends Resource
 {
@@ -40,7 +41,7 @@ class NotaFornecedorResource extends Resource
             ->columns([
                 ViewColumn::make('selecionar')
                     ->label('')
-                    ->state(fn (): bool => true)
+                    ->state(fn ($record): bool => (int) (Livewire::current()?->highlightedRecordId ?? 0) === (int) $record->getKey())
                     ->width('2.1rem')
                     ->view('filament.components.erp.notas-fornecedores.columns.select')
                     ->alignCenter()

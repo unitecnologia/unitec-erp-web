@@ -3,8 +3,12 @@
 namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 
 use App\Models\Orcamento;
+use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Orcamento\OrcamentoReportService;
+use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
+use App\Support\Erp\WhatsApp\WhatsAppPhone;
+use App\Support\Erp\WhatsApp\WhatsAppSender;
 use Filament\Notifications\Notification;
 use Livewire\Attributes\On;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -20,6 +24,8 @@ trait ManagesOrcamentoEmailModal
 
     public string $emailTo = '';
 
+    public string $whatsAppTo = '';
+
     public string $emailSubject = '';
 
     public string $emailMessage = '';
@@ -33,7 +39,7 @@ trait ManagesOrcamentoEmailModal
 
     public function openEmailModal(): void
     {
-        if (! $this->highlightedRecordIdOrNotify('email')) {
+        if (! $this->highlightedRecordIdOrNotify('enviar')) {
             return;
         }
 
@@ -53,11 +59,15 @@ trait ManagesOrcamentoEmailModal
         $this->cleanupEmailAttachments();
 
         $report = app(OrcamentoReportService::class);
+        $orcamento = $report->loadOrcamento($orcamento);
         $numero = $report->formatNumero($orcamento->numero);
         $pdf = $report->storePdfAttachment($orcamento);
+        $cliente = $orcamento->cliente;
+        $phoneRaw = $cliente?->celular1 ?: ($cliente?->whatsapp ?: '');
 
         $this->emailOrcamentoId = $orcamento->id;
-        $this->emailTo = trim((string) ($orcamento->cliente?->email ?? ''));
+        $this->emailTo = trim((string) ($cliente?->email ?? ''));
+        $this->whatsAppTo = WhatsAppPhone::formatDisplay($phoneRaw);
         $this->emailSubject = $report->defaultEmailSubject($numero);
         $this->emailMessage = $report->defaultEmailMessage($numero);
         $this->emailAttachments = [[
@@ -69,6 +79,9 @@ trait ManagesOrcamentoEmailModal
         $this->emailSelectedAttachmentId = 'orcamento-pdf';
         $this->emailExtraUpload = null;
         $this->emailModalOpen = true;
+
+        $this->dispatch('erp-orc-focus-envio-modal');
+        $this->dispatch('erp-masks-refresh');
     }
 
     public function closeEmailModal(): void
@@ -76,11 +89,21 @@ trait ManagesOrcamentoEmailModal
         $this->emailModalOpen = false;
         $this->emailOrcamentoId = null;
         $this->emailTo = '';
+        $this->whatsAppTo = '';
         $this->emailSubject = '';
         $this->emailMessage = '';
         $this->emailExtraUpload = null;
         $this->emailSelectedAttachmentId = null;
         $this->cleanupEmailAttachments();
+    }
+
+    public function updatedEmailMessage(string $value): void
+    {
+        $clean = WhatsAppMessageHelper::stripSystemFooter($value);
+
+        if ($clean !== $value) {
+            $this->emailMessage = $clean;
+        }
     }
 
     public function selectEmailAttachment(string $attachmentId): void
@@ -105,7 +128,7 @@ trait ManagesOrcamentoEmailModal
         }
 
         $storedPath = $this->emailExtraUpload->store('temp/email-attachments', 'local');
-        $fullPath = storage_path('app/' . $storedPath);
+        $fullPath = storage_path('app/'.$storedPath);
 
         $this->emailAttachments[] = [
             'id' => uniqid('extra-', true),
@@ -194,7 +217,7 @@ trait ManagesOrcamentoEmailModal
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
+                ->body('Verifique a configuração de e-mail em Empresa → Parâmetros → E-mail.')
                 ->danger()
                 ->send();
 
@@ -203,10 +226,87 @@ trait ManagesOrcamentoEmailModal
 
         Notification::make()
             ->title('E-mail enviado.')
+            ->body('A tela permanece aberta para enviar também por WhatsApp, se quiser.')
             ->success()
             ->send();
+    }
 
-        $this->closeEmailModal();
+    public function sendOrcamentoWhatsApp(): void
+    {
+        $this->emailMessage = WhatsAppMessageHelper::stripSystemFooter($this->emailMessage);
+        $maxLength = WhatsAppMessageHelper::maxUserMessageLength();
+
+        $this->validate([
+            'whatsAppTo' => ['required', 'string', 'max:30', new CelularBrasileiroValido()],
+            'emailMessage' => ['required', 'string', 'max:'.$maxLength],
+        ], [
+            'whatsAppTo.required' => 'Informe o WhatsApp do destinatário.',
+            'emailMessage.required' => 'Informe a mensagem.',
+        ]);
+
+        $attachment = $this->emailAttachments[0] ?? null;
+        $pdfPath = is_array($attachment) ? ($attachment['path'] ?? null) : null;
+        $pdfName = is_array($attachment) ? (string) ($attachment['name'] ?? 'ORCAMENTO.PDF') : 'ORCAMENTO.PDF';
+
+        if (! is_string($pdfPath) || ! is_file($pdfPath)) {
+            Notification::make()
+                ->title('PDF do orçamento não encontrado.')
+                ->body('Feche e abra novamente o envio (F9).')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresa = app(OrcamentoReportService::class)->resolveEmpresa();
+
+        if (! $empresa) {
+            Notification::make()
+                ->title('Empresa não identificada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $sender = app(WhatsAppSender::class);
+
+        try {
+            $result = $sender->sendDocumentMessage(
+                empresa: $empresa,
+                tipo: WhatsAppSender::TIPO_ORCAMENTO,
+                number: $this->whatsAppTo,
+                text: $this->emailMessage,
+                documentPath: $pdfPath,
+                documentName: $pdfName !== '' ? $pdfName : 'ORCAMENTO.PDF',
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body('Verifique a conexão em Empresa → Parâmetros → WhatsApp.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('WhatsApp enviado.')
+            ->body('A tela permanece aberta para enviar também por e-mail, se quiser.')
+            ->success()
+            ->send();
     }
 
     protected function cleanupEmailAttachments(): void

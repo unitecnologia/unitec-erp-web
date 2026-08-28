@@ -4,8 +4,10 @@ namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\ContaPagar;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Reports\ReportEmpresaScope;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ContasPagarReport extends AbstractTabularReport
 {
@@ -29,6 +31,7 @@ class ContasPagarReport extends AbstractTabularReport
         return [
             'numero' => 'NÚMERO',
             'emissao' => 'EMISSÃO',
+            'empresa' => 'EMPRESA',
             'vencimento' => 'VENCIMENTO',
             'fornecedor' => 'FORNECEDOR',
             'documento' => 'DOCUMENTO',
@@ -41,7 +44,17 @@ class ContasPagarReport extends AbstractTabularReport
 
     public function defaultColumns(): array
     {
-        return array_keys($this->columns());
+        return [
+            'numero',
+            'emissao',
+            'vencimento',
+            'fornecedor',
+            'documento',
+            'produto',
+            'valor',
+            'pago',
+            'saldo',
+        ];
     }
 
     public function numericColumns(): array
@@ -51,7 +64,7 @@ class ContasPagarReport extends AbstractTabularReport
 
     public function filterFields(): array
     {
-        return $this->withColumnsField([
+        return $this->withColumnsField($this->withEmpresaFilter([
             ...$this->periodFilterFields(),
             [
                 'key' => 'situacao',
@@ -64,15 +77,20 @@ class ContasPagarReport extends AbstractTabularReport
                     'vencidos' => 'Vencidos',
                 ],
             ],
-        ]);
+        ]));
     }
 
     public function build(Request $request): array
     {
-        $columns = $this->resolveColumns($request->query('cols'));
+        $columns = $this->columnsForEmpresaScope(
+            $this->resolveColumns($request->query('cols')),
+            $request,
+            after: 'emissao',
+        );
         $situacao = (string) $request->query('situacao', 'todos');
+        $multi = $this->isMultiEmpresaScope($request);
+        $hasEmpresa = Schema::hasColumn((new ContaPagar)->getTable(), 'empresa_id');
 
-        // Vencidos: janela ampla (até ontem) para alinhar ao KPI "Pagar vencido".
         if ($situacao === 'vencidos') {
             $hoje = ErpTimezone::toLocal();
             [$de, $ate] = $this->periodFromRequest(
@@ -85,10 +103,14 @@ class ContasPagarReport extends AbstractTabularReport
         }
 
         $query = ContaPagar::query()
-            ->with('fornecedor')
+            ->with(['fornecedor', 'empresa'])
             ->whereBetween('vencimento', [$de->toDateString(), $ate->toDateString()])
             ->orderBy('vencimento')
             ->orderBy('id');
+
+        if ($hasEmpresa) {
+            ReportEmpresaScope::applyToQueryAllowingNullForSingle($query, $request, 'empresa_id');
+        }
 
         if ($situacao === 'abertos') {
             $query->where('saldo', '>', 0);
@@ -98,31 +120,39 @@ class ContasPagarReport extends AbstractTabularReport
             $query->where('saldo', '>', 0)->whereDate('vencimento', '<', ErpTimezone::toLocal()->toDateString());
         }
 
-        $rows = $query->limit(5000)->get()->map(fn (ContaPagar $conta): array => [
-            'numero' => (string) $conta->numero,
-            'emissao' => static::formatDate($conta->emissao),
-            'vencimento' => static::formatDate($conta->vencimento),
-            'fornecedor' => (string) ($conta->fornecedor?->nome_razao ?? ''),
-            'documento' => (string) ($conta->documento ?? ''),
-            'produto' => (string) ($conta->produto ?? ''),
-            'valor' => static::formatMoney((float) $conta->valor),
-            'pago' => static::formatMoney((float) $conta->valor_pago),
-            'saldo' => static::formatMoney((float) $conta->saldo),
-        ])->all();
+        $rows = $query->limit(5000)->get()->map(function (ContaPagar $conta) use ($multi): array {
+            $row = [
+                'numero' => (string) $conta->numero,
+                'emissao' => static::formatDate($conta->emissao),
+                'vencimento' => static::formatDate($conta->vencimento),
+                'fornecedor' => (string) ($conta->fornecedor?->nome_razao ?? ''),
+                'documento' => (string) ($conta->documento ?? ''),
+                'produto' => (string) ($conta->produto ?? ''),
+                'valor' => static::formatMoney((float) $conta->valor),
+                'pago' => static::formatMoney((float) $conta->valor_pago),
+                'saldo' => static::formatMoney((float) $conta->saldo),
+            ];
+
+            if ($multi) {
+                $row['empresa'] = ReportEmpresaScope::labelEmpresa($conta->empresa);
+            }
+
+            return $row;
+        })->all();
 
         return $this->result(
-            [
+            $this->withEmpresaFilterValue([
                 'de' => $de->toDateString(),
                 'ate' => $ate->toDateString(),
                 'situacao' => $situacao,
                 'cols' => $columns,
-            ],
+            ], $request),
             $columns,
             $rows,
-            [
-                'VENCIMENTO: ' . $this->periodLabel($de, $ate),
-                'SITUAÇÃO: ' . mb_strtoupper($situacao, 'UTF-8'),
-            ],
+            $this->withEmpresaSummary([
+                'VENCIMENTO: '.$this->periodLabel($de, $ate),
+                'SITUAÇÃO: '.mb_strtoupper($situacao, 'UTF-8'),
+            ], $request),
         );
     }
 }

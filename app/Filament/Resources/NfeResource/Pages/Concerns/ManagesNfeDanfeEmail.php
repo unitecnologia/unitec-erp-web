@@ -5,9 +5,13 @@ namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\NfeEvento;
+use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
+use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
+use App\Support\Erp\WhatsApp\WhatsAppPhone;
+use App\Support\Erp\WhatsApp\WhatsAppSender;
 use Filament\Notifications\Notification;
 
 trait ManagesNfeDanfeEmail
@@ -17,6 +21,8 @@ trait ManagesNfeDanfeEmail
     public ?int $nfeDanfeEmailNfeId = null;
 
     public string $nfeDanfeEmailTo = '';
+
+    public string $nfeDanfeWhatsAppTo = '';
 
     public string $nfeDanfeEmailSubject = '';
 
@@ -28,7 +34,7 @@ trait ManagesNfeDanfeEmail
     public function openNfeDanfeEmailModal(): void
     {
         if (! $this->nfeFiscalSucessoNfeId) {
-            $this->showNfeFiscalOverlayInfo('E-mail', 'NF-e não encontrada para envio.');
+            $this->showNfeFiscalOverlayInfo('Enviar nota', 'NF-e não encontrada para envio.');
 
             return;
         }
@@ -60,7 +66,7 @@ trait ManagesNfeDanfeEmail
             return (int) $this->nfeModalRecordId;
         }
 
-        return $this->highlightedRecordIdOrNotify('email');
+        return $this->highlightedRecordIdOrNotify('enviar');
     }
 
     protected function prepareNfeDanfeEmailModal(int $nfeId, bool $useFiscalOverlayErrors = false): void
@@ -74,7 +80,7 @@ trait ManagesNfeDanfeEmail
         }
 
         if ($nfe->status !== Nfe::STATUS_TRANSMITIDA) {
-            $this->notifyNfeDanfeEmailError('Somente NF-e transmitida pode ser enviada por e-mail.', $useFiscalOverlayErrors);
+            $this->notifyNfeDanfeEmailError('Somente NF-e transmitida pode ser enviada.', $useFiscalOverlayErrors);
 
             return;
         }
@@ -91,27 +97,25 @@ trait ManagesNfeDanfeEmail
 
         try {
             $report = app(NfeDanfeReportService::class);
-            $pdf = $report->storePdfAttachment($nfe, $empresa);
+            $attachments = $report->buildDispatchAttachments($nfe, $empresa);
         } catch (\Throwable $exception) {
             report($exception);
 
-            $this->notifyNfeDanfeEmailError('Não foi possível gerar o PDF da DANFE para envio.', $useFiscalOverlayErrors);
+            $this->notifyNfeDanfeEmailError('Não foi possível gerar os anexos da NF-e para envio.', $useFiscalOverlayErrors);
 
             return;
         }
 
-        $clienteNome = trim((string) ($nfe->cliente?->nome_razao ?? $nfe->cliente?->nome ?? ''));
+        $cliente = $nfe->cliente;
+        $clienteNome = trim((string) ($cliente?->nome_razao ?? $cliente?->nome ?? ''));
+        $phoneRaw = $cliente?->celular1 ?: ($cliente?->whatsapp ?: ($cliente?->fone1 ?: ''));
 
         $this->nfeDanfeEmailNfeId = (int) $nfe->id;
-        $this->nfeDanfeEmailTo = trim((string) ($nfe->cliente?->email ?? ''));
+        $this->nfeDanfeEmailTo = trim((string) ($cliente?->email ?? ''));
+        $this->nfeDanfeWhatsAppTo = WhatsAppPhone::formatDisplay($phoneRaw);
         $this->nfeDanfeEmailSubject = $report->defaultEmailSubject($nfe);
         $this->nfeDanfeEmailMessage = $report->defaultEmailMessage($nfe, $clienteNome);
-        $this->nfeDanfeEmailAttachments = [[
-            'id' => 'danfe',
-            'name' => $pdf['name'],
-            'path' => $pdf['path'],
-            'display' => $pdf['display'],
-        ]];
+        $this->nfeDanfeEmailAttachments = $attachments;
         $this->nfeDanfeEmailModalOpen = true;
 
         $this->dispatch('erp-nfe-focus-danfe-email-modal');
@@ -120,16 +124,25 @@ trait ManagesNfeDanfeEmail
     protected function notifyNfeDanfeEmailError(string $message, bool $useFiscalOverlayErrors): void
     {
         if ($useFiscalOverlayErrors) {
-            $this->showNfeFiscalOverlayInfo('E-mail', $message);
+            $this->showNfeFiscalOverlayInfo('Enviar nota', $message);
 
             return;
         }
 
         Notification::make()
-            ->title('E-mail')
+            ->title('Enviar nota')
             ->body($message)
             ->warning()
             ->send();
+    }
+
+    public function updatedNfeDanfeEmailMessage(string $value): void
+    {
+        $clean = WhatsAppMessageHelper::stripSystemFooter($value);
+
+        if ($clean !== $value) {
+            $this->nfeDanfeEmailMessage = $clean;
+        }
     }
 
     public function sendNfeDanfeEmail(): void
@@ -147,7 +160,7 @@ trait ManagesNfeDanfeEmail
 
         if ($this->nfeDanfeEmailAttachments === []) {
             Notification::make()
-                ->title('Anexo da DANFE não encontrado.')
+                ->title('Anexos da NF-e não encontrados.')
                 ->warning()
                 ->send();
 
@@ -196,7 +209,7 @@ trait ManagesNfeDanfeEmail
 
             Notification::make()
                 ->title('Não foi possível enviar o e-mail.')
-                ->body('Verifique a configuração de e-mail em Configurações Fiscais.')
+                ->body('Verifique a configuração de e-mail em Empresa → Parâmetros → E-mail.')
                 ->danger()
                 ->send();
 
@@ -206,7 +219,7 @@ trait ManagesNfeDanfeEmail
         NfeEventoLogger::registrar(
             nfeId: (int) $nfe->id,
             tipo: NfeEvento::TIPO_EMAIL,
-            titulo: 'DANFE enviada por e-mail',
+            titulo: 'NF-e enviada por e-mail',
             descricao: $this->nfeDanfeEmailSubject,
             destinatario: $this->nfeDanfeEmailTo,
             metadata: [
@@ -217,10 +230,112 @@ trait ManagesNfeDanfeEmail
 
         Notification::make()
             ->title('E-mail enviado.')
+            ->body('A tela permanece aberta para enviar também por WhatsApp, se quiser.')
             ->success()
             ->send();
+    }
 
-        $this->closeNfeDanfeEmailModal();
+    public function sendNfeDanfeWhatsApp(): void
+    {
+        $this->nfeDanfeEmailMessage = WhatsAppMessageHelper::stripSystemFooter($this->nfeDanfeEmailMessage);
+        $maxLength = WhatsAppMessageHelper::maxUserMessageLength();
+
+        $this->validate([
+            'nfeDanfeWhatsAppTo' => ['required', 'string', 'max:30', new CelularBrasileiroValido()],
+            'nfeDanfeEmailMessage' => ['required', 'string', 'max:'.$maxLength],
+        ], [
+            'nfeDanfeWhatsAppTo.required' => 'Informe o WhatsApp do destinatário.',
+            'nfeDanfeEmailMessage.required' => 'Informe a mensagem.',
+        ]);
+
+        $documents = $this->buildNfeDanfeWhatsAppDocuments();
+
+        if ($documents === []) {
+            Notification::make()
+                ->title('Anexos da NF-e não encontrados.')
+                ->body('Feche e abra novamente o envio da nota.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $nfe = Nfe::query()->find($this->nfeDanfeEmailNfeId);
+
+        if (! $nfe) {
+            Notification::make()
+                ->title('NF-e não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresa = Empresa::query()->find($nfe->empresa_id);
+
+        if (! $empresa) {
+            Notification::make()
+                ->title('Empresa não identificada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $sender = app(WhatsAppSender::class);
+
+        try {
+            $result = $sender->sendDocumentMessages(
+                empresa: $empresa,
+                tipo: WhatsAppSender::TIPO_NFE,
+                number: $this->nfeDanfeWhatsAppTo,
+                text: $this->nfeDanfeEmailMessage,
+                documents: $documents,
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body('Verifique a conexão em Empresa → Parâmetros → WhatsApp.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Não foi possível enviar o WhatsApp.')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        NfeEventoLogger::registrar(
+            nfeId: (int) $nfe->id,
+            tipo: NfeEvento::TIPO_WHATSAPP,
+            titulo: 'NF-e enviada por WhatsApp',
+            descricao: 'DANFE e XML enviados ao destinatário.',
+            destinatario: WhatsAppPhone::formatDisplay($this->nfeDanfeWhatsAppTo) ?? $this->nfeDanfeWhatsAppTo,
+            metadata: [
+                'contexto' => 'danfe',
+                'destinatario_tipo' => 'cliente',
+                'anexos' => collect($this->nfeDanfeEmailAttachments)
+                    ->pluck('name')
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ],
+        );
+
+        Notification::make()
+            ->title('WhatsApp enviado.')
+            ->body('A tela permanece aberta para enviar também por e-mail, se quiser.')
+            ->success()
+            ->send();
     }
 
     public function closeNfeDanfeEmailModal(): void
@@ -228,6 +343,7 @@ trait ManagesNfeDanfeEmail
         $this->nfeDanfeEmailModalOpen = false;
         $this->nfeDanfeEmailNfeId = null;
         $this->nfeDanfeEmailTo = '';
+        $this->nfeDanfeWhatsAppTo = '';
         $this->nfeDanfeEmailSubject = '';
         $this->nfeDanfeEmailMessage = '';
         $this->cleanupNfeDanfeEmailAttachments();
@@ -244,5 +360,33 @@ trait ManagesNfeDanfeEmail
         }
 
         $this->nfeDanfeEmailAttachments = [];
+    }
+
+    /**
+     * @return list<array{path: string, name: string, mimetype: string, caption?: string}>
+     */
+    protected function buildNfeDanfeWhatsAppDocuments(): array
+    {
+        $documents = [];
+
+        foreach ($this->nfeDanfeEmailAttachments as $attachment) {
+            $path = $attachment['path'] ?? null;
+
+            if (! is_string($path) || ! is_file($path)) {
+                continue;
+            }
+
+            $name = (string) ($attachment['name'] ?? 'documento');
+            $isXml = ($attachment['id'] ?? '') === 'xml' || str_ends_with(strtolower($name), '.xml');
+
+            $documents[] = [
+                'path' => $path,
+                'name' => $name !== '' ? $name : ($isXml ? 'NFE.xml' : 'DANFE-NFE.PDF'),
+                'mimetype' => $isXml ? 'application/xml' : 'application/pdf',
+                'caption' => $isXml ? 'XML da NF-e' : null,
+            ];
+        }
+
+        return $documents;
     }
 }

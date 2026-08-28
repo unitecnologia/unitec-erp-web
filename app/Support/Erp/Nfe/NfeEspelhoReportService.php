@@ -22,8 +22,8 @@ final class NfeEspelhoReportService
 
         $data['espelho'] = true;
         $data['documentoTitulo'] = 'ESPELHO DA NF-e';
-        $data['documentoSubtitulo'] = 'Pré-visualização — sem validade fiscal';
-        $data['avisoEspelho'] = 'NOTA EM ABERTO — SEM VALOR FISCAL';
+        $data['documentoSubtitulo'] = 'Espelho sem validade fiscal — apenas conferência';
+        $data['avisoEspelho'] = 'ESPELHO DA NF-e — SEM VALIDADE FISCAL';
         $data['protocolo'] = '';
         $data['chave'] = '';
         $data['chaveFormatada'] = '—';

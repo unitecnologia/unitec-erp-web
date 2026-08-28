@@ -19,6 +19,9 @@ window.ErpUppercase = {
         if (input.hasAttribute("data-mask") || input.dataset.erpPasswordMask) {
             return true;
         }
+        if (input.hasAttribute("data-erp-date") || input.classList.contains("erp-date-input")) {
+            return true;
+        }
         if (input.classList.contains("erp-pcad-form__input--password")) {
             return true;
         }

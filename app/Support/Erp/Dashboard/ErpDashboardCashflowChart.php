@@ -14,23 +14,24 @@ use Throwable;
 final class ErpDashboardCashflowChart
 {
     /**
-     * @return array{labels: list<string>, entradas: list<float>, saidas: list<float>}
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{labels: list<string>, entradas: list<float>, saidas: list<float>, empty?: bool}
      */
-    public static function data(): array
+    public static function data(int|array|null $empresaScope = null): array
     {
-        $real = static::fromDatabase();
-
-        if ($real !== null) {
-            return $real;
-        }
-
-        return ErpDashboardDemoData::cashflowChart();
+        return static::fromDatabase($empresaScope) ?? [
+            'labels' => ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
+            'entradas' => [0.0, 0.0, 0.0, 0.0],
+            'saidas' => [0.0, 0.0, 0.0, 0.0],
+            'empty' => true,
+        ];
     }
 
     /**
-     * @return array{labels: list<string>, entradas: list<float>, saidas: list<float>}|null
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{labels: list<string>, entradas: list<float>, saidas: list<float>, empty?: bool}|null
      */
-    private static function fromDatabase(): ?array
+    private static function fromDatabase(int|array|null $empresaScope = null): ?array
     {
         try {
             if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
@@ -47,13 +48,23 @@ final class ErpDashboardCashflowChart
                 $inicio = $hoje->copy()->startOfWeek()->subWeeks($week)->startOfDay();
                 $fim = $inicio->copy()->endOfWeek()->endOfDay();
 
+                // A semana atual termina hoje: nunca somar emissões futuras.
+                if ($week === 0) {
+                    $fim = $fim->min($hoje->copy()->endOfDay());
+                }
+
                 $labels[] = 'Sem '.(4 - $week);
-                $entradas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'entrada');
-                $saidas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'saida');
+                $entradas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'entrada', $empresaScope);
+                $saidas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'saida', $empresaScope);
             }
 
             if (array_sum($entradas) <= 0 && array_sum($saidas) <= 0) {
-                return null;
+                return [
+                    'labels' => $labels,
+                    'entradas' => $entradas,
+                    'saidas' => $saidas,
+                    'empty' => true,
+                ];
             }
 
             return [

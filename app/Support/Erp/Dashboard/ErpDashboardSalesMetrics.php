@@ -4,22 +4,35 @@ namespace App\Support\Erp\Dashboard;
 
 use App\Models\PdvVenda;
 use App\Models\Venda;
+use App\Support\Erp\ErpEmpresaScopeFilter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardSalesMetrics
 {
-    public static function faturamentoDia(?Carbon $day = null): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function faturamentoDia(?Carbon $day = null, int|array|null $empresaScope = null): float
     {
         $day ??= Carbon::today();
 
-        return round(static::sumVendasNaData($day) + static::sumPdvSemEspelhoNaData($day), 2);
+        return round(
+            static::sumVendasNaData($day, $empresaScope) + static::sumPdvSemEspelhoNaData($day, $empresaScope),
+            2
+        );
     }
 
-    public static function faturamentoPeriodo(Carbon $from, Carbon $to): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function faturamentoPeriodo(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
-        return round(static::sumVendasNoPeriodo($from, $to) + static::sumPdvSemEspelhoNoPeriodo($from, $to), 2);
+        return round(
+            static::sumVendasNoPeriodo($from, $to, $empresaScope) + static::sumPdvSemEspelhoNoPeriodo($from, $to, $empresaScope),
+            2
+        );
     }
 
     public static function variacaoPercentual(float $atual, float $anterior): ?float
@@ -38,7 +51,7 @@ final class ErpDashboardSalesMetrics
         if ($variacao !== null) {
             $sinal = $variacao > 0 ? '+' : '';
 
-            return $sinal . number_format($variacao, 1, ',', '') . '% vs ontem';
+            return $sinal.number_format($variacao, 1, ',', '').'% vs ontem';
         }
 
         if ($hoje > 0 && $ontem <= 0) {
@@ -48,47 +61,62 @@ final class ErpDashboardSalesMetrics
         return 'Sem vendas no período';
     }
 
-    private static function sumVendasNaData(Carbon $day): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumVendasNaData(Carbon $day, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new Venda)->getTable())) {
                 return 0.0;
             }
 
-            return (float) Venda::query()
+            $q = Venda::query()
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
-                ->whereDate('data', $day->toDateString())
-                ->sum('total');
+                ->whereDate('data', $day->toDateString());
+
+            ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
+
+            return (float) $q->sum('total');
         } catch (Throwable) {
             return 0.0;
         }
     }
 
-    private static function sumVendasNoPeriodo(Carbon $from, Carbon $to): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumVendasNoPeriodo(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new Venda)->getTable())) {
                 return 0.0;
             }
 
-            return (float) Venda::query()
+            $q = Venda::query()
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                 ->whereDate('data', '>=', $from->toDateString())
-                ->whereDate('data', '<=', $to->toDateString())
-                ->sum('total');
+                ->whereDate('data', '<=', $to->toDateString());
+
+            ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
+
+            return (float) $q->sum('total');
         } catch (Throwable) {
             return 0.0;
         }
     }
 
-    private static function sumPdvSemEspelhoNaData(Carbon $day): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumPdvSemEspelhoNaData(Carbon $day, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new PdvVenda)->getTable())) {
                 return 0.0;
             }
 
-            return (float) PdvVenda::query()
+            $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
                 ->whereNull('venda_id')
                 ->where(function ($query) use ($day): void {
@@ -97,21 +125,27 @@ final class ErpDashboardSalesMetrics
                             $fallback->whereNull('fechado_em')
                                 ->whereDate('created_at', $day->toDateString());
                         });
-                })
-                ->sum('total');
+                });
+
+            ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
+
+            return (float) $q->sum('total');
         } catch (Throwable) {
             return 0.0;
         }
     }
 
-    private static function sumPdvSemEspelhoNoPeriodo(Carbon $from, Carbon $to): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumPdvSemEspelhoNoPeriodo(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         try {
             if (! Schema::hasTable((new PdvVenda)->getTable())) {
                 return 0.0;
             }
 
-            return (float) PdvVenda::query()
+            $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
                 ->whereNull('venda_id')
                 ->where(function ($query) use ($from, $to): void {
@@ -124,8 +158,11 @@ final class ErpDashboardSalesMetrics
                             ->whereDate('created_at', '>=', $from->toDateString())
                             ->whereDate('created_at', '<=', $to->toDateString());
                     });
-                })
-                ->sum('total');
+                });
+
+            ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
+
+            return (float) $q->sum('total');
         } catch (Throwable) {
             return 0.0;
         }

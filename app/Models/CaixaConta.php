@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -139,6 +140,96 @@ class CaixaConta extends Model
     public function ultimoUsuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'ultimo_usuario_id');
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'caixa_conta_user')
+            ->withPivot(['empresa_id', 'is_padrao'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Contas liberáveis para usuário no PDV: só tipo PDV (legado CAIXA/X).
+     * SUBCAIXA fica para destino de sangria/fechamento (ex.: CAIXA GERAL), não para operar PDV.
+     */
+    public function scopeAssignable($query)
+    {
+        return $query
+            ->where('ativo', true)
+            ->where(function ($builder): void {
+                $builder
+                    ->where('sistema', false)
+                    ->orWhereNull('sistema');
+            })
+            ->whereRaw('UPPER(nome) <> ?', [self::NOME_CAIXA_GERAL])
+            ->whereIn('tipo', [self::TIPO_PDV, 'CAIXA', 'X']);
+    }
+
+    /**
+     * Garante ao menos uma conta operacional tipo PDV (promove SUBCAIXA não-sistema ou cria).
+     */
+    public static function ensurePdvOperacional(): self
+    {
+        // Legado comum: "CAIXA" cadastrado como SUBCAIXA — passa a PDV.
+        self::query()
+            ->where('ativo', true)
+            ->where('tipo', self::TIPO_SUBCAIXA)
+            ->where(function ($builder): void {
+                $builder
+                    ->where('sistema', false)
+                    ->orWhereNull('sistema');
+            })
+            ->whereRaw('UPPER(TRIM(nome)) = ?', ['CAIXA'])
+            ->update(['tipo' => self::TIPO_PDV]);
+
+        $existente = self::query()
+            ->where('ativo', true)
+            ->whereIn('tipo', [self::TIPO_PDV, 'CAIXA', 'X'])
+            ->whereRaw('UPPER(nome) <> ?', [self::NOME_CAIXA_GERAL])
+            ->orderBy('codigo')
+            ->first();
+
+        if ($existente) {
+            if ((string) $existente->tipo !== self::TIPO_PDV) {
+                $existente->forceFill(['tipo' => self::TIPO_PDV])->save();
+            }
+
+            return $existente->fresh() ?? $existente;
+        }
+
+        $promover = self::query()
+            ->where('ativo', true)
+            ->where(function ($builder): void {
+                $builder
+                    ->where('sistema', false)
+                    ->orWhereNull('sistema');
+            })
+            ->where('tipo', self::TIPO_SUBCAIXA)
+            ->whereRaw('UPPER(nome) <> ?', [self::NOME_CAIXA_GERAL])
+            ->orderBy('codigo')
+            ->first();
+
+        if ($promover) {
+            $promover->forceFill(['tipo' => self::TIPO_PDV])->save();
+
+            return $promover->fresh() ?? $promover;
+        }
+
+        $codigo = ((int) self::query()->max('codigo')) + 1;
+
+        if ($codigo < 1) {
+            $codigo = 1;
+        }
+
+        return self::query()->create([
+            'codigo' => $codigo,
+            'nome' => 'CAIXA PDV',
+            'tipo' => self::TIPO_PDV,
+            'situacao' => self::SITUACAO_ABERTO,
+            'ativo' => true,
+            'sistema' => false,
+        ]);
     }
 
     protected function casts(): array

@@ -139,13 +139,6 @@ final class PdvConfig
         return (float) ($this->empresa?->param_acrescimo_maximo ?? 0);
     }
 
-    public function exibirF3Vendedor(): bool
-    {
-        // Controlado exclusivamente pelo parÃ¢metro da empresa.
-        // (terminais.exibe_f3 Ã© da ContingÃªncia NFCe, conceito distinto.)
-        return (bool) ($this->empresa?->param_pdv_exibir_f3_vendedor ?? false);
-    }
-
     public function somAtivo(): bool
     {
         return (bool) ($this->empresa?->param_pdv_ativar_som ?? false);
@@ -167,12 +160,40 @@ final class PdvConfig
         return (bool) ($this->terminal?->ler_peso ?? false);
     }
 
+    /**
+     * Configuração serial da balança do terminal (Device Service / PDV).
+     *
+     * @return array{
+     *     marca: string,
+     *     port: string,
+     *     baudRate: int,
+     *     dataBits: int,
+     *     parity: string,
+     *     stopBits: string,
+     *     handshake: string
+     * }
+     */
+    public function balancaSerialSettings(): array
+    {
+        $terminal = $this->terminal;
+
+        return [
+            'marca' => trim((string) ($terminal?->balanca_marca ?? '')),
+            'port' => strtoupper(trim((string) ($terminal?->balanca_porta ?? ''))),
+            'baudRate' => (int) ($terminal?->balanca_velocidade ?: 9600),
+            'dataBits' => (int) ($terminal?->balanca_databits ?: 8),
+            'parity' => trim((string) ($terminal?->balanca_paridade ?: 'None')) ?: 'None',
+            'stopBits' => trim((string) ($terminal?->balanca_stopbits ?: '1')) ?: '1',
+            'handshake' => trim((string) ($terminal?->balanca_handshaking ?: 'None')) ?: 'None',
+        ];
+    }
+
+    /**
+     * Sempre ativo: etiqueta de balança é interpretada quando o produto é de balança.
+     * (Coluna terminais.busca_balanca_barras mantida só por compatibilidade.)
+     */
     public function buscaBalancaBarras(): bool
     {
-        if ($this->terminal !== null) {
-            return (bool) $this->terminal->busca_balanca_barras;
-        }
-
         return true;
     }
 
@@ -225,7 +246,7 @@ final class PdvConfig
             ->value('id');
     }
 
-    /** Modelo de etiqueta de balança (1, 2, 3 ou 4 — padrão Delphi). */
+    /** Modelo de etiqueta de balança (1–5). */
     public function modeloBalanca(): int
     {
         $modelo = $this->empresa?->param_balanca_etiqueta_modelo
@@ -276,12 +297,12 @@ final class PdvConfig
     }
 
     /**
-     * Terminal com Device Service ativado (impressÃ£o RAW silenciosa no PC do caixa).
-     * Desligado = sempre fallback navegador.
+     * Device Service sempre ativo (agente local no PC do caixa).
+     * Sem impressora RAW configurada, o PrintTarget cai no navegador.
      */
     public function usarDeviceService(): bool
     {
-        return (bool) ($this->terminal?->usar_device_service ?? false);
+        return true;
     }
 
     /**

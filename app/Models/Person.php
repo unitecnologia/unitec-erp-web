@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpDataSyncVersion;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -77,6 +78,17 @@ class Person extends Model
     /** Código legado ainda encontrado em bases antigas — tratar como CF. */
     public const CODIGO_CONSUMIDOR_FINAL_LEGADO = '000001';
 
+    protected static function booted(): void
+    {
+        static::saved(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PEOPLE);
+        });
+
+        static::deleted(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PEOPLE);
+        });
+    }
+
     /**
      * @return list<string>
      */
@@ -93,6 +105,46 @@ class Person extends Model
         $codigo = strtoupper(trim((string) $codigo));
 
         return $codigo !== '' && in_array($codigo, self::codigosConsumidorFinal(), true);
+    }
+
+    /**
+     * Garante o cadastro padrão de Consumidor Final (PDV / Força de Vendas).
+     * Aceita códigos CF/000001 ou nome "CONSUMIDOR FINAL" (bases legadas).
+     */
+    public static function resolveConsumidorFinal(): self
+    {
+        $person = self::query()
+            ->whereIn('codigo', self::codigosConsumidorFinal())
+            ->orderByRaw('CASE WHEN codigo = ? THEN 0 ELSE 1 END', [self::CODIGO_CONSUMIDOR_FINAL])
+            ->orderBy('id')
+            ->first();
+
+        if (! $person) {
+            $person = self::query()
+                ->where('is_cliente', true)
+                ->whereRaw('UPPER(TRIM(nome_razao)) = ?', ['CONSUMIDOR FINAL'])
+                ->orderBy('id')
+                ->first();
+        }
+
+        if ($person) {
+            if (
+                (string) $person->codigo === self::CODIGO_CONSUMIDOR_FINAL_LEGADO
+                && ! self::query()->where('codigo', self::CODIGO_CONSUMIDOR_FINAL)->exists()
+            ) {
+                $person->forceFill(['codigo' => self::CODIGO_CONSUMIDOR_FINAL])->save();
+            }
+
+            return $person;
+        }
+
+        return self::query()->create([
+            'codigo' => self::CODIGO_CONSUMIDOR_FINAL,
+            'pessoa_tipo' => self::PESSOA_FISICA,
+            'nome_razao' => 'CONSUMIDOR FINAL',
+            'is_cliente' => true,
+            'ativo' => true,
+        ]);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Nfe;
 use App\Models\NfeEvento;
 use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
+use App\Support\Erp\Nfe\NfeEstoqueService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
@@ -94,6 +95,8 @@ final class NfeCancelamentoService
 
         (new ContadorCloudPortalHookService())->onNfeCancelada($nfe, $empresa);
 
-        return $nfe;
+        (new NfeEstoqueService())->estornarSeAplicavel($nfe, $empresa);
+
+        return $nfe->fresh() ?? $nfe;
     }
 }

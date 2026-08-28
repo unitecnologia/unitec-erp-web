@@ -28,7 +28,7 @@ class ForcaVendasDeviceResource extends Resource
 
     public static function canAccess(): bool
     {
-        return ErpAccess::currentCan('forca_vendas.access');
+        return false;
     }
 
     public static function table(Table $table): Table

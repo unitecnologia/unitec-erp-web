@@ -11,6 +11,7 @@ use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
+use App\Support\Fiscal\NfceTerminalSequencia;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -46,9 +47,9 @@ class ConfigFiscaisPage extends Page
     public array $form = [];
 
     /**
-     * Série NFC-e por caixa (PDVs offline), editável na aba "PDVs Offline".
+     * Série NFC-e por caixa (aba PDVs Offline).
      *
-     * @var array<int, array{id: int, nome: string, terminal: string, serie: string, numero_inicial: int, usar_numero_inicial: bool}>
+     * @var array<int, array{id: int, nome: string, terminal: string, serie: string, proximo_numero: int, ultimo_nfce: int|null}>
      */
     public array $terminais = [];
 
@@ -100,7 +101,7 @@ class ConfigFiscaisPage extends Page
 
     public function setActiveTab(string $tab): void
     {
-        $allowed = ['webservice', 'certificado', 'nfce', 'nfe', 'pdv_offline', 'email', 'resp_tecnico'];
+        $allowed = ['webservice', 'certificado', 'nfce', 'nfe', 'pdv_offline', 'resp_tecnico'];
 
         $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'webservice';
 
@@ -114,7 +115,7 @@ class ConfigFiscaisPage extends Page
     }
 
     /**
-     * Carrega os caixas da empresa para edição da série NFC-e por PDV offline.
+     * Carrega os caixas da empresa para edição da série NFC-e por caixa.
      */
     protected function loadTerminais(): void
     {
@@ -126,25 +127,35 @@ class ConfigFiscaisPage extends Page
             return;
         }
 
+        $params = VendasParametro::forEmpresa($empresaId);
+
         $this->terminais = Terminal::query()
             ->where('empresa_id', $empresaId)
             ->orderBy('numero_logico_terminal')
             ->orderBy('id')
             ->get()
-            ->map(fn (Terminal $t): array => [
-                'id' => (int) $t->id,
-                'nome' => (string) ($t->nome ?: 'Caixa'),
-                'terminal' => (string) ($t->numero_logico_terminal ?: $t->id),
-                'serie' => (string) ($t->serie ?: ''),
-                'numero_inicial' => (int) ($t->numeracao_inicial ?: 1),
-                'usar_numero_inicial' => (bool) $t->usar_numero_inicial,
-            ])
+            ->map(function (Terminal $t) use ($params): array {
+                $serieEfetiva = NfceTerminalSequencia::serieEfetiva($t, $params);
+                $ultimo = NfceTerminalSequencia::ultimoNumero((int) $t->empresa_id, $serieEfetiva);
+
+                $serieGravada = trim((string) ($t->serie ?: ''));
+
+                return [
+                    'id' => (int) $t->id,
+                    'nome' => (string) ($t->nome ?: 'Caixa'),
+                    'terminal' => (string) ($t->numero_logico_terminal ?: $t->id),
+                    // Pré-preenche com a série efetiva para não parecer "—" sem valor.
+                    'serie' => $serieGravada !== '' ? $serieGravada : $serieEfetiva,
+                    'proximo_numero' => NfceTerminalSequencia::proximoPiso($t, $params),
+                    'ultimo_nfce' => $ultimo ?? 0,
+                ];
+            })
             ->all();
     }
 
     /**
-     * Grava a série NFC-e (e número inicial) de cada caixa. Bloqueia séries
-     * duplicadas entre caixas — cada PDV offline precisa de série exclusiva.
+     * Grava a série NFC-e e o próximo número de cada caixa.
+     * Bloqueia séries duplicadas — cada caixa precisa de série exclusiva.
      */
     public function saveTerminaisSeries(): void
     {
@@ -156,6 +167,21 @@ class ConfigFiscaisPage extends Page
             return;
         }
 
+        if ($this->persistTerminaisSeries($empresaId)) {
+            Notification::make()->title('Séries dos caixas gravadas.')->success()->send();
+        }
+    }
+
+    /**
+     * Persiste série / próximo nº dos caixas. Retorna false se bloqueou (duplicata ou piso).
+     */
+    protected function persistTerminaisSeries(int $empresaId): bool
+    {
+        if ($this->terminais === []) {
+            return true;
+        }
+
+        $params = VendasParametro::forEmpresa($empresaId);
         $seriesUsadas = [];
 
         foreach ($this->terminais as $linha) {
@@ -170,11 +196,11 @@ class ConfigFiscaisPage extends Page
             if (isset($seriesUsadas[$chave])) {
                 Notification::make()
                     ->title('Série duplicada entre caixas')
-                    ->body("A série {$serie} está repetida. Cada PDV offline precisa de série exclusiva.")
+                    ->body("A série {$serie} está repetida. Cada caixa precisa de série exclusiva.")
                     ->danger()
                     ->send();
 
-                return;
+                return false;
             }
 
             $seriesUsadas[$chave] = true;
@@ -191,17 +217,32 @@ class ConfigFiscaisPage extends Page
             }
 
             $serie = trim((string) ($linha['serie'] ?? ''));
+            $terminal->serie = $serie !== '' ? $serie : null;
+
+            $piso = NfceTerminalSequencia::proximoPiso($terminal, $params);
+            $proximo = max(1, (int) ($linha['proximo_numero'] ?? $piso));
+
+            if ($proximo < $piso) {
+                $nome = (string) ($linha['nome'] ?? 'Caixa');
+                Notification::make()
+                    ->title('Próx. nº inválido')
+                    ->body("O caixa {$nome} não pode usar próximo {$proximo}. O mínimo é {$piso} (último da série + 1).")
+                    ->danger()
+                    ->send();
+
+                return false;
+            }
 
             $terminal->update([
                 'serie' => $serie !== '' ? $serie : null,
-                'numeracao_inicial' => max(1, (int) ($linha['numero_inicial'] ?? 1)),
-                'usar_numero_inicial' => (bool) ($linha['usar_numero_inicial'] ?? false),
+                'numeracao_inicial' => $proximo,
+                'usar_numero_inicial' => true,
             ]);
         }
 
         $this->loadTerminais();
 
-        Notification::make()->title('Séries dos PDVs offline gravadas.')->success()->send();
+        return true;
     }
 
     protected function syncNfeStoragePathsToForm(): void
@@ -235,8 +276,6 @@ class ConfigFiscaisPage extends Page
             'form.aguardar' => ['required', 'integer', 'min:0'],
             'form.intervalo' => ['required', 'integer', 'min:0'],
             'form.tentativas' => ['required', 'integer', 'min:1'],
-            'form.numero' => ['required', 'integer', 'min:1'],
-            'form.serie' => ['required', 'string', 'max:10'],
             'form.numero_nfe' => ['required', 'integer', 'min:1'],
             'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
             'form.id_token' => ['nullable', 'string', 'max:40'],
@@ -266,12 +305,10 @@ class ConfigFiscaisPage extends Page
             ...NfeFiscalConfig::defaultWebStack(),
             'versao_nfe' => (int) ($this->form['versao_nfe'] ?? 4),
             'tipo_emissao' => (int) ($this->form['tipo_emissao'] ?? 1),
-            'id_token' => $this->form['id_token'] ?: null,
-            'token' => $this->form['token'] ?: null,
+            'id_token' => trim((string) ($this->form['id_token'] ?? '')) ?: null,
+            'token' => trim((string) ($this->form['token'] ?? '')) ?: null,
             'versao_qrcode' => (int) ($this->form['versao_qrcode'] ?? 2),
             'logomarca' => $this->form['logomarca'] ?: null,
-            'numero' => (int) $this->form['numero'],
-            'serie' => (string) $this->form['serie'],
             'serie_nfe' => (int) ($this->form['serie_nfe'] ?? 1),
             'numero_nfe' => (int) ($this->form['numero_nfe'] ?? 1),
             'email_host' => $this->form['email_host'] ?: null,
@@ -319,6 +356,15 @@ class ConfigFiscaisPage extends Page
         $this->form = NfeFiscalConfig::toFormArray($params);
         $this->form['proxy_senha'] = '';
 
+        if (! $this->persistTerminaisSeries($empresaId)) {
+            Notification::make()
+                ->title('Configurações gravadas, mas as séries dos caixas não foram salvas.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         Notification::make()->title('Configurações fiscais gravadas.')->success()->send();
     }
 
@@ -346,48 +392,77 @@ class ConfigFiscaisPage extends Page
             return;
         }
 
-        $content = file_get_contents($this->certificadoUpload->getRealPath());
-        $result = NfeFiscalConfig::readPkcs12($content, $senha);
+        try {
+            $realPath = $this->certificadoUpload->getRealPath();
 
-        if (! $result['ok']) {
-            Notification::make()->title($result['message'])->danger()->send();
+            if (! is_string($realPath) || $realPath === '' || ! is_file($realPath)) {
+                Notification::make()
+                    ->title('Arquivo .pfx inválido ou expirado.')
+                    ->body('Selecione o arquivo novamente e clique em Importar certificado.')
+                    ->warning()
+                    ->send();
 
-            return;
+                return;
+            }
+
+            $content = file_get_contents($realPath);
+
+            if ($content === false || $content === '') {
+                Notification::make()->title('Não foi possível ler o arquivo .pfx.')->danger()->send();
+
+                return;
+            }
+
+            $result = NfeFiscalConfig::readPkcs12($content, $senha);
+
+            if (! $result['ok']) {
+                Notification::make()->title($result['message'])->danger()->send();
+
+                return;
+            }
+
+            $relative = 'certificados/'.$empresaId.'/certificado.pfx';
+
+            $this->certificadoUpload->storeAs(
+                'certificados/'.$empresaId,
+                'certificado.pfx',
+                'local',
+            );
+
+            $params = VendasParametro::forEmpresa($empresaId);
+            $params->forceFill([
+                'caminho_certificado' => $relative,
+                'senha_certificado' => $senha,
+                'numero_serie_certificado' => $result['numero_serie'] ?? null,
+                ...NfeFiscalConfig::defaultWebStack(),
+            ])->save();
+
+            NfeFiscalConfig::ensureDirectories($params->fresh());
+            NfeFiscalConfig::syncWebStack($params->fresh());
+
+            $this->certificadoUpload = null;
+            $this->form['caminho_certificado'] = $relative;
+            $this->form['numero_serie_certificado'] = (string) ($result['numero_serie'] ?? '');
+            $this->form['senha_certificado'] = $senha;
+            $this->refreshCertificadoInfo();
+
+            $titulo = (string) ($result['titulo'] ?? 'Certificado digital');
+            $validade = (string) ($result['validade'] ?? '');
+
+            Notification::make()
+                ->title("Certificado importado: {$titulo}")
+                ->body($validade !== '' ? "Válido até {$validade}." : null)
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível importar o certificado.')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
         }
-
-        $relative = 'certificados/'.$empresaId.'/certificado.pfx';
-
-        $this->certificadoUpload->storeAs(
-            'certificados/'.$empresaId,
-            'certificado.pfx',
-            'local',
-        );
-
-        $params = VendasParametro::forEmpresa($empresaId);
-        $params->update([
-            'caminho_certificado' => $relative,
-            'senha_certificado' => $senha,
-            'numero_serie_certificado' => $result['numero_serie'] ?? null,
-            ...NfeFiscalConfig::defaultWebStack(),
-        ]);
-
-        NfeFiscalConfig::ensureDirectories($params->fresh());
-        NfeFiscalConfig::syncWebStack($params->fresh());
-
-        $this->certificadoUpload = null;
-        $this->form['caminho_certificado'] = $relative;
-        $this->form['numero_serie_certificado'] = (string) ($result['numero_serie'] ?? '');
-        $this->form['senha_certificado'] = $senha;
-        $this->refreshCertificadoInfo();
-
-        $titulo = (string) ($result['titulo'] ?? 'Certificado digital');
-        $validade = (string) ($result['validade'] ?? '');
-
-        Notification::make()
-            ->title("Certificado importado: {$titulo}")
-            ->body($validade !== '' ? "Válido até {$validade}." : null)
-            ->success()
-            ->send();
     }
 
     public function testEmailSmtp(): void

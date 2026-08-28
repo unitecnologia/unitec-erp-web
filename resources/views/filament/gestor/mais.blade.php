@@ -60,6 +60,14 @@
                     </div>
                 @endif
 
+                <button type="button" class="gestor-menu__item" onclick="window.UnitecGestorInstall && window.UnitecGestorInstall()">
+                    <span class="gestor-menu__icon" data-icon="install"></span>
+                    <span>
+                        <strong>Instalar app</strong>
+                        <small>Adicionar o Executivo à tela inicial</small>
+                    </span>
+                </button>
+
                 <button type="button" class="gestor-menu__item" wire:click="toggleTema">
                     <span class="gestor-menu__icon" data-icon="theme"></span>
                     <span>

@@ -1,10 +1,18 @@
 @php
+    use Illuminate\Support\Carbon;
+
     $searchFields = [
-        'codigo' => 'CÓDIGO',
-        'recebi_de' => 'NOMINAL',
+        'codigo' => 'Código',
+        'recebi_de' => 'Nominal',
     ];
 
     $pageSizeOptions = [25, 50, 100];
+    $periodoDeValor = filled($this->periodoDe)
+        ? Carbon::parse($this->periodoDe)->format('d/m/Y')
+        : '';
+    $periodoAteValor = filled($this->periodoAte)
+        ? Carbon::parse($this->periodoAte)->format('d/m/Y')
+        : '';
 @endphp
 
 <div
@@ -24,19 +32,31 @@
             <label class="erp-recibos__period-label">
                 de
                 <input
-                    type="date"
+                    type="text"
+                    data-erp-date
                     data-wire-field="periodoDe"
                     data-erp-date-wire="iso"
-                    class="erp-recibos__period-input erp-recibos__period-from"
+                    data-erp-date-initial="{{ $this->periodoDe }}"
+                    value="{{ $periodoDeValor }}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="dd/mm/aaaa"
+                    class="erp-recibos__period-input erp-recibos__period-from erp-date-input"
                 >
             </label>
             <label class="erp-recibos__period-label">
                 até
                 <input
-                    type="date"
+                    type="text"
+                    data-erp-date
                     data-wire-field="periodoAte"
                     data-erp-date-wire="iso"
-                    class="erp-recibos__period-input"
+                    data-erp-date-initial="{{ $this->periodoAte }}"
+                    value="{{ $periodoAteValor }}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="dd/mm/aaaa"
+                    class="erp-recibos__period-input erp-date-input"
                 >
             </label>
             <button

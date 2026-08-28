@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\Erp\License\LicencaMachineInfo;
 use App\Support\Erp\License\LicencaRemotaService;
 use App\Support\Erp\License\LicencaSnapshot;
@@ -60,6 +62,14 @@ class LicencaSistemaPage extends Page
 
     public bool $jaConsultado = false;
 
+    public ?int $licencaPcLimite = null;
+
+    public int $licencaPcEmUso = 0;
+
+    public ?int $licencaTelLimite = null;
+
+    public int $licencaTelEmUso = 0;
+
     public function mount(LicencaRemotaService $licencas): void
     {
         ErpScreen::set('Licença do Sistema');
@@ -68,7 +78,7 @@ class LicencaSistemaPage extends Page
         $this->portalUrl = rtrim((string) config('unitec.licenca_api.base_url', ''), '/')
             ?: $this->pagamentoUrl;
         $this->suporteEmail = (string) config('unitec.licenca_suporte.email', 'sac@unitecnologiasc.com.br');
-        $this->suporteWhatsapp = (string) config('unitec.licenca_suporte.whatsapp', '47996446859');
+        $this->suporteWhatsapp = (string) config('unitec.licenca_suporte.whatsapp', '47984002117');
         $this->suporteSite = (string) config('unitec.licenca_suporte.site', '');
         $this->computador = LicencaMachineInfo::computador();
         $this->mac = LicencaMachineInfo::macAddress();
@@ -78,7 +88,7 @@ class LicencaSistemaPage extends Page
         $this->cnpjMascarado = $cnpj ? $this->maskCnpj($cnpj) : '—';
 
         // Carrega cache/sessão sem forçar HTTP; o usuário confirma com "Ativar Online".
-        $this->applySnapshot($licencas->checkCurrentEmpresa(forceRefresh: false));
+        $this->applySnapshot($licencas->checkCurrentEmpresa(forceRefresh: false), $licencas);
         $this->jaConsultado = true;
     }
 
@@ -139,38 +149,44 @@ class LicencaSistemaPage extends Page
         $this->verificando = true;
 
         try {
-            $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
-            $licencas->rememberLoginGate($snapshot);
-            $this->applySnapshot($snapshot);
+            // Única consulta HTTP fora do login: quando o usuário clica Verificar / Ativar Online.
+            $portal = $licencas->checkCurrentEmpresa(forceRefresh: true);
+            $licencas->syncMensalidadeNoGate();
+            $licencas->rememberLoginGate($portal);
+
+            $snapshot = $licencas->applyMensalidadeExpiry($portal);
+            $this->applySnapshot($snapshot, $licencas);
             $this->jaConsultado = true;
 
-            $title = match ($snapshot->status) {
-                LicencaSnapshot::STATUS_ATIVO => 'Licença ativa no portal.',
-                LicencaSnapshot::STATUS_BLOQUEADO => 'CNPJ cadastrado, porém bloqueado.',
-                LicencaSnapshot::STATUS_NAO_ENCONTRADO => 'CNPJ não cadastrado no portal.',
-                LicencaSnapshot::STATUS_SEM_CNPJ => 'Cadastre o CNPJ da empresa.',
-                LicencaSnapshot::STATUS_DESABILITADO => 'Validação remota desabilitada.',
+            $title = match (true) {
+                $licencas->mensalidadeVencida() => 'Mensalidade vencida. Regularize o pagamento.',
+                $snapshot->status === LicencaSnapshot::STATUS_ATIVO => 'Licença ativa no portal.',
+                $snapshot->status === LicencaSnapshot::STATUS_BLOQUEADO => 'CNPJ cadastrado, porém bloqueado.',
+                $snapshot->status === LicencaSnapshot::STATUS_NAO_ENCONTRADO => 'CNPJ não cadastrado no portal.',
+                $snapshot->status === LicencaSnapshot::STATUS_SEM_CNPJ => 'Cadastre o CNPJ da empresa.',
+                $snapshot->status === LicencaSnapshot::STATUS_DESABILITADO => 'Validação remota desabilitada.',
                 default => 'Não foi possível consultar o portal.',
             };
 
             $notification = Notification::make()->title($title);
 
-            if (in_array($snapshot->status, [
-                LicencaSnapshot::STATUS_ATIVO,
-                LicencaSnapshot::STATUS_DESABILITADO,
-            ], true)) {
+            if ($snapshot->isAllowed()) {
                 $notification->success();
             } elseif (in_array($snapshot->status, [
                 LicencaSnapshot::STATUS_BLOQUEADO,
                 LicencaSnapshot::STATUS_NAO_ENCONTRADO,
                 LicencaSnapshot::STATUS_SEM_CNPJ,
-            ], true)) {
+            ], true) || $licencas->mensalidadeVencida()) {
                 $notification->warning();
             } else {
                 $notification->danger();
             }
 
             $notification->send();
+
+            if ($licencas->isEnabled() && ! $snapshot->isAllowed()) {
+                $this->redirect(LicencaBloqueadaPage::getUrl());
+            }
         } finally {
             $this->verificando = false;
         }
@@ -182,14 +198,28 @@ class LicencaSistemaPage extends Page
         $this->redirect(filament()->getUrl());
     }
 
-    private function applySnapshot(LicencaSnapshot $snapshot): void
+    private function applySnapshot(LicencaSnapshot $snapshot, ?LicencaRemotaService $licencas = null): void
     {
+        $licencas ??= app(LicencaRemotaService::class);
+
         $this->status = $snapshot->status;
         $this->statusLabel = $this->labelForStatus($snapshot->status);
         $this->nome = (string) ($snapshot->nome ?? '');
         $this->mensagem = (string) ($snapshot->mensagem ?? '');
 
-        $expires = $snapshot->expiresAt();
+        // Preferência: vencimento da mensalidade (pagamento). Fallback: valido_ate.
+        $dueRaw = $licencas->loginGateMensalidadeDueDate();
+        $expires = null;
+
+        if (filled($dueRaw)) {
+            try {
+                $expires = Carbon::parse($dueRaw)->startOfDay();
+            } catch (\Throwable) {
+                $expires = null;
+            }
+        }
+
+        $expires ??= $snapshot->expiresAt();
         $this->validoAte = $expires ? $expires->format('d/m/Y') : '';
 
         if ($this->validoAte === '' && filled($snapshot->validoAte)) {
@@ -199,6 +229,42 @@ class LicencaSistemaPage extends Page
                 $this->validoAte = (string) $snapshot->validoAte;
             }
         }
+
+        $this->applyLicenseUsage($snapshot);
+    }
+
+    private function applyLicenseUsage(LicencaSnapshot $snapshot): void
+    {
+        $this->licencaPcLimite = $snapshot->quantidadeComputadores;
+        $this->licencaTelLimite = $snapshot->quantidadeTelefones;
+        $this->licencaPcEmUso = 0;
+        $this->licencaTelEmUso = 0;
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if (! $empresaId) {
+            return;
+        }
+
+        $usage = app(DeviceLicenseService::class)->usageForEmpresa($empresaId);
+
+        $this->licencaPcLimite ??= $usage[DeviceLicenseService::CATEGORY_COMPUTADOR]['limit'];
+        $this->licencaTelLimite ??= $usage[DeviceLicenseService::CATEGORY_TELEFONE]['limit'];
+        $this->licencaPcEmUso = $usage[DeviceLicenseService::CATEGORY_COMPUTADOR]['in_use'];
+        $this->licencaTelEmUso = $usage[DeviceLicenseService::CATEGORY_TELEFONE]['in_use'];
+    }
+
+    public function formatLicencaUso(int $emUso, ?int $limite): string
+    {
+        if ($limite !== null) {
+            return $emUso.' em uso de '.$limite;
+        }
+
+        if ($emUso > 0) {
+            return $emUso.' em uso';
+        }
+
+        return '—';
     }
 
     private function labelForStatus(string $status): string

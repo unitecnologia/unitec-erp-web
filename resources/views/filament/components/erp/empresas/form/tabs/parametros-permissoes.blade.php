@@ -23,11 +23,19 @@
                             'label' => $meta['label'],
                         ])
                     @elseif ($field === 'param_geral_bloquear_estoque_negativo')
+                        @php
+                            $bloquearEstoqueNegativoAtivo = filter_var(
+                                $this->data['param_geral_bloquear_estoque_negativo'] ?? false,
+                                FILTER_VALIDATE_BOOLEAN,
+                            );
+                        @endphp
                         <label class="erp-pcad__check">
+                            {{-- wire:key remonta o input: Livewire morph não atualiza a property checked --}}
                             <input
                                 type="checkbox"
+                                wire:key="emp-bloquear-estoque-negativo-{{ $bloquearEstoqueNegativoAtivo ? '1' : '0' }}"
                                 wire:click.prevent="toggleBloquearEstoqueNegativo"
-                                @checked(filter_var($this->data['param_geral_bloquear_estoque_negativo'] ?? false, FILTER_VALIDATE_BOOLEAN))
+                                @checked($bloquearEstoqueNegativoAtivo)
                             >
                             <span>{{ $meta['label'] }}</span>
                         </label>

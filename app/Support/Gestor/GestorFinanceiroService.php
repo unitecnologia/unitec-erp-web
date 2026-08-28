@@ -25,31 +25,32 @@ final class GestorFinanceiroService
     public function build(?int $empresaId = null): array
     {
         $empresaId = $empresaId ?: app(GestorExecutivoService::class)->empresaId();
+        $empresaArg = $empresaId > 0 ? $empresaId : null;
         $hoje = ErpFinanceiroMetricas::hoje();
         $ontem = $hoje->copy()->subDay();
         $inicioMes = $hoje->copy()->startOfMonth();
         $inicioMesAnt = $hoje->copy()->subMonthNoOverflow()->startOfMonth();
         $fimMesAnt = $hoje->copy()->subMonthNoOverflow()->endOfMonth();
 
-        $saldo = ErpFinanceiroMetricas::saldoCaixa();
-        $saldoOntem = ErpFinanceiroMetricas::saldoCaixaAte($ontem);
+        $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaArg);
+        $saldoOntem = ErpFinanceiroMetricas::saldoCaixaAte($ontem, null, $empresaArg);
         $varSaldoPct = ErpDashboardSalesMetrics::variacaoPercentual($saldo, $saldoOntem);
 
-        $hojeMov = ErpFinanceiroMetricas::movimentosCaixaNoDia($hoje);
-        $ontemMov = ErpFinanceiroMetricas::movimentosCaixaNoDia($ontem);
+        $hojeMov = ErpFinanceiroMetricas::movimentosCaixaNoDia($hoje, $empresaArg);
+        $ontemMov = ErpFinanceiroMetricas::movimentosCaixaNoDia($ontem, $empresaArg);
 
-        $receberHoje = $this->comVariacao(ErpFinanceiroMetricas::receberNoDia($hoje), ErpFinanceiroMetricas::receberNoDia($ontem));
-        $pagarHoje = $this->comVariacao(ErpFinanceiroMetricas::pagarNoDia($hoje), ErpFinanceiroMetricas::pagarNoDia($ontem));
+        $receberHoje = $this->comVariacao(ErpFinanceiroMetricas::receberNoDia($hoje, $empresaArg), ErpFinanceiroMetricas::receberNoDia($ontem, $empresaArg));
+        $pagarHoje = $this->comVariacao(ErpFinanceiroMetricas::pagarNoDia($hoje, $empresaArg), ErpFinanceiroMetricas::pagarNoDia($ontem, $empresaArg));
 
-        $receberVencido = $this->comVariacao(ErpFinanceiroMetricas::receberVencido($hoje));
-        $pagarVencido = $this->comVariacao(ErpFinanceiroMetricas::pagarVencido($hoje));
+        $receberVencido = $this->comVariacao(ErpFinanceiroMetricas::receberVencido($hoje, $empresaArg));
+        $pagarVencido = $this->comVariacao(ErpFinanceiroMetricas::pagarVencido($hoje, $empresaArg));
 
-        $receberMes = $this->comVariacao(ErpFinanceiroMetricas::titulosReceber($inicioMes, $hoje));
-        $pagarMes = $this->comVariacao(ErpFinanceiroMetricas::titulosPagar($inicioMes, $hoje));
+        $receberMes = $this->comVariacao(ErpFinanceiroMetricas::titulosReceber($inicioMes, $hoje, $empresaArg));
+        $pagarMes = $this->comVariacao(ErpFinanceiroMetricas::titulosPagar($inicioMes, $hoje, $empresaArg));
 
-        $serie7d = $this->serieSaldo7Dias($saldo, $hoje);
-        $projecao = $this->projecaoCaixa($saldo, $hoje);
-        $inadimplencia = ErpFinanceiroMetricas::inadimplencia($hoje);
+        $serie7d = $this->serieSaldo7Dias($saldo, $hoje, $empresaArg);
+        $projecao = $this->projecaoCaixa($saldo, $hoje, $empresaArg);
+        $inadimplencia = ErpFinanceiroMetricas::inadimplencia($hoje, $empresaArg);
         $acimaLimite = $this->clientesAcimaLimite();
         $proximos = $this->proximosVencimentos($hoje, 5);
         $aprovacoes = 0;
@@ -91,12 +92,12 @@ final class GestorFinanceiroService
             'hoje' => $hojeMov,
             'ontem' => $ontemMov,
             'mes' => [
-                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'entrada'),
-                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'saida'),
+                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'entrada', $empresaArg),
+                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'saida', $empresaArg),
             ],
             'mes_anterior' => [
-                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'entrada'),
-                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'saida'),
+                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'entrada', $empresaArg),
+                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'saida', $empresaArg),
             ],
             'receber_hoje' => $receberHoje,
             'pagar_hoje' => $pagarHoje,
@@ -301,22 +302,19 @@ final class GestorFinanceiroService
     /**
      * @return list<array{label: string, valor: float}>
      */
-    private function serieSaldo7Dias(float $saldoAtual, Carbon $hoje): array
+    private function serieSaldo7Dias(float $saldoAtual, Carbon $hoje, ?int $empresaId = null): array
     {
-        $nets = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $day = $hoje->copy()->subDays($i);
-            $mov = ErpFinanceiroMetricas::movimentosCaixaNoDia($day);
-            $nets[$day->toDateString()] = (float) $mov['resultado'];
-        }
+        $from = $hoje->copy()->subDays(6);
+        $nets = ErpFinanceiroMetricas::resultadosCaixaPorDia($from, $hoje, $empresaId);
 
         // Reconstrói saldo diário a partir do saldo atual.
         $cursor = $saldoAtual;
         $reversed = [];
         for ($i = 0; $i <= 6; $i++) {
             $day = $hoje->copy()->subDays($i);
-            $reversed[$day->toDateString()] = $cursor;
-            $cursor = round($cursor - ($nets[$day->toDateString()] ?? 0), 2);
+            $key = $day->toDateString();
+            $reversed[$key] = $cursor;
+            $cursor = round($cursor - ($nets[$key] ?? 0), 2);
         }
 
         $out = [];
@@ -335,11 +333,11 @@ final class GestorFinanceiroService
     /**
      * @return array{dias_negativo: ?int, receber_7d: float, pagar_7d: float, mensagem: string, tom: string}
      */
-    private function projecaoCaixa(float $saldo, Carbon $hoje): array
+    private function projecaoCaixa(float $saldo, Carbon $hoje, ?int $empresaId = null): array
     {
         $ate = $hoje->copy()->addDays(14);
-        $receberPorDia = $this->saldosPorVencimentoReceber($hoje, $ate);
-        $pagarPorDia = $this->saldosPorVencimentoPagar($hoje, $ate);
+        $receberPorDia = $this->saldosPorVencimentoReceber($hoje, $ate, $empresaId);
+        $pagarPorDia = $this->saldosPorVencimentoPagar($hoje, $ate, $empresaId);
 
         $receber7 = 0.0;
         $pagar7 = 0.0;
@@ -397,21 +395,35 @@ final class GestorFinanceiroService
     /**
      * @return array<string, float>
      */
-    private function saldosPorVencimentoReceber(Carbon $from, Carbon $to): array
+    private function saldosPorVencimentoReceber(Carbon $from, Carbon $to, ?int $empresaId = null): array
     {
         try {
             if (! Schema::hasTable((new ContaReceber)->getTable())) {
                 return [];
             }
 
-            return ContaReceber::query()
+            $q = ContaReceber::query()
                 ->where('saldo', '>', 0)
                 ->whereDate('vencimento', '>=', $from->toDateString())
                 ->whereDate('vencimento', '<=', $to->toDateString())
-                ->get(['vencimento', 'saldo'])
-                ->groupBy(fn (ContaReceber $c): string => $c->vencimento?->toDateString() ?? '')
-                ->map(fn ($group): float => round((float) $group->sum('saldo'), 2))
-                ->all();
+                ->selectRaw('DATE(vencimento) as dia, SUM(saldo) as total')
+                ->groupByRaw('DATE(vencimento)');
+
+            if ($empresaId && $empresaId > 0 && Schema::hasColumn((new ContaReceber)->getTable(), 'empresa_id')) {
+                $q->where('empresa_id', $empresaId);
+            }
+
+            $out = [];
+            foreach ($q->get() as $row) {
+                $dia = (string) ($row->dia ?? '');
+                if ($dia === '') {
+                    continue;
+                }
+                $key = strlen($dia) >= 10 ? substr($dia, 0, 10) : $dia;
+                $out[$key] = round((float) ($row->total ?? 0), 2);
+            }
+
+            return $out;
         } catch (Throwable) {
             return [];
         }
@@ -420,21 +432,35 @@ final class GestorFinanceiroService
     /**
      * @return array<string, float>
      */
-    private function saldosPorVencimentoPagar(Carbon $from, Carbon $to): array
+    private function saldosPorVencimentoPagar(Carbon $from, Carbon $to, ?int $empresaId = null): array
     {
         try {
             if (! Schema::hasTable((new ContaPagar)->getTable())) {
                 return [];
             }
 
-            return ContaPagar::query()
+            $q = ContaPagar::query()
                 ->where('saldo', '>', 0)
                 ->whereDate('vencimento', '>=', $from->toDateString())
                 ->whereDate('vencimento', '<=', $to->toDateString())
-                ->get(['vencimento', 'saldo'])
-                ->groupBy(fn (ContaPagar $c): string => $c->vencimento?->toDateString() ?? '')
-                ->map(fn ($group): float => round((float) $group->sum('saldo'), 2))
-                ->all();
+                ->selectRaw('DATE(vencimento) as dia, SUM(saldo) as total')
+                ->groupByRaw('DATE(vencimento)');
+
+            if ($empresaId && $empresaId > 0 && Schema::hasColumn((new ContaPagar)->getTable(), 'empresa_id')) {
+                $q->where('empresa_id', $empresaId);
+            }
+
+            $out = [];
+            foreach ($q->get() as $row) {
+                $dia = (string) ($row->dia ?? '');
+                if ($dia === '') {
+                    continue;
+                }
+                $key = strlen($dia) >= 10 ? substr($dia, 0, 10) : $dia;
+                $out[$key] = round((float) ($row->total ?? 0), 2);
+            }
+
+            return $out;
         } catch (Throwable) {
             return [];
         }

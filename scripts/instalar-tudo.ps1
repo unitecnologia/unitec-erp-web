@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 
 <#
 
@@ -20,7 +20,11 @@ param(
 
     [switch]$NoPause,
 
-    [switch]$FromSetup
+    [switch]$FromSetup,
+
+    [switch]$Recovery,
+
+    [switch]$ApplyBundledSeed
 
 )
 
@@ -82,6 +86,10 @@ function Request-Administrator {
 
     if ($FromSetup) { $argList += '-FromSetup' }
 
+    if ($Recovery) { $argList += '-Recovery' }
+
+    if ($ApplyBundledSeed) { $argList += '-ApplyBundledSeed' }
+
     if ($NoPause) { $argList += '-NoPause' }
 
 
@@ -140,7 +148,15 @@ if ([string]::IsNullOrWhiteSpace($AppPath)) {
 
 $AppPath = Resolve-UnitecAppPath -Path $AppPath
 
+if (-not $ApplyBundledSeed -and (Test-UnitecBundledSeedPresent -AppPath $AppPath)) {
+    $ApplyBundledSeed = $true
+}
 
+if ($ApplyBundledSeed) {
+    $Recovery = $false
+} elseif (-not $Recovery -and (Test-UnitecExistingInstall -AppPath $AppPath)) {
+    $Recovery = $true
+}
 
 if ([string]::IsNullOrWhiteSpace($AppUrl)) {
 
@@ -156,8 +172,6 @@ $SourceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 
 Request-Administrator
 
-
-
 $LeigoMode = [bool]$FromSetup
 
 if ($FromSetup) {
@@ -169,6 +183,10 @@ if ($FromSetup) {
 
 
 $logFile = Start-InstallLog -AppPath $AppPath
+
+# TEMP seguro antes de qualquer Expand-Archive / checklist (PCs com caminho 8.3 quebrado).
+$safeTemp = Initialize-UnitecSafeTempEnvironment -AppPath $AppPath
+Write-InstallLog -AppPath $AppPath -Message ("TEMP seguro: {0}" -f $safeTemp)
 
 $progress = $null
 
@@ -183,6 +201,11 @@ if ($LeigoMode) {
 
 
 Write-InstallLog -AppPath $AppPath -Message 'Inicio da instalacao automatica (runtime MariaDB mariadb-install-db)'
+
+if ($Recovery) {
+    Write-InstallLog -AppPath $AppPath -Message 'Modo recupera: pasta/instalacao existente — banco sera preservado.'
+    Ensure-UnitecEnvFile -AppPath $AppPath -AppUrl $AppUrl | Out-Null
+}
 
 
 
@@ -204,7 +227,11 @@ try {
 
         Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Copiando arquivos do sistema...' -Percent 15
 
-        Copy-UnitecProjectTree -SourceRoot $sourceFull -TargetRoot $targetFull -Quiet
+        if ($Recovery) {
+            Copy-UnitecProjectTree -SourceRoot $sourceFull -TargetRoot $targetFull -Quiet -ExcludeTools
+        } else {
+            Copy-UnitecProjectTree -SourceRoot $sourceFull -TargetRoot $targetFull -Quiet
+        }
 
     }
 
@@ -254,6 +281,10 @@ try {
 
         FromSetup  = $FromSetup
 
+        Recovery   = $Recovery
+
+        ApplyBundledSeed = $ApplyBundledSeed
+
     }
 
 
@@ -278,23 +309,50 @@ try {
 
 
 
-    Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Criando atalho na Area de Trabalho...' -Percent 72
+    Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Liberando portas no firewall (estacoes da rede)...' -Percent 70
 
-    Register-UnitecFirewallRule
+    Register-UnitecNetworkFirewallRules -IncludeMariaDb
+
+    Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Criando atalho na Area de Trabalho...' -Percent 72
 
     New-UnitecDesktopShortcuts -AppPath $AppPath
 
     Install-UnitecHeidiSqlSupport -AppPath $AppPath
 
-    Register-UnitecLogonStartup -AppPath $AppPath
+    # Remove tarefa de logon legada; auto-start oficial = servico UnitecErpServer.
+    Unregister-UnitecLogonStartup -AppPath $AppPath
 
+    $serviceScript = Join-Path $PSScriptRoot 'install-unitec-erp-service.ps1'
+    $serverExe = Join-Path $AppPath 'bin\UnitecErpServer.exe'
+    $serviceInstalled = $false
+    if ((Test-Path $serviceScript) -and (Test-Path $serverExe)) {
+        Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Registrando servico Windows Unitec ERP Server...' -Percent 80
+        try {
+            & $serviceScript -AppPath $AppPath
+            $serviceInstalled = $true
+        } catch {
+            Write-Warn ("Servico Windows nao instalado agora: {0}" -f $_.Exception.Message)
+        }
+    }
 
+    $deviceServiceScript = Join-Path $PSScriptRoot 'install-device-service-startup.ps1'
+    $deviceServiceExe = Join-Path $AppPath 'services\unitec-device-service\dist\Unitec.DeviceService.exe'
+    if ((Test-Path $deviceServiceScript) -and (Test-Path $deviceServiceExe)) {
+        Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Registrando servico Windows de impressao e balanca...' -Percent 82
+        try {
+            & $deviceServiceScript -AppPath $AppPath
+        } catch {
+            Write-Warn ("Device Service Windows nao instalado agora: {0}" -f $_.Exception.Message)
+        }
+    }
 
     Write-InstallStep -Progress $progress -LeigoMode:$LeigoMode -AppPath $AppPath -Message 'Iniciando o Unitec ERP...' -Percent 85
 
     Sync-UnitecEnvAppUrl -AppPath $AppPath -AppUrl $AppUrl | Out-Null
 
-    Start-UnitecApplicationServer -AppPath $AppPath
+    if (-not $serviceInstalled) {
+        Start-UnitecApplicationServer -AppPath $AppPath
+    }
 
 
 
@@ -310,7 +368,14 @@ try {
 
     Write-InstallLog -AppPath $AppPath -Message 'Instalacao concluida com sucesso'
 
-
+    # Sessões PHP antigas + marcador para o navegador limpar cookies sozinho na abertura.
+    $sessionsDir = Join-Path $AppPath 'storage\framework\sessions'
+    if (Test-Path -LiteralPath $sessionsDir) {
+        Get-ChildItem -LiteralPath $sessionsDir -File -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne '.gitignore' } |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+    Set-Content -LiteralPath (Join-Path $AppPath '.unitec-browser-reset') -Value ((Get-Date).ToString('o')) -Encoding ASCII
 
     if ($LeigoMode) {
 
@@ -320,11 +385,17 @@ try {
 
 
 
-    $openScript = Join-Path $PSScriptRoot 'open-unitec-app.ps1'
+    $launcherExe = Join-Path $AppPath 'bin\Unitec ERP.exe'
+    if (Test-Path -LiteralPath $launcherExe) {
+        $openProc = Start-Process -FilePath $launcherExe -ArgumentList @(
+            '--app', $AppPath
+        ) -PassThru -WindowStyle Normal
 
-    & $openScript -AppPath $AppPath -AppUrl $AppUrl -RelativePath '/admin' -LeigoMode
-    if ($LASTEXITCODE -ne 0) {
-        throw 'O sistema foi instalado, mas nao abriu no navegador. Use o atalho Unitec ERP.'
+        if ($null -eq $openProc) {
+            Write-InstallLog -AppPath $AppPath -Message 'Sistema instalado; abertura automatica falhou (use o atalho Unitec ERP).'
+        }
+    } else {
+        Write-InstallLog -AppPath $AppPath -Message 'Sistema instalado; bin\Unitec ERP.exe ausente — use o atalho apos build-erp-desktop.'
     }
 
     if ($LeigoMode) {

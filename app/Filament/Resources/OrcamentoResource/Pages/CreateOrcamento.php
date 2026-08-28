@@ -19,6 +19,15 @@ class CreateOrcamento extends CreateRecord
 
         ErpScreen::set('Lançamento de Orçamento');
         $this->initializeOrcamentoFormDefaults();
+
+        // Novo orçamento: cursor em Razão Social (exceto retorno de atalho já com cliente/produto).
+        if ($this->clienteId === null
+            && blank($this->itemCodigoInput)
+            && blank(trim($this->itemProdutoSearch))
+        ) {
+            $this->dispatch('orc-focus-cliente');
+            $this->dispatch('erp-orcamento-focus-cliente');
+        }
     }
 
     protected function getRedirectUrl(): string

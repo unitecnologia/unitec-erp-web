@@ -4,7 +4,6 @@ namespace App\Filament\Resources\UserResource\Pages\Concerns;
 use App\Models\Empresa;
 use App\Models\ErpProfile;
 use App\Models\User;
-use App\Models\Vendedor;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpOnboarding;
 use Filament\Notifications\Notification;
@@ -118,10 +117,8 @@ trait ManagesUserFormModal
             'userForm.empresas' => ['required', 'array', 'min:1'],
             'userForm.empresas.*' => ['integer', 'exists:empresas,id'],
             'userForm.erp_profile_id' => ['nullable', 'integer', 'exists:erp_profiles,id'],
-            'userForm.vendedor_id' => ['nullable', 'integer', 'exists:vendedores,id'],
             'userForm.senha_app_forca_vendas' => ['nullable', 'string', 'max:60'],
             'userForm.is_admin' => ['required', 'in:S,N'],
-            'userForm.is_supervisor' => ['required', 'in:S,N'],
             'userForm.ativo' => ['required', 'in:S,N'],
             'userForm.copiar_permissoes' => ['required', 'in:S,N'],
         ];
@@ -169,24 +166,20 @@ trait ManagesUserFormModal
             'userForm.empresa_id' => 'empresa padrão',
             'userForm.empresas' => 'empresas liberadas',
             'userForm.erp_profile_id' => 'perfil',
-            'userForm.vendedor_id' => 'vendedor padrão',
             'userForm.copiar_permissoes_de' => 'usuário para copiar permissões',
         ]);
         $name = mb_strtoupper(trim((string) $this->userForm['name']), 'UTF-8');
+        // vendedor_id não é editável aqui — único escritor: RH → Funcionários (aba Operador).
         $data = [
             'name' => $name,
             'empresa_id' => (int) $this->userForm['empresa_id'],
             'erp_profile_id' => filled($this->userForm['erp_profile_id'] ?? null)
                 ? (int) $this->userForm['erp_profile_id']
                 : null,
-            'vendedor_id' => filled($this->userForm['vendedor_id'] ?? null)
-                ? (int) $this->userForm['vendedor_id']
-                : null,
             'senha_app_forca_vendas' => filled($this->userForm['senha_app_forca_vendas'] ?? null)
                 ? (string) $this->userForm['senha_app_forca_vendas']
                 : null,
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
-            'is_supervisor' => ($this->userForm['is_supervisor'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
         ];
         if (filled($this->userForm['password'] ?? null)) {
@@ -224,10 +217,10 @@ trait ManagesUserFormModal
             $this->userModalRecordId = null;
             $this->userForm = [];
             Notification::make()
-                ->title('Usuário cadastrado. Agora cadastre o colaborador.')
+                ->title('Usuário cadastrado. Agora cadastre o funcionário (aba Operador).')
                 ->success()
                 ->send();
-            $this->redirect(\App\Filament\Resources\VendedorResource::getUrl('index'));
+            $this->redirect(\App\Filament\Resources\RhFuncionarioResource::getUrl('index'));
 
             return;
         }
@@ -266,7 +259,7 @@ trait ManagesUserFormModal
             }
         }
 
-        foreach (['erp_profile_id', 'vendedor_id', 'copiar_permissoes_de'] as $field) {
+        foreach (['erp_profile_id', 'copiar_permissoes_de'] as $field) {
             if (($form[$field] ?? '') === '' || ($form[$field] ?? null) === null) {
                 $form[$field] = '';
             } else {
@@ -274,7 +267,7 @@ trait ManagesUserFormModal
             }
         }
 
-        foreach (['is_admin', 'is_supervisor', 'ativo', 'copiar_permissoes'] as $field) {
+        foreach (['is_admin', 'ativo', 'copiar_permissoes'] as $field) {
             $form[$field] = (($form[$field] ?? 'N') === 'S') ? 'S' : 'N';
         }
 
@@ -345,9 +338,7 @@ trait ManagesUserFormModal
             'empresa_id' => (string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1),
             'empresas' => [(string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1)],
             'erp_profile_id' => '',
-            'vendedor_id' => '',
             'is_admin' => $onboarding ? 'S' : 'N',
-            'is_supervisor' => 'N',
             'ativo' => 'S',
             'copiar_permissoes' => 'S',
             'copiar_permissoes_de' => $defaultCopyFrom ? (string) $defaultCopyFrom : '',
@@ -373,9 +364,7 @@ trait ManagesUserFormModal
             'empresas' => $record->empresas->pluck('id')->map(fn ($id): string => (string) $id)->values()->all()
                 ?: array_values(array_filter([(string) ($record->empresa_id ?? '')])),
             'erp_profile_id' => $record->erp_profile_id ? (string) $record->erp_profile_id : '',
-            'vendedor_id' => $record->vendedor_id ? (string) $record->vendedor_id : '',
             'is_admin' => $record->is_admin ? 'S' : 'N',
-            'is_supervisor' => $record->is_supervisor ? 'S' : 'N',
             'ativo' => $record->ativo ? 'S' : 'N',
             'copiar_permissoes' => 'N',
             'copiar_permissoes_de' => $defaultCopyFrom ? (string) $defaultCopyFrom : '',
@@ -448,17 +437,36 @@ trait ManagesUserFormModal
             ->all();
     }
 
-    /**
-     * @return array<int, string>
-     */
-
-    public function userVendedorOptions(): array
+    public function userOperadorVinculado(): bool
     {
-        return Vendedor::query()
-            ->where('ativo', true)
-            ->orderBy('nome')
-            ->pluck('nome', 'id')
-            ->all();
+        if (! $this->userModalRecordId) {
+            return false;
+        }
+
+        return User::query()
+            ->whereKey($this->userModalRecordId)
+            ->whereNotNull('vendedor_id')
+            ->exists();
+    }
+
+    public function userOperadorVinculoInfo(): string
+    {
+        if (! $this->userModalRecordId) {
+            return 'Ainda não vinculado — configure em RH → Funcionários.';
+        }
+
+        $user = User::query()->with('vendedor')->find($this->userModalRecordId);
+        $vendedor = $user?->vendedor;
+
+        if (! $vendedor) {
+            return 'Não vinculado — configure em RH → Funcionários → aba Operador.';
+        }
+
+        $label = trim(($vendedor->codigo !== null && $vendedor->codigo !== '' ? $vendedor->codigo.' — ' : '').(string) $vendedor->nome);
+
+        return $vendedor->ativo
+            ? $label
+            : $label.' (operador inativo)';
     }
 
     /**

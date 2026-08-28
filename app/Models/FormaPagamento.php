@@ -88,10 +88,24 @@ class FormaPagamento extends Model
         return [
             'caixa' => 'Caixa',
             'contas_receber' => 'Contas à Receber',
-            'ficha_cliente' => 'Ficha Cliente',
+            'credito_cliente' => 'Crédito Cliente',
             'troca' => 'Troca',
             'deposito' => 'Depósito',
             'nenhum' => 'Nenhum',
         ];
+    }
+
+    /**
+     * Pré-definição ao mudar o Tipo na tela Formas de Pagamento.
+     */
+    public static function defaultTipoMovimento(?string $tipo): string
+    {
+        return match (mb_strtolower(trim((string) $tipo), 'UTF-8')) {
+            'dinheiro', 'pix', 'cartao_debito', 'tef' => 'caixa',
+            'cartao_credito', 'cheque', 'boleto', 'crediario' => 'contas_receber',
+            'deposito' => 'deposito',
+            'troca' => 'troca',
+            default => 'nenhum',
+        };
     }
 }

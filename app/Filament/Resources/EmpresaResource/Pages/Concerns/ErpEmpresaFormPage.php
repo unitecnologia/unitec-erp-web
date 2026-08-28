@@ -24,6 +24,7 @@ trait ErpEmpresaFormPage
     use ManagesCclassTribLookup;
     use ManagesEmpresaBloquearEstoqueNegativo;
     use ManagesEmpresaEstoques;
+    use ManagesEmpresaEmailConfig;
     use ManagesEmpresaFormUi;
     use ManagesEmpresaImpostoPadraoApply;
     use ManagesEmpresaImpostoTabelasImport;
@@ -92,7 +93,8 @@ trait ErpEmpresaFormPage
     {
         $this->whatsAppQr = null;
         $this->data['cnpj_representante'] = static::normalizeOptionalCnpjRepresentante($this->data['cnpj_representante'] ?? null);
-        $this->ensureEmpresaRequiredDefaults();
+        // Só ajusta $this->data — não remonta o form Filament no hot path (evita ActionNotResolvable / travamento).
+        $this->ensureEmpresaRequiredDefaults(syncForm: false);
 
         try {
             $this->validate(
@@ -119,17 +121,18 @@ trait ErpEmpresaFormPage
             );
 
             if ($this instanceof EditRecord) {
-                $this->save();
-            } else {
-                /** @var CreateRecord $this */
-                $this->create();
+                // Commit do banco primeiro; efeitos colaterais (WhatsApp/.env/e-mail) depois do redirect controlado.
+                $this->save(shouldRedirect: false, shouldSendSavedNotification: true);
+                $this->runEmpresaPostSaveSideEffects();
+                $this->redirect($this->getEmpresaListRedirectUrl());
+
+                return;
             }
 
-            $empresa = $this->resolveEmpresaRecordForWhatsApp();
-
-            if ($empresa) {
-                app(\App\Support\Erp\WhatsApp\WhatsAppGatewayManager::class)->writeRuntimeConfig($empresa->fresh());
-            }
+            /** @var CreateRecord $this */
+            $this->create();
+            // create() já redireciona; efeitos leves sem bloquear a resposta.
+            $this->runEmpresaPostSaveSideEffects();
         } catch (\Illuminate\Validation\ValidationException $exception) {
             $body = collect($exception->errors())->flatten()->unique()->filter()->implode(' ');
 
@@ -154,7 +157,31 @@ trait ErpEmpresaFormPage
         }
     }
 
-    protected function ensureEmpresaRequiredDefaults(): void
+    /**
+     * Efeitos fora da transação Filament — nunca podem travar a gravação da empresa.
+     * Credenciais ML (.env) NÃO são gravadas — tudo fica no banco.
+     */
+    protected function runEmpresaPostSaveSideEffects(): void
+    {
+        try {
+            $empresa = $this->resolveEmpresaRecordForWhatsApp();
+
+            if ($empresa) {
+                app(\App\Support\Erp\WhatsApp\WhatsAppGatewayManager::class)
+                    ->writeRuntimeConfig($empresa->fresh());
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        try {
+            $this->persistEmpresaEmailConfigQuietly();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    protected function ensureEmpresaRequiredDefaults(bool $syncForm = true): void
     {
         if (blank($this->data['codigo'] ?? null)) {
             $this->data['codigo'] = (string) Empresa::nextCodigo();
@@ -176,7 +203,9 @@ trait ErpEmpresaFormPage
             $this->data['nome'] = $fantasia !== '' ? $fantasia : $razao;
         }
 
-        $this->safeFillEmpresaForm();
+        if ($syncForm) {
+            $this->safeFillEmpresaForm();
+        }
     }
 
     public function cancelForm(): void
@@ -237,12 +266,16 @@ trait ErpEmpresaFormPage
 
         $merged = $this->normalizeEmpresaParametrosFormData($merged);
         $merged = $this->normalizeEmpresaDocumentFormData($merged);
+        $merged = $this->normalizeEmpresaMercadoLivreFormData($merged);
 
-        // Campos só de UI / .env — não gravar na tabela empresas.
+        // Alias legado meli_env_* (se ainda vier do front) e parâmetros fiscais removidos.
         unset(
             $merged['meli_env_is_hub'],
             $merged['meli_env_app_url'],
             $merged['meli_env_hub_url'],
+            $merged['param_fiscal_enviar_email_nfe'],
+            $merged['param_fiscal_usar_credito_icms'],
+            $merged['param_fiscal_recolhe_fcp'],
         );
 
         if (array_key_exists('param_ui_density', $merged)) {
@@ -297,6 +330,65 @@ trait ErpEmpresaFormPage
     }
 
     /**
+     * Normaliza config ML para gravar no banco (empresas).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function normalizeEmpresaMercadoLivreFormData(array $data): array
+    {
+        // Compat: UI meli_env_* → colunas param_meli_* (banco).
+        if (array_key_exists('meli_env_is_hub', $data)) {
+            $data['param_meli_is_hub'] = filter_var($data['meli_env_is_hub'], FILTER_VALIDATE_BOOL);
+        }
+
+        if (array_key_exists('meli_env_app_url', $data)) {
+            $data['param_meli_app_url'] = rtrim(trim((string) ($data['meli_env_app_url'] ?? '')), '/') ?: null;
+        } elseif (array_key_exists('param_meli_app_url', $data)) {
+            $data['param_meli_app_url'] = rtrim(trim((string) ($data['param_meli_app_url'] ?? '')), '/') ?: null;
+        }
+
+        if (array_key_exists('meli_env_hub_url', $data)) {
+            $data['param_meli_hub_url'] = rtrim(trim((string) ($data['meli_env_hub_url'] ?? '')), '/') ?: null;
+        } elseif (array_key_exists('param_meli_hub_url', $data)) {
+            $data['param_meli_hub_url'] = rtrim(trim((string) ($data['param_meli_hub_url'] ?? '')), '/') ?: null;
+        }
+
+        foreach (['param_meli_client_id', 'param_meli_redirect_uri'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = trim((string) ($data[$field] ?? '')) ?: null;
+            }
+        }
+
+        // Não apagar segredos/tokens se o formulário veio em branco.
+        $record = property_exists($this, 'record') && $this->record instanceof Empresa
+            ? $this->record
+            : null;
+
+        foreach ([
+            'param_meli_client_secret',
+            'param_meli_access_token',
+            'param_meli_refresh_token',
+        ] as $secretField) {
+            if (! array_key_exists($secretField, $data)) {
+                continue;
+            }
+
+            if (filled($data[$secretField])) {
+                continue;
+            }
+
+            if ($record && filled($record->{$secretField} ?? null)) {
+                unset($data[$secretField]);
+            } else {
+                $data[$secretField] = null;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
@@ -337,6 +429,16 @@ trait ErpEmpresaFormPage
         if (array_key_exists('param_api_servicos_timeout', $data) && $data['param_api_servicos_timeout'] !== '') {
             $data['param_api_servicos_timeout'] = (int) $data['param_api_servicos_timeout'];
         }
+
+        if (array_key_exists('param_licenca_api_timeout', $data)) {
+            if ($data['param_licenca_api_timeout'] === '' || $data['param_licenca_api_timeout'] === null) {
+                $data['param_licenca_api_timeout'] = 8;
+            } else {
+                $data['param_licenca_api_timeout'] = max(2, min(30, (int) $data['param_licenca_api_timeout']));
+            }
+        }
+
+        unset($data['param_licenca_api_url']);
 
         if (array_key_exists('param_whatsapp_timeout', $data)) {
             if ($data['param_whatsapp_timeout'] === '' || $data['param_whatsapp_timeout'] === null) {
@@ -454,6 +556,8 @@ trait ErpEmpresaFormPage
 
     protected function prepareEmpresaParametrosForForm(): void
     {
+        $this->loadEmpresaEmailConfig();
+
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true) {
                 continue;
@@ -503,6 +607,8 @@ trait ErpEmpresaFormPage
         }
 
         $this->safeFillEmpresaForm();
+        $this->hydrateCloudflareCredentialsFromDefaults();
+        $this->hydrateUpdateDownloadUrlFromDefault();
     }
 
     protected function getEmpresaListRedirectUrl(): string

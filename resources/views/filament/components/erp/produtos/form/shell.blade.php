@@ -30,10 +30,12 @@
         ['field' => 'is_grade', 'label' => 'Grade', 'disabled' => ! $this->isEditingProduct()],
         ['field' => 'usa_tab_preco', 'label' => 'Usar Tab. Preço', 'disabled' => false],
         ['field' => 'is_combustivel', 'label' => 'Combustível', 'disabled' => false],
+        ['field' => 'tem_info_nutricional', 'label' => 'Info. Nutricional', 'disabled' => false],
         ['field' => 'usa_imei', 'label' => 'Usa IMEI', 'disabled' => false],
         ['field' => 'contr_est_grade', 'label' => 'Contr. Est. Grade', 'disabled' => false],
         ['field' => 'mostrar_no_app', 'label' => 'Mostrar no App', 'disabled' => false],
-        ['field' => 'produto_pesado', 'label' => 'Produto Pesado', 'disabled' => false],
+        ['field' => 'produto_pesado', 'label' => 'Produto de Balança', 'disabled' => false],
+        ['field' => 'controla_lote_validade', 'label' => 'Controla lote/validade', 'disabled' => false],
     ];
 @endphp
 
@@ -103,12 +105,14 @@
                             @include('filament.components.erp.produtos.form.tabs.impostos')
                         @elseif ($this->activeFormTab === 'estoques')
                             @include('filament.components.erp.produtos.form.tabs.estoques')
-                        @elseif ($this->activeFormTab === 'promocao')
-                            @include('filament.components.erp.produtos.form.tabs.promocao')
+                        @elseif ($this->activeFormTab === 'lotes')
+                            @include('filament.components.erp.produtos.form.tabs.lotes')
                         @elseif ($this->activeFormTab === 'adicionais')
                             @include('filament.components.erp.produtos.form.tabs.adicionais')
                         @elseif ($this->activeFormTab === 'combustivel')
                             @include('filament.components.erp.produtos.form.tabs.combustivel')
+                        @elseif ($this->activeFormTab === 'info_nutricional')
+                            @include('filament.components.erp.produtos.form.tabs.info-nutricional')
                         @elseif ($this->activeFormTab === 'grade')
                             @include('filament.components.erp.produtos.form.tabs.grade')
                         @elseif ($this->activeFormTab === 'imei')
@@ -145,18 +149,6 @@
                                 >
                                 <span>{{ $param['label'] }}</span>
                             </label>
-                            @if ($param['field'] === 'produto_pesado' && ($this->data['produto_pesado'] ?? false))
-                                <div class="erp-produtos-pcad__params-prefixo">
-                                    <label for="pprod-prefixo-balanca">Prefixo</label>
-                                    <input
-                                        id="pprod-prefixo-balanca"
-                                        type="text"
-                                        wire:model="data.prefixo_balanca"
-                                        maxlength="10"
-                                        class="erp-pcad-form__input"
-                                    >
-                                </div>
-                            @endif
                         @endforeach
                     </div>
                 </fieldset>
@@ -180,5 +172,4 @@
     $cclassImportJsVersion = file_exists($cclassImportJsPath) ? filemtime($cclassImportJsPath) : time();
 @endphp
 <script src="{{ asset('js/erp-cclass-trib-import.js') }}?v={{ $cclassImportJsVersion }}" defer></script>
-<script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $jsVersion }}"></script>
 <script src="{{ asset('js/erp-produtos-form.js') }}?v={{ $jsVersion }}" defer></script>

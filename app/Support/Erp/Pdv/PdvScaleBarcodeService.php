@@ -17,25 +17,16 @@ final class PdvScaleBarcodeService
      */
     public function parse(Product $product, string $barcode): ?array
     {
-        $barcode = trim($barcode);
+        $barcode = preg_replace('/\D/', '', trim($barcode)) ?? '';
 
         if ($barcode === '' || strlen($barcode) < 7) {
             return null;
         }
 
-        $prefixoProduto = trim((string) ($product->prefixo_balanca ?? ''));
+        // PLU = código do produto (nunca o id).
+        $prefixoProduto = trim((string) ($product->codigo ?? ''));
 
         if ($prefixoProduto === '') {
-            return null;
-        }
-
-        if (! str_starts_with($barcode, $prefixoProduto)) {
-            return null;
-        }
-
-        $preco = $this->priceService->resolvePrecoVenda($product, 1);
-
-        if ($preco <= 0) {
             return null;
         }
 
@@ -45,12 +36,35 @@ final class PdvScaleBarcodeService
         $filler = BalancaEtiquetaLayout::fillerLength($modelo);
         $valorLen = BalancaEtiquetaLayout::valorLength($modelo);
 
+        $codeInBarcode = BalancaEtiquetaLayout::productCodeFromBarcode(
+            $barcode,
+            $prefixoBarra,
+            $digitos,
+            $modelo
+        );
+        $codeInProduct = BalancaEtiquetaLayout::normalizeProductCode(
+            $prefixoProduto,
+            $prefixoBarra,
+            $digitos
+        );
+
+        if ($codeInBarcode !== $codeInProduct && ! str_starts_with($barcode, preg_replace('/\D/', '', $prefixoProduto) ?? '')) {
+            return null;
+        }
+
+        $preco = $this->priceService->resolvePrecoVenda($product, 1);
+
+        if ($preco <= 0) {
+            return null;
+        }
+
         // Preferência: layout configurado (prefixo EAN + dígitos + filler).
         $valorStart = strlen($prefixoBarra) + $digitos + $filler;
 
         // Fallback: se o prefixo do produto for maior (ex.: já inclui o "2"), usa o comprimento dele.
-        if (strlen($prefixoProduto) > $valorStart) {
-            $valorStart = strlen($prefixoProduto);
+        $prefixoDigits = preg_replace('/\D/', '', $prefixoProduto) ?? '';
+        if (strlen($prefixoDigits) > $valorStart) {
+            $valorStart = strlen($prefixoDigits);
         }
 
         // Compat Delphi/legado: muitos cadastros usam 7 chars (2 + 6 dígitos).
@@ -65,11 +79,14 @@ final class PdvScaleBarcodeService
             $segmento = substr($barcode, 7, 5);
         }
 
+        if ($segmento === '' || ! ctype_digit($segmento)) {
+            return null;
+        }
+
         $segmentoValor = (float) $segmento;
 
         if (BalancaEtiquetaLayout::isTotalPrice($modelo)) {
-            $divisor = $valorLen >= 6 ? 100 : 100;
-            $total = round($segmentoValor / $divisor, 2);
+            $total = round($segmentoValor / 100, 2);
             $quantidade = $total > 0 ? round($total / $preco, 3) : 1;
 
             return [

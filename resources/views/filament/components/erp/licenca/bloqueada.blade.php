@@ -8,20 +8,77 @@
     $descricao = match ($this->status) {
         'sem_cnpj' => 'Informe o CNPJ da empresa no cadastro para validarmos a licença.',
         'nao_encontrado' => 'Este CNPJ não está no gerenciador de licenças da Unitec.',
-        default => 'Pague o Pix abaixo. Assim que o portal confirmar, o sistema libera automaticamente.',
+        default => filled($this->mensagem)
+            ? $this->mensagem
+            : 'O acesso foi bloqueado no gerenciador de licenças. Entre em contato com o suporte Unitec para liberar.',
     };
 
-    $valorLabel = filled($this->pixAmount)
-        ? 'R$ '.number_format((float) str_replace(',', '.', $this->pixAmount), 2, ',', '.')
-        : '';
+    $vencimentoLabel = ($this->mensalidadeVencida ?? false) ? 'Vencimento' : 'Válido até';
 @endphp
+
+{{-- Overlay + shell: estilos críticos inline (não dependem de cache do CSS) --}}
+<style>
+    .fi-body:has(.erp-licenca-bloqueada-page) .erp-shell,
+    .fi-body.erp-licenca-bloqueada-body .erp-shell { display: none !important; }
+    .fi-body:has(.erp-licenca-bloqueada-page),
+    .fi-body.erp-licenca-bloqueada-body {
+        overflow: hidden !important;
+        background: #0b1a2e !important;
+    }
+    .erp-licenca-bloqueada {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483000 !important;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        box-sizing: border-box;
+        background:
+            radial-gradient(900px 420px at 50% 12%, rgba(59, 130, 246, 0.22), transparent 60%),
+            linear-gradient(165deg, #0b1a2e 0%, #13233f 42%, #1e3a5f 100%) !important;
+    }
+    .erp-licenca-bloqueada__brand {
+        color: rgba(226, 232, 240, 0.9);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+    .erp-licenca-bloqueada__card {
+        width: min(23.5rem, calc(100vw - 1.5rem));
+        max-height: calc(100dvh - 3.5rem);
+        overflow: auto;
+        padding: 1rem 1.05rem 0.95rem;
+        border-radius: 16px;
+        background: #fff !important;
+        color: #0f172a;
+        box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45);
+        box-sizing: border-box;
+    }
+</style>
 
 <div
     class="erp-licenca-bloqueada"
-    @if ($this->pixReady && $this->status === 'bloqueado')
-        wire:poll.15s="pollPagamento"
-    @endif
+    x-data="{
+        copied: false,
+        async copyPix(code) {
+            if (!code) return;
+            try {
+                await navigator.clipboard.writeText(code);
+                this.copied = true;
+                setTimeout(() => this.copied = false, 1800);
+            } catch (e) {
+                const input = this.$refs.pixInput;
+                if (input) { input.focus(); input.select(); }
+            }
+        }
+    }"
 >
+    <div class="erp-licenca-bloqueada__brand">{{ config('unitec.app_name') }}</div>
+
     <div class="erp-licenca-bloqueada__card">
         <div class="erp-licenca-bloqueada__badge">Licença</div>
         <h1 class="erp-licenca-bloqueada__title">{{ $titulo }}</h1>
@@ -42,62 +99,60 @@
             @endif
             @if (filled($this->validoAte))
                 <div>
-                    <dt>Válido até</dt>
+                    <dt>{{ $vencimentoLabel }}</dt>
                     <dd>{{ \Illuminate\Support\Carbon::parse($this->validoAte)->format('d/m/Y') }}</dd>
                 </div>
             @endif
         </dl>
 
-        @if ($this->pixLoading)
-            <div class="erp-licenca-bloqueada__pix-loading">Gerando QR Code Pix…</div>
-        @elseif ($this->pixReady)
-            <div class="erp-licenca-bloqueada__pix">
-                <div class="erp-licenca-bloqueada__pix-head">
-                    <strong>Pague com Pix</strong>
-                    @if ($valorLabel !== '')
-                        <span>{{ $valorLabel }}</span>
+        @if ($this->mensalidadeVencida ?? false)
+            @if ($this->pixLoading ?? false)
+                <p class="erp-licenca-bloqueada__pix-loading">Carregando Pix…</p>
+            @elseif (filled($this->pixQrDataUrl ?? null) || filled($this->pixBrCode ?? null))
+                <div class="erp-licenca-bloqueada__pix">
+                    <div class="erp-licenca-bloqueada__pix-head">
+                        <strong>Pagar com Pix</strong>
+                        @if (filled($this->pixAmount ?? null))
+                            <span>{{ $this->pixAmount }}</span>
+                        @endif
+                    </div>
+                    @if (filled($this->pixDescription ?? null))
+                        <p class="erp-licenca-bloqueada__pix-desc">{{ $this->pixDescription }}</p>
+                    @endif
+                    @if (filled($this->pixQrDataUrl ?? null))
+                        <img
+                            class="erp-licenca-bloqueada__qr"
+                            src="{{ $this->pixQrDataUrl }}"
+                            alt="QR Code Pix"
+                            width="128"
+                            height="128"
+                        >
+                    @endif
+                    <p class="erp-licenca-bloqueada__pix-hint">Escaneie o QR ou copie o código Pix.</p>
+                    @if (filled($this->pixBrCode ?? null))
+                        <div class="erp-licenca-bloqueada__copia">
+                            <input
+                                x-ref="pixInput"
+                                class="erp-licenca-bloqueada__copia-input"
+                                type="text"
+                                readonly
+                                value="{{ $this->pixBrCode }}"
+                                aria-label="Código Pix copia e cola"
+                            >
+                            <button
+                                type="button"
+                                class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--ghost erp-licenca-bloqueada__btn--copy"
+                                @click="copyPix(@js($this->pixBrCode))"
+                            >
+                                <span x-show="!copied">Copiar</span>
+                                <span x-show="copied" x-cloak>Copiado</span>
+                            </button>
+                        </div>
                     @endif
                 </div>
-
-                @if (filled($this->pixDescription))
-                    <p class="erp-licenca-bloqueada__pix-desc">{{ $this->pixDescription }}</p>
-                @endif
-
-                @if (filled($this->pixQrCodeDataUrl))
-                    <img
-                        src="{{ $this->pixQrCodeDataUrl }}"
-                        alt="QR Code Pix"
-                        class="erp-licenca-bloqueada__qr"
-                    >
-                @endif
-
-                <p class="erp-licenca-bloqueada__pix-hint">
-                    Escaneie com o app do banco. A liberação é automática após a confirmação.
-                </p>
-
-                @if (filled($this->pixBrCode))
-                    <div class="erp-licenca-bloqueada__copia" x-data="{ copied: false }">
-                        <input
-                            type="text"
-                            readonly
-                            class="erp-licenca-bloqueada__copia-input"
-                            value="{{ $this->pixBrCode }}"
-                            id="erp-licenca-pix-brcode"
-                        >
-                        <button
-                            type="button"
-                            class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--ghost erp-licenca-bloqueada__btn--copy"
-                            x-on:click="
-                                navigator.clipboard.writeText(document.getElementById('erp-licenca-pix-brcode').value);
-                                copied = true;
-                                setTimeout(() => copied = false, 2000);
-                            "
-                        >
-                            <span x-text="copied ? 'Copiado!' : 'Copiar Pix'"></span>
-                        </button>
-                    </div>
-                @endif
-            </div>
+            @elseif (filled($this->pixMessage ?? null))
+                <p class="erp-licenca-bloqueada__feedback">{{ $this->pixMessage }}</p>
+            @endif
         @endif
 
         @if (filled($this->feedback))
@@ -105,17 +160,15 @@
         @endif
 
         <div class="erp-licenca-bloqueada__actions">
-            @if (! $this->pixReady && filled($this->cnpj) && $this->status === 'bloqueado')
-                <button
-                    type="button"
-                    class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--primary"
-                    wire:click="carregarPix"
-                    wire:loading.attr="disabled"
-                >
-                    <span wire:loading.remove wire:target="carregarPix">Gerar QR Code Pix</span>
-                    <span wire:loading wire:target="carregarPix">Gerando…</span>
-                </button>
-            @endif
+            <button
+                type="button"
+                class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--accent"
+                wire:click="verificarNovamente"
+                wire:loading.attr="disabled"
+            >
+                <span wire:loading.remove wire:target="verificarNovamente">Verificar liberação</span>
+                <span wire:loading wire:target="verificarNovamente">Verificando…</span>
+            </button>
 
             @if (filled($this->pagamentoUrl))
                 <a
@@ -128,210 +181,9 @@
 
             <button
                 type="button"
-                class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--accent"
-                wire:click="verificarNovamente"
-                wire:loading.attr="disabled"
-            >
-                <span wire:loading.remove wire:target="verificarNovamente">Já paguei — verificar</span>
-                <span wire:loading wire:target="verificarNovamente">Verificando…</span>
-            </button>
-
-            <button
-                type="button"
                 class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--ghost"
                 wire:click="sair"
             >Sair</button>
         </div>
     </div>
 </div>
-
-<style>
-.erp-licenca-bloqueada-page .fi-page-content,
-.erp-licenca-bloqueada-page .fi-sc {
-    padding: 0 !important;
-}
-.erp-licenca-bloqueada {
-    min-height: calc(100dvh - 3rem);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    background: linear-gradient(160deg, #0f2744 0%, #1e3a5f 45%, #334155 100%);
-}
-.erp-licenca-bloqueada__card {
-    width: min(26rem, 100%);
-    padding: 1.15rem 1.2rem 1.1rem;
-    border-radius: 14px;
-    border: 1px solid rgb(148 163 184 / 28%);
-    background: #f8fafc;
-    box-shadow: 0 22px 48px rgb(2 6 23 / 35%);
-}
-.erp-licenca-bloqueada__badge {
-    display: inline-flex;
-    margin-bottom: 0.45rem;
-    padding: 0.12rem 0.45rem;
-    border-radius: 999px;
-    background: #fee2e2;
-    color: #b91c1c;
-    font-size: 0.65rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.erp-licenca-bloqueada__title {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #0f172a;
-}
-.erp-licenca-bloqueada__desc {
-    margin: 0.35rem 0 0;
-    font-size: 0.82rem;
-    line-height: 1.4;
-    color: #475569;
-}
-.erp-licenca-bloqueada__meta {
-    display: grid;
-    gap: 0.35rem;
-    margin: 0.85rem 0 0;
-    padding: 0.6rem 0.7rem;
-    border-radius: 10px;
-    background: #e8eef6;
-    border: 1px solid #c7d5e8;
-}
-.erp-licenca-bloqueada__meta > div {
-    display: grid;
-    grid-template-columns: 5.2rem minmax(0, 1fr);
-    gap: 0.35rem;
-    align-items: baseline;
-}
-.erp-licenca-bloqueada__meta dt {
-    margin: 0;
-    font-size: 0.64rem;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-}
-.erp-licenca-bloqueada__meta dd {
-    margin: 0;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #0f2744;
-    word-break: break-word;
-}
-.erp-licenca-bloqueada__pix-loading {
-    margin-top: 0.85rem;
-    padding: 0.75rem;
-    border-radius: 10px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    color: #1d4ed8;
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-align: center;
-}
-.erp-licenca-bloqueada__pix {
-    margin-top: 0.85rem;
-    padding: 0.75rem;
-    border-radius: 12px;
-    background: #fff;
-    border: 1px solid #cbd5e1;
-    text-align: center;
-}
-.erp-licenca-bloqueada__pix-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-size: 0.84rem;
-    color: #0f172a;
-}
-.erp-licenca-bloqueada__pix-head span {
-    font-weight: 800;
-    color: #1d4ed8;
-}
-.erp-licenca-bloqueada__pix-desc {
-    margin: 0.35rem 0 0;
-    font-size: 0.72rem;
-    color: #64748b;
-}
-.erp-licenca-bloqueada__qr {
-    width: 11.5rem;
-    height: 11.5rem;
-    margin: 0.65rem auto 0.35rem;
-    display: block;
-    border-radius: 8px;
-    background: #fff;
-}
-.erp-licenca-bloqueada__pix-hint {
-    margin: 0;
-    font-size: 0.7rem;
-    color: #64748b;
-}
-.erp-licenca-bloqueada__copia {
-    display: grid;
-    gap: 0.35rem;
-    margin-top: 0.55rem;
-}
-.erp-licenca-bloqueada__copia-input {
-    width: 100%;
-    min-height: 2rem;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    background: #f8fafc;
-    font-size: 0.68rem;
-    color: #334155;
-}
-.erp-licenca-bloqueada__feedback {
-    margin: 0.7rem 0 0;
-    padding: 0.5rem 0.6rem;
-    border-radius: 8px;
-    background: #fff7ed;
-    border: 1px solid #fdba74;
-    color: #9a3412;
-    font-size: 0.76rem;
-    font-weight: 600;
-}
-.erp-licenca-bloqueada__actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    margin-top: 0.85rem;
-}
-.erp-licenca-bloqueada__btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.25rem;
-    padding: 0.4rem 0.85rem;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    font-size: 0.82rem;
-    font-weight: 700;
-    text-decoration: none;
-    cursor: pointer;
-}
-.erp-licenca-bloqueada__btn:disabled {
-    opacity: 0.55;
-    cursor: wait;
-}
-.erp-licenca-bloqueada__btn--primary {
-    background: #0f172a;
-    color: #fff;
-}
-.erp-licenca-bloqueada__btn--accent {
-    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
-    border-color: #1e40af;
-    color: #fff;
-}
-.erp-licenca-bloqueada__btn--ghost {
-    background: #fff;
-    border-color: #cbd5e1;
-    color: #334155;
-}
-.erp-licenca-bloqueada__btn--copy {
-    min-height: 1.9rem;
-    font-size: 0.76rem;
-}
-</style>

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
+    'empresa_id',
     'numero',
     'emissao',
     'historico',
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'recebido_em',
     'saldo',
     'forma',
+    'numero_cheque',
     'cartao_nsu',
     'cartao_autorizacao',
     'cartao_maquininha',
@@ -69,6 +71,11 @@ class ContaReceber extends Model
     public static function calcularSaldo(float $valor, float $desconto, float $juros, float $valorRecebido): float
     {
         return round(max(0, $valor - $desconto + $juros - $valorRecebido), 2);
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
     }
 
     public function cliente(): BelongsTo

@@ -45,12 +45,8 @@ class GrupoResource extends Resource
                 TextColumn::make('nome')
                     ->label('Descrição')
                     ->wrap(false)
-                    ->weight(FontWeight::Bold),
-                TextColumn::make('mostrar_no_app')
-                    ->label('App')
-                    ->alignCenter()
-                    ->formatStateUsing(fn ($state): string => $state ? '�o"' : '')
-                    ->weight(FontWeight::Bold),
+                    ->weight(FontWeight::Bold)
+                    ->formatStateUsing(fn ($state): string => Grupo::displayNome((string) $state)),
             ])
             ->defaultSort('id', 'asc')
             ->striped()

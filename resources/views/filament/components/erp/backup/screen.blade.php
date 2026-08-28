@@ -22,9 +22,29 @@
             } catch (e) {
                 await $wire.failBackup((e && e.message) ? e.message : 'Erro inesperado ao gerar backup.');
             }
+        },
+        async runRestore() {
+            if ($wire.running || $wire.progressActive) return;
+            try {
+                await $wire.atualizarProgresso(8, 'Iniciando restauração…', 'Validando confirmação e arquivo', 'preparar');
+                const prep = await $wire.prepararRestore();
+                if (! prep || ! prep.ok) return;
+
+                await $wire.atualizarProgresso(30, 'Restaurando banco…', 'Backup de segurança + importação do dump', 'exportar');
+                const result = await $wire.executarRestore(prep.path || '');
+                if (! result || ! result.ok) return;
+
+                await $wire.atualizarProgresso(90, 'Finalizando…', 'Atualizando status e lista', 'finalizar');
+                await $wire.finalizarRestore(result);
+            } catch (e) {
+                await $wire.failRestore((e && e.message) ? e.message : 'Erro inesperado ao restaurar backup.');
+            }
         }
     }"
-    x-init="window.__erpBackupRun = () => runBackup()"
+    x-init="
+        window.__erpBackupRun = () => runBackup();
+        window.__erpBackupRestore = () => runRestore();
+    "
     x-on:keydown.escape.window="
         if ($wire.running || $wire.progressActive) { $event.preventDefault(); return; }
         $event.preventDefault();
@@ -34,7 +54,7 @@
     <header class="erp-backup__header">
         <div class="erp-backup__header-text">
             <h1 class="erp-backup__title">Backup do banco de dados</h1>
-            <p class="erp-backup__subtitle">Gere, configure e acompanhe cópias do MySQL</p>
+            <p class="erp-backup__subtitle">Gere, configure, restaure e acompanhe cópias do MySQL</p>
         </div>
         <button
             type="button"
@@ -113,6 +133,20 @@
                     >
                 </label>
 
+                <label class="erp-backup__field erp-backup__field--full">
+                    <span class="erp-backup__label">Token Portal — Log de BKP</span>
+                    <input
+                        type="password"
+                        wire:model="portalBkpToken"
+                        class="erp-backup__input"
+                        placeholder="Token copiado no portal, aba Log de BKP"
+                        autocomplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        @disabled($this->running || $this->progressActive)
+                    >
+                </label>
+
                 <label class="erp-backup__toggle">
                     <input
                         type="checkbox"
@@ -181,6 +215,9 @@
                             <th>Tipo</th>
                             <th>Data</th>
                             <th>Tamanho</th>
+                            @if (erp_can('backup.restore'))
+                                <th class="erp-backup__th-action">Ação</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -196,10 +233,27 @@
                                 </td>
                                 <td class="erp-backup__muted">{{ $arquivo['modified_at'] }}</td>
                                 <td class="erp-backup__size">{{ $arquivo['size_label'] }}</td>
+                                @if (erp_can('backup.restore'))
+                                    <td class="erp-backup__action">
+                                        @if (($arquivo['kind'] ?? 'sql') === 'sql')
+                                            <button
+                                                type="button"
+                                                class="erp-backup__row-btn"
+                                                wire:click="abrirRestoreModal({{ \Illuminate\Support\Js::from($arquivo['path']) }})"
+                                                @disabled($this->running || $this->progressActive)
+                                                title="Restaurar este backup"
+                                            >
+                                                Restaurar
+                                            </button>
+                                        @else
+                                            <span class="erp-backup__muted">—</span>
+                                        @endif
+                                    </td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="erp-backup__empty">Nenhum backup encontrado nesta pasta.</td>
+                                <td colspan="{{ erp_can('backup.restore') ? 5 : 4 }}" class="erp-backup__empty">Nenhum backup encontrado nesta pasta.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -219,6 +273,16 @@
             >
                 <span x-show="! ($wire.running || $wire.progressActive)">F2 · Gerar backup</span>
                 <span x-show="$wire.running || $wire.progressActive" x-cloak>Gerando…</span>
+            </button>
+        @endif
+        @if (erp_can('backup.restore'))
+            <button
+                type="button"
+                class="erp-backup__btn erp-backup__btn--warn"
+                wire:click="abrirRestoreModal"
+                @disabled($this->running || $this->progressActive)
+            >
+                Restaurar backup
             </button>
         @endif
         @if (erp_can('backup.update'))
@@ -250,11 +314,94 @@
         </button>
     </footer>
 
+    @if ($this->showRestoreModal && ! $this->running && ! $this->progressActive)
+        <div class="erp-backup__overlay erp-backup__overlay--modal" role="dialog" aria-modal="true" aria-labelledby="erp-backup-restore-title">
+            <div class="erp-backup__restore-panel">
+                <div class="erp-backup__restore-head">
+                    <h2 id="erp-backup-restore-title" class="erp-backup__restore-title">Restaurar backup</h2>
+                    <button type="button" class="erp-backup__restore-close" wire:click="fecharRestoreModal" aria-label="Fechar">&times;</button>
+                </div>
+
+                <p class="erp-backup__restore-warn">
+                    Esta operação sobrescreve o banco atual. Um backup de segurança será gerado antes.
+                    Peça para outros usuários saírem do sistema durante a restauração.
+                </p>
+
+                <div class="erp-backup__field erp-backup__field--full">
+                    <span class="erp-backup__label">Pasta do backup</span>
+                    <div class="erp-backup__path-row">
+                        <input
+                            type="text"
+                            wire:model="pastaRestore"
+                            wire:change="atualizarPastaRestore"
+                            class="erp-backup__input"
+                            placeholder="Ex.: C:\BKP"
+                            spellcheck="false"
+                        >
+                        <button
+                            type="button"
+                            class="erp-backup__browse"
+                            wire:click="selecionarPastaRestore"
+                            wire:loading.attr="disabled"
+                            wire:target="selecionarPastaRestore"
+                        >
+                            <span wire:loading.remove wire:target="selecionarPastaRestore">Escolher…</span>
+                            <span wire:loading wire:target="selecionarPastaRestore">Abrindo…</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="erp-backup__field erp-backup__field--full" style="margin-top: 0.55rem;">
+                    <span class="erp-backup__label">Arquivo .sql</span>
+                    @if ($this->arquivosRestore === [])
+                        <p class="erp-backup__restore-empty">Nenhum backup Unitec (.sql) encontrado nesta pasta.</p>
+                    @else
+                        <select wire:model="arquivoRestorePath" class="erp-backup__input erp-backup__select">
+                            @foreach ($this->arquivosRestore as $item)
+                                <option value="{{ $item['path'] }}">
+                                    {{ $item['name'] }} — {{ $item['modified_at'] }} ({{ $item['size_label'] }})
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+                </div>
+
+                <div class="erp-backup__field erp-backup__field--full" style="margin-top: 0.55rem;">
+                    <span class="erp-backup__label">Digite RESTAURAR para confirmar</span>
+                    <input
+                        type="text"
+                        wire:model="confirmacaoRestore"
+                        class="erp-backup__input"
+                        placeholder="RESTAURAR"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                </div>
+
+                <div class="erp-backup__restore-actions">
+                    <button type="button" class="erp-backup__btn erp-backup__btn--ghost" wire:click="fecharRestoreModal">
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        class="erp-backup__btn erp-backup__btn--warn"
+                        wire:click="confirmarRestoreEExecutar"
+                        @disabled($this->arquivosRestore === [] || trim($this->arquivoRestorePath) === '')
+                    >
+                        Confirmar restauração
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($this->progressActive || $this->running)
         <div class="erp-backup__overlay" role="dialog" aria-modal="true" aria-labelledby="erp-backup-progress-title">
             <div class="erp-backup__overlay-panel">
                 <div class="erp-backup__spinner" aria-hidden="true"></div>
-                <h2 id="erp-backup-progress-title" class="erp-backup__overlay-title">{{ $this->progressLabel !== '' ? $this->progressLabel : 'Gerando backup…' }}</h2>
+                <h2 id="erp-backup-progress-title" class="erp-backup__overlay-title">
+                    {{ $this->progressLabel !== '' ? $this->progressLabel : ($this->progressMode === 'restore' ? 'Restaurando…' : 'Gerando backup…') }}
+                </h2>
                 @if (filled($this->progressDetail))
                     <p class="erp-backup__overlay-detail">{{ $this->progressDetail }}</p>
                 @endif
@@ -275,9 +422,15 @@
                 </div>
 
                 <ol class="erp-backup__steps">
-                    <li @class(['is-done' => in_array($this->progressStep, ['exportar', 'finalizar'], true), 'is-active' => $this->progressStep === 'preparar'])>Preparar</li>
-                    <li @class(['is-done' => $this->progressStep === 'finalizar', 'is-active' => $this->progressStep === 'exportar'])>Exportar</li>
-                    <li @class(['is-active' => $this->progressStep === 'finalizar', 'is-done' => $this->progressPct >= 100 && $this->progressStep === 'finalizar'])>Finalizar</li>
+                    @if ($this->progressMode === 'restore')
+                        <li @class(['is-done' => in_array($this->progressStep, ['exportar', 'finalizar'], true), 'is-active' => $this->progressStep === 'preparar'])>Preparar</li>
+                        <li @class(['is-done' => $this->progressStep === 'finalizar', 'is-active' => $this->progressStep === 'exportar'])>Importar</li>
+                        <li @class(['is-active' => $this->progressStep === 'finalizar', 'is-done' => $this->progressPct >= 100 && $this->progressStep === 'finalizar'])>Finalizar</li>
+                    @else
+                        <li @class(['is-done' => in_array($this->progressStep, ['exportar', 'finalizar'], true), 'is-active' => $this->progressStep === 'preparar'])>Preparar</li>
+                        <li @class(['is-done' => $this->progressStep === 'finalizar', 'is-active' => $this->progressStep === 'exportar'])>Exportar</li>
+                        <li @class(['is-active' => $this->progressStep === 'finalizar', 'is-done' => $this->progressPct >= 100 && $this->progressStep === 'finalizar'])>Finalizar</li>
+                    @endif
                 </ol>
 
                 <p class="erp-backup__overlay-hint">Aguarde, não feche esta tela.</p>

@@ -1,4 +1,306 @@
-/* Devolução de Compra — listagem reutiliza erp-orcamentos; modal próprio */
+/* Devolução de Compra — listagem própria; modal de lançamento */
+
+.erp-devolucao-compra-page .erp-orcamentos {
+    padding: 0.5rem 0.65rem 0;
+    margin: 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__filters {
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem;
+    margin: 0 0 0.35rem;
+    background: var(--erp-bg-toolbar);
+    border: 1px solid var(--erp-border-light);
+    border-left: 4px solid var(--erp-brand-primary);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-md);
+    font-family: var(--erp-font);
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__search-group {
+    display: inline-flex;
+    flex: 1 1 32rem;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__search-field {
+    width: auto;
+    min-width: 6.75rem;
+    flex-shrink: 0;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__search-desc-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__search-text {
+    flex: 1 1 auto;
+    min-width: 14rem;
+    max-width: none;
+    width: auto;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__period-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.55rem;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__period-group .erp-orcamentos__filter-title {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__period-group .erp-orcamentos__period-label {
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__period-input,
+.erp-devolucao-compra-page .erp-orcamentos__period-input.erp-date-input,
+.erp-devolucao-compra-page .erp-orcamentos__period-group .erp-date-field {
+    width: calc(11ch + 2.35rem);
+    min-width: calc(11ch + 2.35rem);
+    max-width: calc(11ch + 2.35rem);
+    box-sizing: border-box;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__period-input,
+.erp-devolucao-compra-page .erp-orcamentos__period-input.erp-date-input {
+    padding-inline: 0.35rem 2.25rem !important;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__page-size-group {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-devolucao-compra-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    .erp-devolucao-compra-page .erp-orcamentos__period-group,
+    .erp-devolucao-compra-page .erp-orcamentos__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tabs-wrap {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tabs {
+    margin: 0;
+    gap: 0.25rem;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem;
+    line-height: 1.1;
+    min-height: 0;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--todos {
+    background: #111827;
+    color: #fff;
+    border-color: #030712;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--todos.erp-orcamentos__tab--active {
+    background: #030712;
+    color: #fff;
+    border-color: #000;
+    box-shadow: inset 0 -2px 0 #000;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--aberto {
+    background: #facc15;
+    color: #422006;
+    border-color: #ca8a04;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--aberto.erp-orcamentos__tab--active {
+    background: #eab308;
+    border-color: #a16207;
+    box-shadow: inset 0 -2px 0 #a16207;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--fechado {
+    background: #2563eb;
+    color: #fff;
+    border-color: #1d4ed8;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--fechado.erp-orcamentos__tab--active {
+    background: #1d4ed8;
+    border-color: #1e3a8a;
+    box-shadow: inset 0 -2px 0 #1e3a8a;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--cancelado {
+    background: #dc2626;
+    color: #fff;
+    border-color: #b91c1c;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__tab--cancelado.erp-orcamentos__tab--active {
+    background: #b91c1c;
+    border-color: #7f1d1d;
+    box-shadow: inset 0 -2px 0 #7f1d1d;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__total {
+    margin: 0 0.65rem;
+    padding: 0.35rem 0.65rem;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__total-label {
+    font-size: 0.75rem;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos__total-value {
+    font-size: 0.875rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-numero,
+.erp-devolucao-compra-page .fi-ta-cell-numero,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(1),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(1) {
+    width: 4.5rem;
+    max-width: 4.5rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-data,
+.erp-devolucao-compra-page .fi-ta-cell-data,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(2),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(2) {
+    width: 6.25rem;
+    max-width: 6.25rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-compra-numero,
+.erp-devolucao-compra-page .fi-ta-cell-compra-numero,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(3),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(3) {
+    width: 5.5rem;
+    max-width: 5.5rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-fornecedor-nome,
+.erp-devolucao-compra-page .fi-ta-cell-fornecedor-nome,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(4),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: auto !important;
+    min-width: 12rem;
+    max-width: none;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-situacao,
+.erp-devolucao-compra-page .fi-ta-cell-situacao,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(5),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+    width: 6.5rem;
+    max-width: 6.5rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-header-cell-total,
+.erp-devolucao-compra-page .fi-ta-cell-total,
+.erp-devolucao-compra-page .fi-ta-header-cell:nth-child(6),
+.erp-devolucao-compra-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+    width: 7.5rem;
+    max-width: 7.5rem;
+}
+
+.erp-devolucao-compra-page .fi-ta-cell-situacao .fi-ta-col {
+    justify-content: center !important;
+}
+
+.erp-devolucao-compra-page .erp-devcompra__status-chip {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #fff;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra__status-chip--aberta {
+    background: #000;
+    border-color: #000;
+}
+
+.erp-devolucao-compra-page .erp-devcompra__status-chip--finalizada {
+    background: #16a34a;
+    border-color: #15803d;
+}
+
+.erp-devolucao-compra-page .erp-devcompra__status-chip--cancelada {
+    background: #dc2626;
+    border-color: #b91c1c;
+}
 
 /* Com o lançamento aberto: esconde menu e barra de ícones (fundo só do modal). */
 .fi-body:has(.erp-devcompra-lancamento-modal) .erp-menu-bar,
@@ -300,6 +602,251 @@
     cursor: not-allowed;
 }
 
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 430;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(980px, calc(100vw - 1.5rem));
+    max-height: min(44rem, calc(100vh - 2rem));
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: 10px;
+    background: #f8fafc;
+    box-shadow: 0 18px 52px rgba(15, 23, 42, 0.42);
+    overflow: hidden;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    cursor: pointer;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal .erp-lookup-modal__close:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.8rem;
+    background: #f1f5f9;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__search {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.55rem;
+    flex-shrink: 0;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__search label,
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__search span {
+    color: #334155;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__search input {
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__search input:focus {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table-wrap {
+    flex: 1 1 auto;
+    min-height: 15rem;
+    overflow: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table {
+    width: 100%;
+    min-width: 48rem;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.48rem 0.55rem;
+    border-bottom: 1px solid #93c5fd;
+    background: #e8f1fb;
+    color: #173b69;
+    font-size: 0.71rem;
+    font-weight: 800;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table td {
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid #e2e8f0;
+    color: #1e293b;
+    vertical-align: middle;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table tbody tr:hover td {
+    background: #eff6ff;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-number {
+    font-weight: 800;
+    text-align: center;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-fornecedor {
+    max-width: 20rem;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-money {
+    text-align: right;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-action {
+    text-align: right;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-action button {
+    min-height: 1.75rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: 5px;
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-action button:hover {
+    background: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__status {
+    display: inline-flex;
+    padding: 0.16rem 0.4rem;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__table .is-empty {
+    padding: 2rem 0.75rem;
+    color: #64748b;
+    text-align: center;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    flex-shrink: 0;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer button {
+    min-height: 1.85rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+    color: #1e3a5f;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer button:hover:not(:disabled) {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    background: #eff6ff;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-selecionar-compra-modal__footer button.is-close {
+    border-color: #fecaca;
+    background: #fff1f2;
+    color: #9f1239;
+}
+
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__lookup {
     position: absolute;
     top: calc(100% + 0.25rem);
@@ -366,35 +913,49 @@
     flex: 1 1 auto;
     min-height: 10rem;
     overflow: auto;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
     background: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid {
     width: 100%;
+    min-width: 48rem;
     border-collapse: collapse;
-    font-size: 0.78rem;
+    table-layout: fixed;
+    font-size: 0.8rem;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid th {
     position: sticky;
     top: 0;
-    z-index: 1;
-    padding: 0.4rem 0.45rem;
-    border-bottom: 1px solid #cbd5e1;
-    background: #e2e8f0;
-    color: #0f172a;
-    font-size: 0.7rem;
+    z-index: 2;
+    padding: 0.42rem 0.55rem;
+    border-bottom: 1px solid #1e5a9e;
+    background: linear-gradient(180deg, #276cab 0%, #164f87 100%);
+    color: #fff;
+    font-size: 0.65rem;
     font-weight: 800;
+    letter-spacing: 0.025em;
     text-align: left;
+    text-transform: uppercase;
     white-space: nowrap;
 }
 
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid th:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.28);
+}
+
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid td {
-    padding: 0.28rem 0.45rem;
+    padding: 0.25rem 0.55rem;
     border-bottom: 1px solid #e2e8f0;
+    color: #27364a;
     vertical-align: middle;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid td:not(:last-child) {
+    border-right: 1px solid #e7edf5;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid tbody tr:nth-child(even):not(.erp-lookup-modal__row--selected) td {
@@ -402,12 +963,26 @@
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid tbody tr:hover:not(.erp-lookup-modal__row--selected) td {
-    background: #e8f2ff;
+    background: #eef6ff;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid tbody tr {
+    cursor: pointer;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid .erp-lookup-modal__row--selected td {
-    background: #bfdbfe !important;
-    color: #0f172a;
+    background: #b9ddfb !important;
+    color: #0b3158;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid .erp-lookup-modal__row--selected .erp-devcompra-lancamento-modal__qty-input {
+    border-color: #2878b8;
+    background: #fff;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid .erp-lookup-modal__row--selected .erp-devcompra-lancamento-modal__product-description,
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__grid .erp-lookup-modal__row--selected .erp-devcompra-lancamento-modal__total-value {
+    color: #082b4d;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__num {
@@ -420,21 +995,93 @@
     white-space: nowrap;
 }
 
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-code {
+    width: 4.75rem;
+    text-align: center;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-description {
+    width: auto;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-quantity,
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-return {
+    width: 7.65rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-price {
+    width: 7rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__col-total {
+    width: 7.35rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__product-code {
+    color: #526277;
+    font-feature-settings: "tnum";
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__product-description {
+    overflow: hidden;
+    color: #172a42;
+    font-size: 0.74rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__quantity-value {
+    display: inline-flex;
+    min-width: 4.8rem;
+    justify-content: flex-end;
+    color: #526277;
+    font-feature-settings: "tnum";
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__qty-input {
-    width: 5.5rem;
-    min-height: 1.55rem;
-    padding: 0.15rem 0.35rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 5px;
-    background: #fff;
+    width: 100%;
+    min-height: 1.65rem;
+    padding: 0.12rem 0.4rem;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: #f8fbff;
+    color: #12395f;
+    font-feature-settings: "tnum";
+    font-size: 0.74rem;
+    font-weight: 800;
     text-align: right;
-    font-size: 0.78rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__qty-input:focus {
     outline: none;
-    border-color: var(--erp-brand-primary, #1e5a9e);
-    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__price-value,
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__total-value {
+    display: inline-flex;
+    justify-content: flex-end;
+    font-feature-settings: "tnum";
+    font-size: 0.72rem;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__price-value {
+    color: #526277;
+    font-weight: 650;
+}
+
+.erp-devolucao-compra-page .erp-devcompra-lancamento-modal__total-value {
+    min-width: 5.6rem;
+    color: #12395f;
+    font-weight: 850;
 }
 
 .erp-devolucao-compra-page .erp-devcompra-lancamento-modal__footer {

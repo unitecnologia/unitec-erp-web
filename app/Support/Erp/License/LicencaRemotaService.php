@@ -15,22 +15,11 @@ class LicencaRemotaService
 
     public function isEnabled(): bool
     {
-        $enabled = config('unitec.licenca_api.enabled', true);
-
-        if (is_string($enabled)) {
-            $enabled = filter_var($enabled, FILTER_VALIDATE_BOOL);
-        }
-
-        if (! $enabled) {
+        if (! $this->resolveEnabled()) {
             return false;
         }
 
-        $baseUrl = trim((string) (
-            config('unitec.licenca_api.base_url')
-            ?: env('UNITEC_LICENCA_API_URL', '')
-        ));
-
-        return $baseUrl !== '';
+        return $this->resolveBaseUrl() !== '';
     }
 
     public function checkCurrentEmpresa(bool $forceRefresh = false): LicencaSnapshot
@@ -52,12 +41,17 @@ class LicencaRemotaService
             );
         }
 
-        return $this->checkCnpj($cnpj, $forceRefresh);
+        $snapshot = $this->checkCnpj($cnpj, $forceRefresh);
+        $this->hydrateMensalidadeFromCache($cnpj);
+
+        return $snapshot;
     }
 
     /**
      * Única verificação “pesada” da sessão: no login (barra Abrindo o sistema).
      * Depois disso o middleware só lê o gate da sessão — sem HTTP.
+     *
+     * Portal offline: mantém grace/INDISPONIVEL (libera), exceto se mensalidade local estiver vencida.
      */
     public function validateAtLogin(): LicencaSnapshot
     {
@@ -84,10 +78,124 @@ class LicencaRemotaService
             return $snapshot;
         }
 
+        // Portal (forceRefresh) + mensalidade: único momento HTTP além do botão Verificar.
         $snapshot = $this->checkCnpj($cnpj, forceRefresh: true);
         $this->rememberLoginGate($snapshot);
+        $this->hydrateMensalidadeFromCache($cnpj);
+        $this->syncMensalidadeNoGate($cnpj);
+        $this->rememberLoginGate($snapshot);
 
-        return $snapshot;
+        return $this->applyMensalidadeExpiry($snapshot);
+    }
+
+    /**
+     * Garante gate na sessão sem chamar o portal (menu/SPA).
+     * Preferência: gate existente → cache/grace → indisponível (libera o menu).
+     */
+    public function ensureLoginGateWithoutRemote(): LicencaSnapshot
+    {
+        $existing = $this->loginGateSnapshot();
+
+        if ($existing !== null) {
+            $this->hydrateMensalidadeFromCache($this->currentCnpj());
+
+            return $this->applyMensalidadeExpiry($existing);
+        }
+
+        if (! $this->isEnabled()) {
+            $snapshot = new LicencaSnapshot(
+                status: LicencaSnapshot::STATUS_DESABILITADO,
+                validoAte: $this->localFallbackDate(),
+                mensagem: 'Validação remota desabilitada.',
+            );
+            $this->rememberLoginGate($snapshot);
+
+            return $snapshot;
+        }
+
+        $cnpj = $this->currentCnpj();
+
+        if ($cnpj === null) {
+            $snapshot = new LicencaSnapshot(
+                status: LicencaSnapshot::STATUS_SEM_CNPJ,
+                mensagem: 'Cadastre o CNPJ da empresa para validar a licença.',
+            );
+            $this->rememberLoginGate($snapshot);
+
+            return $snapshot;
+        }
+
+        $local = $this->resolveLocalSnapshot($cnpj);
+
+        if ($local !== null) {
+            $this->rememberLoginGate($local);
+            $this->hydrateMensalidadeFromCache($cnpj);
+
+            return $this->applyMensalidadeExpiry($local);
+        }
+
+        // Sem cache local: não bloqueia o menu com HTTP. Valida de verdade no login.
+        $snapshot = new LicencaSnapshot(
+            status: LicencaSnapshot::STATUS_INDISPONIVEL,
+            validoAte: $this->localFallbackDate(),
+            mensagem: 'Licença será revalidada no próximo login.',
+        );
+        $this->rememberLoginGate($snapshot);
+
+        return $this->applyMensalidadeExpiry($snapshot);
+    }
+
+    /**
+     * Snapshot só de memo/sessão/cache/grace — nunca HTTP.
+     */
+    private function resolveLocalSnapshot(string $cnpj): ?LicencaSnapshot
+    {
+        $cnpj = $this->normalizeCnpj($cnpj);
+
+        if (strlen($cnpj) !== 14) {
+            return null;
+        }
+
+        if (isset(self::$requestMemo[$cnpj])) {
+            return self::$requestMemo[$cnpj];
+        }
+
+        $gateSnapshot = $this->loginGateSnapshot();
+
+        if ($gateSnapshot !== null) {
+            self::$requestMemo[$cnpj] = $gateSnapshot;
+
+            return $gateSnapshot;
+        }
+
+        $sessionHit = $this->fromSessionFastPath($cnpj);
+
+        if ($sessionHit !== null) {
+            self::$requestMemo[$cnpj] = $sessionHit;
+
+            return $sessionHit;
+        }
+
+        $cached = Cache::get($this->cacheKey($cnpj));
+
+        if (is_array($cached)) {
+            $snapshot = LicencaSnapshot::fromArray($cached, true);
+            self::$requestMemo[$cnpj] = $snapshot;
+            $this->storeSessionFastPath($cnpj, $snapshot);
+
+            return $snapshot;
+        }
+
+        $graceHit = $this->fromGraceFastPath($cnpj);
+
+        if ($graceHit !== null) {
+            self::$requestMemo[$cnpj] = $graceHit;
+            $this->storeSessionFastPath($cnpj, $graceHit);
+
+            return $graceHit;
+        }
+
+        return null;
     }
 
     /**
@@ -115,24 +223,251 @@ class LicencaRemotaService
             return null;
         }
 
+        // Mensalidade vencida bloqueia mesmo se o portal ainda disser "ativo".
+        if ($this->mensalidadeVencida()) {
+            return false;
+        }
+
         return (bool) ($gate['allowed'] ?? false);
+    }
+
+    /**
+     * True quando há data de mensalidade e ela já passou (início do dia).
+     */
+    public function mensalidadeVencida(): bool
+    {
+        $raw = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
+
+        if ($raw === '') {
+            return false;
+        }
+
+        try {
+            $due = \Carbon\Carbon::parse($raw)->startOfDay();
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $due->lt(now()->startOfDay());
+    }
+
+    /**
+     * Se a mensalidade estiver vencida, força status bloqueado (KPI "Vencida" passa a bloquear o ERP).
+     */
+    public function applyMensalidadeExpiry(LicencaSnapshot $snapshot): LicencaSnapshot
+    {
+        if (! $this->isEnabled()) {
+            return $snapshot;
+        }
+
+        if (! $this->mensalidadeVencida()) {
+            return $snapshot;
+        }
+
+        if ($snapshot->status === LicencaSnapshot::STATUS_BLOQUEADO) {
+            return $snapshot;
+        }
+
+        $due = $this->loginGateMensalidadeDueDate();
+
+        return new LicencaSnapshot(
+            status: LicencaSnapshot::STATUS_BLOQUEADO,
+            validoAte: $due ?: $snapshot->validoAte,
+            nome: $snapshot->nome,
+            mensagem: 'Mensalidade vencida. Regularize o pagamento para continuar usando o sistema.',
+            bloquearAtualizacao: $snapshot->bloquearAtualizacao,
+            quantidadeComputadores: $snapshot->quantidadeComputadores,
+            quantidadeTelefones: $snapshot->quantidadeTelefones,
+            fromCache: $snapshot->fromCache,
+        );
+    }
+
+    /**
+     * Vencimento da próxima mensalidade (pagamento), gravado no login / cache.
+     */
+    public function loginGateMensalidadeDueDate(): ?string
+    {
+        $gate = session($this->loginGateKey());
+
+        if (is_array($gate)) {
+            $due = trim((string) ($gate['mensalidade_due_date'] ?? ''));
+
+            if ($due !== '') {
+                return $due;
+            }
+        }
+
+        $cached = $this->mensalidadeFromCache($this->currentCnpj());
+
+        return filled($cached['due_date'] ?? null) ? (string) $cached['due_date'] : null;
+    }
+
+    public function loginGateMensalidadeLabel(): ?string
+    {
+        $gate = session($this->loginGateKey());
+
+        if (is_array($gate)) {
+            $label = trim((string) ($gate['mensalidade_description'] ?? ''));
+
+            if ($label !== '') {
+                return $label;
+            }
+        }
+
+        $cached = $this->mensalidadeFromCache($this->currentCnpj());
+
+        return filled($cached['description'] ?? null) ? (string) $cached['description'] : null;
     }
 
     public function rememberLoginGate(LicencaSnapshot $snapshot): void
     {
+        $gate = session($this->loginGateKey());
+        $previous = is_array($gate) ? $gate : [];
+
+        // Mantém o status do portal intacto; o vencimento da mensalidade só afeta `allowed`.
+        $allowed = $snapshot->isAllowed() && ! $this->mensalidadeVencida();
+
         session([
             $this->loginGateKey() => [
-                'allowed' => $snapshot->isAllowed(),
+                'allowed' => $allowed,
                 'status' => $snapshot->status,
                 'checked_at' => time(),
                 'snapshot' => $snapshot->toArray(),
+                // Mantém mensalidade já carregada se existir (até syncMensalidadeNoGate).
+                'mensalidade_due_date' => $previous['mensalidade_due_date'] ?? null,
+                'mensalidade_description' => $previous['mensalidade_description'] ?? null,
+                'mensalidade_amount' => $previous['mensalidade_amount'] ?? null,
             ],
         ]);
     }
 
+    public function rememberMensalidadeGate(?string $dueDate, ?string $description = null, ?string $amount = null): void
+    {
+        $gate = session($this->loginGateKey());
+
+        if (! is_array($gate)) {
+            $gate = [];
+        }
+
+        $dueDate = trim((string) $dueDate);
+        $gate['mensalidade_due_date'] = $dueDate !== '' ? $dueDate : null;
+        $gate['mensalidade_description'] = filled($description) ? trim((string) $description) : ($gate['mensalidade_description'] ?? null);
+        $gate['mensalidade_amount'] = filled($amount) ? trim((string) $amount) : ($gate['mensalidade_amount'] ?? null);
+
+        session([$this->loginGateKey() => $gate]);
+
+        $cnpj = $this->currentCnpj();
+
+        if ($cnpj !== null && $dueDate !== '') {
+            Cache::put($this->mensalidadeCacheKey($cnpj), [
+                'due_date' => $dueDate,
+                'description' => $gate['mensalidade_description'],
+                'amount' => $gate['mensalidade_amount'],
+            ], now()->addHours(12));
+        }
+
+        // Reavalia bloqueio com a nova data (ex.: mensalidade vencida).
+        $current = $this->loginGateSnapshot();
+        if ($current !== null) {
+            $this->rememberLoginGate($current);
+        }
+    }
+
+    /**
+     * Agenda sync da mensalidade DEPOIS de enviar a resposta HTTP.
+     * Não atrasa login nem cliques.
+     */
+    public function scheduleMensalidadeSync(?string $cnpj = null): void
+    {
+        $cnpj = $this->normalizeCnpj((string) ($cnpj ?? $this->currentCnpj() ?? ''));
+
+        if (strlen($cnpj) !== 14) {
+            return;
+        }
+
+        if (session('erp.licenca.mensalidade_sync_scheduled')) {
+            return;
+        }
+
+        session(['erp.licenca.mensalidade_sync_scheduled' => true]);
+
+        dispatch(function () use ($cnpj): void {
+            app(self::class)->syncMensalidadeNoGate($cnpj);
+        })->afterResponse();
+    }
+
+    public function hydrateMensalidadeFromCache(?string $cnpj = null): void
+    {
+        $cnpj = $this->normalizeCnpj((string) ($cnpj ?? $this->currentCnpj() ?? ''));
+        $cached = $this->mensalidadeFromCache($cnpj);
+
+        if ($cached === null) {
+            return;
+        }
+
+        $this->rememberMensalidadeGate(
+            $cached['due_date'] ?? null,
+            $cached['description'] ?? null,
+            $cached['amount'] ?? null,
+        );
+    }
+
+    public function syncMensalidadeNoGate(?string $cnpj = null): void
+    {
+        $cnpj = $this->normalizeCnpj((string) ($cnpj ?? $this->currentCnpj() ?? ''));
+
+        if (strlen($cnpj) !== 14) {
+            return;
+        }
+
+        try {
+            $info = app(LicencaPortalPagamentoService::class)->proximaMensalidade($cnpj);
+
+            if (! ($info['ok'] ?? false)) {
+                return;
+            }
+
+            $this->rememberMensalidadeGate(
+                $info['due_date'] ?? null,
+                $info['description'] ?? null,
+                $info['amount'] ?? null,
+            );
+        } catch (Throwable $e) {
+            Log::warning('Não foi possível sincronizar vencimento da mensalidade.', [
+                'cnpj' => $cnpj,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @return array{due_date?: string, description?: string, amount?: string}|null
+     */
+    private function mensalidadeFromCache(?string $cnpj): ?array
+    {
+        $cnpj = $this->normalizeCnpj((string) ($cnpj ?? ''));
+
+        if (strlen($cnpj) !== 14) {
+            return null;
+        }
+
+        $cached = Cache::get($this->mensalidadeCacheKey($cnpj));
+
+        return is_array($cached) ? $cached : null;
+    }
+
+    private function mensalidadeCacheKey(string $cnpj): string
+    {
+        return 'erp.licenca.mensalidade.'.$cnpj;
+    }
+
     public function forgetLoginGate(): void
     {
-        session()->forget($this->loginGateKey());
+        session()->forget([
+            $this->loginGateKey(),
+            'erp.licenca.mensalidade_sync_scheduled',
+            'erp.licenca.mensalidade_sync_tried',
+        ]);
     }
 
     public function checkCnpj(string $cnpj, bool $forceRefresh = false): LicencaSnapshot
@@ -238,17 +573,13 @@ class LicencaRemotaService
 
     public function pagamentoUrl(): string
     {
-        // Portal Unitec — fixo no código (não depende de .env do cliente).
-        return 'https://unitecnologiasc.digital';
+        return $this->resolveBaseUrl() ?: 'https://unitecnologiasc.digital';
     }
 
     private function fetchFromApi(string $cnpj): LicencaSnapshot
     {
-        $baseUrl = rtrim(trim((string) (
-            config('unitec.licenca_api.base_url')
-            ?: env('UNITEC_LICENCA_API_URL', '')
-        )), '/');
-        $timeout = max(2, min(8, (int) config('unitec.licenca_api.timeout', 5)));
+        $baseUrl = $this->resolveBaseUrl();
+        $timeout = $this->resolveTimeout();
         $url = $baseUrl.'/api/licenca/'.$cnpj;
 
         $response = Http::timeout($timeout)
@@ -278,6 +609,11 @@ class LicencaRemotaService
         }
 
         $status = strtolower(trim((string) ($payload['status'] ?? '')));
+        $bloqueado = filter_var($payload['bloqueado'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($bloqueado) {
+            $status = LicencaSnapshot::STATUS_BLOQUEADO;
+        }
 
         if (! in_array($status, [LicencaSnapshot::STATUS_ATIVO, LicencaSnapshot::STATUS_BLOQUEADO], true)) {
             throw new \RuntimeException('Status de licença desconhecido: '.$status);
@@ -287,6 +623,9 @@ class LicencaRemotaService
             status: $status,
             validoAte: $this->normalizeValidoAte($payload['valido_ate'] ?? null),
             nome: filled($payload['nome'] ?? null) ? trim((string) $payload['nome']) : null,
+            bloquearAtualizacao: filter_var($payload['bloquear_atualizacao'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            quantidadeComputadores: $this->normalizeQuota($payload['quantidade_computadores'] ?? null),
+            quantidadeTelefones: $this->normalizeQuota($payload['quantidade_telefones'] ?? null),
         );
     }
 
@@ -303,6 +642,15 @@ class LicencaRemotaService
         }
 
         return $raw;
+    }
+
+    private function normalizeQuota(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || strtolower((string) $value) === 'null') {
+            return null;
+        }
+
+        return max(0, (int) $value);
     }
 
     private function cacheTtlSeconds(LicencaSnapshot $snapshot): int
@@ -374,6 +722,9 @@ class LicencaRemotaService
                 validoAte: $snapshot->validoAte,
                 nome: $snapshot->nome,
                 mensagem: 'Usando última validação (sem esperar API).',
+                bloquearAtualizacao: $snapshot->bloquearAtualizacao,
+                quantidadeComputadores: $snapshot->quantidadeComputadores,
+                quantidadeTelefones: $snapshot->quantidadeTelefones,
                 fromCache: true,
             );
         }
@@ -401,6 +752,9 @@ class LicencaRemotaService
                     validoAte: $snapshot->validoAte,
                     nome: $snapshot->nome,
                     mensagem: 'Usando última validação (API indisponível).',
+                    bloquearAtualizacao: $snapshot->bloquearAtualizacao,
+                    quantidadeComputadores: $snapshot->quantidadeComputadores,
+                    quantidadeTelefones: $snapshot->quantidadeTelefones,
                     fromCache: true,
                 );
             }
@@ -414,6 +768,9 @@ class LicencaRemotaService
                     validoAte: $snapshot->validoAte,
                     nome: $snapshot->nome,
                     mensagem: $snapshot->mensagem ?? 'Licença bloqueada (última consulta).',
+                    bloquearAtualizacao: $snapshot->bloquearAtualizacao,
+                    quantidadeComputadores: $snapshot->quantidadeComputadores,
+                    quantidadeTelefones: $snapshot->quantidadeTelefones,
                     fromCache: true,
                 );
             }
@@ -456,6 +813,41 @@ class LicencaRemotaService
     private function sessionKey(string $cnpj): string
     {
         return 'erp.licenca.session.'.$cnpj;
+    }
+
+    private function resolveEnabled(): bool
+    {
+        $empresa = ErpContext::currentEmpresa();
+
+        if ($empresa !== null && array_key_exists('param_licenca_api_habilitar', $empresa->getAttributes())) {
+            return (bool) $empresa->param_licenca_api_habilitar;
+        }
+
+        $enabled = config('unitec.licenca_api.enabled', true);
+
+        if (is_string($enabled)) {
+            $enabled = filter_var($enabled, FILTER_VALIDATE_BOOL);
+        }
+
+        return (bool) $enabled;
+    }
+
+    private function resolveBaseUrl(): string
+    {
+        // Portal Unitec é nativo (config) — não grava mais URL na tabela empresas (row size).
+        return rtrim(trim((string) config('unitec.licenca_api.base_url', 'https://unitecnologiasc.digital')), '/');
+    }
+
+    private function resolveTimeout(): int
+    {
+        $empresa = ErpContext::currentEmpresa();
+        $fromEmpresa = (int) ($empresa?->param_licenca_api_timeout ?? 0);
+
+        if ($fromEmpresa >= 2) {
+            return max(2, min(30, $fromEmpresa));
+        }
+
+        return max(2, min(30, (int) config('unitec.licenca_api.timeout', 8)));
     }
 
     private function normalizeCnpj(string $cnpj): string

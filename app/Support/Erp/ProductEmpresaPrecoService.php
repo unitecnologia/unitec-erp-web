@@ -56,13 +56,13 @@ final class ProductEmpresaPrecoService
         $empresaId = $empresaId ?: (int) (session('erp_empresa_id') ?? 0);
 
         if ($empresaId > 0) {
-            $row = ProductEmpresaPreco::query()
-                ->where('product_id', $product->id)
-                ->where('empresa_id', $empresaId)
-                ->first();
+            $row = $this->overlayForEmpresa($product, $empresaId);
 
             if ($row) {
-                return $this->extractFromRow($row);
+                return $this->fillZerosFromProduct(
+                    $this->extractFromRow($row),
+                    $this->extractFromProduct($product)
+                );
             }
         }
 
@@ -134,6 +134,38 @@ final class ProductEmpresaPrecoService
         }
 
         return $this->upsert($product, $empresaId, $this->extractFromProduct($product));
+    }
+
+    /**
+     * Overlay 0 + cadastro > 0 → usa o cadastro naquele campo (importação vazia / loja sem preço).
+     *
+     * @param  array<string, float>  $overlay
+     * @param  array<string, float>  $cadastro
+     * @return array<string, float>
+     */
+    protected function fillZerosFromProduct(array $overlay, array $cadastro): array
+    {
+        foreach (self::FIELDS as $field) {
+            if (($overlay[$field] ?? 0.0) == 0.0 && ($cadastro[$field] ?? 0.0) != 0.0) {
+                $overlay[$field] = $cadastro[$field];
+            }
+        }
+
+        return $overlay;
+    }
+
+    protected function overlayForEmpresa(Product $product, int $empresaId): ?ProductEmpresaPreco
+    {
+        if ($product->relationLoaded('empresaPrecos')) {
+            $row = $product->empresaPrecos->firstWhere('empresa_id', $empresaId);
+
+            return $row instanceof ProductEmpresaPreco ? $row : null;
+        }
+
+        return ProductEmpresaPreco::query()
+            ->where('product_id', $product->id)
+            ->where('empresa_id', $empresaId)
+            ->first();
     }
 
     /**

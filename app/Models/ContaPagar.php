@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
+    'empresa_id',
     'numero',
     'emissao',
     'produto',
     'documento',
     'fornecedor_id',
+    'compra_id',
     'vencimento',
     'valor',
     'desconto',
@@ -40,9 +42,19 @@ class ContaPagar extends Model
         return round(max(0, $valor - $desconto + $juros - $valorPago), 2);
     }
 
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
+    }
+
     public function fornecedor(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'fornecedor_id');
+    }
+
+    public function compra(): BelongsTo
+    {
+        return $this->belongsTo(Compra::class, 'compra_id');
     }
 
     public function pagamentos(): HasMany

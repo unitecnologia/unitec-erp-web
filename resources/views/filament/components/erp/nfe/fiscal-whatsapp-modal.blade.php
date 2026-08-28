@@ -48,17 +48,23 @@
                 </div>
 
                 <div class="erp-nfe-whatsapp-modal__field">
-                    <span class="erp-nfe-whatsapp-modal__label">Anexo:</span>
+                    <span class="erp-nfe-whatsapp-modal__label">Anexos:</span>
                     <div class="erp-nfe-whatsapp-modal__attachments">
                         @if ($this->nfeWhatsAppPdfDisplay !== '')
                             <span class="erp-nfe-whatsapp-modal__attachment is-selected">
                                 {{ $this->nfeWhatsAppPdfDisplay }}
                             </span>
-                        @else
-                            <span class="erp-nfe-whatsapp-modal__attachments-empty">Gerando PDF…</span>
+                        @endif
+                        @if ($this->nfeWhatsAppXmlDisplay !== '')
+                            <span class="erp-nfe-whatsapp-modal__attachment is-selected">
+                                {{ $this->nfeWhatsAppXmlDisplay }}
+                            </span>
+                        @endif
+                        @if ($this->nfeWhatsAppPdfDisplay === '' && $this->nfeWhatsAppXmlDisplay === '')
+                            <span class="erp-nfe-whatsapp-modal__attachments-empty">Gerando anexos…</span>
                         @endif
                     </div>
-                    <p class="erp-nfe-whatsapp-modal__hint">O PDF da DANFE será enviado junto com a mensagem acima.</p>
+                    <p class="erp-nfe-whatsapp-modal__hint">A DANFE (PDF) e o XML da NF-e serão enviados junto com a mensagem acima.</p>
                 </div>
             </div>
 

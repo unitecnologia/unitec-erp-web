@@ -509,7 +509,7 @@
     overflow: hidden;
 }
 
-/* â”€â”€ Larguras de colunas (Delphi) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Larguras de colunas — ordem: Nº, Data, Hora ab., Hora fe., Cliente, …, NFC-e, olho */
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(1),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -525,15 +525,59 @@
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(3),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(3),
-.erp-vendas-page .fi-ta-header-cell-cliente\.nome-razao,
-.erp-vendas-page .fi-ta-cell-cliente\.nome-razao {
-    width: auto !important;
-    min-width: 12rem;
+.erp-vendas-page .fi-ta-header-cell-hora_abertura,
+.erp-vendas-page .fi-ta-cell-hora_abertura {
+    width: 5.35rem !important;
+    min-width: 5.35rem !important;
+    max-width: 5.5rem !important;
+    padding-inline: 0.12rem !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+}
+
+.erp-vendas-page .fi-ta-cell-hora_abertura .fi-ta-col,
+.erp-vendas-page .fi-ta-cell-hora_abertura .fi-ta-col .fi-ta-text,
+.erp-vendas-page .fi-ta-cell-hora_abertura .fi-ta-text-item {
+    justify-content: center !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
     max-width: none !important;
 }
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(4),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-vendas-page .fi-ta-header-cell-hora,
+.erp-vendas-page .fi-ta-cell-hora {
+    width: 5.35rem !important;
+    min-width: 5.35rem !important;
+    max-width: 5.5rem !important;
+    padding-inline: 0.12rem !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+}
+
+.erp-vendas-page .fi-ta-cell-hora .fi-ta-col,
+.erp-vendas-page .fi-ta-cell-hora .fi-ta-col .fi-ta-text,
+.erp-vendas-page .fi-ta-cell-hora .fi-ta-text-item {
+    justify-content: center !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    max-width: none !important;
+}
+
+.erp-vendas-page .fi-ta-header-cell:nth-child(5),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-vendas-page .fi-ta-header-cell-cliente\.nome-razao,
+.erp-vendas-page .fi-ta-cell-cliente\.nome-razao {
+    width: auto !important;
+    min-width: 11rem;
+    max-width: none !important;
+}
+
+.erp-vendas-page .fi-ta-header-cell:nth-child(6),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-vendas-page .fi-ta-header-cell-vendedor_nome,
 .erp-vendas-page .fi-ta-cell-vendedor_nome {
     width: 6.5rem !important;
@@ -541,8 +585,8 @@
     max-width: 6.5rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(5),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-vendas-page .fi-ta-header-cell:nth-child(7),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-vendas-page .fi-ta-header-cell-plataforma,
 .erp-vendas-page .fi-ta-cell-plataforma {
     width: 5rem !important;
@@ -550,8 +594,8 @@
     max-width: 5.25rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(6),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-vendas-page .fi-ta-header-cell:nth-child(8),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(8),
 .erp-vendas-page .fi-ta-header-cell-forma_pagamento,
 .erp-vendas-page .fi-ta-cell-forma_pagamento {
     width: calc(7rem + 1.2cm) !important;
@@ -559,8 +603,8 @@
     max-width: calc(7rem + 1.2cm);
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(7),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-vendas-page .fi-ta-header-cell:nth-child(9),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-vendas-page .fi-ta-header-cell-total,
 .erp-vendas-page .fi-ta-cell-total {
     width: 6.5rem !important;
@@ -571,7 +615,7 @@
     white-space: nowrap !important;
 }
 
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-col,
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
 .erp-vendas-page .fi-ta-cell-total .fi-ta-col {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -580,7 +624,7 @@
     justify-content: flex-start !important;
 }
 
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-ta-col .fi-ta-text,
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col .fi-ta-text,
 .erp-vendas-page .fi-ta-cell-total .fi-ta-col .fi-ta-text {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -621,8 +665,8 @@
     color: #fff;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(8),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-vendas-page .fi-ta-header-cell:nth-child(10),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(10),
 .erp-vendas-page .fi-ta-header-cell-status,
 .erp-vendas-page .fi-ta-cell-status {
     width: 5.5rem;
@@ -630,8 +674,46 @@
     max-width: 5.75rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(9),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-vendas-page .fi-ta-cell-status .fi-ta-col {
+    justify-content: center !important;
+}
+
+.erp-vendas-page .erp-vendas-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5rem;
+    padding: 0.04rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.erp-vendas-page .erp-vendas-status--aberto {
+    background: #facc15;
+    color: #422006;
+}
+
+.erp-vendas-page .erp-vendas-status--gravado {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.erp-vendas-page .erp-vendas-status--fechado {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-vendas-page .erp-vendas-status--cancelado {
+    background: #dc2626;
+    color: #fff;
+}
+
+.erp-vendas-page .fi-ta-header-cell:nth-child(11),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(11),
 .erp-vendas-page .fi-ta-header-cell-entrega\.status,
 .erp-vendas-page .fi-ta-cell-entrega\.status {
     width: 4.75rem;
@@ -639,8 +721,8 @@
     max-width: 5rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(10),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-vendas-page .fi-ta-header-cell:nth-child(12),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(12),
 .erp-vendas-page .fi-ta-header-cell-tipo,
 .erp-vendas-page .fi-ta-cell-tipo {
     width: 4.75rem;
@@ -648,8 +730,8 @@
     max-width: 5rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(11),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(11),
+.erp-vendas-page .fi-ta-header-cell:nth-child(13),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(13),
 .erp-vendas-page .fi-ta-header-cell-pdvVenda\.numero,
 .erp-vendas-page .fi-ta-cell-pdvVenda\.numero {
     width: 6.25rem !important;
@@ -657,8 +739,8 @@
     max-width: 6.5rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(12),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(12),
+.erp-vendas-page .fi-ta-header-cell:nth-child(14),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14),
 .erp-vendas-page .fi-ta-header-cell-pdvVenda\.nfce\.numero,
 .erp-vendas-page .fi-ta-cell-pdvVenda\.nfce\.numero {
     width: 7.25rem !important;
@@ -666,30 +748,8 @@
     max-width: 7.5rem;
 }
 
-.erp-vendas-page .fi-ta-header-cell:nth-child(13),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(13),
-.erp-vendas-page .fi-ta-header-cell-hora,
-.erp-vendas-page .fi-ta-cell-hora {
-    width: 4.75rem !important;
-    min-width: 4.75rem !important;
-    max-width: 5rem !important;
-    padding-inline: 0.28rem !important;
-    overflow: visible !important;
-    white-space: nowrap !important;
-}
-
-.erp-vendas-page .fi-ta-cell-hora .fi-ta-col,
-.erp-vendas-page .fi-ta-cell-hora .fi-ta-col .fi-ta-text,
-.erp-vendas-page .fi-ta-cell-hora .fi-ta-text-item {
-    justify-content: center !important;
-    overflow: visible !important;
-    white-space: nowrap !important;
-    text-overflow: clip !important;
-    max-width: none !important;
-}
-
-.erp-vendas-page .fi-ta-header-cell:nth-child(14),
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14),
+.erp-vendas-page .fi-ta-header-cell:nth-child(15),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15),
 .erp-vendas-page .fi-ta-header-cell-ver-itens,
 .erp-vendas-page .fi-ta-cell-ver-itens {
     width: 1.75rem !important;
@@ -699,7 +759,7 @@
     overflow: visible;
 }
 
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14) .fi-ta-col,
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15) .fi-ta-col,
 .erp-vendas-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -755,18 +815,18 @@
 }
 
 .erp-vendas-page .fi-ta-header-cell-ver-itens,
-.erp-vendas-page .fi-ta-header-cell:nth-child(14) {
+.erp-vendas-page .fi-ta-header-cell:nth-child(15) {
     padding: 0 !important;
     box-shadow: var(--erp-vendas-scrollbar-size, 17px) 0 0 0 #164a85;
 }
 
 .erp-vendas-page .fi-ta-cell-ver-itens,
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14) {
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15) {
     position: relative;
 }
 
 .erp-vendas-page .fi-ta-cell-ver-itens::after,
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14)::after {
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15)::after {
     content: '';
     position: absolute;
     top: 0;
@@ -945,6 +1005,136 @@
 .erp-vendas-page .erp-vendas-itens-modal__print-btn:disabled {
     opacity: 0.65;
     cursor: wait;
+}
+
+/* Modal cancelar venda (F4) */
+.erp-vendas-page .erp-vendas-cancel-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, calc(100vw - 2rem));
+    border: 1px solid #7f96b3;
+    border-radius: 10px;
+    background: #f4f7fb;
+    box-shadow: 0 22px 56px rgba(15, 40, 71, 0.42);
+    overflow: hidden;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.7rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__close {
+    width: 1.55rem;
+    height: 1.55rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__body {
+    padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem;
+    color: #334155;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__textarea {
+    display: block;
+    width: 100%;
+    min-height: 5.5rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    resize: vertical;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__textarea:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+    border-color: #3b82f6;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__counter {
+    margin: 0.35rem 0 0;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__counter--warn {
+    color: #c2410c;
+    font-weight: 600;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__counter--ok {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.55rem 0.85rem 0.75rem;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__btn {
+    min-width: 5.5rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: #0f172a;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-vendas-page .erp-vendas-cancel-modal__btn--danger {
+    border-color: #b91c1c;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
 }
 
 @media (max-width: 1200px) {

@@ -34,6 +34,7 @@ class PdvVenda extends Model
         'situacao',
         'motivo_estorno',
         'fechado_em',
+        'aberto_em',
         'uuid',
         'origem',
         'terminal_offline',
@@ -52,6 +53,7 @@ class PdvVenda extends Model
             'dinheiro' => 'decimal:2',
             'fiscal' => 'boolean',
             'fechado_em' => 'datetime',
+            'aberto_em' => 'datetime',
         ];
     }
 

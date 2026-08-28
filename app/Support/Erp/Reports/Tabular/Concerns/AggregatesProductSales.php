@@ -4,24 +4,33 @@ namespace App\Support\Erp\Reports\Tabular\Concerns;
 
 use App\Models\Venda;
 use App\Models\VendaItem;
+use App\Support\Erp\Reports\ReportEmpresaScope;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Carbon\CarbonInterface;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 trait AggregatesProductSales
 {
     /**
      * @return Collection<int, object>
      */
-    protected function productSalesAggregate(CarbonInterface $de, CarbonInterface $ate): Collection
+    protected function productSalesAggregate(CarbonInterface $de, CarbonInterface $ate, ?Request $request = null): Collection
     {
-        return VendaItem::query()
+        $query = VendaItem::query()
             ->join('vendas', 'vendas.id', '=', 'venda_itens.venda_id')
             ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id')
             ->where('vendas.status', Venda::STATUS_FECHADO)
             ->whereBetween('vendas.data', [$de->toDateString(), $ate->toDateString()])
-            ->whereNotNull('venda_itens.product_id')
+            ->whereNotNull('venda_itens.product_id');
+
+        if ($request && Schema::hasColumn((new Venda)->getTable(), 'empresa_id')) {
+            ReportEmpresaScope::applyToQuery($query, $request, 'vendas.empresa_id');
+        }
+
+        return $query
             ->groupBy(
                 'venda_itens.product_id',
                 'products.codigo',

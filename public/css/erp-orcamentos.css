@@ -1175,6 +1175,23 @@
     background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%);
 }
 
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp {
+    background: linear-gradient(180deg, #25d366 0%, #128c7e 100%) !important;
+    border-color: #86efac !important;
+    color: #fff !important;
+}
+
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"]:hover,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"]:hover,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp:hover,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp:hover {
+    background: linear-gradient(180deg, #2fe576 0%, #25d366 100%) !important;
+    border-color: #86efac !important;
+}
+
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] {
     background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%);
     border-color: #fca5a5;
@@ -1209,9 +1226,17 @@
 
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__icon,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__icon,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__icon,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__icon,
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
-    color: var(--erp-text-inverse, #fff);
+    color: var(--erp-text-inverse, #fff) !important;
 }
 
 .erp-orcamentos-page .erp-orc-email-modal .erp-pcad-actions__label kbd {
@@ -1222,27 +1247,182 @@
     font-weight: 700;
 }
 
-/* ── Modal WhatsApp (F10) ─────────────────────────────────────────────── */
-.erp-orcamentos-page .erp-orc-whatsapp-modal .erp-lookup-modal__window {
+/* ── Modal envio unificado (F9 — e-mail + WhatsApp, padrão NF-e) ───────── */
+.erp-orcamentos-page .erp-orc-envio-modal .erp-lookup-modal__window {
+    position: relative;
     width: min(42rem, calc(100vw - 2rem));
 }
 
-.erp-orcamentos-page .erp-orc-whatsapp-modal .erp-orc-email-modal__field:has(.erp-orc-whatsapp-modal__textarea) {
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field--message {
     align-items: start;
 }
 
-.erp-orcamentos-page .erp-orc-whatsapp-modal__textarea {
-    min-height: 14rem;
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: #0f172a;
+    background: #fff;
+    font-family: inherit;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    min-height: 8.5rem;
     resize: vertical;
     line-height: 1.45;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     white-space: pre-wrap;
 }
 
-.erp-orcamentos-page .erp-orc-whatsapp-modal__hint {
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input:focus,
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__error {
     grid-column: 2;
-    margin: 0;
-    font-size: 0.74rem;
-    color: var(--erp-text-muted, #64748b);
+    font-size: 0.72rem;
+    color: #b91c1c;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-size: 0.75rem;
+    color: #0f172a;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment.is-selected {
+    border-color: #16a34a;
+    background: #ecfdf5;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments-empty {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__hint {
+    grid-column: 2;
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-pcad-actions__btn.is-busy {
+    opacity: 0.92;
+    cursor: wait;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy[wire\:loading],
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy[style*="display: flex"] {
+    display: flex !important;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-panel {
+    position: relative;
+    z-index: 1;
+    width: min(22rem, 100%);
+    padding: 1rem 1.1rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #86efac;
+    background: linear-gradient(180deg, #f8fffb 0%, #eefcf3 100%);
+    box-shadow: 0 18px 40px rgba(15, 40, 71, 0.28);
+    text-align: center;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-spinner {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0 auto 0.55rem;
+    border: 2.5px solid #bbf7d0;
+    border-top-color: var(--erp-brand-accent-soft, #16a34a);
+    border-radius: 999px;
+    animation: erp-orc-email-busy-spin 0.7s linear infinite;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-status {
+    margin: 0 0 0.55rem;
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #14532d;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #86efac;
+    background: #ecfdf5;
+    overflow: hidden;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-bar {
+    height: 100%;
+    width: 38%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #15803d 0%, #16a34a 45%, #4ade80 100%);
+    background-size: 200% 100%;
+    animation: erp-orc-email-busy-slide 1.05s ease-in-out infinite;
+}
+
+.erp-orcamentos-page .erp-orc-envio-modal .erp-orc-email-modal__busy-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+@keyframes erp-orc-email-busy-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes erp-orc-email-busy-slide {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(280%); }
 }
 

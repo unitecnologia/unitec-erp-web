@@ -51,7 +51,7 @@
     display: flex !important;
     flex-direction: column !important;
     flex: 0 0 auto !important;
-    width: min(36rem, 96vw) !important;
+    width: min(38rem, 96vw) !important;
     height: auto !important;
     max-height: calc(100dvh - 2.5rem) !important;
     margin: 0 auto !important;
@@ -546,8 +546,48 @@
     font-weight: 650;
 }
 
+.erp-backup__th-action,
+.erp-backup__action {
+    width: 5.2rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-backup__table th.erp-backup__th-action {
+    text-align: center;
+}
+
+.erp-backup__row-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.35rem;
+    padding: 0 0.45rem;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    background: #fffbeb;
+    color: #b45309;
+    font-size: 0.62rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-backup__row-btn:hover {
+    background: #fef3c7;
+    border-color: #d97706;
+}
+
+.erp-backup__row-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
 .erp-backup__table th:last-child {
     text-align: right;
+}
+
+.erp-backup__table th.erp-backup__th-action:last-child {
+    text-align: center;
 }
 
 .erp-backup__empty {
@@ -614,6 +654,17 @@
 .erp-backup__btn--ghost:hover {
     background: #fff;
     color: #0f172a;
+}
+
+.erp-backup__btn--warn {
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+    border-color: #b45309;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.28);
+}
+
+.erp-backup__btn--warn:hover {
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
 }
 
 .erp-backup__btn--end {
@@ -821,6 +872,84 @@
     margin: 0.75rem 0 0;
     font-size: 0.68rem;
     color: #94a3b8;
+}
+
+.erp-backup__overlay--modal {
+    align-items: flex-start;
+    padding-top: 1.5rem;
+}
+
+.erp-backup__restore-panel {
+    width: min(28rem, 100%);
+    padding: 0.95rem 1rem 1rem;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f4f8fc 100%);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 18px 40px rgba(8, 20, 40, 0.28);
+    text-align: left;
+}
+
+.erp-backup__restore-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+}
+
+.erp-backup__restore-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.erp-backup__restore-close {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.2rem;
+}
+
+.erp-backup__restore-close:hover {
+    color: #0f172a;
+}
+
+.erp-backup__restore-warn {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 9px;
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.erp-backup__restore-empty {
+    margin: 0.35rem 0 0;
+    font-size: 0.74rem;
+    color: #94a3b8;
+}
+
+.erp-backup__select {
+    height: auto;
+    min-height: 1.85rem;
+    padding: 0.35rem 0.45rem;
+}
+
+.erp-backup__restore-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #e2e8f0;
 }
 
 .erp-backup {

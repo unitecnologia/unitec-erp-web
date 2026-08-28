@@ -142,7 +142,7 @@ class FiscalMailService
             return $empresaEmail;
         }
 
-        throw new \RuntimeException('Configure o e-mail remetente nas Configurações Fiscais ou no cadastro da empresa.');
+        throw new \RuntimeException('Configure o e-mail remetente em Empresa → Parâmetros → E-mail ou no cadastro da empresa.');
     }
 
     /**
@@ -168,7 +168,7 @@ class FiscalMailService
         $fromEmail = $mailable->fromAddress ?: self::resolveSenderEmail($form, null);
 
         if ($apiKey === null || $apiKey === '') {
-            throw new \RuntimeException('Configure a API Key nas Configurações Fiscais.');
+            throw new \RuntimeException('Configure a API Key em Empresa → Parâmetros → E-mail.');
         }
 
         $fromName = trim((string) ($mailable->fromName ?: $fromName ?: 'Uni Sistemas'));
@@ -205,7 +205,7 @@ class FiscalMailService
             $subject = 'Teste de e-mail — Uni Sistemas';
         }
 
-        $body = "Este é um e-mail de teste enviado pelas Configurações Fiscais do Uni Sistemas.\n\n"
+        $body = "Este é um e-mail de teste enviado pelas configurações de E-mail da Empresa no Uni Sistemas.\n\n"
             .'Provedor: '.(self::apiProviderLabels()[$provider] ?? $provider)."\n"
             ."Remetente: {$fromEmail}\n"
             .'Data/hora: '.now()->format('d/m/Y H:i:s');

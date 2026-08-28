@@ -17,8 +17,13 @@ class ErpAccess
       return false;
     }
 
+    // Administrador tem acesso total — módulos da empresa não podem esconder telas.
     if ($user->is_admin) {
       return true;
+    }
+
+    if (! EmpresaModulos::enabledForPermission(ErpContext::currentEmpresa(), $permission)) {
+      return false;
     }
 
     return in_array($permission, static::permissionsFor($user), true);

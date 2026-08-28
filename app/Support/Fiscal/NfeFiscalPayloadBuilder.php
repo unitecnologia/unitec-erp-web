@@ -74,8 +74,26 @@ final class NfeFiscalPayloadBuilder
             $nfe->data_emissao->format('Y-m-d'),
             ErpTimezone::DEFAULT,
         )->startOfDay();
-        if ($nfe->hora_emissao) {
-            $emissao = $emissao->setTimeFromTimeString((string) $nfe->hora_emissao);
+
+        $horaEmissao = trim((string) ($nfe->hora_emissao ?? ''));
+        if ($horaEmissao !== '') {
+            $emissao = $emissao->setTimeFromTimeString($horaEmissao);
+        } else {
+            // Sem hora no formulário: usar agora (Brasil). Meia-noite gera cStat 703
+            // quando a data ainda é “amanhã” ou o horário fica no futuro vs SEFAZ.
+            $agora = ErpTimezone::nowLocal();
+            if ($emissao->toDateString() === $agora->toDateString()) {
+                $emissao = $agora->copy();
+            } else {
+                // Data diferente de hoje: meio-dia local (evita 00:00 e 23:59 extremos).
+                $emissao = $emissao->setTime(12, 0, 0);
+            }
+        }
+
+        // Nunca enviar dhEmi no futuro (margem 1 min) — SEFAZ rejeita cStat 703.
+        $limite = ErpTimezone::nowLocal()->addMinute();
+        if ($emissao->greaterThan($limite)) {
+            $emissao = ErpTimezone::nowLocal();
         }
 
         $dataSaida = $nfe->data_saida;
@@ -96,6 +114,15 @@ final class NfeFiscalPayloadBuilder
                 $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples')),
             ))
             ->all();
+
+        $valorProdutos = round(array_sum(array_map(
+            static fn (ItemDto $item): float => $item->valorTotal,
+            $itens,
+        )), 2);
+        $valorDesconto = round(array_sum(array_map(
+            static fn (ItemDto $item): float => $item->desconto,
+            $itens,
+        )), 2);
 
         $parcelas = [];
         if (strtolower((string) ($nfe->forma_pgto ?? 'a_vista')) !== 'a_vista') {
@@ -148,28 +175,28 @@ final class NfeFiscalPayloadBuilder
                 cNf: $cNf,
                 tpAmb: $tpAmb,
                 tpEmis: (int) ltrim((string) ($nfe->tipo_emissao ?: '1'), '0') ?: 1,
-                natOp: 'VENDA',
+                natOp: $finNFe === 4 ? 'DEVOLUCAO DE MERCADORIA' : 'VENDA',
                 codigoMunicipioFg: (string) ($empresa->cidade_codigo ?: ''),
                 dataEmissao: $emissao,
             ),
             destinatario: $this->buildDestinatario($cliente),
             itens: $itens,
-            valorProdutos: round((float) ($nfe->subtotal ?: $nfe->total), 2),
+            valorProdutos: $valorProdutos,
             valorNota: round((float) $nfe->total, 2),
             idDest: $idDest,
             indFinal: $this->resolveIndFinal($nfe, $cliente),
             finNFe: $finNFe,
             modFrete: (int) ltrim((string) ($nfe->tipo_frete ?? '9'), '0'),
-            valorDesconto: $this->sumItensCampo($nfe, 'desconto'),
+            valorDesconto: $valorDesconto,
             valorFrete: $this->sumItensCampo($nfe, 'frete'),
             valorSeguro: $this->sumItensCampo($nfe, 'seguro'),
             valorOutros: $this->sumItensCampo($nfe, 'outros'),
             valorTotTrib: $valorTotTrib,
             dataSaida: $dataSaida,
-            parcelas: $parcelas,
+            parcelas: $finNFe === 4 ? [] : $parcelas,
             informacoesComplementares: $informacoesContribuinte,
             informacoesFisco: $informacoesFisco,
-            pagamentos: $this->mapPagamentos($nfe),
+            pagamentos: $this->mapPagamentos($nfe, $finNFe),
             homologacao: $tpAmb === 2,
             respTecnico: NfeFiscalConfig::respTecnicoFromParametros($parametros),
             transporte: $this->buildTransporte($nfe),
@@ -207,6 +234,18 @@ final class NfeFiscalPayloadBuilder
         if (blank($empresa->ie)) {
             throw new FiscalEngineException('Inscrição estadual da empresa não informada.');
         }
+    }
+
+    /** NCM para o motor: item → produto → 00000000 (igual NFC-e). SEFAZ rejeita se inválido. */
+    private function resolveNcmItem(NfeItem $item): string
+    {
+        $ncm = preg_replace('/\D+/', '', (string) ($item->ncm ?? '')) ?? '';
+
+        if ($ncm === '') {
+            $ncm = preg_replace('/\D+/', '', (string) ($item->product?->ncm ?? '')) ?? '';
+        }
+
+        return $ncm !== '' ? $ncm : '00000000';
     }
 
     private function buildEmitente(Empresa $empresa): EmitenteDto
@@ -287,14 +326,15 @@ final class NfeFiscalPayloadBuilder
     private function mapItem(NfeItem $item, int $numero, int $crt = 1): ItemDto
     {
         $origem = (int) ($item->product?->origem ?? 0);
+        $ncm = $this->resolveNcmItem($item);
         $vTotTrib = round(
             (float) ($item->trib_fed ?? 0) + (float) ($item->trib_est ?? 0) + (float) ($item->trib_mun ?? 0),
             2,
         );
 
-        if ($vTotTrib <= 0 && filled($item->ncm)) {
+        if ($vTotTrib <= 0 && $ncm !== '' && $ncm !== '00000000') {
             $ibpt = app(\App\Support\Erp\Fiscal\IbptLookupService::class)->calcularParaBase(
-                (string) $item->ncm,
+                $ncm,
                 (float) $item->total,
                 $origem,
             );
@@ -306,16 +346,18 @@ final class NfeFiscalPayloadBuilder
             $csosn = trim((string) $item->cst);
         }
 
+        [$valorUnitario, $valorBruto, $desconto] = $this->valoresComerciaisItem($item);
+
         return new ItemDto(
             numero: $numero,
             codigo: (string) ($item->cod_barra ?: $item->product_id ?: $numero),
             descricao: (string) $item->descricao,
-            ncm: (string) ($item->ncm ?: '00000000'),
+            ncm: $ncm,
             cfop: (string) ($item->cfop ?: '5102'),
             unidade: (string) ($item->unidade ?: 'UN'),
             quantidade: (float) $item->quantidade,
-            valorUnitario: (float) $item->valor_unitario,
-            valorTotal: (float) $item->total,
+            valorUnitario: $valorUnitario,
+            valorTotal: $valorBruto,
             imposto: IbscbsImpostoFactory::fromNfeItem(
                 item: $item,
                 origem: $origem,
@@ -324,12 +366,36 @@ final class NfeFiscalPayloadBuilder
                 vTotTrib: $vTotTrib,
                 crt: $crt,
             ),
-            desconto: (float) ($item->desconto ?? 0),
+            desconto: $desconto,
             frete: (float) ($item->frete ?? 0),
             seguro: (float) ($item->seguro ?? 0),
             acrescimo: (float) ($item->outros ?? 0),
             infoAdicionais: filled($item->info_adicionais) ? (string) $item->info_adicionais : null,
         );
+    }
+
+    /**
+     * SEFAZ: vProd = qCom × vUnCom (bruto). vDesc não pode ser maior que vProd (cStat 483).
+     * Na grade, `total` é o líquido (bruto − desconto + outros).
+     *
+     * @return array{0: float, 1: float, 2: float} [valorUnitario, valorBruto, desconto]
+     */
+    private function valoresComerciaisItem(NfeItem $item): array
+    {
+        $quantidade = (float) $item->quantidade;
+        $valorUnitario = (float) $item->valor_unitario;
+        $desconto = round(max(0.0, (float) ($item->desconto ?? 0)), 2);
+        $valorBruto = round($quantidade * $valorUnitario, 2);
+
+        if ($valorBruto <= 0) {
+            $valorBruto = round(max(0.0, (float) $item->total + $desconto), 2);
+        }
+
+        if ($desconto > $valorBruto) {
+            $desconto = $valorBruto;
+        }
+
+        return [$valorUnitario, $valorBruto, $desconto];
     }
 
     private function sumItensCampo(Nfe $nfe, string $campo): float
@@ -411,8 +477,12 @@ final class NfeFiscalPayloadBuilder
     /**
      * @return list<PagamentoDto>
      */
-    private function mapPagamentos(Nfe $nfe): array
+    private function mapPagamentos(Nfe $nfe, int $finNFe = 1): array
     {
+        if ($finNFe === 4) {
+            return [new PagamentoDto(tipo: '90', valor: 0.0)];
+        }
+
         $valor = round((float) $nfe->total, 2);
 
         if ($valor <= 0) {

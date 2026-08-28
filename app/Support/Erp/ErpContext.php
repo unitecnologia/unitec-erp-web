@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\Auth;
 
 class ErpContext
 {
+    private static ?int $memoEmpresaId = null;
+
+    private static bool $memoEmpresaIdResolved = false;
+
+    private static ?Empresa $memoEmpresa = null;
+
+    private static bool $memoEmpresaResolved = false;
+
     /**
      * Empresa ativa da sessão (com fallback para a empresa do usuário).
      *
@@ -17,16 +25,39 @@ class ErpContext
      */
     public static function currentEmpresaId(): ?int
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        if (self::$memoEmpresaIdResolved) {
+            return self::$memoEmpresaId;
+        }
 
-        return filled($empresaId) ? (int) $empresaId : null;
+        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        self::$memoEmpresaId = filled($empresaId) ? (int) $empresaId : null;
+        self::$memoEmpresaIdResolved = true;
+
+        return self::$memoEmpresaId;
     }
 
     public static function currentEmpresa(): ?Empresa
     {
-        $empresaId = self::currentEmpresaId();
+        if (self::$memoEmpresaResolved) {
+            return self::$memoEmpresa;
+        }
 
-        return $empresaId ? Empresa::query()->find($empresaId) : null;
+        $empresaId = self::currentEmpresaId();
+        self::$memoEmpresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+        self::$memoEmpresaResolved = true;
+
+        return self::$memoEmpresa;
+    }
+
+    /**
+     * Limpa memo do request (troca de empresa / testes).
+     */
+    public static function clearMemo(): void
+    {
+        self::$memoEmpresaId = null;
+        self::$memoEmpresaIdResolved = false;
+        self::$memoEmpresa = null;
+        self::$memoEmpresaResolved = false;
     }
 
     /**
@@ -79,7 +110,7 @@ class ErpContext
             'Empresa' => $empresa?->nome ?? '—',
             'IP' => request()->ip() ?? '—',
             'Atualizado Em' => ErpTimezone::toLocal()->format('d/m/Y H:i:s'),
-            'Versão' => config('unitec.versao'),
+            'Versão' => ErpUpdateService::readInstalledVersion(),
         ];
     }
 }

@@ -8,7 +8,7 @@
                 <input
                     id="cfg-nfce-id-token"
                     type="text"
-                    wire:model="form.id_token"
+                    wire:model.live="form.id_token"
                     class="erp-pcad-form__input erp-config-fiscais-form__input--token-id"
                     inputmode="numeric"
                     autocomplete="off"
@@ -19,40 +19,23 @@
                 <input
                     id="cfg-nfce-token"
                     type="text"
-                    wire:model="form.token"
+                    wire:model.live="form.token"
                     class="erp-pcad-form__input erp-config-fiscais-form__input--csc"
                     autocomplete="off"
                     spellcheck="false"
+                    data-erp-preserve-case="1"
                     placeholder="Token informado pela SEFAZ SC"
                 >
             </div>
         </fieldset>
 
         <fieldset class="erp-pcad__group erp-config-fiscais-form__nfce-group">
-            <legend class="erp-pcad__group-title">Numeração e emissão</legend>
+            <legend class="erp-pcad__group-title">Emissão</legend>
 
-            <div class="erp-config-fiscais-form__nfce-inline-row">
-                <label class="erp-pcad-form__label" for="cfg-nfce-serie">Série</label>
-                <input
-                    id="cfg-nfce-serie"
-                    type="text"
-                    wire:model.live="form.serie"
-                    class="erp-pcad-form__input erp-pcad-form__input--xs"
-                    maxlength="3"
-                >
-
-                <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-nfce-numero">Próx. nº</label>
-                <input
-                    id="cfg-nfce-numero"
-                    type="number"
-                    wire:model="form.numero"
-                    class="erp-pcad-form__input erp-pcad-form__input--xs"
-                    min="1"
-                >
-
-                <label class="erp-pcad-form__label erp-pcad-form__label--inline">Últ. NFC-e</label>
-                <output class="erp-config-fiscais-form__ult-nfce" aria-live="polite">{{ $this->ultimaNfceNumeroLabel() }}</output>
-            </div>
+            <p class="erp-pcad-form__hint">
+                Série, próximo número e última NFC-e ficam por caixa na aba <strong>PDVs Offline</strong>
+                (inclui o caixa da retaguarda).
+            </p>
 
             <div class="erp-config-fiscais-form__nfce-inline-row erp-config-fiscais-form__nfce-inline-row--emissao">
                 <label class="erp-pcad-form__label" for="cfg-nfce-tipo-emissao">Emissão</label>
@@ -85,18 +68,14 @@
         <table class="erp-config-fiscais-form__nfce-grid" aria-label="Resumo NFC-e">
             <thead>
                 <tr>
-                    <th>Série</th>
                     <th>ID Token</th>
                     <th>Token</th>
-                    <th>Próx.</th>
-                    <th>Últ.</th>
                     <th>UF</th>
                     <th>Amb.</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>{{ $this->form['serie'] ?? '—' }}</td>
                     <td>{{ filled($this->form['id_token'] ?? null) ? $this->form['id_token'] : '—' }}</td>
                     <td class="erp-config-fiscais-form__nfce-grid-token">
                         @if (filled($this->form['token'] ?? null))
@@ -105,8 +84,6 @@
                             —
                         @endif
                     </td>
-                    <td>{{ $this->form['numero'] ?? '—' }}</td>
-                    <td>{{ $this->ultimaNfceNumeroLabel() }}</td>
                     <td>{{ strtoupper((string) ($this->form['uf'] ?? '—')) }}</td>
                     <td>{{ ((int) ($this->form['ambiente'] ?? 1)) === 0 ? 'Prod.' : 'Hom.' }}</td>
                 </tr>

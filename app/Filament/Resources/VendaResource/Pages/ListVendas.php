@@ -8,6 +8,7 @@ use App\Filament\Resources\VendaResource;
 use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\Venda;
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\Pdv\PdvCupomPrinter;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Queries\VendaListQueryBuilder;
@@ -69,6 +70,14 @@ class ListVendas extends ListRecords
 
     public string $itensModalTotalFormatted = 'R$ 0,00';
 
+    public bool $cancelVendaModalOpen = false;
+
+    public ?int $cancelVendaId = null;
+
+    public string $cancelVendaMotivo = '';
+
+    public ?string $cancelVendaNumero = null;
+
     public function mount(): void
     {
         // Datas padrão antes do parent::mount (loadTable / query).
@@ -112,6 +121,11 @@ class ListVendas extends ListRecords
     protected function erpListEntityName(): string
     {
         return 'uma venda';
+    }
+
+    protected function erpListSyncChannel(): ?string
+    {
+        return ErpDataSyncVersion::CHANNEL_SALES;
     }
 
     protected function customErpListKeyboardConfig(): array
@@ -215,6 +229,7 @@ class ListVendas extends ListRecords
                 View::make('filament.components.erp.vendas.footer-total'),
                 View::make('filament.components.erp.vendas.action-bar'),
                 View::make('filament.components.erp.vendas.itens-modal'),
+                View::make('filament.components.erp.vendas.cancel-modal'),
             ]);
     }
 
@@ -437,10 +452,76 @@ class ListVendas extends ListRecords
             return;
         }
 
+        if ($venda->temOrigemPdv()) {
+            Notification::make()
+                ->title('Não é possível cancelar esta venda pelo ERP.')
+                ->body('Vendas do PDV devem ser canceladas no próprio PDV (Consulta de vendas → Estorno).')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $numero = ltrim((string) $venda->numero, '0') ?: '0';
+
+        $this->cancelVendaId = (int) $venda->id;
+        $this->cancelVendaNumero = $numero;
+        $this->cancelVendaMotivo = '';
+        $this->cancelVendaModalOpen = true;
+    }
+
+    public function confirmCancelVenda(): void
+    {
+        if (! $this->cancelVendaModalOpen || ! $this->cancelVendaId) {
+            return;
+        }
+
+        $motivo = PdvEstornoMotivo::normalize($this->cancelVendaMotivo);
+        $erroMotivo = PdvEstornoMotivo::validate($motivo);
+
+        if ($erroMotivo !== null) {
+            Notification::make()
+                ->title('Cancelar venda')
+                ->body($erroMotivo)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $venda = Venda::query()->find($this->cancelVendaId);
+
+        if (! $venda) {
+            $this->closeCancelVendaModal();
+
+            return;
+        }
+
+        if ($venda->status === Venda::STATUS_CANCELADO) {
+            Notification::make()
+                ->title('Venda já está cancelada.')
+                ->warning()
+                ->send();
+            $this->closeCancelVendaModal();
+
+            return;
+        }
+
+        if ($venda->temOrigemPdv()) {
+            Notification::make()
+                ->title('Não é possível cancelar esta venda pelo ERP.')
+                ->body('Vendas do PDV devem ser canceladas no próprio PDV (Consulta de vendas → Estorno).')
+                ->warning()
+                ->send();
+            $this->closeCancelVendaModal();
+
+            return;
+        }
+
         try {
             $result = (new EstornarVendaService())->fromVenda(
                 $venda,
-                PdvEstornoMotivo::MOTIVO_AUTOMATICO,
+                $motivo,
                 EstornarVendaService::ORIGEM_LISTA_VENDAS,
             );
         } catch (DomainException $exception) {
@@ -466,10 +547,12 @@ class ListVendas extends ListRecords
                 ->title('Venda já está cancelada.')
                 ->warning()
                 ->send();
+            $this->closeCancelVendaModal();
 
             return;
         }
 
+        $this->closeCancelVendaModal();
         $this->clearListSelection();
         $this->resetTable();
 
@@ -482,6 +565,14 @@ class ListVendas extends ListRecords
             ->body($body)
             ->success()
             ->send();
+    }
+
+    public function closeCancelVendaModal(): void
+    {
+        $this->cancelVendaModalOpen = false;
+        $this->cancelVendaId = null;
+        $this->cancelVendaMotivo = '';
+        $this->cancelVendaNumero = null;
     }
 
     protected function erpListSelectPrompt(string $action): string

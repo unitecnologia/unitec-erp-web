@@ -106,12 +106,67 @@
         return r.body;
     }
 
+    async function readScale(settings) {
+        const r = await request('/api/scale/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings || {}),
+        }, 6000);
+
+        if (!r.ok || !(r.body && r.body.ok)) {
+            const msg = (r.body && r.body.message) || ('HTTP ' + r.status);
+            const error = new Error(msg);
+            error.response = r.body || null;
+            throw error;
+        }
+
+        return r.body;
+    }
+
     window.ErpDeviceService = {
         baseUrl: baseUrl,
         status: status,
         printers: printers,
         printRaw: printRaw,
         openDrawer: openDrawer,
+        readScale: readScale,
         isAvailable: status,
+        /**
+         * Se a API :9330 estiver offline, pede ao ERP (mesmo PC) para iniciar o serviço Windows.
+         */
+        ensureLocal: async function () {
+            try {
+                const online = await status();
+                if (online) {
+                    return { ok: true, online: true, started: false };
+                }
+            } catch (_) {}
+
+            const ensureUrl = (window.ErpDeviceConfig || {}).ensureUrl;
+            if (!ensureUrl) {
+                return { ok: false, online: false, started: false };
+            }
+
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                || document.querySelector('input[name="_token"]')?.value
+                || '';
+
+            try {
+                const res = await fetch(ensureUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': token,
+                    },
+                });
+                const body = await res.json().catch(function () { return {}; });
+                return body || { ok: res.ok };
+            } catch (err) {
+                console.warn('[ErpDeviceService] ensureLocal falhou:', err);
+                return { ok: false, online: false, started: false };
+            }
+        },
     };
 })();

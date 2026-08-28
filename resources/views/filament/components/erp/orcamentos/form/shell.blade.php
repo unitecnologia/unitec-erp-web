@@ -4,7 +4,9 @@
 @endphp
 
 <div class="erp-orc-pcad">
-    @include('filament.components.erp.orcamentos.form.header', ['ufs' => $ufs, 'readOnly' => $readOnly])
+    @include('filament.components.erp.orcamentos.form.header', ['readOnly' => $readOnly])
+
+    @include('filament.components.erp.orcamentos.form.produto-bar', ['readOnly' => $readOnly])
 
     <div class="erp-pcad__tabs">
         <button

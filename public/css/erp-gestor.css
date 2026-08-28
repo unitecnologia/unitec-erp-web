@@ -124,6 +124,44 @@ html, body, .fi-body, .fi-main, .fi-main-ctn, .fi-page, .fi-page-content, .fi-si
 }
 .gestor-head__meta { margin: 0; font-size: 0.78rem; color: var(--gx-muted); }
 .gestor-head__actions { display: flex; gap: 0.4rem; }
+
+.gestor-empresa {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.35rem;
+    max-width: 100%;
+}
+
+.gestor-empresa__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gx-muted);
+}
+
+.gestor-empresa__select {
+    appearance: none;
+    width: min(100%, 16rem);
+    height: 2rem;
+    padding: 0 1.75rem 0 0.65rem;
+    border: 1px solid var(--gx-border, #cbd5e1);
+    border-radius: 8px;
+    background:
+        linear-gradient(45deg, transparent 50%, var(--gx-muted, #64748b) 50%) calc(100% - 14px) / 5px 5px no-repeat,
+        linear-gradient(135deg, var(--gx-muted, #64748b) 50%, transparent 50%) calc(100% - 9px) / 5px 5px no-repeat,
+        var(--gx-surface, #fff);
+    color: var(--gx-text, #0f172a);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.gestor-empresa__select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
 .gestor-icon-btn {
     width: 40px; height: 40px; border-radius: 12px;
     border: 1px solid var(--gx-border); background: var(--gx-surface); color: var(--gx-ink);
@@ -1458,6 +1496,15 @@ html, body, .fi-body, .fi-main, .fi-main-ctn, .fi-page, .fi-page-content, .fi-si
     height: 13.5rem;
 }
 
+.gestor-chart-card__empty {
+    margin: 0;
+    padding: 1.4rem 0.6rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: center;
+}
+
 .gestor-chart-card__body canvas {
     width: 100% !important;
     height: 100% !important;
@@ -1489,4 +1536,88 @@ html, body, .fi-body, .fi-main, .fi-main-ctn, .fi-page, .fi-page-content, .fi-si
     .gestor-chart-card__body--line {
         height: 14rem;
     }
+}
+
+.gestor-date-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+.gestor-field__input--date {
+    padding-right: 2.4rem;
+    cursor: pointer;
+    color-scheme: light;
+}
+
+.gestor-date-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.gestor-date-wrap__icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2.4rem;
+    background: transparent
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231e5a9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")
+        center / 1rem 1rem no-repeat;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.gestor-validade-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--gx-muted);
+}
+
+.gestor-item__validade {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 750;
+    color: var(--gx-muted);
+}
+
+.gestor-item__validade-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / 55%), 0 1px 2px rgb(15 23 42 / 22%);
+}
+
+.gestor-item__validade--ok .gestor-item__validade-dot {
+    background: radial-gradient(circle at 30% 28%, #bbf7d0 0%, #4ade80 42%, #16a34a 100%);
+}
+
+.gestor-item__validade--atencao {
+    color: #a16207;
+}
+
+.gestor-item__validade--atencao .gestor-item__validade-dot {
+    background: radial-gradient(circle at 30% 28%, #fef08a 0%, #facc15 42%, #ca8a04 100%);
+}
+
+.gestor-item__validade--vencido {
+    color: #b91c1c;
+}
+
+.gestor-item__validade--vencido .gestor-item__validade-dot {
+    background: radial-gradient(circle at 30% 28%, #fca5a5 0%, #ef4444 42%, #b91c1c 100%);
 }

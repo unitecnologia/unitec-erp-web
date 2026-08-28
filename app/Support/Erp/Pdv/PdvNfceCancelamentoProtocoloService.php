@@ -5,6 +5,7 @@ namespace App\Support\Erp\Pdv;
 use App\Models\Empresa;
 use App\Models\PdvVenda;
 use App\Support\Erp\Compra\CompraDanfeReportService;
+use App\Support\Erp\Orcamento\OrcamentoBobinaFormatter as F;
 use Illuminate\Support\Carbon;
 
 final class PdvNfceCancelamentoProtocoloService
@@ -30,7 +31,7 @@ final class PdvNfceCancelamentoProtocoloService
         $protocolo = (string) ($documento?->protocolo_cancelamento ?? '');
         $chave = (string) ($documento?->chave ?? '');
 
-        return [
+        $data = [
             'venda' => $venda,
             'empresa' => $empresa,
             'usuario' => $usuario,
@@ -46,6 +47,90 @@ final class PdvNfceCancelamentoProtocoloService
             'autoPrint' => $autoPrint,
             'printedAt' => $printedAt,
         ];
+
+        $data['lines'] = $this->buildLines($data);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    public function buildLines(array $data): array
+    {
+        $emitente = $data['emitente'] ?? [];
+        $venda = $data['venda'];
+        $lines = [];
+
+        $fantasia = (string) ($emitente['fantasia'] ?: $emitente['nome'] ?? 'EMPRESA');
+        foreach (F::wrap($fantasia) as $line) {
+            $lines[] = F::center($line);
+        }
+
+        $nome = (string) ($emitente['nome'] ?? '');
+        if ($nome !== '' && $nome !== $fantasia) {
+            foreach (F::wrap($nome) as $line) {
+                $lines[] = F::center($line);
+            }
+        }
+
+        foreach (F::wrap('CNPJ: '.($emitente['cnpj'] ?? '').' IE: '.($emitente['ie'] ?? '')) as $line) {
+            $lines[] = F::center($line);
+        }
+
+        if (filled($emitente['endereco'] ?? null)) {
+            foreach (F::wrap((string) $emitente['endereco']) as $line) {
+                $lines[] = F::center($line);
+            }
+        }
+
+        $cidadeUf = trim(($emitente['municipio'] ?? '').' - '.($emitente['uf'] ?? ''), ' -');
+        if ($cidadeUf !== '') {
+            foreach (F::wrap($cidadeUf) as $line) {
+                $lines[] = F::center($line);
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = F::center('PROTOCOLO DE CANCELAMENTO');
+        $lines[] = F::center('NFC-e');
+        $lines[] = '';
+        $lines[] = F::center('PDV #'.str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT));
+        $lines[] = F::center('NFC-e No '.$data['numeroNf'].' Serie '.$data['serie']);
+        $lines[] = F::center('Cancelada em '.$data['dataCancelamento'].' '.$data['horaCancelamento']);
+        $lines[] = F::center('Operador: '.$data['usuario']);
+        $lines[] = F::rule('-');
+        $lines[] = F::center('Protocolo de cancelamento');
+        $lines[] = '';
+
+        foreach (F::wrap((string) $data['protocoloFormatado']) as $line) {
+            $lines[] = F::center($line);
+        }
+        foreach (F::wrap((string) $data['protocolo']) as $line) {
+            $lines[] = F::center($line);
+        }
+
+        $motivo = trim((string) ($data['motivoEstorno'] ?? ''));
+        if ($motivo !== '') {
+            $lines[] = '';
+            $lines[] = 'Justificativa';
+            foreach (F::wrap(mb_strtoupper($motivo, 'UTF-8')) as $line) {
+                $lines[] = $line;
+            }
+        }
+
+        $lines[] = F::rule('-');
+        $lines[] = F::center('Chave de acesso');
+        foreach (F::wrap((string) $data['chaveFormatada']) as $line) {
+            $lines[] = F::center($line);
+        }
+
+        $printedAt = $data['printedAt'] ?? now();
+        $lines[] = '';
+        $lines[] = F::center('Impresso em '.$printedAt->format('d/m/Y H:i:s'));
+
+        return $lines;
     }
 
     /**
@@ -67,7 +152,7 @@ final class PdvNfceCancelamentoProtocoloService
 
         $endereco = trim(implode(', ', array_filter([
             trim((string) ($empresa->endereco ?? '')),
-            filled($empresa->numero) ? 'nº ' . $empresa->numero : null,
+            filled($empresa->numero) ? 'nº '.$empresa->numero : null,
             trim((string) ($empresa->bairro ?? '')),
         ])));
 
@@ -101,6 +186,6 @@ final class PdvNfceCancelamentoProtocoloService
             return $protocolo;
         }
 
-        return substr($digits, 0, 3) . ' ' . substr($digits, 3, 3) . ' ' . substr($digits, 6, 3) . ' ' . substr($digits, 9);
+        return substr($digits, 0, 3).' '.substr($digits, 3, 3).' '.substr($digits, 6, 3).' '.substr($digits, 9);
     }
 }

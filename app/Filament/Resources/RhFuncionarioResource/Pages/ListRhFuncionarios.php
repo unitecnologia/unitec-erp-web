@@ -8,6 +8,7 @@ use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Resources\RhFuncionarioResource\Pages\Concerns\ManagesRhFuncionarioFormModal;
 use App\Models\RhFuncionario;
+use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -47,7 +48,13 @@ class ListRhFuncionarios extends ListRecords
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();
 
-        ErpScreen::set('RH — Funcionários');
+        $onboardingTitle = ErpOnboarding::screenTitle();
+        ErpScreen::set($onboardingTitle ?? 'RH — Funcionários');
+
+        if (ErpOnboarding::step() === ErpOnboarding::STEP_COLABORADOR && ! $this->rhFuncionarioModalOpen) {
+            $this->createRhFuncionario();
+            $this->rhFuncionarioForm['eh_operador'] = true;
+        }
     }
 
     /**

@@ -4,6 +4,8 @@ namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
 use App\Models\Terminal;
 use App\Support\Erp\ErpUppercase;
+use App\Support\Erp\License\DeviceLicenseLimitExceeded;
+use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\Erp\Terminais\TerminalFormOptions;
 use Filament\Notifications\Notification;
@@ -75,12 +77,88 @@ trait ManagesTerminalMasterDetail
         $this->terminalInfoId = null;
     }
 
+    public function notifyBalancaTestResult(bool $ok, string $message, ?string $peso = null): void
+    {
+        $body = trim($message);
+
+        if ($ok && filled($peso)) {
+            $pesoFmt = number_format((float) $peso, 3, ',', '.');
+            $body = trim("Peso lido: {$pesoFmt} kg".($body !== '' ? " — {$body}" : ''));
+        }
+
+        $notification = Notification::make()
+            ->title($ok ? 'Balança comunicando.' : 'Teste da balança falhou.')
+            ->body($body !== '' ? $body : ($ok ? 'Leitura concluída.' : 'Falha na comunicação.'))
+            ->duration(8000);
+
+        if ($ok) {
+            $notification->success();
+        } else {
+            $notification->danger();
+        }
+
+        $notification->send();
+    }
+
     /**
      * @return list<string>
      */
     public function terminalTabKeys(): array
     {
-        return ['configuracoes', 'balanca', 'sat', 'tef'];
+        return ['configuracoes', 'balanca', 'tef', 'aparelhos'];
+    }
+
+    /**
+     * Título do bloco de vínculo: ERP quando o caixa selecionado é o da retaguarda.
+     */
+    public function terminalConfigGrupoTitulo(): string
+    {
+        $origens = $this->terminalConfigOrigens();
+        $isErp = in_array('erp_web', $origens, true) || in_array('gestor_web', $origens, true);
+        $isPdv = in_array('pdv_offline', $origens, true);
+
+        if ($isErp && $isPdv) {
+            return 'ERP / PDV Offline';
+        }
+
+        if ($isErp) {
+            return 'ERP';
+        }
+
+        if ($isPdv) {
+            return 'PDV Offline';
+        }
+
+        $nome = mb_strtoupper(trim((string) ($this->data['nome'] ?? '')), 'UTF-8');
+        if ($nome === 'ERP' || str_starts_with($nome, 'ERP')) {
+            return 'ERP';
+        }
+
+        return 'PDV Offline';
+    }
+
+    public function terminalConfigEhPdvOffline(): bool
+    {
+        return str_contains($this->terminalConfigGrupoTitulo(), 'PDV');
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function terminalConfigOrigens(): array
+    {
+        $origens = $this->data['origens_dispositivo'] ?? [];
+
+        if (is_string($origens)) {
+            $decoded = json_decode($origens, true);
+            $origens = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($origens)) {
+            return [];
+        }
+
+        return array_values(array_filter($origens, fn ($o): bool => is_string($o) && $o !== ''));
     }
 
     public function createTerminal(): void
@@ -136,12 +214,14 @@ trait ManagesTerminalMasterDetail
             $this->data['velocidade'] = 9600;
         }
 
-        if (blank($this->data['porta'] ?? null)) {
-            $this->data['porta'] = 'COM2';
-        }
+        if (! $this->terminalConfigEhPdvOffline()) {
+            if (blank($this->data['porta'] ?? null)) {
+                $this->data['porta'] = 'COM2';
+            }
 
-        if (blank($this->data['modelo'] ?? null)) {
-            $this->data['modelo'] = 'ELGIN';
+            if (blank($this->data['modelo'] ?? null)) {
+                $this->data['modelo'] = 'ELGIN';
+            }
         }
 
         if (blank(trim((string) ($this->data['nome'] ?? '')))) {
@@ -167,6 +247,26 @@ trait ManagesTerminalMasterDetail
         $payload = $this->mergeTerminalFormData($this->data);
 
         if ($this->isNewTerminal) {
+            $devices = app(DeviceLicenseService::class);
+
+            try {
+                if ($devices->isAvailable() && (bool) $payload['ativo']) {
+                    $devices->assertCapacity(
+                        (int) $payload['empresa_id'],
+                        DeviceLicenseService::CATEGORY_COMPUTADOR,
+                    );
+                    $payload['categoria_licenca'] = DeviceLicenseService::CATEGORY_COMPUTADOR;
+                }
+            } catch (DeviceLicenseLimitExceeded $e) {
+                Notification::make()
+                    ->title('Limite de computadores atingido.')
+                    ->body($e->getMessage())
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
             $terminal = Terminal::query()->create($payload);
             $this->isNewTerminal = false;
             $this->editingTerminalId = $terminal->id;
@@ -222,15 +322,6 @@ trait ManagesTerminalMasterDetail
             ->title('Terminal ativo')
             ->body($terminal->nome . ' será usado no PDV desta sessão.')
             ->success()
-            ->send();
-    }
-
-    public function moduleStubSatTest(): void
-    {
-        Notification::make()
-            ->title('Testar SAT')
-            ->body('Integração SAT disponível no PDV desktop. Em implementação no web.')
-            ->info()
             ->send();
     }
 
@@ -329,7 +420,7 @@ trait ManagesTerminalMasterDetail
         $this->data = [
             ...$terminal->attributesToArray(),
             'ativo' => (bool) ($terminal->ativo ?? true),
-            'usar_device_service' => (bool) ($terminal->usar_device_service ?? false),
+            'usar_device_service' => true,
             'numero_logico_terminal' => $terminal->numero_logico_terminal,
             'tipo_operacao_padrao' => TerminalFormOptions::normalizeTipoOperacaoPadrao(
                 (string) ($extra['tipo_operacao_padrao'] ?? 'pedido_nao_fiscal'),
@@ -342,6 +433,12 @@ trait ManagesTerminalMasterDetail
             'tipo_impressora' => (string) ($terminal->tipo_impressora ?? '0'),
             'ip' => $terminal->ip ?: TerminalResolver::make()->resolveClientIp(),
         ];
+
+        if ($this->terminalConfigEhPdvOffline()) {
+            $this->data['porta'] = (string) ($terminal->porta ?? '');
+            $this->data['modelo'] = (string) ($terminal->modelo ?: 'ELGIN');
+            $this->data['nvias'] = (int) ($terminal->nvias ?: 1);
+        }
 
         $this->ensurePortasBasicas();
     }
@@ -410,7 +507,7 @@ trait ManagesTerminalMasterDetail
         $merged = ErpUppercase::normalizeFormData($data);
 
         $merged['ativo'] = filter_var($merged['ativo'] ?? true, FILTER_VALIDATE_BOOLEAN);
-        $merged['usar_device_service'] = filter_var($merged['usar_device_service'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $merged['usar_device_service'] = true;
         $merged['imprime'] = filter_var($merged['imprime'] ?? true, FILTER_VALIDATE_BOOLEAN);
         $merged['usa_gaveta'] = filter_var($merged['usa_gaveta'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $merged['eh_caixa'] = filter_var($merged['eh_caixa'] ?? true, FILTER_VALIDATE_BOOLEAN);
@@ -424,10 +521,6 @@ trait ManagesTerminalMasterDetail
             $merged['empresa_id'] = TerminalResolver::make()->resolveEmpresaId();
         }
 
-        if (($merged['tipo_fechamento'] ?? null) !== '0' && ($merged['tipo_fechamento'] ?? null) !== 0) {
-            $merged['meia_folha'] = false;
-        }
-
         $merged['impressora_extra'] = [
             'tipo_operacao_padrao' => (string) ($merged['tipo_operacao_padrao'] ?? 'pedido_nao_fiscal'),
             'preview_impressao' => (bool) ($merged['preview_impressao'] ?? false),
@@ -436,10 +529,16 @@ trait ManagesTerminalMasterDetail
         $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($merged['porta'] ?? null);
         if ($fromRaw !== null) {
             $merged['impressora_nome'] = $fromRaw;
-            // Porta RAW: com impressora Windows => impressão silenciosa (Device Service).
-            if (! array_key_exists('usar_device_service', $data)) {
-                $merged['usar_device_service'] = true;
-            }
+        }
+
+        if ($this->terminalConfigEhPdvOffline()) {
+            unset(
+                $merged['tipo_impressora'],
+                $merged['nvias'],
+                $merged['modelo'],
+                $merged['porta'],
+                $merged['impressora_nome'],
+            );
         }
 
         unset(
@@ -448,7 +547,23 @@ trait ManagesTerminalMasterDetail
             $merged['updated_at'],
             $merged['tipo_operacao_padrao'],
             $merged['preview_impressao'],
+            $merged['meia_folha'],
         );
+
+        if (! $this->isNewTerminal) {
+            unset(
+                $merged['serie'],
+                $merged['numeracao_inicial'],
+                $merged['usar_numero_inicial'],
+                $merged['device_uuid'],
+                $merged['origens_dispositivo'],
+                $merged['device_last_seen_at'],
+                $merged['device_registered_at'],
+                $merged['device_platform'],
+                $merged['device_name'],
+                $merged['categoria_licenca'],
+            );
+        }
 
         return $merged;
     }
@@ -485,7 +600,15 @@ trait ManagesTerminalMasterDetail
             'ativo' => true,
             'eh_caixa' => true,
             'imprime' => true,
-            'usar_device_service' => false,
+            'usar_device_service' => true,
+            'balanca_marca' => 'balToledo',
+            'balanca_porta' => 'COM3',
+            'balanca_velocidade' => '9600',
+            'balanca_databits' => '8',
+            'balanca_paridade' => 'None',
+            'balanca_stopbits' => '1',
+            'balanca_handshaking' => 'None',
+            'ler_peso' => false,
         ];
     }
 

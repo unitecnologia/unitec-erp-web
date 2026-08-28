@@ -3,24 +3,21 @@
 namespace App\Support\Erp\Compra;
 
 use App\Models\Compra;
-use App\Models\Estoque;
+use App\Models\DevolucaoCompra;
 use App\Models\NotaFornecedor;
-use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
-use App\Support\Erp\ProductEstoqueSaldoService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Cancela compra: se veio de nota com entrada de estoque, estorna o estoque
- * e devolve a nota para "Aceita" (pode gerar de novo). Senão, só status.
+ * Cancela compra aberta: devolve a nota para "Aceita" (pode gerar de novo).
+ * Compra fechada deve ser reaberta (F7) antes — estorno completo fica só no Reabrir.
  */
 final class CancelarCompraService
 {
     public const OPERACAO = 'CANCELAR_COMPRA';
 
     public function __construct(
-        private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
         private readonly ErpOperacaoLogService $operacaoLog = new ErpOperacaoLogService(),
     ) {}
 
@@ -33,59 +30,48 @@ final class CancelarCompraService
             throw new DomainException('Compra já está cancelada.');
         }
 
+        if ($compra->status === Compra::STATUS_FECHADA) {
+            throw new DomainException(
+                'Compra fechada. Use F7 Reabrir para estornar estoque/financeiro; depois cancele.'
+            );
+        }
+
+        if ($this->temDevolucaoFinalizada($compra)) {
+            throw new DomainException(
+                'Existe devolução de compra finalizada vinculada. Estorne a devolução antes de cancelar.'
+            );
+        }
+
         $nota = NotaFornecedor::query()
             ->where('compra_id', $compra->id)
             ->first();
 
-        $teveEntradaEstoque = $nota !== null
-            && $nota->status === NotaFornecedor::STATUS_GEROU_COMPRAS;
-
         $empresaId = $compra->empresa_id ? (int) $compra->empresa_id : null;
-        $estoqueId = $this->resolveEstoqueId($empresaId);
 
-        DB::transaction(function () use ($compra, $nota, $teveEntradaEstoque, $estoqueId): void {
-            if ($teveEntradaEstoque) {
-                $compra->loadMissing('itens');
-
-                foreach ($compra->itens as $item) {
-                    if (! $item->product_id) {
-                        continue;
-                    }
-
-                    $product = Product::query()->find($item->product_id);
-
-                    if ($product && ! $product->is_servico) {
-                        $this->saldos->decrementar(
-                            (int) $product->id,
-                            (float) $item->quantidade,
-                            $estoqueId,
-                        );
-                    }
-                }
-
-                if ($nota) {
-                    $nota->forceFill([
-                        'status' => NotaFornecedor::STATUS_ACEITA,
-                        // Mantém compra_id para auditoria; nova geração cria outra compra.
-                    ])->save();
-                }
+        DB::transaction(function () use ($compra, $nota): void {
+            if ($nota && $nota->status === NotaFornecedor::STATUS_GEROU_COMPRAS) {
+                $nota->forceFill([
+                    'status' => NotaFornecedor::STATUS_ACEITA,
+                    // Mantém compra_id para auditoria; nova geração cria outra compra.
+                ])->save();
             }
 
-            $compra->update(['status' => Compra::STATUS_CANCELADA]);
+            $compra->update([
+                'status' => Compra::STATUS_CANCELADA,
+                'lancamento_draft' => null,
+            ]);
         });
 
         $this->operacaoLog->registrar(
             operacao: self::OPERACAO,
-            resumo: $teveEntradaEstoque
-                ? 'Compra #'.$compra->numero.' cancelada com estorno de estoque.'
-                : 'Compra #'.$compra->numero.' cancelada (sem entrada de estoque).',
+            resumo: 'Compra #'.$compra->numero.' cancelada.',
             origem: 'lista_compras',
             documentoTipo: 'compra',
             documentoId: (int) $compra->id,
             documentoNumero: (string) $compra->numero,
             detalhes: [
-                'estoque_estornado' => $teveEntradaEstoque,
                 'nota_id' => $nota?->id,
+                'nota_liberada' => $nota !== null && $nota->status === NotaFornecedor::STATUS_ACEITA,
             ],
             empresaId: $empresaId,
         );
@@ -93,18 +79,27 @@ final class CancelarCompraService
         return $compra->fresh() ?? $compra;
     }
 
-    private function resolveEstoqueId(?int $empresaId): ?int
+    /**
+     * Notas com status gerou_compras cuja compra já está cancelada → Aceita.
+     *
+     * @return int quantidade de notas reparadas
+     */
+    public static function repararNotasComCompraCancelada(): int
     {
-        if (! $empresaId) {
-            return null;
-        }
+        return NotaFornecedor::query()
+            ->where('status', NotaFornecedor::STATUS_GEROU_COMPRAS)
+            ->whereNotNull('compra_id')
+            ->whereIn('compra_id', Compra::query()
+                ->select('id')
+                ->where('status', Compra::STATUS_CANCELADA))
+            ->update(['status' => NotaFornecedor::STATUS_ACEITA]);
+    }
 
-        $id = Estoque::query()
-            ->where('empresa_id', $empresaId)
-            ->where('ativo', true)
-            ->orderBy('codigo')
-            ->value('id');
-
-        return $id ? (int) $id : null;
+    private function temDevolucaoFinalizada(Compra $compra): bool
+    {
+        return DevolucaoCompra::query()
+            ->where('compra_id', $compra->id)
+            ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
+            ->exists();
     }
 }

@@ -116,7 +116,7 @@
                         </span>
                     </div>
                     <div class="erp-licenca-sistema-modal__meta-row">
-                        <span class="erp-licenca-sistema-modal__meta-label">Validade da Licença</span>
+                        <span class="erp-licenca-sistema-modal__meta-label">Vencimento da mensalidade</span>
                         <input
                             type="text"
                             class="erp-licenca-sistema-modal__validity"
@@ -124,6 +124,18 @@
                             readonly
                             tabindex="-1"
                         >
+                    </div>
+                    <div class="erp-licenca-sistema-modal__meta-row">
+                        <span class="erp-licenca-sistema-modal__meta-label">Computadores (PC)</span>
+                        <span class="erp-licenca-sistema-modal__meta-value erp-licenca-sistema-modal__meta-value--usage">
+                            {{ $this->formatLicencaUso($this->licencaPcEmUso, $this->licencaPcLimite) }}
+                        </span>
+                    </div>
+                    <div class="erp-licenca-sistema-modal__meta-row">
+                        <span class="erp-licenca-sistema-modal__meta-label">Telefones</span>
+                        <span class="erp-licenca-sistema-modal__meta-value erp-licenca-sistema-modal__meta-value--usage">
+                            {{ $this->formatLicencaUso($this->licencaTelEmUso, $this->licencaTelLimite) }}
+                        </span>
                     </div>
                     @if (filled($this->mensagem))
                         <p class="erp-licenca-sistema-modal__hint">{{ $this->mensagem }}</p>

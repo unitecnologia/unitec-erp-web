@@ -120,7 +120,10 @@ final class PdvFinalizarOperacao
 
     public static function solicitaConfirmacaoImpressaoApos(string $operacao): bool
     {
-        return $operacao === self::NFCE_TRANSMITIR;
+        return in_array($operacao, [
+            self::NFCE_TRANSMITIR,
+            self::NFCE_CONTINGENCIA,
+        ], true);
     }
 
     public static function mensagemStub(string $operacao): string

@@ -5,7 +5,10 @@ namespace App\Filament\Resources\EmpresaResource\Pages\Concerns;
 use App\Support\ContadorCloud\ContadorCloudClient;
 use App\Support\ContadorCloud\ContadorCloudConfig;
 use App\Models\Empresa;
+use App\Support\Erp\Cloudflare\CloudflareTunnelProvisioner;
+use App\Support\Erp\CloudflaredStatus;
 use App\Support\Erp\EmpresaParametros;
+use App\Support\Erp\ErpSystemConfig;
 use App\Support\Erp\WhatsApp\WhatsAppClient;
 use App\Support\Erp\WhatsApp\WhatsAppConfig;
 use App\Support\Erp\WhatsApp\WhatsAppGatewayManager;
@@ -20,6 +23,17 @@ trait ManagesEmpresaFormUi
 
     public ?string $whatsAppQr = null;
 
+    /** @var array{online: bool, checked_at: ?string, last_online_at: ?string, pid: ?int, message: string, source: ?string, config_present: bool} */
+    public array $cloudflaredStatus = [
+        'online' => false,
+        'checked_at' => null,
+        'last_online_at' => null,
+        'pid' => null,
+        'message' => '',
+        'source' => null,
+        'config_present' => false,
+    ];
+
     public function setActiveFormTab(string $tab): void
     {
         $allowed = ['dados', 'parametros', 'obs_fisco', 'obs_carne', 'obs_nfce', 'obs_contribuinte', 'msg_cobranca'];
@@ -29,6 +43,10 @@ trait ManagesEmpresaFormUi
         }
 
         $this->activeFormTab = $tab;
+
+        if ($tab === 'parametros' && $this->activeParametrosSubTab === 'api_servicos') {
+            $this->refreshCloudflaredStatus();
+        }
     }
 
     public function setActiveParametrosSubTab(string $tab): void
@@ -40,6 +58,220 @@ trait ManagesEmpresaFormUi
         }
 
         $this->activeParametrosSubTab = $tab;
+
+        if ($tab === 'sistema') {
+            $this->hydrateUpdateDownloadUrlFromDefault();
+        }
+
+        if ($tab === 'api_servicos') {
+            $this->refreshCloudflaredStatus();
+        }
+    }
+
+    public function refreshCloudflaredStatus(): void
+    {
+        $this->hydrateCloudflareSubdomainFromUrl();
+        $this->hydrateCloudflareCredentialsFromDefaults();
+
+        $deployed = CloudflaredStatus::ensureExeInProgramData();
+        if ($deployed && CloudflaredStatus::configExists() && ! (bool) (CloudflaredStatus::read()['online'] ?? false)) {
+            try {
+                CloudflaredStatus::requestRestart();
+            } catch (\Throwable) {
+                // status abaixo ainda reflete o estado atual
+            }
+        }
+
+        $this->cloudflaredStatus = CloudflaredStatus::read();
+    }
+
+    private function hydrateCloudflareCredentialsFromDefaults(): void
+    {
+        foreach (EmpresaParametros::cloudflareAcessoFields() as $field => $meta) {
+            if (! in_array($field, [
+                'param_cf_api_token',
+                'param_cf_account_id',
+                'param_cf_zone_id',
+                'param_cf_base_domain',
+            ], true)) {
+                continue;
+            }
+
+            $current = trim((string) ($this->data[$field] ?? ''));
+            if ($current !== '') {
+                continue;
+            }
+
+            $default = trim((string) ($meta['default'] ?? ''));
+            if ($default !== '') {
+                $this->data[$field] = $default;
+            }
+        }
+    }
+
+    /**
+     * Link oficial do canal update — preenche o form se a base ainda estiver vazia.
+     */
+    protected function hydrateUpdateDownloadUrlFromDefault(): void
+    {
+        $current = trim((string) ($this->data['param_update_download_url'] ?? ''));
+        if ($current !== '') {
+            return;
+        }
+
+        $default = trim((string) (EmpresaParametros::sistemaFields()['param_update_download_url']['default'] ?? ''));
+        if ($default === '') {
+            $default = ErpSystemConfig::DEFAULT_UPDATE_DOWNLOAD_URL;
+        }
+
+        $this->data['param_update_download_url'] = $default;
+
+        if (method_exists($this, 'safeFillEmpresaForm')) {
+            $this->safeFillEmpresaForm();
+        }
+    }
+
+    private function hydrateCloudflareSubdomainFromUrl(): void
+    {
+        if (trim((string) ($this->data['param_cf_subdomain'] ?? '')) !== '') {
+            return;
+        }
+
+        $fromUrl = app(CloudflareTunnelProvisioner::class)
+            ->subdomainFromPublicUrl((string) ($this->data['param_erp_public_url'] ?? ''));
+        if ($fromUrl !== '') {
+            $this->data['param_cf_subdomain'] = $fromUrl;
+        }
+    }
+
+    public function sugerirSubdominioCloudflare(): void
+    {
+        $empresa = $this->resolveEmpresaRecordForWhatsApp();
+
+        // Prefere o que está na tela (pode ainda não ter sido gravado).
+        $name = trim((string) (
+            ($this->data['fantasia'] ?? '')
+            ?: ($this->data['razao_social'] ?? '')
+            ?: ($this->data['nome'] ?? '')
+            ?: ($empresa instanceof Empresa
+                ? ($empresa->fantasia ?: $empresa->razao_social ?: $empresa->nome ?: '')
+                : '')
+        ));
+
+        $provisioner = app(CloudflareTunnelProvisioner::class);
+        $suggested = $provisioner->suggestSubdomain($name !== '' ? $name : $empresa);
+
+        if ($suggested === '') {
+            $fromUrl = $provisioner->subdomainFromPublicUrl((string) ($this->data['param_erp_public_url'] ?? ''));
+            $suggested = $fromUrl;
+        }
+
+        if ($suggested === '') {
+            Notification::make()
+                ->title('Acesso remoto')
+                ->body('Informe o nome fantasia (aba Dados) ou a URL pública para sugerir o subdomínio.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->data = array_merge($this->data ?? [], [
+            'param_cf_subdomain' => $suggested,
+        ]);
+
+        if (method_exists($this, 'safeFillEmpresaForm')) {
+            $this->safeFillEmpresaForm();
+        }
+
+        Notification::make()
+            ->title('Subdomínio sugerido')
+            ->body('Preenchido: '.$suggested)
+            ->success()
+            ->send();
+    }
+
+    public function ativarTunelCloudflare(): void
+    {
+        $empresa = $this->resolveEmpresaRecordForWhatsApp();
+        if (! $empresa instanceof Empresa) {
+            Notification::make()
+                ->title('Acesso remoto')
+                ->body('Grave a empresa antes de ativar o túnel.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->data['param_acesso_remoto_habilitar'] = true;
+        $this->hydrateCloudflareCredentialsFromDefaults();
+
+        $provisioner = app(CloudflareTunnelProvisioner::class);
+        $subdomain = trim((string) ($this->data['param_cf_subdomain'] ?? ''));
+        if ($subdomain === '') {
+            $subdomain = $provisioner->subdomainFromPublicUrl((string) ($this->data['param_erp_public_url'] ?? ''));
+            if ($subdomain !== '') {
+                $this->data['param_cf_subdomain'] = $subdomain;
+            }
+        }
+
+        $apiToken = trim((string) ($this->data['param_cf_api_token'] ?? ''));
+        $accountId = trim((string) ($this->data['param_cf_account_id'] ?? ''));
+        $zoneId = trim((string) ($this->data['param_cf_zone_id'] ?? ''));
+        $baseDomain = trim((string) ($this->data['param_cf_base_domain'] ?? ''));
+
+        try {
+            $result = $provisioner->provision($empresa, [
+                'subdomain' => $subdomain,
+                'api_token' => $apiToken,
+                'account_id' => $accountId,
+                'zone_id' => $zoneId,
+                'base_domain' => $baseDomain,
+            ]);
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Não foi possível ativar o túnel')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+            $this->refreshCloudflaredStatus();
+
+            return;
+        }
+
+        $this->data['param_cf_subdomain'] = $result['subdomain'];
+        $this->data['param_cf_hostname'] = $result['hostname'];
+        $this->data['param_cf_tunnel_id'] = $result['tunnel_id'];
+        $this->data['param_erp_public_url'] = $result['erp_url'];
+        $this->data['param_gestor_public_url'] = $result['gestor_url'];
+        $this->data['param_acesso_remoto_habilitar'] = true;
+
+        $empresa->forceFill([
+            'param_acesso_remoto_habilitar' => true,
+            'param_cf_api_token' => $apiToken !== '' ? $apiToken : $empresa->param_cf_api_token,
+            'param_cf_account_id' => $accountId !== '' ? $accountId : $empresa->param_cf_account_id,
+            'param_cf_zone_id' => $zoneId !== '' ? $zoneId : $empresa->param_cf_zone_id,
+            'param_cf_base_domain' => $baseDomain !== '' ? $baseDomain : $empresa->param_cf_base_domain,
+            'param_cf_subdomain' => $result['subdomain'],
+            'param_cf_hostname' => $result['hostname'],
+            'param_cf_tunnel_id' => $result['tunnel_id'],
+            'param_erp_public_url' => $result['erp_url'],
+            'param_gestor_public_url' => $result['gestor_url'],
+        ])->save();
+
+        $this->refreshCloudflaredStatus();
+
+        $body = 'Configuração gravada para https://'.$result['hostname'].'. O UnitecErpServer sobe o túnel em alguns segundos — use Atualizar para conferir o status.';
+        if (! empty($result['recreated_missing_credentials'])) {
+            $body = 'Credencial local ausente (ex.: restore de outro PC) — túnel recriado neste computador. '.$body;
+        }
+
+        Notification::make()
+            ->title('Túnel Cloudflare')
+            ->body($body)
+            ->success()
+            ->send();
     }
 
     public function modulePending(string $module): void
@@ -156,6 +388,56 @@ trait ManagesEmpresaFormUi
         $this->applyWhatsAppGatewayResult($empresa, $result);
     }
 
+    /**
+     * Sobe (ou reinicia) o processo Node do gateway Baileys — útil se o serviço foi finalizado ou travou.
+     */
+    public function startWhatsAppNodeService(): void
+    {
+        $empresa = $this->resolveEmpresaRecordForWhatsApp();
+
+        if (! $empresa) {
+            Notification::make()
+                ->title('WhatsApp')
+                ->body('Salve a empresa antes de iniciar o serviço Node.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->persistWhatsAppFormFields($empresa);
+
+        $manager = app(WhatsAppGatewayManager::class);
+
+        if ($manager->nodeExecutable() === null) {
+            Notification::make()
+                ->title('WhatsApp')
+                ->body('Node.js não encontrado. Instale o Node ou use o runtime em tools\\node.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $result = $manager->restartGateway($empresa->fresh());
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('WhatsApp')
+                ->body('Falha ao iniciar o serviço Node: '.$e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('WhatsApp')
+            ->body($result['message'])
+            ->{($result['ok'] ?? false) ? 'success' : 'warning'}()
+            ->send();
+    }
+
     public function disconnectWhatsApp(): void
     {
         $empresa = $this->resolveEmpresaRecordForWhatsApp();
@@ -268,7 +550,7 @@ trait ManagesEmpresaFormUi
             'param_whatsapp_limite_dia' => max(1, (int) ($this->data['param_whatsapp_limite_dia'] ?? 100)),
             'param_whatsapp_enviar_orcamento' => (bool) ($this->data['param_whatsapp_enviar_orcamento'] ?? true),
             'param_whatsapp_enviar_cobranca' => (bool) ($this->data['param_whatsapp_enviar_cobranca'] ?? true),
-            'param_whatsapp_enviar_nfe' => (bool) ($this->data['param_whatsapp_enviar_nfe'] ?? false),
+            'param_whatsapp_enviar_nfe' => (bool) ($this->data['param_whatsapp_enviar_nfe'] ?? true),
         ])->save();
 
         app(WhatsAppGatewayManager::class)->resolveOrCreateKey($empresa->fresh());

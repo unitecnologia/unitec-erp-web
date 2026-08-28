@@ -2,7 +2,9 @@
 
 namespace App\Support\Erp\Vendas;
 
+use App\Models\DevolucaoVenda;
 use App\Models\Empresa;
+use App\Models\Nfe;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\Product;
@@ -33,6 +35,8 @@ final class EstornarVendaService
     public const ORIGEM_PDV = 'pdv';
 
     public const ORIGEM_NFCE_LISTA = 'nfce_lista';
+
+    public const ORIGEM_NFE_LISTA = 'nfe_lista';
 
     public const ORIGEM_MONITOR_FV = 'monitor_fv';
 
@@ -78,6 +82,15 @@ final class EstornarVendaService
                 plataforma: (string) ($venda->plataforma ?? 'erp'),
             );
         }
+
+        if ($origem === self::ORIGEM_LISTA_VENDAS && $venda->temOrigemPdv()) {
+            throw new DomainException(
+                'Vendas do PDV devem ser canceladas no próprio PDV (Consulta de vendas → Estorno).',
+            );
+        }
+
+        $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
+        $this->assertSemNfeTransmitidaAtiva($venda, $origem);
 
         if ($venda->forcaVendasOrder !== null && $venda->forcaVendasOrder->venda_id) {
             return $this->estornarForcaVendas($venda, $motivo, $origem);
@@ -144,6 +157,9 @@ final class EstornarVendaService
             throw new DomainException('Não foi possível localizar a venda de retaguarda para estorno.');
         }
 
+        $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
+        $this->assertSemNfeTransmitidaAtiva($venda, $origem);
+
         if ($venda->forcaVendasOrder !== null && $venda->forcaVendasOrder->venda_id) {
             return $this->estornarForcaVendas($venda, $motivo, $origem);
         }
@@ -207,13 +223,6 @@ final class EstornarVendaService
     ): EstornarVendaResult {
         $pdvVenda->loadMissing(['itens', 'pagamentos', 'nfce']);
 
-        $protocoloCancelamento = $this->cancelarNfceSeNecessario(
-            $pdvVenda,
-            $empresa,
-            $motivo,
-            $bloquearCancelamentoDocFiscal,
-        );
-
         $sessaoId = $pdvCaixaSessaoId
             ?? ($pdvVenda->pdv_caixa_sessao_id ? (int) $pdvVenda->pdv_caixa_sessao_id : null);
 
@@ -221,15 +230,75 @@ final class EstornarVendaService
             throw new DomainException('Sessão de caixa da venda não encontrada para registrar o estorno.');
         }
 
+        // Valida e trava antes de qualquer HTTP à SEFAZ (evita nota cancelada + venda viva).
+        DB::transaction(function () use ($pdvVenda, $venda): void {
+            $pdvLocked = PdvVenda::query()->whereKey($pdvVenda->id)->lockForUpdate()->first();
+
+            if ($pdvLocked === null) {
+                throw new DomainException('Venda PDV não encontrada para estorno.');
+            }
+
+            if ($pdvLocked->situacao === 'C') {
+                throw new DomainException('Esta venda já está cancelada.');
+            }
+
+            $vendaLocked = Venda::query()->whereKey($venda->id)->lockForUpdate()->first();
+
+            if ($vendaLocked === null) {
+                throw new DomainException('Venda de retaguarda não encontrada para estorno.');
+            }
+
+            if ($vendaLocked->status === Venda::STATUS_CANCELADO) {
+                throw new DomainException('Esta venda já está cancelada.');
+            }
+
+            $this->assertSemDevolucaoQueBloqueiaEstorno($vendaLocked);
+
+            $erroFinanceiro = $this->financeiroService->motivoBloqueioEstornoContasReceber($pdvLocked);
+
+            if ($erroFinanceiro !== null) {
+                throw new DomainException($erroFinanceiro);
+            }
+        });
+
+        $protocoloCancelamento = null;
+
         try {
+            $protocoloCancelamento = $this->cancelarNfceSeNecessario(
+                $pdvVenda->fresh(['nfce']) ?? $pdvVenda,
+                $empresa,
+                $motivo,
+                $bloquearCancelamentoDocFiscal,
+            );
+
             DB::transaction(function () use ($pdvVenda, $venda, $motivo, $sessaoId): void {
-                $erroFinanceiro = $this->financeiroService->estornarContasReceber($pdvVenda);
+                $pdvLocked = PdvVenda::query()->whereKey($pdvVenda->id)->lockForUpdate()->first();
+
+                if ($pdvLocked === null) {
+                    throw new DomainException('Venda PDV não encontrada para estorno.');
+                }
+
+                if ($pdvLocked->situacao === 'C') {
+                    return;
+                }
+
+                $vendaLocked = Venda::query()->whereKey($venda->id)->lockForUpdate()->first();
+
+                if ($vendaLocked === null) {
+                    throw new DomainException('Venda de retaguarda não encontrada para estorno.');
+                }
+
+                $this->assertSemDevolucaoQueBloqueiaEstorno($vendaLocked);
+
+                $pdvLocked->loadMissing(['itens', 'pagamentos']);
+
+                $erroFinanceiro = $this->financeiroService->estornarContasReceber($pdvLocked);
 
                 if ($erroFinanceiro !== null) {
                     throw new DomainException($erroFinanceiro);
                 }
 
-                foreach ($pdvVenda->itens as $item) {
+                foreach ($pdvLocked->itens as $item) {
                     if (! $item->product_id) {
                         continue;
                     }
@@ -248,24 +317,30 @@ final class EstornarVendaService
 
                 $this->caixaMovimentoService->registrarSaidasEstornoFromModel(
                     $sessaoId,
-                    $pdvVenda,
-                    $pdvVenda->pagamentos,
+                    $pdvLocked,
+                    $pdvLocked->pagamentos,
                 );
 
-                $this->retaguardaMirrorService->estornar($pdvVenda);
+                $this->retaguardaMirrorService->estornar($pdvLocked);
 
-                $pdvVenda->update([
+                $pdvLocked->update([
                     'situacao' => 'C',
                     'motivo_estorno' => $motivo,
                 ]);
 
-                if ($venda->status !== Venda::STATUS_CANCELADO) {
-                    $venda->update(['status' => Venda::STATUS_CANCELADO]);
+                if ($vendaLocked->status !== Venda::STATUS_CANCELADO) {
+                    $vendaLocked->update(['status' => Venda::STATUS_CANCELADO]);
                 }
 
-                $this->logisticaHook->onVendaCancelada($venda, $motivo);
+                $this->logisticaHook->onVendaCancelada($vendaLocked, $motivo);
             });
         } catch (DomainException $exception) {
+            $msg = $exception->getMessage();
+
+            if (filled($protocoloCancelamento)) {
+                $msg .= ' Atenção: a NFC-e já foi cancelada na SEFAZ. Consulte o status fiscal antes de tentar novamente.';
+            }
+
             $this->registrarLog(
                 $venda,
                 $pdvVenda,
@@ -273,11 +348,14 @@ final class EstornarVendaService
                 $origem,
                 $protocoloCancelamento,
                 'erro',
-                $exception->getMessage(),
+                $msg,
             );
 
-            throw $exception;
+            throw new DomainException($msg, 0, $exception);
         }
+
+        $pdvVenda->refresh();
+        $venda->refresh();
 
         $this->registrarLog(
             $venda,
@@ -294,6 +372,66 @@ final class EstornarVendaService
             pdvVendaId: (int) $pdvVenda->id,
             protocoloCancelamento: $protocoloCancelamento,
             plataforma: Venda::PLATAFORMA_PDV,
+        );
+    }
+
+    /**
+     * Pedido com NF-e ainda transmitida: cancelar a nota primeiro (tela NF-e),
+     * que em seguida pode estornar o pedido. Exceto quando a origem já é o cancelamento da NF-e.
+     *
+     * @throws DomainException
+     */
+    private function assertSemNfeTransmitidaAtiva(Venda $venda, string $origem): void
+    {
+        if ($origem === self::ORIGEM_NFE_LISTA) {
+            return;
+        }
+
+        $nfe = Nfe::query()
+            ->where('venda_id', (int) $venda->id)
+            ->where('status', Nfe::STATUS_TRANSMITIDA)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($nfe === null) {
+            return;
+        }
+
+        throw new DomainException(
+            'Existe NF-e transmitida (#'.$nfe->numero.') vinculada a este pedido. '
+            .'Cancele a NF-e primeiro na tela de NF-e; o cancelamento da nota também estorna o pedido.'
+        );
+    }
+
+    /**
+     * Devolução finalizada já devolveu estoque/financeiro — estornar a venda novamente inflaria o estoque.
+     *
+     * @throws DomainException
+     */
+    private function assertSemDevolucaoQueBloqueiaEstorno(Venda $venda): void
+    {
+        $query = DevolucaoVenda::query()
+            ->where('situacao', DevolucaoVenda::SITUACAO_FINALIZADA)
+            ->where(function ($q) use ($venda): void {
+                $q->where('venda_id', (int) $venda->id);
+
+                $numero = trim((string) ($venda->numero ?? ''));
+                if ($numero !== '') {
+                    $q->orWhere(function ($q2) use ($numero): void {
+                        $q2->whereNull('venda_id')->where('venda_numero', $numero);
+                    });
+                }
+            });
+
+        $dev = $query->orderByDesc('id')->first();
+
+        if ($dev === null) {
+            return;
+        }
+
+        throw new DomainException(
+            'Não é possível estornar/cancelar esta venda: existe devolução #'.$dev->numero
+            .' finalizada. Use a devolução para o ajuste de estoque/financeiro; estornar a venda novamente duplicaria o estoque.'
         );
     }
 

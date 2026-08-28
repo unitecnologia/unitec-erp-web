@@ -4,7 +4,10 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PersonResource;
-use App\Filament\Resources\ProductResource;
+use App\Models\CaixaConta;
+use App\Support\Erp\CloudflaredStatus;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -23,12 +26,14 @@ trait ManagesPdvUi
     use ManagesPdvGaveta;
     use ManagesPdvGrade;
     use ManagesPdvImportar;
+    use ManagesPdvAcessoRapido;
     use ManagesPdvReceber;
     use ManagesPdvReimprimir;
     use ManagesPdvRemoverItens;
     use ManagesPdvSerial;
     use ManagesPdvTabelaPreco;
     use ManagesPdvVenda;
+    use ManagesPdvVendaEspera;
     use ManagesPdvVendedor;
 
     public bool $caixaAberto = false;
@@ -48,8 +53,6 @@ trait ManagesPdvUi
 
     public ?string $activeModal = null;
 
-    public bool $overlayProductOpen = false;
-
     public bool $overlayPersonOpen = false;
 
     /** @var array<string, string> */
@@ -57,7 +60,7 @@ trait ManagesPdvUi
         'historico' => '',
         'valor' => '0,00',
         'tipo_conta' => '',
-        'destino' => 'SANGRIA P/ CAIXA GERAL',
+        'destino' => '',
     ];
 
     /** @var array<string, string> */
@@ -68,6 +71,48 @@ trait ManagesPdvUi
     ];
 
     public string $vendedor = '';
+
+    public string $pdvAcessoNegadoTitle = '';
+
+    /** @var list<string> */
+    public array $pdvAcessoNegadoLines = [];
+
+    public ?string $pdvAcessoNegadoHint = null;
+
+    public bool $pdvAcessoNegadoVoltarDashboard = true;
+
+    /**
+     * @param  list<string>  $lines
+     */
+    public function openPdvAcessoNegado(
+        string $title,
+        array $lines,
+        bool $voltarDashboard = true,
+        ?string $hint = null,
+    ): void {
+        $this->pdvAcessoNegadoTitle = $title;
+        $this->pdvAcessoNegadoLines = array_values($lines);
+        $this->pdvAcessoNegadoHint = $hint;
+        $this->pdvAcessoNegadoVoltarDashboard = $voltarDashboard;
+        // Modal nativo do PDV (visível); substitui Options / qualquer outro modal.
+        $this->activeModal = 'acesso_negado';
+    }
+
+    public function dismissPdvAcessoNegado(): void
+    {
+        $voltar = $this->pdvAcessoNegadoVoltarDashboard;
+
+        $this->activeModal = null;
+        $this->pdvAcessoNegadoTitle = '';
+        $this->pdvAcessoNegadoLines = [];
+        $this->pdvAcessoNegadoHint = null;
+        $this->pdvAcessoNegadoVoltarDashboard = true;
+
+        if ($voltar) {
+            ErpScreen::set('Principal');
+            $this->redirect(Dashboard::getUrl(), navigate: false);
+        }
+    }
 
     /**
      * @return list<string>
@@ -84,25 +129,110 @@ trait ManagesPdvUi
     }
 
     /**
-     * @return list<string>
+     * Formas permitidas na sangria com saldo disponível na sessão.
+     *
+     * @return array<string, string> value => label com saldo
+     */
+    public function getSangriaTipoContaOptionsProperty(): array
+    {
+        $sessao = $this->caixaSessaoAtual();
+
+        if (! $sessao) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach (['DINHEIRO', 'CHEQUE'] as $forma) {
+            $saldo = $sessao->saldoPorForma($forma);
+
+            if ($saldo <= 0) {
+                continue;
+            }
+
+            $options[$forma] = $forma.' — R$ '.ErpMoney::formatBr($saldo);
+        }
+
+        return $options;
+    }
+
+    /**
+     * Destinos da sangria: apenas subcaixas ativas.
+     *
+     * @return array<string, string> id => "codigo — NOME"
      */
     public function getSangriaDestinoOptionsProperty(): array
     {
-        return [
-            'SANGRIA P/ CAIXA GERAL',
-            'SANGRIA P/ BANCO',
-            'SANGRIA P/ TESOURARIA',
-        ];
+        return CaixaConta::query()
+            ->where('ativo', true)
+            ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
+            ->orderBy('codigo')
+            ->get(['id', 'codigo', 'nome'])
+            ->mapWithKeys(fn (CaixaConta $conta): array => [
+                (string) $conta->id => $this->sangriaDestinoLabel($conta),
+            ])
+            ->all();
+    }
+
+    protected function sangriaDestinoLabel(CaixaConta $conta): string
+    {
+        return trim((string) $conta->codigo).' — '.mb_strtoupper((string) $conta->nome, 'UTF-8');
+    }
+
+    /**
+     * @param  array<string, string>  $destinos
+     */
+    protected function defaultSangriaDestinoId(array $destinos): string
+    {
+        if ($destinos === []) {
+            return '';
+        }
+
+        $geralId = (string) CaixaConta::ensureCaixaGeral()->id;
+
+        if (isset($destinos[$geralId])) {
+            return $geralId;
+        }
+
+        return (string) array_key_first($destinos);
+    }
+
+    protected function prepareSangriaFormOnOpen(): void
+    {
+        $formas = $this->sangriaTipoContaOptions;
+
+        if ($formas === []) {
+            Notification::make()
+                ->title('Sem saldo para sangria.')
+                ->body('Não há saldo em DINHEIRO ou CHEQUE nesta sessão.')
+                ->warning()
+                ->send();
+            $this->sangriaForm['tipo_conta'] = '';
+        } else {
+            $atual = (string) ($this->sangriaForm['tipo_conta'] ?? '');
+
+            if ($atual === '' || ! isset($formas[$atual])) {
+                $this->sangriaForm['tipo_conta'] = isset($formas['DINHEIRO'])
+                    ? 'DINHEIRO'
+                    : (string) array_key_first($formas);
+            }
+        }
+
+        $destinos = $this->sangriaDestinoOptions;
+        $destinoAtual = (string) ($this->sangriaForm['destino'] ?? '');
+
+        if ($destinoAtual === '' || ! isset($destinos[$destinoAtual])) {
+            $this->sangriaForm['destino'] = $this->defaultSangriaDestinoId($destinos);
+        }
+
+        if ($this->sangriaForm['valor'] === '' || $this->sangriaForm['valor'] === null) {
+            $this->sangriaForm['valor'] = '0,00';
+        }
     }
 
     public function getCaixaTituloProperty(): string
     {
         return $this->caixaAberto ? 'CAIXA ABERTO' : 'CAIXA FECHADO';
-    }
-
-    public function getProductOverlayUrlProperty(): string
-    {
-        return ProductResource::getUrl('create') . '?pdv=1';
     }
 
     public function getPersonOverlayUrlProperty(): string
@@ -119,7 +249,7 @@ trait ManagesPdvUi
 
     public function openPdvModal(string $modal): void
     {
-        if (in_array($modal, ['resumo', 'sangria', 'suprimento', 'finalizar'], true)) {
+        if (in_array($modal, ['resumo', 'sangria', 'suprimento', 'finalizar', 'acesso_rapido'], true)) {
             if (! $this->caixaAberto) {
                 Notification::make()
                     ->title('Caixa fechado.')
@@ -140,14 +270,34 @@ trait ManagesPdvUi
             return;
         }
 
+        if ($modal === 'sangria') {
+            $this->prepareSangriaFormOnOpen();
+        }
+
+        if ($modal === 'acesso_rapido') {
+            $this->prepareAcessoRapidoOnOpen();
+        }
+
         $this->activeModal = $modal;
         $this->dispatch('erp-pdv-modal-opened', modal: $modal);
     }
 
     public function closePdvModal(): void
     {
+        if ($this->activeModal === 'acesso_rapido' && ($this->acessoRapidoEditando ?? false)) {
+            $this->saveAcessoRapidoToDb();
+            $this->acessoRapidoEditando = false;
+            $this->acessoRapidoBusca = '';
+            $this->acessoRapidoBuscaResults = [];
+            $this->acessoRapidoSlotAlvo = null;
+        }
+
         $wasSair = $this->activeModal === 'sair';
         $wasFinalizar = $this->activeModal === 'finalizar';
+
+        if ($this->fechamentoMoedasModalOpen ?? false) {
+            $this->fechamentoMoedasModalOpen = false;
+        }
 
         if ($this->activeModal === 'finalizar') {
             $this->finalizarConfirmSair = false;
@@ -165,8 +315,14 @@ trait ManagesPdvUi
 
     public function handlePdvEscape(): void
     {
-        if ($this->overlayProductOpen) {
-            $this->closeProductOverlay();
+        if ($this->fechamentoMoedasModalOpen ?? false) {
+            $this->fecharContarMoedas();
+
+            return;
+        }
+
+        if ($this->activeModal === 'acesso_negado') {
+            $this->dismissPdvAcessoNegado();
 
             return;
         }
@@ -183,8 +339,26 @@ trait ManagesPdvUi
             return;
         }
 
+        if ($this->pdvConfirmImprimirMovimentoCaixa ?? false) {
+            $this->confirmImprimirMovimentoCaixa(false);
+
+            return;
+        }
+
+        if ($this->pdvConfirmImprimirResumoCaixa ?? false) {
+            $this->confirmImprimirResumoCaixa(false);
+
+            return;
+        }
+
         if ($this->activeModal !== null) {
             if ($this->activeModal === 'bloqueio' || $this->pdvBloqueado) {
+                return;
+            }
+
+            if ($this->activeModal === 'acesso_negado') {
+                $this->dismissPdvAcessoNegado();
+
                 return;
             }
 
@@ -248,32 +422,36 @@ trait ManagesPdvUi
                 'reimprimir' => $this->cancelReimprimir(),
                 'consulta_venda' => $this->cancelConsultaVenda(),
                 'estorno_venda' => $this->cancelEstornoVenda(),
+                'vendas_espera' => $this->cancelVendaEmEspera(),
                 'fiscal_aviso' => $this->sairPdvFiscalOverlay(),
                 'tabela_preco' => $this->cancelTabelaPreco(),
                 'remover_itens' => $this->cancelRemoverItens(),
                 'autorizacao' => $this->cancelPdvAutorizacao(),
                 'bloqueio' => $this->cancelUnlockPdv(),
+                'acesso_rapido' => $this->fecharAcessoRapido(),
                 default => $this->closePdvModal(),
             };
 
             return;
         }
 
+        // Fluxo normal (sem Caixa Rápido): Esc volta preço → qtd → código,
+        // mesmo se o termo de busca já estiver vazio (não depende de pdvEmConsulta).
+        if ($this->pdvLaunchStep === 'preco') {
+            $this->pdvLaunchStep = 'qtd';
+            $this->dispatch('erp-pdv-focus-launch', field: 'qtd');
+
+            return;
+        }
+
+        if ($this->pdvLaunchStep === 'qtd') {
+            $this->pdvLaunchStep = 'search';
+            $this->dispatch('erp-pdv-focus-search');
+
+            return;
+        }
+
         if ($this->pdvEmConsulta) {
-            if ($this->pdvLaunchStep === 'preco') {
-                $this->pdvLaunchStep = 'qtd';
-                $this->dispatch('erp-pdv-focus-launch', field: 'qtd');
-
-                return;
-            }
-
-            if ($this->pdvLaunchStep === 'qtd') {
-                $this->pdvLaunchStep = 'search';
-                $this->dispatch('erp-pdv-focus-search');
-
-                return;
-            }
-
             $this->clearPdvSearch();
 
             return;
@@ -292,6 +470,7 @@ trait ManagesPdvUi
     public function toggleCaixa(): void
     {
         if ($this->caixaAberto) {
+            $this->resetFechamentoForm();
             $this->openPdvModal('fechar_caixa');
 
             return;
@@ -303,32 +482,6 @@ trait ManagesPdvUi
 
         $this->aberturaForm['valor'] = '0,00';
         $this->openPdvModal('abrir_caixa');
-    }
-
-    public function openProductOverlay(): void
-    {
-        if (! $this->caixaAberto) {
-            Notification::make()
-                ->title('Caixa fechado.')
-                ->body('Abra o caixa com F2 antes de continuar.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $this->overlayProductOpen = true;
-        $this->dispatch('erp-pdv-overlay-opened', type: 'product');
-    }
-
-    public function closeProductOverlay(): void
-    {
-        if (! $this->overlayProductOpen) {
-            return;
-        }
-
-        $this->overlayProductOpen = false;
-        $this->dispatch('erp-pdv-overlay-closed');
     }
 
     public function openPersonOverlay(): void
@@ -398,12 +551,22 @@ trait ManagesPdvUi
      */
     public function getPdvStatusBarProperty(): array
     {
+        $user = Auth::user();
+        $conta = trim((string) ($user?->defaultCaixaContaNome(ErpContext::currentEmpresaId()) ?? ''));
+        $empresaNome = trim((string) (ErpContext::currentEmpresa()?->nome ?? ''));
+
         return [
-            'conta' => 'CAIXA',
-            'usuario' => Auth::user()?->name ?? 'USUARIO',
+            'empresa' => $empresaNome !== ''
+                ? mb_strtoupper($empresaNome, 'UTF-8')
+                : '—',
+            'conta' => $conta !== '' ? $conta : 'CAIXA',
+            'usuario' => $user?->name ?? 'USUARIO',
             'vendedor' => $this->vendedor,
             'tabela_preco' => $this->pdvTabelaPrecoLabel,
             'data_hora' => now()->format('d/m/Y H:i:s'),
+            'tunel' => \App\Support\Erp\ErpSystemConfig::acessoRemotoHabilitado()
+                ? CloudflaredStatus::forUi()
+                : null,
         ];
     }
 }

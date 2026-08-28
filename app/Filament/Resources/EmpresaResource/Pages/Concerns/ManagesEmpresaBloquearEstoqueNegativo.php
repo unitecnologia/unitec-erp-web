@@ -13,13 +13,8 @@ trait ManagesEmpresaBloquearEstoqueNegativo
 
     public function toggleBloquearEstoqueNegativo(): void
     {
-        $enabled = filter_var(
-            $this->data['param_geral_bloquear_estoque_negativo'] ?? false,
-            FILTER_VALIDATE_BOOLEAN,
-        );
-
-        if ($enabled) {
-            $this->data['param_geral_bloquear_estoque_negativo'] = false;
+        if ($this->isBloquearEstoqueNegativoAtivo()) {
+            $this->aplicarBloquearEstoqueNegativo(false);
             $this->zerarEstoqueNegativoModalOpen = false;
 
             return;
@@ -28,7 +23,7 @@ trait ManagesEmpresaBloquearEstoqueNegativo
         $count = (new ZeraEstoqueNegativoService())->countNegativos();
 
         if ($count === 0) {
-            $this->data['param_geral_bloquear_estoque_negativo'] = true;
+            $this->aplicarBloquearEstoqueNegativo(true);
 
             return;
         }
@@ -41,13 +36,13 @@ trait ManagesEmpresaBloquearEstoqueNegativo
     {
         $count = (new ZeraEstoqueNegativoService())->zerarTodos();
 
-        $this->data['param_geral_bloquear_estoque_negativo'] = true;
+        $this->aplicarBloquearEstoqueNegativo(true);
         $this->zerarEstoqueNegativoModalOpen = false;
         $this->zerarEstoqueNegativoModalCount = 0;
 
         Notification::make()
             ->title('Estoque negativo zerado')
-            ->body($count.' produto(s) ajustado(s). Bloqueio de estoque negativo ativado.')
+            ->body($count.' produto(s) ajustado(s).')
             ->success()
             ->send();
     }
@@ -56,11 +51,31 @@ trait ManagesEmpresaBloquearEstoqueNegativo
     {
         $this->zerarEstoqueNegativoModalOpen = false;
         $this->zerarEstoqueNegativoModalCount = 0;
-        $this->data['param_geral_bloquear_estoque_negativo'] = false;
+        $this->aplicarBloquearEstoqueNegativo(false);
     }
 
     public function handleZerarEstoqueNegativoModalEscape(): void
     {
         $this->cancelZerarEstoqueNegativoModal();
+    }
+
+    public function isBloquearEstoqueNegativoAtivo(): bool
+    {
+        return filter_var(
+            $this->data['param_geral_bloquear_estoque_negativo'] ?? false,
+            FILTER_VALIDATE_BOOLEAN,
+        );
+    }
+
+    private function aplicarBloquearEstoqueNegativo(bool $ativo): void
+    {
+        // Reatribui o array inteiro: nested set em $this->data[...] o Livewire não detecta.
+        $this->data = array_merge($this->data ?? [], [
+            'param_geral_bloquear_estoque_negativo' => $ativo,
+        ]);
+
+        if (method_exists($this, 'safeFillEmpresaForm')) {
+            $this->safeFillEmpresaForm();
+        }
     }
 }

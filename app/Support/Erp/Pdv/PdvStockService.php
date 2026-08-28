@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductComposition;
 use App\Models\ProductGrade;
 use App\Models\ProductSerial;
+use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\ProductEstoqueSaldoService;
 
 final class PdvStockService
@@ -21,6 +22,7 @@ final class PdvStockService
         ?int $productSerialId = null,
         ?string $docSaida = null,
         ?int $estoqueId = null,
+        ?\App\Models\Empresa $empresa = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -31,12 +33,26 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId);
+            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId, $empresa);
 
             return;
         }
 
-        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId);
+        if (EstoqueNegativoPolicy::ativo($empresa)) {
+            EstoqueNegativoPolicy::garantirSaidaPermitida($product, $quantidade, $estoqueId, $empresa);
+
+            if ($productGradeId && $product->contr_est_grade) {
+                if ($msg = $this->validaEstoqueGrade($product, $productGradeId, $quantidade)) {
+                    throw new \RuntimeException($msg.' Bloqueio de estoque negativo está ativo.');
+                }
+            }
+        }
+
+        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId, $empresa);
+
+        if ($product->controla_lote_validade) {
+            (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, $quantidade);
+        }
 
         if ($productGradeId && $product->contr_est_grade) {
             ProductGrade::query()
@@ -110,7 +126,7 @@ final class PdvStockService
         return null;
     }
 
-    private function baixaComposicao(Product $product, float $quantidade, ?string $docSaida, ?int $estoqueId = null): void
+    private function baixaComposicao(Product $product, float $quantidade, ?string $docSaida, ?int $estoqueId = null, ?\App\Models\Empresa $empresa = null): void
     {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -125,13 +141,13 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId);
+            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId, $empresa);
         }
     }
 
-    private function decrementarEstoqueProduto(Product $product, float $quantidade, ?int $estoqueId = null): void
+    private function decrementarEstoqueProduto(Product $product, float $quantidade, ?int $estoqueId = null, ?\App\Models\Empresa $empresa = null): void
     {
-        $this->saldos->decrementar((int) $product->id, $quantidade, $estoqueId);
+        $this->saldos->decrementar((int) $product->id, $quantidade, $estoqueId, $empresa);
     }
 
     private function baixaSerial(int $productSerialId, ?string $docSaida): void
@@ -168,6 +184,10 @@ final class PdvStockService
         }
 
         $this->saldos->incrementar((int) $product->id, $quantidade, $estoqueId);
+
+        if ($product->controla_lote_validade) {
+            (new \App\Support\Erp\ProductLoteService())->devolver($product, $quantidade);
+        }
 
         if ($productGradeId && $product->contr_est_grade) {
             ProductGrade::query()

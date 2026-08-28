@@ -299,7 +299,7 @@ trait ManagesRhFuncionarioFormModal
             'rhFuncionarioForm.cpf' => ['nullable', 'string', 'max:14'],
             'rhFuncionarioForm.email' => ['nullable', 'email', 'max:120'],
             'rhFuncionarioForm.cargo_id' => ['required', 'integer', 'exists:rh_cargos,id'],
-            'rhFuncionarioForm.departamento_id' => ['required', 'integer', 'exists:rh_departamentos,id'],
+            'rhFuncionarioForm.departamento_id' => ['nullable', 'integer', 'exists:rh_departamentos,id'],
             'rhFuncionarioForm.uf' => ['nullable', 'string', 'max:2'],
             'rhFuncionarioForm.terminais' => ['array'],
             'rhFuncionarioForm.terminais.*' => ['integer', Rule::exists('terminais', 'id')],
@@ -315,7 +315,6 @@ trait ManagesRhFuncionarioFormModal
             $this->validate($rules, [
                 'rhFuncionarioForm.nome.required' => 'Informe o nome.',
                 'rhFuncionarioForm.cargo_id.required' => 'Selecione o cargo.',
-                'rhFuncionarioForm.departamento_id.required' => 'Selecione o departamento.',
                 'rhFuncionarioForm.usuario_id.required' => 'Selecione o usuário do operador.',
                 'rhFuncionarioForm.estoque_id.required' => 'Selecione o estoque do operador.',
             ], [
@@ -468,12 +467,12 @@ trait ManagesRhFuncionarioFormModal
             return;
         }
 
+        // Não chamar highlightRecord() aqui: ele usa skipRender() e a tela não fecha no browser.
         $this->rhFuncionarioModalOpen = false;
         $this->rhFuncionarioModalRecordId = null;
         $this->rhFuncionarioForm = $this->blankRhFuncionarioForm();
-        $this->clearListSelection();
+        $this->highlightedRecordId = (int) $record->getKey();
         $this->resetTable();
-        $this->highlightRecord((int) $record->getKey());
     }
 
     /**
@@ -520,7 +519,16 @@ trait ManagesRhFuncionarioFormModal
      */
     public function rhTerminalOptions(): array
     {
+        $empresaId = (int) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+
+        if ($empresaId < 1) {
+            return [];
+        }
+
         return Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('ativo', true)
+            ->where('nome', '!=', '')
             ->orderBy('numero_logico_terminal')
             ->orderBy('nome')
             ->get(['id', 'nome', 'numero_logico_terminal', 'pdv', 'eh_caixa'])

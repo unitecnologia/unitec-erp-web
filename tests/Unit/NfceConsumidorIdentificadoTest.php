@@ -32,6 +32,7 @@ class NfceConsumidorIdentificadoTest extends TestCase
         $this->assertSame('MARIA SILVA', NfceConsumidorIdentificado::nome($person));
         $this->assertStringContainsString('RUA DAS PALMEIRAS', (string) NfceConsumidorIdentificado::endereco($person));
         $this->assertSame('045.***.***-01', NfceConsumidorIdentificado::cpfMascarado($venda));
+        $this->assertSame('045.333.239-01', NfceConsumidorIdentificado::cpfFormatado($venda));
     }
 
     public function test_nao_considera_consumidor_final_como_identificado(): void
@@ -53,13 +54,15 @@ class NfceConsumidorIdentificadoTest extends TestCase
         $this->assertFalse(NfceConsumidorIdentificado::ehClienteIdentificado($legado));
     }
 
-    public function test_cpf_digits_e_mascarado_lgpd(): void
+    public function test_cpf_digits_mascarado_e_formatado(): void
     {
         $this->assertSame('04533323901', NfceConsumidorIdentificado::cpfDigits('045.333.239-01'));
         $this->assertSame('', NfceConsumidorIdentificado::cpfDigits('123'));
 
         $venda = new PdvVenda(['cpf_nota' => '04533323901']);
         $this->assertSame('045.***.***-01', NfceConsumidorIdentificado::cpfMascarado($venda));
+        $this->assertSame('045.333.239-01', NfceConsumidorIdentificado::cpfFormatado($venda));
         $this->assertNull(NfceConsumidorIdentificado::cpfMascarado(new PdvVenda(['cpf_nota' => null])));
+        $this->assertNull(NfceConsumidorIdentificado::cpfFormatado(new PdvVenda(['cpf_nota' => null])));
     }
 }

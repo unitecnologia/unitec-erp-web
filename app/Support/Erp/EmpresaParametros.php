@@ -155,7 +155,6 @@ final class EmpresaParametros
             'param_pdv_pedido_duas_vias' => ['label' => 'Pedido em Duas Vias (PDV)', 'default' => false],
             'param_pdv_permitir_desconto_item' => ['label' => 'Permitir Desconto Item (PDV)', 'default' => true],
             'param_pdv_habilitar_desconto' => ['label' => 'Habilitar Desconto no PDV', 'default' => false],
-            'param_pdv_exibir_f3_vendedor' => ['label' => 'Exibir F3 Vendedor no PDV', 'default' => false],
             'param_pdv_ativar_som' => ['label' => 'Ativar Som no PDV (bip ao incluir item)', 'default' => false],
             'param_pdv_nfce_descricao_completa' => ['label' => 'NFC-e: Descrição Completa dos Itens (sem abreviar)', 'default' => false],
             'param_pdv_carga_auto' => ['label' => 'Carga Automática do PDV Offline', 'default' => true],
@@ -178,12 +177,51 @@ final class EmpresaParametros
                 'default' => false,
             ],
 
-            'param_fiscal_enviar_email_nfe' => ['label' => 'Enviar Email NFe', 'default' => true],
-            'param_fiscal_usar_credito_icms' => ['label' => 'Usar Crédito ICMS', 'default' => true],
             'param_fiscal_puxar_cfop_produto' => ['label' => 'Puxar CFOP do Produto', 'default' => false],
-            'param_fiscal_recolhe_fcp' => ['label' => 'Empresa Recolhe FCP', 'default' => true],
             'param_fiscal_bloquear_cancelamento_doc' => ['label' => 'Bloquear Cancelamento Venda com Documento Fiscal Emitido', 'default' => true],
             'param_fiscal_motivo_estorno_automatico' => ['label' => 'Motivo de Estorno Automático', 'default' => false],
+            'param_fiscal_nfe_baixa_estoque' => [
+                'label' => 'NF-e baixa estoque',
+                'hint' => 'Marcado: ao transmitir NF-e de saída, baixa o estoque dos produtos. Desmarcado: não movimenta estoque.',
+                'default' => true,
+            ],
+        ];
+    }
+
+    /**
+     * Módulos opcionais da empresa. Eles definem o que existe para todos os
+     * usuários; as permissões de usuário definem quem pode operar cada módulo.
+     *
+     * @return array<string, array{label: string, description: string, default: bool}>
+     */
+    public static function moduleEnableFields(): array
+    {
+        return [
+            'param_modulo_pdv' => [
+                'label' => 'PDV',
+                'description' => 'Ponto de venda, caixa e NFC-e no balcão.',
+                'default' => true,
+            ],
+            'param_modulo_ordens_servico' => [
+                'label' => 'Ordens de serviço',
+                'description' => 'Cadastro e acompanhamento de serviços.',
+                'default' => false,
+            ],
+            'param_modulo_logistica' => [
+                'label' => 'Logística e expedição',
+                'description' => 'Expedição, transportadores, veículos e rotas.',
+                'default' => false,
+            ],
+            'param_modulo_rh' => [
+                'label' => 'Recursos humanos',
+                'description' => 'Funcionários, cargos, departamentos e painel RH.',
+                'default' => true,
+            ],
+            'param_modulo_mercado_livre' => [
+                'label' => 'Mercado Livre',
+                'description' => 'Integração e configuração do Mercado Livre.',
+                'default' => false,
+            ],
         ];
     }
 
@@ -727,6 +765,88 @@ final class EmpresaParametros
     }
 
     /**
+     * Links públicos (Cloudflare Tunnel / acesso remoto).
+     *
+     * @return array<string, array{label: string, default: string, type: string}>
+     */
+    public static function acessoRemotoFields(): array
+    {
+        return [
+            'param_erp_public_url' => [
+                'label' => 'URL pública do ERP',
+                'default' => 'https://sua-loja.unierp.uk',
+                'type' => 'text',
+            ],
+            'param_gestor_public_url' => [
+                'label' => 'URL pública do Gestor',
+                'default' => 'https://sua-loja.unierp.uk/gestor',
+                'type' => 'text',
+            ],
+        ];
+    }
+
+    /**
+     * Credenciais / estado do provisionamento Cloudflare (acesso remoto).
+     *
+     * @return array<string, array{label: string, default: string, type: string}>
+     */
+    public static function cloudflareAcessoFields(): array
+    {
+        $cfg = (array) config('unitec.cloudflare', []);
+
+        return [
+            'param_cf_api_token' => [
+                'label' => 'Token Cloudflare',
+                'default' => trim((string) ($cfg['api_token'] ?? '')),
+                'type' => 'string',
+            ],
+            'param_cf_account_id' => [
+                'label' => 'Account ID',
+                'default' => trim((string) ($cfg['account_id'] ?? '')),
+                'type' => 'string',
+            ],
+            'param_cf_zone_id' => [
+                'label' => 'Zone ID',
+                'default' => trim((string) ($cfg['zone_id'] ?? '')),
+                'type' => 'string',
+            ],
+            'param_cf_base_domain' => [
+                'label' => 'Domínio base',
+                'default' => trim((string) ($cfg['base_domain'] ?? 'unierp.uk')) ?: 'unierp.uk',
+                'type' => 'string',
+            ],
+            'param_cf_subdomain' => [
+                'label' => 'Subdomínio',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_cf_tunnel_id' => [
+                'label' => 'Tunnel ID',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_cf_hostname' => [
+                'label' => 'Hostname',
+                'default' => '',
+                'type' => 'string',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function acessoRemotoBooleanFields(): array
+    {
+        return [
+            'param_acesso_remoto_habilitar' => [
+                'label' => 'Habilitar acesso remoto',
+                'default' => true,
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, bool|null>
      */
     public static function difalBooleanFields(): array
@@ -753,7 +873,36 @@ final class EmpresaParametros
     public static function apiServicosBooleanFields(): array
     {
         return [
-            'param_api_servicos_habilitar' => ['label' => 'Habilitar API de Serviços', 'default' => false],
+            'param_api_servicos_habilitar' => ['label' => 'Habilitar Busca Produto Auto', 'default' => false],
+        ];
+    }
+
+    /**
+     * Timeout da API de licença (URL do portal é nativa em config/unitec.php).
+     *
+     * @return array<string, array{label: string, default: int|float|string|null, type: string}>
+     */
+    public static function licencaApiFields(): array
+    {
+        return [
+            'param_licenca_api_timeout' => [
+                'label' => 'Timeout (segundos)',
+                'default' => 8,
+                'type' => 'integer',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function licencaApiBooleanFields(): array
+    {
+        return [
+            'param_licenca_api_habilitar' => [
+                'label' => 'Validar licença online (bloqueio pelo gerenciador)',
+                'default' => true,
+            ],
         ];
     }
 
@@ -783,7 +932,7 @@ final class EmpresaParametros
             'param_whatsapp_habilitar' => ['label' => 'Habilitar envio de WhatsApp pelo ERP', 'default' => false],
             'param_whatsapp_enviar_orcamento' => ['label' => 'Permitir envio de orçamentos', 'default' => true],
             'param_whatsapp_enviar_cobranca' => ['label' => 'Permitir envio de cobranças', 'default' => true],
-            'param_whatsapp_enviar_nfe' => ['label' => 'Permitir envio de NF-e (desabilitado por padrão; use e-mail)', 'default' => false],
+            'param_whatsapp_enviar_nfe' => ['label' => 'Permitir envio de NF-e', 'default' => true],
         ];
     }
 
@@ -868,6 +1017,8 @@ final class EmpresaParametros
             'param_meli_client_id' => ['label' => 'Client ID', 'default' => '', 'type' => 'string'],
             'param_meli_client_secret' => ['label' => 'Client Secret', 'default' => '', 'type' => 'string'],
             'param_meli_redirect_uri' => ['label' => 'URI de redirect', 'default' => '', 'type' => 'string'],
+            'param_meli_app_url' => ['label' => 'APP_URL (ML)', 'default' => '', 'type' => 'string'],
+            'param_meli_hub_url' => ['label' => 'Hub URL (ML)', 'default' => '', 'type' => 'string'],
             'param_meli_user_id' => ['label' => 'ID do usuário ML', 'default' => '', 'type' => 'string'],
             'param_meli_nickname' => ['label' => 'Apelido ML', 'default' => '', 'type' => 'string'],
             'param_meli_access_token' => ['label' => 'Access Token', 'default' => '', 'type' => 'string'],
@@ -893,6 +1044,46 @@ final class EmpresaParametros
     {
         return [
             'param_meli_habilitar' => ['label' => 'Habilitar integração Mercado Livre', 'default' => false],
+            'param_meli_is_hub' => ['label' => 'Este servidor é o hub ML', 'default' => false],
+        ];
+    }
+
+    /**
+     * Campos da aba API iFood (Merchant API — OAuth).
+     *
+     * @return array<string, array{label: string, default: int|float|string|null, type: string}>
+     */
+    public static function ifoodFields(): array
+    {
+        return [
+            'param_ifood_client_id' => ['label' => 'Client ID', 'default' => '', 'type' => 'string'],
+            'param_ifood_client_secret' => ['label' => 'Client Secret', 'default' => '', 'type' => 'string'],
+            'param_ifood_merchant_id' => ['label' => 'Merchant ID', 'default' => '', 'type' => 'string'],
+            'param_ifood_ambiente' => ['label' => 'Ambiente', 'default' => 'sandbox', 'type' => 'string'],
+            'param_ifood_access_token' => ['label' => 'Access Token', 'default' => '', 'type' => 'string'],
+            'param_ifood_refresh_token' => ['label' => 'Refresh Token', 'default' => '', 'type' => 'string'],
+            'param_ifood_webhook_secret' => ['label' => 'Webhook Secret', 'default' => '', 'type' => 'string'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function ifoodAmbienteOptions(): array
+    {
+        return [
+            'sandbox' => 'Sandbox',
+            'producao' => 'Produção',
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function ifoodBooleanFields(): array
+    {
+        return [
+            'param_ifood_habilitar' => ['label' => 'Habilitar integração iFood', 'default' => false],
         ];
     }
 
@@ -906,7 +1097,7 @@ final class EmpresaParametros
         return [
             'param_update_download_url' => [
                 'label' => 'Link do arquivo de atualização (Unitec-ERP-Update.zip)',
-                'default' => '',
+                'default' => \App\Support\Erp\ErpSystemConfig::DEFAULT_UPDATE_DOWNLOAD_URL,
                 'type' => 'text',
             ],
             'param_backup_pasta_destino' => [
@@ -925,7 +1116,7 @@ final class EmpresaParametros
                 'type' => 'string',
             ],
             'param_balanca_etiqueta_modelo' => [
-                'label' => 'Modelo da etiqueta de balança (01–04)',
+                'label' => 'Modelo da etiqueta de balança (01–05)',
                 'default' => 4,
                 'type' => 'integer',
             ],
@@ -951,6 +1142,11 @@ final class EmpresaParametros
             ],
             'param_backup_ultimo_status' => [
                 'label' => 'Status do último backup',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_portal_bkp_token' => [
+                'label' => 'Token do Portal para Log de BKP',
                 'default' => '',
                 'type' => 'string',
             ],
@@ -1098,6 +1294,10 @@ final class EmpresaParametros
             $defaults[$field] = $meta['default'];
         }
 
+        foreach (self::moduleEnableFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
         foreach (self::impostoFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
@@ -1138,6 +1338,26 @@ final class EmpresaParametros
             $defaults[$field] = $meta['default'];
         }
 
+        foreach (self::acessoRemotoFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::acessoRemotoBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::cloudflareAcessoFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::licencaApiFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::licencaApiBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
         foreach (self::whatsAppFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
@@ -1159,6 +1379,14 @@ final class EmpresaParametros
         }
 
         foreach (self::mercadoLivreBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::ifoodFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::ifoodBooleanFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
 
@@ -1278,8 +1506,10 @@ final class EmpresaParametros
             'boleto' => 'API Boleto',
             'api_servicos' => 'API de Serviços',
             'whatsapp' => 'WhatsApp',
+            'email' => 'E-mail',
             'portal_contador' => 'Portal do Contador',
             'mercado_livre' => 'Mercado Livre',
+            'ifood' => 'API iFood',
             'estoques' => 'Cadastro de Estoque',
             'sistema' => 'Atualização e Backup',
         ];

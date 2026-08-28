@@ -7,6 +7,7 @@ use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\PersonResource;
 use App\Models\Person;
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\Queries\PersonListQueryBuilder;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
@@ -137,6 +138,11 @@ class ListPeople extends ListRecords
     protected function erpListEntityName(): string
     {
         return 'uma pessoa';
+    }
+
+    protected function erpListSyncChannel(): ?string
+    {
+        return ErpDataSyncVersion::CHANNEL_PEOPLE;
     }
 
     protected function customErpListKeyboardConfig(): array

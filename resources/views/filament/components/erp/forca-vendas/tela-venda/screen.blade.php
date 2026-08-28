@@ -18,42 +18,41 @@
         $refs.barcode?.focus();
     })"
     x-on:keydown.window="
-        if (@js($this->excluirItemModalOpen)) {
+        const finOpen = $wire.etapa === 'finalizacao';
+        const descontoOpen = !!$wire.descontoModalOpen;
+        const excluirOpen = !!$wire.excluirItemModalOpen;
+        const canhotoOpen = !!$wire.finalizarCartaoCanhotoAberta;
+
+        if (excluirOpen) {
             if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarExcluirItem(); return; }
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelarExcluirItem(); return; }
             return;
         }
-        const inField = $event.target.closest('input, textarea, select, button.erp-fv-tv__combo-btn');
-        if ($event.key === 'Delete' && !inField && !@js($finOpen) && !@js($this->descontoModalOpen)) {
+
+        const target = $event.target;
+        const inField = target.closest?.('input, textarea, select, button.erp-fv-tv__combo-btn');
+        const inValorPagamento = typeof target?.id === 'string' && target.id.startsWith('erp-fv-finalizar-valor-');
+        const inClienteFin = target?.id === 'erp-fv-fin-cliente';
+        const inAjusteFin = !!target.closest?.('.erp-fv-fin__ajuste');
+        const tecla = ($event.key || '');
+        const teclaAtalho = tecla.length === 1 && /[a-zA-Z0-9]/.test(tecla) && !$event.ctrlKey && !$event.altKey && !$event.metaKey;
+
+        if ($event.key === 'Delete' && !inField && !finOpen && !descontoOpen) {
             $event.preventDefault();
             $wire.pedirConfirmacaoExcluirItem();
             return;
         }
-        if ($event.ctrlKey && ($event.key === 'd' || $event.key === 'D')) {
-            if (!@js($finOpen) && !inField) {
+        if ($event.ctrlKey && (tecla === 'd' || tecla === 'D')) {
+            if (!finOpen && !inField) {
                 $event.preventDefault();
                 $wire.abrirModalDescontoItem();
                 return;
             }
         }
-        if (inField) {
-            // Escape no campo: fecha sugestões (wire) — não cancela a venda.
-            if ($event.key === 'Escape') {
-                $event.preventDefault();
-                return;
-            }
-            if ($event.key === 'F4' || $event.key === 'F5' || $event.key === 'F8') {
-                $event.preventDefault();
-            } else {
-                return;
-            }
-        }
-        if (@js($this->descontoModalOpen)) {
-            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharModalDescontoItem(); }
-            return;
-        }
-        if (@js($finOpen)) {
-            if (@js($this->finalizarCartaoCanhotoAberta)) {
+
+        // Finalização: atalhos A/B/C… preenchem o restante (padrão PDV), mesmo com foco no Valor.
+        if (finOpen) {
+            if (canhotoOpen) {
                 if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelFinalizarCartaoCanhoto(); return; }
                 if ($event.key === 'F2') { $event.preventDefault(); $wire.gerarParcelasCartaoCanhoto(); return; }
                 if ($event.key === 'F7') { $event.preventDefault(); $wire.concluirCartaoCanhoto(); return; }
@@ -71,10 +70,37 @@
             if ($event.key === 'F4' || $event.key === 'F6') { $event.preventDefault(); return; }
             if ($event.key === 'F5') { $event.preventDefault(); $wire.confirmarPedido(); return; }
             if ($event.key === 'F8') { $event.preventDefault(); $wire.faturarPedido(); return; }
-            if (!inField && $event.key.length === 1 && /[a-zA-Z0-9]/.test($event.key)) {
-                $event.preventDefault();
-                $wire.selectPagamentoByAtalho($event.key);
+
+            if (inClienteFin || inAjusteFin) {
+                return;
             }
+            // Só letras/atalhos das formas (A, B, C…). Dígitos e vírgula ficam livres no Valor.
+            if (teclaAtalho) {
+                const atalhos = Array.from(document.querySelectorAll('.erp-fv-fin .erp-pdv-finalizar__kbd'))
+                    .map((el) => (el.textContent || '').trim().toUpperCase())
+                    .filter((v) => v.length === 1);
+                if (atalhos.includes(tecla.toUpperCase())) {
+                    $event.preventDefault();
+                    $event.stopPropagation();
+                    $wire.selectPagamentoByAtalho(tecla);
+                }
+            }
+            return;
+        }
+
+        if (inField) {
+            if ($event.key === 'Escape') {
+                $event.preventDefault();
+                return;
+            }
+            if ($event.key === 'F4' || $event.key === 'F5' || $event.key === 'F8') {
+                $event.preventDefault();
+            } else {
+                return;
+            }
+        }
+        if (descontoOpen) {
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharModalDescontoItem(); }
             return;
         }
         if ($event.key === 'F4') { $event.preventDefault(); $wire.irParaFinalizacao(); }

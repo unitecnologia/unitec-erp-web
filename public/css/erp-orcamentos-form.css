@@ -45,7 +45,7 @@
     display: flex !important;
     flex: 1 1 0 !important;
     flex-direction: column !important;
-    align-items: stretch !important;
+    align-items: center !important;
     justify-content: stretch !important;
     min-height: 0 !important;
     overflow: hidden !important;
@@ -57,12 +57,13 @@
     display: flex !important;
     flex-direction: column !important;
     flex: 1 1 0 !important;
-    width: 100% !important;
-    max-width: none !important;
+    width: calc(100% - 5cm) !important;
+    max-width: calc(100% - 5cm) !important;
     min-height: 0 !important;
     max-height: none !important;
     height: auto !important;
     overflow: hidden !important;
+    margin-inline: auto !important;
 }
 
 .fi-page.erp-orcamentos-form-page {
@@ -166,7 +167,281 @@
 
 .erp-orc-header {
     flex-shrink: 0;
-    padding: 0.15rem 0 0.25rem;
+    padding: 0;
+}
+
+.erp-orc-header-panel {
+    flex-shrink: 0;
+    margin: 0 0 0.25rem;
+    padding: 0;
+}
+
+.erp-orc-header-panel:has(.erp-orc-cliente-lookup) {
+    position: relative;
+    z-index: 70;
+}
+
+.erp-orc-header-panel .erp-fv-tv__box {
+    margin-top: 0.45rem;
+}
+
+.erp-orc-header-panel .erp-orc-cliente-field {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Razão um pouco menor / CPF-CNPJ 1cm maior */
+.erp-orc-header-panel .erp-fv-tv__field--grow {
+    flex: 1 1 calc(12rem - 1cm);
+    min-width: calc(10rem - 1cm);
+    max-width: calc(100% - 1cm);
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--doc {
+    width: calc(8.4rem + 1cm);
+    flex: 0 0 calc(8.4rem + 1cm);
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--uf {
+    width: 4.5rem;
+    flex: 0 0 4.5rem;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--uf select.erp-nfe__input,
+.erp-orc-header-panel .erp-fv-tv__field--uf .erp-nfe__input {
+    padding-left: 0.35rem;
+    padding-right: 0.2rem;
+    text-align: center;
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--end {
+    flex: 1 1 calc(9rem - 3cm);
+    min-width: calc(8rem - 3cm);
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--cep {
+    width: 7.2rem;
+    flex: 0 0 7.2rem;
+    min-width: 7.2rem;
+}
+
+.erp-orc-cep-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.erp-orc-cep-wrap .erp-nfe__input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-orc-cep-lupa {
+    flex: 0 0 1.7rem;
+    width: 1.7rem;
+    min-height: 1.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f3460;
+    cursor: pointer;
+    line-height: 1;
+    font-size: 0.78rem;
+}
+
+.erp-orc-cep-lupa:hover {
+    background: #e8f1fb;
+    border-color: #1e5a9e;
+}
+
+.erp-orc-cep-lupa:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.erp-orc-header-panel .erp-fv-tv__field--cidade {
+    position: relative;
+    z-index: 5;
+    width: calc(11rem + 3cm);
+    flex: 0 0 calc(11rem + 3cm);
+    min-width: calc(11rem + 3cm);
+    max-width: calc(11rem + 3cm);
+}
+
+.erp-orc-header-panel:has(.erp-orc-cidade-suggest) {
+    overflow: visible;
+    z-index: 70;
+}
+
+.erp-orc-cidade-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.erp-orc-cidade-suggest {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    min-width: 16rem;
+    z-index: 80;
+    margin: 0;
+    padding: 0.2rem 0;
+    list-style: none;
+    max-height: 14rem;
+    overflow: auto;
+    background: #ffffff;
+    border: 1px solid #b8c9de;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgb(15 52 96 / 14%);
+}
+
+.erp-orc-cidade-suggest li {
+    margin: 0;
+}
+
+.erp-orc-cidade-suggest button {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.32rem 0.55rem;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: #0f172a;
+}
+
+.erp-orc-cidade-suggest button:hover {
+    background: #e8f1fb;
+}
+
+.erp-orc-cidade-suggest button.is-selected {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.erp-orc-cidade-suggest button.is-selected .erp-orc-cidade-suggest__code {
+    color: #dbeafe;
+}
+
+.erp-orc-cidade-suggest button.is-selected .erp-orc-cidade-suggest__nome,
+.erp-orc-cidade-suggest button.is-selected .erp-orc-cidade-suggest__uf {
+    color: #ffffff;
+}
+
+.erp-orc-cidade-suggest__code {
+    flex: 0 0 4.2rem;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+}
+
+.erp-orc-cidade-suggest__nome {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-orc-cidade-suggest__uf {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-orc-header-panel__validade {
+    width: 5.5rem;
+    flex: 0 0 auto;
+}
+
+.erp-orc-header-panel__validade .erp-nfe__input {
+    text-align: right;
+}
+
+.erp-orc-header-panel__forma {
+    width: 14rem;
+    flex: 0 0 14rem;
+    max-width: 14rem;
+}
+
+.erp-orc-header-panel__select {
+    appearance: auto;
+    cursor: pointer;
+}
+
+/* Inputs do cabeçalho Cliente (mesmo padrão da Tela Venda) */
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field .erp-nfe__input,
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field select.erp-nfe__input {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.22rem 0.45rem;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
+    box-sizing: border-box;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field .erp-nfe__input:focus,
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field select.erp-nfe__input:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    background: #fff;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field .erp-nfe__input[readonly],
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field .erp-nfe__input:disabled,
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field select.erp-nfe__input:disabled {
+    background: #dce6f2;
+    border-color: #9eb6d4;
+    color: #1e293b;
+    font-weight: 600;
+    opacity: 1;
+    cursor: default;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field .erp-nfe__input:not([readonly]):not(:disabled),
+.erp-orcamentos-form-page .erp-orc-header-panel .erp-fv-tv__field select.erp-nfe__input:not(:disabled) {
+    background: #fff;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel #orc-cliente:not([readonly]):not(:disabled) {
+    background: #fff8e8 !important;
+    border: 2px solid #1e5a9e !important;
+    min-height: 2.05rem;
+    font-weight: 700;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel #orc-cliente:focus {
+    background: #fff !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22) !important;
+}
+
+.erp-orcamentos-form-page .erp-orc-header-panel #orc-forma:not([readonly]):not(:disabled),
+.erp-orcamentos-form-page .erp-orc-header-panel #orc-validade:not([readonly]):not(:disabled),
+.erp-orcamentos-form-page .erp-orc-header-panel #orc-vendedor:not(:disabled) {
+    background: #fff;
 }
 
 .erp-orc-pcad .erp-pcad__tabs {
@@ -877,16 +1152,160 @@
     border-top: 1px solid var(--erp-border-light, #c7d5e8);
 }
 
-.erp-orc-post-save-modal__body {
-    padding: 0.75rem 0.85rem;
+.erp-orc-post-save-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 350;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
 }
 
-.erp-orc-post-save-modal__message {
-    margin: 0;
-    font-size: 0.88rem;
+.erp-orc-post-save-modal .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 42%);
+    backdrop-filter: blur(2px);
+}
+
+.erp-orc-post-save-modal__window {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, calc(100vw - 2rem));
+    padding: 1.35rem 1.35rem 1.1rem;
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 18px 48px rgb(15 23 42 / 22%);
+    text-align: center;
+}
+
+.erp-orc-post-save-modal__close {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-orc-post-save-modal__close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.erp-orc-post-save-modal__icon {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    margin: 0 auto 0.7rem;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #15803d;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.erp-orc-post-save-modal__title {
+    margin: 0 0 0.3rem;
+    font-size: 1.12rem;
     font-weight: 700;
-    color: #000080;
-    line-height: 1.45;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+}
+
+.erp-orc-post-save-modal__lead {
+    margin: 0 0 0.85rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.erp-orc-post-save-modal__card {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    text-align: left;
+}
+
+.erp-orc-post-save-modal__code {
+    display: inline-block;
+    margin-bottom: 0.28rem;
+    padding: 0.08rem 0.42rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.erp-orc-post-save-modal__total {
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.erp-orc-post-save-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.erp-orc-post-save-modal__btn {
+    min-width: 7.2rem;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-orc-post-save-modal__btn--primary {
+    border: 1px solid #15803d;
+    background: #15803d;
+    color: #fff;
+}
+
+.erp-orc-post-save-modal__btn--primary:hover,
+.erp-orc-post-save-modal__btn--primary:focus-visible {
+    background: #166534;
+    border-color: #166534;
+}
+
+.erp-orc-post-save-modal__btn--ghost {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-orc-post-save-modal__btn--ghost:hover,
+.erp-orc-post-save-modal__btn--ghost:focus-visible {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.erp-orc-post-save-modal__hint {
+    margin: 0.7rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94a3b8;
 }
 
 .erp-orc-item-delete-modal {
@@ -902,33 +1321,289 @@
 .erp-orc-item-delete-modal .erp-lookup-modal__backdrop {
     position: absolute;
     inset: 0;
-    background: rgb(0 0 0 / 35%);
-}
-
-.erp-orc-item-delete-modal .erp-lookup-modal__window {
-    position: relative;
-    z-index: 1;
+    background: rgb(15 23 42 / 42%);
+    backdrop-filter: blur(2px);
 }
 
 .erp-orc-item-delete-modal__window {
-    width: min(24rem, calc(100vw - 2rem));
+    position: relative;
+    z-index: 1;
+    width: min(26rem, calc(100vw - 2rem));
+    padding: 1.35rem 1.35rem 1.1rem;
+    border: 1px solid #fecaca;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 18px 48px rgb(15 23 42 / 22%);
+    text-align: center;
 }
 
-.erp-orc-item-delete-modal__body {
-    padding: 0.75rem 0.85rem;
+.erp-orc-item-delete-modal__close {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
 }
 
-.erp-orc-item-delete-modal__message {
-    margin: 0 0 0.5rem;
-    font-size: 0.88rem;
+.erp-orc-item-delete-modal__close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.erp-orc-item-delete-modal__icon {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    margin: 0 auto 0.7rem;
+    border-radius: 999px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.erp-orc-item-delete-modal__title {
+    margin: 0 0 0.3rem;
+    font-size: 1.12rem;
     font-weight: 700;
-    color: #000080;
-    line-height: 1.45;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
 }
 
-.erp-orc-item-delete-modal__item {
+.erp-orc-item-delete-modal__lead {
+    margin: 0 0 0.85rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.erp-orc-item-delete-modal__card {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    text-align: left;
+}
+
+.erp-orc-item-delete-modal__code {
+    display: inline-block;
+    margin-bottom: 0.28rem;
+    padding: 0.08rem 0.42rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.erp-orc-item-delete-modal__name {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.86rem;
+    font-weight: 700;
     color: #0f172a;
     line-height: 1.35;
+}
+
+.erp-orc-item-delete-modal__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.4rem 0 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-orc-item-delete-modal__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.erp-orc-item-delete-modal__btn {
+    min-width: 7.2rem;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-orc-item-delete-modal__btn--danger {
+    border: 1px solid #dc2626;
+    background: #dc2626;
+    color: #fff;
+}
+
+.erp-orc-item-delete-modal__btn--danger:hover,
+.erp-orc-item-delete-modal__btn--danger:focus-visible {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
+.erp-orc-item-delete-modal__btn--ghost {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+}
+
+.erp-orc-item-delete-modal__btn--ghost:hover,
+.erp-orc-item-delete-modal__btn--ghost:focus-visible {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.erp-orc-item-delete-modal__hint {
+    margin: 0.7rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+/* Barra produto + grade estilo Tela Venda */
+.erp-orc-produto-bar {
+    flex-shrink: 0;
+    margin: 0.15rem 0 0.35rem;
+    padding: 0 0.05rem;
+}
+
+.erp-orc-produto-bar .erp-fv-tv__box {
+    margin-top: 0.45rem;
+}
+
+.erp-orc-produto-bar .erp-fv-tv__panel--produto {
+    padding: 0;
+}
+
+/* Inputs da barra: mesmos estilos da Tela Venda (lá o seletor exige .erp-fv-tela-venda-page) */
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field .erp-nfe__input,
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field textarea.erp-nfe__input {
+    width: 100%;
+    min-height: 1.85rem;
+    padding: 0.22rem 0.45rem;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.2;
+    box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
+    box-sizing: border-box;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field .erp-nfe__input:focus {
+    outline: none;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    background: #fff;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__input--barcode,
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field--qtd .erp-nfe__input,
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field--preco .erp-nfe__input {
+    min-height: 2.1rem !important;
+    border: 2px solid #1e5a9e !important;
+    background: #fff8e8 !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    box-shadow: inset 0 1px 2px rgba(15, 52, 96, 0.08);
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__input--barcode::placeholder {
+    color: #64748b;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__input--barcode:focus,
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field--qtd .erp-nfe__input:focus,
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field--preco .erp-nfe__input:focus {
+    border-color: #1d4ed8 !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22) !important;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field .erp-fv-tv__input--total[readonly] {
+    min-height: 2.1rem;
+    border: 2px solid #1e5a9e;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 800;
+    box-shadow: inset 0 1px 2px rgba(15, 52, 96, 0.08);
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field .erp-nfe__input:disabled {
+    opacity: 1;
+    background: #fff8e8 !important;
+    color: #0f172a !important;
+    cursor: text;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__field--total-item {
+    width: 6.8rem;
+}
+
+.erp-orcamentos-form-page .erp-orc-produto-bar .erp-fv-tv__btn-desc:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-orc-itens--fv {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__body {
+    flex: 1;
+    min-height: 220px;
+    margin: 0;
+}
+
+.erp-orc-pcad .erp-pcad__workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-orc-pcad .erp-pcad__content:has(.erp-orc-itens--fv) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.erp-orc-itens--fv .erp-orc-itens__delete-btn {
+    border: 0;
+    background: transparent;
+    color: #b91c1c;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0.15rem;
+}
+
+.erp-orc-itens--fv .erp-orc-itens__delete-btn:hover {
+    color: #7f1d1d;
 }

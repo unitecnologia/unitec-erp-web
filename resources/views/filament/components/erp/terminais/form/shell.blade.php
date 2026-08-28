@@ -3,8 +3,8 @@
         @foreach ([
             'configuracoes' => 'Configurações',
             'balanca' => 'Balanças',
-            'sat' => 'SAT',
             'tef' => 'TEF/POS',
+            'aparelhos' => 'Aparelhos',
         ] as $tab => $label)
             <button
                 type="button"
@@ -19,7 +19,12 @@
 
     <div class="erp-pcad__workspace erp-terminais-pcad__workspace">
         <div class="erp-pcad__content">
-            @include('filament.components.erp.terminais.form.tabs.' . $this->activeTerminalTab)
+            @php
+                $terminalTab = in_array($this->activeTerminalTab, $this->terminalTabKeys(), true)
+                    ? $this->activeTerminalTab
+                    : 'configuracoes';
+            @endphp
+            @include('filament.components.erp.terminais.form.tabs.' . $terminalTab)
         </div>
     </div>
 </div>

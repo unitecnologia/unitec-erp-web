@@ -2175,7 +2175,7 @@
 .erp-comando__exit { background: none; border: none; font-weight: 700; cursor: pointer; color: var(--erp-brand-primary); }
 
 .erp-migra-fb__panel {
-    width: min(100%, 40rem);
+    width: min(100%, calc(40rem + 5cm));
     padding: 1.1rem 1.25rem 1.25rem;
     background: var(--erp-bg-toolbar, #eef4fb);
     border: 1px solid var(--erp-border-light, #c7d5e8);
@@ -2406,7 +2406,7 @@
     color: #0f172a;
 }
 
-.erp-migra-fb__footer { width: min(100%, 40rem); }
+.erp-migra-fb__footer { width: min(100%, calc(40rem + 5cm)); }
 
 @media (max-width: 640px) {
     .erp-migra-fb__grid { grid-template-columns: 1fr; }

@@ -4,12 +4,15 @@ namespace Database\Seeders;
 
 use App\Models\FiscalClassificacaoTributaria;
 use App\Models\FiscalIbptItem;
+use App\Support\Erp\Fiscal\NcmCatalogService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Tabelas fiscais padrão do sistema (CFOP + cClassTrib + IBPT + Tabela ICMS).
+ * Tabelas fiscais padrão do sistema (CFOP + cClassTrib + IBPT + NCM + Tabela ICMS).
  * Empregam dados oficiais embutidos em database/data/fiscal.
+ * cClassTrib, IBPT e NCM: se já houver registros, o seed preserva (não esvazia).
+ * Atualização intencional: botão "Atualizar tabela" / Importar IPBTAX na tela.
  */
 class FiscalTabelasPadraoSeeder extends Seeder
 {
@@ -23,6 +26,14 @@ class FiscalTabelasPadraoSeeder extends Seeder
 
     protected function seedCclassTrib(): void
     {
+        if (FiscalClassificacaoTributaria::query()->exists()) {
+            $this->command?->info(
+                'cClassTrib já presente — preservada ('.FiscalClassificacaoTributaria::query()->count().' registro(s)).'
+            );
+
+            return;
+        }
+
         $path = database_path('data/fiscal/cclass_trib.json');
 
         if (! is_file($path)) {
@@ -77,6 +88,14 @@ class FiscalTabelasPadraoSeeder extends Seeder
 
     protected function seedIbpt(): void
     {
+        // Tabela padrão do sistema: se já houver dados (instalação/importação), nunca apagar.
+        if (FiscalIbptItem::query()->exists()) {
+            $this->command?->info('IBPT já presente — preservada ('.FiscalIbptItem::query()->count().' registro(s)).');
+            $this->ensureNcmsFromIbpt();
+
+            return;
+        }
+
         $gzPath = database_path('data/fiscal/ibpt_itens.jsonl.gz');
         $plainPath = database_path('data/fiscal/ibpt_itens.jsonl');
 
@@ -146,5 +165,28 @@ class FiscalTabelasPadraoSeeder extends Seeder
         });
 
         $this->command?->info('IBPT padrão: '.count($payload).' registro(s).');
+        $this->ensureNcmsFromIbpt();
+    }
+
+    /**
+     * Catálogo ncms padrão a partir da IPBTAX (upsert — nunca apaga NCMs existentes).
+     */
+    protected function ensureNcmsFromIbpt(): void
+    {
+        if (! FiscalIbptItem::query()->exists()) {
+            return;
+        }
+
+        try {
+            $result = (new NcmCatalogService)->syncFromIbpt();
+            $this->command?->info(
+                'NCM padrão (de IBPT): '.$result['synced'].' código(s)'
+                .' — criados '.$result['created']
+                .', atualizados '.$result['updated'].'.'
+            );
+        } catch (\Throwable $e) {
+            report($e);
+            $this->command?->warn('Falha ao sincronizar NCMs a partir da IBPT: '.$e->getMessage());
+        }
     }
 }

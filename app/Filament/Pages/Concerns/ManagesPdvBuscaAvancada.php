@@ -4,12 +4,13 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Pdv\PdvProductSearchRanking;
 
 trait ManagesPdvBuscaAvancada
 {
     public string $buscaAvancadaSearch = '';
 
-    public string $buscaAvancadaColumn = 'descricao';
+    public string $buscaAvancadaColumn = 'codigo_barras';
 
     /** @var array<int, array<string, mixed>> */
     public array $buscaAvancadaResults = [];
@@ -24,6 +25,7 @@ trait ManagesPdvBuscaAvancada
             return;
         }
 
+        $this->buscaAvancadaColumn = 'codigo_barras';
         $this->buscaAvancadaSearch = trim($this->pdvSearch);
         $this->refreshBuscaAvancadaResults();
         $this->openPdvModal('busca_avancada');
@@ -65,6 +67,14 @@ trait ManagesPdvBuscaAvancada
         $config = $this->pdvConfig();
         $like = $config->pesquisaPartesDescricao() ? '%' . $term . '%' : $term . '%';
         $column = $this->buscaAvancadaColumn;
+        $empresaId = $config->empresa()?->id ? (int) $config->empresa()->id : null;
+
+        $prefixAttributes = match ($column) {
+            'codigo' => ['codigo'],
+            'referencia' => ['referencia'],
+            'codigo_barras' => ['codigo_barras', 'codigo_barras_caixa'],
+            default => ['descricao'],
+        };
 
         $query = Product::query()->where('ativo', true);
 
@@ -80,12 +90,27 @@ trait ManagesPdvBuscaAvancada
             };
         });
 
+        $candidates = $query
+            ->orderBy('descricao')
+            ->limit(PdvProductSearchRanking::CANDIDATE_LIMIT)
+            ->get();
+
+        $ranked = PdvProductSearchRanking::rankProducts(
+            $candidates,
+            $term,
+            $prefixAttributes,
+            $empresaId,
+            100,
+        );
+
         $priceService = $this->pdvPriceService();
 
-        $this->buscaAvancadaResults = $query
-            ->orderBy('descricao')
-            ->limit(100)
-            ->get()
+        $previousProductId = 0;
+        if ($this->selectedBuscaAvancadaIndex !== null) {
+            $previousProductId = (int) ($this->buscaAvancadaResults[$this->selectedBuscaAvancadaIndex]['product_id'] ?? 0);
+        }
+
+        $this->buscaAvancadaResults = $ranked
             ->map(fn (Product $product): array => [
                 'product_id' => $product->id,
                 'codigo' => $product->codigo,
@@ -99,7 +124,20 @@ trait ManagesPdvBuscaAvancada
             ->values()
             ->all();
 
-        $this->selectedBuscaAvancadaIndex = $this->buscaAvancadaResults === [] ? null : 0;
+        $this->selectedBuscaAvancadaIndex = null;
+
+        if ($previousProductId > 0) {
+            foreach ($this->buscaAvancadaResults as $index => $row) {
+                if ((int) ($row['product_id'] ?? 0) === $previousProductId) {
+                    $this->selectedBuscaAvancadaIndex = $index;
+                    break;
+                }
+            }
+        }
+
+        if ($this->selectedBuscaAvancadaIndex === null) {
+            $this->selectedBuscaAvancadaIndex = $this->buscaAvancadaResults === [] ? null : 0;
+        }
     }
 
     public function selectBuscaAvancadaResult(int $index): void

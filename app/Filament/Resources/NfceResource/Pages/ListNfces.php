@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\NfceResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\NfceResource;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceClienteEmail;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceContadorEmail;
@@ -27,6 +28,7 @@ use Livewire\Attributes\Url;
 class ListNfces extends ListRecords
 {
     use InteractsWithErpListPage;
+    use InteractsWithErpPermissions;
     use ManagesNfceFiscalActions;
     use ManagesNfceRelatorio;
     use ManagesNfceContadorEmail;
@@ -171,6 +173,7 @@ class ListNfces extends ListRecords
                 'pdvVenda.user',
                 'pdvVenda.vendedor',
                 'pdvVenda.venda',
+                'pdvVenda.person',
             ]);
 
         $empresaId = $this->empresaIdAtiva();
@@ -229,7 +232,10 @@ class ListNfces extends ListRecords
             'numero' => $query->where('numero', 'like', $like),
             'chave' => $query->where('chave', 'like', $like),
             'protocolo' => $query->where('protocolo', 'like', $like),
-            'cpf' => $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like)),
+            'cpf' => $query->where(function (Builder $outer) use ($like): void {
+                $outer->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda->where('cpf_nota', 'like', $like))
+                    ->orWhereHas('pdvVenda.person', fn (Builder $person): Builder => $person->where('cpf_cnpj', 'like', $like));
+            }),
             'caixa' => $query->whereHas('pdvVenda.sessao.terminal', fn (Builder $terminal): Builder => $terminal->where('nome', 'like', $like)),
             'usuario' => $query->whereHas('pdvVenda.user', fn (Builder $user): Builder => $user->where('name', 'like', $like)),
             'vendedor' => $query->where(function (Builder $outer) use ($like): void {

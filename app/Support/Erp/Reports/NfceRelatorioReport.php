@@ -3,7 +3,7 @@
 namespace App\Support\Erp\Reports;
 
 use App\Models\PdvVendaNfce;
-use Illuminate\Support\Carbon;
+use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Collection;
 
 class NfceRelatorioReport
@@ -63,11 +63,7 @@ class NfceRelatorioReport
             return '';
         }
 
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('d/m/Y');
-        }
-
-        return Carbon::parse((string) $value)->format('d/m/Y');
+        return ErpTimezone::toLocal($value)->format('d/m/Y');
     }
 
     public static function formatNumero(mixed $numero): string

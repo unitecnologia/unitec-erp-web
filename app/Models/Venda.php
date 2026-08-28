@@ -7,7 +7,9 @@ namespace App\Models;
 
 
 use App\Models\Nfe;
+use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
+use App\Support\Erp\ErpDataSyncVersion;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -19,11 +21,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
 
+    'empresa_id',
+
     'numero',
 
     'data',
 
     'hora',
+
+    'hora_abertura',
 
     'cliente_id',
 
@@ -76,6 +82,17 @@ class Venda extends Model
     public const PLATAFORMA_ERP = 'erp';
 
     public const PLATAFORMA_MOBILE = 'mobile';
+
+    protected static function booted(): void
+    {
+        static::saved(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_SALES);
+        });
+
+        static::deleted(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_SALES);
+        });
+    }
 
     /**
 
@@ -136,8 +153,8 @@ class Venda extends Model
     }
 
     /**
-     * Plataforma de origem da venda, inferida pelo vínculo com PDV / Força de Vendas
-     * quando o campo gravado estiver ausente ou incorreto (ex.: backfill antigo).
+     * Plataforma de origem da venda.
+     * Respeita o campo gravado (erp/mobile/pdv); só infere quando estiver vazio.
      */
     public function plataformaEfetiva(): string
     {
@@ -145,11 +162,19 @@ class Venda extends Model
             return self::PLATAFORMA_PDV;
         }
 
-        if ($this->temOrigemMobile()) {
+        $plataforma = $this->plataforma;
+
+        if (in_array($plataforma, [self::PLATAFORMA_ERP, self::PLATAFORMA_MOBILE, self::PLATAFORMA_PDV], true)) {
+            return (string) $plataforma;
+        }
+
+        if ($this->temOrigemMobileApp()) {
             return self::PLATAFORMA_MOBILE;
         }
 
-        $plataforma = $this->plataforma;
+        if ($this->temOrigemTelaVendaErp()) {
+            return self::PLATAFORMA_ERP;
+        }
 
         if ($plataforma !== null && $plataforma !== '') {
             return (string) $plataforma;
@@ -175,6 +200,9 @@ class Venda extends Model
         return $this->pdvVenda()->exists();
     }
 
+    /**
+     * Qualquer pedido Força de Vendas / Tela de Venda (histórico).
+     */
     public function temOrigemMobile(): bool
     {
         if ($this->relationLoaded('forcaVendasOrder')) {
@@ -184,12 +212,47 @@ class Venda extends Model
         return $this->forcaVendasOrder()->exists();
     }
 
+    /**
+     * App Força de Vendas (dispositivo real), não a Tela de Venda do ERP.
+     */
+    public function temOrigemMobileApp(): bool
+    {
+        $order = $this->relationLoaded('forcaVendasOrder')
+            ? $this->forcaVendasOrder
+            : $this->forcaVendasOrder()->first();
+
+        if ($order === null) {
+            return false;
+        }
+
+        return ! $this->orderIsTelaVendaErp($order);
+    }
+
+    public function temOrigemTelaVendaErp(): bool
+    {
+        $order = $this->relationLoaded('forcaVendasOrder')
+            ? $this->forcaVendasOrder
+            : $this->forcaVendasOrder()->first();
+
+        return $order !== null && $this->orderIsTelaVendaErp($order);
+    }
+
+    private function orderIsTelaVendaErp(object $order): bool
+    {
+        return (string) ($order->device_uuid ?? '') === 'monitor-web';
+    }
+
     public static function nextNumero(): string
     {
         return app(\App\Support\Erp\VendaNumeroService::class)->proximo();
     }
 
 
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
+    }
 
     public function cliente(): BelongsTo
 

@@ -123,7 +123,6 @@ class FinanceiroGestorPage extends Page
         }
 
         return (bool) $user->is_admin
-            || (bool) $user->is_supervisor
             || ErpAccess::can($user, 'contas_pagar.baixa')
             || ErpAccess::can($user, 'contas_pagar.update')
             || ErpAccess::can($user, 'contas_pagar.access');
@@ -138,7 +137,6 @@ class FinanceiroGestorPage extends Page
         }
 
         return (bool) $user->is_admin
-            || (bool) $user->is_supervisor
             || ErpAccess::can($user, 'contas_receber.baixa')
             || ErpAccess::can($user, 'contas_receber.update')
             || ErpAccess::can($user, 'contas_receber.access');

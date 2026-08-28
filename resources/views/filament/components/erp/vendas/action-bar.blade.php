@@ -1,6 +1,6 @@
 <div class="erp-vendas-actions">
     @if (erp_can('vendas.create'))
-        <button type="button" class="erp-vendas-actions__btn" disabled title="Em breve — use o PDV ou Força de Vendas">
+        <button type="button" class="erp-vendas-actions__btn" disabled title="Em breve — use o PDV">
             <span class="erp-vendas-actions__icon erp-vendas-actions__icon--new">+</span>
             <span class="erp-vendas-actions__label"><kbd>F2</kbd> | Novo</span>
         </button>

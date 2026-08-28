@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Models\VendasInternasDevice;
+use App\Models\Terminal;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureVendasInternasDeviceApproved
@@ -30,6 +32,21 @@ class EnsureVendasInternasDeviceApproved
             return response()->json([
                 'message' => 'Aparelho aguardando autorização do administrador.',
                 'code' => $code,
+            ], 403);
+        }
+
+        if (
+            Schema::hasColumn('terminais', 'device_uuid')
+            && $device->empresa_id
+            && ! Terminal::query()
+                ->where('empresa_id', $device->empresa_id)
+                ->where('device_uuid', $uuid)
+                ->where('ativo', true)
+                ->exists()
+        ) {
+            return response()->json([
+                'message' => 'Aparelho desativado em Configurações → Terminais.',
+                'code' => 'device_terminal_inactive',
             ], 403);
         }
 

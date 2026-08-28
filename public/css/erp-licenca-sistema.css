@@ -243,6 +243,12 @@
     text-align: right;
 }
 
+.erp-licenca-sistema-modal__meta-value--usage {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #1e293b;
+}
+
 .erp-licenca-sistema-modal__badge {
     display: inline-flex;
     align-items: center;

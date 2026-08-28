@@ -218,6 +218,27 @@ body:has(.unitec-login-root) {
     color: var(--unitec-login-muted);
 }
 
+.unitec-login__schema-alert {
+    margin: 0 0 0.85rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.unitec-login__schema-alert--erro {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+.unitec-login__schema-alert--ok {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
 .unitec-login__close {
     display: flex;
     align-items: center;

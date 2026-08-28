@@ -38,6 +38,10 @@ class BalancaConfigPage extends Page
 
     public string $status = '';
 
+    public int $progressPercent = 0;
+
+    public string $progressLabel = '';
+
     public string $feedbackMsg = '';
 
     public string $feedbackTipo = 'ok';
@@ -309,6 +313,8 @@ class BalancaConfigPage extends Page
         $this->running = true;
         $this->clearFeedback();
         $this->status = 'Gerando arquivo…';
+        $this->progressPercent = 8;
+        $this->progressLabel = 'Preparando…';
         $this->downloadPath = null;
         $this->downloadName = null;
         $this->arquivos = [];
@@ -325,6 +331,9 @@ class BalancaConfigPage extends Page
                 $this->modeloPadrao = $this->modelo;
             }
 
+            $this->progressPercent = 35;
+            $this->progressLabel = 'Gerando arquivos…';
+
             $result = app(BalancaExportService::class)->generate(
                 $this->modelo,
                 $this->diretorio,
@@ -339,16 +348,22 @@ class BalancaConfigPage extends Page
             $this->status = (string) ($result['message'] ?? '');
 
             if ($result['ok'] ?? false) {
+                $this->progressPercent = 100;
+                $this->progressLabel = (string) $result['message'];
                 $this->setFeedback(
                     $this->wroteToDisk ? 'ok' : 'info',
                     (string) $result['message']
                 );
             } else {
+                $this->progressPercent = 0;
+                $this->progressLabel = (string) ($result['message'] ?? 'Falha ao gerar arquivo.');
                 $this->setFeedback('erro', (string) ($result['message'] ?? 'Falha ao gerar arquivo.'));
             }
         } catch (Throwable $e) {
             report($e);
             $this->status = '';
+            $this->progressPercent = 0;
+            $this->progressLabel = 'Erro ao gerar arquivo.';
             $this->setFeedback('erro', 'Erro ao gerar arquivo: '.$e->getMessage());
         } finally {
             $this->running = false;

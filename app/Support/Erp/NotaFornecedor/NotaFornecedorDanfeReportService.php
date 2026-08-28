@@ -6,6 +6,7 @@ use App\Models\ContadorCloudSyncLog;
 use App\Models\Empresa;
 use App\Models\NotaFornecedor;
 use App\Support\Erp\Compra\CompraDanfeReportService;
+use App\Support\Erp\Fiscal\CfopEntradaResolver;
 use DOMDocument;
 use DOMElement;
 use Illuminate\Support\Facades\Auth;
@@ -248,29 +249,49 @@ class NotaFornecedorDanfeReportService
             $vProd = (float) str_replace(',', '.', $this->child($prod, 'vProd') ?: '0');
             $vDesc = (float) str_replace(',', '.', $this->child($prod, 'vDesc') ?: '0');
             $ean = preg_replace('/\D/', '', $this->child($prod, 'cEAN') ?: $this->child($prod, 'cEANTrib') ?: '') ?? '';
+            $nItem = trim((string) ($det->getAttribute('nItem') ?: ''));
+            $cfopXml = $this->child($prod, 'CFOP');
+            $temSt = $this->itemTemSt($icmsVals, $cfopXml);
+            $tipoIcms = $this->resolveTipoIcms($icmsVals, $temSt);
+            $cest = preg_replace('/\D/', '', $this->child($prod, 'CEST') ?: '') ?? '';
+            $ibscbsItem = $this->extractIbscbsItem($impostoEl);
 
             $somaBasePis += $pisVals['v_bc'];
             $somaBaseCofins += $cofinsVals['v_bc'];
             $somaBaseIpi += $ipiVals['v_bc'];
 
             $itens[] = [
-                'item' => (string) $index,
+                'item' => $nItem !== '' ? $nItem : (string) $index,
                 'codigo' => $this->child($prod, 'cProd') ?: '—',
                 'ean' => $ean,
                 'descricao' => mb_strtoupper($this->child($prod, 'xProd') ?: '—', 'UTF-8'),
                 'ncm' => $this->child($prod, 'NCM'),
+                'cest' => $cest,
                 'cst' => $icmsVals['cst'],
-                'cfop' => $this->child($prod, 'CFOP'),
+                'cfop' => $cfopXml,
                 'un' => $this->child($prod, 'uCom') ?: 'UN',
                 'quant' => number_format($qCom, 4, ',', '.'),
+                'quant_num' => $qCom,
                 'valor_unit' => number_format($vUnCom, 4, ',', '.'),
                 'valor_total' => number_format($vProd, 2, ',', '.'),
                 'desconto' => number_format($vDesc, 2, ',', '.'),
                 'base_icms' => number_format($icmsVals['v_bc'], 2, ',', '.'),
                 'valor_icms' => number_format($icmsVals['v_icms'], 2, ',', '.'),
+                'base_icms_st' => number_format($icmsVals['v_bc_st'], 2, ',', '.'),
+                'valor_icms_st' => number_format($icmsVals['v_icms_st'], 2, ',', '.'),
                 'valor_ipi' => number_format($ipiVals['v_ipi'], 2, ',', '.'),
+                'valor_pis' => number_format($pisVals['v_pis'], 2, ',', '.'),
+                'valor_cofins' => number_format($cofinsVals['v_cofins'], 2, ',', '.'),
                 'aliq_icms' => number_format($icmsVals['p_icms'], 2, ',', '.'),
                 'aliq_ipi' => number_format($ipiVals['p_ipi'], 2, ',', '.'),
+                'tem_st' => $temSt,
+                'tipo_icms' => $tipoIcms,
+                'base_ibs_cbs' => number_format($ibscbsItem['v_bc'], 2, ',', '.'),
+                'valor_ibs' => number_format($ibscbsItem['v_ibs'], 2, ',', '.'),
+                'valor_cbs' => number_format($ibscbsItem['v_cbs'], 2, ',', '.'),
+                'aliq_ibs' => number_format($ibscbsItem['p_ibs'], 4, ',', '.'),
+                'aliq_cbs' => number_format($ibscbsItem['p_cbs'], 4, ',', '.'),
+                'lotes' => $this->extractRastros($prod),
             ];
         }
 
@@ -281,6 +302,8 @@ class NotaFornecedorDanfeReportService
         $icmsTot = $totalNode instanceof DOMElement
             ? $totalNode->getElementsByTagName('ICMSTot')->item(0)
             : null;
+
+        $ibscbsTot = $this->extractIbscbsTotais($totalNode instanceof DOMElement ? $totalNode : null);
 
         $totais = [
             'subtotal' => $this->money($icmsTot instanceof DOMElement ? $this->child($icmsTot, 'vProd') : '0'),
@@ -320,6 +343,9 @@ class NotaFornecedorDanfeReportService
             'total_produtos' => $this->money($icmsTot instanceof DOMElement ? $this->child($icmsTot, 'vProd') : '0'),
             'outras' => $this->money($icmsTot instanceof DOMElement ? $this->child($icmsTot, 'vOutro') : '0'),
             'total_nota' => $this->money($icmsTot instanceof DOMElement ? $this->child($icmsTot, 'vNF') : '0'),
+            'base_ibs_cbs' => number_format($ibscbsTot['v_bc'], 2, ',', '.'),
+            'valor_ibs' => number_format($ibscbsTot['v_ibs'], 2, ',', '.'),
+            'valor_cbs' => number_format($ibscbsTot['v_cbs'], 2, ',', '.'),
         ];
 
         $serie = $ide instanceof DOMElement ? ($this->child($ide, 'serie') ?: '1') : '1';
@@ -379,11 +405,20 @@ class NotaFornecedorDanfeReportService
     }
 
     /**
-     * @return array{cst: string, v_bc: float, p_icms: float, v_icms: float}
+     * @return array{cst: string, cst_puro: string, v_bc: float, p_icms: float, v_icms: float, v_bc_st: float, v_icms_st: float, p_mva_st: float}
      */
     private function extractIcms(?DOMElement $imposto): array
     {
-        $empty = ['cst' => '', 'v_bc' => 0.0, 'p_icms' => 0.0, 'v_icms' => 0.0];
+        $empty = [
+            'cst' => '',
+            'cst_puro' => '',
+            'v_bc' => 0.0,
+            'p_icms' => 0.0,
+            'v_icms' => 0.0,
+            'v_bc_st' => 0.0,
+            'v_icms_st' => 0.0,
+            'p_mva_st' => 0.0,
+        ];
 
         if (! $imposto) {
             return $empty;
@@ -405,13 +440,173 @@ class NotaFornecedorDanfeReportService
 
             return [
                 'cst' => $orig !== '' ? $orig.$cst : $cst,
+                'cst_puro' => $cst,
                 'v_bc' => (float) str_replace(',', '.', $this->child($child, 'vBC') ?: '0'),
                 'p_icms' => (float) str_replace(',', '.', $this->child($child, 'pICMS') ?: '0'),
                 'v_icms' => (float) str_replace(',', '.', $this->child($child, 'vICMS') ?: '0'),
+                'v_bc_st' => (float) str_replace(',', '.', $this->child($child, 'vBCST') ?: '0'),
+                'v_icms_st' => (float) str_replace(',', '.', $this->child($child, 'vICMSST') ?: '0'),
+                'p_mva_st' => (float) str_replace(',', '.', $this->child($child, 'pMVAST') ?: '0'),
             ];
         }
 
         return $empty;
+    }
+
+    /**
+     * @param  array{cst?: string, cst_puro?: string, v_bc_st?: float, v_icms_st?: float}  $icmsVals
+     */
+    private function itemTemSt(array $icmsVals, string $cfopXml): bool
+    {
+        if (((float) ($icmsVals['v_icms_st'] ?? 0)) > 0.0 || ((float) ($icmsVals['v_bc_st'] ?? 0)) > 0.0) {
+            return true;
+        }
+
+        $cstPuro = preg_replace('/\D/', '', (string) ($icmsVals['cst_puro'] ?? '')) ?? '';
+
+        if ($cstPuro === '') {
+            $cstFull = preg_replace('/\D/', '', (string) ($icmsVals['cst'] ?? '')) ?? '';
+            if (strlen($cstFull) >= 3 && in_array(substr($cstFull, -3), ['201', '202', '203', '500'], true)) {
+                $cstPuro = substr($cstFull, -3);
+            } elseif (strlen($cstFull) >= 2) {
+                $cstPuro = substr($cstFull, -2);
+            } else {
+                $cstPuro = $cstFull;
+            }
+        }
+
+        if (in_array($cstPuro, ['10', '30', '60', '70', '201', '202', '203', '500'], true)) {
+            return true;
+        }
+
+        return CfopEntradaResolver::isCfopSaidaSt($cfopXml);
+    }
+
+    /**
+     * @param  array{cst?: string, cst_puro?: string}  $icmsVals
+     */
+    private function resolveTipoIcms(array $icmsVals, bool $temSt): string
+    {
+        if ($temSt) {
+            return 'st';
+        }
+
+        $cstPuro = preg_replace('/\D/', '', (string) ($icmsVals['cst_puro'] ?? '')) ?? '';
+
+        if ($cstPuro === '') {
+            $cstFull = preg_replace('/\D/', '', (string) ($icmsVals['cst'] ?? '')) ?? '';
+            $cstPuro = strlen($cstFull) >= 2 ? substr($cstFull, -2) : $cstFull;
+        }
+
+        if (in_array($cstPuro, ['40', '41', '50'], true)) {
+            return 'isento';
+        }
+
+        // CSOSN isentos / sem destaque comum
+        if (in_array($cstPuro, ['300', '400'], true) || in_array(substr($cstPuro, -3), ['300', '400'], true)) {
+            return 'isento';
+        }
+
+        return 'normal';
+    }
+
+    /**
+     * @return array{v_bc: float, v_ibs: float, v_cbs: float, p_ibs: float, p_cbs: float}
+     */
+    private function extractIbscbsItem(?DOMElement $imposto): array
+    {
+        $empty = ['v_bc' => 0.0, 'v_ibs' => 0.0, 'v_cbs' => 0.0, 'p_ibs' => 0.0, 'p_cbs' => 0.0];
+
+        if (! $imposto) {
+            return $empty;
+        }
+
+        $ibscbs = $imposto->getElementsByTagName('IBSCBS')->item(0);
+
+        if (! $ibscbs instanceof DOMElement) {
+            return $empty;
+        }
+
+        $g = $ibscbs->getElementsByTagName('gIBSCBS')->item(0);
+        $root = $g instanceof DOMElement ? $g : $ibscbs;
+
+        $gIbsUf = $root->getElementsByTagName('gIBSUF')->item(0);
+        $gIbsMun = $root->getElementsByTagName('gIBSMun')->item(0);
+        $gCbs = $root->getElementsByTagName('gCBS')->item(0);
+
+        $pIbsUf = $gIbsUf instanceof DOMElement
+            ? (float) str_replace(',', '.', $this->child($gIbsUf, 'pIBSUF') ?: '0')
+            : 0.0;
+        $pIbsMun = $gIbsMun instanceof DOMElement
+            ? (float) str_replace(',', '.', $this->child($gIbsMun, 'pIBSMun') ?: '0')
+            : 0.0;
+        $pCbs = $gCbs instanceof DOMElement
+            ? (float) str_replace(',', '.', $this->child($gCbs, 'pCBS') ?: '0')
+            : 0.0;
+
+        $vIbs = (float) str_replace(',', '.', $this->child($root, 'vIBS') ?: '0');
+        if ($vIbs <= 0.0) {
+            $vUf = $gIbsUf instanceof DOMElement
+                ? (float) str_replace(',', '.', $this->child($gIbsUf, 'vIBSUF') ?: '0')
+                : 0.0;
+            $vMun = $gIbsMun instanceof DOMElement
+                ? (float) str_replace(',', '.', $this->child($gIbsMun, 'vIBSMun') ?: '0')
+                : 0.0;
+            $vIbs = $vUf + $vMun;
+        }
+
+        $vCbs = $gCbs instanceof DOMElement
+            ? (float) str_replace(',', '.', $this->child($gCbs, 'vCBS') ?: '0')
+            : 0.0;
+
+        return [
+            'v_bc' => (float) str_replace(',', '.', $this->child($root, 'vBC') ?: $this->child($root, 'vBCIBSCBS') ?: '0'),
+            'v_ibs' => $vIbs,
+            'v_cbs' => $vCbs,
+            'p_ibs' => $pIbsUf + $pIbsMun,
+            'p_cbs' => $pCbs,
+        ];
+    }
+
+    /**
+     * @return array{v_bc: float, v_ibs: float, v_cbs: float}
+     */
+    private function extractIbscbsTotais(?DOMElement $totalNode): array
+    {
+        $empty = ['v_bc' => 0.0, 'v_ibs' => 0.0, 'v_cbs' => 0.0];
+
+        if (! $totalNode) {
+            return $empty;
+        }
+
+        $ibscbsTot = $totalNode->getElementsByTagName('IBSCBSTot')->item(0);
+
+        if (! $ibscbsTot instanceof DOMElement) {
+            return $empty;
+        }
+
+        $gIbs = $ibscbsTot->getElementsByTagName('gIBS')->item(0);
+        $vIbs = 0.0;
+        if ($gIbs instanceof DOMElement) {
+            $vIbs = (float) str_replace(',', '.', $this->child($gIbs, 'vIBS') ?: '0');
+            if ($vIbs <= 0.0) {
+                $gUf = $gIbs->getElementsByTagName('gIBSUF')->item(0);
+                $gMun = $gIbs->getElementsByTagName('gIBSMun')->item(0);
+                $vIbs = ($gUf instanceof DOMElement ? (float) str_replace(',', '.', $this->child($gUf, 'vIBSUF') ?: '0') : 0.0)
+                    + ($gMun instanceof DOMElement ? (float) str_replace(',', '.', $this->child($gMun, 'vIBSMun') ?: '0') : 0.0);
+            }
+        }
+
+        $gCbs = $ibscbsTot->getElementsByTagName('gCBS')->item(0);
+        $vCbs = $gCbs instanceof DOMElement
+            ? (float) str_replace(',', '.', $this->child($gCbs, 'vCBS') ?: '0')
+            : 0.0;
+
+        return [
+            'v_bc' => (float) str_replace(',', '.', $this->child($ibscbsTot, 'vBCIBSCBS') ?: '0'),
+            'v_ibs' => $vIbs,
+            'v_cbs' => $vCbs,
+        ];
     }
 
     /**
@@ -891,6 +1086,9 @@ class NotaFornecedorDanfeReportService
             'total_ipi' => $zero,
             'base_st' => $zero,
             'total_st' => $zero,
+            'base_ibs_cbs' => $zero,
+            'valor_ibs' => $zero,
+            'valor_cbs' => $zero,
             'valor_icms' => $zero,
             'base_icms_st' => $zero,
             'valor_icms_st' => $zero,
@@ -898,6 +1096,37 @@ class NotaFornecedorDanfeReportService
             'outras' => $zero,
             'total_nota' => number_format($totalNota, 2, ',', '.'),
         ];
+    }
+
+    /**
+     * @return list<array{lote: string, data_validade: string, quantidade: string}>
+     */
+    private function extractRastros(DOMElement $prod): array
+    {
+        $lotes = [];
+
+        foreach ($prod->getElementsByTagName('rastro') as $rastro) {
+            if (! $rastro instanceof DOMElement) {
+                continue;
+            }
+
+            $nLote = trim($this->child($rastro, 'nLote'));
+            $dVal = trim($this->child($rastro, 'dVal'));
+            $qLoteRaw = trim($this->child($rastro, 'qLote'));
+            $qLote = (float) str_replace(',', '.', $qLoteRaw !== '' ? $qLoteRaw : '0');
+
+            if ($nLote === '' && $dVal === '' && $qLote <= 0) {
+                continue;
+            }
+
+            $lotes[] = [
+                'lote' => $nLote,
+                'data_validade' => $this->formatDate($dVal),
+                'quantidade' => number_format(max(0, $qLote), 3, ',', '.'),
+            ];
+        }
+
+        return $lotes;
     }
 
     private function child(DOMElement $parent, string $tag): string

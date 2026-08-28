@@ -66,7 +66,7 @@ final class BalancaModel
         return match (self::normalize($modelo)) {
             self::FILIZOLA => ['CADTXT.TXT', 'SETORTXT.TXT'],
             self::TOLEDO, self::TOLEDO_MGV5 => ['TXITENS.TXT'],
-            self::TOLEDO_MGV6, self::TOLEDO_MGV7 => ['ITENSMGV.TXT'],
+            self::TOLEDO_MGV6, self::TOLEDO_MGV7 => ['ITENSMGV.TXT', 'DEPTO.TXT', 'INFNUTRI.TXT'],
             self::URANO, self::URANO_S, self::URANO_URF32 => ['Produtos.txt'],
             default => ['CADTXT.TXT'],
         };
@@ -78,8 +78,8 @@ final class BalancaModel
             self::FILIZOLA => 'Filizola (CADTXT.TXT + SETORTXT.TXT)',
             self::TOLEDO => 'Toledo clássico (TXITENS.TXT)',
             self::TOLEDO_MGV5 => 'Toledo MGV5 (TXITENS.TXT)',
-            self::TOLEDO_MGV6 => 'Toledo MGV6 (ITENSMGV.TXT)',
-            self::TOLEDO_MGV7 => 'Toledo MGV7 (ITENSMGV.TXT)',
+            self::TOLEDO_MGV6 => 'Toledo MGV6 (ITENSMGV + DEPTO + INFNUTRI)',
+            self::TOLEDO_MGV7 => 'Toledo MGV7 (ITENSMGV + DEPTO + INFNUTRI)',
             self::URANO => 'Urano (Produtos.txt)',
             self::URANO_S => 'Urano S (Produtos.txt)',
             self::URANO_URF32 => 'Urano URF32 (Produtos.txt)',

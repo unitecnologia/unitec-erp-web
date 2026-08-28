@@ -27,7 +27,7 @@ function initErpEmpresasForm() {
     }
 
     initErpMasks(page);
-    bindErpEmpresasFormKeys(page);
+    bindErpEmpresasFormKeys();
     bindSearchEmpresaCnpj(page);
 }
 
@@ -65,15 +65,22 @@ function bindSearchEmpresaCnpj(page) {
     });
 }
 
-function bindErpEmpresasFormKeys(page) {
-    if (page.dataset.erpFormKeysBound === '1') {
+function bindErpEmpresasFormKeys() {
+    // Um único listener global — evita empilhar F5/ESC a cada navigated/morph.
+    if (window.__erpEmpresasFormKeysBound) {
         return;
     }
 
-    page.dataset.erpFormKeysBound = '1';
+    window.__erpEmpresasFormKeysBound = true;
 
     document.addEventListener('keydown', (event) => {
-        if (! document.querySelector('.erp-empresas-form-page')) {
+        const page = document.querySelector('.erp-empresas-form-page');
+
+        if (! page) {
+            return;
+        }
+
+        if (event.key !== 'F5' && event.key !== 'Escape') {
             return;
         }
 
@@ -86,16 +93,34 @@ function bindErpEmpresasFormKeys(page) {
             return;
         }
 
-        if (event.key === 'F5') {
+        // Evita disparar várias gravações enquanto uma ainda está em andamento.
+        if (componentEl.classList.contains('wire-loading') || componentEl.getAttribute('wire:loading') === 'true') {
             event.preventDefault();
-            component.call('saveForm');
 
             return;
         }
 
-        if (event.key === 'Escape') {
+        if (event.key === 'F5') {
             event.preventDefault();
-            component.call('cancelForm');
+
+            if (window.__erpEmpresasSaving) {
+                return;
+            }
+
+            window.__erpEmpresasSaving = true;
+
+            Promise.resolve(component.call('saveForm'))
+                .catch(() => {})
+                .finally(() => {
+                    window.setTimeout(() => {
+                        window.__erpEmpresasSaving = false;
+                    }, 800);
+                });
+
+            return;
         }
+
+        event.preventDefault();
+        component.call('cancelForm');
     });
 }

@@ -6,6 +6,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Crypt;
 
 #[Fillable([
     'empresa_id',
@@ -215,27 +216,69 @@ class VendasParametro extends Model
         return $this->safeEncrypted('senha_certificado');
     }
 
+    /**
+     * Lê senha em texto puro. Valores legados criptografados pelo Laravel (eyJ…)
+     * são descriptografados uma vez e regravados em claro; MAC inválido → null.
+     */
     public function safeEncrypted(string $attribute): ?string
     {
-        if (! filled($this->getRawOriginal($attribute))) {
+        $raw = $this->getRawOriginal($attribute);
+
+        if (! filled($raw)) {
             return null;
         }
 
-        try {
-            $value = $this->{$attribute};
+        $raw = (string) $raw;
 
-            return filled($value) ? (string) $value : null;
-        } catch (DecryptException) {
-            return null;
+        if ($this->looksLikeLaravelEncryptedPayload($raw)) {
+            try {
+                $plain = Crypt::decryptString($raw);
+            } catch (DecryptException) {
+                return null;
+            }
+
+            if (! filled($plain)) {
+                return null;
+            }
+
+            $plain = (string) $plain;
+
+            if ($this->exists && $this->getKey() !== null) {
+                $this->newQueryWithoutScopes()
+                    ->whereKey($this->getKey())
+                    ->update([$attribute => $plain]);
+
+                $this->attributes[$attribute] = $plain;
+                $this->syncOriginalAttribute($attribute);
+            }
+
+            return $plain;
         }
+
+        return $raw;
+    }
+
+    private function looksLikeLaravelEncryptedPayload(string $value): bool
+    {
+        if (! str_starts_with($value, 'eyJ')) {
+            return false;
+        }
+
+        $decoded = base64_decode($value, true);
+
+        if ($decoded === false || $decoded === '') {
+            return false;
+        }
+
+        $json = json_decode($decoded, true);
+
+        return is_array($json)
+            && isset($json['iv'], $json['value'], $json['mac']);
     }
 
     protected function casts(): array
     {
         return [
-            'senha_certificado' => 'encrypted',
-            'proxy_senha' => 'encrypted',
-            'email_senha' => 'encrypted',
             'dfe_bloqueado_ate' => 'datetime',
         ];
     }

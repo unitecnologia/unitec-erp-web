@@ -4,7 +4,7 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
 use App\Models\Product;
 use App\Models\ProductPriceHistory;
-use Illuminate\Support\Facades\Auth;
+use App\Support\Erp\Product\ProductPriceHistoryRecorder;
 
 trait ManagesProductUltimosPrecos
 {
@@ -13,16 +13,28 @@ trait ManagesProductUltimosPrecos
 
     public ?float $lastSavedPrecoVenda = null;
 
+    public ?float $lastSavedPrecoAtacado = null;
+
+    public ?float $lastSavedPrecoEspecial = null;
+
+    public ?float $lastSavedPrecoCusto = null;
+
     protected function loadProductPriceHistories(?Product $product = null): void
     {
         if (! $product) {
             $this->priceHistoryRows = [];
             $this->lastSavedPrecoVenda = null;
+            $this->lastSavedPrecoAtacado = null;
+            $this->lastSavedPrecoEspecial = null;
+            $this->lastSavedPrecoCusto = null;
 
             return;
         }
 
         $this->lastSavedPrecoVenda = (float) $product->preco_venda;
+        $this->lastSavedPrecoAtacado = (float) $product->preco_atacado;
+        $this->lastSavedPrecoEspecial = (float) $product->preco_especial;
+        $this->lastSavedPrecoCusto = (float) $product->preco_custo;
 
         $this->priceHistoryRows = $product->priceHistories()
             ->orderByDesc('registrado_em')
@@ -31,28 +43,28 @@ trait ManagesProductUltimosPrecos
             ->get()
             ->map(fn (ProductPriceHistory $history): array => [
                 'id' => $history->id,
+                'preco_custo' => $this->formatBrDecimal($history->preco_custo ?? 0, 2),
                 'ultimo_preco' => $this->formatBrDecimal($history->ultimo_preco, 2),
+                'preco_atacado' => $this->formatBrDecimal($history->preco_atacado ?? 0, 2),
+                'preco_especial' => $this->formatBrDecimal($history->preco_especial ?? 0, 2),
                 'registrado_em' => $history->registrado_em?->format('d/m/Y') ?? '',
                 'usuario' => $history->usuario ?? '—',
+                'forma_alteracao' => ProductPriceHistoryRecorder::formaLabel($history->forma_alteracao),
             ])
             ->values()
             ->all();
     }
 
-    protected function recordProductPriceHistoryIfChanged(Product $product, ?float $previousPrice = null): void
+    protected function recordProductPriceHistoryIfChanged(Product $product): void
     {
-        $previous = $previousPrice ?? $this->lastSavedPrecoVenda;
-        $current = (float) $product->preco_venda;
-
-        if ($previous === null || round($previous, 2) === round($current, 2)) {
-            return;
-        }
-
-        $product->priceHistories()->create([
-            'ultimo_preco' => $previous,
-            'registrado_em' => now()->toDateString(),
-            'usuario' => Auth::user()?->name ?? 'Sistema',
-        ]);
+        (new ProductPriceHistoryRecorder())->recordSalePricesIfChanged(
+            product: $product,
+            forma: ProductPriceHistoryRecorder::FORMA_DIGITACAO,
+            varejoAnterior: $this->lastSavedPrecoVenda,
+            atacadoAnterior: $this->lastSavedPrecoAtacado,
+            especialAnterior: $this->lastSavedPrecoEspecial,
+            custoAnterior: $this->lastSavedPrecoCusto,
+        );
     }
 
     protected function syncProductChildRecords(Product $product): void

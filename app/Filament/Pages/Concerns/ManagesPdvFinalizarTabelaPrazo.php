@@ -71,7 +71,7 @@ trait ManagesPdvFinalizarTabelaPrazo
     public function getFinalizarCrediarioTotalValorProperty(): float
     {
         foreach ($this->finalizarPagamentos as $pagamento) {
-            if (! PdvFinalizarPagamentosHelper::isFormaCrediario((string) ($pagamento['forma'] ?? ''))) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
                 continue;
             }
 
@@ -83,6 +83,69 @@ trait ManagesPdvFinalizarTabelaPrazo
         }
 
         return 0.0;
+    }
+
+    /** Carnê (impressão) só para Crediário — não para cheque/boleto. */
+    public function getFinalizarParcelasEhCrediarioProperty(): bool
+    {
+        foreach ($this->finalizarPagamentos as $pagamento) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+
+            return $tipo === 'crediario'
+                || PdvFinalizarPagamentosHelper::isFormaCrediario((string) ($pagamento['forma'] ?? ''));
+        }
+
+        return false;
+    }
+
+    /** Cheque: mostra coluna número do cheque (oculta F5 Boleto). */
+    public function getFinalizarParcelasEhChequeProperty(): bool
+    {
+        foreach ($this->finalizarPagamentos as $pagamento) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+
+            return $tipo === 'cheque'
+                || PdvFinalizarPagamentosHelper::isFormaCheque((string) ($pagamento['forma'] ?? ''));
+        }
+
+        return false;
+    }
+
+    /** Boleto: botão F5 (quando houver emissão). */
+    public function getFinalizarParcelasEhBoletoProperty(): bool
+    {
+        foreach ($this->finalizarPagamentos as $pagamento) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+
+            return $tipo === 'boleto'
+                || PdvFinalizarPagamentosHelper::isFormaBoleto((string) ($pagamento['forma'] ?? ''));
+        }
+
+        return false;
     }
 
     protected function resetFinalizarTabelaPrazo(): void
@@ -101,8 +164,8 @@ trait ManagesPdvFinalizarTabelaPrazo
     }
 
     /**
-     * Crediário sempre passa pela tela Contas Receber | Parcelas
-     * (como no Delphi). Só libera o fechamento após F7 | Concluir.
+     * Crediário / cheque / boleto passam pela tela Contas Receber | Parcelas.
+     * Só libera o fechamento após F7 | Concluir.
      */
     protected function ensureTabelaPrazoCrediario(bool $abrirSeNecessario = true): bool
     {
@@ -111,7 +174,7 @@ trait ManagesPdvFinalizarTabelaPrazo
         }
 
         if (! $this->finalizarClienteId) {
-            $this->notifyPdvError('Informe o cliente para pagamento CREDIÁRIO.');
+            $this->notifyPdvError('Informe o cliente para pagamento a prazo.');
 
             return false;
         }
@@ -237,7 +300,7 @@ trait ManagesPdvFinalizarTabelaPrazo
     {
         $formaIds = FormaPagamento::query()
             ->where('ativo', true)
-            ->where('tipo', 'crediario')
+            ->whereIn('tipo', ['crediario', 'cheque', 'boleto'])
             ->pluck('id');
 
         $this->finalizarTabelasPrazoPredefinidas = TabelaPrazo::query()
@@ -335,6 +398,7 @@ trait ManagesPdvFinalizarTabelaPrazo
                 'vencimento' => $venc->format('d/m/Y'),
                 'valor' => ErpMoney::formatBr($valor),
                 'dias' => $diaInt,
+                'numero_cheque' => '',
             ];
         }
 
@@ -410,6 +474,10 @@ trait ManagesPdvFinalizarTabelaPrazo
 
     public function abrirCarneImpressao(): void
     {
+        if (! $this->finalizarParcelasEhCrediario) {
+            return;
+        }
+
         if ($this->finalizarParcelasRows === []) {
             $this->notifyPdvError(
                 'Gere as parcelas antes de imprimir o carnê.',
@@ -658,13 +726,13 @@ trait ManagesPdvFinalizarTabelaPrazo
         }
 
         if ($this->finalizarParcelasRows === [] || blank($this->finalizarTabelaPrazoDias)) {
-            return 'Informe as parcelas do crediário (Contas Receber | Parcelas).';
+            return 'Informe as parcelas (Contas Receber | Parcelas).';
         }
 
         $dias = PdvFinalizarPagamentosHelper::diasDeString((string) $this->finalizarTabelaPrazoDias);
 
         if ($dias === []) {
-            return 'Parcelas do crediário inválidas.';
+            return 'Parcelas inválidas.';
         }
 
         return null;
@@ -689,6 +757,21 @@ trait ManagesPdvFinalizarTabelaPrazo
         $dias = PdvFinalizarPagamentosHelper::diasDeString((string) $this->finalizarTabelaPrazoDias);
 
         return $dias !== [] ? $dias : null;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    protected function finalizarParcelasChequeNumerosList(): ?array
+    {
+        if (! $this->finalizarParcelasEhCheque || $this->finalizarParcelasRows === []) {
+            return null;
+        }
+
+        return collect($this->finalizarParcelasRows)
+            ->map(fn (array $row): string => trim((string) ($row['numero_cheque'] ?? '')))
+            ->values()
+            ->all();
     }
 
     /** Compat: métodos antigos da lista de tabelas. */

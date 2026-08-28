@@ -4496,12 +4496,17 @@
 .erp-nfe-page .erp-nfe-fiscal-overlay {
     position: fixed;
     inset: 0;
-    z-index: 400;
+    z-index: 420;
     display: grid;
     place-items: center;
     padding: 1rem;
     background: rgb(15 52 96 / 35%);
     backdrop-filter: blur(2px);
+}
+
+/* Erro/sucesso sempre montados: blade usa style display; .is-visible reforça após js(). */
+.erp-nfe-page .erp-nfe-fiscal-overlay.is-visible {
+    display: grid;
 }
 
 .erp-nfe-page .erp-nfe-fiscal-overlay__box {

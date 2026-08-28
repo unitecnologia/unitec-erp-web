@@ -12,7 +12,12 @@
     $periodoAteIso = filled($this->periodoAte) ? $this->periodoAte : '';
 @endphp
 
-<div class="erp-orcamentos">
+<div
+    class="erp-orcamentos"
+    @if ($this->erpListSyncPollEnabled())
+        wire:poll.{{ $this->erpListSyncPollIntervalSeconds() }}s.visible="pollErpListSync"
+    @endif
+>
     <div class="erp-orcamentos__filters">
         <div class="erp-orcamentos__filters-row">
             <div class="erp-orcamentos__search-group">

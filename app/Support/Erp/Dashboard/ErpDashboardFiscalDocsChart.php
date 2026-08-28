@@ -4,44 +4,51 @@ namespace App\Support\Erp\Dashboard;
 
 use App\Models\Nfe;
 use App\Models\PdvVendaNfce;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardFiscalDocsChart
 {
     /**
-     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string}
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string, empty?: bool}
      */
-    public static function data(?int $empresaId = null): array
+    public static function data(int|array|null $empresaScope = null): array
     {
-        $real = static::fromDatabase($empresaId);
-
-        if ($real !== null) {
-            return $real;
-        }
-
-        return ErpDashboardDemoData::fiscalDocsChart();
+        return static::fromDatabase($empresaScope) ?? [
+            'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
+            'values' => [0.0, 0.0, 0.0, 0.0],
+            'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
+            'unit' => 'count',
+            'empty' => true,
+        ];
     }
 
     /**
-     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string}|null
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string, empty?: bool}|null
      */
-    private static function fromDatabase(?int $empresaId = null): ?array
+    private static function fromDatabase(int|array|null $empresaScope = null): ?array
     {
         try {
-            $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
-            $inicio = Carbon::today()->startOfMonth();
-            $fim = Carbon::today()->endOfMonth();
-
-            $nfeAut = static::countNfe($empresaId, $inicio, $fim, autorizadas: true);
-            $nfePend = static::countNfe($empresaId, $inicio, $fim, autorizadas: false);
-            $nfceAut = static::countNfce($empresaId, $inicio, $fim, autorizadas: true);
-            $nfcePend = static::countNfce($empresaId, $inicio, $fim, autorizadas: false);
-
-            if ($nfeAut + $nfePend + $nfceAut + $nfcePend <= 0) {
-                return null;
+            if ($empresaScope === null) {
+                $empresaId = ErpDashboardCertificadoAlert::resolveEmpresaId();
+                $empresaScope = ($empresaId && $empresaId > 0) ? $empresaId : null;
             }
+
+            $hoje = ErpFinanceiroMetricas::hoje();
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje;
+
+            $nfeAut = static::countNfe($empresaScope, $inicio, $fim, autorizadas: true);
+            $nfePend = static::countNfe($empresaScope, $inicio, $fim, autorizadas: false);
+            $nfceAut = static::countNfce($empresaScope, $inicio, $fim, autorizadas: true);
+            $nfcePend = static::countNfce($empresaScope, $inicio, $fim, autorizadas: false);
+
+            $empty = ($nfeAut + $nfePend + $nfceAut + $nfcePend) <= 0;
 
             return [
                 'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
@@ -53,13 +60,17 @@ final class ErpDashboardFiscalDocsChart
                 ],
                 'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
                 'unit' => 'count',
+                'empty' => $empty,
             ];
         } catch (Throwable) {
             return null;
         }
     }
 
-    private static function countNfe(?int $empresaId, Carbon $inicio, Carbon $fim, bool $autorizadas): int
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function countNfe(int|array|null $empresaScope, Carbon $inicio, Carbon $fim, bool $autorizadas): int
     {
         if (! Schema::hasTable((new Nfe)->getTable())) {
             return 0;
@@ -69,9 +80,7 @@ final class ErpDashboardFiscalDocsChart
             ->whereDate('data_emissao', '>=', $inicio->toDateString())
             ->whereDate('data_emissao', '<=', $fim->toDateString());
 
-        if ($empresaId) {
-            $query->where('empresa_id', $empresaId);
-        }
+        ErpFinanceiroMetricas::applyEmpresaColumn($query, (new Nfe)->getTable(), $empresaScope);
 
         if ($autorizadas) {
             $query->where(function ($builder): void {
@@ -93,28 +102,22 @@ final class ErpDashboardFiscalDocsChart
         return (int) $query->count();
     }
 
-    private static function countNfce(?int $empresaId, Carbon $inicio, Carbon $fim, bool $autorizadas): int
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function countNfce(int|array|null $empresaScope, Carbon $inicio, Carbon $fim, bool $autorizadas): int
     {
         if (! Schema::hasTable((new PdvVendaNfce)->getTable())) {
             return 0;
         }
 
         $query = PdvVendaNfce::query()
-            ->where(function ($period) use ($inicio, $fim): void {
-                $period->where(function ($auth) use ($inicio, $fim): void {
-                    $auth->whereNotNull('autorizada_em')
-                        ->whereDate('autorizada_em', '>=', $inicio->toDateString())
-                        ->whereDate('autorizada_em', '<=', $fim->toDateString());
-                })->orWhere(function ($fallback) use ($inicio, $fim): void {
-                    $fallback->whereNull('autorizada_em')
-                        ->whereDate('created_at', '>=', $inicio->toDateString())
-                        ->whereDate('created_at', '<=', $fim->toDateString());
-                });
+            ->whereHas('pdvVenda', function (Builder $venda) use ($inicio, $fim): void {
+                $venda->whereDate('fechado_em', '>=', $inicio->toDateString())
+                    ->whereDate('fechado_em', '<=', $fim->toDateString());
             });
 
-        if ($empresaId) {
-            $query->where('empresa_id', $empresaId);
-        }
+        static::applyNfceEmpresaScope($query, $empresaScope);
 
         if ($autorizadas) {
             $query->whereIn('status', [
@@ -129,5 +132,35 @@ final class ErpDashboardFiscalDocsChart
         }
 
         return (int) $query->count();
+    }
+
+    /**
+     * Mesmo critério da tela NFC-e: empresa_id no scope OU (nulo + sessão PDV).
+     *
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function applyNfceEmpresaScope(Builder $query, int|array|null $empresaScope): void
+    {
+        if ($empresaScope === null) {
+            return;
+        }
+
+        $ids = is_array($empresaScope)
+            ? array_values(array_filter(array_map('intval', $empresaScope)))
+            : [(int) $empresaScope];
+        $ids = array_values(array_filter($ids, fn (int $id): bool => $id > 0));
+
+        if ($ids === []) {
+            return;
+        }
+
+        $query->where(function (Builder $outer) use ($ids): void {
+            $outer->whereIn('empresa_id', $ids)
+                ->orWhere(function (Builder $inner) use ($ids): void {
+                    $inner->whereNull('empresa_id')
+                        ->whereHas('pdvVenda.sessao', fn (Builder $sessao): Builder => $sessao
+                            ->whereIn('empresa_id', $ids));
+                });
+        });
     }
 }

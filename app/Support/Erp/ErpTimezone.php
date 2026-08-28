@@ -17,4 +17,16 @@ final class ErpTimezone
 
         return Carbon::parse($moment)->timezone(self::DEFAULT);
     }
+
+    /** Data de calendário do estabelecimento (Y-m-d). */
+    public static function today(): string
+    {
+        return self::toLocal()->toDateString();
+    }
+
+    /** Agora no fuso do estabelecimento. */
+    public static function nowLocal(): Carbon
+    {
+        return self::toLocal();
+    }
 }

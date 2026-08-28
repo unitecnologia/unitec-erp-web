@@ -52,6 +52,7 @@ trait ManagesPdvReceber
 
         $query = ContaReceber::query()
             ->with('cliente:id,nome_razao,codigo')
+            ->where('forma', ContaReceber::FORMA_CARTEIRA)
             ->where('saldo', '>', 0)
             ->orderBy('vencimento');
 
@@ -136,6 +137,12 @@ trait ManagesPdvReceber
 
         if (! $conta || (float) $conta->saldo <= 0) {
             $this->notifyPdvError('Conta indisponível.');
+
+            return;
+        }
+
+        if ($conta->forma !== ContaReceber::FORMA_CARTEIRA) {
+            $this->notifyPdvError('Só é possível receber contas em carteira neste caixa.');
 
             return;
         }

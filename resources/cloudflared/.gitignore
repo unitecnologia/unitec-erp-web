@@ -1,0 +1,4 @@
+# Binário oficial (~60 MB) — baixado por scripts/criar-pacote-update.ps1
+cloudflared.exe
+*.exe
+!README.txt

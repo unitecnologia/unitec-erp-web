@@ -5,16 +5,22 @@ namespace App\Support\Erp;
 use App\Models\AjusteEstoque;
 use App\Models\Empresa;
 use App\Models\Product;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 final class AjusteEstoqueService
 {
+    public function __construct(
+        private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
+    ) {}
+
     public function criar(int $productId, string $data, float $qtdAjust): AjusteEstoque
     {
         return DB::transaction(function () use ($productId, $data, $qtdAjust): AjusteEstoque {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->firstOrFail();
+            [$estoqueId, $empresa] = $this->resolverDeposito();
 
-            $this->garantirEstoquePermitido($product, $qtdAjust);
+            $this->garantirEstoquePermitido($product, $qtdAjust, $estoqueId);
 
             $ajuste = AjusteEstoque::query()->create([
                 'data' => $data,
@@ -22,9 +28,7 @@ final class AjusteEstoqueService
                 'qtd_ajust' => $qtdAjust,
             ]);
 
-            $product->update([
-                'estoque' => round((float) $product->estoque + $qtdAjust, 3),
-            ]);
+            $this->aplicarDelta($productId, $qtdAjust, $estoqueId, $empresa);
 
             return $ajuste;
         });
@@ -35,15 +39,14 @@ final class AjusteEstoqueService
         return DB::transaction(function () use ($ajuste, $data, $qtdAjust): AjusteEstoque {
             $ajuste = AjusteEstoque::query()->whereKey($ajuste->getKey())->lockForUpdate()->firstOrFail();
             $product = Product::query()->whereKey($ajuste->product_id)->lockForUpdate()->firstOrFail();
+            [$estoqueId, $empresa] = $this->resolverDeposito();
 
-            $deltaLiquido = $qtdAjust - (float) $ajuste->qtd_ajust;
-            $estoqueAposReversao = round((float) $product->estoque - (float) $ajuste->qtd_ajust, 3);
+            $qtdAnterior = (float) $ajuste->qtd_ajust;
+            $deltaLiquido = $qtdAjust - $qtdAnterior;
 
-            if ($this->bloquearEstoqueNegativo() && ($estoqueAposReversao + $qtdAjust) < 0) {
-                throw new \RuntimeException('Ajuste deixaria o estoque negativo.');
-            }
+            $this->garantirEstoquePermitido($product, $deltaLiquido, $estoqueId);
 
-            $product->update(['estoque' => round($estoqueAposReversao + $qtdAjust, 3)]);
+            $this->aplicarDelta((int) $product->id, $deltaLiquido, $estoqueId, $empresa);
 
             $ajuste->update([
                 'data' => $data,
@@ -61,9 +64,10 @@ final class AjusteEstoqueService
             $product = Product::query()->whereKey($ajuste->product_id)->lockForUpdate()->first();
 
             if ($product) {
-                $product->update([
-                    'estoque' => round((float) $product->estoque - (float) $ajuste->qtd_ajust, 3),
-                ]);
+                [$estoqueId, $empresa] = $this->resolverDeposito();
+                $qtdReversao = -1 * (float) $ajuste->qtd_ajust;
+                $this->garantirEstoquePermitido($product, $qtdReversao, $estoqueId);
+                $this->aplicarDelta((int) $product->id, $qtdReversao, $estoqueId, $empresa);
             }
 
             $ajuste->delete();
@@ -75,22 +79,47 @@ final class AjusteEstoqueService
         return (int) (AjusteEstoque::query()->max('id') ?? 0) + 1;
     }
 
-    private function garantirEstoquePermitido(Product $product, float $qtdAjust): void
+    private function aplicarDelta(int $productId, float $delta, ?int $estoqueId, ?Empresa $empresa): void
+    {
+        if (abs($delta) < 0.0005) {
+            return;
+        }
+
+        if ($delta > 0) {
+            $this->saldos->incrementar($productId, $delta, $estoqueId, $empresa);
+        } else {
+            $this->saldos->decrementar($productId, abs($delta), $estoqueId, $empresa);
+        }
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?Empresa}
+     */
+    private function resolverDeposito(): array
+    {
+        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        $empresaId = $empresaId ? (int) $empresaId : null;
+        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+        $estoqueId = $this->saldos->estoqueIdParaEmpresa($empresaId);
+
+        return [$estoqueId, $empresa];
+    }
+
+    private function garantirEstoquePermitido(Product $product, float $qtdAjust, ?int $estoqueId): void
     {
         if (! $this->bloquearEstoqueNegativo()) {
             return;
         }
 
-        if (((float) $product->estoque + $qtdAjust) < 0) {
+        $atual = $this->saldos->fisico((int) $product->id, $estoqueId);
+
+        if (($atual + $qtdAjust) < 0) {
             throw new \RuntimeException('Ajuste deixaria o estoque negativo.');
         }
     }
 
     private function bloquearEstoqueNegativo(): bool
     {
-        $empresaId = session('erp_empresa_id', auth()->user()?->empresa_id);
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
-
-        return (bool) ($empresa?->param_geral_bloquear_estoque_negativo ?? false);
+        return EstoqueNegativoPolicy::ativo();
     }
 }

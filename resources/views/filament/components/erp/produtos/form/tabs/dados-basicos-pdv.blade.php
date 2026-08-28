@@ -5,7 +5,16 @@
 <div class="erp-pcad-form">
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pprod-codigo">Código</label>
-        <input id="pprod-codigo" type="text" wire:model="data.codigo" readonly class="erp-pcad-form__input erp-pcad-form__input--xs">
+        <input
+            id="pprod-codigo"
+            type="text"
+            value="{{ $this->data['codigo'] ?? '' }}"
+            disabled
+            tabindex="-1"
+            aria-readonly="true"
+            class="erp-pcad-form__input erp-pcad-form__input--xs erp-produtos-form__input--codigo erp-produtos-form__input--info"
+        >
+        <input type="hidden" wire:model="data.codigo">
         <label class="erp-pcad-form__label erp-pcad-form__label--inline erp-pcad-form__label--required" for="pprod-descricao">Descrição</label>
         <input id="pprod-descricao" type="text" wire:model="data.descricao" class="erp-pcad-form__input erp-pcad-form__input--grow">
     </div>
@@ -98,12 +107,9 @@
 
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pprod-grupo">F2 | Grupo</label>
-        @include('filament.components.erp.produtos.form.compact-select', [
-            'id' => 'pprod-grupo',
-            'field' => 'grupo',
-            'options' => $this->grupoOptions,
-            'grow' => true,
-        ])
+        @include('filament.components.erp.produtos.form.grupo-select', [
+                        'id' => 'pprod-grupo',
+                    ])
         <button type="button" data-erp-open-lookup="grupo" class="erp-pcad-form__btn" title="Cadastrar / gerenciar Grupo">
             <span class="erp-pcad-form__btn-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -118,7 +124,9 @@
             'id' => 'pprod-unidade',
             'field' => 'unidade',
             'options' => collect($this->unidadeOptions)
-                ->mapWithKeys(fn (string $label, string $sigla): array => [$sigla => $sigla.' — '.$label])
+                ->mapWithKeys(fn (string $label, string $sigla): array => [
+                    $sigla => \App\Models\Unidade::optionLabel($sigla, $label),
+                ])
                 ->all(),
         ])
         <button type="button" data-erp-open-lookup="unidade" class="erp-pcad-form__btn" title="Cadastrar / gerenciar Unidade">
@@ -171,15 +179,8 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pprod-validade">Validade</label>
-        <input id="pprod-validade" type="text" wire:model.blur="data.validade" data-wire-field="data.validade" data-mask="date-br" placeholder="dd/mm/aaaa" class="erp-pcad-form__input erp-pcad-form__input--validade">
-    </div>
-
-    <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pprod-est-min">Estoque Mínimo</label>
         <input id="pprod-est-min" type="text" wire:model="data.estoque_minimo" data-mask="integer" inputmode="numeric" class="erp-pcad-form__input erp-pcad-form__input--num">
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pprod-est-inicial">Estoque Inicial</label>
-        <input id="pprod-est-inicial" type="text" wire:model="data.estoque_inicial" wire:blur="syncEstoqueFromInicialOnBlur" data-mask="integer" inputmode="numeric" class="erp-pcad-form__input erp-pcad-form__input--num">
         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pprod-estoque">Estoque Atual</label>
         <input
             id="pprod-estoque"

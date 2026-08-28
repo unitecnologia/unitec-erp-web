@@ -20,7 +20,7 @@ class NfeListQueryBuilder
 
     public function __construct(
 
-        public string $statusFilter = 'aberta',
+        public string $statusFilter = 'todas',
 
         public string $searchColumn = 'cliente',
 
@@ -72,7 +72,7 @@ class NfeListQueryBuilder
 
 
 
-        $status = (string) $request->query('status', 'aberta');
+        $status = (string) $request->query('status', 'todas');
 
         $campo = (string) $request->query('campo', 'cliente');
 
@@ -120,7 +120,7 @@ class NfeListQueryBuilder
 
         return new self(
 
-            statusFilter: in_array($status, $allowedStatus, true) ? $status : 'aberta',
+            statusFilter: in_array($status, $allowedStatus, true) ? $status : 'todas',
 
             searchColumn: $campo,
 
@@ -402,7 +402,7 @@ class NfeListQueryBuilder
 
         return [
 
-            'status' => $this->statusFilter !== 'aberta' ? $this->statusFilter : null,
+            'status' => $this->statusFilter !== 'todas' ? $this->statusFilter : null,
 
             'campo' => $this->searchColumn !== 'cliente' ? $this->searchColumn : null,
 

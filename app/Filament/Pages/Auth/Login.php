@@ -4,7 +4,12 @@ namespace App\Filament\Pages\Auth;
 
 use App\Models\Empresa;
 use App\Models\User;
+use App\Support\Erp\Atualizacao\AtualizacaoApplyService;
+use App\Support\Erp\Atualizacao\AtualizacaoPasta;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpUpdateProcessLauncher;
+use App\Support\Erp\License\LicencaRemotaService;
+use App\Support\Erp\License\LicencaSnapshot;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Login as BaseLogin;
@@ -17,6 +22,7 @@ use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
 use SensitiveParameter;
@@ -28,6 +34,18 @@ class Login extends BaseLogin
     protected Width | string | null $maxWidth = Width::SevenExtraLarge;
 
     private const REMEMBER_COOKIE = 'erp_login_remember';
+
+    public bool $showUpdatePrompt = false;
+
+    public ?string $pendingUpdateVersion = null;
+
+    public bool $applyingUpdate = false;
+
+    public ?string $updateApplyError = null;
+
+    public ?string $schemaMigrateError = null;
+
+    public ?string $schemaMigrateOk = null;
 
     public function hasLogo(): bool
     {
@@ -46,12 +64,33 @@ class Login extends BaseLogin
 
     public function mount(): void
     {
-        if (filament()->auth()->check()) {
-            filament()->auth()->logout();
+        $this->schemaMigrateError = session()->pull('erp_migrate_error')
+            ?: (\Illuminate\Support\Facades\Cache::pull('erp.schema.migrate_error') ?: null);
+        $this->schemaMigrateOk = session()->pull('erp_migrate_ok');
 
-            session()->forget('erp_empresa_id');
-            session()->invalidate();
-            session()->regenerateToken();
+        // Já autenticado aguardando Sim/Não da atualização.
+        if (filament()->auth()->check() && session('erp_awaiting_update_choice')) {
+            $snapshot = $this->snapshotForAtualizacaoGate();
+            if ($this->shouldSkipAtualizacaoPrompt($snapshot)) {
+                $this->clearUpdatePromptSession();
+                $this->finishLoginAfterUpdateChoice($snapshot);
+
+                return;
+            }
+
+            $this->showUpdatePrompt = true;
+            $this->pendingUpdateVersion = (string) session('erp_pending_update_version', '');
+
+            return;
+        }
+
+        // Já autenticado: vai para o painel. NÃO fazer logout aqui —
+        // o login usa JS (UnitecLoginBoot.succeed) e ainda fica um instante nesta
+        // página; logout no remount cancelava a sessão e devolvia à tela de login.
+        if (filament()->auth()->check()) {
+            $this->redirect(session()->pull('url.intended', filament()->getUrl()));
+
+            return;
         }
 
         $this->form->fill($this->getDefaultFormState());
@@ -216,6 +255,7 @@ class Login extends BaseLogin
                 'class' => 'unitec-login__senha-wrap',
             ])
             ->extraInputAttributes([
+                'id' => 'unitec-login-senha',
                 'tabindex' => 3,
                 'autocomplete' => 'off',
                 'autocapitalize' => 'off',
@@ -327,27 +367,156 @@ class Login extends BaseLogin
         if ($primeiroAcesso) {
             session()->forget('erp_empresa_id');
             $target = \App\Filament\Resources\EmpresaResource::getUrl('create');
-        } else {
-            session(['erp_empresa_id' => $empresaId]);
+            $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.succeed('.Js::from($target).')');
 
-            // Conferência de licença só no login (barra "Abrindo o sistema").
-            // Depois disso o middleware não chama a API ao abrir telas.
-            try {
-                $licencas = app(\App\Support\Erp\License\LicencaRemotaService::class);
-                $snapshot = $licencas->validateAtLogin();
-                if ($licencas->isEnabled() && ! $snapshot->isAllowed()) {
-                    $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
-                } else {
-                    $target = session()->pull('url.intended', filament()->getUrl());
-                }
-            } catch (\Throwable) {
+            return null;
+        }
+
+        session(['erp_empresa_id' => $empresaId]);
+        \App\Support\Erp\ErpContext::clearMemo();
+
+        // Atualização pronta: pergunta Sim/Não, salvo se o portal bloquear a instalação.
+        if (AtualizacaoPasta::ensurePendingReady()) {
+            $snapshot = $this->snapshotForAtualizacaoGate();
+            if ($this->shouldSkipAtualizacaoPrompt($snapshot)) {
+                $this->finishLoginAfterUpdateChoice($snapshot);
+
+                return null;
+            }
+
+            $version = AtualizacaoPasta::pendingVersion() ?? '';
+            session([
+                'erp_awaiting_update_choice' => true,
+                'erp_pending_update_version' => $version,
+            ]);
+            $this->showUpdatePrompt = true;
+            $this->pendingUpdateVersion = $version;
+            $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
+
+            return null;
+        }
+
+        $this->finishLoginAfterUpdateChoice();
+
+        return null;
+    }
+
+    public function aceitarAtualizacao(): void
+    {
+        if (! filament()->auth()->check()) {
+            return;
+        }
+
+        $this->applyingUpdate = true;
+        $this->updateApplyError = null;
+        AtualizacaoApplyService::initializeProgress(base_path());
+
+        if (! ErpUpdateProcessLauncher::launch(base_path())) {
+            $this->applyingUpdate = false;
+            $this->updateApplyError = 'Não foi possível iniciar o processo de atualização.';
+            throw ValidationException::withMessages([
+                'data.login_senha' => $this->updateApplyError,
+            ]);
+        }
+    }
+
+    public function finalizarAtualizacaoAplicada(): void
+    {
+        if (! filament()->auth()->check()) {
+            return;
+        }
+
+        $progress = AtualizacaoApplyService::readProgress(base_path());
+        if (($progress['state'] ?? '') !== 'completed') {
+            return;
+        }
+
+        $this->clearUpdatePromptSession();
+        $this->showUpdatePrompt = false;
+        $this->applyingUpdate = false;
+        $this->updateApplyError = null;
+        $this->finishLoginAfterUpdateChoice();
+    }
+
+    public function falharAtualizacaoAplicada(string $message = ''): void
+    {
+        $this->applyingUpdate = false;
+        $this->updateApplyError = trim($message) !== ''
+            ? trim($message)
+            : 'Não foi possível aplicar a atualização.';
+
+        Log::error('Falha ao aplicar atualizacao/', ['message' => $this->updateApplyError]);
+        $this->addError('data.login_senha', $this->updateApplyError);
+    }
+
+    public function recusarAtualizacao(): void
+    {
+        $this->clearUpdatePromptSession();
+        $this->showUpdatePrompt = false;
+        $this->finishLoginAfterUpdateChoice();
+    }
+
+    private function clearUpdatePromptSession(): void
+    {
+        session()->forget(['erp_awaiting_update_choice', 'erp_pending_update_version']);
+    }
+
+    private function snapshotForAtualizacaoGate(): ?LicencaSnapshot
+    {
+        try {
+            return app(LicencaRemotaService::class)->validateAtLogin();
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao consultar licença para o gate de atualização.', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function shouldSkipAtualizacaoPrompt(?LicencaSnapshot $snapshot): bool
+    {
+        if ($snapshot === null) {
+            return false;
+        }
+
+        if ($snapshot->bloquearAtualizacao) {
+            return true;
+        }
+
+        $licencas = app(LicencaRemotaService::class);
+
+        return $licencas->isEnabled() && ! $snapshot->isAllowed();
+    }
+
+    private function finishLoginAfterUpdateChoice(?LicencaSnapshot $snapshot = null): void
+    {
+        $target = filament()->getUrl();
+
+        try {
+            $licencas = app(LicencaRemotaService::class);
+            $snapshot ??= $licencas->validateAtLogin();
+            if ($licencas->isEnabled() && ! $snapshot->isAllowed()) {
+                $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
+            } else {
+                $target = session()->pull('url.intended', filament()->getUrl());
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao validar licença no login.', [
+                'message' => $e->getMessage(),
+            ]);
+
+            $licencas = app(LicencaRemotaService::class);
+            $licencas->hydrateMensalidadeFromCache();
+
+            if ($licencas->isEnabled() && ($licencas->mensalidadeVencida() || $licencas->loginGateIsAllowed() === false)) {
+                $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
+            } else {
                 $target = session()->pull('url.intended', filament()->getUrl());
             }
         }
 
         $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.succeed('.Js::from($target).')');
-
-        return null;
     }
 
     protected function getFormActions(): array

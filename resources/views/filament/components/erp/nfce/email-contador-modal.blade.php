@@ -103,10 +103,11 @@
                     wire:click="sendNfceContadorEmail"
                     wire:loading.attr="disabled"
                     wire:target="sendNfceContadorEmail,sendNfceContadorWhatsApp"
+                    wire:loading.class="is-busy"
                     class="erp-pcad-actions__btn"
                     data-erp-key="F5"
                 >
-                    <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✓</span>
+                    <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✉</span>
                     <span class="erp-pcad-actions__label" wire:loading.remove wire:target="sendNfceContadorEmail"><kbd>F5</kbd> | Email</span>
                     <span class="erp-pcad-actions__label" wire:loading wire:target="sendNfceContadorEmail">Enviando…</span>
                 </button>
@@ -115,17 +116,55 @@
                     wire:click="sendNfceContadorWhatsApp"
                     wire:loading.attr="disabled"
                     wire:target="sendNfceContadorEmail,sendNfceContadorWhatsApp"
+                    wire:loading.class="is-busy"
                     class="erp-pcad-actions__btn"
                     data-erp-key="WhatsApp"
                 >
-                    <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✓</span>
+                    <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✆</span>
                     <span class="erp-pcad-actions__label" wire:loading.remove wire:target="sendNfceContadorWhatsApp">WhatsApp</span>
                     <span class="erp-pcad-actions__label" wire:loading wire:target="sendNfceContadorWhatsApp">Enviando…</span>
                 </button>
-                <button type="button" wire:click="closeNfceContadorEmailModal" class="erp-pcad-actions__btn" data-erp-key="Escape">
+                <button
+                    type="button"
+                    wire:click="closeNfceContadorEmailModal"
+                    wire:loading.attr="disabled"
+                    wire:target="sendNfceContadorEmail,sendNfceContadorWhatsApp"
+                    class="erp-pcad-actions__btn"
+                    data-erp-key="Escape"
+                >
                     <span class="erp-pcad-actions__icon erp-pcad-actions__icon--exit">✕</span>
                     <span class="erp-pcad-actions__label"><kbd>ESC</kbd> | Fechar</span>
                 </button>
+            </div>
+
+            <div
+                class="erp-orc-email-modal__busy"
+                wire:loading.flex
+                wire:target="sendNfceContadorEmail,sendNfceContadorWhatsApp"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+            >
+                <div class="erp-orc-email-modal__busy-backdrop" aria-hidden="true"></div>
+                <div class="erp-orc-email-modal__busy-panel">
+                    <div class="erp-orc-email-modal__busy-spinner" aria-hidden="true"></div>
+                    <p class="erp-orc-email-modal__busy-status" wire:loading wire:target="sendNfceContadorEmail">
+                        Gerando pacote e enviando e-mail…
+                    </p>
+                    <p class="erp-orc-email-modal__busy-status" wire:loading wire:target="sendNfceContadorWhatsApp">
+                        Gerando pacote e enviando WhatsApp…
+                    </p>
+                    <div
+                        class="erp-orc-email-modal__busy-track"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-label="Progresso do envio"
+                    >
+                        <div class="erp-orc-email-modal__busy-bar"></div>
+                    </div>
+                    <p class="erp-orc-email-modal__busy-hint">Aguarde, não feche esta tela.</p>
+                </div>
             </div>
         </div>
     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ProductPhotoUrl;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,10 +35,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'preco_especial',
     'estoque',
     'estoque_minimo',
-    'estoque_inicial',
     'peso_kg',
     'localizacao',
     'validade',
+    'lote',
+    'controla_lote_validade',
+    'info_adicionais',
     'ncm',
     'ncm_descricao',
     'cest',
@@ -86,6 +89,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'issqn',
     'prefixo_balanca',
     'produto_pesado',
+    'tem_info_nutricional',
+    'nutri_porcao_qtd',
+    'nutri_porcao_unidade',
+    'nutri_medida_inteiro',
+    'nutri_medida_fracao',
+    'nutri_medida_tipo',
+    'nutri_valor_energetico',
+    'nutri_carboidratos',
+    'nutri_proteinas',
+    'nutri_gorduras_totais',
+    'nutri_gorduras_saturadas',
+    'nutri_gorduras_trans',
+    'nutri_fibra',
+    'nutri_sodio',
     'ativo',
     'is_fiscal',
     'paga_comissao',
@@ -119,6 +136,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Product extends Model
 {
+    protected static function booted(): void
+    {
+        static::saved(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PRODUCTS);
+        });
+
+        static::deleted(static function (): void {
+            ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PRODUCTS);
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -137,7 +165,6 @@ class Product extends Model
             'preco_especial' => 'decimal:2',
             'estoque' => 'decimal:3',
             'estoque_minimo' => 'decimal:3',
-            'estoque_inicial' => 'decimal:3',
             'peso_kg' => 'decimal:3',
             'origem' => 'integer',
             'aliq_icms' => 'decimal:2',
@@ -154,6 +181,17 @@ class Product extends Model
             'motivo_desoneracao' => 'integer',
             'tributacao_monofasica' => 'boolean',
             'produto_pesado' => 'boolean',
+            'tem_info_nutricional' => 'boolean',
+            'nutri_porcao_qtd' => 'integer',
+            'nutri_medida_inteiro' => 'integer',
+            'nutri_valor_energetico' => 'decimal:1',
+            'nutri_carboidratos' => 'decimal:1',
+            'nutri_proteinas' => 'decimal:1',
+            'nutri_gorduras_totais' => 'decimal:1',
+            'nutri_gorduras_saturadas' => 'decimal:1',
+            'nutri_gorduras_trans' => 'decimal:1',
+            'nutri_fibra' => 'decimal:1',
+            'nutri_sodio' => 'decimal:1',
             'principio_ativo_id' => 'integer',
             'aliq_ibs_uf' => 'decimal:4',
             'aliq_cbs' => 'decimal:4',
@@ -168,6 +206,7 @@ class Product extends Model
             'peso_liq' => 'decimal:3',
             'issqn' => 'decimal:2',
             'validade' => 'date',
+            'controla_lote_validade' => 'boolean',
             'promo_data_inicio' => 'date',
             'promo_data_fim' => 'date',
             'promo_preco_venda' => 'decimal:2',
@@ -240,6 +279,11 @@ class Product extends Model
         return $this->hasMany(EstoqueReserva::class);
     }
 
+    public function lotes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductLote::class);
+    }
+
     public function fotoUrl(): ?string
     {
         if (blank($this->foto_path)) {
@@ -297,28 +341,23 @@ class Product extends Model
             $fromDb = Unidade::query()
                 ->where('ativo', true)
                 ->orderBy('sigla')
-                ->pluck('descricao', 'sigla')
-                ->all();
+                ->get(['sigla', 'descricao']);
 
-            if ($fromDb !== []) {
-                return $fromDb;
+            if ($fromDb->isNotEmpty()) {
+                return $fromDb
+                    ->mapWithKeys(fn (Unidade $u): array => [
+                        strtoupper(trim((string) $u->sigla)) => Unidade::normalizeDescricao(
+                            (string) $u->sigla,
+                            (string) $u->descricao
+                        ),
+                    ])
+                    ->all();
             }
         } catch (\Throwable) {
             // Tabela ainda não migrada — usa fallback estático.
         }
 
-        return [
-            'UN' => 'UNIDADE',
-            'KG' => 'KG',
-            'PC' => 'PC',
-            'CX' => 'CX',
-            'LT' => 'LT',
-            'MT' => 'MT',
-            'M2' => 'M2',
-            'M3' => 'M3',
-            'PAR' => 'PAR',
-            'SC' => 'SC',
-        ];
+        return Unidade::descricoesCanonicas();
     }
 
     public function validadeVencida(?\Carbon\CarbonInterface $reference = null): bool
@@ -330,5 +369,63 @@ class Product extends Model
         $reference ??= now()->startOfDay();
 
         return $this->validade->copy()->startOfDay()->lt($reference);
+    }
+
+    /**
+     * Dias até a validade (negativo = vencido). Null se sem data.
+     */
+    public function validadeDiasRestantes(?\Carbon\CarbonInterface $reference = null): ?int
+    {
+        if ($this->validade === null) {
+            return null;
+        }
+
+        $reference ??= now()->startOfDay();
+
+        return (int) $reference->diffInDays($this->validade->copy()->startOfDay(), false);
+    }
+
+    /**
+     * Faixa visual da validade na grid: ok|atencao|vencido.
+     */
+    public function validadeStatus(?\Carbon\CarbonInterface $reference = null): ?string
+    {
+        $dias = $this->validadeDiasRestantes($reference);
+
+        if ($dias === null) {
+            return null;
+        }
+
+        if ($dias < 0) {
+            return 'vencido';
+        }
+
+        // Amarelo: 8 a 30 dias (≤7 também amarelo — sem lilás/laranja).
+        if ($dias <= 30) {
+            return 'atencao';
+        }
+
+        return 'ok';
+    }
+
+    public function validadeStatusLabel(?\Carbon\CarbonInterface $reference = null): string
+    {
+        $status = $this->validadeStatus($reference);
+        $dias = $this->validadeDiasRestantes($reference);
+
+        return match ($status) {
+            'ok' => 'Mais de 30 dias',
+            'atencao' => ($dias !== null && $dias <= 7) ? 'Até 7 dias' : 'Entre 8 e 30 dias',
+            'vencido' => 'Vencido',
+            default => '',
+        };
+    }
+
+    /**
+     * Produto com bloco nutricional preenchido para exportação de balança (MGV).
+     */
+    public function hasInfoNutricional(): bool
+    {
+        return (bool) ($this->tem_info_nutricional ?? false);
     }
 }

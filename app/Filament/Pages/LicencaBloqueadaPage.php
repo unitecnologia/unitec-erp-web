@@ -9,8 +9,6 @@ use App\Support\Erp\License\LicencaSnapshot;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\View;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +22,8 @@ class LicencaBloqueadaPage extends Page
     protected static ?string $slug = 'licenca-bloqueada';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    protected string $view = 'filament.pages.licenca-bloqueada';
 
     public string $status = '';
 
@@ -39,45 +39,41 @@ class LicencaBloqueadaPage extends Page
 
     public string $feedback = '';
 
+    public bool $mensalidadeVencida = false;
+
     public bool $pixLoading = false;
 
-    public bool $pixReady = false;
+    public string $pixQrDataUrl = '';
 
-    public ?int $pixInvoiceId = null;
+    public string $pixBrCode = '';
 
     public string $pixAmount = '';
 
     public string $pixDescription = '';
 
-    public string $pixDueDate = '';
+    public int $pixInvoiceId = 0;
 
-    public string $pixBrCode = '';
+    public string $pixMessage = '';
 
-    public string $pixQrCodeDataUrl = '';
-
-    public string $pixCopied = '';
-
-    public int $pollTick = 0;
-
-    public function mount(
-        LicencaRemotaService $licencas,
-        LicencaPortalPagamentoService $pagamentos,
-    ): void {
+    public function mount(LicencaRemotaService $licencas): void
+    {
         ErpScreen::set('Licença');
         $this->pagamentoUrl = $licencas->pagamentoUrl();
         $this->cnpj = $licencas->currentCnpj() ?? '';
-        $this->applySnapshot($licencas->checkCurrentEmpresa());
 
-        if ($this->status === LicencaSnapshot::STATUS_ATIVO
-            || $this->status === LicencaSnapshot::STATUS_DESABILITADO
-            || $this->status === LicencaSnapshot::STATUS_INDISPONIVEL) {
+        $portal = $licencas->checkCurrentEmpresa();
+        $snapshot = $licencas->applyMensalidadeExpiry($portal);
+        $this->applySnapshot($snapshot, $licencas);
+
+        // Libera a tela só se portal + mensalidade permitirem.
+        if ($snapshot->isAllowed()) {
             $this->redirect(Filament::getUrl());
 
             return;
         }
 
-        if ($this->status === LicencaSnapshot::STATUS_BLOQUEADO && filled($this->cnpj)) {
-            $this->carregarPix($pagamentos);
+        if ($this->mensalidadeVencida) {
+            $this->carregarPixMensalidade();
         }
     }
 
@@ -96,15 +92,6 @@ class LicencaBloqueadaPage extends Page
         return null;
     }
 
-    public function content(Schema $schema): Schema
-    {
-        return $schema
-            ->gap(false)
-            ->components([
-                View::make('filament.components.erp.licenca.bloqueada'),
-            ]);
-    }
-
     /**
      * @return array<string>
      */
@@ -113,58 +100,15 @@ class LicencaBloqueadaPage extends Page
         return [...parent::getPageClasses(), 'erp-licenca-bloqueada-page'];
     }
 
-    public function carregarPix(LicencaPortalPagamentoService $pagamentos): void
+    /**
+     * @return array<string, string>
+     */
+    public function getExtraBodyAttributes(): array
     {
-        if (! filled($this->cnpj)) {
-            return;
-        }
+        $attributes = parent::getExtraBodyAttributes();
+        $attributes['class'] = trim(($attributes['class'] ?? '').' erp-licenca-bloqueada-body');
 
-        $this->pixLoading = true;
-        $this->pixReady = false;
-        $this->feedback = '';
-
-        $result = $pagamentos->carregarPixPendente($this->cnpj);
-
-        $this->pixLoading = false;
-
-        if (! ($result['ok'] ?? false)) {
-            $this->feedback = (string) ($result['message'] ?? 'Não foi possível carregar o Pix.');
-
-            return;
-        }
-
-        $this->pixReady = true;
-        $this->pixInvoiceId = isset($result['invoice_id']) ? (int) $result['invoice_id'] : null;
-        $this->pixAmount = (string) ($result['amount'] ?? '');
-        $this->pixDescription = (string) ($result['description'] ?? '');
-        $this->pixDueDate = (string) ($result['due_date'] ?? '');
-        $this->pixBrCode = (string) ($result['br_code'] ?? '');
-        $this->pixQrCodeDataUrl = (string) ($result['qr_code_data_url'] ?? '');
-    }
-
-    public function pollPagamento(
-        LicencaRemotaService $licencas,
-        LicencaPortalPagamentoService $pagamentos,
-    ): void {
-        $this->pollTick++;
-
-        // A cada ~30s confere Pix no portal (mais pesado: login + check).
-        if ($this->pixInvoiceId && filled($this->cnpj) && ($this->pollTick % 2) === 0) {
-            $check = $pagamentos->verificarPagamentoFatura($this->cnpj, $this->pixInvoiceId);
-
-            if ($check['paid'] ?? false) {
-                $this->feedback = 'Pagamento encontrado. Liberando sistema…';
-            }
-        }
-
-        // GET leve no status da licença (sem cache) para liberar assim que o portal ativar.
-        $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
-        $licencas->rememberLoginGate($snapshot);
-        $this->applySnapshot($snapshot);
-
-        if ($snapshot->isAllowed()) {
-            $this->redirect(Filament::getUrl());
-        }
+        return $attributes;
     }
 
     public function verificarNovamente(
@@ -173,17 +117,19 @@ class LicencaBloqueadaPage extends Page
     ): void {
         $this->feedback = '';
 
-        if ($this->pixInvoiceId && filled($this->cnpj)) {
-            $check = $pagamentos->verificarPagamentoFatura($this->cnpj, $this->pixInvoiceId);
-
-            if ($check['paid'] ?? false) {
-                $this->feedback = 'Pagamento confirmado no portal. Validando licença…';
+        if ($this->pixInvoiceId > 0 && filled($this->cnpj)) {
+            $pago = $pagamentos->verificarPagamentoFatura($this->cnpj, $this->pixInvoiceId);
+            if (($pago['ok'] ?? false) && ($pago['paid'] ?? false)) {
+                $this->feedback = (string) ($pago['message'] ?? 'Pagamento confirmado.');
             }
         }
 
-        $snapshot = $licencas->checkCurrentEmpresa(forceRefresh: true);
-        $licencas->rememberLoginGate($snapshot);
-        $this->applySnapshot($snapshot);
+        $portal = $licencas->checkCurrentEmpresa(forceRefresh: true);
+        $licencas->syncMensalidadeNoGate();
+        $licencas->rememberLoginGate($portal);
+
+        $snapshot = $licencas->applyMensalidadeExpiry($portal);
+        $this->applySnapshot($snapshot, $licencas);
 
         if ($snapshot->isAllowed()) {
             $this->redirect(Filament::getUrl());
@@ -191,18 +137,15 @@ class LicencaBloqueadaPage extends Page
             return;
         }
 
-        if ($this->feedback === '') {
-            $this->feedback = 'Ainda bloqueado. Pague o Pix abaixo ou aguarde a confirmação automática.';
+        if ($this->mensalidadeVencida) {
+            $this->carregarPixMensalidade();
+            $this->feedback = filled($this->feedback)
+                ? $this->feedback
+                : 'Mensalidade ainda vencida. Pague o Pix e verifique novamente.';
+        } else {
+            $this->limparPix();
+            $this->feedback = 'Ainda bloqueado. Aguarde a liberação no gerenciador de licenças.';
         }
-
-        if (! $this->pixReady && filled($this->cnpj)) {
-            $this->carregarPix($pagamentos);
-        }
-    }
-
-    public function copiarPix(): void
-    {
-        $this->pixCopied = 'Código Pix copiado.';
     }
 
     public function sair(): void
@@ -214,11 +157,78 @@ class LicencaBloqueadaPage extends Page
         $this->redirect(Filament::getLoginUrl());
     }
 
-    private function applySnapshot(LicencaSnapshot $snapshot): void
+    private function applySnapshot(LicencaSnapshot $snapshot, LicencaRemotaService $licencas): void
     {
         $this->status = $snapshot->status;
         $this->nome = (string) ($snapshot->nome ?? '');
         $this->validoAte = (string) ($snapshot->validoAte ?? '');
         $this->mensagem = (string) ($snapshot->mensagem ?? '');
+        $this->mensalidadeVencida = $licencas->mensalidadeVencida();
+    }
+
+    private function carregarPixMensalidade(): void
+    {
+        $this->pixLoading = true;
+        $this->pixMessage = '';
+
+        try {
+            if ($this->cnpj === '') {
+                $this->limparPix();
+                $this->pixMessage = 'CNPJ não disponível para gerar o Pix.';
+
+                return;
+            }
+
+            $pix = app(LicencaPortalPagamentoService::class)->carregarPixPendente($this->cnpj);
+
+            if (! ($pix['ok'] ?? false)) {
+                $this->limparPix();
+                $this->pixMessage = (string) ($pix['message'] ?? 'Não foi possível carregar o Pix agora.');
+
+                return;
+            }
+
+            $this->pixInvoiceId = (int) ($pix['invoice_id'] ?? 0);
+            $this->pixAmount = $this->formatAmount((string) ($pix['amount'] ?? ''));
+            $this->pixDescription = (string) ($pix['description'] ?? '');
+            $this->pixBrCode = (string) ($pix['br_code'] ?? '');
+            $this->pixQrDataUrl = (string) ($pix['qr_code_data_url'] ?? '');
+            $this->pixMessage = '';
+
+            if ($this->pixQrDataUrl === '' && $this->pixBrCode === '') {
+                $this->pixMessage = 'Pix gerado sem QR. Use Abrir portal ou tente novamente.';
+            }
+        } finally {
+            $this->pixLoading = false;
+        }
+    }
+
+    private function limparPix(): void
+    {
+        $this->pixInvoiceId = 0;
+        $this->pixAmount = '';
+        $this->pixDescription = '';
+        $this->pixBrCode = '';
+        $this->pixQrDataUrl = '';
+        $this->pixMessage = '';
+        $this->pixLoading = false;
+    }
+
+    private function formatAmount(string $amount): string
+    {
+        $amount = trim($amount);
+
+        if ($amount === '') {
+            return '';
+        }
+
+        if (preg_match('/^\d+([.,]\d{1,2})?$/', $amount) === 1) {
+            $normalized = str_replace(',', '.', $amount);
+            $value = (float) $normalized;
+
+            return 'R$ '.number_format($value, 2, ',', '.');
+        }
+
+        return $amount;
     }
 }

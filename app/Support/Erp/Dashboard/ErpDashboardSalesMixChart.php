@@ -2,9 +2,10 @@
 
 namespace App\Support\Erp\Dashboard;
 
-use App\Models\Orcamento;
 use App\Models\PdvVenda;
 use App\Models\Venda;
+use App\Support\Erp\ErpEmpresaScopeFilter;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -12,44 +13,44 @@ use Throwable;
 final class ErpDashboardSalesMixChart
 {
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{labels: list<string>, values: list<float>, colors: list<string>}
      */
-    public static function data(): array
+    public static function data(int|array|null $empresaScope = null): array
     {
-        $real = static::fromDatabase();
-
-        if ($real !== null) {
-            return $real;
-        }
-
-        return ErpDashboardDemoData::salesMixChart();
+        return static::fromDatabase($empresaScope) ?? [
+            'labels' => [],
+            'values' => [],
+            'colors' => [],
+            'unit' => 'money',
+        ];
     }
 
     /**
+     * @param  int|list<int>|null  $empresaScope
      * @return array{labels: list<string>, values: list<float>, colors: list<string>}|null
      */
-    private static function fromDatabase(): ?array
+    private static function fromDatabase(int|array|null $empresaScope = null): ?array
     {
         try {
-            $inicio = Carbon::today()->startOfMonth();
-            $fim = Carbon::today()->endOfMonth();
+            $hoje = ErpFinanceiroMetricas::hoje();
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje;
 
-            $pdv = static::sumPdv($inicio, $fim);
-            $pedidos = static::sumPedidos($inicio, $fim);
-            $orcamentos = static::sumOrcamentos($inicio, $fim);
+            $pdv = static::sumPdv($inicio, $fim, $empresaScope);
+            $pedidos = static::sumPedidos($inicio, $fim, $empresaScope);
 
-            if ($pdv <= 0 && $pedidos <= 0 && $orcamentos <= 0) {
+            if ($pdv <= 0 && $pedidos <= 0) {
                 return null;
             }
 
             return [
-                'labels' => ['PDV', 'Pedidos', 'Orçamentos'],
+                'labels' => ['PDV', 'Pedidos'],
                 'values' => [
                     round($pdv, 2),
                     round($pedidos, 2),
-                    round($orcamentos, 2),
                 ],
-                'colors' => ['#1e5a9e', '#0d9488', '#d97706'],
+                'colors' => ['#1e5a9e', '#0d9488'],
                 'unit' => 'money',
             ];
         } catch (Throwable) {
@@ -57,13 +58,16 @@ final class ErpDashboardSalesMixChart
         }
     }
 
-    private static function sumPdv(Carbon $from, Carbon $to): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumPdv(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         if (! Schema::hasTable((new PdvVenda)->getTable())) {
             return 0.0;
         }
 
-        return (float) PdvVenda::query()
+        $q = PdvVenda::query()
             ->where('situacao', '!=', 'C')
             ->where(function ($query) use ($from, $to): void {
                 $query->where(function ($fechamento) use ($from, $to): void {
@@ -75,33 +79,34 @@ final class ErpDashboardSalesMixChart
                         ->whereDate('created_at', '>=', $from->toDateString())
                         ->whereDate('created_at', '<=', $to->toDateString());
                 });
-            })
-            ->sum('total');
+            });
+
+        ErpEmpresaScopeFilter::applyPdvSessao($q, $empresaScope);
+
+        return (float) $q->sum('total');
     }
 
-    private static function sumPedidos(Carbon $from, Carbon $to): float
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    private static function sumPedidos(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         if (! Schema::hasTable((new Venda)->getTable())) {
             return 0.0;
         }
 
-        return (float) Venda::query()
+        $q = Venda::query()
             ->whereNotIn('status', [Venda::STATUS_CANCELADO])
             ->where('tipo', '!=', Venda::TIPO_CUPOM)
+            ->where(function ($query): void {
+                $query->whereNull('plataforma')
+                    ->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
+            })
             ->whereDate('data', '>=', $from->toDateString())
-            ->whereDate('data', '<=', $to->toDateString())
-            ->sum('total');
-    }
+            ->whereDate('data', '<=', $to->toDateString());
 
-    private static function sumOrcamentos(Carbon $from, Carbon $to): float
-    {
-        if (! Schema::hasTable((new Orcamento)->getTable())) {
-            return 0.0;
-        }
+        ErpEmpresaScopeFilter::applyColumn($q, (new Venda)->getTable(), $empresaScope);
 
-        return (float) Orcamento::query()
-            ->whereDate('created_at', '>=', $from->toDateString())
-            ->whereDate('created_at', '<=', $to->toDateString())
-            ->sum('total');
+        return (float) $q->sum('total');
     }
 }

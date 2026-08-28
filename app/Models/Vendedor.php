@@ -134,6 +134,7 @@ class Vendedor extends Model
 
     /**
      * Caixa amarrado ao colaborador na empresa informada (ou na principal).
+     * Preferência: pivot do operador; fallback: caixa padrão do usuário em Permissões.
      */
     public function caixaContaDaEmpresa(?int $empresaId = null): ?CaixaConta
     {
@@ -148,6 +149,14 @@ class Vendedor extends Model
             : $this->empresas()->where('empresas.id', $empresaId)->first();
 
         $caixaId = $empresa?->pivot?->caixa_conta_id;
+
+        if (! $caixaId) {
+            $usuario = $this->relationLoaded('usuario')
+                ? $this->usuario
+                : $this->usuario()->first();
+
+            $caixaId = $usuario?->defaultCaixaContaId($empresaId);
+        }
 
         if (! $caixaId) {
             return null;

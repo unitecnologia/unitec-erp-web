@@ -100,7 +100,12 @@ class NfeListagemReport
             return trim((string) $chave);
         }
 
-        return trim(chunk_split($digits, 4, ' '));
+        $groups = str_split($digits, 4);
+
+        // Duas linhas no PDF (DomPDF corta com nowrap/overflow).
+        return implode(' ', array_slice($groups, 0, 6))
+            ."\n"
+            .implode(' ', array_slice($groups, 6));
     }
 
     public static function formatDate(mixed $value): string
@@ -131,13 +136,13 @@ class NfeListagemReport
         return match ($column) {
             'numero' => '5%',
             'serie' => '4%',
-            'data_emissao' => '8%',
-            'data_saida' => '8%',
-            'cliente' => '22%',
-            'chave' => '7cm',
-            'protocolo' => '14%',
+            'data_emissao' => '7%',
+            'data_saida' => '7%',
+            'cliente' => '16%',
+            'chave' => '32%',
+            'protocolo' => '13%',
             'status' => '10%',
-            'total' => '8%',
+            'total' => '7%',
             default => 'auto',
         };
     }

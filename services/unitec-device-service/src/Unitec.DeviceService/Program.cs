@@ -5,7 +5,6 @@ using Unitec.DeviceService.Domain;
 using Unitec.DeviceService.Domain.Drivers;
 using Unitec.DeviceService.Domain.Dtos;
 using Unitec.DeviceService.Infrastructure.Printing;
-using Unitec.DeviceService.Host;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -19,7 +18,7 @@ builder.WebHost.UseUrls(urls);
 builder.Services.AddSingleton<WindowsPrinterEnumerator>();
 builder.Services.AddSingleton<IPrinterDriver, WindowsRawPrinterDriver>();
 builder.Services.AddSingleton<PrintService>();
-builder.Services.AddHostedService<TrayIconHostedService>();
+builder.Services.AddSingleton<ScaleReadService>();
 builder.Services.AddCors(options =>
 {
     // ERP no navegador (outro host/porta) chama 127.0.0.1:9330 no PC do caixa.
@@ -91,6 +90,12 @@ app.MapPost("/api/print/pdf", (PrintPdfRequest body, PrintService print) =>
 app.MapPost("/api/open-drawer", async (OpenDrawerRequest body, PrintService print, CancellationToken ct) =>
 {
     var result = await print.OpenDrawerAsync(body, ct);
+    return result.Ok ? Results.Json(result) : Results.BadRequest(result);
+});
+
+app.MapPost("/api/scale/read", async (ScaleReadRequest body, ScaleReadService scale, CancellationToken ct) =>
+{
+    var result = await scale.ReadAsync(body, ct);
     return result.Ok ? Results.Json(result) : Results.BadRequest(result);
 });
 

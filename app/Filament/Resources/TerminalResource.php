@@ -53,7 +53,6 @@ class TerminalResource extends Resource
             'tipo_fechamento', 'impressora_nome', 'pagina_codigo',
             'balanca_porta', 'balanca_velocidade', 'balanca_marca', 'balanca_paridade',
             'balanca_databits', 'balanca_stopbits', 'balanca_handshaking',
-            'caminho_sat_dll', 'modelo_sat_dll', 'tipo_sat_dll',
             'ip_servidor_tef', 'mensagem_pin_pad', 'mensagem_pdv',
             'caminho_cozinha', 'caminho_bar',
         ];
@@ -74,7 +73,7 @@ class TerminalResource extends Resource
             'eh_caixa', 'pdv', 'ativo', 'restaurante', 'delivery', 'logado', 'usa_tef', 'usa_pos',
             'exibe_f3', 'exibe_f4', 'exibe_f5', 'exibe_f6', 'pesquisa_rapida', 'ler_peso',
             'busca_balanca_barras', 'mostrar_mensagem_pdv', 'mostrar_tela_caixa_livre',
-            'imprime', 'usa_gaveta', 'usar_device_service', 'usar_numero_inicial', 'meia_folha',
+            'imprime', 'usa_gaveta', 'usar_device_service', 'usar_numero_inicial',
             'tef_via_reduzida', 'tef_multiplos_cartoes',
         ];
 
@@ -131,6 +130,19 @@ class TerminalResource extends Resource
                     ->label('IP')
                     ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('categoria_licenca')
+                    ->label('Licença')
+                    ->badge()
+                    ->formatStateUsing(static fn (?string $state): string => match ($state) {
+                        'telefone' => 'Telefone',
+                        'computador' => 'Computador',
+                        default => 'Terminal',
+                    })
+                    ->color(static fn (?string $state): string => $state === 'telefone' ? 'info' : 'gray'),
+                TextColumn::make('device_last_seen_at')
+                    ->label('Último acesso')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('—'),
                 IconColumn::make('eh_caixa')
                     ->label('Caixa')
                     ->boolean()

@@ -3,6 +3,8 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\Venda;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpEmpresaScopeFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +62,23 @@ class VendaListQueryBuilder
     {
         $query = Venda::query()->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'entrega']);
 
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($empresaId) {
+            if (Schema::hasColumn((new Venda)->getTable(), 'empresa_id')) {
+                // Empresa da sessão OU legado sem empresa_id mas com origem PDV/FV da mesma empresa.
+                $query->where(function (Builder $scoped) use ($empresaId): void {
+                    $scoped->where('empresa_id', $empresaId)
+                        ->orWhere(function (Builder $legacy) use ($empresaId): void {
+                            $legacy->whereNull('empresa_id');
+                            ErpEmpresaScopeFilter::applyVendaOrigemFallback($legacy, $empresaId);
+                        });
+                });
+            } else {
+                ErpEmpresaScopeFilter::applyVendaOrigemFallback($query, $empresaId);
+            }
+        }
+
         if ($this->statusFilter !== 'todos') {
             $query->where('status', $this->statusFilter);
         }
@@ -70,6 +89,8 @@ class VendaListQueryBuilder
 
         if ($this->isDateSearchColumn()) {
             $this->applyLocalSearchByDateRange($query);
+            // Periodo do dia opcional junto com a data (ex.: 08:00–12:00 no dia).
+            $this->applyLocalSearchByTimeRange($query);
         } elseif ($this->isTimeSearchColumn()) {
             $this->applyLocalSearchByTimeRange($query);
         } elseif (filled($this->localSearch)) {
@@ -114,25 +135,47 @@ class VendaListQueryBuilder
             return;
         }
 
+        $horaDe = $this->normalizeHoraFiltro($this->localSearchHoraDe);
+        $horaAte = $this->normalizeHoraFiltro($this->localSearchHoraAte);
+
         if ($this->databaseDriver($query) === 'sqlite') {
-            if (filled($this->localSearchHoraDe)) {
-                $query->whereRaw("strftime('%H:%M', hora) >= ?", [$this->localSearchHoraDe]);
+            if ($horaDe !== null) {
+                $query->whereRaw("strftime('%H:%M:%S', hora) >= ?", [$horaDe]);
             }
 
-            if (filled($this->localSearchHoraAte)) {
-                $query->whereRaw("strftime('%H:%M', hora) <= ?", [$this->localSearchHoraAte]);
+            if ($horaAte !== null) {
+                $query->whereRaw("strftime('%H:%M:%S', hora) <= ?", [$horaAte]);
             }
 
             return;
         }
 
-        if (filled($this->localSearchHoraDe)) {
-            $query->whereRaw("TIME_FORMAT(hora, '%H:%i') >= ?", [$this->localSearchHoraDe]);
+        if ($horaDe !== null) {
+            $query->whereRaw("TIME_FORMAT(hora, '%H:%i:%s') >= ?", [$horaDe]);
         }
 
-        if (filled($this->localSearchHoraAte)) {
-            $query->whereRaw("TIME_FORMAT(hora, '%H:%i') <= ?", [$this->localSearchHoraAte]);
+        if ($horaAte !== null) {
+            $query->whereRaw("TIME_FORMAT(hora, '%H:%i:%s') <= ?", [$horaAte]);
         }
+    }
+
+    protected function normalizeHoraFiltro(string $value): ?string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}$/', $value) === 1) {
+            return $value.':00';
+        }
+
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $value) === 1) {
+            return $value;
+        }
+
+        return null;
     }
 
     /**

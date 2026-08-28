@@ -6,7 +6,10 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\VendasInternasDeviceResource;
 use App\Models\VendasInternasDevice;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\License\DeviceLicenseLimitExceeded;
+use App\Support\Erp\License\DeviceLicenseService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -31,9 +34,7 @@ class ListVendasInternasAparelhos extends ListRecords
 
     public function mount(): void
     {
-        parent::mount();
-
-        ErpScreen::set('Aparelhos Vendas Internas');
+        $this->redirect(\App\Filament\Resources\TerminalResource::getUrl('index').'?tab=aparelhos', navigate: true);
     }
 
     protected static function erpListPageClass(): string
@@ -122,7 +123,32 @@ class ListVendasInternasAparelhos extends ListRecords
             return;
         }
 
+        $empresaId = (int) ($device->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
+
+        try {
+            $devices = app(DeviceLicenseService::class);
+            if ($empresaId > 0 && $devices->isAvailable()) {
+                $devices->register(
+                    empresaId: $empresaId,
+                    deviceUuid: (string) $device->device_uuid,
+                    category: DeviceLicenseService::CATEGORY_TELEFONE,
+                    origin: 'vendas_internas',
+                    deviceName: $device->device_name,
+                    platform: $device->platform,
+                );
+            }
+        } catch (DeviceLicenseLimitExceeded $e) {
+            Notification::make()
+                ->title('Limite de telefones atingido.')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $device->forceFill([
+            'empresa_id' => $empresaId ?: $device->empresa_id,
             'status' => VendasInternasDevice::STATUS_APROVADO,
             'revoked_at' => null,
             'approved_at' => now(),

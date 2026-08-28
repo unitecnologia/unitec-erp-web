@@ -566,12 +566,10 @@ trait ManagesProductCadastroLookup
                 'model' => Grupo::class,
                 'columns' => [
                     'nome' => 'Grupo',
-                    'mostrar_no_app' => 'App',
                 ],
                 'searchColumns' => ['nome'],
                 'defaultSearchColumn' => 'nome',
-                'formFields' => ['nome', 'mostrar_no_app'],
-                'booleanFields' => ['mostrar_no_app'],
+                'formFields' => ['nome'],
             ],
             'ncm' => [
                 'title' => 'NCM',
@@ -714,6 +712,65 @@ trait ManagesProductCadastroLookup
     public function getGrupoOptionsProperty(): array
     {
         return $this->productAuxiliaryOptions(Grupo::class, 'nome', 'grupo');
+    }
+
+    /**
+     * Linhas do select de grupo (nome + flags App / Balança).
+     *
+     * @return list<array{id: int, nome: string, label: string, mostrar_no_app: bool, balanca_marcado: bool}>
+     */
+    public function getGrupoSelectRowsProperty(): array
+    {
+        $rows = Grupo::query()
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'mostrar_no_app', 'balanca_marcado'])
+            ->map(fn (Grupo $grupo): array => [
+                'id' => (int) $grupo->id,
+                'nome' => (string) $grupo->nome,
+                'label' => Grupo::displayNome((string) $grupo->nome),
+                'mostrar_no_app' => (bool) $grupo->mostrar_no_app,
+                'balanca_marcado' => (bool) $grupo->balanca_marcado,
+            ])
+            ->all();
+
+        $current = trim((string) ($this->data['grupo'] ?? ''));
+
+        if ($current !== '' && ! collect($rows)->contains(fn (array $row): bool => $row['nome'] === $current)) {
+            array_unshift($rows, [
+                'id' => 0,
+                'nome' => $current,
+                'label' => Grupo::displayNome($current),
+                'mostrar_no_app' => false,
+                'balanca_marcado' => false,
+            ]);
+        }
+
+        return $rows;
+    }
+
+    public function toggleGrupoFlag(string $nome, string $field): void
+    {
+        if (! in_array($field, ['mostrar_no_app', 'balanca_marcado'], true)) {
+            return;
+        }
+
+        $nome = trim($nome);
+
+        if ($nome === '') {
+            return;
+        }
+
+        $grupo = Grupo::query()
+            ->whereRaw('UPPER(TRIM(nome)) = ?', [mb_strtoupper($nome, 'UTF-8')])
+            ->first();
+
+        if (! $grupo) {
+            return;
+        }
+
+        $grupo->{$field} = ! (bool) $grupo->{$field};
+        $grupo->save();
     }
 
     /**

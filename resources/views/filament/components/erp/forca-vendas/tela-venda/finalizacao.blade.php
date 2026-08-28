@@ -13,6 +13,23 @@
     aria-modal="true"
     aria-labelledby="erp-fv-fin-title"
     x-data
+    x-on:keydown.window.capture="
+        if ($wire.etapa !== 'finalizacao') return;
+        if ($wire.finalizarCartaoCanhotoAberta) return;
+        const t = $event.target;
+        if (t?.id === 'erp-fv-fin-cliente' || t?.closest?.('.erp-fv-fin__ajuste')) return;
+        const k = $event.key || '';
+        if ($event.ctrlKey || $event.altKey || $event.metaKey) return;
+        // Apenas letras de atalho — nunca dígitos (digitação do Valor).
+        if (k.length !== 1 || ! /[a-zA-Z]/.test(k)) return;
+        const atalhos = Array.from(document.querySelectorAll('.erp-fv-fin .erp-pdv-finalizar__kbd'))
+            .map((el) => (el.textContent || '').trim().toUpperCase())
+            .filter((v) => v.length === 1);
+        if (! atalhos.includes(k.toUpperCase())) return;
+        $event.preventDefault();
+        $event.stopPropagation();
+        $wire.selectPagamentoByAtalho(k);
+    "
     x-on:erp-fv-focus-pagamento.window="
         $nextTick(() => {
             const el = document.getElementById('erp-fv-finalizar-valor-' + ($event.detail.index ?? 0));
@@ -59,7 +76,7 @@
                             id="erp-fv-fin-cliente"
                         >
                         @if ($this->clienteSugestoesOpen && $this->clienteSugestoes !== [])
-                            <ul class="erp-fv-fin__suggest" role="listbox">
+                            <ul class="erp-fv-fin__suggest erp-fv-fin__suggest--cliente" role="listbox">
                                 @foreach ($this->clienteSugestoes as $index => $sug)
                                     <li wire:key="fv-fin-cli-sug-{{ $sug['id'] }}">
                                         <button
@@ -71,13 +88,20 @@
                                             <span class="erp-fv-fin__suggest-code">{{ $sug['codigo'] }}</span>
                                             <span class="erp-fv-fin__suggest-nome">{{ $sug['nome'] }}</span>
                                             <span class="erp-fv-fin__suggest-credito">
-                                                <span>Lim {{ $sug['limite'] ?? '0,00' }}</span>
-                                                <span>Util {{ $sug['utilizado'] ?? '0,00' }}</span>
-                                                <span @class(['is-vencido' => ($sug['tem_vencidas'] ?? false)])>Venc {{ $sug['vencidas'] ?? '0,00' }}</span>
+                                                <span class="erp-fv-fin__suggest-cred erp-fv-fin__suggest-cred--lim">Lim {{ $sug['limite'] ?? '0,00' }}</span>
+                                                <span class="erp-fv-fin__suggest-cred erp-fv-fin__suggest-cred--util">Util {{ $sug['utilizado'] ?? '0,00' }}</span>
+                                                <span @class([
+                                                    'erp-fv-fin__suggest-cred',
+                                                    'erp-fv-fin__suggest-cred--venc',
+                                                    'is-vencido' => ($sug['tem_vencidas'] ?? false),
+                                                ])>Venc {{ $sug['vencidas'] ?? '0,00' }}</span>
                                             </span>
-                                            @if (filled($sug['cpf_cnpj'] ?? null))
-                                                <span class="erp-fv-fin__suggest-doc">{{ $sug['cpf_cnpj'] }}</span>
-                                            @endif
+                                            <span @class([
+                                                'erp-fv-fin__suggest-doc',
+                                                'is-cnpj' => ($sug['doc_tipo'] ?? '') === 'cnpj',
+                                                'is-cpf' => ($sug['doc_tipo'] ?? '') === 'cpf',
+                                                'is-empty' => blank($sug['cpf_cnpj'] ?? null),
+                                            ])>{{ $sug['cpf_cnpj'] ?? '' }}</span>
                                         </button>
                                     </li>
                                 @endforeach
@@ -153,9 +177,9 @@
                                             <input
                                                 id="erp-fv-finalizar-valor-{{ $index }}"
                                                 type="text"
-                                                wire:model.live.debounce.300ms="meiosPagamento.{{ $index }}.valor"
+                                                wire:model.blur="meiosPagamento.{{ $index }}.valor"
                                                 wire:focus="selectPagamentoRow({{ $index }})"
-                                                wire:keydown.enter.prevent="confirmarValorPagamentoLinha"
+                                                wire:keydown.enter.prevent="confirmarValorPagamentoLinha($event.target.value)"
                                                 class="erp-pdv-finalizar__grid-input"
                                                 data-mask="money-br"
                                                 inputmode="decimal"

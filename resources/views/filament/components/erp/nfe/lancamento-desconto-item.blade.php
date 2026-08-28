@@ -73,13 +73,19 @@
                     'erp-pdv-desconto__preview--acrescimo' => $preview['temAjuste'] && $preview['tipo'] === 'acrescimo',
                 ])>
                     <div class="erp-pdv-desconto__preview-row">
-                        <span>Preço</span>
+                        <span>Preço unit.</span>
                         <span class="erp-pdv-desconto__preview-precos">
                             <span class="erp-pdv-desconto__preview-de">R$ {{ $preview['base'] }}</span>
                             <span class="erp-pdv-desconto__preview-seta">→</span>
                             <strong class="erp-pdv-desconto__preview-novo">R$ {{ $preview['novoPreco'] }}</strong>
                         </span>
                     </div>
+                    @if ($preview['temAjuste'])
+                        <div class="erp-pdv-desconto__preview-row">
+                            <span>{{ $preview['tipo'] === 'acrescimo' ? 'ACRE. (linha)' : 'DESC. (linha)' }}</span>
+                            <strong>R$ {{ $preview['ajuste'] }}</strong>
+                        </div>
+                    @endif
                     <div class="erp-pdv-desconto__preview-row erp-pdv-desconto__preview-row--total">
                         <span>Total do item</span>
                         <strong>R$ {{ $preview['total'] }}</strong>

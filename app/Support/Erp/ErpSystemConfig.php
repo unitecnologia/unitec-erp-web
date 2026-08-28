@@ -7,6 +7,8 @@ use App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert;
 
 final class ErpSystemConfig
 {
+    public const DEFAULT_UPDATE_DOWNLOAD_URL = 'https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip';
+
     public static function empresa(?int $empresaId = null): ?Empresa
     {
         $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
@@ -20,8 +22,6 @@ final class ErpSystemConfig
 
     public static function updateDownloadUrl(?int $empresaId = null): string
     {
-        $github = 'https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip';
-
         $fromDb = trim((string) static::empresa($empresaId)?->param_update_download_url);
 
         if ($fromDb !== '' && ! static::isDeadUpdateHost($fromDb)) {
@@ -34,7 +34,46 @@ final class ErpSystemConfig
             return $fromEnv;
         }
 
-        return $github;
+        return self::DEFAULT_UPDATE_DOWNLOAD_URL;
+    }
+
+    public static function acessoRemotoHabilitado(?int $empresaId = null): bool
+    {
+        $empresa = static::empresa($empresaId);
+
+        if ($empresa === null) {
+            return true;
+        }
+
+        return (bool) ($empresa->param_acesso_remoto_habilitar ?? true);
+    }
+
+    public static function publicUrl(?int $empresaId = null): string
+    {
+        if (static::acessoRemotoHabilitado($empresaId)) {
+            $fromDb = rtrim(trim((string) static::empresa($empresaId)?->param_erp_public_url), '/');
+
+            if ($fromDb !== '') {
+                return $fromDb;
+            }
+        }
+
+        return rtrim((string) config('app.url', ''), '/');
+    }
+
+    public static function gestorPublicUrl(?int $empresaId = null): string
+    {
+        if (static::acessoRemotoHabilitado($empresaId)) {
+            $fromDb = rtrim(trim((string) static::empresa($empresaId)?->param_gestor_public_url), '/');
+
+            if ($fromDb !== '') {
+                return $fromDb;
+            }
+        }
+
+        $base = static::publicUrl($empresaId);
+
+        return $base !== '' ? $base.'/gestor' : '';
     }
 
     private static function isDeadUpdateHost(string $url): bool

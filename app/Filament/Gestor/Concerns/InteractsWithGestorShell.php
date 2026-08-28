@@ -2,7 +2,9 @@
 
 namespace App\Filament\Gestor\Concerns;
 
+use App\Models\Empresa;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
 use App\Support\Gestor\GestorExecutivoService;
 use Illuminate\Support\Facades\Auth;
 
@@ -10,10 +12,13 @@ trait InteractsWithGestorShell
 {
     public string $gestorTema = 'light';
 
+    public ?int $empresaGestorId = null;
+
     public function mountGestorShell(): void
     {
         $tema = (string) (request()->cookie('gestor_tema') ?? session('gestor_tema', 'light'));
         $this->gestorTema = in_array($tema, ['light', 'dark'], true) ? $tema : 'light';
+        $this->empresaGestorId = $this->empresaIdAtiva();
     }
 
     public function toggleTema(): void
@@ -21,6 +26,66 @@ trait InteractsWithGestorShell
         $this->gestorTema = $this->gestorTema === 'dark' ? 'light' : 'dark';
         session(['gestor_tema' => $this->gestorTema]);
         cookie()->queue(cookie('gestor_tema', $this->gestorTema, 60 * 24 * 365));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function empresasGestor(): array
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return [];
+        }
+
+        $ids = $user->accessibleEmpresaIds();
+        if ($ids === []) {
+            return [];
+        }
+
+        return Empresa::query()
+            ->whereIn('id', $ids)
+            ->where('ativo', true)
+            ->orderBy('nome')
+            ->pluck('nome', 'id')
+            ->mapWithKeys(fn ($nome, $id): array => [(int) $id => (string) $nome])
+            ->all();
+    }
+
+    public function empresaIdAtiva(): int
+    {
+        return app(GestorExecutivoService::class)->empresaId();
+    }
+
+    public function updatedEmpresaGestorId(mixed $value): void
+    {
+        $this->switchEmpresaGestor((int) $value);
+    }
+
+    public function switchEmpresaGestor(int $empresaId): void
+    {
+        $user = Auth::user();
+        if ($user === null || $empresaId <= 0) {
+            return;
+        }
+
+        if (! ErpContext::userCanAccessEmpresa($empresaId, $user)) {
+            $this->empresaGestorId = $this->empresaIdAtiva();
+
+            return;
+        }
+
+        if ($empresaId === $this->empresaIdAtiva()) {
+            $this->empresaGestorId = $empresaId;
+
+            return;
+        }
+
+        session(['erp_empresa_id' => $empresaId]);
+        ErpContext::clearMemo();
+        $this->empresaGestorId = $empresaId;
+
+        $this->redirect(static::getUrl(panel: 'gestor'));
     }
 
     public function logoutGestor(): void
@@ -40,13 +105,13 @@ trait InteractsWithGestorShell
 
     public function empresaNome(): string
     {
-        $id = app(GestorExecutivoService::class)->empresaId();
+        $id = $this->empresaIdAtiva();
 
         if ($id <= 0) {
             return '';
         }
 
-        return (string) (\App\Models\Empresa::query()->whereKey($id)->value('nome') ?? '');
+        return (string) (Empresa::query()->whereKey($id)->value('nome') ?? '');
     }
 
     /**
@@ -108,8 +173,7 @@ trait InteractsWithGestorShell
         return ErpAccess::can($user, 'produtos.access')
             || ErpAccess::can($user, 'ajusta_preco.access')
             || ErpAccess::can($user, 'ajuste_estoque.access')
-            || (bool) $user->is_admin
-            || (bool) $user->is_supervisor;
+            || (bool) $user->is_admin;
     }
 
     public function money(float $value): string

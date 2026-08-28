@@ -7,7 +7,11 @@ use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\InteractsWithErpSimpleListPage;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\ReciboResource;
+use App\Filament\Resources\ReciboResource\Pages\Concerns\ManagesReciboEmailModal;
+use App\Models\Person;
+use App\Models\Product;
 use App\Models\Recibo;
+use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\ValorPorExtenso;
@@ -27,6 +31,7 @@ class ListRecibos extends ListRecords
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use InteractsWithErpSimpleListPage;
+    use ManagesReciboEmailModal;
     use NormalizesErpUppercaseFormData;
 
     protected static string $resource = ReciboResource::class;
@@ -54,12 +59,50 @@ class ListRecibos extends ListRecords
     /** @var array<string, mixed> */
     public array $form = [];
 
+    public bool $recebiLookupOpen = false;
+
+    /** @var array<int, array{id: int, nome: string, fantasia: string, cpf_cnpj: string}> */
+    public array $recebiResults = [];
+
+    public ?int $selectedRecebiIndex = null;
+
+    public bool $referenteLookupOpen = false;
+
+    /** @var array<int, array{id: int, codigo: string, descricao: string}> */
+    public array $referenteResults = [];
+
+    public ?int $selectedReferenteIndex = null;
+
+    public bool $printModalOpen = false;
+
+    public bool $previewOverlayOpen = false;
+
+    public ?string $previewOverlayUrl = null;
+
     public function mount(): void
     {
         parent::mount();
 
         ErpScreen::set('Impressão de Recibos');
         $this->resetForm();
+        $this->emailModalOpen = false;
+        $this->aplicarPeriodoMensalPadrao();
+    }
+
+    protected function aplicarPeriodoMensalPadrao(): void
+    {
+        if ($this->periodoDe !== '' || $this->periodoAte !== '') {
+            return;
+        }
+
+        $hoje = ErpTimezone::toLocal();
+        $inicio = $hoje->copy()->startOfMonth()->toDateString();
+        $fim = $hoje->copy()->endOfMonth()->toDateString();
+
+        $this->periodoDe = $inicio;
+        $this->periodoAte = $fim;
+        $this->periodoDeApplied = $inicio;
+        $this->periodoAteApplied = $fim;
     }
 
     protected static function erpListPageClass(): string
@@ -96,6 +139,7 @@ class ListRecibos extends ListRecords
     {
         return match ($action) {
             'print' => 'um recibo na lista para imprimir',
+            'enviar' => 'um recibo na lista para enviar',
             default => $this->defaultErpListSelectPrompt($action),
         };
     }
@@ -107,11 +151,11 @@ class ListRecibos extends ListRecords
             'create' => 'createRecibo',
             'edit' => 'editRecibo',
             'delete' => null,
-            'refresh' => 'refreshTable',
+            'refresh' => null,
             'searchFocusKey' => 'F12',
             'extraKeys' => [
-                'F5' => ['method' => 'refreshTable'],
-                'F6' => ['method' => 'imprimirRecibo'],
+                'F6' => ['method' => 'openPrintModal'],
+                'F9' => ['method' => 'openEmailModal'],
             ],
         ];
     }
@@ -186,6 +230,9 @@ class ListRecibos extends ListRecords
                 View::make('filament.components.erp.recibos.footer-summary'),
                 View::make('filament.components.erp.recibos.action-bar'),
                 View::make('filament.components.erp.recibos.modal'),
+                View::make('filament.components.erp.recibos.print-modal'),
+                View::make('filament.components.erp.recibos.email-modal'),
+                View::make('filament.components.erp.recibos.preview-overlay'),
             ]);
     }
 
@@ -216,7 +263,13 @@ class ListRecibos extends ListRecords
             return;
         }
 
-        parent::refreshTable();
+        $this->resetTable();
+        $this->syncErpListSyncVersionFromStore();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
     }
 
     public function focusSearch(): void
@@ -228,7 +281,6 @@ class ListRecibos extends ListRecords
     {
         return [
             'form.valor',
-            'form.extenso',
             'form.emissao',
             'form.codigo',
         ];
@@ -236,6 +288,36 @@ class ListRecibos extends ListRecords
 
     public function handleRecibosEscape(): void
     {
+        if ($this->previewOverlayOpen) {
+            $this->closePreviewOverlay();
+
+            return;
+        }
+
+        if ($this->emailModalOpen) {
+            $this->closeEmailModal();
+
+            return;
+        }
+
+        if ($this->printModalOpen) {
+            $this->closePrintModal();
+
+            return;
+        }
+
+        if ($this->showForm && $this->recebiLookupOpen) {
+            $this->closeRecebiLookup();
+
+            return;
+        }
+
+        if ($this->showForm && $this->referenteLookupOpen) {
+            $this->closeReferenteLookup();
+
+            return;
+        }
+
         if ($this->showForm) {
             $this->closeForm();
 
@@ -288,16 +370,277 @@ class ListRecibos extends ListRecords
             'codigo' => $record->codigo,
             'emissao' => $record->emissao?->format('Y-m-d') ?? '',
             'valor' => number_format((float) $record->valor, 2, ',', '.'),
-            'extenso' => $record->ensureExtenso(),
+            'extenso' => mb_strtoupper($record->ensureExtenso(), 'UTF-8'),
             'recebi_de' => $record->recebi_de,
             'referente_a' => $record->referente_a ?? '',
         ];
         $this->showForm = true;
     }
 
-    public function updatedFormValor(mixed $value): void
+    public function syncExtensoFromValor(): void
     {
-        $this->form['extenso'] = ValorPorExtenso::fromMoney($value);
+        $parsed = ValorPorExtenso::normalize($this->form['valor'] ?? null);
+
+        if ($parsed !== null) {
+            $this->form['valor'] = ErpMoney::formatBr($parsed);
+        }
+
+        $extenso = ValorPorExtenso::fromMoney($this->form['valor'] ?? null);
+        $this->form['extenso'] = $extenso !== ''
+            ? mb_strtoupper($extenso, 'UTF-8')
+            : '';
+    }
+
+    public function updatedFormRecebiDe(mixed $value): void
+    {
+        if (! $this->showForm) {
+            return;
+        }
+
+        $this->recebiLookupOpen = true;
+        $this->refreshRecebiResults();
+    }
+
+    public function openRecebiLookup(): void
+    {
+        $this->recebiLookupOpen = true;
+
+        if (filled(trim((string) ($this->form['recebi_de'] ?? '')))) {
+            $this->refreshRecebiResults();
+        }
+    }
+
+    public function refreshRecebiResults(): void
+    {
+        $term = trim((string) ($this->form['recebi_de'] ?? ''));
+
+        if ($term === '') {
+            $this->recebiResults = [];
+            $this->selectedRecebiIndex = null;
+
+            return;
+        }
+
+        $like = '%'.$term.'%';
+        $digits = preg_replace('/\D/', '', $term) ?? '';
+
+        $query = Person::query()
+            ->where('ativo', true)
+            ->where('is_cliente', true)
+            ->where(function ($sub) use ($like, $digits, $term): void {
+                $sub->where('nome_razao', 'like', $like)
+                    ->orWhere('apelido_fantasia', 'like', $like)
+                    ->orWhere('cpf_cnpj', 'like', $like);
+
+                if (strlen($digits) >= 2) {
+                    $digitsLike = '%'.$digits.'%';
+                    $sub->orWhereRaw(
+                        "replace(replace(replace(replace(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') like ?",
+                        [$digitsLike]
+                    );
+                }
+
+                if (ctype_digit($term)) {
+                    $sub->orWhere('codigo', 'like', $like);
+                }
+            });
+
+        $this->recebiResults = $query
+            ->orderBy('nome_razao')
+            ->limit(50)
+            ->get()
+            ->map(fn (Person $person): array => [
+                'id' => $person->id,
+                'nome' => mb_strtoupper($person->nome_razao, 'UTF-8'),
+                'fantasia' => mb_strtoupper((string) ($person->apelido_fantasia ?? ''), 'UTF-8'),
+                'cpf_cnpj' => $person->cpf_cnpj ?? '',
+            ])
+            ->all();
+
+        $this->selectedRecebiIndex = $this->recebiResults === [] ? null : 0;
+    }
+
+    public function moveRecebiSelection(int $delta): void
+    {
+        if ($this->recebiResults === []) {
+            return;
+        }
+
+        $step = $delta >= 0 ? 1 : -1;
+        $index = ($this->selectedRecebiIndex ?? 0) + $step;
+        $count = count($this->recebiResults);
+        $this->selectedRecebiIndex = max(0, min($count - 1, $index));
+    }
+
+    public function selectRecebiResult(int $index): void
+    {
+        if (! isset($this->recebiResults[$index])) {
+            return;
+        }
+
+        $this->selectedRecebiIndex = $index;
+        $this->confirmRecebiSelection();
+    }
+
+    public function confirmRecebiSelection(): void
+    {
+        $index = $this->selectedRecebiIndex;
+
+        if ($index === null || ! isset($this->recebiResults[$index])) {
+            $this->closeRecebiLookup();
+
+            return;
+        }
+
+        $this->form['recebi_de'] = $this->recebiResults[$index]['nome'];
+        $this->closeRecebiLookup();
+        $this->dispatch('erp-recibo-focus-referente');
+    }
+
+    public function handleRecebiEnter(): void
+    {
+        if ($this->recebiLookupOpen && $this->selectedRecebiIndex !== null && isset($this->recebiResults[$this->selectedRecebiIndex])) {
+            $this->confirmRecebiSelection();
+
+            return;
+        }
+
+        // Nome livre: grava no recibo mesmo sem existir no cadastro.
+        $this->closeRecebiLookup();
+        $this->dispatch('erp-recibo-focus-referente');
+    }
+
+    public function closeRecebiLookup(): void
+    {
+        $this->recebiLookupOpen = false;
+        $this->recebiResults = [];
+        $this->selectedRecebiIndex = null;
+    }
+
+    public function updatedFormReferenteA(mixed $value): void
+    {
+        if (! $this->showForm) {
+            return;
+        }
+
+        $this->referenteLookupOpen = true;
+        $this->refreshReferenteResults();
+    }
+
+    public function openReferenteLookup(): void
+    {
+        $this->referenteLookupOpen = true;
+
+        if ($this->referenteSearchTerm() !== '') {
+            $this->refreshReferenteResults();
+        }
+    }
+
+    public function refreshReferenteResults(): void
+    {
+        $term = $this->referenteSearchTerm();
+
+        if (mb_strlen($term) < 2) {
+            $this->referenteResults = [];
+            $this->selectedReferenteIndex = null;
+
+            return;
+        }
+
+        $like = '%'.$term.'%';
+
+        $this->referenteResults = Product::query()
+            ->where('ativo', true)
+            ->where(function ($query) use ($like, $term): void {
+                $query->where('descricao', 'like', $like)
+                    ->orWhere('codigo', 'like', $like)
+                    ->orWhere('referencia', 'like', $like)
+                    ->orWhere('codigo_barras', 'like', $like)
+                    ->orWhere('codigo_barras_caixa', 'like', $like);
+
+                if (ctype_digit($term)) {
+                    $query->orWhere('codigo', $term);
+                }
+            })
+            ->orderByRaw(
+                'CASE WHEN codigo = ? THEN 0 WHEN codigo_barras = ? OR codigo_barras_caixa = ? OR referencia = ? THEN 1 WHEN descricao LIKE ? THEN 2 ELSE 3 END',
+                [$term, $term, $term, $term, $term.'%'],
+            )
+            ->orderBy('descricao')
+            ->limit(40)
+            ->get(['id', 'codigo', 'descricao'])
+            ->map(fn (Product $product): array => [
+                'id' => (int) $product->id,
+                'codigo' => mb_strtoupper(trim((string) ($product->codigo ?? '')), 'UTF-8'),
+                'descricao' => mb_strtoupper(trim((string) ($product->descricao ?? '')), 'UTF-8'),
+            ])
+            ->all();
+
+        $this->selectedReferenteIndex = $this->referenteResults === [] ? null : 0;
+    }
+
+    public function selectReferenteResult(int $index): void
+    {
+        if (! isset($this->referenteResults[$index])) {
+            return;
+        }
+
+        $this->selectedReferenteIndex = $index;
+        $this->confirmReferenteSelection();
+    }
+
+    public function confirmReferenteSelection(): void
+    {
+        $index = $this->selectedReferenteIndex;
+
+        if ($index === null || ! isset($this->referenteResults[$index])) {
+            $this->closeReferenteLookup();
+
+            return;
+        }
+
+        $descricao = $this->referenteResults[$index]['descricao'];
+        $this->applyReferenteProductDescription($descricao);
+        $this->closeReferenteLookup();
+    }
+
+    public function handleReferenteEnter(): void
+    {
+        if ($this->referenteLookupOpen && $this->selectedReferenteIndex !== null && isset($this->referenteResults[$this->selectedReferenteIndex])) {
+            $this->confirmReferenteSelection();
+        }
+    }
+
+    public function closeReferenteLookup(): void
+    {
+        $this->referenteLookupOpen = false;
+        $this->referenteResults = [];
+        $this->selectedReferenteIndex = null;
+    }
+
+    /**
+     * Busca pela última linha digitada (permite vários produtos / textos no campo).
+     */
+    protected function referenteSearchTerm(): string
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", (string) ($this->form['referente_a'] ?? ''));
+        $lines = explode("\n", $text);
+        $last = (string) end($lines);
+
+        return trim($last);
+    }
+
+    protected function applyReferenteProductDescription(string $descricao): void
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", (string) ($this->form['referente_a'] ?? ''));
+        $lines = explode("\n", $text);
+
+        if ($lines === []) {
+            $lines = [''];
+        }
+
+        $lines[count($lines) - 1] = $descricao;
+        $this->form['referente_a'] = implode("\n", $lines);
     }
 
     public function saveRecibo(): void
@@ -347,6 +690,8 @@ class ListRecibos extends ListRecords
             $extenso = ValorPorExtenso::fromMoney($valor);
         }
 
+        $extenso = mb_strtoupper($extenso, 'UTF-8');
+
         $payload = [
             'codigo' => (int) $data['codigo'],
             'emissao' => $data['emissao'],
@@ -378,6 +723,7 @@ class ListRecibos extends ListRecords
     public function closeForm(): void
     {
         $this->showForm = false;
+        $this->closeRecebiLookup();
         $this->resetForm();
     }
 
@@ -394,7 +740,7 @@ class ListRecibos extends ListRecords
         $this->deleteSimpleRecord(Recibo::class, 'Recibo excluído.');
     }
 
-    public function imprimirRecibo(): void
+    public function openPrintModal(): void
     {
         if ($this->showForm) {
             return;
@@ -404,18 +750,71 @@ class ListRecibos extends ListRecords
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('print');
-
-        if (! $recordId) {
+        if (! $this->highlightedRecordIdOrNotify('print')) {
             return;
         }
 
-        $this->redirect(route('erp.reports.recibo', ['recibo' => $recordId]), navigate: false);
+        $this->printModalOpen = true;
+    }
+
+    public function closePrintModal(): void
+    {
+        $this->printModalOpen = false;
+    }
+
+    public function visualizarReciboImpressao(): void
+    {
+        if (! $this->highlightedRecordId) {
+            return;
+        }
+
+        if (! $this->erpAuthorizeOrNotify('recibos.print')) {
+            return;
+        }
+
+        $this->closePrintModal();
+        $this->previewOverlayUrl = route('erp.reports.recibo', [
+            'recibo' => $this->highlightedRecordId,
+            'embed' => 1,
+        ]);
+        $this->previewOverlayOpen = true;
+    }
+
+    public function imprimirBobinaRecibo(): void
+    {
+        if (! $this->highlightedRecordId) {
+            return;
+        }
+
+        if (! $this->erpAuthorizeOrNotify('recibos.print')) {
+            return;
+        }
+
+        $this->closePrintModal();
+        $this->previewOverlayUrl = route('erp.reports.recibo', [
+            'recibo' => $this->highlightedRecordId,
+            'bobina' => 1,
+            'embed' => 1,
+        ]);
+        $this->previewOverlayOpen = true;
+    }
+
+    public function closePreviewOverlay(): void
+    {
+        $this->previewOverlayOpen = false;
+        $this->previewOverlayUrl = null;
+    }
+
+    public function imprimirRecibo(): void
+    {
+        $this->openPrintModal();
     }
 
     protected function resetForm(): void
     {
         $this->formId = null;
+        $this->closeRecebiLookup();
+        $this->closeReferenteLookup();
         $this->resetErrorBag();
         $this->form = [
             'codigo' => null,

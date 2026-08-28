@@ -5,7 +5,6 @@ namespace App\Support\Erp\NotaFornecedor;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProdutoFornecedor;
-use App\Support\Erp\BrDecimal;
 use Illuminate\Support\Collection;
 
 /**
@@ -31,8 +30,9 @@ final class NotaFornecedorXmlProdutoMatcher
         $vinculos = $fornecedor
             ? $this->loadVinculosPorCodigo((int) $fornecedor->id)
             : collect();
+        $unidadesCadastradas = Product::unidades();
 
-        return array_values(array_map(function (array $item) use ($fornecedor, $vinculos): array {
+        return array_values(array_map(function (array $item) use ($fornecedor, $vinculos, $unidadesCadastradas): array {
             $match = $this->findExistingProduct($item, $fornecedor, $vinculos);
 
             if ($match && $fornecedor) {
@@ -44,14 +44,25 @@ final class NotaFornecedorXmlProdutoMatcher
             $item['produto_codigo'] = $match?->codigo;
             $item['produto_descricao'] = $match?->descricao;
             $item['grupo'] = filled($match?->grupo) ? (string) $match->grupo : (string) ($item['grupo'] ?? '');
-            $item['pr_venda'] = $match && $match->preco_venda !== null
-                ? number_format((float) $match->preco_venda, 3, ',', '.')
-                : number_format(
-                    BrDecimal::parse((string) ($item['pr_venda'] ?? $item['prc_unitario'] ?? '0'), 3),
-                    3,
-                    ',',
-                    '.'
-                );
+            // Pr. Venda inicia zerado na importação; o usuário define depois (custo unitário ≠ preço de venda).
+            $item['pr_venda'] = '0,000';
+
+            if ($match) {
+                $unidadeProduto = mb_strtoupper(trim((string) ($match->unidade ?? '')), 'UTF-8');
+                if ($unidadeProduto !== '' && array_key_exists($unidadeProduto, $unidadesCadastradas)) {
+                    $item['und'] = $unidadeProduto;
+                } else {
+                    $undXml = mb_strtoupper(trim((string) ($item['und'] ?? '')), 'UTF-8');
+                    $item['und'] = ($undXml !== '' && array_key_exists($undXml, $unidadesCadastradas))
+                        ? $undXml
+                        : '';
+                }
+            } else {
+                $undXml = mb_strtoupper(trim((string) ($item['und'] ?? '')), 'UTF-8');
+                $item['und'] = ($undXml !== '' && array_key_exists($undXml, $unidadesCadastradas))
+                    ? $undXml
+                    : '';
+            }
 
             return $item;
         }, $itens));

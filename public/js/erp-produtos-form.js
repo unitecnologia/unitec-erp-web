@@ -55,6 +55,72 @@ function focusPrecificacaoInputById(fieldId) {
     }
 }
 
+/**
+ * Cadastro novo: cursor em Descrição.
+ * Só na abertura da tela e cancelado na primeira ação do usuário, para nunca
+ * roubar o foco de quem já está navegando com Enter.
+ */
+let erpDescricaoFocusTimer = null;
+
+function cancelProdutoDescricaoFocus() {
+    if (erpDescricaoFocusTimer !== null) {
+        window.clearTimeout(erpDescricaoFocusTimer);
+        erpDescricaoFocusTimer = null;
+    }
+}
+
+function bindProdutoDescricaoFocusCancel() {
+    if (window.__erpProdutoDescricaoFocusCancelBound) {
+        return;
+    }
+
+    window.__erpProdutoDescricaoFocusCancelBound = true;
+
+    // Só interação real do usuário cancela — eventos programáticos da carga não.
+    const cancelIfLeftDescricao = (event) => {
+        if (event.target?.id !== 'pprod-descricao') {
+            cancelProdutoDescricaoFocus();
+        }
+    };
+
+    document.addEventListener('keydown', cancelIfLeftDescricao, true);
+    document.addEventListener('pointerdown', cancelIfLeftDescricao, true);
+}
+
+function focusProdutoDescricaoOnCreate(page) {
+    if (! page || ! page.classList.contains('erp-produtos-form-page--create')) {
+        return;
+    }
+
+    bindProdutoDescricaoFocusCancel();
+    cancelProdutoDescricaoFocus();
+
+    const attempts = [0, 50, 150];
+
+    const tryFocus = (index) => {
+        erpDescricaoFocusTimer = null;
+
+        const input = document.getElementById('pprod-descricao');
+
+        if (input && ! input.disabled) {
+            input.removeAttribute('readonly');
+            input.focus();
+
+            if (document.activeElement === input) {
+                return;
+            }
+        }
+
+        const next = index + 1;
+
+        if (next < attempts.length) {
+            erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(next), attempts[next]);
+        }
+    };
+
+    erpDescricaoFocusTimer = window.setTimeout(() => tryFocus(0), attempts[0]);
+}
+
 function initErpProdutosForm() {
     const page = document.querySelector('.erp-produtos-form-page');
 
@@ -68,6 +134,7 @@ function initErpProdutosForm() {
     bindErpProdutosLocFields(page);
     bindSearchCodigoBarras(page);
     bindProductCadastroLookup(page);
+    focusProdutoDescricaoOnCreate(page);
 }
 
 function initErpProdutosFormInputs(page) {
@@ -525,6 +592,17 @@ function bindErpProdutosFormKeys() {
         }
 
         if (event.key === 'F5') {
+            event.preventDefault();
+            window.saveErpProdutosForm();
+
+            return;
+        }
+
+        // Enter no botão Salvar encerra o ciclo do formulário gravando.
+        if (
+            event.key === 'Enter'
+            && document.activeElement?.closest('.erp-pcad-actions__btn--primary[data-erp-key="F5"]')
+        ) {
             event.preventDefault();
             window.saveErpProdutosForm();
 

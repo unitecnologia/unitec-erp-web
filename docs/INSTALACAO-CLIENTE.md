@@ -1,33 +1,31 @@
-﻿# InstalaÃ§Ã£o Unitec ERP â€” Cliente
+﻿# Instalação Unitec ERP — Cliente
 
-## InstalaÃ§Ã£o (1 arquivo)
+## Instalação (1 arquivo)
 
-1. Receba **`Instalador Sistema Facil.exe`**
-2. Duplo clique â†’ **AvanÃ§ar** â†’ **Instalar**
-3. Aguarde terminar (aceite permissÃ£o de administrador se pedir)
-4. O sistema abre sozinho no navegador
+1. Receba **`Instalar Unitec ERP.exe`**
+2. Duplo clique → **Avançar** → **Instalar**
+3. Aguarde terminar (aceite permissão de administrador se pedir)
+4. O sistema abre sozinho em janela de aplicativo (Chrome/Edge `--app`)
 
 Pronto. O instalador faz **tudo sozinho**:
 
-- Laragon 8.6 + PHP 8.4, MySQL e Apache
-- Sistema Unitec ERP em **`C:\UNITECNOLOGIA_WEB`**
-- Banco de dados
-- Atalhos na Ãrea de Trabalho
-- Abre a Retaguarda automaticamente
+- PHP + MariaDB embutidos
+- Sistema em **`C:\UNITECNOLOGIA_WEB`**
+- Banco de dados (se a pasta já existir, **recupera sem apagar o banco**)
+- Atalho **Unitec ERP** na Área de Trabalho
+- Abre o sistema automaticamente
 
 **Sem internet na loja** (tudo vem embutido no EXE).
 
 ---
 
-## Atalhos na Ãrea de Trabalho
+## Atalho na Área de Trabalho
 
-| Atalho | FunÃ§Ã£o |
+| Atalho | Função |
 |--------|--------|
-| **INFORSYSTEM Retaguarda** | Cadastros, vendas, financeiro |
-| **INFORSYSTEM PDV** | Caixa / PDV |
-| **INFORSYSTEM Pre-venda** | OrÃ§amentos |
+| **Unitec ERP** | Abre o sistema em janela de aplicativo (Chrome/Edge `--app`) |
 
-Os atalhos **sobem o servidor e abrem o sistema sozinhos** â€” nÃ£o precisa configurar nada.
+Só este atalho. Sem outros lançadores na Área de Trabalho.
 
 ---
 
@@ -38,17 +36,17 @@ Os atalhos **sobem o servidor e abrem o sistema sozinhos** â€” nÃ£o preci
 | Usuário | `USUARIO` |
 | Senha | `01` |
 
-Troque a senha apÃ³s o primeiro acesso.
+Troque a senha após o primeiro acesso.
 
 ---
 
 ## Se algo der errado
 
-| Problema | SoluÃ§Ã£o |
+| Problema | Solução |
 |----------|---------|
 | Instalador mostrou erro | Envie ao suporte o arquivo `C:\UNITECNOLOGIA_WEB\instalacao.log` |
-| Atalho nÃ£o abriu | Duplo clique de novo em **INFORSYSTEM Retaguarda** |
-| Ainda nÃ£o abriu | Clique direito em **`Corrigir Dominio.bat`** em `C:\UNITECNOLOGIA_WEB` â†’ **Executar como administrador** |
+| Atalho não abriu | Duplo clique de novo em **Unitec ERP** |
+| Ainda não abriu | Clique direito em **`Corrigir Dominio.bat`** em `C:\UNITECNOLOGIA_WEB\suporte` → **Executar como administrador** |
 
 ---
 

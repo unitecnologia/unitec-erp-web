@@ -15,6 +15,8 @@ class VendaListagemReport
         return [
             'numero' => 'NÚMERO',
             'data' => 'DATA',
+            'hora_abertura' => 'HORA AB.',
+            'hora' => 'HORA FE.',
             'cliente' => 'CLIENTE',
             'vendedor' => 'VENDEDOR',
             'plataforma' => 'PLATAFORMA',
@@ -22,7 +24,6 @@ class VendaListagemReport
             'total' => 'TOTAL',
             'status' => 'SITUAÇÃO',
             'tipo' => 'TIPO',
-            'hora' => 'HORA',
         ];
     }
 
@@ -69,6 +70,7 @@ class VendaListagemReport
             'status' => Venda::statusLabels()[$venda->status] ?? (string) $venda->status,
             'tipo' => Venda::tipoLabels()[$venda->tipo] ?? (string) $venda->tipo,
             'hora' => static::formatHora($venda->hora),
+            'hora_abertura' => static::formatHora($venda->hora_abertura ?? null),
             'plataforma' => $venda->plataformaLabel(),
             default => '',
         };
@@ -105,10 +107,16 @@ class VendaListagemReport
         }
 
         if ($value instanceof \DateTimeInterface) {
-            return $value->format('H:i');
+            return $value->format('H:i:s');
         }
 
-        return substr((string) $value, 0, 5);
+        try {
+            return \Illuminate\Support\Carbon::parse((string) $value)->format('H:i:s');
+        } catch (\Throwable) {
+            $raw = (string) $value;
+
+            return strlen($raw) >= 8 ? substr($raw, 0, 8) : substr($raw, 0, 5);
+        }
     }
 
     public static function isNumericColumn(string $column): bool
@@ -203,7 +211,7 @@ class VendaListagemReport
             'numero' => 'Número',
             'data' => 'Data',
             'total' => 'Total',
-            'hora' => 'Hora',
+            'hora' => 'Hora fe.',
         ];
     }
 
@@ -238,6 +246,8 @@ class VendaListagemReport
             $parts = array_filter([
                 filled($localSearchDe) ? 'de ' . static::formatDate($localSearchDe) : null,
                 filled($localSearchAte) ? 'até ' . static::formatDate($localSearchAte) : null,
+                filled($localSearchHoraDe) ? 'hora de ' . $localSearchHoraDe : null,
+                filled($localSearchHoraAte) ? 'hora até ' . $localSearchHoraAte : null,
             ]);
 
             return $parts !== [] ? 'DATA: ' . implode(' ', $parts) : null;

@@ -29,7 +29,6 @@ class ProductCloneService
         $clone->preco_custo_anterior = 0;
         $clone->preco_venda_anterior = 0;
         $clone->estoque = 0;
-        $clone->estoque_inicial = 0;
         $clone->foto_path = null;
         $clone->save();
 

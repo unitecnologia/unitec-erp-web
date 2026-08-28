@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'transportadora_id',
     'venda_id',
     'pdv_venda_id',
+    'devolucao_compra_id',
     'chave',
     'chave_nfe_referenciada',
     'protocolo',
@@ -58,6 +59,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'trib_imp',
     'total_itens',
     'status',
+    'estoque_baixado',
     'situacao',
     'finalidade',
     'movimento',
@@ -132,6 +134,36 @@ class Nfe extends Model
     /**
      * @return array<string, string>
      */
+    public static function finalidadeLabels(): array
+    {
+        return [
+            '1' => 'NORMAL',
+            '2' => 'COMPLEMENTAR',
+            '3' => 'AJUSTE',
+            '4' => 'DEVOLUÇÃO',
+            'normal' => 'NORMAL',
+            'complementar' => 'COMPLEMENTAR',
+            'ajuste' => 'AJUSTE',
+            'devolucao' => 'DEVOLUÇÃO',
+        ];
+    }
+
+    public static function finalidadeLabel(?string $finalidade): string
+    {
+        $key = trim((string) $finalidade);
+
+        if ($key === '') {
+            return 'NORMAL';
+        }
+
+        return self::finalidadeLabels()[$key]
+            ?? self::finalidadeLabels()[mb_strtolower($key, 'UTF-8')]
+            ?? mb_strtoupper($key, 'UTF-8');
+    }
+
+    /**
+     * @return array<string, string>
+     */
     public static function situacaoToStatusMap(): array
     {
         return [
@@ -183,12 +215,17 @@ class Nfe extends Model
 
     public function transportadora(): BelongsTo
     {
-        return $this->belongsTo(Person::class, 'transportadora_id');
+        return $this->belongsTo(Transportadora::class, 'transportadora_id');
     }
 
     public function venda(): BelongsTo
     {
         return $this->belongsTo(Venda::class);
+    }
+
+    public function devolucaoCompra(): BelongsTo
+    {
+        return $this->belongsTo(DevolucaoCompra::class, 'devolucao_compra_id');
     }
 
     public function itens(): HasMany
@@ -251,6 +288,7 @@ class Nfe extends Model
             'total_itens' => 'decimal:4',
             'peso_b' => 'decimal:3',
             'peso_l' => 'decimal:3',
+            'estoque_baixado' => 'boolean',
         ];
     }
 }

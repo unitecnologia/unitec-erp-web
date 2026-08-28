@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\VendedorResource\Pages\Concerns;
 
-use App\Models\CaixaConta;
-use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\PriceTable;
 use App\Models\RhCargo;
@@ -47,7 +45,7 @@ trait ManagesVendedorFormModal
             return;
         }
 
-        $record = Vendedor::query()->with(['empresas', 'terminais'])->find($this->highlightedRecordId);
+        $record = Vendedor::query()->with(['terminais', 'usuario'])->find($this->highlightedRecordId);
 
         if (! $record) {
             Notification::make()
@@ -69,25 +67,9 @@ trait ManagesVendedorFormModal
      */
     public function updatedVendedorForm(mixed $value, string $key): void
     {
-        if ($key === 'empresas' || str_starts_with($key, 'empresas.')) {
-            if (! is_array($this->vendedorForm['empresas'] ?? null)) {
-                $this->vendedorForm['empresas'] = [];
-            }
-
-            return;
-        }
-
         if ($key === 'terminais' || str_starts_with($key, 'terminais.')) {
             if (! is_array($this->vendedorForm['terminais'] ?? null)) {
                 $this->vendedorForm['terminais'] = [];
-            }
-
-            return;
-        }
-
-        if ($key === 'caixas_por_empresa' || str_starts_with($key, 'caixas_por_empresa.')) {
-            if (! is_array($this->vendedorForm['caixas_por_empresa'] ?? null)) {
-                $this->vendedorForm['caixas_por_empresa'] = [];
             }
 
             return;
@@ -208,10 +190,6 @@ JS);
                 'vendedorForm.telefone' => ['nullable', 'string', 'max:20'],
                 'vendedorForm.whatsapp' => ['nullable', 'string', 'max:20'],
                 'vendedorForm.ativo' => ['required', 'in:S,N'],
-                'vendedorForm.empresas' => ['required', 'array', 'min:1'],
-                'vendedorForm.empresas.*' => ['integer', Rule::exists('empresas', 'id')],
-                'vendedorForm.caixas_por_empresa' => ['array'],
-                'vendedorForm.caixas_por_empresa.*' => ['nullable', 'integer', Rule::exists('caixa_contas', 'id')],
                 'vendedorForm.terminais' => ['array'],
                 'vendedorForm.terminais.*' => ['integer', Rule::exists('terminais', 'id')],
                 'vendedorForm.tabela_venda_id' => ['nullable', 'integer', Rule::exists('price_tables', 'id')],
@@ -222,10 +200,7 @@ JS);
                 'vendedorForm.comissao_ap' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
                 'vendedorForm.comissao_servico' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             ],
-            [
-                'vendedorForm.empresas.required' => 'Selecione ao menos uma empresa.',
-                'vendedorForm.empresas.min' => 'Selecione ao menos uma empresa.',
-            ],
+            [],
             [
                 'vendedorForm.codigo' => 'código',
                 'vendedorForm.rh_funcionario_id' => 'funcionário',
@@ -233,9 +208,6 @@ JS);
                 'vendedorForm.nome' => 'nome',
                 'vendedorForm.cpf' => 'CPF',
                 'vendedorForm.ativo' => 'ativo',
-                'vendedorForm.empresas' => 'empresa',
-                'vendedorForm.caixas_por_empresa' => 'caixa',
-                'vendedorForm.caixas_por_empresa.*' => 'caixa',
                 'vendedorForm.terminais' => 'PDVs liberados',
                 'vendedorForm.tabela_venda_id' => 'tabela de venda',
                 'vendedorForm.usuario_id' => 'usuário',
@@ -246,25 +218,6 @@ JS);
                 'vendedorForm.comissao_servico' => 'comissão de serviço',
             ],
         );
-
-        $empresaIdsParaCaixa = array_values(array_unique(array_filter(
-            array_map('intval', (array) ($this->vendedorForm['empresas'] ?? []))
-        )));
-        $caixasInformados = (array) ($this->vendedorForm['caixas_por_empresa'] ?? []);
-        foreach ($empresaIdsParaCaixa as $empresaIdCaixa) {
-            $caixaSelecionado = $caixasInformados[$empresaIdCaixa]
-                ?? $caixasInformados[(string) $empresaIdCaixa]
-                ?? null;
-            if ($caixaSelecionado === null || $caixaSelecionado === '') {
-                $this->addError(
-                    'vendedorForm.caixas_por_empresa.'.$empresaIdCaixa,
-                    'Informe o caixa de cada empresa selecionada.',
-                );
-            }
-        }
-        if ($this->getErrorBag()->isNotEmpty()) {
-            return;
-        }
 
         $rhFuncionarioId = $this->vendedorForm['rh_funcionario_id'] ?? null;
         $rhFuncionarioId = $rhFuncionarioId !== null && $rhFuncionarioId !== ''
@@ -278,20 +231,19 @@ JS);
         $usuarioId = $this->vendedorForm['usuario_id'] ?? null;
         $usuarioId = $usuarioId !== null && $usuarioId !== '' ? (int) $usuarioId : null;
 
-        $empresaIds = array_values(array_unique(array_filter(
-            array_map('intval', (array) ($this->vendedorForm['empresas'] ?? []))
-        )));
+        $syncPayload = $this->empresaVendedorSyncFromUsuario($usuarioId);
 
-        $caixasPorEmpresa = (array) ($this->vendedorForm['caixas_por_empresa'] ?? []);
-        $syncPayload = [];
-        foreach ($empresaIds as $empresaId) {
-            $caixaId = $caixasPorEmpresa[$empresaId] ?? $caixasPorEmpresa[(string) $empresaId] ?? null;
-            $caixaId = $caixaId !== null && $caixaId !== '' ? (int) $caixaId : null;
-            $syncPayload[$empresaId] = ['caixa_conta_id' => $caixaId];
+        if ($syncPayload === []) {
+            $this->addError(
+                'vendedorForm.usuario_id',
+                'Este usuário não tem empresas liberadas. Configure em Permissões / Usuários → Empresas.',
+            );
+
+            return;
         }
 
         $data = $this->normalizeVendedorFormData($this->vendedorForm);
-        $data['empresa_id'] = $empresaIds[0] ?? null;
+        $data['empresa_id'] = array_key_first($syncPayload);
 
         if ($this->vendedorModalRecordId) {
             $record = Vendedor::query()->find($this->vendedorModalRecordId);
@@ -515,28 +467,47 @@ JS);
     }
 
     /**
-     * Contas caixa disponíveis para amarrar ao colaborador.
-     * Inclui PDV e SUBCAIXA operacionais (exclui contas de sistema como CAIXA GERAL).
+     * Espelha empresas/caixas do usuário (Permissões) no vínculo do operador.
+     * Evita conflito com os campos antigos do formulário.
      *
-     * @return array<int|string, string>
+     * @return array<int, array{caixa_conta_id: int|null}>
      */
-    public function caixaContaOptions(): array
+    protected function empresaVendedorSyncFromUsuario(?int $usuarioId): array
     {
-        return CaixaConta::query()
-            ->where('ativo', true)
-            ->where('sistema', false)
-            ->whereIn('tipo', [
-                CaixaConta::TIPO_PDV,
-                CaixaConta::TIPO_SUBCAIXA,
-                'CAIXA',
-                'X',
-            ])
-            ->orderBy('codigo')
-            ->get(['id', 'codigo', 'nome'])
-            ->mapWithKeys(fn (CaixaConta $conta): array => [
-                $conta->id => trim($conta->codigo.' - '.$conta->nome),
-            ])
-            ->all();
+        if (! $usuarioId) {
+            return [];
+        }
+
+        $user = User::query()->find($usuarioId);
+
+        if (! $user) {
+            return [];
+        }
+
+        $empresaIds = $user->accessibleEmpresaIds();
+
+        if ($empresaIds === []) {
+            return [];
+        }
+
+        // Preferência: empresa padrão do usuário primeiro.
+        if (filled($user->empresa_id)) {
+            $padrao = (int) $user->empresa_id;
+            $empresaIds = array_values(array_unique([
+                $padrao,
+                ...array_filter($empresaIds, static fn (int $id): bool => $id !== $padrao),
+            ]));
+        }
+
+        $payload = [];
+        foreach ($empresaIds as $empresaId) {
+            $caixaId = $user->defaultCaixaContaId($empresaId);
+            $payload[(int) $empresaId] = [
+                'caixa_conta_id' => $caixaId && $caixaId > 0 ? $caixaId : null,
+            ];
+        }
+
+        return $payload;
     }
 
     /**
@@ -546,7 +517,16 @@ JS);
      */
     public function terminalOptions(): array
     {
+        $empresaId = (int) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+
+        if ($empresaId < 1) {
+            return [];
+        }
+
         return Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('ativo', true)
+            ->where('nome', '!=', '')
             ->orderBy('numero_logico_terminal')
             ->orderBy('nome')
             ->get(['id', 'nome', 'numero_logico_terminal', 'pdv', 'eh_caixa'])
@@ -565,28 +545,6 @@ JS);
 
                 return [$terminal->id => $prefix.$nome.$suffix];
             })
-            ->all();
-    }
-
-    /**
-     * @return array<int|string, string>
-     */
-    public function empresaOptions(): array
-    {
-        return Empresa::query()
-            ->orderBy('nome')
-            ->pluck('nome', 'id')
-            ->all();
-    }
-
-    /**
-     * @return array<int|string, string>
-     */
-    public function empresaCodigos(): array
-    {
-        return Empresa::query()
-            ->orderBy('codigo')
-            ->pluck('codigo', 'id')
             ->all();
     }
 
@@ -710,8 +668,6 @@ JS);
             'rh_funcionario_id' => '',
             'nome' => '',
             'ativo' => 'S',
-            'empresas' => [],
-            'caixas_por_empresa' => [],
             'terminais' => [],
             'cargo' => '',
             'cpf' => '',
@@ -770,14 +726,6 @@ JS);
             'rh_funcionario_id' => $rhId ? (string) $rhId : '',
             'nome' => (string) $record->nome,
             'ativo' => $record->ativo ? 'S' : 'N',
-            'empresas' => $record->empresas->pluck('id')->map(fn ($id): int => (int) $id)->all(),
-            'caixas_por_empresa' => $record->empresas
-                ->mapWithKeys(fn (Empresa $empresa): array => [
-                    (int) $empresa->id => $empresa->pivot->caixa_conta_id
-                        ? (string) $empresa->pivot->caixa_conta_id
-                        : '',
-                ])
-                ->all(),
             'terminais' => $record->terminais->pluck('id')->map(fn ($id): int => (int) $id)->all(),
             'cargo' => (string) $record->cargo,
             'cpf' => (string) $record->cpf,
@@ -832,8 +780,6 @@ JS);
         unset(
             $data['usuario_id'],
             $data['rh_funcionario_id'],
-            $data['empresas'],
-            $data['caixas_por_empresa'],
             $data['terminais']
         );
 

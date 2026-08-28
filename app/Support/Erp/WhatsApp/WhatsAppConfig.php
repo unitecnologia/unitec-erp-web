@@ -66,7 +66,7 @@ readonly class WhatsAppConfig
             timeout: max(1, (int) $timeout),
             enviarOrcamento: (bool) ($data['param_whatsapp_enviar_orcamento'] ?? true),
             enviarCobranca: (bool) ($data['param_whatsapp_enviar_cobranca'] ?? true),
-            enviarNfe: (bool) ($data['param_whatsapp_enviar_nfe'] ?? false),
+            enviarNfe: (bool) ($data['param_whatsapp_enviar_nfe'] ?? true),
             limiteDia: max(1, (int) $limite),
             msgsHoje: max(0, (int) $msgsHoje),
             msgsData: filled($msgsData) ? (string) $msgsData : null,

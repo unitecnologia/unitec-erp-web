@@ -68,19 +68,23 @@
         </span>
         <span class="erp-nfe-actions__label"><kbd>F5</kbd> | Desconhecer</span>
     </button>
-    @if (in_array($this->statusFilter, ['aceita', 'gerou_compras'], true))
-        <button type="button" wire:click="openLerXmlSelecionada" class="erp-nfe-actions__btn" data-erp-key="F6">
-            <span class="erp-nfe-actions__icon erp-nfe-actions__icon--xml">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-                    <path d="M14 3v5h5"/>
-                    <path d="M9.5 12.5l2 2-2 2"/>
-                    <path d="M14.5 12.5l-2 2 2 2"/>
-                </svg>
-            </span>
-            <span class="erp-nfe-actions__label"><kbd>F6</kbd> | Ler XML</span>
-        </button>
-    @endif
+    <button
+        type="button"
+        wire:click="openLerXmlSelecionada"
+        class="erp-nfe-actions__btn"
+        data-erp-key="F6"
+        title="Ler XML da nota selecionada ou buscar arquivo (e-mail / pasta)"
+    >
+        <span class="erp-nfe-actions__icon erp-nfe-actions__icon--xml">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+                <path d="M14 3v5h5"/>
+                <path d="M9.5 12.5l2 2-2 2"/>
+                <path d="M14.5 12.5l-2 2 2 2"/>
+            </svg>
+        </span>
+        <span class="erp-nfe-actions__label"><kbd>F6</kbd> | Ler XML</span>
+    </button>
     <button type="button" wire:click="openNotaFornecedorVisualizarSelecionada" class="erp-nfe-actions__btn">
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

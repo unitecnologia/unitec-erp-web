@@ -124,17 +124,6 @@ trait ManagesProductPriceCalculation
         $this->form->fill($this->data);
     }
 
-    public function syncEstoqueFromInicialOnBlur(): void
-    {
-        if ($this->isEditingProduct()) {
-            return;
-        }
-
-        $inicial = $this->parseBrDecimal($this->data['estoque_inicial'] ?? 0, 0);
-        $this->data['estoque'] = $this->formatBrDecimal($inicial, 3);
-        $this->form->fill($this->data);
-    }
-
     /**
      * @param  array<string, mixed>  $data
      */

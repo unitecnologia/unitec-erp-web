@@ -32,6 +32,10 @@ trait ManagesNfceFiscalActions
 
     public function cancelarNfce(): void
     {
+        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfce.cancel')) {
+            return;
+        }
+
         $id = $this->highlightedRecordIdOrNotify('cancelar');
         if (! $id) {
             return;
@@ -69,6 +73,10 @@ trait ManagesNfceFiscalActions
 
     public function confirmCancelarNfce(): void
     {
+        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfce.cancel')) {
+            return;
+        }
+
         $id = $this->highlightedRecordId;
         $nfce = $id ? PdvVendaNfce::query()->with('pdvVenda')->find($id) : null;
         $venda = $nfce?->pdvVenda;

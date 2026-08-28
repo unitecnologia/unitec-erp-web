@@ -79,7 +79,14 @@ final class ValorPorExtenso
 
         $raw = str_replace(['R$', ' '], '', $raw);
 
-        if (str_contains($raw, ',') && str_contains($raw, '.')) {
+        // BR: 1.000 / 1.000.000 (milhares com ponto)
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $raw) === 1) {
+            $raw = str_replace('.', '', $raw);
+        } elseif (preg_match('/^\d{1,3}(\.\d{3})+,\d{1,2}$/', $raw) === 1) {
+            // BR: 1.000,50
+            $raw = str_replace('.', '', $raw);
+            $raw = str_replace(',', '.', $raw);
+        } elseif (str_contains($raw, ',') && str_contains($raw, '.')) {
             $raw = str_replace('.', '', $raw);
             $raw = str_replace(',', '.', $raw);
         } elseif (str_contains($raw, ',')) {

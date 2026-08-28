@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
 use App\Models\Empresa;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeImportacaoService;
 use App\Support\Erp\Nfe\NfeImportacaoTipo;
 use Filament\Notifications\Notification;
@@ -36,6 +37,15 @@ trait ManagesNfeImportacao
 
     /** @var array<string, mixed>|null */
     public ?array $nfeImportDetalhe = null;
+
+    /** Vínculo com pedido/venda importado — impede baixa duplicada de estoque na NF-e. */
+    public ?int $nfeModalVendaId = null;
+
+    /** Vínculo com venda PDV importada (NFC-e) — impede baixa duplicada de estoque. */
+    public ?int $nfeModalPdvVendaId = null;
+
+    /** Vínculo com devolução de compra — impede baixa duplicada de estoque na NF-e. */
+    public ?int $nfeModalDevolucaoCompraId = null;
 
     public function importNfeModal(): void
     {
@@ -94,7 +104,7 @@ trait ManagesNfeImportacao
             return;
         }
 
-        $hoje = now()->toDateString();
+        $hoje = ErpTimezone::today();
 
         $this->nfeImportMenuOpen = false;
         $this->nfeImportTipo = $tipo;
@@ -323,6 +333,32 @@ trait ManagesNfeImportacao
 
         if (filled($payload['numero_pedido'])) {
             $this->nfeForm['numero_pedido'] = (string) $payload['numero_pedido'];
+        }
+
+        // Pedido/NFC-e já movimentaram estoque na origem — NF-e não deve baixar de novo.
+        if (in_array($this->nfeImportTipo, [NfeImportacaoTipo::VENDA, NfeImportacaoTipo::PEDIDO_WEB, NfeImportacaoTipo::NFCE], true)) {
+            $vendaId = (int) ($payload['venda_id'] ?? 0);
+            $pdvVendaId = (int) ($payload['pdv_venda_id'] ?? 0);
+            $this->nfeModalVendaId = $vendaId > 0 ? $vendaId : $this->nfeModalVendaId;
+            $this->nfeModalPdvVendaId = $pdvVendaId > 0 ? $pdvVendaId : $this->nfeModalPdvVendaId;
+        }
+
+        if ($this->nfeImportTipo === NfeImportacaoTipo::DEV_COMPRA) {
+            $devolucaoId = (int) ($payload['devolucao_compra_id'] ?? 0);
+            $this->nfeModalDevolucaoCompraId = $devolucaoId > 0 ? $devolucaoId : null;
+
+            if (filled($payload['finalidade'] ?? null)) {
+                $this->nfeForm['finalidade'] = (string) $payload['finalidade'];
+            }
+
+            if (filled($payload['natureza_operacao'] ?? null)) {
+                $this->nfeForm['natureza_operacao'] = (string) $payload['natureza_operacao'];
+            }
+
+            if (filled($payload['data_emissao'] ?? null)) {
+                $this->nfeForm['data_emissao'] = (string) $payload['data_emissao'];
+                $this->nfeForm['data_saida'] = (string) ($payload['data_saida'] ?? $payload['data_emissao']);
+            }
         }
 
         $this->nfeForm['movimento'] = $payload['movimento'] ?? 'saida';

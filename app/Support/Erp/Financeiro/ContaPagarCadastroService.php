@@ -2,7 +2,9 @@
 
 namespace App\Support\Erp\Financeiro;
 
+use App\Models\Compra;
 use App\Models\ContaPagar;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,8 @@ class ContaPagarCadastroService
         $vencimentoBase = Carbon::parse((string) $dados['vencimento'])->startOfDay();
         $historico = mb_strtoupper(trim((string) ($dados['historico'] ?? '')), 'UTF-8');
         $documentoBase = mb_strtoupper(trim((string) ($dados['documento'] ?? '')), 'UTF-8');
+        $compraId = (int) ($dados['compra_id'] ?? 0);
+        $empresaId = $this->resolveEmpresaId($compraId);
 
         $valores = $this->distribuirValor($valorTotal, $parcelas);
 
@@ -51,6 +55,8 @@ class ContaPagarCadastroService
             $historico,
             $documentoBase,
             $fornecedorId,
+            $compraId,
+            $empresaId,
         ): array {
             $criadas = [];
 
@@ -62,7 +68,8 @@ class ContaPagarCadastroService
                     $documento = str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT).'/'.$parcelas;
                 }
 
-                $criadas[] = ContaPagar::query()->create([
+                $payload = [
+                    'empresa_id' => $empresaId,
                     'numero' => ContaPagar::nextNumero(),
                     'emissao' => $emissao->toDateString(),
                     'documento' => $documento !== '' ? $documento : null,
@@ -74,7 +81,107 @@ class ContaPagarCadastroService
                     'juros' => 0,
                     'valor_pago' => 0,
                     'pago_em' => null,
-                ]);
+                ];
+
+                if ($compraId > 0) {
+                    $payload['compra_id'] = $compraId;
+                }
+
+                $criadas[] = ContaPagar::query()->create($payload);
+            }
+
+            return $criadas;
+        });
+    }
+
+    /**
+     * Cria contas a pagar a partir de uma lista explícita de parcelas (XML / tela Contas a Pagar).
+     *
+     * @param  array{
+     *     emissao: string,
+     *     documento?: string|null,
+     *     fornecedor_id: int,
+     *     historico?: string|null
+     * }  $dados
+     * @param  list<array{documento?: string, vencimento: string, valor: float|string}>  $parcelas
+     * @return list<ContaPagar>
+     */
+    public function criarDeLista(array $dados, array $parcelas): array
+    {
+        $fornecedorId = (int) ($dados['fornecedor_id'] ?? 0);
+
+        if ($fornecedorId <= 0) {
+            throw new InvalidArgumentException('Selecione o fornecedor.');
+        }
+
+        if ($parcelas === []) {
+            throw new InvalidArgumentException('Informe ao menos uma parcela.');
+        }
+
+        $emissao = Carbon::parse((string) $dados['emissao'])->startOfDay();
+        $historico = mb_strtoupper(trim((string) ($dados['historico'] ?? '')), 'UTF-8');
+        $documentoBase = mb_strtoupper(trim((string) ($dados['documento'] ?? '')), 'UTF-8');
+        $compraId = (int) ($dados['compra_id'] ?? 0);
+        $empresaId = $this->resolveEmpresaId($compraId);
+        $totalParcelas = count($parcelas);
+
+        return DB::transaction(function () use (
+            $parcelas,
+            $emissao,
+            $historico,
+            $documentoBase,
+            $fornecedorId,
+            $compraId,
+            $empresaId,
+            $totalParcelas,
+        ): array {
+            $criadas = [];
+
+            foreach ($parcelas as $i => $parcela) {
+                $valor = ErpMoney::parseBr($parcela['valor'] ?? 0);
+
+                if ($valor <= 0) {
+                    throw new InvalidArgumentException('Parcela '.($i + 1).' com valor inválido.');
+                }
+
+                $documento = mb_strtoupper(trim((string) ($parcela['documento'] ?? '')), 'UTF-8');
+                if ($documento === '') {
+                    $documento = $documentoBase !== ''
+                        ? $documentoBase.'-'.str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT)
+                        : ($i + 1).'/'.$totalParcelas;
+                }
+
+                $vencimentoRaw = trim((string) ($parcela['vencimento'] ?? ''));
+                if ($vencimentoRaw === '') {
+                    throw new InvalidArgumentException('Parcela '.($i + 1).' sem vencimento.');
+                }
+
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $vencimentoRaw) === 1) {
+                    $vencimento = Carbon::createFromFormat('d/m/Y', $vencimentoRaw)->startOfDay();
+                } else {
+                    $vencimento = Carbon::parse($vencimentoRaw)->startOfDay();
+                }
+
+                $payload = [
+                    'empresa_id' => $empresaId,
+                    'numero' => ContaPagar::nextNumero(),
+                    'emissao' => $emissao->toDateString(),
+                    'documento' => $documento,
+                    'fornecedor_id' => $fornecedorId,
+                    'vencimento' => $vencimento->toDateString(),
+                    'produto' => $historico !== '' ? $historico : null,
+                    'valor' => $valor,
+                    'desconto' => 0,
+                    'juros' => 0,
+                    'valor_pago' => 0,
+                    'pago_em' => null,
+                ];
+
+                if ($compraId > 0) {
+                    $payload['compra_id'] = $compraId;
+                }
+
+                $criadas[] = ContaPagar::query()->create($payload);
             }
 
             return $criadas;
@@ -146,5 +253,19 @@ class ContaPagarCadastroService
         }
 
         return $valores;
+    }
+
+    private function resolveEmpresaId(int $compraId): ?int
+    {
+        if ($compraId > 0) {
+            $fromCompra = Compra::query()->whereKey($compraId)->value('empresa_id');
+            if ($fromCompra) {
+                return (int) $fromCompra;
+            }
+        }
+
+        $current = ErpContext::currentEmpresaId();
+
+        return $current ? (int) $current : null;
     }
 }

@@ -1,11 +1,13 @@
 <div class="erp-pcad-form erp-config-fiscais-form erp-config-fiscais-form--nfce">
     <fieldset class="erp-pcad__group erp-config-fiscais-form__nfce-group">
-        <legend class="erp-pcad__group-title">NFC-e por Caixa (PDVs Offline)</legend>
+        <legend class="erp-pcad__group-title">NFC-e por caixa</legend>
 
         <p class="erp-pcad-form__hint">
-            Cada PDV offline emite NFC-e com uma <strong>série exclusiva</strong> para evitar colisão de numeração
-            quando os caixas operam sem o servidor. O CSC (ID Token/Token), ambiente e versão do QR-code são
-            compartilhados da empresa (aba NFC-e). A série definida aqui é enviada ao PDV na carga.
+            Cada caixa (PDV offline e o da <strong>retaguarda</strong>) emite NFC-e com série exclusiva,
+            para não colidir a numeração. CSC, ambiente e QR-code vêm da aba NFC-e.
+            A série e o próximo número daqui vão na carga do PDV offline (o caixa que já emitiu
+            continua a sequência local).
+            <strong>F2 | Gravar</strong> salva o CSC e as séries dos caixas juntos.
         </p>
 
         @if (empty($this->terminais))
@@ -17,8 +19,8 @@
                         <th>Caixa</th>
                         <th>Terminal</th>
                         <th>Série NFC-e</th>
-                        <th>Nº inicial</th>
-                        <th>Usar nº inicial</th>
+                        <th>Próx. nº</th>
+                        <th>Últ. NFC-e</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -29,7 +31,7 @@
                             <td>
                                 <input
                                     type="text"
-                                    wire:model="terminais.{{ $index }}.serie"
+                                    wire:model.live="terminais.{{ $index }}.serie"
                                     class="erp-pcad-form__input erp-pcad-form__input--xs"
                                     maxlength="3"
                                     inputmode="numeric"
@@ -39,16 +41,15 @@
                             <td>
                                 <input
                                     type="number"
-                                    wire:model="terminais.{{ $index }}.numero_inicial"
+                                    wire:model="terminais.{{ $index }}.proximo_numero"
                                     class="erp-pcad-form__input erp-pcad-form__input--xs"
                                     min="1"
                                 >
                             </td>
                             <td>
-                                <input
-                                    type="checkbox"
-                                    wire:model="terminais.{{ $index }}.usar_numero_inicial"
-                                >
+                                <output class="erp-config-fiscais-form__ult-nfce" aria-live="polite">
+                                    {{ $terminal['ultimo_nfce'] }}
+                                </output>
                             </td>
                         </tr>
                     @endforeach

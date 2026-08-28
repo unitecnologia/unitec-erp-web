@@ -19,6 +19,9 @@
         >
             <div class="erp-lookup-modal__titlebar erp-nf-forn-import-xml-modal__titlebar">
                 <span id="erp-nf-forn-import-xml-title">Importar XML</span>
+                @if (($this->importarXmlHeader['tem_st'] ?? false) === true)
+                    <span class="erp-nf-forn-import-xml-modal__st-badge" title="Nota com ICMS substituição tributária">Com ST</span>
+                @endif
                 <button
                     type="button"
                     class="erp-lookup-modal__close"
@@ -53,15 +56,15 @@
                             <div class="erp-nf-forn-import-xml-modal__fields-row">
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--chave">
                                     <span>Chave NFe</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['chave'] ?? '' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly" title="{{ $this->importarXmlHeader['chave'] ?? '' }}">{{ $this->importarXmlHeader['chave'] ?? '—' }}</div>
                                 </label>
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--date">
                                     <span>Data Entrada</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['data_entrada'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly">{{ $this->importarXmlHeader['data_entrada'] ?? '—' }}</div>
                                 </label>
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--date">
                                     <span>Data Emissão</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['data_emissao'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly">{{ $this->importarXmlHeader['data_emissao'] ?? '—' }}</div>
                                 </label>
                             </div>
 
@@ -97,19 +100,19 @@
                                             >{{ $this->importarXmlHeader['fornecedor_status_label'] ?? '' }}</span>
                                         @endif
                                     </span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['fornecedor'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly" title="{{ $this->importarXmlHeader['fornecedor'] ?? '' }}">{{ $this->importarXmlHeader['fornecedor'] ?? '—' }}</div>
                                 </label>
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--cnpj">
                                     <span>CNPJ</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['cnpj'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly">{{ $this->importarXmlHeader['cnpj'] ?? '—' }}</div>
                                 </label>
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--uf">
                                     <span>UF</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['uf'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly">{{ $this->importarXmlHeader['uf'] ?? '—' }}</div>
                                 </label>
                                 <label class="erp-nf-forn-import-xml-modal__field erp-nf-forn-import-xml-modal__field--nota">
                                     <span>Nota Fiscal</span>
-                                    <input type="text" readonly value="{{ $this->importarXmlHeader['numero'] ?? '—' }}">
+                                    <div class="erp-nf-forn-import-xml-modal__field-value is-readonly">{{ $this->importarXmlHeader['numero'] ?? '—' }}</div>
                                 </label>
                             </div>
                         </div>
@@ -124,7 +127,51 @@
 
                 <section class="erp-nf-forn-import-xml-modal__panel erp-nf-forn-import-xml-modal__panel--itens">
                     <div class="erp-nf-forn-import-xml-modal__main">
-                        <div class="erp-nf-forn-import-xml-modal__grid-wrap">
+                        <div
+                            class="erp-nf-forn-import-xml-modal__grid-wrap"
+                            x-data
+                            @keydown.enter="
+                                const el = $event.target;
+                                if (
+                                    (! (el instanceof HTMLInputElement) && ! (el instanceof HTMLSelectElement) && ! (el instanceof HTMLButtonElement))
+                                    || el.disabled
+                                ) {
+                                    return;
+                                }
+                                if (! el.hasAttribute('data-erp-xml-enter')) {
+                                    return;
+                                }
+
+                                $event.preventDefault();
+                                $event.stopPropagation();
+
+                                const fields = Array.from($el.querySelectorAll(
+                                    'input[data-erp-xml-enter]:not([disabled]), select[data-erp-xml-enter]:not([disabled]), button[data-erp-xml-enter]:not([disabled])'
+                                )).filter((field) => field.offsetParent !== null);
+
+                                const idx = fields.indexOf(el);
+                                const next = idx >= 0 ? (fields[idx + 1] ?? null) : null;
+
+                                el.blur();
+
+                                if (! next) {
+                                    return;
+                                }
+
+                                const tryFocus = (attempt = 0) => {
+                                    next.focus();
+                                    if (document.activeElement === next || attempt >= 12) {
+                                        if (next instanceof HTMLInputElement && ! next.readOnly) {
+                                            next.select();
+                                        }
+                                        return;
+                                    }
+                                    setTimeout(() => tryFocus(attempt + 1), 30 + (attempt * 20));
+                                };
+
+                                setTimeout(() => tryFocus(0), 0);
+                            "
+                        >
                             <table class="erp-nf-forn-import-xml-modal__grid">
                                 <thead>
                                     <tr>
@@ -136,8 +183,9 @@
                                         <th>Qtd. Total</th>
                                         <th>Und</th>
                                         <th>Prc. Unitário</th>
-                                        <th>Pr. Venda</th>
-                                        <th>CFOP</th>
+                                        <th>CFOP XML</th>
+                                        <th>CFOP Entrada</th>
+                                        <th>ST</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -148,6 +196,7 @@
                                                 'erp-nf-forn-import-xml-modal__row',
                                                 'erp-nf-forn-import-xml-modal__row--selected' => $this->importarXmlItemIndex !== null && $this->importarXmlItemIndex === $index,
                                                 'erp-nf-forn-import-xml-modal__row--unlinked' => ! ($row['vinculado'] ?? false),
+                                                'erp-nf-forn-import-xml-modal__row--st' => ($row['tem_st'] ?? false) === true,
                                             ])
                                         >
                                             <td>
@@ -164,38 +213,65 @@
                                                             : 'Sem código do sistema') }}"
                                                 >{{ $codigoSistema !== '' ? $codigoSistema : '—' }}</div>
                                             </td>
-                                            <td>
+                                            <td wire:click.stop>
                                                 @php
                                                     $descricaoSistema = trim((string) ($row['produto_descricao'] ?? ''));
                                                     $descricaoXml = trim((string) ($row['descricao'] ?? ''));
                                                     $descricaoExibir = $descricaoSistema !== '' ? $descricaoSistema : $descricaoXml;
+                                                    $editandoDescricao = $this->importarXmlDescricaoEditIndex === $index;
                                                 @endphp
-                                                <div
-                                                    @class([
-                                                        'erp-nf-forn-import-xml-modal__cell-input',
-                                                        'erp-nf-forn-import-xml-modal__cell-input--desc',
-                                                        'erp-nf-forn-import-xml-modal__cell-input--readonly',
-                                                        'erp-nf-forn-import-xml-modal__desc' => ! ($row['vinculado'] ?? false),
-                                                    ])
-                                                    title="{{ $descricaoSistema !== '' && $descricaoXml !== '' && $descricaoSistema !== $descricaoXml
-                                                        ? 'Sistema: '.$descricaoSistema.' | XML: '.$descricaoXml
-                                                        : $descricaoExibir }}"
-                                                >{{ $descricaoExibir !== '' ? $descricaoExibir : '—' }}</div>
+                                                <div class="erp-nf-forn-import-xml-modal__desc-wrap">
+                                                    @if ($editandoDescricao)
+                                                        <input
+                                                            type="text"
+                                                            wire:model="importarXmlDescricaoEditValor"
+                                                            class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--desc erp-nf-forn-import-xml-modal__desc-input"
+                                                            autocomplete="off"
+                                                            title="Editar descrição"
+                                                            x-data="{ cancelling: false }"
+                                                            x-init="$nextTick(() => { $el.focus(); $el.select(); })"
+                                                            @click.stop
+                                                            @focus="$event.target.select()"
+                                                            @keydown.enter.prevent="$wire.salvarDescricaoItemXml({{ $index }})"
+                                                            @keydown.escape.prevent="cancelling = true; $wire.cancelarEdicaoDescricaoXml()"
+                                                            @blur="if (!cancelling) { $wire.salvarDescricaoItemXml({{ $index }}) }"
+                                                        >
+                                                    @else
+                                                        <div
+                                                            @class([
+                                                                'erp-nf-forn-import-xml-modal__cell-input',
+                                                                'erp-nf-forn-import-xml-modal__cell-input--desc',
+                                                                'erp-nf-forn-import-xml-modal__cell-input--readonly',
+                                                                'erp-nf-forn-import-xml-modal__desc' => ! ($row['vinculado'] ?? false),
+                                                            ])
+                                                            title="{{ $descricaoSistema !== '' && $descricaoXml !== '' && $descricaoSistema !== $descricaoXml
+                                                                ? 'Sistema: '.$descricaoSistema.' | XML: '.$descricaoXml
+                                                                : $descricaoExibir }}"
+                                                            wire:click="selectImportarXmlItem({{ $index }})"
+                                                        >{{ $descricaoExibir !== '' ? $descricaoExibir : '—' }}</div>
+                                                        <button
+                                                            type="button"
+                                                            class="erp-nf-forn-import-xml-modal__desc-edit"
+                                                            title="Editar descrição"
+                                                            wire:click.stop="iniciarEdicaoDescricaoXml({{ $index }})"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                                <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                                                            </svg>
+                                                        </button>
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td>
-                                                <select
-                                                    wire:model.blur="importarXmlItens.{{ $index }}.grupo"
-                                                    wire:click.stop
-                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-select"
-                                                >
-                                                    <option value="">—</option>
-                                                    @if (filled($row['grupo'] ?? '') && ! array_key_exists($row['grupo'], $this->importarXmlGruposOptions))
-                                                        <option value="{{ $row['grupo'] }}">{{ $row['grupo'] }}</option>
-                                                    @endif
-                                                    @foreach ($this->importarXmlGruposOptions as $grupoNome)
-                                                        <option value="{{ $grupoNome }}">{{ $grupoNome }}</option>
-                                                    @endforeach
-                                                </select>
+                                                @include('filament.components.erp.notas-fornecedores.import-xml-select-combo', [
+                                                    'value' => $row['grupo'] ?? '',
+                                                    'itemIndex' => $index,
+                                                    'field' => 'grupo',
+                                                    'options' => $this->importarXmlGruposOptions,
+                                                    'title' => 'Grupo do produto',
+                                                    'panelWidth' => 220,
+                                                    'center' => false,
+                                                ])
                                             </td>
                                             <td>
                                                 <input
@@ -203,9 +279,13 @@
                                                     wire:model.blur="importarXmlItens.{{ $index }}.qtd_emb"
                                                     wire:blur="recalcularLinhaItemXml({{ $index }})"
                                                     wire:click.stop
+                                                    data-erp-xml-enter
                                                     class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--num"
                                                     autocomplete="off"
                                                     title="Quantidade do XML (qCom)"
+                                                    @focus="$event.target.select()"
+                                                    @click="$event.target.select()"
+                                                    @mouseup.prevent
                                                 >
                                             </td>
                                             <td>
@@ -214,9 +294,13 @@
                                                     wire:model.blur="importarXmlItens.{{ $index }}.qtd_unid"
                                                     wire:blur="recalcularLinhaItemXml({{ $index }})"
                                                     wire:click.stop
+                                                    data-erp-xml-enter
                                                     class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--num"
                                                     autocomplete="off"
                                                     title="Fator: unidades de estoque por embalagem"
+                                                    @focus="$event.target.select()"
+                                                    @click="$event.target.select()"
+                                                    @mouseup.prevent
                                                 >
                                             </td>
                                             <td>
@@ -224,40 +308,45 @@
                                                     type="text"
                                                     wire:model.blur="importarXmlItens.{{ $index }}.qtd_total"
                                                     wire:click.stop
+                                                    data-erp-xml-enter
                                                     class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--num"
                                                     autocomplete="off"
                                                     title="Total estoque = Qtd. Emb. × Qtd. Unid."
                                                     readonly
+                                                    tabindex="0"
+                                                    @focus="$event.target.select()"
+                                                    @click="$event.target.select()"
+                                                    @mouseup.prevent
                                                 >
                                             </td>
                                             <td>
-                                                <input
-                                                    type="text"
-                                                    wire:model.blur="importarXmlItens.{{ $index }}.und"
-                                                    wire:click.stop
-                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--center"
-                                                    autocomplete="off"
-                                                >
+                                                @include('filament.components.erp.notas-fornecedores.import-xml-select-combo', [
+                                                    'value' => $row['und'] ?? '',
+                                                    'itemIndex' => $index,
+                                                    'field' => 'und',
+                                                    'options' => collect($this->importarXmlUnidadesOptions)
+                                                        ->mapWithKeys(fn ($descricao, $sigla) => [(string) $sigla => (string) $sigla])
+                                                        ->all(),
+                                                    'title' => 'Unidade do cadastro (pode alterar)',
+                                                    'panelWidth' => 104,
+                                                    'enterNav' => true,
+                                                    'center' => true,
+                                                ])
                                             </td>
                                             <td>
-                                                <input
-                                                    type="text"
-                                                    wire:model.blur="importarXmlItens.{{ $index }}.prc_unitario"
-                                                    wire:blur="recalcularLinhaItemXml({{ $index }})"
-                                                    wire:click.stop
-                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--num"
-                                                    autocomplete="off"
-                                                    title="Preço unitário da nota (por embalagem)"
+                                                <div
+                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__money"
+                                                    title="Preço unitário da nota (somente informação)"
                                                 >
+                                                    <span class="erp-nf-forn-import-xml-modal__money-rs">R$</span>
+                                                    <span class="erp-nf-forn-import-xml-modal__money-val">{{ $row['prc_unitario'] ?? '0,000' }}</span>
+                                                </div>
                                             </td>
                                             <td>
-                                                <input
-                                                    type="text"
-                                                    wire:model.blur="importarXmlItens.{{ $index }}.pr_venda"
-                                                    wire:click.stop
-                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--num"
-                                                    autocomplete="off"
-                                                >
+                                                <div
+                                                    class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center"
+                                                    title="CFOP do XML (saída/venda do fornecedor)"
+                                                >{{ ($row['cfop_xml'] ?? '') !== '' ? $row['cfop_xml'] : '—' }}</div>
                                             </td>
                                             <td>
                                                 @include('filament.components.erp.notas-fornecedores.cfop-combo', [
@@ -267,10 +356,17 @@
                                                     'compact' => true,
                                                 ])
                                             </td>
+                                            <td>
+                                                @if (($row['tem_st'] ?? false) === true)
+                                                    <span class="erp-nf-forn-import-xml-modal__st-chip" title="Substituição tributária — Base ST {{ $row['base_icms_st'] ?? '0,00' }} / Valor ST {{ $row['valor_icms_st'] ?? '0,00' }}">ST</span>
+                                                @else
+                                                    <span class="erp-nf-forn-import-xml-modal__st-chip erp-nf-forn-import-xml-modal__st-chip--off">—</span>
+                                                @endif
+                                            </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="10">Nenhum item no XML.</td>
+                                            <td colspan="11">Nenhum item no XML.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -364,13 +460,24 @@
                                     ['key' => 'total_ipi', 'label' => 'Total IPI'],
                                     ['key' => 'base_st', 'label' => 'Base ST'],
                                     ['key' => 'total_st', 'label' => 'Total ST'],
+                                    ['key' => 'base_ibs_cbs', 'label' => 'Base IBS/CBS'],
+                                    ['key' => 'valor_ibs', 'label' => 'Valor IBS'],
+                                    ['key' => 'valor_cbs', 'label' => 'Valor CBS'],
                                 ];
                             @endphp
                             <div class="erp-nf-forn-import-xml-modal__totais">
                                 @foreach ($totaisCampos as $campo)
-                                    <label class="erp-nf-forn-import-xml-modal__total-field">
+                                    @php
+                                        $totalVal = (string) ($this->importarXmlTotais[$campo['key']] ?? '0,00');
+                                        $isStField = in_array($campo['key'], ['base_st', 'total_st'], true);
+                                        $stHighlight = $isStField && \App\Support\Erp\BrDecimal::parse($totalVal, 2) > 0;
+                                    @endphp
+                                    <label @class([
+                                        'erp-nf-forn-import-xml-modal__total-field',
+                                        'erp-nf-forn-import-xml-modal__total-field--st' => $stHighlight,
+                                    ])>
                                         <span>{{ $campo['label'] }}</span>
-                                        <input type="text" readonly value="{{ $this->importarXmlTotais[$campo['key']] ?? '0,00' }}">
+                                        <input type="text" readonly value="{{ $totalVal }}">
                                     </label>
                                 @endforeach
                             </div>
@@ -383,6 +490,12 @@
                                 $detQtdEmb = (string) ($item['qtd_emb'] ?? '—');
                                 $detQtdTotal = (string) ($item['qtd_total'] ?? $detQtdEmb);
                                 $detTotal = (string) ($item['valor_total'] ?? '0,00');
+                                $detTipoIcms = match ((string) ($item['tipo_icms'] ?? '')) {
+                                    'st' => 'ST',
+                                    'isento' => 'Isento',
+                                    default => 'Normal',
+                                };
+                                $detCest = trim((string) ($item['cest'] ?? ''));
                             @endphp
                             <div class="erp-nf-forn-import-xml-modal__detalhe-wrap">
                                 <table class="erp-nf-forn-import-xml-modal__detalhe-grid">
@@ -391,9 +504,12 @@
                                             <th>Cód. XML</th>
                                             <th>Descrição XML</th>
                                             <th>NCM</th>
+                                            <th>CEST</th>
                                             <th>CFOP XML</th>
                                             <th>CFOP Entrada</th>
                                             <th>CST</th>
+                                            <th>ICMS</th>
+                                            <th>ST</th>
                                             <th>Qtd Emb</th>
                                             <th>Qtd Estoque</th>
                                             <th>Und</th>
@@ -413,6 +529,9 @@
                                                 <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center">{{ ($item['ncm'] ?? '') !== '' ? $item['ncm'] : '—' }}</div>
                                             </td>
                                             <td>
+                                                <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center">{{ $detCest !== '' ? $detCest : '—' }}</div>
+                                            </td>
+                                            <td>
                                                 <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center">{{ $detCfopXml !== '' ? $detCfopXml : '—' }}</div>
                                             </td>
                                             <td>
@@ -420,6 +539,16 @@
                                             </td>
                                             <td>
                                                 <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center">{{ ($item['cst'] ?? '') !== '' ? $item['cst'] : '—' }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--center" title="Classificação ICMS do XML">{{ $detTipoIcms }}</div>
+                                            </td>
+                                            <td>
+                                                @if (($item['tem_st'] ?? false) === true)
+                                                    <span class="erp-nf-forn-import-xml-modal__st-chip" title="Base ST {{ $item['base_icms_st'] ?? '0,00' }} / Valor ST {{ $item['valor_icms_st'] ?? '0,00' }}">ST</span>
+                                                @else
+                                                    <span class="erp-nf-forn-import-xml-modal__st-chip erp-nf-forn-import-xml-modal__st-chip--off">—</span>
+                                                @endif
                                             </td>
                                             <td>
                                                 <div class="erp-nf-forn-import-xml-modal__cell-input erp-nf-forn-import-xml-modal__cell-input--readonly erp-nf-forn-import-xml-modal__cell-input--num">{{ $detQtdEmb }}</div>
@@ -473,6 +602,51 @@
                     </button>
                     <button type="button" class="erp-nf-forn-import-xml-aviso__btn" wire:click="closeImportarXmlModal">
                         Fechar mesmo assim
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($this->importarXmlEmpresaConfirmOpen)
+        <div
+            class="erp-nf-forn-import-xml-aviso is-visible erp-nf-forn-import-xml-aviso--warning"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="erp-nf-forn-import-xml-empresa-title"
+            wire:keydown.escape.window="cancelarImportXmlOutraEmpresa"
+        >
+            <div class="erp-nf-forn-import-xml-aviso__backdrop" wire:click="cancelarImportXmlOutraEmpresa"></div>
+            <div class="erp-nf-forn-import-xml-aviso__panel">
+                <div class="erp-nf-forn-import-xml-aviso__icon" aria-hidden="true">!</div>
+                <h2 id="erp-nf-forn-import-xml-empresa-title" class="erp-nf-forn-import-xml-aviso__title">
+                    XML de outra empresa
+                </h2>
+                <div class="erp-nf-forn-import-xml-aviso__text">
+                    Este XML foi emitido para:
+                    <br><strong>{{ $this->importarXmlEmpresaConfirmNome }}</strong>
+                    @if ($this->importarXmlEmpresaConfirmCnpj !== '' && $this->importarXmlEmpresaConfirmCnpj !== '—')
+                        <br>CNPJ/CPF: <strong>{{ $this->importarXmlEmpresaConfirmCnpj }}</strong>
+                    @endif
+                    <br><br>
+                    Essa não é a empresa logada.
+                    <br><br>
+                    Deseja continuar a importação?
+                </div>
+                <div class="erp-nf-forn-import-xml-aviso__actions">
+                    <button
+                        type="button"
+                        class="erp-nf-forn-import-xml-aviso__btn erp-nf-forn-import-xml-aviso__btn--ghost"
+                        wire:click="cancelarImportXmlOutraEmpresa"
+                    >
+                        Não
+                    </button>
+                    <button
+                        type="button"
+                        class="erp-nf-forn-import-xml-aviso__btn"
+                        wire:click="confirmarImportXmlOutraEmpresa"
+                    >
+                        Sim, continuar
                     </button>
                 </div>
             </div>
@@ -595,13 +769,21 @@
                 <p class="erp-nf-forn-import-xml-progress__detail" title="{{ $progressDetail }}">
                     {{ $progressDetail }}
                 </p>
-                <div class="erp-nf-forn-import-xml-progress__track" aria-hidden="true">
+                <div
+                    class="erp-nf-forn-import-xml-progress__track"
+                    aria-hidden="true"
+                    @if ($this->importarXmlCadastroProgressOpen) wire:ignore @endif
+                >
                     <div
                         class="erp-nf-forn-import-xml-progress__bar"
-                        style="width: {{ max(4, min(100, $progressPercent)) }}%"
+                        @if ($this->importarXmlCadastroProgressOpen) data-erp-xml-progress-bar @endif
+                        style="width: {{ max(4, min(100, (int) $progressPercent)) }}%{{ $this->importarXmlCadastroProgressOpen ? '; transition: none' : '' }}"
                     ></div>
                 </div>
-                <p class="erp-nf-forn-import-xml-progress__meta">
+                <p
+                    class="erp-nf-forn-import-xml-progress__meta"
+                    @if ($this->importarXmlCadastroProgressOpen) data-erp-xml-progress-meta wire:ignore @endif
+                >
                     {{ $progressMeta }}
                 </p>
                 <p class="erp-nf-forn-import-xml-progress__hint">Aguarde, não feche esta tela.</p>

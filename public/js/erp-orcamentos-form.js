@@ -10,25 +10,84 @@ const ERP_ORC_FORM_ACTIONS = {
 };
 
 document.addEventListener('livewire:init', () => {
+    window.Livewire.on('erp-orcamento-focus-cliente', () => {
+        focusOrcFormInput('orc-cliente', { selectAll: false });
+    });
+
+    window.Livewire.on('orc-focus-cliente-end', () => {
+        const placeCursorAtEnd = () => {
+            const input = document.getElementById('orc-cliente');
+            if (!input || input.disabled) {
+                return;
+            }
+            input.removeAttribute('readonly');
+            input.focus();
+            const len = (input.value || '').length;
+            try {
+                input.setSelectionRange(len, len);
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        placeCursorAtEnd();
+        requestAnimationFrame(placeCursorAtEnd);
+        window.setTimeout(placeCursorAtEnd, 40);
+        window.setTimeout(placeCursorAtEnd, 120);
+    });
+
+    window.Livewire.on('orc-cidade-scroll-selected', () => {
+        const scrollSelected = () => {
+            document.querySelector('#orc-cidade-sugestoes .is-selected')?.scrollIntoView({ block: 'nearest' });
+        };
+        requestAnimationFrame(scrollSelected);
+        window.setTimeout(scrollSelected, 40);
+    });
+
+    window.Livewire.on('orc-focus-field', (...args) => {
+        const payload = args[0];
+        const id = (payload && typeof payload === 'object')
+            ? (payload.id ?? payload[0])
+            : payload;
+        if (!id) {
+            return;
+        }
+        const focusEl = () => {
+            const el = document.getElementById(id);
+            if (!el || el.disabled) {
+                return;
+            }
+            el.removeAttribute('readonly');
+            el.focus();
+            if (typeof el.select === 'function' && el.tagName === 'INPUT') {
+                el.select();
+            }
+        };
+        focusEl();
+        requestAnimationFrame(focusEl);
+        window.setTimeout(focusEl, 50);
+        window.setTimeout(focusEl, 150);
+    });
+
     window.Livewire.on('erp-orcamento-focus-barcode', () => {
         focusOrcFormInput('orc-barcode');
     });
 
     window.Livewire.on('erp-orcamento-focus-item-codigo', () => {
-        focusOrcFormInput('orc-item-codigo');
+        focusOrcFormInput('orc-prod-barcode') || focusOrcFormInput('orc-item-codigo');
     });
 
     window.Livewire.on('erp-orcamento-focus-item-descricao', () => {
-        focusOrcFormInput('orc-item-descricao', { selectAll: false });
+        focusOrcFormInput('orc-prod-barcode') || focusOrcFormInput('orc-item-descricao', { selectAll: false });
         requestAnimationFrame(positionOrcProdutoLookup);
     });
 
     window.Livewire.on('erp-orcamento-focus-item-quantidade', () => {
-        focusOrcFormInput('orc-item-quantidade');
+        focusOrcFormInput('orc-prod-qtd') || focusOrcFormInput('orc-item-quantidade');
     });
 
     window.Livewire.on('erp-orcamento-focus-item-preco', () => {
-        focusOrcFormInput('orc-item-preco');
+        focusOrcFormInput('orc-prod-preco') || focusOrcFormInput('orc-item-preco');
     });
 
     window.Livewire.on('erp-orcamento-masks-refresh', () => {
@@ -40,7 +99,9 @@ document.addEventListener('livewire:init', () => {
     });
 
     window.Livewire.on('erp-orcamento-post-save-prompt-opened', () => {
-        document.querySelector('.erp-orc-post-save-modal [wire\\:click="sairAposGravarOrcamento"]')?.focus();
+        window.setTimeout(() => {
+            document.getElementById('erp-orc-post-save-sair')?.focus();
+        }, 50);
     });
 
     window.Livewire.on('erp-orcamento-item-delete-opened', () => {
@@ -103,8 +164,29 @@ function initErpOrcamentosForm() {
     }
 
     bindErpOrcamentosFormKeys();
+    bindOrcClienteLookupClickOutside();
     bindOrcProdutoLookupFloating();
     requestAnimationFrame(positionOrcProdutoLookup);
+}
+
+function bindOrcClienteLookupClickOutside() {
+    if (window.__erpOrcClienteLookupClickOutsideBound) {
+        return;
+    }
+
+    window.__erpOrcClienteLookupClickOutsideBound = true;
+
+    document.addEventListener('mousedown', (event) => {
+        const field = document.querySelector('.erp-orcamentos-form-page .erp-orc-cliente-field');
+        const lookup = field?.querySelector('.erp-orc-cliente-lookup, .erp-orc-cliente-lookup--empty');
+
+        if (! field || ! lookup || field.contains(event.target)) {
+            return;
+        }
+
+        const component = getErpOrcamentosComponent();
+        component?.call('closeClienteLookup');
+    });
 }
 
 function bindOrcProdutoLookupFloating() {
@@ -263,8 +345,10 @@ function focusOrcFormInput(id, options = {}) {
     const input = document.getElementById(id);
 
     if (! input || input.disabled) {
-        return;
+        return false;
     }
+
+    input.removeAttribute('readonly');
 
     const selectAll = options.selectAll !== false;
 
@@ -275,4 +359,6 @@ function focusOrcFormInput(id, options = {}) {
     if (selectAll) {
         input.select();
     }
+
+    return true;
 }

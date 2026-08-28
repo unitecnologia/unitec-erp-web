@@ -143,7 +143,6 @@ class AuthController
             'tabela_venda_descricao' => $tabela?->descricao,
             'pix_api_habilitada' => (bool) ($empresa?->param_pix_habilitar ?? false),
             'is_admin' => (bool) $user->is_admin,
-            'is_supervisor' => (bool) $user->is_supervisor,
             'permissions' => $user->effectivePermissionKeys(),
         ];
     }

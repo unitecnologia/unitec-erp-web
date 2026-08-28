@@ -3,8 +3,10 @@
 namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\Compra;
+use App\Support\Erp\Reports\ReportEmpresaScope;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class HistoricoComprasReport extends AbstractTabularReport
 {
@@ -28,6 +30,7 @@ class HistoricoComprasReport extends AbstractTabularReport
         return [
             'numero' => 'NÚMERO',
             'data_entrada' => 'ENTRADA',
+            'empresa' => 'EMPRESA',
             'data_emissao' => 'EMISSÃO',
             'nota' => 'NOTA',
             'fornecedor' => 'FORNECEDOR',
@@ -38,7 +41,15 @@ class HistoricoComprasReport extends AbstractTabularReport
 
     public function defaultColumns(): array
     {
-        return array_keys($this->columns());
+        return [
+            'numero',
+            'data_entrada',
+            'data_emissao',
+            'nota',
+            'fornecedor',
+            'status',
+            'total',
+        ];
     }
 
     public function numericColumns(): array
@@ -48,7 +59,7 @@ class HistoricoComprasReport extends AbstractTabularReport
 
     public function filterFields(): array
     {
-        return $this->withColumnsField([
+        return $this->withColumnsField($this->withEmpresaFilter([
             ...$this->periodFilterFields(),
             [
                 'key' => 'status',
@@ -56,48 +67,65 @@ class HistoricoComprasReport extends AbstractTabularReport
                 'type' => 'select',
                 'options' => ['todos' => 'Todos'] + Compra::statusLabels(),
             ],
-        ]);
+        ]));
     }
 
     public function build(Request $request): array
     {
         [$de, $ate] = $this->periodFromRequest($request);
-        $columns = $this->resolveColumns($request->query('cols'));
+        $columns = $this->columnsForEmpresaScope(
+            $this->resolveColumns($request->query('cols')),
+            $request,
+            after: 'data_entrada',
+        );
         $status = (string) $request->query('status', 'todos');
+        $multi = $this->isMultiEmpresaScope($request);
 
         $query = Compra::query()
-            ->with('fornecedor')
+            ->with(['fornecedor', 'empresa'])
             ->whereBetween('data_entrada', [$de->toDateString(), $ate->toDateString()])
             ->orderByDesc('data_entrada')
             ->orderByDesc('id');
+
+        if (Schema::hasColumn((new Compra)->getTable(), 'empresa_id')) {
+            ReportEmpresaScope::applyToQuery($query, $request, 'empresa_id');
+        }
 
         if ($status !== 'todos') {
             $query->where('status', $status);
         }
 
-        $rows = $query->limit(5000)->get()->map(fn (Compra $compra): array => [
-            'numero' => (string) $compra->numero,
-            'data_entrada' => static::formatDate($compra->data_entrada),
-            'data_emissao' => static::formatDate($compra->data_emissao),
-            'nota' => (string) ($compra->numero_nota ?? ''),
-            'fornecedor' => (string) ($compra->fornecedor?->nome_razao ?? ''),
-            'status' => Compra::statusLabels()[$compra->status] ?? (string) $compra->status,
-            'total' => static::formatMoney((float) $compra->total),
-        ])->all();
+        $rows = $query->limit(5000)->get()->map(function (Compra $compra) use ($multi): array {
+            $row = [
+                'numero' => (string) $compra->numero,
+                'data_entrada' => static::formatDate($compra->data_entrada),
+                'data_emissao' => static::formatDate($compra->data_emissao),
+                'nota' => (string) ($compra->numero_nota ?? ''),
+                'fornecedor' => (string) ($compra->fornecedor?->nome_razao ?? ''),
+                'status' => Compra::statusLabels()[$compra->status] ?? (string) $compra->status,
+                'total' => static::formatMoney((float) $compra->total),
+            ];
+
+            if ($multi) {
+                $row['empresa'] = ReportEmpresaScope::labelEmpresa($compra->empresa);
+            }
+
+            return $row;
+        })->all();
 
         return $this->result(
-            [
+            $this->withEmpresaFilterValue([
                 'de' => $de->toDateString(),
                 'ate' => $ate->toDateString(),
                 'status' => $status,
                 'cols' => $columns,
-            ],
+            ], $request),
             $columns,
             $rows,
-            [
-                'PERÍODO: ' . $this->periodLabel($de, $ate),
-                'STATUS: ' . mb_strtoupper($status === 'todos' ? 'TODOS' : (Compra::statusLabels()[$status] ?? $status), 'UTF-8'),
-            ],
+            $this->withEmpresaSummary([
+                'PERÍODO: '.$this->periodLabel($de, $ate),
+                'STATUS: '.mb_strtoupper($status === 'todos' ? 'TODOS' : (Compra::statusLabels()[$status] ?? $status), 'UTF-8'),
+            ], $request),
         );
     }
 }

@@ -8,8 +8,6 @@
 
     $perfis = $this->userProfileOptions();
 
-    $vendedores = $this->userVendedorOptions();
-
     $usuariosCopia = $this->userCopyPermissionUsers();
     $usuarioCopiaSelecionado = (int) ($this->userForm['copiar_permissoes_de'] ?? 0);
 
@@ -319,28 +317,16 @@
 
 
 
-                        <div class="erp-pcad-form__row">
-
-                            <label class="erp-pcad-form__label" for="usuario-vendedor">Vendedor Padrão</label>
-
-                            <select id="usuario-vendedor" wire:model="userForm.vendedor_id" class="erp-pcad-form__select erp-pcad-form__input--grow">
-
-                                <option value="">— Nenhum —</option>
-
-                                @foreach ($vendedores as $id => $nome)
-
-                                    <option value="{{ $id }}">{{ $nome }}</option>
-
-                                @endforeach
-
-                            </select>
-
-                            @error('userForm.vendedor_id')
-
-                                <span class="erp-usuario-form-modal__error">{{ $message }}</span>
-
-                            @enderror
-
+                        <div class="erp-pcad-form__row erp-usuario-form-modal__vinculo-row">
+                            <label class="erp-pcad-form__label">Operador (RH)</label>
+                            <div class="erp-vform__field-stack">
+                                <div class="erp-usuario-form-modal__vinculo {{ $this->userOperadorVinculado() ? 'is-linked' : 'is-empty' }}">
+                                    {{ $this->userOperadorVinculoInfo() }}
+                                </div>
+                                <p class="erp-usuario-form-modal__hint">
+                                    Somente leitura — vínculo em <strong>RH → Funcionários → aba Operador</strong>.
+                                </p>
+                            </div>
                         </div>
 
 
@@ -520,24 +506,6 @@
                                 >
 
                                 <span>ATIVO</span>
-
-                            </label>
-
-                            <label class="erp-pcad__check erp-usuario-form-modal__status-check">
-
-                                <input
-
-                                    type="checkbox"
-
-                                    wire:model="userForm.is_supervisor"
-
-                                    true-value="S"
-
-                                    false-value="N"
-
-                                >
-
-                                <span>SUPERVISOR</span>
 
                             </label>
 

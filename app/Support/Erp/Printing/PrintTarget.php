@@ -5,8 +5,8 @@ namespace App\Support\Erp\Printing;
 /**
  * Destino da impressão no caixa.
  *
- * Device Service só entra se o Terminal tiver "Usar Device Service" ativo
- * e impressora Windows configurada; senão / offline → navegador.
+ * Device Service é o caminho preferido quando há impressora Windows/RAW
+ * configurada no terminal; senão / offline → navegador.
  */
 final class PrintTarget
 {
@@ -14,7 +14,7 @@ final class PrintTarget
         public readonly ?string $printerName,
         public readonly int $copies = 1,
         public readonly string $tipoImpressora = '1',
-        public readonly bool $useDeviceService = false,
+        public readonly bool $useDeviceService = true,
     ) {}
 
     public function hasPrinter(): bool

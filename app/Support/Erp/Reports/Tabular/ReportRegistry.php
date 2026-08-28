@@ -19,6 +19,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasClienteReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasVendedorReport;
 use App\Support\Erp\Reports\Tabular\Definitions\MovimentoCaixaReport;
+use App\Support\Erp\Reports\Tabular\Definitions\OutrasSaidasMovimentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PlanoContasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PrecoAlteradoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosLucratividadeReport;
@@ -28,6 +29,8 @@ use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMenosLucrativosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMenosVendidosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoCaixaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoFinanceiroContaReport;
+use App\Support\Erp\Reports\Tabular\Definitions\ValidadeLotesReport;
+use App\Support\Erp\Reports\Tabular\Definitions\ValidadeProdutosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasCfopCsosnReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasFormaPagamentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasPdvReport;
@@ -60,6 +63,8 @@ class ReportRegistry
             'estoque-minimo' => EstoqueMinimoReport::class,
             'estoque-negativo' => EstoqueNegativoReport::class,
             'conferencia-estoque' => ConferenciaEstoqueReport::class,
+            'validade-produtos' => ValidadeProdutosReport::class,
+            'validade-lotes' => ValidadeLotesReport::class,
             'historico-vendas' => HistoricoVendasReport::class,
             'historico-orcamentos' => HistoricoOrcamentosReport::class,
             'historico-vendas-cliente' => HistoricoVendasClienteReport::class,
@@ -75,6 +80,7 @@ class ReportRegistry
             'contas-pagar' => ContasPagarReport::class,
             'resumo-caixa' => ResumoCaixaReport::class,
             'movimento-caixa' => MovimentoCaixaReport::class,
+            'outras-saidas-movimento' => OutrasSaidasMovimentoReport::class,
             'balanco-financeiro' => BalancoFinanceiroReport::class,
             'resumo-financeiro-conta' => ResumoFinanceiroContaReport::class,
             'plano-contas' => PlanoContasReport::class,

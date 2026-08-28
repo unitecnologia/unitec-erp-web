@@ -3,8 +3,9 @@
 namespace App\Support\Erp\Balanca;
 
 /**
- * Layouts de etiqueta/código de barras EAN de balança (modelos 01–04).
- * Paridade com param_pdv_modelo_balanca do PDV Delphi.
+ * Layouts de etiqueta/código de barras EAN de balança (modelos 01–05).
+ * Paridade com param_pdv_modelo_balanca do PDV Delphi (01–04) + 05 (6 dígitos + total)
+ * observado em etiquetas reais de açougue/balança.
  */
 final class BalancaEtiquetaLayout
 {
@@ -24,6 +25,7 @@ final class BalancaEtiquetaLayout
             2 => '02 — 5 dígitos + peso',
             3 => '03 — 5 dígitos + total',
             4 => '04 — 6 dígitos + peso',
+            5 => '05 — 6 dígitos + total',
         ];
     }
 
@@ -31,7 +33,7 @@ final class BalancaEtiquetaLayout
     {
         $modelo = (int) $modelo;
 
-        return in_array($modelo, [1, 2, 3, 4], true) ? $modelo : self::DEFAULT_MODELO;
+        return in_array($modelo, [1, 2, 3, 4, 5], true) ? $modelo : self::DEFAULT_MODELO;
     }
 
     public static function normalizePrefixo(mixed $prefixo): string
@@ -76,7 +78,7 @@ final class BalancaEtiquetaLayout
     }
 
     /**
-     * Quantidade de dígitos do segmento peso (5) ou total/preço (6).
+     * Quantidade de dígitos do segmento peso (5) ou total/preço (5 ou 6).
      */
     public static function valorLength(int $modelo): int
     {
@@ -85,7 +87,7 @@ final class BalancaEtiquetaLayout
 
     public static function isTotalPrice(int $modelo): bool
     {
-        return self::normalizeModelo($modelo) === 3;
+        return in_array(self::normalizeModelo($modelo), [3, 5], true);
     }
 
     /**
@@ -97,7 +99,44 @@ final class BalancaEtiquetaLayout
     }
 
     /**
-     * Diagramas compactos dos 4 layouts (guia visual).
+     * Extrai o código do produto (PLU) do EAN, já com o tamanho configurado.
+     */
+    public static function productCodeFromBarcode(string $barcode, string $prefixo, int $digitos, int $modelo = 4): string
+    {
+        $barcode = preg_replace('/\D/', '', $barcode) ?? '';
+        $prefixo = self::normalizePrefixo($prefixo);
+        $digitos = self::normalizeDigitos($digitos);
+        $start = strlen($prefixo);
+
+        return str_pad(substr($barcode, $start, $digitos), $digitos, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Normaliza o código/PLU do produto para o mesmo formato do trecho do EAN.
+     */
+    public static function normalizeProductCode(string $productCode, string $eanPrefix, int $digitos): string
+    {
+        $raw = preg_replace('/\D/', '', $productCode) ?? '';
+        $eanPrefix = self::normalizePrefixo($eanPrefix);
+        $digitos = self::normalizeDigitos($digitos);
+
+        if ($raw === '') {
+            return str_repeat('0', $digitos);
+        }
+
+        if (str_starts_with($raw, $eanPrefix) && strlen($raw) > strlen($eanPrefix)) {
+            $raw = substr($raw, strlen($eanPrefix));
+        }
+
+        if (strlen($raw) > $digitos) {
+            $raw = substr($raw, -$digitos);
+        }
+
+        return str_pad($raw, $digitos, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Diagramas compactos dos layouts (guia visual).
      *
      * @return list<array{
      *     modelo: int,
@@ -156,6 +195,18 @@ final class BalancaEtiquetaLayout
                     ['v' => '2', 'role' => 'prefix', 'cap' => 'Pref.'],
                     ['v' => 'CCCCCC', 'role' => 'prod', 'cap' => 'Produto'],
                     ['v' => 'PPPPP', 'role' => 'peso', 'cap' => 'Peso'],
+                    ['v' => 'D', 'role' => 'dv', 'cap' => 'DV'],
+                ],
+            ],
+            [
+                'modelo' => 5,
+                'title' => '05',
+                'digitos' => 6,
+                'valor' => 'total',
+                'parts' => [
+                    ['v' => '2', 'role' => 'prefix', 'cap' => 'Pref.'],
+                    ['v' => 'CCCCCC', 'role' => 'prod', 'cap' => 'Produto'],
+                    ['v' => 'TTTTT', 'role' => 'total', 'cap' => 'Total'],
                     ['v' => 'D', 'role' => 'dv', 'cap' => 'DV'],
                 ],
             ],

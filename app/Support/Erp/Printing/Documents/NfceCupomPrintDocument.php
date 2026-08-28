@@ -104,15 +104,21 @@ final class NfceCupomPrintDocument implements PrintDocument
         $p->textRaw(EscPosCharset::encode('Emissao: '.$data['dataEmissao'].' '.$data['horaEmissao'])."\n");
         $p->textRaw(EscPosCharset::encode('Operador: '.$data['usuario'])."\n");
 
+        if (! empty($data['numeroPedido'])) {
+            $p->textRaw(EscPosCharset::encode('Numero: '.$data['numeroPedido'])."\n");
+        }
+
+        $p->textRaw(EscPosCharset::encode('DAV: '.($data['numeroPdv'] ?? str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT)))."\n");
+
+        if (! empty($data['vendedorNome'])) {
+            $p->textRaw(EscPosCharset::encode('Vendedor: '.$data['vendedorNome'])."\n");
+        }
+
         if (! empty($data['consumidorNome'])) {
             $p->textRaw(EscPosCharset::encode('Consumidor: '.$data['consumidorNome'])."\n");
             if (! empty($data['consumidorEndereco'])) {
                 $p->textRaw(EscPosCharset::encode('Endereco: '.$data['consumidorEndereco'])."\n");
             }
-        }
-
-        if (! empty($data['cpfNotaMascarado'])) {
-            $p->textRaw(EscPosCharset::encode('CPF: '.$data['cpfNotaMascarado'])."\n");
         }
 
         $p->textRaw(str_repeat('-', 48)."\n");
@@ -166,7 +172,31 @@ final class NfceCupomPrintDocument implements PrintDocument
 
         if ($venda->pagamentos->isNotEmpty()) {
             foreach ($venda->pagamentos as $pagamento) {
-                $p->textRaw(EscPosCharset::encode($pagamento->descricaoComCanhoto().': R$ '.number_format((float) $pagamento->valor, 2, ',', ''))."\n");
+                $p->textRaw(EscPosCharset::encode($pagamento->linhaCupom())."\n");
+            }
+        }
+
+        if (! empty($data['cpfNota'])) {
+            $p->textRaw(EscPosCharset::encode('CPF: '.$data['cpfNota'])."\n");
+        }
+
+        $observacoes = trim((string) ($venda->observacoes ?? ''));
+        if ($observacoes !== '') {
+            foreach (preg_split('/\R/u', wordwrap($observacoes, 48, "\n", true)) ?: [] as $linhaObs) {
+                if (trim($linhaObs) === '') {
+                    continue;
+                }
+                $p->textRaw(EscPosCharset::encode($linhaObs)."\n");
+            }
+        }
+
+        $obsNfce = trim((string) ($data['obsNfce'] ?? ''));
+        if ($obsNfce !== '') {
+            foreach (preg_split('/\R/u', wordwrap($obsNfce, 48, "\n", true)) ?: [] as $linhaObsNfce) {
+                if (trim($linhaObsNfce) === '') {
+                    continue;
+                }
+                $p->textRaw(EscPosCharset::encode($linhaObsNfce)."\n");
             }
         }
 

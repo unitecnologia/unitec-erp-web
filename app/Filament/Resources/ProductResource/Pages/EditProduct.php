@@ -35,6 +35,7 @@ class EditProduct extends EditRecord
         $this->loadProductPriceHistories($this->record);
         $this->loadProductImeis($this->record);
         $this->loadProductReservas($this->record);
+        $this->loadProductLotes($this->record);
         $this->captureProductFormBaseline();
     }
 
@@ -52,6 +53,11 @@ class EditProduct extends EditRecord
     {
         $this->syncProductChildRecords($this->record);
         $this->syncProductFormData();
+
+        if ($this->record) {
+            app(\App\Support\Erp\ProductLoteService::class)->garantirLoteInicial($this->record->fresh());
+            $this->loadProductLotes($this->record->fresh());
+        }
 
         Notification::make()
             ->title('Produto gravado com sucesso.')

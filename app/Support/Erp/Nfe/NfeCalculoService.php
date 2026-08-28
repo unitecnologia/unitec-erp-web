@@ -29,7 +29,7 @@ final class NfeCalculoService
 
      */
 
-    public function calcular(array $rows, ?Empresa $empresa, ?string $clienteUf): array
+    public function calcular(array $rows, ?Empresa $empresa, ?string $clienteUf, ?array $impostoCalcHint = null): array
 
     {
 
@@ -63,7 +63,8 @@ final class NfeCalculoService
 
             $outros = $this->rowMoney($row, 'outros', 0.0);
 
-            $total = round(max(0, ($qtd * $preco) - $desconto), 2);
+            $bruto = round($qtd * $preco, 3);
+            $total = round(max(0, $bruto + $outros - $desconto), 3);
 
             $ncmIbpt = (string) ($product?->ncm ?: ($row['ncm'] ?? ''));
             $ibpt = (new IbptLookupService)->calcularParaBase(
@@ -78,17 +79,7 @@ final class NfeCalculoService
 
                 : $this->resolveCfop($product, $interestadual, $empresa);
 
-            $cst = filled($row['cst'] ?? null)
-
-                ? (string) $row['cst']
-
-                : $this->resolveCst($product, $interestadual);
-
-            $csosn = filled($row['csosn'] ?? null)
-
-                ? (string) $row['csosn']
-
-                : $this->resolveCsosn($product, $interestadual);
+            ['cst' => $cst, 'csosn' => $csosn] = $this->resolveIcmsForRow($row, $product, $interestadual, $empresa);
 
             $defaultAliqIcms = $this->resolveAliqIcms($product, $interestadual);
 
@@ -98,27 +89,56 @@ final class NfeCalculoService
 
             $defaultAliqIpi = (float) ($product?->aliq_ipi ?? 0);
 
-            $baseIcms = $this->rowMoney($row, 'base_icms', $total);
+            $defaultBaseIcms = $total;
+            if (
+                $this->isEmpresaSimples($empresa)
+                && $this->csosnSemBaseIcms($csosn)
+                && $defaultAliqIcms <= 0
+            ) {
+                $defaultBaseIcms = 0.0;
+            }
 
-            $aliqIcms = $this->rowMoney($row, 'aliq_icms', $defaultAliqIcms);
+            $baseIcms = $this->rowMoney($row, 'base_icms', $defaultBaseIcms);
 
-            $valorIcms = $this->rowMoney($row, 'valor_icms', round($baseIcms * $aliqIcms / 100, 2));
+            $editedField = ($impostoCalcHint !== null && (int) ($impostoCalcHint['index'] ?? -1) === $index)
+                ? (string) ($impostoCalcHint['field'] ?? '')
+                : null;
 
-            $basePisCof = $this->rowMoney($row, 'base_pis_icms', $total);
+            [$aliqIcms, $valorIcms] = $this->resolveTaxPair(
+                $baseIcms,
+                $row,
+                'aliq_icms',
+                'valor_icms',
+                $defaultAliqIcms,
+                $editedField,
+            );
 
-            $aliqPis = $this->rowMoney($row, 'aliq_pis_icms', $defaultAliqPis);
+            [$aliqPis, $valorPis] = $this->resolveTaxPair(
+                $baseIcms,
+                $row,
+                'aliq_pis_icms',
+                'valor_pis_icms',
+                $defaultAliqPis,
+                $editedField,
+            );
 
-            $valorPis = $this->rowMoney($row, 'valor_pis_icms', round($basePisCof * $aliqPis / 100, 2));
+            [$aliqCof, $valorCof] = $this->resolveTaxPair(
+                $baseIcms,
+                $row,
+                'aliq_cofins_icms',
+                'valor_cofins_icms',
+                $defaultAliqCof,
+                $editedField,
+            );
 
-            $aliqCof = $this->rowMoney($row, 'aliq_cofins_icms', $defaultAliqCof);
-
-            $valorCof = $this->rowMoney($row, 'valor_cofins_icms', round($basePisCof * $aliqCof / 100, 2));
-
-            $baseIpi = $this->rowMoney($row, 'base_ipi', $total);
-
-            $aliqIpi = $this->rowMoney($row, 'aliq_ipi', $defaultAliqIpi);
-
-            $valorIpi = $this->rowMoney($row, 'valor_ipi', round($baseIpi * $aliqIpi / 100, 2));
+            [$aliqIpi, $valorIpi] = $this->resolveTaxPair(
+                $baseIcms,
+                $row,
+                'aliq_ipi',
+                'valor_ipi',
+                $defaultAliqIpi,
+                $editedField,
+            );
 
             $valorDesoneracao = $this->rowMoney($row, 'valor_desoneracao', 0.0);
 
@@ -150,6 +170,10 @@ final class NfeCalculoService
 
                 'codigo' => filled($row['codigo'] ?? null) ? (string) $row['codigo'] : $product?->codigo,
 
+                'referencia' => filled($row['referencia'] ?? null)
+                    ? (string) $row['referencia']
+                    : trim((string) ($product?->referencia ?? '')),
+
                 'cfop' => $cfop,
 
                 'cst' => $cst,
@@ -160,7 +184,9 @@ final class NfeCalculoService
 
                 'cest' => $product?->cest,
 
-                'cod_barra' => $product?->codigo_barras,
+                'cod_barra' => filled($row['cod_barra'] ?? null)
+                    ? (string) $row['cod_barra']
+                    : (string) ($product?->codigo_barras ?? ''),
 
                 'unidade' => filled($row['unidade'] ?? null)
 
@@ -206,25 +232,31 @@ final class NfeCalculoService
 
                 'valor_desoneracao' => $valorDesoneracao,
 
-                'base_ipi' => $baseIpi,
+                'base_ipi' => $baseIcms,
 
                 'aliq_ipi' => $aliqIpi,
 
                 'valor_ipi' => $valorIpi,
 
-                'cst_ipi' => $product?->cst_ipi,
+                'cst_ipi' => filled($row['cst_ipi'] ?? null)
+                    ? (string) $row['cst_ipi']
+                    : ($product?->cst_ipi ?? '99'),
 
-                'cst_pis' => $product?->cst_saida ?? '01',
+                'cst_pis' => filled($row['cst_pis'] ?? null)
+                    ? (string) $row['cst_pis']
+                    : ($product?->cst_saida ?? '01'),
 
-                'base_pis_icms' => $basePisCof,
+                'base_pis_icms' => $baseIcms,
 
                 'aliq_pis_icms' => $aliqPis,
 
                 'valor_pis_icms' => $valorPis,
 
-                'cst_cofins' => $product?->cst_cofins ?? $product?->cst_saida ?? '01',
+                'cst_cofins' => filled($row['cst_cofins'] ?? null)
+                    ? (string) $row['cst_cofins']
+                    : ($product?->cst_cofins ?? $product?->cst_saida ?? '01'),
 
-                'base_cofins_icms' => $basePisCof,
+                'base_cofins_icms' => $baseIcms,
 
                 'aliq_cofins_icms' => $aliqCof,
 
@@ -250,7 +282,7 @@ final class NfeCalculoService
 
             ];
 
-            $totais['subtotal'] += $total;
+            $totais['subtotal'] += $bruto;
 
             $totais['desconto'] += $desconto;
 
@@ -266,17 +298,23 @@ final class NfeCalculoService
 
             $totais['valor_icms'] += $valorIcms;
 
-            $totais['base_ipi'] += $baseIpi;
+            $totais['base_ipi'] += $baseIcms;
 
             $totais['valor_ipi'] += $valorIpi;
 
-            $totais['base_pis'] += $basePisCof;
+            $totais['base_pis'] += $baseIcms;
 
             $totais['valor_pis'] += $valorPis;
 
-            $totais['base_cofins'] += $basePisCof;
+            $totais['base_cofins'] += $baseIcms;
 
             $totais['valor_cofins'] += $valorCof;
+
+            $baseSt = $this->rowMoney($row, 'base_icms_st', 0.0);
+            $valorSt = $this->rowMoney($row, 'valor_icms_st', 0.0);
+
+            $totais['base_st'] += $baseSt;
+            $totais['valor_st'] += $valorSt;
 
             $totais['trib_fed'] += $ibpt['trib_fed'];
             $totais['trib_est'] += $ibpt['trib_est'];
@@ -292,7 +330,15 @@ final class NfeCalculoService
 
         }
 
-        $totais['total'] = round($totais['subtotal'] + $totais['frete'] + $totais['seguro'] + $totais['outras'], 2);
+        $totais['subtotal'] = round($totais['subtotal'], 2);
+        $totais['desconto'] = round($totais['desconto'], 2);
+        $totais['frete'] = round($totais['frete'], 2);
+        $totais['seguro'] = round($totais['seguro'], 2);
+        $totais['outras'] = round($totais['outras'], 2);
+        $totais['total'] = round(
+            $totais['subtotal'] - $totais['desconto'] + $totais['frete'] + $totais['seguro'] + $totais['outras'],
+            2,
+        );
         $totais['trib_fed'] = round((float) $totais['trib_fed'], 2);
         $totais['trib_est'] = round((float) $totais['trib_est'], 2);
         $totais['trib_mun'] = round((float) $totais['trib_mun'], 2);
@@ -392,6 +438,80 @@ final class NfeCalculoService
 
     }
 
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{cst: string, csosn: string}
+     */
+    protected function resolveIcmsForRow(array $row, ?Product $product, bool $interestadual, ?Empresa $empresa): array
+    {
+        if ($this->isEmpresaSimples($empresa)) {
+            if (filled($row['cst'] ?? null)) {
+                $cstNorm = preg_replace('/\D/', '', (string) $row['cst']) ?: '';
+                $csosnNorm = preg_replace('/\D/', '', (string) ($row['csosn'] ?? '')) ?: '';
+
+                if (
+                    $cstNorm !== ''
+                    && $cstNorm !== $csosnNorm
+                    && ! $this->cstMatchesProductIcms($row['cst'], $product)
+                ) {
+                    return ['cst' => '', 'csosn' => trim((string) $row['cst'])];
+                }
+            }
+
+            if (filled($row['csosn'] ?? null)) {
+                return ['cst' => '', 'csosn' => (string) $row['csosn']];
+            }
+
+            return [
+                'cst' => '',
+                'csosn' => (string) ($this->resolveCsosn($product, $interestadual) ?: '102'),
+            ];
+        }
+
+        $cst = filled($row['cst'] ?? null)
+            ? (string) $row['cst']
+            : $this->resolveCst($product, $interestadual);
+
+        $csosn = filled($row['csosn'] ?? null)
+            ? (string) $row['csosn']
+            : (string) ($this->resolveCsosn($product, $interestadual) ?? '');
+
+        return ['cst' => $cst, 'csosn' => $csosn];
+    }
+
+    protected function isEmpresaSimples(?Empresa $empresa): bool
+    {
+        if ($empresa === null) {
+            return true;
+        }
+
+        return strtolower((string) ($empresa->regime_tributario ?? 'simples')) === 'simples';
+    }
+
+    protected function csosnSemBaseIcms(string $csosn): bool
+    {
+        $norm = str_pad(preg_replace('/\D/', '', $csosn) ?? '', 3, '0', STR_PAD_LEFT);
+
+        return in_array($norm, ['102', '103', '300', '400', '500'], true);
+    }
+
+    protected function cstMatchesProductIcms(mixed $rowCst, ?Product $product): bool
+    {
+        if ($product === null) {
+            return false;
+        }
+
+        $rowDigits = preg_replace('/\D/', '', (string) $rowCst) ?: '';
+        $productDigits = preg_replace('/\D/', '', (string) ($product->cst_icms ?? '')) ?: '';
+
+        if ($rowDigits === '' || $productDigits === '') {
+            return false;
+        }
+
+        return ltrim($rowDigits, '0') === ltrim($productDigits, '0')
+            || str_pad($rowDigits, 3, '0', STR_PAD_LEFT) === str_pad($productDigits, 3, '0', STR_PAD_LEFT);
+    }
+
     protected function resolveCfop(?Product $product, bool $interestadual, ?Empresa $empresa): string
 
     {
@@ -466,6 +586,31 @@ final class NfeCalculoService
 
         return $default;
 
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{0: float, 1: float}
+     */
+    private function resolveTaxPair(
+        float $base,
+        array $row,
+        string $aliqKey,
+        string $valorKey,
+        float $defaultAliq,
+        ?string $editedField,
+    ): array {
+        if ($editedField === $valorKey && $base > 0) {
+            $valor = round($this->rowMoney($row, $valorKey, 0.0), 2);
+            $aliq = round($valor / $base * 100, 2);
+
+            return [$aliq, $valor];
+        }
+
+        $aliq = $this->rowMoney($row, $aliqKey, $defaultAliq);
+        $valor = round($base * $aliq / 100, 2);
+
+        return [$aliq, $valor];
     }
 
     private function parseQuantity(mixed $value): float

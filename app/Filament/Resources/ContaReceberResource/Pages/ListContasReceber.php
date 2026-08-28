@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ContaReceberResource\Pages;
 
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberBaixaModal;
+use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberFormModal;
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberViewModal;
 use App\Filament\Concerns\InteractsWithLocalClienteSearchLookup;
 use App\Filament\Concerns\InteractsWithErpListPage;
@@ -31,6 +32,7 @@ class ListContasReceber extends ListRecords
     use \App\Filament\Concerns\InteractsWithErpPermissions;
     use InteractsWithLocalClienteSearchLookup;
     use ManagesContaReceberBaixaModal;
+    use ManagesContaReceberFormModal;
     use ManagesContaReceberViewModal;
 
     protected static string $resource = ContaReceberResource::class;
@@ -93,6 +95,8 @@ class ListContasReceber extends ListRecords
     {
         return [
             'searchInput' => '.erp-receber__input',
+            'create' => 'createConta',
+            'edit' => 'editConta',
             'delete' => 'deleteConta',
             'extraKeys' => [
                 'F4' => ['method' => 'printContasReceber'],
@@ -180,7 +184,7 @@ class ListContasReceber extends ListRecords
     {
         return [
             'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
-            'valor', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
         ];
     }
 
@@ -203,6 +207,7 @@ class ListContasReceber extends ListRecords
             'emissao', 'vencimento', 'recebido_em' => $this->applyLocalSearchByDate($query, $term, $column),
             'historico' => $query->where('historico', 'like', $like),
             'documento' => $query->where('documento', 'like', $like),
+            'numero_cheque' => $query->where('numero_cheque', 'like', $like),
             'cliente' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like)),
             'valor', 'desconto', 'juros', 'valor_recebido', 'saldo' => $this->applyLocalSearchByMoney($query, $term, $column),
         };
@@ -354,6 +359,7 @@ class ListContasReceber extends ListRecords
                 View::make('filament.components.erp.receber.action-bar'),
                 View::make('filament.components.erp.receber.view-modal'),
                 View::make('filament.components.erp.receber.baixa-modal'),
+                View::make('filament.components.erp.receber.form-modal'),
             ]);
     }
 
@@ -470,20 +476,6 @@ class ListContasReceber extends ListRecords
     {
         $this->highlightedRecordId = null;
         $this->selecionadosParaBaixa = [];
-    }
-
-    public function createConta(): void
-    {
-        $this->modulePending('Cadastro de conta a receber (Fase 2)');
-    }
-
-    public function editConta(): void
-    {
-        if (! $this->highlightedRecordIdOrNotify('edit')) {
-            return;
-        }
-
-        $this->modulePending('Alteração de conta a receber (Fase 2)');
     }
 
     public function deleteConta(): void

@@ -5,6 +5,7 @@ namespace App\Support\Erp\Pdv;
 use App\Models\Empresa;
 use App\Models\PdvVenda;
 use App\Support\Erp\Compra\CompraDanfeReportService;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
 use App\Support\ForcaVendas\ForcaVendasPairing;
 use Illuminate\Support\Carbon;
@@ -34,18 +35,23 @@ final class PdvNfceSimuladaService
         bool $autoPrint = false,
         ?Carbon $printedAt = null,
     ): array {
-        $venda->loadMissing(['itens.product', 'pagamentos', 'person', 'nfce']);
+        $venda->loadMissing(['itens.product', 'pagamentos', 'person', 'nfce', 'venda', 'vendedor']);
         $printedAt ??= now();
         $documento = $venda->nfce;
         $operacao = $this->resolveOperacao($venda, $operacao, $documento);
         $chave = $documento?->chave ?? $this->gerarChaveAcesso($empresa, $venda, $operacao);
-        $emissao = $venda->fechado_em ?? $printedAt;
+        $emissao = ErpTimezone::toLocal($venda->fechado_em ?? $printedAt);
         $serie = str_pad((string) ($documento?->serie ?? '1'), 3, '0', STR_PAD_LEFT);
         $numeroNf = str_pad((string) ($documento?->numero ?? $venda->numero), 9, '0', STR_PAD_LEFT);
         $protocolo = $documento?->protocolo ?? $this->gerarProtocolo($venda);
         $qrTexto = $documento?->qr_code_conteudo ?? $this->gerarQrTexto($chave, $operacao);
         $ibpt = $this->calcularIbptDaVenda($venda);
         $consumidor = NfceConsumidorIdentificado::resolvePerson($venda);
+        $numeroPdv = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
+        $numeroPedido = $venda->venda?->numero !== null
+            ? str_pad((string) $venda->venda->numero, 6, '0', STR_PAD_LEFT)
+            : null;
+        $vendedorNome = trim((string) ($venda->vendedor_nome ?: $venda->vendedor?->nome ?: ''));
 
         return [
             'venda' => $venda,
@@ -73,7 +79,10 @@ final class PdvNfceSimuladaService
             'emitente' => $this->buildEmitente($empresa),
             'consumidorNome' => NfceConsumidorIdentificado::nome($consumidor),
             'consumidorEndereco' => NfceConsumidorIdentificado::endereco($consumidor),
-            'cpfNotaMascarado' => NfceConsumidorIdentificado::cpfMascarado($venda),
+            'cpfNota' => NfceConsumidorIdentificado::cpfFormatado($venda),
+            'numeroPdv' => $numeroPdv,
+            'numeroPedido' => $numeroPedido,
+            'vendedorNome' => $vendedorNome !== '' ? $vendedorNome : null,
             'obsNfce' => trim((string) ($empresa?->obs_nfce ?? '')),
             'textoIbpt' => $ibpt['texto'],
             'tribFed' => $ibpt['trib_fed'],
@@ -130,7 +139,7 @@ final class PdvNfceSimuladaService
     public function gerarChaveAcesso(?Empresa $empresa, PdvVenda $venda, string $operacao): string
     {
         $uf = self::UF_IBGE[strtoupper((string) ($empresa?->uf ?? 'SC'))] ?? '42';
-        $emissao = $venda->fechado_em ?? now();
+        $emissao = ErpTimezone::toLocal($venda->fechado_em ?? now());
         $aamm = $emissao->format('ym');
         $cnpj = str_pad(substr(preg_replace('/\D/', '', (string) ($empresa?->cnpj ?? '00000000000000')) ?: '0', 0, 14), 14, '0', STR_PAD_LEFT);
         $modelo = '65';

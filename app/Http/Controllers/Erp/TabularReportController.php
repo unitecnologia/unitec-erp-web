@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Empresa;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\Reports\Tabular\ChartableTabularReport;
 use App\Support\Erp\Reports\Tabular\ReportRegistry;
 use App\Support\Erp\Reports\Tabular\TabularReportDefinition;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +28,7 @@ class TabularReportController extends Controller
 
         $built = $report->build($request);
         $empresa = $this->currentEmpresa();
+        $supportsChart = $report instanceof ChartableTabularReport;
 
         $data = [
             'empresa' => $empresa,
@@ -43,9 +46,12 @@ class TabularReportController extends Controller
             'filterFields' => $report->filterFields(),
             'printedAt' => now(),
             'reportUrl' => ReportRegistry::route($slug),
-            'closeUrl' => url('/admin'),
+            'closeUrl' => $this->resolveCloseUrl($request),
             'autoPrint' => $request->boolean('auto'),
             'emptyMessage' => 'Nenhum registro encontrado para os filtros informados.',
+            'supportsChart' => $supportsChart,
+            'chartConfig' => $supportsChart ? $report->chartConfig() : null,
+            'chartDataUrl' => $supportsChart ? route('erp.reports.tabular.chart', ['slug' => $slug]) : null,
         ];
 
         if ($request->boolean('pdf')) {
@@ -59,6 +65,17 @@ class TabularReportController extends Controller
         }
 
         return view('reports.tabular', $data);
+    }
+
+    public function chart(Request $request, string $slug): JsonResponse
+    {
+        abort_unless(ReportRegistry::has($slug), 404);
+
+        $report = ReportRegistry::make($slug);
+        abort_unless(ErpAccess::currentCan($report->permission()), 403);
+        abort_unless($report instanceof ChartableTabularReport, 404);
+
+        return response()->json($report->chartData($request));
     }
 
     /**
@@ -98,6 +115,17 @@ class TabularReportController extends Controller
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
 
         return $empresaId ? Empresa::query()->find($empresaId) : null;
+    }
+
+    protected function resolveCloseUrl(Request $request): string
+    {
+        $returnUrl = trim((string) $request->query('return'));
+
+        if ($returnUrl !== '' && str_starts_with($returnUrl, url('/admin'))) {
+            return $returnUrl;
+        }
+
+        return url('/admin');
     }
 
     protected function formatEmpresaEndereco(?Empresa $empresa): string
