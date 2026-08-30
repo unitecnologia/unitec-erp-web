@@ -561,6 +561,13 @@
     margin-top: 0.15rem;
 }
 
+.erp-produtos-pcad__empresa-select:disabled {
+    cursor: default;
+    opacity: 1;
+    color: inherit;
+    background-color: #f3f4f6;
+}
+
 .erp-produtos-pcad__cadastro-em {
     display: flex;
     flex-direction: column;

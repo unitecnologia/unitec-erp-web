@@ -13,7 +13,6 @@
     $status = ErpContext::statusBar();
     $empresaId = (int) (session('erp_empresa_id') ?? auth()->user()?->empresa_id ?? 0);
     $empresas = $this->productFormEmpresas();
-    $podeTrocarEmpresa = $empresas->count() > 1;
 
     $dataCadastro = isset($this->record?->created_at)
         ? $this->record->created_at->format('d/m/Y')
@@ -48,8 +47,8 @@
             <legend class="erp-produtos-pcad__fieldset-legend">Selecione empresa</legend>
             <select
                 class="erp-pcad-form__select erp-produtos-pcad__empresa-select"
-                @disabled(! $podeTrocarEmpresa)
-                wire:change="switchProductFormEmpresa($event.target.value)"
+                disabled
+                title="Troque de empresa pelo menu Trocar Empresa. Na Precificação você pode ver o preço de outra filial."
             >
                 @forelse ($empresas as $empresa)
                     <option value="{{ $empresa->id }}" @selected($empresaId === (int) $empresa->id)>

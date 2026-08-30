@@ -31,6 +31,7 @@ trait ErpProductFormPage
     use ManagesCclassTribLookup;
     use ManagesProductBarcodeLookup;
     use ManagesProductCardex;
+    use ManagesProductEstoqueLog;
     use ManagesProductPhoto;
     use NormalizesErpUppercaseFormData;
     use ManagesProductCadastroLookup;
@@ -747,8 +748,7 @@ trait ErpProductFormPage
         }
 
         $this->switchProductFormEmpresaPrecos($fromEmpresaId, $empresaId);
-        session(['erp_empresa_id' => $empresaId]);
-        \App\Support\Erp\ErpContext::clearMemo();
+        $this->productFormEmpresaId = $empresaId;
 
         if (! $this->isEditingProduct()) {
             $this->applyEmpresaImpostoPadraoToProductForm(notify: false);

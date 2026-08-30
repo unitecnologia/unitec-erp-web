@@ -13,7 +13,6 @@ use App\Support\Erp\NotaFornecedor\NotaFornecedorProductPrefill;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorXmlProdutoMatcher;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Facades\Auth;
 
 class CreateProduct extends CreateRecord
 {
@@ -38,13 +37,14 @@ class CreateProduct extends CreateRecord
         parent::mount();
 
         ErpScreen::set('Cadastro de Produtos');
+        $this->ensureProductFormEmpresaId();
 
         if ($this->embedsInPdv) {
             $this->activeFormTab = 'dados';
         }
 
         // Sempre busca a empresa ativa na hora do "Novo" para já trazer o Imposto Padrão.
-        $empresaId = (int) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 0);
+        $empresaId = $this->currentProductEmpresaId();
         $empresa = $empresaId > 0 ? Empresa::query()->find($empresaId) : null;
 
         $defaults = [

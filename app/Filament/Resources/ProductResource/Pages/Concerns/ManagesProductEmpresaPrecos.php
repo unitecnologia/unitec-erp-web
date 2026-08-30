@@ -24,14 +24,31 @@ trait ManagesProductEmpresaPrecos
     /** @var array<int, array{id: int, nome: string, codigo: string|null}> */
     public array $productReplicaPrecosOpcoes = [];
 
+    /**
+     * Empresa do contexto de preços deste formulário (Precificação / overlay).
+     * Independente de session('erp_empresa_id') — não troca a empresa ativa do ERP.
+     */
+    public int $productFormEmpresaId = 0;
+
     protected function productEmpresaPrecoService(): ProductEmpresaPrecoService
     {
         return app(ProductEmpresaPrecoService::class);
     }
 
+    protected function ensureProductFormEmpresaId(): void
+    {
+        if ($this->productFormEmpresaId > 0) {
+            return;
+        }
+
+        $this->productFormEmpresaId = (int) (session('erp_empresa_id') ?? auth()->user()?->empresa_id ?? 0);
+    }
+
     protected function currentProductEmpresaId(): int
     {
-        return (int) (session('erp_empresa_id') ?? auth()->user()?->empresa_id ?? 0);
+        $this->ensureProductFormEmpresaId();
+
+        return $this->productFormEmpresaId;
     }
 
     /**
@@ -149,7 +166,7 @@ trait ManagesProductEmpresaPrecos
                 ])
                 ->values()
                 ->all();
-            $this->productReplicaPrecosSelecionadas = $outras->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $this->productReplicaPrecosSelecionadas = [];
             $this->productReplicaPrecosOpen = true;
 
             return;

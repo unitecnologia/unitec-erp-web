@@ -23,6 +23,7 @@ class EditProduct extends EditRecord
         parent::mount($record);
 
         ErpScreen::set('Cadastro de Produtos');
+        $this->ensureProductFormEmpresaId();
 
         $this->syncProductFormData();
         $this->applyEmpresaPrecosToFormData($this->record);
