@@ -10,7 +10,7 @@
 ; Sem PowerShell no atalho do cliente.
 
 #define MyAppName "UNI SISTEMAS 3.0"
-#define MyAppVersion "6.4.1.86"
+#define MyAppVersion "6.4.1.164"
 #define MyAppVerName "UNI SISTEMAS 3.0"
 #define MyAppPublisher "UNITECNOLOGIA"
 #define MyAppURL "https://unitecnologiasc.com.br/"
