@@ -31,7 +31,6 @@ trait ErpProductFormPage
     use ManagesCclassTribLookup;
     use ManagesProductBarcodeLookup;
     use ManagesProductCardex;
-    use ManagesProductEstoqueLog;
     use ManagesProductPhoto;
     use NormalizesErpUppercaseFormData;
     use ManagesProductCadastroLookup;
