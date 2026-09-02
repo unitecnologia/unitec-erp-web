@@ -3,7 +3,9 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\Orcamento;
+use App\Models\VendasInternasOrder;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 class OrcamentoListQueryBuilder
 {
@@ -24,7 +26,12 @@ class OrcamentoListQueryBuilder
     public function build(): Builder
     {
         $query = $this->buildFilteredQuery();
-        $query->with(['cliente', 'vendedor', 'forcaVendasOrder', 'vendasInternasOrder']);
+        $query->with(array_values(array_filter([
+            'cliente',
+            'vendedor',
+            'forcaVendasOrder',
+            $this->vendasInternasOrderRelation(),
+        ])));
 
         return $this->applyDefaultOrder($query);
     }
@@ -52,18 +59,32 @@ class OrcamentoListQueryBuilder
             "{$table}.created_at",
         ]);
 
-        $query->with([
+        $query->with(array_values(array_filter([
             'cliente:id,nome_razao,cidade_nome,uf',
             'vendedor:id,nome',
             'forcaVendasOrder:id,orcamento_id',
-            'vendasInternasOrder:id,orcamento_id',
-        ]);
+            $this->vendasInternasOrderRelation('id,orcamento_id'),
+        ])));
 
         if (! $this->applyDefaultOrder) {
             return $query;
         }
 
         return $this->applyDefaultOrder($query);
+    }
+
+    /**
+     * Relação opcional: instalações sem módulo VI não podem derrubar a lista.
+     */
+    protected function vendasInternasOrderRelation(?string $columns = null): ?string
+    {
+        if (! Schema::hasTable((new VendasInternasOrder)->getTable())) {
+            return null;
+        }
+
+        return $columns === null
+            ? 'vendasInternasOrder'
+            : 'vendasInternasOrder:'.$columns;
     }
 
     public function sumFilteredTotal(): float

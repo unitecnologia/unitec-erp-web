@@ -260,6 +260,27 @@
 
 /* â”€â”€ Grade: visual moderno (erp-grid.css) + linhas compactas â”€â”€â”€â”€â”€ */
 
+.erp-orcamentos-page.fi-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0 !important;
+}
+
+.erp-orcamentos-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-orcamentos-page .fi-sc > div:has(.erp-list-grid-area),
+.erp-orcamentos-page .fi-sc > div:has(.fi-ta) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .erp-orcamentos-page .fi-ta-ctn {
     margin: 0 0.65rem !important;
     min-height: 12rem;

@@ -3,23 +3,26 @@
 .fi-body:has(.erp-list-page) {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 0;
 }
 
 .fi-body:has(.erp-list-page) .fi-layout {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
 }
 
 .fi-body:has(.erp-list-page) .fi-main-ctn {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .fi-body:has(.erp-list-page) .fi-main {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -28,19 +31,21 @@
 .fi-body:has(.erp-list-page) .fi-main > * {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
 }
 
 .erp-list-page.fi-page {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
     padding: 0 !important;
     background: var(--erp-bg-app, #eef4fb) !important;
     border: none !important;
     box-shadow: none !important;
-    flex: 1;
-    min-height: 0 !important;
 }
 
 .erp-list-page .fi-header,
@@ -54,7 +59,7 @@
 .erp-list-page .fi-page-content {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     padding: 0 !important;
     gap: 0 !important;
@@ -63,8 +68,9 @@
 .erp-list-page .fi-sc {
     display: flex !important;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
+    overflow: hidden;
     gap: 0 !important;
 }
 
@@ -78,10 +84,19 @@
     padding-bottom: 0 !important;
 }
 
+/* Listagem leve — filtros, abas, rodapé e ações não encolhem */
+.erp-list-filters,
+.erp-list-tabs,
+.erp-list-footer,
+.erp-list-total,
+.erp-list-actions {
+    flex: 0 0 auto;
+}
+
 .erp-list-page .fi-sc > div:has(.fi-ta) {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
     flex-shrink: 1;
@@ -89,13 +104,48 @@
     padding-top: 0 !important;
 }
 
+/* Listagem leve — slot da grade ocupa o restante vertical */
+.erp-list-page .fi-sc > div:has(.erp-list-grid-area) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    flex-shrink: 1;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Único scroll vertical da listagem leve */
+.erp-list-grid-area {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.erp-list-grid-area .fi-ta-table thead,
+.erp-list-grid-area .fi-ta-header-cell {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
 .erp-list-page .fi-sc-component:has(.fi-ta) {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
-    height: 100%;
+}
+
+.erp-list-page .fi-sc-component:has(.erp-list-grid-area) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .erp-list-page .fi-ta {
@@ -125,6 +175,15 @@
     background: var(--erp-bg-panel, #fff);
     margin: 0 0.65rem !important;
     box-shadow: var(--erp-shadow-lg, 0 8px 24px rgba(15, 52, 96, 0.18)) !important;
+}
+
+/* Listagem leve: tabela cresce no scrollport; não herdar flex/overflow da grade Filament */
+.erp-list-page .erp-list-grid-area .fi-ta-ctn {
+    display: block;
+    flex: none;
+    width: auto;
+    min-height: 100%;
+    overflow: visible !important;
 }
 
 .erp-list-page .fi-ta-main {
