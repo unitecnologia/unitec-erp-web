@@ -32,7 +32,7 @@ trait InteractsWithErpListPage
      */
     protected function erpListSyncPollSeconds(): int
     {
-        return 20;
+        return 45;
     }
 
     public function erpListSyncPollEnabled(): bool
@@ -135,7 +135,7 @@ trait InteractsWithErpListPage
 
     public function mountInteractsWithErpListPage(): void
     {
-        $this->loadTable();
+        // parent::mount() (ListRecords) já chama loadTable(); evitar dupla inicialização.
         $this->syncErpListSyncVersionFromStore();
     }
 
@@ -166,7 +166,8 @@ trait InteractsWithErpListPage
         }
 
         $this->erpListSyncVersion = $current;
-        $this->resetTable();
+        // Soft refresh: não remonta Filament inteiro (filtros/Alpine).
+        $this->resetPage();
     }
 
     protected function syncErpListSyncVersionFromStore(): void

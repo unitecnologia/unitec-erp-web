@@ -2,10 +2,10 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\Venda;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use App\Support\Erp\Reports\VendasPorFormaPagamentoAggregator;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 /**
@@ -57,7 +57,7 @@ final class ErpDashboardPaymentMethodsChart
     private static function fromDatabase(int|array|null $empresaScope = null): ?array
     {
         try {
-            if (! Schema::hasTable((new Venda)->getTable())) {
+            if (! ErpSchema::hasTable((new Venda)->getTable())) {
                 return null;
             }
 

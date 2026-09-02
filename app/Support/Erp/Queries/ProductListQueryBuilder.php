@@ -61,20 +61,30 @@ class ProductListQueryBuilder
         $usaEstoqueEmpresa = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null);
         $estoqueId = $usaEstoqueEmpresa ? $estoqueService->estoqueIdParaEmpresa($empresaId) : null;
 
-        $query = Product::query()
-            ->with('ultFornecedor')
-            ->withSum(
-                ['estoqueReservas as estoque_reservado_sum' => fn (Builder $reservaQuery): Builder => $reservaQuery
-                    ->where('status', EstoqueReserva::STATUS_ATIVA)
-                    ->when($estoqueId !== null, fn (Builder $q): Builder => $q->where('estoque_id', $estoqueId))],
-                'quantidade',
-            );
+        $query = Product::query();
+        $productsTable = $query->getModel()->getTable();
+        $prefix = $query->getConnection()->getTablePrefix();
+        $reservasAlias = 'erp_reservas_sum';
+        $reservasAliasSql = $prefix.$reservasAlias;
 
-        if ($this->empresa !== null) {
-            $query->with(['empresaPrecos' => static function ($precos) use ($empresaId): void {
-                $precos->where('empresa_id', $empresaId);
-            }]);
-        }
+        // Reservas: 1 JOIN agregado (Laravel prefixa o alias do leftJoinSub).
+        $reservas = EstoqueReserva::query()
+            ->selectRaw('product_id, COALESCE(SUM(quantidade), 0) as estoque_reservado_sum')
+            ->where('status', EstoqueReserva::STATUS_ATIVA)
+            ->when($estoqueId !== null, fn (Builder $q): Builder => $q->where('estoque_id', $estoqueId))
+            ->groupBy('product_id');
+
+        $query->leftJoinSub($reservas, $reservasAlias, function ($join) use ($productsTable, $reservasAlias): void {
+            // Alias sem prefixo: o query builder prefixa sozinho no JOIN/ON.
+            $join->on("{$reservasAlias}.product_id", '=', "{$productsTable}.id");
+        })
+            ->addSelect("{$productsTable}.*")
+            ->addSelect(\Illuminate\Support\Facades\DB::raw(
+                // DB::raw NÃO recebe prefixo automático — usar alias já prefixado.
+                "COALESCE({$reservasAliasSql}.estoque_reservado_sum, 0) as estoque_reservado_sum"
+            ));
+
+        // empresaPrecos: só no ProductResource::table modifyQueryUsing — evita eager duplo.
 
         if ($usaEstoqueEmpresa) {
             $estoqueService->applyEstoqueEmpresaSelect($query, $empresaId);
@@ -148,7 +158,7 @@ class ProductListQueryBuilder
         }
 
         if ($orderBy === 'codigo') {
-            return $query->orderByRaw('CAST(codigo AS UNSIGNED) asc');
+            return $query->orderBy('codigo');
         }
 
         if ($orderBy === 'validade') {

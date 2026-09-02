@@ -2,12 +2,12 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\Nfe;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardFiscalDocsChart
@@ -72,7 +72,7 @@ final class ErpDashboardFiscalDocsChart
      */
     private static function countNfe(int|array|null $empresaScope, Carbon $inicio, Carbon $fim, bool $autorizadas): int
     {
-        if (! Schema::hasTable((new Nfe)->getTable())) {
+        if (! ErpSchema::hasTable((new Nfe)->getTable())) {
             return 0;
         }
 
@@ -107,7 +107,7 @@ final class ErpDashboardFiscalDocsChart
      */
     private static function countNfce(int|array|null $empresaScope, Carbon $inicio, Carbon $fim, bool $autorizadas): int
     {
-        if (! Schema::hasTable((new PdvVendaNfce)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvVendaNfce)->getTable())) {
             return 0;
         }
 

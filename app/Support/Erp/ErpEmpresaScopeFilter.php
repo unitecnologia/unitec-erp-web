@@ -4,7 +4,6 @@ namespace App\Support\Erp;
 
 use App\Models\PdvVenda;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
 
 final class ErpEmpresaScopeFilter
 {
@@ -17,7 +16,7 @@ final class ErpEmpresaScopeFilter
             return;
         }
 
-        if (! Schema::hasColumn($table, 'empresa_id')) {
+        if (! ErpSchema::hasColumn($table, 'empresa_id')) {
             return;
         }
 
@@ -51,7 +50,7 @@ final class ErpEmpresaScopeFilter
 
         $pdvTable = (new PdvVenda)->getTable();
 
-        if (Schema::hasColumn($pdvTable, 'empresa_id')) {
+        if (ErpSchema::hasColumn($pdvTable, 'empresa_id')) {
             if (is_array($scope)) {
                 $ids = array_values(array_filter(array_map('intval', $scope)));
 
@@ -65,7 +64,7 @@ final class ErpEmpresaScopeFilter
             return;
         }
 
-        if (! Schema::hasTable('pdv_caixa_sessoes') || ! Schema::hasColumn('pdv_caixa_sessoes', 'empresa_id')) {
+        if (! ErpSchema::hasTable('pdv_caixa_sessoes') || ! ErpSchema::hasColumn('pdv_caixa_sessoes', 'empresa_id')) {
             return;
         }
 

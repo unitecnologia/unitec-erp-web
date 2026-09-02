@@ -8,6 +8,7 @@ use App\Filament\Resources\CompraResource\Pages\Concerns\ManagesCompraContadorEm
 use App\Filament\Concerns\ManagesImportarXmlModal;
 use App\Filament\Resources\CompraResource;
 use App\Filament\Resources\ProductResource\Pages\Concerns\ManagesProductPrecificacao;
+use App\Livewire\Erp\CompraListTable;
 use App\Models\CaixaConta;
 use App\Models\Compra;
 use App\Models\Empresa;
@@ -22,16 +23,17 @@ use App\Support\Erp\Compra\FinalizarCompraLancamentoService;
 use App\Support\Erp\Compra\ReabrirCompraLancamentoService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Queries\CompraListQueryBuilder;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorDanfeReportService;
 use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListCompras extends ListRecords
@@ -256,6 +258,10 @@ class ListCompras extends ListRecords
         }
     }
 
+    public function mountInteractsWithTable(): void
+    {
+    }
+
     protected static function erpListPageClass(): string
     {
         return 'erp-compras-page';
@@ -307,125 +313,25 @@ class ListCompras extends ListRecords
         return $this->buildListQuery();
     }
 
+    protected function listQueryBuilder(): CompraListQueryBuilder
+    {
+        return new CompraListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+        );
+    }
+
     protected function buildListQuery(): Builder
     {
-        $query = parent::getTableQuery()
-            ->with(['fornecedor'])
-            ->withExists([
-                'devolucoes as has_devolucao_finalizada' => fn (Builder $query): Builder => $query
-                    ->where('situacao', \App\Models\DevolucaoCompra::SITUACAO_FINALIZADA),
-            ]);
-
-        $empresaId = ErpContext::currentEmpresaId();
-
-        if ($empresaId !== null) {
-            $query->where(function (Builder $empresaQuery) use ($empresaId): void {
-                $empresaQuery
-                    ->where('empresa_id', $empresaId)
-                    ->orWhereNull('empresa_id');
-            });
-        }
-
-        if ($this->statusFilter !== 'todas') {
-            $query->where('status', $this->statusFilter);
-        }
-
-        if ($this->isDateSearchColumn()) {
-            $this->applyLocalSearchByDateRange($query);
-        } elseif (filled($this->localSearch)) {
-            $this->applyLocalSearch($query, $this->localSearch);
-        }
-
-        return $query;
+        return $this->listQueryBuilder()->buildForList();
     }
 
     protected function isDateSearchColumn(): bool
     {
-        return in_array($this->searchColumn, ['data_emissao', 'data_entrada'], true);
-    }
-
-    protected function applyLocalSearchByDateRange(Builder $query): void
-    {
-        if (! filled($this->localSearchDe) && ! filled($this->localSearchAte)) {
-            return;
-        }
-
-        $column = $this->searchColumn === 'data_entrada' ? 'data_entrada' : 'data_emissao';
-
-        if (filled($this->localSearchDe)) {
-            $query->whereDate($column, '>=', $this->localSearchDe);
-        }
-
-        if (filled($this->localSearchAte)) {
-            $query->whereDate($column, '<=', $this->localSearchAte);
-        }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function localSearchColumns(): array
-    {
-        return ['numero', 'data_emissao', 'data_entrada', 'numero_nota', 'fornecedor', 'chave', 'total'];
-    }
-
-    protected function applyLocalSearch(Builder $query, string $term): void
-    {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
-            : 'fornecedor';
-
-        $like = '%' . $term . '%';
-
-        match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'numero_nota' => $query->where('numero_nota', 'like', $like),
-            'fornecedor' => $query->whereHas('fornecedor', fn (Builder $fornecedorQuery): Builder => $fornecedorQuery->where('nome_razao', 'like', $like)),
-            'chave' => $query->where('chave_nfe', 'like', $like),
-            'total' => $this->applyLocalSearchByTotal($query, $term),
-            default => null,
-        };
-    }
-
-    protected function applyLocalSearchByTotal(Builder $query, string $term): void
-    {
-        $normalized = str_replace(['R$', ' '], '', $term);
-
-        if (str_contains($normalized, ',')) {
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        }
-
-        if (is_numeric($normalized)) {
-            if ($this->databaseDriver($query) === 'sqlite') {
-                $query->whereRaw('CAST(total AS TEXT) LIKE ?', ['%' . $normalized . '%']);
-
-                return;
-            }
-
-            $query->where('total', 'like', '%' . $normalized . '%');
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("REPLACE(printf('%.2f', total), '.', ',') LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("REPLACE(FORMAT(total, 2), '.', ',') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function databaseDriver(Builder $query): string
-    {
-        return $query->getConnection()->getDriverName();
+        return $this->listQueryBuilder()->isDateSearchColumn();
     }
 
     /**
@@ -499,7 +405,7 @@ class ListCompras extends ListRecords
     #[Computed]
     public function filteredTotal(): float
     {
-        return (float) $this->buildListQuery()->sum('total');
+        return $this->listQueryBuilder()->sumFilteredTotal();
     }
 
     public function content(Schema $schema): Schema
@@ -508,7 +414,7 @@ class ListCompras extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.compras.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.compras.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.compras.footer-total'),
                 View::make('filament.components.erp.compras.action-bar'),
@@ -2601,7 +2507,7 @@ class ListCompras extends ListRecords
         $this->lancamentoFinalizarConfirmOpen = false;
         $this->lancamentoParcelasOpen = false;
         $this->closeCompraLancamento();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
 
         Notification::make()
             ->title('Compra finalizada')
@@ -3644,7 +3550,7 @@ class ListCompras extends ListRecords
     {
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function clearSearch(): void
@@ -3654,7 +3560,7 @@ class ListCompras extends ListRecords
         $this->localSearchAte = '';
         $this->searchColumn = 'fornecedor';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedSearchColumn(): void
@@ -3663,7 +3569,7 @@ class ListCompras extends ListRecords
         $this->localSearchDe = '';
         $this->localSearchAte = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedLocalSearch(): void
@@ -3673,7 +3579,7 @@ class ListCompras extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
     }
 
     public function updatedLocalSearchDe(): void
@@ -3683,7 +3589,7 @@ class ListCompras extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
     }
 
     public function updatedLocalSearchAte(): void
@@ -3693,19 +3599,19 @@ class ListCompras extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
     }
 
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushCompraListRefresh();
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function createCompra(): void
@@ -3721,19 +3627,27 @@ class ListCompras extends ListRecords
         $this->openImportarXmlModalVazio();
     }
 
-    public function editCompra(): void
+    public function editCompra(int | string | null $recordId = null): void
     {
-        $recordId = $this->highlightedRecordIdOrNotify('edit');
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
 
-        if (! $recordId) {
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
-        if ($this->abortIfHighlightedCompraDevolvida('alterar')) {
+        if ($this->compraIsDevolvida($resolvedId)) {
+            Notification::make()
+                ->title('Compra devolvida')
+                ->body('Não é possível alterar uma compra que possui devolução finalizada.')
+                ->warning()
+                ->send();
+
             return;
         }
 
-        $this->openCompraLancamento((int) $recordId, 'alterando');
+        $this->openCompraLancamento($resolvedId, 'alterando');
     }
 
     public function cancelCompra(): void
@@ -3786,7 +3700,7 @@ class ListCompras extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
 
         Notification::make()
             ->title('Compra cancelada.')
@@ -3845,12 +3759,70 @@ class ListCompras extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCompraListRefresh();
 
         Notification::make()
             ->title('Compra reaberta')
             ->body('Estoque, preços e financeiro da finalização foram estornados. Use Alterar (F3) para editar.')
             ->success()
             ->send();
+    }
+
+    #[On('erp-compra-open-lancamento')]
+    public function onErpCompraOpenLancamento(int $compraId): void
+    {
+        $this->openCompraLancamento($compraId);
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushCompraListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    public function resetTable(): void
+    {
+        $this->pushCompraListRefresh();
+    }
+
+    protected function compraIsDevolvida(int $compraId): bool
+    {
+        return $this->scopedCompraQuery()
+            ->whereKey($compraId)
+            ->whereHas(
+                'devolucoes',
+                fn (Builder $query): Builder => $query->where(
+                    'situacao',
+                    \App\Models\DevolucaoCompra::SITUACAO_FINALIZADA,
+                ),
+            )
+            ->exists();
+    }
+
+    protected function pushCompraListRefresh(bool $resetSort = false): void
+    {
+        $total = $this->listQueryBuilder()->sumFilteredTotal();
+
+        $this->dispatch(
+            'erp-compra-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(CompraListTable::class);
+
+        $this->skipRender();
+
+        $this->js(sprintf(
+            '(() => { const el = document.querySelector(".erp-compras__total-value"); if (el) el.textContent = %s; })()',
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
     }
 }

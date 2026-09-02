@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\PdvVenda;
 use App\Models\Venda;
 use App\Support\Erp\ErpEmpresaScopeFilter;
@@ -9,7 +10,6 @@ use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardRecentSales
@@ -38,7 +38,7 @@ final class ErpDashboardRecentSales
         $items = collect();
         $fetchLimit = max($limit * 3, $limit);
 
-        if (Schema::hasTable((new PdvVenda)->getTable())) {
+        if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $pdvQuery = PdvVenda::query()
                 ->with('person:id,nome_razao')
                 ->where('situacao', '!=', 'C')
@@ -63,7 +63,7 @@ final class ErpDashboardRecentSales
             }
         }
 
-        if (Schema::hasTable((new Venda)->getTable())) {
+        if (ErpSchema::hasTable((new Venda)->getTable())) {
             $vendasQuery = Venda::query()
                 ->with('cliente:id,nome_razao')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])

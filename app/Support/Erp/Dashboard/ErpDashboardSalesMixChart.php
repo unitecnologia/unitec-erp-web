@@ -2,12 +2,12 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\PdvVenda;
 use App\Models\Venda;
 use App\Support\Erp\ErpEmpresaScopeFilter;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardSalesMixChart
@@ -63,7 +63,7 @@ final class ErpDashboardSalesMixChart
      */
     private static function sumPdv(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
-        if (! Schema::hasTable((new PdvVenda)->getTable())) {
+        if (! ErpSchema::hasTable((new PdvVenda)->getTable())) {
             return 0.0;
         }
 
@@ -91,7 +91,7 @@ final class ErpDashboardSalesMixChart
      */
     private static function sumPedidos(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
-        if (! Schema::hasTable((new Venda)->getTable())) {
+        if (! ErpSchema::hasTable((new Venda)->getTable())) {
             return 0.0;
         }
 

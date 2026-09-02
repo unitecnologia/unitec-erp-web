@@ -4,6 +4,7 @@ namespace App\Support\Erp\Dashboard;
 
 use App\Models\CaixaLancamento;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -34,28 +35,38 @@ final class ErpDashboardCashflowChart
     private static function fromDatabase(int|array|null $empresaScope = null): ?array
     {
         try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
-                return null;
+            $collector = ErpDashboardCollector::current();
+
+            if ($collector !== null) {
+                $semanas = $collector->cashflowSemanas();
+                $totais = $collector->cashflowEntradasSaidas();
+            } else {
+                if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
+                    return null;
+                }
+
+                $hoje = ErpFinanceiroMetricas::hoje();
+                $semanas = [];
+                for ($week = 3; $week >= 0; $week--) {
+                    $inicio = $hoje->copy()->startOfWeek()->subWeeks($week)->startOfDay();
+                    $fim = $inicio->copy()->endOfWeek()->endOfDay();
+                    if ($week === 0) {
+                        $fim = $fim->min($hoje->copy()->endOfDay());
+                    }
+                    $semanas[] = ['inicio' => $inicio, 'fim' => $fim];
+                }
+
+                $totais = ErpFinanceiroMetricas::entradasSaidasPorSemanas($semanas, $empresaScope);
             }
 
-            $hoje = ErpFinanceiroMetricas::hoje();
             $labels = [];
             $entradas = [];
             $saidas = [];
 
-            // Últimas 4 semanas (Sem 1 = mais antiga, Sem 4 = atual)
-            for ($week = 3; $week >= 0; $week--) {
-                $inicio = $hoje->copy()->startOfWeek()->subWeeks($week)->startOfDay();
-                $fim = $inicio->copy()->endOfWeek()->endOfDay();
-
-                // A semana atual termina hoje: nunca somar emissões futuras.
-                if ($week === 0) {
-                    $fim = $fim->min($hoje->copy()->endOfDay());
-                }
-
-                $labels[] = 'Sem '.(4 - $week);
-                $entradas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'entrada', $empresaScope);
-                $saidas[] = ErpFinanceiroMetricas::sumCaixaCampo($inicio, $fim, 'saida', $empresaScope);
+            foreach ($semanas as $i => $_) {
+                $labels[] = 'Sem '.($i + 1);
+                $entradas[] = (float) ($totais[$i]['entradas'] ?? 0);
+                $saidas[] = (float) ($totais[$i]['saidas'] ?? 0);
             }
 
             if (array_sum($entradas) <= 0 && array_sum($saidas) <= 0) {

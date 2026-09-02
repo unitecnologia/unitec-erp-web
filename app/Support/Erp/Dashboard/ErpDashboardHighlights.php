@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\Person;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaItem;
@@ -15,7 +16,6 @@ use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardHighlights
@@ -87,7 +87,7 @@ final class ErpDashboardHighlights
         $total = 0.0;
         $qtd = 0;
 
-        if (Schema::hasTable((new PdvVenda)->getTable())) {
+        if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
                 ->where('situacao', '!=', 'C')
                 ->where(function ($query) use ($inicio, $fim): void {
@@ -102,7 +102,7 @@ final class ErpDashboardHighlights
             $qtd += (int) ($row->qtd ?? 0);
         }
 
-        if (Schema::hasTable((new Venda)->getTable())) {
+        if (ErpSchema::hasTable((new Venda)->getTable())) {
             $q = Venda::query()
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                 ->where(function ($query): void {
@@ -143,7 +143,7 @@ final class ErpDashboardHighlights
         /** @var array<string, array{nome: string, qty: float}> $map */
         $map = [];
 
-        if (Schema::hasTable((new PdvVendaItem)->getTable()) && Schema::hasTable((new PdvVenda)->getTable())) {
+        if (ErpSchema::hasTable((new PdvVendaItem)->getTable()) && ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $rows = PdvVendaItem::query()
                 ->selectRaw('product_id, MAX(descricao) as descricao, SUM(quantidade) as qty')
                 ->whereHas('venda', function (Builder $query) use ($inicio, $fim): void {
@@ -169,7 +169,7 @@ final class ErpDashboardHighlights
             }
         }
 
-        if (Schema::hasTable((new VendaItem)->getTable()) && Schema::hasTable((new Venda)->getTable())) {
+        if (ErpSchema::hasTable((new VendaItem)->getTable()) && ErpSchema::hasTable((new Venda)->getTable())) {
             $rows = VendaItem::query()
                 ->selectRaw('product_id, SUM(quantidade) as qty')
                 ->whereNotNull('product_id')
@@ -232,7 +232,7 @@ final class ErpDashboardHighlights
         /** @var array<int, float> $totais */
         $totais = [];
 
-        if (Schema::hasTable((new PdvVenda)->getTable())) {
+        if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
                 ->selectRaw('person_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
@@ -250,7 +250,7 @@ final class ErpDashboardHighlights
             }
         }
 
-        if (Schema::hasTable((new Venda)->getTable())) {
+        if (ErpSchema::hasTable((new Venda)->getTable())) {
             $q = Venda::query()
                 ->selectRaw('cliente_id, SUM(total) as total')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])
@@ -299,7 +299,7 @@ final class ErpDashboardHighlights
         /** @var array<int, float> $totais */
         $totais = [];
 
-        if (Schema::hasTable((new PdvVenda)->getTable())) {
+        if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
                 ->selectRaw('vendedor_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
@@ -317,7 +317,7 @@ final class ErpDashboardHighlights
             }
         }
 
-        if (Schema::hasTable((new Venda)->getTable())) {
+        if (ErpSchema::hasTable((new Venda)->getTable())) {
             $q = Venda::query()
                 ->selectRaw('vendedor_id, SUM(total) as total')
                 ->whereNotIn('status', [Venda::STATUS_CANCELADO])

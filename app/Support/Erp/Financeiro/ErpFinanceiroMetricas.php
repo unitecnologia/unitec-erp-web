@@ -2,6 +2,8 @@
 
 namespace App\Support\Erp\Financeiro;
 
+use App\Support\Erp\ErpSchema;
+
 use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
@@ -50,17 +52,18 @@ final class ErpFinanceiroMetricas
     public static function saldoCaixa(?int $caixaContaId = null, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
                 return 0.0;
             }
 
-            $qEntrada = CaixaLancamento::query();
-            $qSaida = CaixaLancamento::query();
+            $q = CaixaLancamento::query();
+            self::applyCaixaEscopo($q, $caixaContaId, $empresaScope);
 
-            self::applyCaixaEscopo($qEntrada, $caixaContaId, $empresaScope);
-            self::applyCaixaEscopo($qSaida, $caixaContaId, $empresaScope);
+            $row = $q
+                ->selectRaw('COALESCE(SUM(entrada), 0) as entradas, COALESCE(SUM(saida), 0) as saidas')
+                ->first();
 
-            return round((float) $qEntrada->sum('entrada') - (float) $qSaida->sum('saida'), 2);
+            return round((float) ($row->entradas ?? 0) - (float) ($row->saidas ?? 0), 2);
         } catch (Throwable) {
             return 0.0;
         }
@@ -72,7 +75,7 @@ final class ErpFinanceiroMetricas
     public static function saldoCaixaAte(Carbon $day, ?int $caixaContaId = null, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
                 return 0.0;
             }
 
@@ -138,7 +141,7 @@ final class ErpFinanceiroMetricas
         $base = self::receberVencido($hoje, $empresaScope);
 
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return ['clientes' => 0, 'valor' => 0.0, 'qtd' => 0];
             }
 
@@ -170,7 +173,7 @@ final class ErpFinanceiroMetricas
     public static function titulosReceber(?Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return ['qtd' => 0, 'valor' => 0.0];
             }
 
@@ -184,9 +187,13 @@ final class ErpFinanceiroMetricas
 
             self::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
 
+            $row = (clone $q)
+                ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(saldo), 0) as valor')
+                ->first();
+
             return [
-                'qtd' => (int) (clone $q)->count(),
-                'valor' => round((float) (clone $q)->sum('saldo'), 2),
+                'qtd' => (int) ($row->qtd ?? 0),
+                'valor' => round((float) ($row->valor ?? 0), 2),
             ];
         } catch (Throwable) {
             return ['qtd' => 0, 'valor' => 0.0];
@@ -200,7 +207,7 @@ final class ErpFinanceiroMetricas
     public static function titulosPagar(?Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaPagar)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 return ['qtd' => 0, 'valor' => 0.0];
             }
 
@@ -214,9 +221,13 @@ final class ErpFinanceiroMetricas
 
             self::applyEmpresaColumn($q, (new ContaPagar)->getTable(), $empresaScope);
 
+            $row = (clone $q)
+                ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(saldo), 0) as valor')
+                ->first();
+
             return [
-                'qtd' => (int) (clone $q)->count(),
-                'valor' => round((float) (clone $q)->sum('saldo'), 2),
+                'qtd' => (int) ($row->qtd ?? 0),
+                'valor' => round((float) ($row->valor ?? 0), 2),
             ];
         } catch (Throwable) {
             return ['qtd' => 0, 'valor' => 0.0];
@@ -229,14 +240,31 @@ final class ErpFinanceiroMetricas
      */
     public static function movimentosCaixaNoDia(Carbon $day, int|array|null $empresaScope = null): array
     {
-        $entradas = self::sumCaixaCampo($day, $day, 'entrada', $empresaScope);
-        $saidas = self::sumCaixaCampo($day, $day, 'saida', $empresaScope);
+        try {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
+                return ['entradas' => 0.0, 'saidas' => 0.0, 'resultado' => 0.0];
+            }
 
-        return [
-            'entradas' => $entradas,
-            'saidas' => $saidas,
-            'resultado' => round($entradas - $saidas, 2),
-        ];
+            $q = CaixaLancamento::query()
+                ->whereDate('emissao', $day->toDateString());
+
+            self::applyCaixaEscopo($q, null, $empresaScope);
+
+            $row = $q
+                ->selectRaw('COALESCE(SUM(entrada), 0) as entradas, COALESCE(SUM(saida), 0) as saidas')
+                ->first();
+
+            $entradas = round((float) ($row->entradas ?? 0), 2);
+            $saidas = round((float) ($row->saidas ?? 0), 2);
+
+            return [
+                'entradas' => $entradas,
+                'saidas' => $saidas,
+                'resultado' => round($entradas - $saidas, 2),
+            ];
+        } catch (Throwable) {
+            return ['entradas' => 0.0, 'saidas' => 0.0, 'resultado' => 0.0];
+        }
     }
 
     /**
@@ -248,7 +276,7 @@ final class ErpFinanceiroMetricas
     public static function resultadosCaixaPorDia(Carbon $from, Carbon $to, int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
                 return [];
             }
 
@@ -278,12 +306,63 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * Entradas e saídas agregadas por intervalo de semanas em uma única query.
+     *
+     * @param  list<array{inicio: Carbon, fim: Carbon}>  $semanas
+     * @param  int|list<int>|null  $empresaScope
+     * @return list<array{entradas: float, saidas: float}>
+     */
+    public static function entradasSaidasPorSemanas(array $semanas, int|array|null $empresaScope = null): array
+    {
+        if ($semanas === []) {
+            return [];
+        }
+
+        try {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
+                return array_fill(0, count($semanas), ['entradas' => 0.0, 'saidas' => 0.0]);
+            }
+
+            $globalInicio = $semanas[0]['inicio']->copy()->startOfDay();
+            $globalFim = $semanas[count($semanas) - 1]['fim']->copy()->endOfDay();
+
+            $selectParts = [];
+            foreach ($semanas as $i => $semana) {
+                $inicio = $semana['inicio']->toDateString();
+                $fim = $semana['fim']->toDateString();
+                $selectParts[] = "COALESCE(SUM(CASE WHEN DATE(emissao) >= '{$inicio}' AND DATE(emissao) <= '{$fim}' THEN entrada ELSE 0 END), 0) as w{$i}_ent";
+                $selectParts[] = "COALESCE(SUM(CASE WHEN DATE(emissao) >= '{$inicio}' AND DATE(emissao) <= '{$fim}' THEN saida ELSE 0 END), 0) as w{$i}_sai";
+            }
+
+            $q = CaixaLancamento::query()
+                ->whereDate('emissao', '>=', $globalInicio->toDateString())
+                ->whereDate('emissao', '<=', $globalFim->toDateString());
+
+            self::applyCaixaEscopo($q, null, $empresaScope);
+
+            $row = $q->selectRaw(implode(', ', $selectParts))->first();
+
+            $out = [];
+            foreach ($semanas as $i => $_) {
+                $out[] = [
+                    'entradas' => round((float) ($row->{"w{$i}_ent"} ?? 0), 2),
+                    'saidas' => round((float) ($row->{"w{$i}_sai"} ?? 0), 2),
+                ];
+            }
+
+            return $out;
+        } catch (Throwable) {
+            return array_fill(0, count($semanas), ['entradas' => 0.0, 'saidas' => 0.0]);
+        }
+    }
+
+    /**
      * @param  int|list<int>|null  $empresaScope
      */
     public static function sumCaixaCampo(Carbon $from, Carbon $to, string $campo, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
                 return 0.0;
             }
 
@@ -341,7 +420,7 @@ final class ErpFinanceiroMetricas
             return;
         }
 
-        if (! Schema::hasColumn($table, 'empresa_id')) {
+        if (! ErpSchema::hasColumn($table, 'empresa_id')) {
             return;
         }
 
@@ -384,7 +463,7 @@ final class ErpFinanceiroMetricas
         }
 
         try {
-            if (! Schema::hasTable('empresas')) {
+            if (! ErpSchema::hasTable('empresas')) {
                 $unica = true;
 
                 return true;
@@ -415,7 +494,7 @@ final class ErpFinanceiroMetricas
             return;
         }
 
-        if (Schema::hasColumn($table, 'empresa_id')) {
+        if (ErpSchema::hasColumn($table, 'empresa_id')) {
             return;
         }
 

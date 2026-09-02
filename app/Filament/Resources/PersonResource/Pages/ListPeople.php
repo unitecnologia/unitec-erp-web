@@ -6,13 +6,13 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\PersonResource;
+use App\Livewire\Erp\PersonListTable;
 use App\Models\Person;
 use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\Queries\PersonListQueryBuilder;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -51,6 +51,32 @@ class ListPeople extends ListRecords
 
         $this->normalizeLocalSearchCase();
         $this->syncErpScreenTitle();
+    }
+
+    public function mountInteractsWithTable(): void
+    {
+    }
+
+    protected function erpAfterSearchColumnChanged(bool $hadSearch = true, bool $changed = true): void
+    {
+        $this->clearListSelection();
+
+        if (! $hadSearch) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->pushPersonListRefresh(resetSort: true);
+    }
+
+    public function erpListSyncPollEnabled(): bool
+    {
+        if (! config('unitec.erp_list_sync_poll_enabled', true)) {
+            return false;
+        }
+
+        return $this->erpListSyncChannel() !== null;
     }
 
     /**
@@ -167,28 +193,28 @@ class ListPeople extends ListRecords
         $this->tipoFilter = $tipo;
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
         $this->syncErpScreenTitle();
+        $this->pushPersonListRefresh(resetSort: true);
     }
 
     public function setStatusFilter(string $filter): void
     {
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushPersonListRefresh();
     }
 
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushPersonListRefresh();
     }
 
     public function search(): void
     {
         $this->normalizeLocalSearchCase();
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushPersonListRefresh(resetSort: true);
     }
 
     protected function normalizeLocalSearchCase(): void
@@ -209,7 +235,62 @@ class ListPeople extends ListRecords
         $this->localSearch = '';
         $this->searchColumn = 'nome_razao';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushPersonListRefresh(resetSort: true);
+    }
+
+    public function pollErpListSync(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $current = ErpDataSyncVersion::current($channel);
+
+        if ($this->erpListSyncVersion === null) {
+            $this->erpListSyncVersion = $current;
+            $this->skipRender();
+
+            return;
+        }
+
+        if (hash_equals($this->erpListSyncVersion, $current)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->erpListSyncVersion = $current;
+        $this->pushPersonListRefresh();
+    }
+
+    protected function pushPersonListRefresh(bool $resetSort = false): void
+    {
+        $this->dispatch(
+            'erp-person-list-refresh',
+            statusFilter: $this->statusFilter,
+            tipoFilter: $this->tipoFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(PersonListTable::class);
+
+        $this->skipRender();
+    }
+
+    public function refreshTable(): void
+    {
+        $this->syncErpListSyncVersionFromStore();
+        $this->pushPersonListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
     }
 
     public function table(Table $table): Table
@@ -224,7 +305,8 @@ class ListPeople extends ListRecords
             tipoFilter: $this->tipoFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
-        ))->build();
+            applyDefaultOrder: false,
+        ))->buildForList();
     }
 
     public function content(Schema $schema): Schema
@@ -233,7 +315,7 @@ class ListPeople extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.pessoas.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.pessoas.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.pessoas.status-filters'),
                 View::make('filament.components.erp.pessoas.action-bar'),
@@ -251,28 +333,30 @@ class ListPeople extends ListRecords
         ]));
     }
 
-    public function editPerson(): void
+    public function editPerson(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('pessoas.update')) {
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('edit');
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
 
-        if (! $recordId) {
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
-        $this->redirect(PersonResource::getUrl('edit', ['record' => $recordId]));
+        $this->redirect(PersonResource::getUrl('edit', ['record' => $resolvedId]));
     }
 
-    public function deletePerson(): void
+    public function deletePerson(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('pessoas.delete')) {
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('delete');
+        $recordId = filled($recordId) ? (int) $recordId : $this->highlightedRecordIdOrNotify('delete');
 
         if (! $recordId) {
             return;
@@ -281,7 +365,7 @@ class ListPeople extends ListRecords
         Person::query()->whereKey($recordId)->delete();
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushPersonListRefresh();
 
         Notification::make()
             ->title('Pessoa excluída.')

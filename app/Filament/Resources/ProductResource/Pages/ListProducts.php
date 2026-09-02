@@ -16,7 +16,7 @@ use App\Support\Erp\Queries\ProductListQueryBuilder;
 use App\Support\Erp\Queries\ProductSerialListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
+use App\Livewire\Erp\ProductListTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -69,6 +69,14 @@ class ListProducts extends ListRecords
         ErpScreen::set($this->isSeriaisView() ? 'Seriais' : 'Produtos');
     }
 
+    /**
+     * A grade é renderizada pelo Livewire filho {@see ProductListTable}.
+     * Evita carregar/serializar registros Filament no componente pai (HTML/Livewire menores).
+     */
+    public function mountInteractsWithTable(): void
+    {
+    }
+
     public function setSearchColumn(string $column): void
     {
         $this->searchColumn = $this->isSeriaisView()
@@ -82,7 +90,7 @@ class ListProducts extends ListRecords
 
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushProductListRefresh(resetSort: true);
     }
 
     protected function normalizeStatusFilter(mixed $value): string
@@ -172,6 +180,15 @@ class ListProducts extends ListRecords
         return ErpDataSyncVersion::CHANNEL_PRODUCTS;
     }
 
+    public function erpListSyncPollEnabled(): bool
+    {
+        if (! config('unitec.erp_list_sync_poll_enabled', true)) {
+            return false;
+        }
+
+        return $this->erpListSyncChannel() !== null;
+    }
+
     protected function erpListSelectPrompt(string $action): string
     {
         return match ($action) {
@@ -206,7 +223,7 @@ class ListProducts extends ListRecords
         $this->searchColumn = $view === 'seriais' ? 'descricao' : $this->normalizeSearchColumn($this->searchColumn);
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushProductListRefresh(resetSort: true);
 
         ErpScreen::set($view === 'seriais' ? 'Seriais' : 'Produtos');
     }
@@ -219,7 +236,7 @@ class ListProducts extends ListRecords
 
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushProductListRefresh();
     }
 
     public function updatedSearchColumn(): void
@@ -230,13 +247,13 @@ class ListProducts extends ListRecords
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushProductListRefresh();
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushProductListRefresh(resetSort: true);
     }
 
     public function clearSearch(): void
@@ -244,7 +261,62 @@ class ListProducts extends ListRecords
         $this->localSearch = '';
         $this->searchColumn = $this->isSeriaisView() ? 'descricao' : 'descricao';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushProductListRefresh(resetSort: true);
+    }
+
+    public function pollErpListSync(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $current = ErpDataSyncVersion::current($channel);
+
+        if ($this->erpListSyncVersion === null) {
+            $this->erpListSyncVersion = $current;
+            $this->skipRender();
+
+            return;
+        }
+
+        if (hash_equals($this->erpListSyncVersion, $current)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->erpListSyncVersion = $current;
+        $this->pushProductListRefresh();
+    }
+
+    protected function pushProductListRefresh(bool $resetSort = false): void
+    {
+        $this->dispatch(
+            'erp-product-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            viewFilter: $this->viewFilter,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(ProductListTable::class);
+
+        $this->skipRender();
+    }
+
+    public function refreshTable(): void
+    {
+        $this->syncErpListSyncVersionFromStore();
+        $this->pushProductListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
     }
 
     public function table(Table $table): Table
@@ -288,7 +360,7 @@ class ListProducts extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.produtos.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.produtos.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.produtos.status-filters'),
                 View::make('filament.components.erp.produtos.action-bar'),
@@ -313,7 +385,7 @@ class ListProducts extends ListRecords
         $this->redirect(ProductResource::getUrl('create'));
     }
 
-    public function editProduct(): void
+    public function editProduct(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('produtos.update')) {
             return;
@@ -328,16 +400,18 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('edit');
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
 
-        if (! $recordId) {
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
-        $this->redirect(ProductResource::getUrl('edit', ['record' => $recordId]));
+        $this->redirect(ProductResource::getUrl('edit', ['record' => $resolvedId]));
     }
 
-    public function deleteProduct(): void
+    public function deleteProduct(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('produtos.delete')) {
             return;
@@ -347,7 +421,7 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('delete');
+        $recordId = filled($recordId) ? (int) $recordId : $this->highlightedRecordIdOrNotify('delete');
 
         if (! $recordId) {
             return;
@@ -396,7 +470,7 @@ class ListProducts extends ListRecords
             ->success()
             ->send();
 
-        $this->resetTable();
+        $this->pushProductListRefresh();
     }
 
     public function duplicateProduct(): void

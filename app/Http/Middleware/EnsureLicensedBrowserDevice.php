@@ -6,10 +6,10 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\License\DeviceLicenseLimitExceeded;
 use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\Erp\Pdv\TerminalResolver;
+use App\Support\Erp\ErpSchema;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 final class EnsureLicensedBrowserDevice
@@ -21,7 +21,7 @@ final class EnsureLicensedBrowserDevice
     public function handle(Request $request, Closure $next): Response
     {
         // Durante rollout/update, nunca impede o ERP se a migration ainda não foi aplicada.
-        if (! Schema::hasColumn('terminais', 'device_uuid')) {
+        if (! ErpSchema::hasColumn('terminais', 'device_uuid')) {
             return $next($request);
         }
 
@@ -33,6 +33,13 @@ final class EnsureLicensedBrowserDevice
         }
 
         $origin = $request->is('gestor/*') ? 'gestor_web' : 'erp_web';
+        $gateKey = 'erp_device_ok_'.$empresaId.'_'.hash('sha256', $deviceUuid.'|'.$origin);
+        $gateUntil = (int) session($gateKey, 0);
+
+        // Mesma janela do throttle de save (5 min): evita SELECT/terminal a cada Livewire.
+        if ($gateUntil > time()) {
+            return $next($request);
+        }
 
         try {
             if ($this->isMobile($request)) {
@@ -53,7 +60,10 @@ final class EnsureLicensedBrowserDevice
                     platform: 'web-desktop',
                 );
             }
+
+            session([$gateKey => time() + 300]);
         } catch (DeviceLicenseLimitExceeded $e) {
+            session()->forget($gateKey);
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

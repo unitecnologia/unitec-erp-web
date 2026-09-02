@@ -16,6 +16,7 @@ use App\Support\Erp\ErpEmpresaScopeFilter;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -47,7 +48,10 @@ final class ErpDashboardGauges
         // Meta de vendas da empresa: só no dashboard se o valor estiver preenchido (> 0).
         $metaEmpresa = static::resolveMetaVendas($empresa, $scope);
         if ($metaEmpresa > 0) {
-            $realizado = static::realizadoPdvMonitor($inicio, $fim, $scope);
+            $collector = ErpDashboardCollector::current();
+            $realizado = $collector !== null
+                ? $collector->realizadoPdvMonitor($inicio, $fim)
+                : static::realizadoPdvMonitor($inicio, $fim, $scope);
             $gauges[] = static::metaVendas($empresa, $realizado, $metaEmpresa);
         }
 
@@ -103,7 +107,7 @@ final class ErpDashboardGauges
     public static function buildVendedores(?int $empresaId = null, int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new Vendedor)->getTable())) {
+            if (! ErpSchema::hasTable((new Vendedor)->getTable())) {
                 return [];
             }
 
@@ -193,7 +197,7 @@ final class ErpDashboardGauges
         }
 
         try {
-            if (Schema::hasTable((new PdvVenda)->getTable())) {
+            if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $rows = PdvVenda::query()
                     ->selectRaw('vendedor_id, SUM(total) as total')
                     ->whereIn('vendedor_id', $vendedorIds)
@@ -217,7 +221,7 @@ final class ErpDashboardGauges
                 }
             }
 
-            if (Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+            if (ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
                 $rows = ForcaVendasOrder::query()
                     ->selectRaw('vendedor_id, SUM(total) as total')
                     ->whereIn('vendedor_id', $vendedorIds)
@@ -333,7 +337,7 @@ final class ErpDashboardGauges
         }
 
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return self::$gaugeMemo[$memoKey] = static::emptyGauge('recebimento', 'Recebimento', 'Sem contas a receber');
             }
 
@@ -401,8 +405,8 @@ final class ErpDashboardGauges
 
             // Vendas da retaguarda são a fonte canônica: incluem os espelhos
             // do PDV e os pedidos da Força de Vendas depois de faturados.
-            if (Schema::hasTable((new VendaItem)->getTable())
-                && Schema::hasTable((new Venda)->getTable())) {
+            if (ErpSchema::hasTable((new VendaItem)->getTable())
+                && ErpSchema::hasTable((new Venda)->getTable())) {
                 $vendaQuery = VendaItem::query()
                     ->join('vendas', 'vendas.id', '=', 'venda_itens.venda_id')
                     ->leftJoin('products', 'products.id', '=', 'venda_itens.product_id')
@@ -424,7 +428,7 @@ final class ErpDashboardGauges
             }
 
             // PDV sem espelho na retaguarda; os espelhados já entraram acima.
-            if (Schema::hasTable((new PdvVendaItem)->getTable())) {
+            if (ErpSchema::hasTable((new PdvVendaItem)->getTable())) {
                 $pdvQuery = PdvVendaItem::query()
                     ->join('pdv_vendas', 'pdv_vendas.id', '=', 'pdv_venda_itens.pdv_venda_id')
                     ->leftJoin('products', 'products.id', '=', 'pdv_venda_itens.product_id')
@@ -507,7 +511,7 @@ final class ErpDashboardGauges
         }
 
         try {
-            if (! Schema::hasTable((new Product)->getTable())) {
+            if (! ErpSchema::hasTable((new Product)->getTable())) {
                 return self::$gaugeMemo['estoque'] = static::emptyGauge('estoque', 'Estoque', 'Sem produtos');
             }
 
@@ -718,7 +722,7 @@ final class ErpDashboardGauges
             $hoje = ErpFinanceiroMetricas::hoje();
             $obrigacoes = 0.0;
 
-            if (Schema::hasTable((new ContaPagar)->getTable())) {
+            if (ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 // Inclui vencidos + a vencer em até 7 dias (pressão de caixa).
                 $pagarQuery = ContaPagar::query()
                     ->where('saldo', '>', 0)
@@ -767,8 +771,11 @@ final class ErpDashboardGauges
     private static function factorVendas(?Empresa $empresa, Carbon $inicio, Carbon $fim, int|array|null $empresaScope = null): array
     {
         try {
+            $collector = ErpDashboardCollector::current();
             // Mesma base do KPI "Faturamento" / Executivo (vendas + PDV sem venda_id).
-            $realizado = ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim, $empresaScope);
+            $realizado = $collector !== null
+                ? $collector->faturamentoPeriodo($inicio, $fim)
+                : ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim, $empresaScope);
             $meta = static::resolveMetaVendas($empresa, $empresaScope);
 
             if ($meta > 0) {
@@ -790,7 +797,9 @@ final class ErpDashboardGauges
             if ($fimAnt->gt($corte)) {
                 $fimAnt = $corte;
             }
-            $anterior = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioAnt, $fimAnt, $empresaScope);
+            $anterior = $collector !== null
+                ? $collector->faturamentoPeriodo($inicioAnt, $fimAnt)
+                : ErpDashboardSalesMetrics::faturamentoPeriodo($inicioAnt, $fimAnt, $empresaScope);
 
             if ($anterior <= 0.01) {
                 $percent = $realizado > 0 ? 80.0 : 50.0;
@@ -881,7 +890,7 @@ final class ErpDashboardGauges
     private static function factorContasPagar(int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaPagar)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 return ['key' => 'pagar', 'label' => 'Contas a pagar', 'percent' => 70.0, 'weight' => 10, 'hint' => 'Sem contas a pagar'];
             }
 
@@ -922,7 +931,7 @@ final class ErpDashboardGauges
     private static function factorInadimplencia(int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return ['key' => 'inadimplencia', 'label' => 'Inadimplência', 'percent' => 70.0, 'weight' => 15, 'hint' => 'Sem contas a receber'];
             }
 
@@ -961,7 +970,7 @@ final class ErpDashboardGauges
         $total = 0.0;
 
         try {
-            if (Schema::hasTable((new PdvVenda)->getTable())) {
+            if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $pdvQuery = PdvVenda::query()
                     ->where('situacao', '!=', 'C')
                     ->where(function ($query) use ($inicio, $fim): void {
@@ -981,7 +990,7 @@ final class ErpDashboardGauges
                 $total += (float) $pdvQuery->sum('total');
             }
 
-            if (Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+            if (ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
                 $fvQuery = ForcaVendasOrder::query()
                     ->where('situacao', '!=', ForcaVendasOrder::SITUACAO_CANCELADO)
                     ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)

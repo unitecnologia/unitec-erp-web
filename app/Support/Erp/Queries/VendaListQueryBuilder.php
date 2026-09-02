@@ -5,6 +5,7 @@ namespace App\Support\Erp\Queries;
 use App\Models\Venda;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpEmpresaScopeFilter;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +23,7 @@ class VendaListQueryBuilder
         public string $localSearchHoraAte = '',
         public string $orderBy = 'numero',
         public string $orderDirection = 'desc',
+        public bool $applyDefaultOrder = true,
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -58,15 +60,69 @@ class VendaListQueryBuilder
         );
     }
 
+    /**
+     * Query completa para relatórios/impressão.
+     */
     public function build(): Builder
     {
-        $query = Venda::query()->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'entrega']);
+        $query = $this->buildFilteredQuery();
+        $query->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'entrega']);
+
+        return $this->applyDefaultOrder($query);
+    }
+
+    /**
+     * Query leve para a grade — colunas visíveis + relacionamentos mínimos.
+     */
+    public function buildForList(): Builder
+    {
+        $table = (new Venda)->getTable();
+
+        $query = $this->buildFilteredQuery()->select([
+            "{$table}.id",
+            "{$table}.numero",
+            "{$table}.data",
+            "{$table}.hora_abertura",
+            "{$table}.hora",
+            "{$table}.cliente_id",
+            "{$table}.vendedor_id",
+            "{$table}.vendedor_nome",
+            "{$table}.plataforma",
+            "{$table}.forma_pagamento",
+            "{$table}.total",
+            "{$table}.status",
+            "{$table}.tipo",
+        ]);
+
+        $query->with([
+            'cliente:id,nome_razao',
+            'vendedor:id,nome',
+            'pdvVenda:id,venda_id,numero',
+            'pdvVenda.nfce:id,pdv_venda_id,numero,serie',
+            'entrega:id,venda_id,status',
+            'forcaVendasOrder:id,venda_id,device_uuid',
+        ]);
+
+        if (! $this->applyDefaultOrder) {
+            return $query;
+        }
+
+        return $this->applyDefaultOrder($query);
+    }
+
+    public function sumFilteredTotal(): float
+    {
+        return (float) $this->buildFilteredQuery()->sum('total');
+    }
+
+    protected function buildFilteredQuery(): Builder
+    {
+        $query = Venda::query();
 
         $empresaId = ErpContext::currentEmpresaId();
 
         if ($empresaId) {
-            if (Schema::hasColumn((new Venda)->getTable(), 'empresa_id')) {
-                // Empresa da sessão OU legado sem empresa_id mas com origem PDV/FV da mesma empresa.
+            if (ErpSchema::hasColumn((new Venda)->getTable(), 'empresa_id')) {
                 $query->where(function (Builder $scoped) use ($empresaId): void {
                     $scoped->where('empresa_id', $empresaId)
                         ->orWhere(function (Builder $legacy) use ($empresaId): void {
@@ -89,7 +145,6 @@ class VendaListQueryBuilder
 
         if ($this->isDateSearchColumn()) {
             $this->applyLocalSearchByDateRange($query);
-            // Periodo do dia opcional junto com a data (ex.: 08:00–12:00 no dia).
             $this->applyLocalSearchByTimeRange($query);
         } elseif ($this->isTimeSearchColumn()) {
             $this->applyLocalSearchByTimeRange($query);
@@ -97,6 +152,11 @@ class VendaListQueryBuilder
             $this->applyLocalSearch($query, $this->localSearch);
         }
 
+        return $query;
+    }
+
+    protected function applyDefaultOrder(Builder $query): Builder
+    {
         $allowedOrder = ['numero', 'data', 'total', 'hora'];
         $orderBy = in_array($this->orderBy, $allowedOrder, true) ? $this->orderBy : 'numero';
         $direction = $this->orderDirection === 'asc' ? 'asc' : 'desc';
@@ -223,14 +283,14 @@ class VendaListQueryBuilder
         }
 
         $term = mb_strtoupper($trimmed, 'UTF-8');
-        $like = '%' . $term . '%';
+        $prefixLike = $term.'%';
 
         match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'cliente' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like)),
+            'numero' => $query->where('numero', 'like', $prefixLike),
+            'cliente' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $prefixLike)),
             'vendedor' => $query->where(fn (Builder $q): Builder => $q
-                ->where('vendedor_nome', 'like', $like)
-                ->orWhereHas('vendedor', fn (Builder $vendedorQuery): Builder => $vendedorQuery->where('nome', 'like', $like))),
+                ->where('vendedor_nome', 'like', $prefixLike)
+                ->orWhereHas('vendedor', fn (Builder $vendedorQuery): Builder => $vendedorQuery->where('nome', 'like', $prefixLike))),
             'total' => $this->applyLocalSearchByTotal($query, $term),
             'situacao' => $this->applyLocalSearchBySituacao($query, $term),
             'tipo' => $this->applyLocalSearchByTipo($query, $term),
@@ -249,23 +309,23 @@ class VendaListQueryBuilder
 
         if (is_numeric($normalized)) {
             if ($this->databaseDriver($query) === 'sqlite') {
-                $query->whereRaw('CAST(total AS TEXT) LIKE ?', ['%' . $normalized . '%']);
+                $query->whereRaw('CAST(total AS TEXT) LIKE ?', ['%'.$normalized.'%']);
 
                 return;
             }
 
-            $query->where('total', 'like', '%' . $normalized . '%');
+            $query->where('total', 'like', '%'.$normalized.'%');
 
             return;
         }
 
         if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("REPLACE(printf('%.2f', total), '.', ',') LIKE ?", ['%' . $term . '%']);
+            $query->whereRaw("REPLACE(printf('%.2f', total), '.', ',') LIKE ?", ['%'.$term.'%']);
 
             return;
         }
 
-        $query->whereRaw("REPLACE(FORMAT(total, 2), '.', ',') LIKE ?", ['%' . $term . '%']);
+        $query->whereRaw("REPLACE(FORMAT(total, 2), '.', ',') LIKE ?", ['%'.$term.'%']);
     }
 
     protected function applyLocalSearchBySituacao(Builder $query, string $term): void
@@ -281,7 +341,7 @@ class VendaListQueryBuilder
             return;
         }
 
-        $query->where('status', 'like', '%' . mb_strtolower($term, 'UTF-8') . '%');
+        $query->where('status', 'like', '%'.mb_strtolower($term, 'UTF-8').'%');
     }
 
     protected function applyLocalSearchByTipo(Builder $query, string $term): void
@@ -297,7 +357,7 @@ class VendaListQueryBuilder
             return;
         }
 
-        $query->where('tipo', 'like', '%' . mb_strtolower($term, 'UTF-8') . '%');
+        $query->where('tipo', 'like', '%'.mb_strtolower($term, 'UTF-8').'%');
     }
 
     protected function applyLocalSearchByPlataforma(Builder $query, string $term): void
@@ -318,7 +378,7 @@ class VendaListQueryBuilder
             }
         }
 
-        $hasPlataformaColumn = Schema::hasColumn((new Venda)->getTable(), 'plataforma');
+        $hasPlataformaColumn = ErpSchema::hasColumn((new Venda)->getTable(), 'plataforma');
 
         match ($plataforma) {
             Venda::PLATAFORMA_MOBILE => $query->where(function (Builder $q) use ($hasPlataformaColumn): void {

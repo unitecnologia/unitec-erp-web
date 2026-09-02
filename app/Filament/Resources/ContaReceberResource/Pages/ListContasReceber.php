@@ -9,6 +9,7 @@ use App\Filament\Concerns\InteractsWithLocalClienteSearchLookup;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\ContaReceberResource;
+use App\Livewire\Erp\ContaReceberListTable;
 use App\Models\ContaReceber;
 use App\Models\Person;
 use App\Support\Erp\ErpScreen;
@@ -17,13 +18,13 @@ use App\Support\Erp\Financeiro\ContaReceberExclusaoService;
 use App\Support\Erp\Queries\ContaReceberListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListContasReceber extends ListRecords
@@ -73,12 +74,24 @@ class ListContasReceber extends ListRecords
 
         ErpScreen::set('Contas a Receber');
 
-        if (! in_array($this->searchColumn, $this->localSearchColumns(), true)) {
+        if (! in_array($this->searchColumn, [
+            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+        ], true)) {
             $this->searchColumn = 'cliente';
         }
 
         // Sem filtro de período padrão: campos vazios = listar todos os títulos.
         // O usuário aplica o intervalo explicitamente em "Filtrar Período".
+    }
+
+    public function mountInteractsWithTable(): void
+    {
+    }
+
+    public function shouldSkipContaReceberLocalSearch(): bool
+    {
+        return $this->shouldSkipLocalSearchWhileTyping();
     }
 
     protected static function erpListPageClass(): string
@@ -131,156 +144,35 @@ class ListContasReceber extends ListRecords
         return $this->buildListQuery();
     }
 
+    protected function listQueryBuilder(): ContaReceberListQueryBuilder
+    {
+        return new ContaReceberListQueryBuilder(
+            situacaoFilter: $this->situacaoFilter,
+            formaFilter: $this->formaFilter,
+            clienteFilter: $this->clienteFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDe: $this->periodoDeApplied,
+            periodoAte: $this->periodoAteApplied,
+            skipLocalSearch: $this->shouldSkipLocalSearchWhileTyping(),
+        );
+    }
+
     protected function buildListQuery(): Builder
     {
-        $query = parent::getTableQuery()
-            ->with(['cliente']);
-
-        if ($this->clienteFilter !== 'todos' && is_numeric($this->clienteFilter)) {
-            $query->where('cliente_id', (int) $this->clienteFilter);
-        }
-
-        $this->applyPeriodFilters($query);
-
-        $hoje = ErpTimezone::toLocal()->toDateString();
-
-        match ($this->situacaoFilter) {
-            'a_receber' => $query->where('saldo', '>', 0)->whereDate('vencimento', '>=', $hoje),
-            'atrasadas' => $query->where('saldo', '>', 0)->whereDate('vencimento', '<', $hoje),
-            'recebidas' => $query->where('saldo', '<=', 0),
-            default => $query,
-        };
-
-        if ($this->formaFilter !== 'todos' && array_key_exists($this->formaFilter, ContaReceber::formaLabels())) {
-            $query->where('forma', $this->formaFilter);
-        }
-
-        if (filled($this->localSearch) && ! $this->shouldSkipLocalSearchWhileTyping()) {
-            $this->applyLocalSearch($query, $this->localSearch);
-        }
-
-        return $query;
-    }
-
-    /**
-     * Filtra por vencimento somente quando o usuário aplicou um período
-     * (campos "de/até" preenchidos + botão Filtrar Período).
-     */
-    protected function applyPeriodFilters(Builder $query): void
-    {
-        if (filled($this->periodoDeApplied)) {
-            $query->whereDate('vencimento', '>=', $this->periodoDeApplied);
-        }
-
-        if (filled($this->periodoAteApplied)) {
-            $query->whereDate('vencimento', '<=', $this->periodoAteApplied);
-        }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function localSearchColumns(): array
-    {
-        return [
-            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
-            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
-        ];
-    }
-
-    protected function applyLocalSearch(Builder $query, string $term): void
-    {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
-            : 'cliente';
-
-        $like = '%' . $term . '%';
-
-        match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'emissao', 'vencimento', 'recebido_em' => $this->applyLocalSearchByDate($query, $term, $column),
-            'historico' => $query->where('historico', 'like', $like),
-            'documento' => $query->where('documento', 'like', $like),
-            'numero_cheque' => $query->where('numero_cheque', 'like', $like),
-            'cliente' => $query->whereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like)),
-            'valor', 'desconto', 'juros', 'valor_recebido', 'saldo' => $this->applyLocalSearchByMoney($query, $term, $column),
-        };
-    }
-
-    protected function applyLocalSearchByDate(Builder $query, string $term, string $column): void
-    {
-        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $term, $matches)) {
-            $query->whereDate($column, "{$matches[3]}-{$matches[2]}-{$matches[1]}");
-
-            return;
-        }
-
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $term)) {
-            $query->whereDate($column, $term);
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("strftime('%d/%m/%Y', {$column}) LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("DATE_FORMAT({$column}, '%d/%m/%Y') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function applyLocalSearchByMoney(Builder $query, string $term, string $column): void
-    {
-        $normalized = str_replace(['R$', ' '], '', $term);
-
-        if (str_contains($normalized, ',')) {
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        }
-
-        if (is_numeric($normalized)) {
-            if ($this->databaseDriver($query) === 'sqlite') {
-                $query->whereRaw("CAST({$column} AS TEXT) LIKE ?", ['%' . $normalized . '%']);
-
-                return;
-            }
-
-            $query->where($column, 'like', '%' . $normalized . '%');
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("REPLACE(printf('%.2f', {$column}), '.', ',') LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("REPLACE(FORMAT({$column}, 2), '.', ',') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function databaseDriver(Builder $query): string
-    {
-        return $query->getConnection()->getDriverName();
+        return $this->listQueryBuilder()->buildForList();
     }
 
     #[Computed]
     public function totalAReceber(): float
     {
-        return (float) $this->buildListQuery()->sum('saldo');
+        return $this->listQueryBuilder()->sumSaldoFiltered();
     }
 
     #[Computed]
     public function totalRecebido(): float
     {
-        return (float) $this->buildListQuery()->sum('valor_recebido');
+        return $this->listQueryBuilder()->sumValorRecebidoFiltered();
     }
 
     #[Computed]
@@ -353,7 +245,7 @@ class ListContasReceber extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.receber.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.receber.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.receber.footer-summary'),
                 View::make('filament.components.erp.receber.action-bar'),
@@ -385,7 +277,7 @@ class ListContasReceber extends ListRecords
         $this->periodoDeApplied = trim($this->periodoDe);
         $this->periodoAteApplied = trim($this->periodoAte);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh();
     }
 
     public function setSituacaoFilter(string $filter): void
@@ -398,7 +290,7 @@ class ListContasReceber extends ListRecords
 
         $this->situacaoFilter = $filter;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh();
     }
 
     public function setFormaFilter(string $filter): void
@@ -417,7 +309,7 @@ class ListContasReceber extends ListRecords
 
         $this->formaFilter = $filter;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh();
     }
 
     public function setViewTab(string $tab): void
@@ -438,7 +330,7 @@ class ListContasReceber extends ListRecords
         $this->clienteFilter = 'todos';
         $this->closeLocalClienteLookup();
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh(resetSort: true);
     }
 
     protected function onLocalClienteConfirmed(Person $person): void
@@ -469,13 +361,19 @@ class ListContasReceber extends ListRecords
         $this->clienteFilter = 'todos';
         $this->closeLocalClienteLookup();
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh(resetSort: true);
     }
 
     protected function clearListSelection(): void
     {
         $this->highlightedRecordId = null;
         $this->selecionadosParaBaixa = [];
+    }
+
+    public function updatedTableRecordsPerPage(): void
+    {
+        $this->clearListSelection();
+        $this->pushContaReceberListRefresh();
     }
 
     public function deleteConta(): void
@@ -512,7 +410,7 @@ class ListContasReceber extends ListRecords
         $conta->delete();
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaReceberListRefresh();
 
         Notification::make()
             ->title('Conta excluída.')
@@ -551,5 +449,139 @@ class ListContasReceber extends ListRecords
         );
 
         $this->redirect(route('erp.reports.contas-receber-cartoes', $params), navigate: false);
+    }
+
+    #[On('erp-receber-open-view')]
+    public function onErpReceberOpenView(int $contaId): void
+    {
+        $this->openContaReceberView($contaId);
+    }
+
+    #[On('erp-receber-toggle-baixa')]
+    public function onErpReceberToggleBaixa(int $contaId, bool $selected): void
+    {
+        $ids = collect($this->selecionadosParaBaixa)->map(fn ($id): int => (int) $id);
+
+        if ($selected) {
+            $ids->push($contaId);
+        } else {
+            $ids = $ids->reject(fn (int $id): bool => $id === $contaId);
+        }
+
+        $this->selecionadosParaBaixa = $ids->unique()->values()->all();
+        $this->pushContaReceberListRefreshSelectionOnly();
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushContaReceberListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    public function resetTable(): void
+    {
+        $this->pushContaReceberListRefresh();
+    }
+
+    protected function pushContaReceberListRefresh(bool $resetSort = false): void
+    {
+        $builder = $this->listQueryBuilder();
+        $totalAReceber = $builder->sumSaldoFiltered();
+        $totalRecebido = $builder->sumValorRecebidoFiltered();
+
+        $this->dispatch(
+            'erp-receber-list-refresh',
+            situacaoFilter: $this->situacaoFilter,
+            formaFilter: $this->formaFilter,
+            clienteFilter: $this->clienteFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            skipLocalSearch: $this->shouldSkipLocalSearchWhileTyping(),
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            selecionadosParaBaixa: $this->selecionadosParaBaixa,
+            resetSort: $resetSort,
+        )->to(ContaReceberListTable::class);
+
+        $this->skipRender();
+
+        $this->patchReceberFooterTotals($totalAReceber, $totalRecebido);
+        $this->patchReceberFooterSelecionado();
+    }
+
+    protected function pushContaReceberListRefreshSelectionOnly(): void
+    {
+        $this->dispatch(
+            'erp-receber-list-refresh',
+            situacaoFilter: $this->situacaoFilter,
+            formaFilter: $this->formaFilter,
+            clienteFilter: $this->clienteFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            skipLocalSearch: $this->shouldSkipLocalSearchWhileTyping(),
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            selecionadosParaBaixa: $this->selecionadosParaBaixa,
+            resetSort: false,
+        )->to(ContaReceberListTable::class);
+
+        $this->skipRender();
+        $this->patchReceberFooterSelecionado();
+    }
+
+    protected function patchReceberFooterTotals(float $totalAReceber, float $totalRecebido): void
+    {
+        $this->js(sprintf(
+            '(() => {
+                const items = document.querySelectorAll(".erp-receber__totals .erp-receber__total-value");
+                if (items[0]) items[0].textContent = %s;
+                if (items[1]) items[1].textContent = %s;
+            })()',
+            json_encode('R$ '.number_format($totalAReceber, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalRecebido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    protected function patchReceberFooterSelecionado(): void
+    {
+        $qtd = $this->quantidadeSelecionada;
+        $total = $this->totalSelecionado;
+        $label = $qtd === 1 ? 'conta' : 'contas';
+
+        $this->js(sprintf(
+            '(() => {
+                const totals = document.querySelector(".erp-receber__totals");
+                if (!totals) return;
+                let block = totals.querySelector(".erp-receber__total-item--selected");
+                if (%d < 1) {
+                    if (block) block.remove();
+                    return;
+                }
+                const formatted = %s;
+                const meta = "(%d " + %s + ")";
+                if (!block) {
+                    block = document.createElement("div");
+                    block.className = "erp-receber__total-item erp-receber__total-item--selected";
+                    block.innerHTML = "<span class=\\"erp-receber__total-label\\">TOTAL SELECIONADO |</span>"
+                        + "<span class=\\"erp-receber__total-value erp-receber__total-value--selected\\"></span>"
+                        + "<span class=\\"erp-receber__total-meta\\"></span>";
+                    totals.appendChild(block);
+                }
+                const valueEl = block.querySelector(".erp-receber__total-value--selected");
+                const metaEl = block.querySelector(".erp-receber__total-meta");
+                if (valueEl) valueEl.textContent = formatted;
+                if (metaEl) metaEl.textContent = meta;
+            })()',
+            $qtd,
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            $qtd,
+            json_encode($label, JSON_UNESCAPED_UNICODE),
+        ));
     }
 }

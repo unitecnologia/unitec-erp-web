@@ -9,13 +9,14 @@ use App\Filament\Resources\ContaPagarResource;
 use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarBaixaModal;
 use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarDesdobramentos;
 use App\Filament\Resources\ContaPagarResource\Pages\Concerns\ManagesContaPagarFormModal;
+use App\Livewire\Erp\ContaPagarListTable;
 use App\Models\ContaPagar;
 use App\Models\Person;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Queries\ContaPagarListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -72,6 +73,15 @@ class ListContasPagar extends ListRecords
             && ($this->localSearchDe === '' || $this->localSearchAte === '')) {
             $this->applyCurrentMonthDateFilter();
         }
+    }
+
+    public function mountInteractsWithTable(): void
+    {
+    }
+
+    public function shouldSkipContaPagarFornecedorSearch(): bool
+    {
+        return $this->shouldSkipFornecedorSearchWhileTyping();
     }
 
     protected static function erpListPageClass(): string
@@ -142,53 +152,22 @@ class ListContasPagar extends ListRecords
         return $this->buildListQuery();
     }
 
+    protected function listQueryBuilder(): ContaPagarListQueryBuilder
+    {
+        return new ContaPagarListQueryBuilder(
+            situacaoFilter: $this->situacaoFilter,
+            fornecedorFilter: $this->fornecedorFilter,
+            searchFieldsActive: $this->normalizedSearchFieldsActive(),
+            localSearchByField: $this->localSearchByField,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            skipFornecedorSearch: $this->shouldSkipFornecedorSearchWhileTyping(),
+        );
+    }
+
     protected function buildListQuery(): Builder
     {
-        $query = parent::getTableQuery()
-            ->with(['fornecedor']);
-
-        $hoje = ErpTimezone::toLocal()->toDateString();
-
-        match ($this->situacaoFilter) {
-            'a_pagar' => $query->where('saldo', '>', 0)->whereDate('vencimento', '>=', $hoje),
-            'atrasadas' => $query->where('saldo', '>', 0)->whereDate('vencimento', '<', $hoje),
-            'pagas' => $query->where('saldo', '<=', 0),
-            default => $query,
-        };
-
-        foreach ($this->normalizedSearchFieldsActive() as $column) {
-            if ($this->isDateSearchColumn($column)) {
-                $this->applyLocalSearchDateRange($query, $column);
-
-                continue;
-            }
-
-            $term = trim((string) ($this->localSearchByField[$column] ?? ''));
-
-            if ($term === '') {
-                continue;
-            }
-
-            if ($column === 'fornecedor') {
-                if ($this->fornecedorFilter !== 'todos' && is_numeric($this->fornecedorFilter)) {
-                    $query->where('fornecedor_id', (int) $this->fornecedorFilter);
-
-                    continue;
-                }
-
-                if ($this->shouldSkipFornecedorSearchWhileTyping()) {
-                    continue;
-                }
-
-                $this->applyFornecedorLocalSearch($query, $term);
-
-                continue;
-            }
-
-            $this->applyLocalSearchForColumn($query, $term, $column);
-        }
-
-        return $query;
+        return $this->listQueryBuilder()->buildForList();
     }
 
     /**
@@ -200,93 +179,6 @@ class ListContasPagar extends ListRecords
             'numero', 'emissao', 'documento', 'fornecedor', 'vencimento',
             'valor', 'desconto', 'juros', 'valor_pago', 'pago_em', 'saldo',
         ];
-    }
-
-    protected function applyLocalSearch(Builder $query, string $term): void
-    {
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
-            : 'numero';
-
-        $this->applyLocalSearchForColumn($query, $term, $column);
-    }
-
-    protected function applyLocalSearchForColumn(Builder $query, string $term, string $column): void
-    {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $like = '%'.$term.'%';
-
-        match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'emissao', 'vencimento', 'pago_em' => $this->applyLocalSearchByDate($query, $term, $column),
-            'documento' => $query->where('documento', 'like', $like),
-            'fornecedor' => $this->applyFornecedorLocalSearch($query, $term),
-            'valor', 'desconto', 'juros', 'valor_pago', 'saldo' => $this->applyLocalSearchByMoney($query, $term, $column),
-            default => null,
-        };
-    }
-
-    protected function applyLocalSearchByDate(Builder $query, string $term, string $column): void
-    {
-        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $term, $matches)) {
-            $query->whereDate($column, "{$matches[3]}-{$matches[2]}-{$matches[1]}");
-
-            return;
-        }
-
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $term)) {
-            $query->whereDate($column, $term);
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("strftime('%d/%m/%Y', {$column}) LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("DATE_FORMAT({$column}, '%d/%m/%Y') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function applyLocalSearchByMoney(Builder $query, string $term, string $column): void
-    {
-        $normalized = str_replace(['R$', ' '], '', $term);
-
-        if (str_contains($normalized, ',')) {
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        }
-
-        if (is_numeric($normalized)) {
-            if ($this->databaseDriver($query) === 'sqlite') {
-                $query->whereRaw("CAST({$column} AS TEXT) LIKE ?", ['%' . $normalized . '%']);
-
-                return;
-            }
-
-            $query->where($column, 'like', '%' . $normalized . '%');
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("REPLACE(printf('%.2f', {$column}), '.', ',') LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("REPLACE(FORMAT({$column}, 2), '.', ',') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function databaseDriver(Builder $query): string
-    {
-        return $query->getConnection()->getDriverName();
     }
 
     #[Computed]
@@ -303,13 +195,13 @@ class ListContasPagar extends ListRecords
     #[Computed]
     public function totalAPagar(): float
     {
-        return (float) $this->buildListQuery()->sum('saldo');
+        return $this->listQueryBuilder()->sumSaldoFiltered();
     }
 
     #[Computed]
     public function totalPago(): float
     {
-        return (float) $this->buildListQuery()->sum('valor_pago');
+        return $this->listQueryBuilder()->sumValorPagoFiltered();
     }
 
     public function content(Schema $schema): Schema
@@ -322,7 +214,8 @@ class ListContasPagar extends ListRecords
             $components[] = View::make('filament.components.erp.pagar.desdobramentos');
         } else {
             $components[] = View::make('filament.components.erp.pagar.hint');
-            $components[] = EmbeddedTable::make()->columnSpanFull();
+            $components[] = View::make('filament.components.erp.pagar.table-host')
+                ->columnSpanFull();
             $components[] = View::make('filament.components.erp.pagar.footer-summary');
         }
 
@@ -578,23 +471,6 @@ class ListContasPagar extends ListRecords
         return null;
     }
 
-    protected function applyFornecedorLocalSearch(Builder $query, string $term): void
-    {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $like = '%'.$term.'%';
-        $query->whereHas(
-            'fornecedor',
-            fn (Builder $fornecedorQuery): Builder => $fornecedorQuery
-                ->where('nome_razao', 'like', $like)
-                ->orWhere('apelido_fantasia', 'like', $like),
-        );
-    }
-
     protected function isDateSearchColumn(string $column): bool
     {
         return in_array($column, ['emissao', 'vencimento', 'pago_em'], true);
@@ -607,18 +483,11 @@ class ListContasPagar extends ListRecords
         $this->localSearchAte = $hoje->copy()->endOfMonth()->toDateString();
     }
 
-    protected function applyLocalSearchDateRange(Builder $query, string $column): void
+    public function updatedTableRecordsPerPage(): void
     {
-        if (filled($this->localSearchDe)) {
-            $query->whereDate($column, '>=', $this->localSearchDe);
-        }
-
-        if (filled($this->localSearchAte)) {
-            $query->whereDate($column, '<=', $this->localSearchAte);
-        }
+        $this->clearListSelection();
+        $this->pushContaPagarListRefresh();
     }
-
-
 
     public function deleteConta(): void
     {
@@ -717,5 +586,63 @@ class ListContasPagar extends ListRecords
             'slug' => 'contas-pagar',
             ...$params,
         ]), navigate: false);
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushContaPagarListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    public function resetTable(): void
+    {
+        if ($this->viewTab === 'titulos') {
+            $this->pushContaPagarListRefresh();
+        }
+    }
+
+    protected function pushContaPagarListRefresh(bool $resetSort = false): void
+    {
+        if ($this->viewTab !== 'titulos') {
+            return;
+        }
+
+        $builder = $this->listQueryBuilder();
+        $totalAPagar = $builder->sumSaldoFiltered();
+        $totalPago = $builder->sumValorPagoFiltered();
+
+        $this->dispatch(
+            'erp-pagar-list-refresh',
+            situacaoFilter: $this->situacaoFilter,
+            fornecedorFilter: $this->fornecedorFilter,
+            searchFieldsActive: $this->normalizedSearchFieldsActive(),
+            localSearchByField: $this->localSearchByField,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            skipFornecedorSearch: $this->shouldSkipFornecedorSearchWhileTyping(),
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(ContaPagarListTable::class);
+
+        $this->skipRender();
+
+        $this->patchPagarFooterTotals($totalAPagar, $totalPago);
+    }
+
+    protected function patchPagarFooterTotals(float $totalAPagar, float $totalPago): void
+    {
+        $this->js(sprintf(
+            '(() => {
+                const items = document.querySelectorAll(".erp-pagar__totals .erp-pagar__total-value");
+                if (items[0]) items[0].textContent = %s;
+                if (items[1]) items[1].textContent = %s;
+            })()',
+            json_encode('R$ '.number_format($totalAPagar, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalPago, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
     }
 }

@@ -7,10 +7,10 @@ use App\Models\PdvVenda;
 use App\Models\PdvVendaPagamento;
 use App\Models\Venda;
 use App\Support\Erp\ErpEmpresaScopeFilter;
+use App\Support\Erp\ErpSchema;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Totais por forma real: mix (DINHEIRO + PIX) soma em cada forma, sem linha combinada.
@@ -28,11 +28,11 @@ final class VendasPorFormaPagamentoAggregator
         string $formaFiltro = '',
         bool $groupByEmpresa = false,
     ): array {
-        if (! Schema::hasTable((new Venda)->getTable())) {
+        if (! ErpSchema::hasTable((new Venda)->getTable())) {
             return [];
         }
 
-        $hasEmpresa = Schema::hasColumn((new Venda)->getTable(), 'empresa_id');
+        $hasEmpresa = ErpSchema::hasColumn((new Venda)->getTable(), 'empresa_id');
         $scope = $hasEmpresa ? $empresaScope : null;
 
         if (self::scopeBlocksAll($scope)) {
@@ -126,7 +126,7 @@ final class VendasPorFormaPagamentoAggregator
      */
     public static function formasCadastro(): Collection
     {
-        if (! Schema::hasTable((new FormaPagamento)->getTable())) {
+        if (! ErpSchema::hasTable((new FormaPagamento)->getTable())) {
             return collect();
         }
 
@@ -149,8 +149,8 @@ final class VendasPorFormaPagamentoAggregator
         bool $groupByEmpresa,
         Collection $cadastro,
     ): void {
-        if (! Schema::hasTable((new PdvVendaPagamento)->getTable())
-            || ! Schema::hasTable((new PdvVenda)->getTable())
+        if (! ErpSchema::hasTable((new PdvVendaPagamento)->getTable())
+            || ! ErpSchema::hasTable((new PdvVenda)->getTable())
         ) {
             return;
         }
@@ -214,8 +214,8 @@ final class VendasPorFormaPagamentoAggregator
 
         ErpEmpresaScopeFilter::applyColumn($query, (new Venda)->getTable(), $empresaScope);
 
-        if (Schema::hasTable((new PdvVendaPagamento)->getTable())
-            && Schema::hasTable((new PdvVenda)->getTable())
+        if (ErpSchema::hasTable((new PdvVendaPagamento)->getTable())
+            && ErpSchema::hasTable((new PdvVenda)->getTable())
         ) {
             $query->whereNotExists(function ($exists): void {
                 $exists->selectRaw('1')

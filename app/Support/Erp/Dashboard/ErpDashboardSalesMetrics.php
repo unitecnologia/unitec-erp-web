@@ -2,11 +2,11 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\PdvVenda;
 use App\Models\Venda;
 use App\Support\Erp\ErpEmpresaScopeFilter;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 final class ErpDashboardSalesMetrics
@@ -67,7 +67,7 @@ final class ErpDashboardSalesMetrics
     private static function sumVendasNaData(Carbon $day, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new Venda)->getTable())) {
+            if (! ErpSchema::hasTable((new Venda)->getTable())) {
                 return 0.0;
             }
 
@@ -89,7 +89,7 @@ final class ErpDashboardSalesMetrics
     private static function sumVendasNoPeriodo(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new Venda)->getTable())) {
+            if (! ErpSchema::hasTable((new Venda)->getTable())) {
                 return 0.0;
             }
 
@@ -112,7 +112,7 @@ final class ErpDashboardSalesMetrics
     private static function sumPdvSemEspelhoNaData(Carbon $day, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new PdvVenda)->getTable())) {
+            if (! ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 return 0.0;
             }
 
@@ -141,7 +141,7 @@ final class ErpDashboardSalesMetrics
     private static function sumPdvSemEspelhoNoPeriodo(Carbon $from, Carbon $to, int|array|null $empresaScope = null): float
     {
         try {
-            if (! Schema::hasTable((new PdvVenda)->getTable())) {
+            if (! ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 return 0.0;
             }
 

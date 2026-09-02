@@ -2,12 +2,12 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSchema;
 use App\Models\PdvVenda;
 use App\Models\Venda;
 use App\Support\Erp\ErpEmpresaScopeFilter;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class ErpDashboardSalesChart
@@ -56,7 +56,7 @@ class ErpDashboardSalesChart
         $byDay = [];
 
         try {
-            if (Schema::hasTable((new Venda)->getTable())) {
+            if (ErpSchema::hasTable((new Venda)->getTable())) {
                 $q = Venda::query()
                     ->whereNotIn('status', [Venda::STATUS_CANCELADO])
                     ->whereDate('data', '>=', $from->toDateString())
@@ -79,7 +79,7 @@ class ErpDashboardSalesChart
                 }
             }
 
-            if (Schema::hasTable((new PdvVenda)->getTable())) {
+            if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $q = PdvVenda::query()
                     ->where('situacao', '!=', 'C')
                     ->whereNull('venda_id')

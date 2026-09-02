@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\Person;
+use App\Support\Erp\ErpTableSort;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,7 @@ class PersonListQueryBuilder
         public string $searchColumn = 'nome_razao',
         public string $localSearch = '',
         public string $orderBy = 'codigo',
+        public bool $applyDefaultOrder = true,
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -45,10 +47,44 @@ class PersonListQueryBuilder
         );
     }
 
+    /**
+     * Query leve para a grade Filament — colunas visíveis + accessor endereco_lista.
+     */
+    public function buildForList(): Builder
+    {
+        $peopleTable = (new Person)->getTable();
+
+        $query = Person::query()->select([
+            "{$peopleTable}.id",
+            "{$peopleTable}.codigo",
+            "{$peopleTable}.nome_razao",
+            "{$peopleTable}.apelido_fantasia",
+            "{$peopleTable}.cpf_cnpj",
+            "{$peopleTable}.rg_ie",
+            "{$peopleTable}.endereco",
+            "{$peopleTable}.numero",
+            "{$peopleTable}.bairro",
+            "{$peopleTable}.cidade_nome",
+            "{$peopleTable}.uf",
+        ]);
+
+        return $this->applyFilters($query);
+    }
+
+    /**
+     * Query completa para relatórios/impressão.
+     */
     public function build(): Builder
     {
         $query = Person::query();
 
+        $this->applyFilters($query);
+
+        return $this->applyDefaultOrder($query);
+    }
+
+    protected function applyFilters(Builder $query): Builder
+    {
         match ($this->statusFilter) {
             'ativos' => $query->where('ativo', true),
             'inativos' => $query->where('ativo', false),
@@ -69,8 +105,21 @@ class PersonListQueryBuilder
             $this->applySearch($query);
         }
 
+        return $query;
+    }
+
+    protected function applyDefaultOrder(Builder $query): Builder
+    {
+        if (! $this->applyDefaultOrder) {
+            return $query;
+        }
+
         $allowedOrder = ['codigo', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj'];
         $orderBy = in_array($this->orderBy, $allowedOrder, true) ? $this->orderBy : 'codigo';
+
+        if ($orderBy === 'codigo') {
+            return ErpTableSort::orderByCodigoNumerico($query);
+        }
 
         return $query->orderBy($orderBy);
     }
@@ -86,7 +135,7 @@ class PersonListQueryBuilder
 
         if ($column === 'endereco') {
             $query->where(function (Builder $builder) use ($searchTerm): void {
-                $term = '%' . $searchTerm . '%';
+                $term = $searchTerm . '%';
                 $builder
                     ->where('endereco', 'like', $term)
                     ->orWhere('bairro', 'like', $term)
@@ -96,7 +145,14 @@ class PersonListQueryBuilder
             return;
         }
 
-        $query->where($column, 'like', '%' . $searchTerm . '%');
+        // codigo/cpf/rg/nome: prefixo indexável (digitação típica no campo).
+        if (in_array($column, ['codigo', 'cpf_cnpj', 'rg_ie', 'nome_razao', 'apelido_fantasia'], true)) {
+            $query->where($column, 'like', $searchTerm . '%');
+
+            return;
+        }
+
+        $query->where($column, 'like', $searchTerm . '%');
     }
 
     /**

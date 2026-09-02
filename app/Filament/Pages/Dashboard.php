@@ -16,10 +16,13 @@ class Dashboard extends BaseDashboard
 {
     public string $dashboardVisao = ErpDashboardScope::VISAO_EMPRESA;
 
+    public bool $dashboardHeavyReady = false;
+
     public function mount(): void
     {
         ErpScreen::set('Principal');
         $this->dashboardVisao = ErpDashboardScope::VISAO_EMPRESA;
+        $this->dashboardHeavyReady = false;
     }
 
     #[Computed]
@@ -35,15 +38,57 @@ class Dashboard extends BaseDashboard
     }
 
     /**
+     * First paint: KPIs + metadados de visão.
+     *
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function dashboardShell(): array
+    {
+        return ErpDashboardData::shell(
+            empresaId: ErpContext::currentEmpresaId(),
+            visao: $this->dashboardVisao,
+        );
+    }
+
+    /**
+     * Blocos pesados (carregados após wire:init).
+     *
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function dashboardHeavy(): array
+    {
+        return ErpDashboardData::heavy(
+            empresaId: ErpContext::currentEmpresaId(),
+            visao: $this->dashboardVisao,
+        );
+    }
+
+    /**
+     * Compat: shell + heavy quando pronto; só shell no first paint.
+     *
      * @return array<string, mixed>
      */
     #[Computed]
     public function dashboardData(): array
     {
-        return ErpDashboardData::all(
-            empresaId: ErpContext::currentEmpresaId(),
-            visao: $this->dashboardVisao,
-        );
+        $shell = $this->dashboardShell;
+
+        if (! $this->dashboardHeavyReady) {
+            return $shell;
+        }
+
+        return [
+            ...$shell,
+            ...$this->dashboardHeavy,
+        ];
+    }
+
+    public function loadDashboardHeavy(): void
+    {
+        $this->dashboardHeavyReady = true;
+        unset($this->dashboardHeavy, $this->dashboardData);
     }
 
     public function setDashboardVisao(string $visao): void
@@ -57,7 +102,8 @@ class Dashboard extends BaseDashboard
         }
 
         $this->dashboardVisao = $visao;
-        unset($this->dashboardData);
+        $this->dashboardHeavyReady = false;
+        unset($this->dashboardShell, $this->dashboardHeavy, $this->dashboardData);
         $this->dispatch('erp-dash-refresh');
     }
 

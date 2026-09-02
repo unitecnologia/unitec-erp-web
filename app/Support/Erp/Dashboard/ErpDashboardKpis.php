@@ -6,6 +6,7 @@ use App\Models\Nfe;
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -44,9 +45,16 @@ final class ErpDashboardKpis
      */
     private static function faturamentoHoje(int|array|null $empresaScope = null): array
     {
+        $collector = ErpDashboardCollector::current();
         $dia = ErpFinanceiroMetricas::hoje();
-        $hoje = ErpDashboardSalesMetrics::faturamentoDia($dia, $empresaScope);
-        $ontem = ErpDashboardSalesMetrics::faturamentoDia($dia->copy()->subDay(), $empresaScope);
+
+        if ($collector !== null) {
+            $hoje = $collector->faturamentoDia($dia);
+            $ontem = $collector->faturamentoDia($dia->copy()->subDay());
+        } else {
+            $hoje = ErpDashboardSalesMetrics::faturamentoDia($dia, $empresaScope);
+            $ontem = ErpDashboardSalesMetrics::faturamentoDia($dia->copy()->subDay(), $empresaScope);
+        }
 
         return [
             'key' => 'faturamento_hoje',
@@ -64,9 +72,14 @@ final class ErpDashboardKpis
      */
     private static function vendasMes(int|array|null $empresaScope = null): array
     {
+        $collector = ErpDashboardCollector::current();
         $fimMes = ErpFinanceiroMetricas::hoje();
         $inicioMes = $fimMes->copy()->startOfMonth();
-        $totalMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $fimMes, $empresaScope);
+
+        $totalMes = $collector !== null
+            ? $collector->faturamentoPeriodo($inicioMes, $fimMes)
+            : ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $fimMes, $empresaScope);
+
         $diasNoMes = max(1, (int) $inicioMes->diffInDays($fimMes) + 1);
         $mediaDia = round($totalMes / $diasNoMes, 2);
 
@@ -88,8 +101,15 @@ final class ErpDashboardKpis
      */
     private static function saldoCaixa(int|array|null $empresaScope = null): array
     {
-        $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
-        $hoje = ErpFinanceiroMetricas::movimentosCaixaNoDia(ErpFinanceiroMetricas::hoje(), $empresaScope);
+        $collector = ErpDashboardCollector::current();
+
+        if ($collector !== null) {
+            $saldo = $collector->saldoCaixa();
+            $hoje = $collector->movimentosCaixaHoje();
+        } else {
+            $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
+            $hoje = ErpFinanceiroMetricas::movimentosCaixaNoDia(ErpFinanceiroMetricas::hoje(), $empresaScope);
+        }
 
         return [
             'key' => 'saldo_caixa',
@@ -108,7 +128,10 @@ final class ErpDashboardKpis
      */
     private static function contasVencidas(int|array|null $empresaScope = null): array
     {
-        $base = ErpFinanceiroMetricas::receberVencido(null, $empresaScope);
+        $collector = ErpDashboardCollector::current();
+        $base = $collector !== null
+            ? $collector->receberVencido()
+            : ErpFinanceiroMetricas::receberVencido(null, $empresaScope);
         $total = (float) $base['valor'];
         $titulos = (int) $base['qtd'];
 
@@ -130,7 +153,10 @@ final class ErpDashboardKpis
      */
     private static function contasPagarVencidas(int|array|null $empresaScope = null): array
     {
-        $base = ErpFinanceiroMetricas::pagarVencido(null, $empresaScope);
+        $collector = ErpDashboardCollector::current();
+        $base = $collector !== null
+            ? $collector->pagarVencido()
+            : ErpFinanceiroMetricas::pagarVencido(null, $empresaScope);
         $total = (float) $base['valor'];
         $titulos = (int) $base['qtd'];
 
@@ -156,7 +182,10 @@ final class ErpDashboardKpis
      */
     private static function estoqueCritico(): array
     {
-        $count = static::countEstoqueCritico();
+        $collector = ErpDashboardCollector::current();
+        $count = $collector !== null
+            ? $collector->estoqueCriticoCount()
+            : static::countEstoqueCritico();
 
         return [
             'key' => 'estoque_critico',
@@ -182,7 +211,10 @@ final class ErpDashboardKpis
      */
     private static function notasRejeitadas(int|array|null $empresaScope = null): array
     {
-        $count = static::countNotasRejeitadas($empresaScope);
+        $collector = ErpDashboardCollector::current();
+        $count = $collector !== null
+            ? $collector->notasRejeitadasCount()
+            : static::countNotasRejeitadas($empresaScope);
 
         return [
             'key' => 'notas_rejeitadas',
@@ -196,10 +228,23 @@ final class ErpDashboardKpis
         ];
     }
 
+    public static function countEstoqueCriticoPublic(): int
+    {
+        return static::countEstoqueCritico();
+    }
+
+    /**
+     * @param  int|list<int>|null  $empresaScope
+     */
+    public static function countNotasRejeitadasPublic(int|array|null $empresaScope = null): int
+    {
+        return static::countNotasRejeitadas($empresaScope);
+    }
+
     private static function countEstoqueCritico(): int
     {
         try {
-            if (! Schema::hasTable((new Product)->getTable())) {
+            if (! ErpSchema::hasTable((new Product)->getTable())) {
                 return 0;
             }
 
@@ -215,7 +260,7 @@ final class ErpDashboardKpis
     private static function countNotasRejeitadas(int|array|null $empresaScope = null): int
     {
         try {
-            if (! Schema::hasTable((new Nfe)->getTable())) {
+            if (! ErpSchema::hasTable((new Nfe)->getTable())) {
                 return 0;
             }
 

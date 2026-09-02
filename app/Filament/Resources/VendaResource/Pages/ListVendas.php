@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VendaResource\Pages;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\VendaResource;
+use App\Livewire\Erp\VendaListTable;
 use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\Venda;
@@ -19,13 +20,13 @@ use DomainException;
 use Filament\Notifications\Notification;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListVendas extends ListRecords
@@ -102,6 +103,19 @@ class ListVendas extends ListRecords
         }
     }
 
+    public function mountInteractsWithTable(): void
+    {
+    }
+
+    public function erpListSyncPollEnabled(): bool
+    {
+        if (! config('unitec.erp_list_sync_poll_enabled', true)) {
+            return false;
+        }
+
+        return $this->erpListSyncChannel() !== null;
+    }
+
     protected function applyTodayDateFilter(): void
     {
         $hoje = ErpTimezone::toLocal()->toDateString();
@@ -133,6 +147,7 @@ class ListVendas extends ListRecords
         return [
             'searchInput' => '.erp-vendas__search-text, .erp-vendas__search-value-select, .erp-vendas__search-date-from, .erp-vendas__search-time-from, .erp-field-dd__btn',
             'searchFocusKey' => 'F8',
+            'edit' => 'editVenda',
             'extraKeys' => [
                 'F4' => ['method' => 'cancelVenda'],
                 'F6' => ['method' => 'printVendas'],
@@ -161,7 +176,22 @@ class ListVendas extends ListRecords
             localSearchAte: $this->localSearchAte,
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
-        ))->build();
+            applyDefaultOrder: false,
+        ))->buildForList();
+    }
+
+    protected function listQueryBuilder(): VendaListQueryBuilder
+    {
+        return new VendaListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            tipoFilter: $this->tipoFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            localSearchHoraDe: $this->localSearchHoraDe,
+            localSearchHoraAte: $this->localSearchHoraAte,
+        );
     }
 
     /**
@@ -215,7 +245,7 @@ class ListVendas extends ListRecords
     #[Computed]
     public function filteredTotal(): float
     {
-        return (float) $this->buildListQuery()->sum('total');
+        return $this->listQueryBuilder()->sumFilteredTotal();
     }
 
     public function content(Schema $schema): Schema
@@ -224,7 +254,7 @@ class ListVendas extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.vendas.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.vendas.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.vendas.footer-total'),
                 View::make('filament.components.erp.vendas.action-bar'),
@@ -262,6 +292,12 @@ class ListVendas extends ListRecords
             '.',
         );
         $this->itensModalOpen = true;
+    }
+
+    #[On('erp-venda-open-itens')]
+    public function onErpVendaOpenItens(int $vendaId): void
+    {
+        $this->openVendaItens($vendaId);
     }
 
     public function closeVendaItens(): void
@@ -332,19 +368,26 @@ class ListVendas extends ListRecords
     {
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushVendaListRefresh();
     }
 
     public function setTipoFilter(string $filter): void
     {
         $this->tipoFilter = $this->normalizeTipoFilter($filter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushVendaListRefresh();
     }
 
     public function setSearchColumn(string $column): void
     {
-        $this->searchColumn = $this->normalizeSearchColumn($column);
+        $normalized = $this->normalizeSearchColumn($column);
+        $hadSearch = filled($this->localSearch)
+            || filled($this->localSearchDe)
+            || filled($this->localSearchAte);
+        $wasData = $this->searchColumn === 'data';
+        $changed = $normalized !== $this->searchColumn;
+
+        $this->searchColumn = $normalized;
         $this->localSearch = '';
         $this->localSearchDe = '';
         $this->localSearchAte = '';
@@ -353,10 +396,29 @@ class ListVendas extends ListRecords
 
         if ($this->searchColumn === 'data') {
             $this->applyTodayDateFilter();
+            $this->clearListSelection();
+            $this->dispatch('erp-masks-refresh');
+            $this->pushVendaListRefresh(resetSort: true);
+
+            return;
         }
 
         $this->clearListSelection();
-        $this->resetTable();
+
+        if ($wasData || $hadSearch) {
+            $this->dispatch('erp-masks-refresh');
+            $this->pushVendaListRefresh(resetSort: true);
+
+            return;
+        }
+
+        if (! $changed) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->skipRender();
         $this->dispatch('erp-masks-refresh');
     }
 
@@ -364,8 +426,8 @@ class ListVendas extends ListRecords
     {
         $this->applyTodayDateFilter();
         $this->clearListSelection();
-        $this->resetTable();
         $this->dispatch('erp-masks-refresh');
+        $this->pushVendaListRefresh(resetSort: true);
     }
 
     public function updatedSearchColumn(): void
@@ -376,13 +438,13 @@ class ListVendas extends ListRecords
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushVendaListRefresh();
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushVendaListRefresh(resetSort: true);
     }
 
     protected function normalizeSearchColumn(mixed $value): string
@@ -412,13 +474,17 @@ class ListVendas extends ListRecords
         $this->modulePending('Cadastro de venda (Fase 2)');
     }
 
-    public function editVenda(): void
+    public function editVenda(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('vendas.update')) {
             return;
         }
 
-        if (! $this->highlightedRecordIdOrNotify('edit')) {
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
+
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
@@ -554,7 +620,7 @@ class ListVendas extends ListRecords
 
         $this->closeCancelVendaModal();
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushVendaListRefresh();
 
         $body = $result->protocoloCancelamento
             ? 'Protocolo NFC-e: '.$result->protocoloCancelamento
@@ -631,5 +697,71 @@ class ListVendas extends ListRecords
             ->title('Segunda via enviada para impressão.')
             ->success()
             ->send();
+    }
+
+    public function pollErpListSync(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $current = ErpDataSyncVersion::current($channel);
+
+        if ($this->erpListSyncVersion === null) {
+            $this->erpListSyncVersion = $current;
+            $this->skipRender();
+
+            return;
+        }
+
+        if (hash_equals($this->erpListSyncVersion, $current)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->erpListSyncVersion = $current;
+        $this->pushVendaListRefresh();
+    }
+
+    public function refreshTable(): void
+    {
+        $this->syncErpListSyncVersionFromStore();
+        $this->pushVendaListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    protected function pushVendaListRefresh(bool $resetSort = false): void
+    {
+        $total = $this->listQueryBuilder()->sumFilteredTotal();
+
+        $this->dispatch(
+            'erp-venda-list-refresh',
+            statusFilter: $this->statusFilter,
+            tipoFilter: $this->tipoFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            localSearchHoraDe: $this->localSearchHoraDe,
+            localSearchHoraAte: $this->localSearchHoraAte,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(VendaListTable::class);
+
+        $this->skipRender();
+
+        $this->js(sprintf(
+            '(() => { const el = document.querySelector(".erp-vendas__total-value"); if (el) el.textContent = %s; })()',
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
     }
 }

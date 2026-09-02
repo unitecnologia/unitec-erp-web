@@ -17,6 +17,10 @@ class ContaReceberListQueryBuilder
         public string $localSearch = '',
         public string $periodoDe = '',
         public string $periodoAte = '',
+        public bool $skipLocalSearch = false,
+        public string $orderBy = 'emissao',
+        public string $orderDirection = 'desc',
+        public bool $applyDefaultOrder = true,
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -25,7 +29,7 @@ class ContaReceberListQueryBuilder
         $allowedForma = array_merge(['todos'], array_keys(ContaReceber::formaLabels()));
         $allowedCampo = [
             'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
-            'valor', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
         ];
 
         $situacao = (string) $request->query('situacao', 'todos');
@@ -46,7 +50,57 @@ class ContaReceberListQueryBuilder
 
     public function build(): Builder
     {
-        $query = ContaReceber::query()->with(['cliente']);
+        $query = $this->buildFilteredQuery()->with(['cliente']);
+
+        return $this->applyDefaultOrder($query);
+    }
+
+    public function buildForList(): Builder
+    {
+        $table = (new ContaReceber)->getTable();
+
+        $query = $this->buildFilteredQuery()->select([
+            "{$table}.id",
+            "{$table}.numero",
+            "{$table}.emissao",
+            "{$table}.historico",
+            "{$table}.documento",
+            "{$table}.cartao_maquininha",
+            "{$table}.cartao_bandeira",
+            "{$table}.cliente_id",
+            "{$table}.vencimento",
+            "{$table}.valor",
+            "{$table}.numero_cheque",
+            "{$table}.desconto",
+            "{$table}.juros",
+            "{$table}.valor_recebido",
+            "{$table}.recebido_em",
+            "{$table}.saldo",
+            "{$table}.forma",
+        ]);
+
+        $query->with(['cliente:id,nome_razao']);
+
+        if (! $this->applyDefaultOrder) {
+            return $query;
+        }
+
+        return $this->applyDefaultOrder($query);
+    }
+
+    public function sumSaldoFiltered(): float
+    {
+        return (float) $this->buildFilteredQuery()->sum('saldo');
+    }
+
+    public function sumValorRecebidoFiltered(): float
+    {
+        return (float) $this->buildFilteredQuery()->sum('valor_recebido');
+    }
+
+    protected function buildFilteredQuery(): Builder
+    {
+        $query = ContaReceber::query();
 
         if ($this->clienteFilter !== 'todos' && is_numeric($this->clienteFilter)) {
             $query->where('cliente_id', (int) $this->clienteFilter);
@@ -73,13 +127,20 @@ class ContaReceberListQueryBuilder
             $query->where('forma', $this->formaFilter);
         }
 
-        if (filled($this->localSearch)) {
+        if (filled($this->localSearch) && ! $this->skipLocalSearch) {
             $this->applyLocalSearch($query);
         }
 
+        return $query;
+    }
+
+    protected function applyDefaultOrder(Builder $query): Builder
+    {
+        $direction = $this->orderDirection === 'asc' ? 'asc' : 'desc';
+
         return $query
-            ->orderByDesc('emissao')
-            ->orderByDesc('numero');
+            ->orderBy('emissao', $direction)
+            ->orderBy('numero', $direction);
     }
 
     protected function applyLocalSearch(Builder $query): void
@@ -90,24 +151,36 @@ class ContaReceberListQueryBuilder
             return;
         }
 
-        $column = $this->searchColumn;
-        $like = '%' . $term . '%';
+        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
+            ? $this->searchColumn
+            : 'cliente';
+
+        $prefixLike = $term.'%';
 
         match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'historico' => $query->where('historico', 'like', $like),
-            'documento' => $query->where('documento', 'like', $like),
+            'numero' => $query->where('numero', 'like', $prefixLike),
+            'historico' => $query->where('historico', 'like', $prefixLike),
+            'documento' => $query->where('documento', 'like', $prefixLike),
+            'numero_cheque' => $query->where('numero_cheque', 'like', $prefixLike),
             'cliente' => $query->whereHas(
                 'cliente',
-                fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like),
+                fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $prefixLike),
             ),
             'emissao', 'vencimento', 'recebido_em' => $this->applyLocalSearchByDate($query, $term, $column),
             'valor', 'desconto', 'juros', 'valor_recebido', 'saldo' => $this->applyLocalSearchByMoney($query, $term, $column),
-            default => $query->whereHas(
-                'cliente',
-                fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like),
-            ),
+            default => null,
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function localSearchColumns(): array
+    {
+        return [
+            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+        ];
     }
 
     protected function applyLocalSearchByDate(Builder $query, string $term, string $column): void
@@ -120,7 +193,17 @@ class ContaReceberListQueryBuilder
 
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $term)) {
             $query->whereDate($column, $term);
+
+            return;
         }
+
+        if ($this->databaseDriver($query) === 'sqlite') {
+            $query->whereRaw("strftime('%d/%m/%Y', {$column}) LIKE ?", ['%'.$term.'%']);
+
+            return;
+        }
+
+        $query->whereRaw("DATE_FORMAT({$column}, '%d/%m/%Y') LIKE ?", ['%'.$term.'%']);
     }
 
     protected function applyLocalSearchByMoney(Builder $query, string $term, string $column): void
@@ -133,8 +216,29 @@ class ContaReceberListQueryBuilder
         }
 
         if (is_numeric($normalized)) {
-            $query->where($column, 'like', '%' . $normalized . '%');
+            if ($this->databaseDriver($query) === 'sqlite') {
+                $query->whereRaw("CAST({$column} AS TEXT) LIKE ?", ['%'.$normalized.'%']);
+
+                return;
+            }
+
+            $query->where($column, 'like', '%'.$normalized.'%');
+
+            return;
         }
+
+        if ($this->databaseDriver($query) === 'sqlite') {
+            $query->whereRaw("REPLACE(printf('%.2f', {$column}), '.', ',') LIKE ?", ['%'.$term.'%']);
+
+            return;
+        }
+
+        $query->whereRaw("REPLACE(FORMAT({$column}, 2), '.', ',') LIKE ?", ['%'.$term.'%']);
+    }
+
+    protected function databaseDriver(Builder $query): string
+    {
+        return $query->getConnection()->getDriverName();
     }
 
     /**

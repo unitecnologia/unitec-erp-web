@@ -6,6 +6,7 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\CaixaResource;
 use App\Filament\Resources\CaixaResource\Pages\Concerns\ManagesCaixaViewModal;
+use App\Livewire\Erp\CaixaListTable;
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
 use App\Models\FormaPagamento;
@@ -14,14 +15,15 @@ use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Pdv\PdvCaixaFechamentoService;
+use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListCaixa extends ListRecords
@@ -85,6 +87,10 @@ class ListCaixa extends ListRecords
         }
     }
 
+    public function mountInteractsWithTable(): void
+    {
+    }
+
     protected static function erpListPageClass(): string
     {
         return 'erp-caixa-page';
@@ -118,170 +124,20 @@ class ListCaixa extends ListRecords
         return $this->buildListQuery();
     }
 
+    protected function listQueryBuilder(): CaixaListQueryBuilder
+    {
+        return new CaixaListQueryBuilder(
+            contaFilter: $this->contaFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+        );
+    }
+
     protected function buildListQuery(): Builder
     {
-        $query = parent::getTableQuery()
-            ->with(['conta']);
-
-        $this->applyEmpresaScope($query);
-        $this->applyContaFilter($query);
-
-        if (filled($this->periodoDeApplied)) {
-            $query->whereDate('emissao', '>=', $this->periodoDeApplied);
-        }
-
-        if (filled($this->periodoAteApplied)) {
-            $query->whereDate('emissao', '<=', $this->periodoAteApplied);
-        }
-
-        if (filled($this->localSearch)) {
-            $this->applyLocalSearch($query, $this->localSearch);
-        }
-
-        return $query;
-    }
-
-    protected function buildSaldoQuery(): Builder
-    {
-        $query = CaixaLancamento::query();
-
-        $this->applyEmpresaScope($query);
-        $this->applyContaFilter($query);
-
-        return $query;
-    }
-
-    protected function applyEmpresaScope(Builder $query): void
-    {
-        $empresaId = ErpContext::currentEmpresaId();
-
-        if (! $empresaId || ! \Illuminate\Support\Facades\Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
-            return;
-        }
-
-        $query->where('empresa_id', $empresaId);
-    }
-
-    protected function applyContaFilter(Builder $query): void
-    {
-        if ($this->contaFilter === 'todas') {
-            return;
-        }
-
-        if (is_numeric($this->contaFilter)) {
-            $query->where('caixa_conta_id', (int) $this->contaFilter);
-        }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function localSearchColumns(): array
-    {
-        return ['codigo', 'emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
-    }
-
-    protected function applyLocalSearch(Builder $query, string $term): void
-    {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
-            : 'codigo';
-
-        $like = '%' . $term . '%';
-
-        match ($column) {
-            'codigo' => $this->applyLocalSearchByCodigo($query, $term),
-            'emissao' => $this->applyLocalSearchByEmissao($query, $term),
-            'documento' => $query->where('documento', 'like', $like),
-            'historico' => $query->where('historico', 'like', $like),
-            'plano_contas' => $query->where('plano_contas', 'like', $like),
-            'conta' => $query->whereHas('conta', fn (Builder $contaQuery): Builder => $contaQuery->where('nome', 'like', $like)),
-            'entrada' => $this->applyLocalSearchByMoney($query, $term, 'entrada'),
-            'saida' => $this->applyLocalSearchByMoney($query, $term, 'saida'),
-        };
-    }
-
-    protected function applyLocalSearchByCodigo(Builder $query, string $term): void
-    {
-        $digits = preg_replace('/\D/', '', $term) ?? '';
-
-        if ($digits !== '' && is_numeric($digits)) {
-            $query->where('codigo', 'like', '%' . $digits . '%');
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw('CAST(codigo AS TEXT) LIKE ?', ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw('CAST(codigo AS CHAR) LIKE ?', ['%' . $term . '%']);
-    }
-
-    protected function applyLocalSearchByEmissao(Builder $query, string $term): void
-    {
-        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $term, $matches)) {
-            $query->whereDate('emissao', "{$matches[3]}-{$matches[2]}-{$matches[1]}");
-
-            return;
-        }
-
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $term)) {
-            $query->whereDate('emissao', $term);
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("strftime('%d/%m/%Y', emissao) LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("DATE_FORMAT(emissao, '%d/%m/%Y') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function applyLocalSearchByMoney(Builder $query, string $term, string $column): void
-    {
-        $normalized = str_replace(['R$', ' '], '', $term);
-
-        if (str_contains($normalized, ',')) {
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        }
-
-        if (is_numeric($normalized)) {
-            if ($this->databaseDriver($query) === 'sqlite') {
-                $query->whereRaw("CAST({$column} AS TEXT) LIKE ?", ['%' . $normalized . '%']);
-
-                return;
-            }
-
-            $query->where($column, 'like', '%' . $normalized . '%');
-
-            return;
-        }
-
-        if ($this->databaseDriver($query) === 'sqlite') {
-            $query->whereRaw("REPLACE(printf('%.2f', {$column}), '.', ',') LIKE ?", ['%' . $term . '%']);
-
-            return;
-        }
-
-        $query->whereRaw("REPLACE(FORMAT({$column}, 2), '.', ',') LIKE ?", ['%' . $term . '%']);
-    }
-
-    protected function databaseDriver(Builder $query): string
-    {
-        return $query->getConnection()->getDriverName();
+        return $this->listQueryBuilder()->buildForList();
     }
 
     #[Computed]
@@ -297,26 +153,19 @@ class ListCaixa extends ListRecords
     #[Computed]
     public function saldoAnterior(): float
     {
-        if (! filled($this->periodoDeApplied)) {
-            return 0.0;
-        }
-
-        $query = $this->buildSaldoQuery()
-            ->whereDate('emissao', '<', $this->periodoDeApplied);
-
-        return (float) $query->sum('entrada') - (float) $query->sum('saida');
+        return $this->listQueryBuilder()->sumSaldoAnterior();
     }
 
     #[Computed]
     public function totalEntrada(): float
     {
-        return (float) $this->buildListQuery()->sum('entrada');
+        return $this->listQueryBuilder()->sumEntradaFiltered();
     }
 
     #[Computed]
     public function totalSaida(): float
     {
-        return (float) $this->buildListQuery()->sum('saida');
+        return $this->listQueryBuilder()->sumSaidaFiltered();
     }
 
     #[Computed]
@@ -331,7 +180,7 @@ class ListCaixa extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.caixa.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.caixa.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.caixa.footer-summary'),
                 View::make('filament.components.erp.caixa.action-bar'),
@@ -356,7 +205,7 @@ class ListCaixa extends ListRecords
     public function updatedContaFilter(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCaixaListRefresh();
     }
 
     public function clearSearch(): void
@@ -364,20 +213,26 @@ class ListCaixa extends ListRecords
         $this->localSearch = '';
         $this->searchColumn = 'codigo';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCaixaListRefresh(resetSort: true);
     }
 
     public function updatedSearchColumn(): void
     {
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCaixaListRefresh(resetSort: true);
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushCaixaListRefresh();
+    }
+
+    public function updatedTableRecordsPerPage(): void
+    {
+        $this->clearListSelection();
+        $this->pushCaixaListRefresh();
     }
 
     public function createLancamento(): void
@@ -489,18 +344,21 @@ class ListCaixa extends ListRecords
         Notification::make()->title('Lançamento de caixa salvo.')->success()->send();
     }
 
-    public function editLancamento(): void
+    public function editLancamento(int | string | null $recordId = null): void
     {
         if (! $this->erpAuthorizeOrNotify('caixa.update')) {
             return;
         }
 
-        $recordId = $this->highlightedRecordIdOrNotify('edit');
-        if (! $recordId) {
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
+
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
-        $lancamento = CaixaLancamento::query()->find($recordId);
+        $lancamento = CaixaLancamento::query()->find($resolvedId);
         if (! $lancamento || ! str_starts_with(mb_strtoupper((string) $lancamento->historico, 'UTF-8'), '[MANUAL] ')) {
             Notification::make()
                 ->title('Lançamento não editável')
@@ -632,5 +490,71 @@ class ListCaixa extends ListRecords
             ->title('Lançamento excluído.')
             ->success()
             ->send();
+    }
+
+    #[On('erp-caixa-open-view')]
+    public function onErpCaixaOpenView(int $lancamentoId): void
+    {
+        $this->openCaixaView($lancamentoId);
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushCaixaListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    public function resetTable(): void
+    {
+        $this->pushCaixaListRefresh();
+    }
+
+    protected function pushCaixaListRefresh(bool $resetSort = false): void
+    {
+        $builder = $this->listQueryBuilder();
+        $saldoAnterior = $builder->sumSaldoAnterior();
+        $totalEntrada = $builder->sumEntradaFiltered();
+        $totalSaida = $builder->sumSaidaFiltered();
+        $saldoAtual = $saldoAnterior + $totalEntrada - $totalSaida;
+
+        $this->dispatch(
+            'erp-caixa-list-refresh',
+            contaFilter: $this->contaFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(CaixaListTable::class);
+
+        $this->skipRender();
+
+        $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual);
+    }
+
+    protected function patchCaixaFooterTotals(
+        float $saldoAnterior,
+        float $totalEntrada,
+        float $totalSaida,
+        float $saldoAtual,
+    ): void {
+        $this->js(sprintf(
+            '(() => {
+                const items = document.querySelectorAll(".erp-caixa__summary-value");
+                if (items[0]) items[0].textContent = %s;
+                if (items[1]) items[1].textContent = %s;
+                if (items[2]) items[2].textContent = %s;
+                if (items[3]) items[3].textContent = %s;
+            })()',
+            json_encode(number_format($saldoAnterior, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode(number_format($totalEntrada, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode(number_format($totalSaida, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode(number_format($saldoAtual, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
     }
 }

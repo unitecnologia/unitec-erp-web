@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Throwable;
+use App\Support\Erp\ErpSchema;
 use Illuminate\Support\Facades\Schema;
 
 final class ErpDashboardSidebarData
@@ -20,7 +21,7 @@ final class ErpDashboardSidebarData
     public static function contasPagarVencidas(int $limit = 50, int|array|null $empresaScope = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaPagar)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 return ['total' => 0, 'items' => []];
             }
 
@@ -32,7 +33,10 @@ final class ErpDashboardSidebarData
 
             ErpFinanceiroMetricas::applyEmpresaColumn($base, (new ContaPagar)->getTable(), $empresaScope);
 
-            $total = (int) (clone $base)->count();
+            $collector = ErpDashboardCollector::current();
+            $total = $collector !== null
+                ? (int) $collector->pagarVencido()['qtd']
+                : (int) (clone $base)->count();
 
             if ($total === 0) {
                 return ['total' => 0, 'items' => []];
@@ -65,13 +69,16 @@ final class ErpDashboardSidebarData
     public static function estoqueMinimo(int $limit = 50): array
     {
         try {
-            if (! Schema::hasTable((new Product)->getTable())) {
+            if (! ErpSchema::hasTable((new Product)->getTable())) {
                 return ['total' => 0, 'items' => []];
             }
 
             $base = Product::query()->estoqueCritico();
 
-            $total = (int) (clone $base)->count();
+            $collector = ErpDashboardCollector::current();
+            $total = $collector !== null
+                ? $collector->estoqueCriticoCount()
+                : (int) (clone $base)->count();
 
             if ($total === 0) {
                 return ['total' => 0, 'items' => []];
