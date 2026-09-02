@@ -10,6 +10,8 @@ let erpPdvCapsLockOn = null;
 let erpPdvNumLockOn = null;
 /** Evita atalho de pagamento (D/P/…) enquanto digita o cliente no finalizar. */
 let erpPdvFinalizarClienteTyping = false;
+/** Evita duplo F10/Enter em Concluir enquanto a venda grava. */
+let erpPdvFinalizarSubmitting = false;
 /** Control físico pressionado (Chrome pode entregar KeyD com ctrlKey:false). */
 let pdvCtrlLatch = false;
 window.__erpPdvCtrlLatch = false;
@@ -133,7 +135,13 @@ function bindErpPdvLivewireEvents() {
         void window.readPdvScaleWeightAndConfirm?.(settings);
     });
 
+    window.Livewire.on('erp-pdv-caixa-closed', () => {
+        clearPdvScanQueue('caixa-closed');
+    });
+
     window.Livewire.on('erp-pdv-focus-finalizar', () => {
+        clearPdvScanQueue('finalizar-opened');
+        erpPdvFinalizarSubmitting = false;
         erpPdvFinalizarClienteTyping = false;
         focusPdvFinalizarPagamento(0);
     });
@@ -193,6 +201,7 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar-aviso', () => {
+        erpPdvFinalizarSubmitting = false;
         // Atraso: o Enter que disparou o aviso ainda pode soltar (keyup) e
         // ativar o botão OK se ele receber foco cedo demais.
         window.setTimeout(() => {
@@ -240,6 +249,7 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-cancelar-venda-opened', () => {
+        clearPdvScanQueue('cancelar-venda-opened');
         window.setTimeout(() => {
             document.getElementById('erp-pdv-cancelar-venda-sim')?.focus();
         }, 50);
@@ -253,6 +263,8 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.hook('commit', ({ succeed }) => {
         succeed(() => {
+            resumePdvScanQueueIfNeeded();
+
             if (window.__erpPdvForceSearchFocusUntil && Date.now() < window.__erpPdvForceSearchFocusUntil) {
                 window.setTimeout(() => tryFocusPdvSearchField(), 0);
                 window.setTimeout(() => tryFocusPdvSearchField(), 30);
@@ -1329,6 +1341,184 @@ async function readPdvScaleWeightAndConfirm(settingsFromServer) {
 
 window.readPdvScaleWeightAndConfirm = readPdvScaleWeightAndConfirm;
 
+/** Fila de leituras do scanner: captura instantânea, processamento sequencial. */
+const pdvScanQueue = [];
+let pdvScanProcessing = false;
+
+window.__erpPdvScanQueueProcessing = function () {
+    return pdvScanProcessing;
+};
+
+window.__erpPdvScanQueueBusy = function () {
+    return pdvScanProcessing || pdvScanQueue.length > 0;
+};
+
+window.clearPdvScanQueue = function clearPdvScanQueue(reason = '') {
+    pdvScanQueue.length = 0;
+
+    if (reason) {
+        console.debug('[PDV scan queue] cleared', reason);
+    }
+};
+
+function normalizePdvScanCode(raw) {
+    return String(raw ?? '').trim().toUpperCase();
+}
+
+function isValidEan13(code) {
+    if (! /^\d{13}$/.test(code)) {
+        return false;
+    }
+
+    let sum = 0;
+
+    for (let i = 0; i < 12; i++) {
+        sum += Number(code[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+
+    const check = (10 - (sum % 10)) % 10;
+
+    return check === Number(code[12]);
+}
+
+/**
+ * Fallback: só divide 26 dígitos quando os dois blocos são EAN-13 válidos.
+ *
+ * @returns {string[]|null}
+ */
+function trySplitConcatenatedEan13(code) {
+    if (code.length !== 26 || ! /^\d{26}$/.test(code)) {
+        return null;
+    }
+
+    const first = code.slice(0, 13);
+    const second = code.slice(13, 26);
+
+    if (! isValidEan13(first) || ! isValidEan13(second)) {
+        console.warn('SCANNER_CONCATENATED_INPUT', {
+            code,
+            length: 26,
+            action: 'passthrough',
+            reason: 'split_rejected_check_digit',
+        });
+
+        return null;
+    }
+
+    console.warn('SCANNER_CONCATENATED_INPUT', {
+        code,
+        length: 26,
+        action: 'split_gtin13x2',
+        parts: [first, second],
+    });
+
+    return [first, second];
+}
+
+/**
+ * Enter/CR é o delimitador principal; não descarta códigos longos genericamente.
+ *
+ * @returns {string[]}
+ */
+function expandPdvScanCode(code) {
+    if (! /^\d+$/.test(code)) {
+        return [code];
+    }
+
+    const split = trySplitConcatenatedEan13(code);
+
+    if (split) {
+        return split;
+    }
+
+    if (code.length > 14) {
+        console.warn('SCANNER_CONCATENATED_INPUT', {
+            code,
+            length: code.length,
+            action: 'passthrough',
+        });
+    }
+
+    return [code];
+}
+
+window.enqueuePdvScan = function enqueuePdvScan(raw, options = {}) {
+    const normalized = normalizePdvScanCode(raw);
+
+    if (! normalized) {
+        if (options.allowEmpty) {
+            pdvScanQueue.push('');
+            void processPdvScanQueue();
+        }
+
+        return;
+    }
+
+    for (const code of expandPdvScanCode(normalized)) {
+        if (code) {
+            pdvScanQueue.push(code);
+        }
+    }
+
+    void processPdvScanQueue();
+};
+
+async function processPdvScanQueue() {
+    if (pdvScanProcessing) {
+        return;
+    }
+
+    pdvScanProcessing = true;
+
+    try {
+        while (pdvScanQueue.length > 0) {
+            const pdv = document.querySelector('.erp-pdv');
+
+            if (pdvHasBlockingUi(pdv)) {
+                break;
+            }
+
+            const code = pdvScanQueue.shift();
+            const component = findPdvLivewireComponent();
+
+            if (! component) {
+                continue;
+            }
+
+            try {
+                await component.set('pdvSearch', code);
+                await component.call('handlePdvSearchEnter');
+            } catch (error) {
+                console.error('[PDV scan queue]', code, error);
+            }
+
+            tryFocusPdvSearchField();
+        }
+    } finally {
+        pdvScanProcessing = false;
+        tryFocusPdvSearchField();
+
+        if (pdvScanQueue.length > 0 && ! pdvHasBlockingUi(document.querySelector('.erp-pdv'))) {
+            void processPdvScanQueue();
+        }
+    }
+}
+
+function resumePdvScanQueueIfNeeded() {
+    if (pdvScanProcessing || pdvScanQueue.length === 0) {
+        return;
+    }
+
+    const pdv = document.querySelector('.erp-pdv');
+
+    if (pdvHasBlockingUi(pdv)) {
+        return;
+    }
+
+    void processPdvScanQueue();
+}
+
+
 function findPdvLivewireComponent() {
     // Mesma resolução do restante do PDV (Livewire.find / wire:id).
     // Livewire.all() pode devolver instâncias internas sem .call().
@@ -1783,8 +1973,24 @@ function bindErpPdvKeys() {
     document.addEventListener('focusin', (event) => {
         if (event.target?.id === 'erp-pdv-finalizar-cliente') {
             erpPdvFinalizarClienteTyping = true;
+
+            return;
+        }
+
+        if (isPdvManualMoneyInput(event.target)) {
+            window.requestAnimationFrame(() => {
+                event.target.select?.();
+            });
         }
     });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || ! isPdvManualMoneyInput(event.target)) {
+            return;
+        }
+
+        commitPdvMoneyInput(event.target);
+    }, true);
     document.addEventListener('focusout', (event) => {
         if (event.target?.id !== 'erp-pdv-finalizar-cliente') {
             return;
@@ -2363,10 +2569,32 @@ function collectFinalizarAtalhos() {
 }
 
 /**
- * Garante que o valor digitado em uma linha de pagamento esteja formatado e
- * sincronizado com o servidor ANTES de qualquer ação (Enter/F10). Evita a
- * condição de corrida entre a máscara de dinheiro e o wire:model.live, que
- * fazia o último dígito não ser computado (ex.: 5000 virar 500).
+ * Normaliza e sincroniza campos monetarios/decimais BR do PDV antes de Enter/F10/blur.
+ *
+ * @param {HTMLInputElement|null} input
+ */
+function commitPdvMoneyInput(input) {
+    if (! input || ! window.ErpMasks) {
+        return;
+    }
+
+    if (window.ErpMasks.isBrDecimalMask(input.dataset.mask)) {
+        input.value = window.ErpMasks.finalizeMaskValue(input);
+    }
+
+    window.ErpMasks.apply(input, { sync: false });
+    delete input.dataset.erpMaskSynced;
+    window.ErpMasks.syncLivewire(input, input.value, false);
+}
+
+function isPdvManualMoneyInput(input) {
+    return input instanceof HTMLInputElement
+        && input.dataset.erpPdvMoneyInput === '1'
+        && input.closest('.erp-pdv');
+}
+
+/**
+ * Garante valor formatado/sincronizado antes de Enter/F10.
  *
  * @param {HTMLElement|null} input
  */
@@ -2375,23 +2603,9 @@ function commitPdvFinalizarValor(input) {
         return;
     }
 
-    if (! window.ErpMasks) {
-        return;
-    }
-
-    window.ErpMasks.apply(input, { sync: false });
-    delete input.dataset.erpMaskSynced;
-    // Sincronização diferida: entra na mesma requisição do component.call()
-    // seguinte, garantindo que o servidor receba o valor final antes de calcular.
-    window.ErpMasks.syncLivewire(input, input.value, false);
+    commitPdvMoneyInput(input);
 }
 
-/**
- * Flush do textarea "Informações Adicionais" antes de F7/F10/atalhos de operação.
- * Sem isso, wire:model deferido perde o texto se o operador finalizar com o foco no campo.
- *
- * @param {HTMLElement|null} [input]
- */
 function commitPdvFinalizarInformacoes(input) {
     const el = (input && input.id === 'erp-pdv-finalizar-informacoes')
         ? input
@@ -2418,34 +2632,50 @@ function commitPdvFinalizarInformacoes(input) {
     }
 }
 
-/**
- * Mesma proteção do commitPdvFinalizarValor, porém genérica para qualquer
- * input com máscara dentro de um modal (ex.: valor de desconto/acréscimo).
- * Evita que o último dígito digitado não seja computado (10,00 virar 1,00).
- *
- * @param {HTMLElement|null} input
- */
 function commitPdvMaskValue(input) {
-    if (! input || ! window.ErpMasks) {
+    if (! input) {
         return;
     }
 
-    window.ErpMasks.apply(input, { sync: false });
-    delete input.dataset.erpMaskSynced;
-    window.ErpMasks.syncLivewire(input, input.value, false);
+    commitPdvMoneyInput(input);
 }
 
 function findFinalizarOperacaoButton(atalho) {
     return document.querySelector(`.erp-pdv-finalizar__operacao-btn[data-atalho="${atalho}"]`);
 }
 
+function commitAndConfirmFinalizarVenda(component) {
+    if (erpPdvFinalizarSubmitting) {
+        return;
+    }
+
+    erpPdvFinalizarSubmitting = true;
+    commitPdvFinalizarValor(document.activeElement);
+    commitPdvFinalizarInformacoes(document.activeElement);
+
+    const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
+    const unica = footer?.dataset?.operacaoUnica;
+    const call = unica
+        ? component.call('confirmFinalizarComOperacao', unica)
+        : component.call('confirmFinalizarVenda');
+
+    Promise.resolve(call).catch(() => {
+        erpPdvFinalizarSubmitting = false;
+    });
+}
+
 function triggerFinalizarOperacao(component, atalho) {
+    if (erpPdvFinalizarSubmitting) {
+        return false;
+    }
+
     const btn = findFinalizarOperacaoButton(atalho);
 
     if (! btn?.dataset?.operacao) {
         return false;
     }
 
+    erpPdvFinalizarSubmitting = true;
     commitPdvFinalizarValor(document.activeElement);
     commitPdvFinalizarInformacoes(document.activeElement);
 
@@ -2453,7 +2683,11 @@ function triggerFinalizarOperacao(component, atalho) {
         window.setTimeout(startPdvFiscalTransmitProgress, 30);
     }
 
-    component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
+    const call = component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
+
+    Promise.resolve(call).catch(() => {
+        erpPdvFinalizarSubmitting = false;
+    });
 
     return true;
 }
@@ -2739,7 +2973,14 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    if (event.key === 'Enter' && (cpfFocused || informacoesFocused || operacaoFocused)) {
+    if (event.key === 'Enter' && operacaoFocused) {
+        event.preventDefault();
+        commitAndConfirmFinalizarVenda(component);
+
+        return;
+    }
+
+    if (event.key === 'Enter' && (cpfFocused || informacoesFocused)) {
         event.preventDefault();
 
         return;
@@ -2793,17 +3034,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
 
     if (event.key === 'F10' || event.key === 'F7') {
         event.preventDefault();
-        commitPdvFinalizarValor(document.activeElement);
-        commitPdvFinalizarInformacoes(document.activeElement);
-
-        const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
-        const unica = footer?.dataset?.operacaoUnica;
-
-        if (unica) {
-            component.call('confirmFinalizarComOperacao', unica);
-        } else {
-            component.call('confirmFinalizarVenda');
-        }
+        commitAndConfirmFinalizarVenda(component);
 
         return;
     }

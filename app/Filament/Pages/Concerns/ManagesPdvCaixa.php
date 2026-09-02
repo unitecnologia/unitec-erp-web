@@ -168,6 +168,7 @@ trait ManagesPdvCaixa
         if (! $aberto) {
             $this->caixaSessaoId = null;
             session()->forget('erp.pdv.caixa_sessao_id');
+            $this->dispatch('erp-pdv-caixa-closed');
         }
     }
 

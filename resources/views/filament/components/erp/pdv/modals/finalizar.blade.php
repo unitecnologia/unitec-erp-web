@@ -510,7 +510,8 @@
                                                     wire:model.live.debounce.300ms="finalizarPagamentos.{{ $index }}.valor"
                                                     wire:focus="selectPagamentoRow({{ $index }})"
                                                     class="erp-pdv-finalizar__grid-input"
-                                                    data-mask="money"
+                                                    data-mask="money-br"
+                                                    inputmode="decimal"
                                                     autocomplete="off"
                                                 >
                                             </span>

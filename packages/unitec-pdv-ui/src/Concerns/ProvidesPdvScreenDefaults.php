@@ -73,6 +73,12 @@ trait ProvidesPdvScreenDefaults
 
     public string $pdvFlashTotal = '';
 
+    public string $pdvUltimoVendaTotal = '0,00';
+
+    public string $pdvUltimoRecebido = '0,00';
+
+    public string $pdvUltimoTroco = '0,00';
+
     // --- Cabeçalho ----------------------------------------------------------
     /** Texto do letreiro (marquee) no topo; vazio = mostra o nome da empresa. */
     public string $pdvMarqueeTexto = '';
@@ -112,4 +118,15 @@ trait ProvidesPdvScreenDefaults
     public function openProductOverlay(): void {}
 
     public function handlePdvEscape(): void {}
+
+    /**
+     * JS compartilhado (erp-pdv-item-added) chama isto ~600 ms após o lançamento.
+     * Sem o método o Livewire devolve 500. Offline usa string (não ?string).
+     */
+    public function clearPdvFlashLancamento(): void
+    {
+        $this->pdvFlashQtd = '';
+        $this->pdvFlashPreco = '';
+        $this->pdvFlashTotal = '';
+    }
 }

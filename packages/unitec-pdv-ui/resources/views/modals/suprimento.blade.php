@@ -16,7 +16,15 @@
 
                     <label class="erp-pdv-form__field">
                         <span>Valor</span>
-                        <input type="text" wire:model="suprimentoForm.valor" class="erp-pdv-form__input erp-pdv-form__input--money">
+                        <input
+                            type="text"
+                            wire:model="suprimentoForm.valor"
+                            class="erp-pdv-form__input erp-pdv-form__input--money"
+                            data-mask="money-br"
+                            data-erp-pdv-money-input="1"
+                            inputmode="decimal"
+                            autocomplete="off"
+                        >
                     </label>
 
                     <label class="erp-pdv-form__field">

@@ -59,8 +59,9 @@
                         type="text"
                         wire:model.live.debounce.300ms="descontoItemValor"
                         class="erp-pdv-modal__input erp-pdv-desconto__valor-input"
-                        data-mask="money"
-                        inputmode="numeric"
+                        data-mask="money-br"
+                        data-erp-pdv-money-input="1"
+                        inputmode="decimal"
                         autocomplete="off"
                     >
                 </div>

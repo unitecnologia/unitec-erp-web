@@ -45,6 +45,13 @@ trait ManagesPdvVenda
 
     public ?string $pdvFlashTotal = null;
 
+    /** Resumo da última venda finalizada (painel direito até a próxima finalização). */
+    public string $pdvUltimoVendaTotal = '0,00';
+
+    public string $pdvUltimoRecebido = '0,00';
+
+    public string $pdvUltimoTroco = '0,00';
+
     public ?int $selectedSearchIndex = null;
 
     public string $pdvLaunchStep = 'search';
@@ -561,7 +568,6 @@ trait ManagesPdvVenda
     {
         $index = $this->selectedPagamentoIndex;
         $pagamento = $this->finalizarPagamentos[$index] ?? [];
-        $forma = (string) ($pagamento['forma'] ?? '');
         $valor = ErpMoney::parseBr($pagamento['valor'] ?? '0');
 
         if ($valor > 0 && PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
@@ -578,6 +584,22 @@ trait ManagesPdvVenda
             if (! $this->ensureCartaoCanhoto()) {
                 return;
             }
+        }
+
+        if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaTef($pagamento)) {
+            $count = count($this->finalizarPagamentos);
+
+            if ($this->selectedPagamentoIndex < $count - 1) {
+                $this->movePagamentoSelection(1);
+            }
+
+            return;
+        }
+
+        if ($this->finalizarValorRestanteValor() <= 0) {
+            $this->dispatch('erp-pdv-focus-finalizar-ok');
+
+            return;
         }
 
         $count = count($this->finalizarPagamentos);
@@ -677,6 +699,46 @@ trait ManagesPdvVenda
         $this->selectedCupomIndex = null;
         $this->pdvMostrarDetalheItem = false;
         $this->syncPdvPreviewFotoFromCupomSelection();
+        $this->loadPdvUltimoResumoVendaFromSession();
+    }
+
+    protected function loadPdvUltimoResumoVendaFromSession(): void
+    {
+        $stored = session('erp.pdv.ultimo_venda_resumo');
+
+        if (is_array($stored)) {
+            $this->pdvUltimoVendaTotal = $this->formatPdvUltimoResumoValor($stored['venda'] ?? null);
+            $this->pdvUltimoRecebido = $this->formatPdvUltimoResumoValor($stored['recebido'] ?? null);
+            $this->pdvUltimoTroco = $this->formatPdvUltimoResumoValor($stored['troco'] ?? null);
+
+            return;
+        }
+
+        $trocoLegado = session('erp.pdv.ultimo_troco', '0,00');
+        $this->pdvUltimoVendaTotal = '0,00';
+        $this->pdvUltimoRecebido = '0,00';
+        $this->pdvUltimoTroco = $this->formatPdvUltimoResumoValor($trocoLegado);
+    }
+
+    protected function formatPdvUltimoResumoValor(mixed $valor): string
+    {
+        return is_string($valor) && $valor !== '' ? $valor : '0,00';
+    }
+
+    protected function persistirPdvUltimoResumoVenda(float $totalVenda, float $recebido, float $troco): void
+    {
+        $this->pdvUltimoVendaTotal = ErpMoney::formatBr($totalVenda);
+        $this->pdvUltimoRecebido = ErpMoney::formatBr($recebido);
+        $this->pdvUltimoTroco = ErpMoney::formatBr($troco);
+
+        session([
+            'erp.pdv.ultimo_venda_resumo' => [
+                'venda' => $this->pdvUltimoVendaTotal,
+                'recebido' => $this->pdvUltimoRecebido,
+                'troco' => $this->pdvUltimoTroco,
+            ],
+        ]);
+        session()->forget('erp.pdv.ultimo_troco');
     }
 
     protected function persistCupomToSession(): void
@@ -2498,6 +2560,12 @@ trait ManagesPdvVenda
 
             return;
         }
+
+        $this->persistirPdvUltimoResumoVenda(
+            $total,
+            $dinheiro,
+            $troco,
+        );
 
         // HTTP SEFAZ fora da transaction: evita NFC-e autorizada + rollback local.
         if ($emitirNfceAposCommit && $vendaId) {

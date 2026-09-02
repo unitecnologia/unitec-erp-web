@@ -145,6 +145,28 @@ final class PdvFinalizarPagamentosHelper
     }
 
     /**
+     * TEF integrado: fluxo próprio (não concluir venda só porque o restante zerou).
+     *
+     * @param  array{forma?: string, tipo?: string, usa_tef?: bool|int|string}  $pagamento
+     */
+    public static function isFormaTef(array $pagamento): bool
+    {
+        $tipo = strtolower(trim((string) ($pagamento['tipo'] ?? '')));
+
+        if ($tipo === 'tef') {
+            return true;
+        }
+
+        if (filter_var($pagamento['usa_tef'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return true;
+        }
+
+        $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+        return str_contains($forma, 'TEF');
+    }
+
+    /**
      * Converte "30,60,90" numa lista de dias [30, 60, 90].
      *
      * @return list<int>

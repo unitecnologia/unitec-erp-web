@@ -71,10 +71,11 @@
                             <input
                                 id="erp-pdv-abertura-valor"
                                 type="text"
-                                inputmode="numeric"
                                 name="pdv_abertura_{{ uniqid() }}"
                                 wire:model.blur="aberturaForm.valor"
-                                data-mask="money"
+                                data-mask="money-br"
+                                data-erp-pdv-money-input="1"
+                                inputmode="decimal"
                                 class="erp-pdv-caixa-modal__input"
                                 autocomplete="off"
                                 autocorrect="off"

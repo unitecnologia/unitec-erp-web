@@ -6508,3 +6508,460 @@
     font-size: 0.72rem;
 }
 
+
+/* === restored approved PDV UI (surgical from backup/wip-pos-6.4.1.174) === */
+/* side panel / ultima venda / rodape / descricao */
+/* Painel direito (foto, busca, totais, total e nome do produto) */
+.erp-pdv__side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    padding: 0.35rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+}
+
+.erp-pdv__logo-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.erp-pdv__product-photo {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 5rem;
+    max-height: none;
+    height: auto;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0.35rem;
+    box-sizing: border-box;
+}
+
+.erp-pdv__product-photo-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+.erp-pdv__grid--cupom tbody td.erp-pdv__grid-col-descricao,
+.erp-pdv__grid--consulta tbody td.erp-pdv__grid-col-descricao {
+    font-size: 16px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-pdv__ultimo-troco {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.28rem;
+    width: 100%;
+    margin: 0;
+    padding: 0.34rem 0.45rem;
+    background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid #6ee7b7;
+    border-radius: 6px;
+    color: #065f46;
+    line-height: 1.05;
+    box-shadow: none;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.erp-pdv__ultimo-troco-heading {
+    flex: 0 0 auto;
+    font-size: clamp(0.5rem, 0.88vw, 0.62rem);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.erp-pdv__ultimo-troco-part {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.18rem;
+    min-width: 0;
+    flex: 0 1 auto;
+    justify-content: flex-start;
+}
+
+.erp-pdv__ultimo-troco-part--minor .erp-pdv__ultimo-troco-k,
+.erp-pdv__ultimo-troco-part--minor .erp-pdv__ultimo-troco-v {
+    font-size: clamp(0.46rem, 0.78vw, 0.56rem);
+    font-weight: 700;
+}
+
+.erp-pdv__ultimo-troco-k {
+    font-size: clamp(0.48rem, 0.85vw, 0.6rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.erp-pdv__ultimo-troco-v {
+    font-size: clamp(0.58rem, 1.02vw, 0.72rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-pdv__ultimo-troco-v--troco {
+    font-size: clamp(0.72rem, 1.25vw, 0.9rem);
+    font-weight: 900;
+    color: #047857;
+}
+
+.erp-pdv__ultimo-troco-sep {
+    flex-shrink: 0;
+    color: rgba(6, 95, 70, 0.45);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.erp-pdv__side-panel .erp-pdv__codigo-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 5px 6px 7px;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: none;
+}
+
+.erp-pdv__side-panel .erp-pdv__search-legend {
+    display: block;
+    position: static;
+    float: none;
+    width: auto;
+    padding: 0;
+    margin: 0;
+    color: var(--erp-brand-primary, #1e5a9e);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    font-weight: 800;
+    text-align: left;
+}
+
+.erp-pdv__side-panel .erp-pdv__search-field {
+    margin-top: 0;
+}
+
+.erp-pdv__side-panel .erp-pdv__search-input {
+    min-height: clamp(2.35rem, 4.8vh, 3.1rem);
+    padding: 0.42rem 0.58rem;
+}
+
+.erp-pdv__side-panel .erp-pdv__totals {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    padding: 0.32rem;
+    gap: 0.4rem;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 6px;
+    box-shadow: none;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-box {
+    min-height: clamp(2.75rem, 8vh, 4.5rem);
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 6px;
+    justify-content: center;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-label {
+    text-align: center;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-value,
+.erp-pdv__side-panel .erp-pdv__total-input {
+    text-align: center;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-box--grand {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    margin-top: 0;
+    margin-bottom: 0.2rem;
+    padding: 0.35rem 0.45rem;
+    min-height: clamp(3.25rem, 9vh, 5rem);
+    background: #fff;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: none;
+    justify-content: center;
+    text-align: center;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-box--grand .erp-pdv__total-label,
+.erp-pdv__side-panel .erp-pdv__total-box--grand .erp-pdv__total-value {
+    text-align: center;
+}
+
+.erp-pdv__toolbar {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    background: linear-gradient(180deg, #6a8eb8 0%, #557aa8 100%);
+    border-top: 1px solid #3d5f88;
+    overflow-x: hidden;
+    overflow-y: visible;
+}
+
+.erp-pdv__toolbar-start {
+    display: flex;
+    flex-shrink: 0;
+    align-items: stretch;
+    padding-right: 0.75rem;
+    margin-right: 0.5rem;
+    border-right: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.erp-pdv__toolbar-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+}
+
+.erp-pdv__tool-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 5rem;
+    height: 3.7rem;
+    min-height: 3.7rem;
+    padding: 0.28rem 0.4rem 0.22rem;
+    border: 1px solid #3d4f62;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #6a6a6a 0%, #4a4a4a 100%);
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    overflow: visible;
+}
+
+.erp-pdv__tool-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #7a7a7a 0%, #5a5a5a 100%);
+}
+
+.erp-pdv__tool-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.55rem;
+    height: 2.55rem;
+    margin-bottom: 0.06rem;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.erp-pdv__tool-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform: none;
+    pointer-events: none;
+}
+
+.erp-pdv__tool-label {
+    margin-top: 0.1rem;
+    font-size: clamp(0.58rem, 1.05vw, 0.66rem);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.15;
+}
+
+.erp-pdv__tool-label kbd {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 800;
+}
+
+.erp-pdv__status {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    background: #2f2f2f;
+    color: #fff;
+    font-size: clamp(0.68rem, 1.2vw, 0.78rem);
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.erp-pdv__status > span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.2;
+}
+
+.erp-pdv__status-empresa {
+    max-width: min(32vw, 24rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-pdv__side-panel {
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__product-photo {
+    flex: 1 1 auto !important;
+    min-height: 5rem !important;
+    max-height: none !important;
+    height: auto !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__ultimo-troco,
+.erp-pdv__side-panel .erp-pdv__codigo-box,
+.erp-pdv__side-panel .erp-pdv__totals,
+.erp-pdv__side-panel .erp-pdv__total-box--grand {
+    flex: 0 0 auto !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__total-box--grand {
+    margin-top: 0 !important;
+}
+
+.erp-pdv__product-photo-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__codigo-box {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__totals {
+    border: 1px solid var(--erp-border-light, #c7d5e8) !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.erp-pdv__side-panel .erp-pdv__search-legend {
+    color: var(--erp-brand-primary, #1e5a9e) !important;
+}
+
+.erp-pdv__tool-btn {
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 5rem !important;
+    height: 3.7rem !important;
+    min-height: 3.7rem !important;
+    padding: 0.28rem 0.4rem 0.22rem !important;
+    overflow: visible !important;
+}
+
+.erp-pdv__tool-icon {
+    width: 2.55rem !important;
+    height: 2.55rem !important;
+    margin-bottom: 0.06rem !important;
+    overflow: visible !important;
+}
+
+.erp-pdv__tool-img {
+    transform: none !important;
+}
+
+.erp-pdv__tool-label {
+    width: 100%;
+    text-align: center !important;
+}
+
+.erp-pdv__tool-label kbd {
+    display: inline-block;
+    padding: 0 0.18rem;
+    border-radius: 3px;
+    background: rgba(30, 90, 158, 0.1);
+}
+
+.erp-pdv__tool-btn--exit .erp-pdv__tool-label kbd {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.erp-pdv__grid--cupom tbody tr:nth-child(even):not(.erp-pdv__grid-row--selected):not(.erp-pdv__grid-empty) td,
+.erp-pdv__grid--consulta tbody tr:nth-child(even):not(.erp-pdv__grid-row--selected):not(.erp-pdv__grid-empty) td {
+    background: #f1f5f9 !important;
+}
+
+.erp-pdv__grid--cupom .erp-pdv__grid-row--selected td,
+.erp-pdv__grid--consulta .erp-pdv__grid-row--selected td {
+    background: #93c5fd !important;
+    color: #0f172a !important;
+    box-shadow: inset 4px 0 0 #1d4ed8 !important;
+}
+
+.erp-pdv__grid--cupom th,
+.erp-pdv__grid--consulta th {
+    padding: 0.18rem 0.35rem !important;
+    height: 1.6rem !important;
+    font-size: 0.78rem !important;
+    vertical-align: middle !important;
+}
+
+.erp-pdv__grid--cupom tbody td.erp-pdv__grid-col-descricao,
+.erp-pdv__grid--consulta tbody td.erp-pdv__grid-col-descricao {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+

@@ -501,7 +501,9 @@
                                                     wire:model.live.debounce.300ms="finalizarPagamentos.{{ $index }}.valor"
                                                     wire:focus="selectPagamentoRow({{ $index }})"
                                                     class="erp-pdv-finalizar__grid-input"
-                                                    data-mask="money"
+                                                    data-mask="money-br"
+                                                    data-erp-pdv-money-input="1"
+                                                    inputmode="decimal"
                                                     autocomplete="off"
                                                 >
                                             </span>
@@ -532,7 +534,9 @@
                                         type="text"
                                         wire:model.live="finalizarForm.desconto_venda"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                        data-mask="money"
+                                        data-mask="money-br"
+                                        data-erp-pdv-money-input="1"
+                                        inputmode="decimal"
                                         autocomplete="off"
                                     >
                                 </label>
@@ -544,7 +548,9 @@
                                         type="text"
                                         wire:model.live="finalizarForm.acrescimo_venda"
                                         class="erp-pdv-finalizar__input erp-pdv-finalizar__input--num"
-                                        data-mask="money"
+                                        data-mask="money-br"
+                                        data-erp-pdv-money-input="1"
+                                        inputmode="decimal"
                                         autocomplete="off"
                                     >
                                 </label>

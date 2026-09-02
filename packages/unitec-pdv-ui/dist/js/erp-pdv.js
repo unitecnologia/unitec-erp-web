@@ -4,14 +4,23 @@ let erpPdvIdleTimer = null;
 let erpPdvIdleBound = false;
 let erpPdvClockTimer = null;
 let erpPdvStatusBarSync = null;
+/** @type {boolean|null} */
+let erpPdvCapsLockOn = null;
+/** @type {boolean|null} */
+let erpPdvNumLockOn = null;
 /** Evita atalho de pagamento (D/P/…) enquanto digita o cliente no finalizar. */
 let erpPdvFinalizarClienteTyping = false;
+/** Evita duplo F10/Enter em Concluir enquanto a venda grava. */
+let erpPdvFinalizarSubmitting = false;
+/** Control físico pressionado (Chrome pode entregar KeyD com ctrlKey:false). */
+let pdvCtrlLatch = false;
+window.__erpPdvCtrlLatch = false;
 
 /** @type {Record<string, [string, ...unknown[]]>} */
 const ERP_PDV_FN_SHORTCUTS = {
     F1: ['openPdvModal', 'options'],
     F2: ['toggleCaixa'],
-    F3: ['openVendedorModal'],
+    F3: ['openPdvModal', 'acesso_rapido'],
     F4: ['openBuscaAvancadaModal'],
     F5: ['openImportarModal'],
     F6: ['cancelarCupom'],
@@ -24,7 +33,7 @@ const ERP_PDV_FN_SHORTCUTS = {
 
 /** @type {Record<string, [string, ...unknown[]]>} */
 const ERP_PDV_CTRL_SHORTCUTS = {
-    d: ['openDescontoItemModal'],
+    // Desconto/Acréscimo (Ctrl+D): handlePdvModifierCapture + btn.click.
     a: ['abrirGaveta'],
     r: ['openReceberModal'],
     l: ['openBuscaPrecoModal'],
@@ -61,6 +70,7 @@ function bindErpPdvLivewireEvents() {
     erpPdvLivewireBound = true;
 
     window.Livewire.on('erp-pdv-modal-opened', (payload) => {
+        ensurePdvFullscreenFromUserGesture();
         window.setTimeout(() => {
             if (payload?.modal === 'sair') {
                 document.getElementById('erp-pdv-sair-sim')?.focus();
@@ -71,6 +81,8 @@ function bindErpPdvLivewireEvents() {
                     || document.getElementById('erp-pdv-remover-itens-sim')?.focus();
             } else if (payload?.modal === 'finalizar') {
                 focusPdvFinalizarPagamento(0);
+            } else if (payload?.modal === 'abrir_caixa' || payload?.modal === 'fechar_caixa') {
+                focusPdvModalField();
             } else {
                 focusPdvModalField();
             }
@@ -118,9 +130,33 @@ function bindErpPdvLivewireEvents() {
         focusPdvSearchField();
     });
 
+    window.Livewire.on('erp-pdv-read-scale', (payload) => {
+        const settings = resolvePdvScaleSettingsFromEvent(payload);
+        void window.readPdvScaleWeightAndConfirm?.(settings);
+    });
+
+    window.Livewire.on('erp-pdv-caixa-closed', () => {
+        clearPdvScanQueue('caixa-closed');
+    });
+
     window.Livewire.on('erp-pdv-focus-finalizar', () => {
+        clearPdvScanQueue('finalizar-opened');
+        erpPdvFinalizarSubmitting = false;
         erpPdvFinalizarClienteTyping = false;
         focusPdvFinalizarPagamento(0);
+    });
+
+    window.Livewire.on('erp-pdv-contar-moedas-opened', () => {
+        window.setTimeout(() => {
+            const primeiro = document.getElementById('erp-pdv-moedas-primeiro');
+
+            if (! primeiro) {
+                return;
+            }
+
+            primeiro.focus();
+            primeiro.select?.();
+        }, 50);
     });
 
     window.Livewire.on('erp-pdv-focus-finalizar-pagamento', (payload) => {
@@ -164,9 +200,45 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-finalizar-aviso', () => {
+        erpPdvFinalizarSubmitting = false;
+        // Atraso: o Enter que disparou o aviso ainda pode soltar (keyup) e
+        // ativar o botão OK se ele receber foco cedo demais.
+        window.setTimeout(() => {
+            const ok = document.getElementById('erp-pdv-finalizar-aviso-ok');
+            const aviso = document.querySelector('.erp-pdv-finalizar-aviso');
+
+            if (! ok || ! aviso) {
+                return;
+            }
+
+            const blockKeyup = (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            };
+
+            ok.addEventListener('keyup', blockKeyup, true);
+            window.setTimeout(() => ok.removeEventListener('keyup', blockKeyup, true), 500);
+            ok.focus();
+        }, 350);
+    });
+
     window.Livewire.on('erp-pdv-focus-finalizar-informacoes', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-finalizar-informacoes')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-finalizar-cpf', () => {
+        window.setTimeout(() => {
+            const el = document.getElementById('erp-pdv-finalizar-cpf');
+            if (! el) {
+                return;
+            }
+            el.focus();
+            el.select?.();
         }, 50);
     });
 
@@ -177,6 +249,7 @@ function bindErpPdvLivewireEvents() {
     });
 
     window.Livewire.on('erp-pdv-cancelar-venda-opened', () => {
+        clearPdvScanQueue('cancelar-venda-opened');
         window.setTimeout(() => {
             document.getElementById('erp-pdv-cancelar-venda-sim')?.focus();
         }, 50);
@@ -190,6 +263,8 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.hook('commit', ({ succeed }) => {
         succeed(() => {
+            resumePdvScanQueueIfNeeded();
+
             if (window.__erpPdvForceSearchFocusUntil && Date.now() < window.__erpPdvForceSearchFocusUntil) {
                 window.setTimeout(() => tryFocusPdvSearchField(), 0);
                 window.setTimeout(() => tryFocusPdvSearchField(), 30);
@@ -231,6 +306,12 @@ function bindErpPdvLivewireEvents() {
             });
         }
 
+        restorePdvBuscaAvancadaFocus();
+
+        if (el?.querySelector?.('#erp-pdv-abertura-valor') || el?.id === 'erp-pdv-abertura-valor') {
+            focusPdvModalField();
+        }
+
         if (el?.querySelector?.('.erp-pdv-finalizar__grid-input') || el?.classList?.contains('erp-pdv-finalizar__grid-input')) {
             window.ErpMasks?.refresh(el?.closest?.('.erp-pdv-finalizar') ?? document.querySelector('.erp-pdv-finalizar') ?? document);
             scrollPdvFinalizarSelectionIntoView();
@@ -239,12 +320,15 @@ function bindErpPdvLivewireEvents() {
         if (el?.querySelector?.('.erp-pdv__total-input') || el?.classList?.contains('erp-pdv__total-input')) {
             window.ErpMasks?.refresh(el?.closest?.('.erp-pdv') ?? document.querySelector('.erp-pdv') ?? document);
         }
-    });
 
-    window.Livewire.on('erp-pdv-focus-vendedor', () => {
-        window.setTimeout(() => {
-            document.getElementById('erp-pdv-vendedor-search')?.focus();
-        }, 50);
+        if (
+            el?.querySelector?.('#erp-pdv-status-num')
+            || el?.querySelector?.('#erp-pdv-status-caps')
+            || el?.querySelector?.('.erp-pdv__status')
+            || el?.classList?.contains('erp-pdv__status')
+        ) {
+            bindPdvStatusBar();
+        }
     });
 
     window.Livewire.on('erp-pdv-focus-desconto', () => {
@@ -353,6 +437,12 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-vendas-espera', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-vendas-espera-search')?.focus();
+        }, 50);
+    });
+
     window.Livewire.on('erp-pdv-focus-estorno-venda', () => {
         window.setTimeout(() => {
             const motivo = document.getElementById('erp-pdv-estorno-motivo');
@@ -376,10 +466,37 @@ function bindErpPdvLivewireEvents() {
         hidePdvFiscalTransmitProgress();
     });
 
+    // "Erro ao carregar a página" / timeout: Livewire morre sem hide — fecha o overlay na hora.
+    window.Livewire.hook('request', ({ fail }) => {
+        fail(() => {
+            const overlay = getPdvFiscalTransmitProgressOverlay();
+
+            if (! overlay?.classList.contains('is-visible') && ! pdvFiscalProgressActive) {
+                return;
+            }
+
+            forceHidePdvFiscalTransmitProgressStuck(
+                'A finalização falhou (comunicação ou erro no servidor). Se a venda não aparecer em Vendas, tente de novo. Se aparecer sem NFC-e, transmita ou use contingência na tela NFC-e.'
+            );
+        });
+    });
+
     window.Livewire.on('erp-pdv-imprimir-pos-venda-opened', () => {
         hidePdvFiscalTransmitProgress();
         window.setTimeout(() => {
             document.getElementById('erp-pdv-imprimir-pos-venda-nao')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-imprimir-movimento-caixa-opened', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-imprimir-movimento-caixa-nao')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-imprimir-resumo-caixa-opened', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-imprimir-resumo-caixa-nao')?.focus();
         }, 50);
     });
 
@@ -436,6 +553,7 @@ function initErpPdv() {
     bindPdvStatusBar();
     bindPdvFiscalTransmitTriggers();
     bindPdvClickGuard();
+    bindPdvLaunchStepBack();
     bindPdvSearchFocusTrap();
 
     const page = document.querySelector('.erp-pdv-page');
@@ -449,6 +567,13 @@ function initErpPdv() {
 
     armPdvKioskFullscreen();
 
+    // Overlay NFC-e às vezes fica preso com is-visible (wire:ignore) e engole o PDV.
+    document.querySelectorAll('[data-erp-pdv-fiscal-progress].is-visible').forEach((overlay) => {
+        if (! pdvFiscalProgressActive) {
+            overlay.classList.remove('is-visible');
+        }
+    });
+
     // Remove cursor customizado antigo, se ainda estiver no DOM.
     page.querySelectorAll('.erp-pdv__search-caret').forEach((el) => el.remove());
 
@@ -460,16 +585,35 @@ function initErpPdv() {
 }
 
 /**
- * Tela cheia "quiosque" ao abrir o PDV pela retaguarda (esconde a barra do Windows).
+ * Tela cheia "quiosque" ao abrir o PDV (esconde a barra do Windows).
  *
- * O navegador só permite entrar em tela cheia a partir de um gesto do usuário,
- * então armamos a entrada no primeiro toque/tecla dentro do PDV. Usamos o
- * Keyboard Lock (quando disponível, Chrome/Edge) para que o Esc continue
- * funcionando no PDV — para sair da tela cheia o operador segura o Esc ou usa
- * Alt+F4.
+ * O navegador só permite fullscreen com gesto do usuário. Em PWA standalone
+ * o clique no atalho PDV já é o gesto — tentamos na hora e, se falhar,
+ * armamos de novo no próximo clique/tecla dentro do PDV.
  */
+function isErpPwaStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: window-controls-overlay)').matches
+        || window.navigator.standalone === true;
+}
+
 function armPdvKioskFullscreen() {
-    if (window.__erpPdvKioskArmed || document.fullscreenElement) {
+    if (document.fullscreenElement) {
+        lockPdvEscapeKey();
+
+        return;
+    }
+
+    // Em PWA, tenta entrar já (pode falhar se não houver gesto nesta carga).
+    if (isErpPwaStandalone()) {
+        enterPdvFullscreen();
+        if (document.fullscreenElement) {
+            return;
+        }
+    }
+
+    if (window.__erpPdvKioskArmed) {
         return;
     }
 
@@ -481,6 +625,7 @@ function armPdvKioskFullscreen() {
     };
 
     window.__erpPdvKioskArmed = true;
+    window.__erpPdvKioskEnterOnce = enterOnce;
     document.addEventListener('pointerdown', enterOnce, true);
     document.addEventListener('keydown', enterOnce, true);
 }
@@ -489,22 +634,27 @@ function enterPdvFullscreen() {
     if (document.fullscreenElement) {
         lockPdvEscapeKey();
 
-        return;
+        return Promise.resolve();
     }
 
     const target = document.documentElement;
-    const request = target.requestFullscreen
-        ? target.requestFullscreen({ navigationUI: 'hide' })
-        : null;
+    const request = typeof target.requestFullscreen === 'function'
+        ? target.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+            // Alguns Chromium/PWA rejeitam navigationUI — tenta sem opções.
+            return target.requestFullscreen();
+        })
+        : (typeof target.webkitRequestFullscreen === 'function'
+            ? Promise.resolve(target.webkitRequestFullscreen())
+            : null);
 
     if (! request || typeof request.then !== 'function') {
         lockPdvEscapeKey();
 
-        return;
+        return Promise.resolve();
     }
 
-    request.then(lockPdvEscapeKey).catch(() => {
-        // Bloqueado pelo navegador: mantém o comportamento normal, sem tela cheia.
+    return request.then(lockPdvEscapeKey).catch(() => {
+        // Bloqueado pelo navegador: mantém janela normal do PWA.
     });
 }
 
@@ -519,6 +669,14 @@ function lockPdvEscapeKey() {
 }
 
 function exitPdvFullscreen() {
+    window.__erpPdvKioskArmed = false;
+
+    if (typeof window.__erpPdvKioskEnterOnce === 'function') {
+        document.removeEventListener('pointerdown', window.__erpPdvKioskEnterOnce, true);
+        document.removeEventListener('keydown', window.__erpPdvKioskEnterOnce, true);
+        window.__erpPdvKioskEnterOnce = null;
+    }
+
     try {
         if (navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
             navigator.keyboard.unlock();
@@ -532,9 +690,21 @@ function exitPdvFullscreen() {
     }
 }
 
+/** Garante fullscreen no gesto do operador (F2 / clique em Abrir caixa). */
+function ensurePdvFullscreenFromUserGesture() {
+    if (! document.querySelector('.erp-pdv-page')) {
+        return;
+    }
+
+    void enterPdvFullscreen();
+}
+
 let pdvFiscalProgressTimer = null;
+let pdvFiscalProgressWatchdogTimer = null;
 let pdvFiscalProgressStepIndex = 0;
 let pdvFiscalProgressActive = false;
+
+const PDV_FISCAL_PROGRESS_WATCHDOG_MS = 90000;
 
 function bindPdvFiscalTransmitTriggers() {
     if (window.__erpPdvFiscalTransmitTriggersBound) {
@@ -636,6 +806,76 @@ function bindPdvClickGuard() {
     }, true);
 }
 
+/**
+ * Fluxo normal (sem Caixa Rápido): clique volta o passo do lançamento.
+ * Qtde volta do Preço; Código volta de Qtde/Preço.
+ * Feito no JS porque o campo do passo inativo é readonly e wire:mousedown não
+ * chega ao servidor — mesmo padrão do Enter nas grades.
+ */
+function bindPdvLaunchStepBack() {
+    if (window.__erpPdvLaunchStepBackBound) {
+        return;
+    }
+
+    window.__erpPdvLaunchStepBackBound = true;
+
+    document.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const target = event.target;
+
+        if (! (target instanceof Element)) {
+            return;
+        }
+
+        const qtdInput = document.getElementById('erp-pdv-launch-qtd');
+        const qtdBox = qtdInput?.closest('.erp-pdv__total-box');
+        const precoBox = document.getElementById('erp-pdv-launch-preco')?.closest('.erp-pdv__total-box');
+
+        if (! qtdBox || ! precoBox) {
+            return;
+        }
+
+        const passoQtd = qtdBox.classList.contains('erp-pdv__total-box--active');
+        const passoPreco = precoBox.classList.contains('erp-pdv__total-box--active');
+
+        // Sem lançamento em andamento: nada a voltar.
+        if (! passoQtd && ! passoPreco) {
+            return;
+        }
+
+        const component = getErpPdvComponent();
+
+        if (! component) {
+            return;
+        }
+
+        if (target.closest('#erp-pdv-search, .erp-pdv__search-field')) {
+            component.call('voltarPdvLaunchPara', 'search');
+
+            return;
+        }
+
+        if (passoPreco && qtdBox.contains(target)) {
+            event.preventDefault();
+
+            // Libera e foca na hora: o clique já deixa o caret na quantidade.
+            qtdInput.removeAttribute('readonly');
+
+            try {
+                qtdInput.focus({ preventScroll: true });
+            } catch (_) {
+                qtdInput.focus();
+            }
+
+            qtdInput.select?.();
+            component.call('voltarPdvLaunchPara', 'qtd');
+        }
+    }, true);
+}
+
 function isPdvScrollbarClick(event, scrollEl) {
     if (! scrollEl) {
         return false;
@@ -687,40 +927,133 @@ function resetPdvFiscalTransmitProgressUi(overlay) {
     }
 }
 
-function advancePdvFiscalTransmitProgress(overlay) {
+/**
+ * Etapa real reportada pelo servidor (0..4). Sem avanço por timer.
+ */
+function setPdvFiscalTransmitProgressStep(stepIndex, label) {
+    const overlay = getPdvFiscalTransmitProgressOverlay();
+
+    if (! overlay) {
+        return;
+    }
+
+    if (! pdvFiscalProgressActive) {
+        pdvFiscalProgressActive = true;
+        overlay.classList.add('is-visible');
+        overlay.setAttribute('aria-busy', 'true');
+    }
+
     const panel = overlay.querySelector('[data-erp-pdv-fiscal-progress-panel]') ?? overlay;
     const steps = Array.from(panel.querySelectorAll('[data-erp-pdv-fiscal-step]'));
     const statusEl = panel.querySelector('[data-erp-pdv-fiscal-step-status]');
     const barEl = panel.querySelector('[data-erp-pdv-fiscal-step-bar]');
+    const target = Math.max(0, Math.min(steps.length - 1, Number(stepIndex) || 0));
 
-    if (steps.length === 0) {
+    pdvFiscalProgressStepIndex = target;
+
+    steps.forEach((step, index) => {
+        step.classList.toggle('is-done', index < target);
+        step.classList.toggle('is-active', index === target);
+    });
+
+    const text = (label && String(label).trim()) || (steps[target] ? steps[target].textContent.trim() : '');
+
+    if (statusEl && text) {
+        statusEl.textContent = text.endsWith('…') || text.endsWith('...') ? text : `${text}…`;
+    }
+
+    if (barEl && steps.length > 0) {
+        barEl.style.width = `${Math.min(100, Math.round(((target + 1) / steps.length) * 100))}%`;
+    }
+}
+
+window.__erpPdvSetFiscalStep = setPdvFiscalTransmitProgressStep;
+
+function applyPdvFiscalProgressStreamPayload(raw) {
+    const text = String(raw || '').trim();
+
+    if (! text) {
         return;
     }
 
-    if (pdvFiscalProgressStepIndex < steps.length - 1) {
-        steps[pdvFiscalProgressStepIndex].classList.remove('is-active');
-        steps[pdvFiscalProgressStepIndex].classList.add('is-done');
-        pdvFiscalProgressStepIndex += 1;
-        steps[pdvFiscalProgressStepIndex].classList.add('is-active');
+    try {
+        const data = JSON.parse(text);
+        setPdvFiscalTransmitProgressStep(data.step, data.label);
+    } catch (_e) {
+        // ignore
+    }
+}
+
+function bindPdvFiscalProgressStreamObserver() {
+    const streamEl = document.querySelector('[data-erp-pdv-fiscal-progress-stream]');
+
+    if (! streamEl || window.__erpPdvFiscalStreamObserverBound) {
+        return;
     }
 
-    if (statusEl && steps[pdvFiscalProgressStepIndex]) {
-        statusEl.textContent = `${steps[pdvFiscalProgressStepIndex].textContent.trim()}…`;
-    }
+    window.__erpPdvFiscalStreamObserverBound = true;
 
-    if (barEl) {
-        const percent = Math.min(100, Math.round(((pdvFiscalProgressStepIndex + 1) / steps.length) * 100));
-        barEl.style.width = `${percent}%`;
+    const observer = new MutationObserver(() => {
+        applyPdvFiscalProgressStreamPayload(streamEl.textContent);
+    });
+
+    observer.observe(streamEl, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+    });
+}
+
+function clearPdvFiscalTransmitWatchdog() {
+    if (pdvFiscalProgressWatchdogTimer) {
+        window.clearTimeout(pdvFiscalProgressWatchdogTimer);
+        pdvFiscalProgressWatchdogTimer = null;
     }
 }
 
 function stopPdvFiscalTransmitProgress() {
     pdvFiscalProgressActive = false;
+    clearPdvFiscalTransmitWatchdog();
 
     if (pdvFiscalProgressTimer) {
         window.clearInterval(pdvFiscalProgressTimer);
         pdvFiscalProgressTimer = null;
     }
+}
+
+function notifyPdvFiscalProgressStuck(message, title = 'NFC-e — atenção') {
+    try {
+        if (typeof FilamentNotification !== 'undefined') {
+            new FilamentNotification()
+                .title(title)
+                .body(message)
+                .warning()
+                .persistent()
+                .send();
+
+            return;
+        }
+    } catch (_e) {
+        // fallback abaixo
+    }
+
+    window.alert(message);
+}
+
+function forceHidePdvFiscalTransmitProgressStuck(reason) {
+    if (! pdvFiscalProgressActive) {
+        const overlay = getPdvFiscalTransmitProgressOverlay();
+
+        if (! overlay?.classList.contains('is-visible')) {
+            return;
+        }
+    }
+
+    hidePdvFiscalTransmitProgress();
+    notifyPdvFiscalProgressStuck(
+        reason
+        || 'A finalização da NFC-e não respondeu a tempo. Confira em Vendas/NFC-e: se a venda não aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingência.'
+    );
 }
 
 function startPdvFiscalTransmitProgress() {
@@ -731,30 +1064,20 @@ function startPdvFiscalTransmitProgress() {
     }
 
     stopPdvFiscalTransmitProgress();
+    bindPdvFiscalProgressStreamObserver();
     pdvFiscalProgressActive = true;
     overlay.classList.add('is-visible');
     overlay.setAttribute('aria-busy', 'true');
     resetPdvFiscalTransmitProgressUi(overlay);
+    setPdvFiscalTransmitProgressStep(0, 'Validando dados da NFC-e');
 
-    window.setTimeout(() => {
-        if (! pdvFiscalProgressActive) {
-            return;
-        }
-
-        advancePdvFiscalTransmitProgress(overlay);
-    }, 700);
-
-    pdvFiscalProgressTimer = window.setInterval(() => {
-        const currentOverlay = getPdvFiscalTransmitProgressOverlay();
-
-        if (! pdvFiscalProgressActive || ! currentOverlay) {
-            stopPdvFiscalTransmitProgress();
-
-            return;
-        }
-
-        advancePdvFiscalTransmitProgress(currentOverlay);
-    }, 850);
+    // Livewire/SEFAZ podem morrer sem dispatch de hide — não deixar o operador preso.
+    pdvFiscalProgressWatchdogTimer = window.setTimeout(() => {
+        pdvFiscalProgressWatchdogTimer = null;
+        forceHidePdvFiscalTransmitProgressStuck(
+            'A transmissão da NFC-e demorou demais ou a conexão caiu. Confira em Vendas/NFC-e: se a venda não aparecer, tente de novo; se aparecer sem NFC-e, transmita ou use contingência.'
+        );
+    }, PDV_FISCAL_PROGRESS_WATCHDOG_MS);
 }
 
 function hidePdvFiscalTransmitProgress() {
@@ -778,16 +1101,428 @@ function focusPdvSearchField() {
     });
 }
 
-function findPdvLivewireComponent() {
-    if (! window.Livewire?.all) {
+function getPdvRootEl() {
+    return document.querySelector('.erp-pdv');
+}
+
+function normalizePdvBalancaSettings(raw) {
+    if (! raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return null;
+    }
+
+    return {
+        marca: String(raw.marca || ''),
+        port: String(raw.port || ''),
+        baudRate: Number(raw.baudRate) || 9600,
+        dataBits: Number(raw.dataBits) || 8,
+        parity: String(raw.parity || 'None'),
+        stopBits: String(raw.stopBits || '1'),
+        handshake: String(raw.handshake || 'None'),
+    };
+}
+
+function resolvePdvScaleSettingsFromEvent(payload) {
+    if (! payload) {
+        return null;
+    }
+
+    if (payload.settings && typeof payload.settings === 'object') {
+        return normalizePdvBalancaSettings(payload.settings);
+    }
+
+    if (Array.isArray(payload)) {
+        const first = payload[0];
+
+        if (first?.settings && typeof first.settings === 'object') {
+            return normalizePdvBalancaSettings(first.settings);
+        }
+
+        if (first?.port) {
+            return normalizePdvBalancaSettings(first);
+        }
+    }
+
+    if (payload.port) {
+        return normalizePdvBalancaSettings(payload);
+    }
+
+    return null;
+}
+
+function getPdvBalancaSettings() {
+    const raw = getPdvRootEl()?.dataset?.balancaSettings;
+
+    if (! raw) {
         return null;
     }
 
     try {
-        return window.Livewire.all().find((component) => component?.el?.querySelector?.('#erp-pdv-search')) ?? null;
-    } catch (_) {
+        return normalizePdvBalancaSettings(JSON.parse(raw));
+    } catch (error) {
         return null;
     }
+}
+
+function setPdvScaleReadingStatus(message) {
+    const legend = document.querySelector('.erp-pdv__search-legend');
+    const root = getPdvRootEl();
+
+    if (root) {
+        root.classList.toggle('is-reading-scale', !! message);
+    }
+
+    if (! legend) {
+        return;
+    }
+
+    if (message) {
+        if (legend.dataset.erpScaleLegend == null) {
+            legend.dataset.erpScaleLegend = legend.textContent || 'Código:';
+        }
+
+        legend.textContent = message;
+        legend.classList.add('erp-pdv__search-legend--scale');
+
+        return;
+    }
+
+    if (legend.dataset.erpScaleLegend != null) {
+        legend.textContent = legend.dataset.erpScaleLegend;
+        delete legend.dataset.erpScaleLegend;
+    }
+
+    legend.classList.remove('erp-pdv__search-legend--scale');
+}
+
+function waitPdvMs(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function findPdvLivewireComponentWithRetry(attempts = 6, delayMs = 50) {
+    for (let i = 0; i < attempts; i += 1) {
+        const component = findPdvLivewireComponent();
+
+        if (component) {
+            return component;
+        }
+
+        await waitPdvMs(delayMs);
+    }
+
+    return null;
+}
+
+function withPdvTimeout(promise, ms, message) {
+    let timer = null;
+
+    const timeout = new Promise((_, reject) => {
+        timer = window.setTimeout(() => {
+            reject(new Error(message || 'Tempo esgotado ao ler a balança.'));
+        }, ms);
+    });
+
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer != null) {
+            window.clearTimeout(timer);
+        }
+    });
+}
+
+async function callPdvScaleFallback(component, message) {
+    const text = message || 'Informe a quantidade em kg manualmente.';
+    const livewire = (component && typeof component.call === 'function')
+        ? component
+        : getErpPdvComponent();
+
+    if (livewire && typeof livewire.call === 'function') {
+        try {
+            await Promise.resolve(livewire.call('beginScaleWeightFallback', text));
+
+            return;
+        } catch (error) {
+            console.warn('[PDV balança] fallback Livewire falhou:', error);
+        }
+    }
+
+    window.alert('Não foi possível ler a balança.\n' + text);
+}
+
+async function readPdvScaleWeightAndConfirm(settingsFromServer) {
+    if (window.__erpPdvScaleReading) {
+        return;
+    }
+
+    window.__erpPdvScaleReading = true;
+    setPdvScaleReadingStatus('Lendo balança…');
+
+    let component = null;
+
+    try {
+        component = await findPdvLivewireComponentWithRetry();
+
+        if (! component || typeof component.call !== 'function') {
+            component = getErpPdvComponent();
+        }
+
+        if (! component || typeof component.call !== 'function') {
+            console.warn('[PDV balança] componente Livewire não encontrado.');
+            setPdvScaleReadingStatus(null);
+            window.alert('Não foi possível ler a balança.\nRecarregue o PDV (Ctrl+F5) e tente de novo.');
+
+            return;
+        }
+
+        const fromServer = normalizePdvBalancaSettings(settingsFromServer);
+        const settings = (fromServer?.port ? fromServer : null) || getPdvBalancaSettings();
+
+        if (! settings?.port) {
+            await callPdvScaleFallback(
+                component,
+                'Configure a porta COM da balança no terminal e recarregue o PDV (Ctrl+F5).',
+            );
+
+            return;
+        }
+
+        if (! window.ErpDeviceService?.readScale) {
+            await callPdvScaleFallback(component, 'Device Service não está disponível neste navegador.');
+
+            return;
+        }
+
+        const ensured = await withPdvTimeout(
+            window.ErpDeviceService.ensureLocal(),
+            5000,
+            'Tempo esgotado ao conectar o Device Service.',
+        );
+
+        if (! ensured?.ok) {
+            throw new Error('Device Service local não está em execução.');
+        }
+
+        if (ensured.started) {
+            setPdvScaleReadingStatus('Iniciando balança…');
+            await waitPdvMs(1200);
+        }
+
+        setPdvScaleReadingStatus(`Lendo ${settings.port}…`);
+        const result = await withPdvTimeout(
+            window.ErpDeviceService.readScale(settings),
+            8000,
+            'Tempo esgotado ao ler a balança. Confira a COM e o simulador.',
+        );
+        const weight = Number(result?.weightKg);
+
+        if (! Number.isFinite(weight) || weight <= 0) {
+            throw new Error(result?.message || 'Peso inválido retornado pela balança.');
+        }
+
+        setPdvScaleReadingStatus(null);
+        const livewire = (component && typeof component.call === 'function')
+            ? component
+            : getErpPdvComponent();
+
+        if (! livewire || typeof livewire.call !== 'function') {
+            throw new Error('Componente Livewire do PDV não disponível. Recarregue (Ctrl+F5).');
+        }
+
+        await Promise.resolve(livewire.call('applyScaleWeightAndConfirm', weight));
+    } catch (error) {
+        setPdvScaleReadingStatus(null);
+        await callPdvScaleFallback(
+            component,
+            error?.message || 'Não foi possível comunicar com a balança.',
+        );
+    } finally {
+        window.__erpPdvScaleReading = false;
+        setPdvScaleReadingStatus(null);
+    }
+}
+
+window.readPdvScaleWeightAndConfirm = readPdvScaleWeightAndConfirm;
+
+/** Fila de leituras do scanner: captura instantânea, processamento sequencial. */
+const pdvScanQueue = [];
+let pdvScanProcessing = false;
+
+window.__erpPdvScanQueueProcessing = function () {
+    return pdvScanProcessing;
+};
+
+window.__erpPdvScanQueueBusy = function () {
+    return pdvScanProcessing || pdvScanQueue.length > 0;
+};
+
+window.clearPdvScanQueue = function clearPdvScanQueue(reason = '') {
+    pdvScanQueue.length = 0;
+
+    if (reason) {
+        console.debug('[PDV scan queue] cleared', reason);
+    }
+};
+
+function normalizePdvScanCode(raw) {
+    return String(raw ?? '').trim().toUpperCase();
+}
+
+function isValidEan13(code) {
+    if (! /^\d{13}$/.test(code)) {
+        return false;
+    }
+
+    let sum = 0;
+
+    for (let i = 0; i < 12; i++) {
+        sum += Number(code[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+
+    const check = (10 - (sum % 10)) % 10;
+
+    return check === Number(code[12]);
+}
+
+/**
+ * Fallback: só divide 26 dígitos quando os dois blocos são EAN-13 válidos.
+ *
+ * @returns {string[]|null}
+ */
+function trySplitConcatenatedEan13(code) {
+    if (code.length !== 26 || ! /^\d{26}$/.test(code)) {
+        return null;
+    }
+
+    const first = code.slice(0, 13);
+    const second = code.slice(13, 26);
+
+    if (! isValidEan13(first) || ! isValidEan13(second)) {
+        console.warn('SCANNER_CONCATENATED_INPUT', {
+            code,
+            length: 26,
+            action: 'passthrough',
+            reason: 'split_rejected_check_digit',
+        });
+
+        return null;
+    }
+
+    console.warn('SCANNER_CONCATENATED_INPUT', {
+        code,
+        length: 26,
+        action: 'split_gtin13x2',
+        parts: [first, second],
+    });
+
+    return [first, second];
+}
+
+/**
+ * Enter/CR é o delimitador principal; não descarta códigos longos genericamente.
+ *
+ * @returns {string[]}
+ */
+function expandPdvScanCode(code) {
+    if (! /^\d+$/.test(code)) {
+        return [code];
+    }
+
+    const split = trySplitConcatenatedEan13(code);
+
+    if (split) {
+        return split;
+    }
+
+    if (code.length > 14) {
+        console.warn('SCANNER_CONCATENATED_INPUT', {
+            code,
+            length: code.length,
+            action: 'passthrough',
+        });
+    }
+
+    return [code];
+}
+
+window.enqueuePdvScan = function enqueuePdvScan(raw, options = {}) {
+    const normalized = normalizePdvScanCode(raw);
+
+    if (! normalized) {
+        if (options.allowEmpty) {
+            pdvScanQueue.push('');
+            void processPdvScanQueue();
+        }
+
+        return;
+    }
+
+    for (const code of expandPdvScanCode(normalized)) {
+        if (code) {
+            pdvScanQueue.push(code);
+        }
+    }
+
+    void processPdvScanQueue();
+};
+
+async function processPdvScanQueue() {
+    if (pdvScanProcessing) {
+        return;
+    }
+
+    pdvScanProcessing = true;
+
+    try {
+        while (pdvScanQueue.length > 0) {
+            const pdv = document.querySelector('.erp-pdv');
+
+            if (pdvHasBlockingUi(pdv)) {
+                break;
+            }
+
+            const code = pdvScanQueue.shift();
+            const component = findPdvLivewireComponent();
+
+            if (! component) {
+                continue;
+            }
+
+            try {
+                await component.set('pdvSearch', code);
+                await component.call('handlePdvSearchEnter');
+            } catch (error) {
+                console.error('[PDV scan queue]', code, error);
+            }
+
+            tryFocusPdvSearchField();
+        }
+    } finally {
+        pdvScanProcessing = false;
+        tryFocusPdvSearchField();
+
+        if (pdvScanQueue.length > 0 && ! pdvHasBlockingUi(document.querySelector('.erp-pdv'))) {
+            void processPdvScanQueue();
+        }
+    }
+}
+
+function resumePdvScanQueueIfNeeded() {
+    if (pdvScanProcessing || pdvScanQueue.length === 0) {
+        return;
+    }
+
+    const pdv = document.querySelector('.erp-pdv');
+
+    if (pdvHasBlockingUi(pdv)) {
+        return;
+    }
+
+    void processPdvScanQueue();
+}
+
+
+function findPdvLivewireComponent() {
+    // Mesma resolução do restante do PDV (Livewire.find / wire:id).
+    // Livewire.all() pode devolver instâncias internas sem .call().
+    return getErpPdvComponent();
 }
 
 function pdvHasBlockingUi(pdv) {
@@ -869,6 +1604,34 @@ function tryFocusPdvSearchField() {
     return document.activeElement === input;
 }
 
+function restorePdvBuscaAvancadaFocus() {
+    const input = document.getElementById('erp-pdv-busca-avancada-search');
+
+    if (! input) {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        const active = document.activeElement;
+
+        if (active === input) {
+            return;
+        }
+
+        if (active && (active.tagName === 'BUTTON' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) {
+            return;
+        }
+
+        if (! active || active === document.body || active === document.documentElement || active.id === 'erp-pdv-search') {
+            try {
+                input.focus({ preventScroll: true });
+            } catch (_) {
+                input.focus();
+            }
+        }
+    });
+}
+
 /**
  * Trap estilo PDV: se o foco “sumiu” (body / área morta), devolve ao Código.
  * Não interfere em inputs/botões/modais em uso.
@@ -927,16 +1690,18 @@ function bindPdvSearchFocusTrap() {
 function bindPdvStatusBar() {
     const statusBar = document.querySelector('.erp-pdv__status');
 
-    if (! statusBar || statusBar.dataset.bound === '1') {
+    if (! statusBar) {
         return;
     }
 
-    statusBar.dataset.bound = '1';
+    if (statusBar.dataset.bound !== '1') {
+        statusBar.dataset.bound = '1';
 
-    const clockEl = document.getElementById('erp-pdv-status-clock');
+        const clockEl = document.getElementById('erp-pdv-status-clock');
 
-    if (clockEl) {
-        tickPdvStatusClock(clockEl);
+        if (clockEl) {
+            tickPdvStatusClock(clockEl);
+        }
     }
 
     if (! erpPdvClockTimer) {
@@ -949,16 +1714,16 @@ function bindPdvStatusBar() {
         }, 1000);
     }
 
-    if (erpPdvStatusBarSync) {
-        return;
+    if (! erpPdvStatusBarSync) {
+        erpPdvStatusBarSync = (event) => {
+            syncPdvLockKeyIndicators(event);
+        };
+
+        document.addEventListener('keydown', erpPdvStatusBarSync);
+        document.addEventListener('keyup', erpPdvStatusBarSync);
     }
 
-    erpPdvStatusBarSync = (event) => {
-        syncPdvLockKeyIndicators(event);
-    };
-
-    document.addEventListener('keydown', erpPdvStatusBarSync);
-    document.addEventListener('keyup', erpPdvStatusBarSync);
+    applyPdvLockKeyIndicatorsFromMemory();
 }
 
 function tickPdvStatusClock(clockEl) {
@@ -978,17 +1743,101 @@ function syncPdvLockKeyIndicators(event) {
     const numEl = document.getElementById('erp-pdv-status-num');
 
     if (capsEl) {
-        setPdvLockKeyState(capsEl, readPdvModifierState(event, 'CapsLock'));
+        syncPdvCapsLockIndicator(event, capsEl);
     }
 
     if (numEl) {
-        let numOn = readPdvModifierState(event, 'NumLock');
+        syncPdvNumLockIndicator(event, numEl);
+    }
+}
 
-        if (! numOn && event?.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD && /^\d$/.test(event.key ?? '')) {
-            numOn = true;
+function isPdvLockToggleKey(event, name) {
+    const key = event?.key ?? '';
+    const code = event?.code ?? '';
+
+    return key === name || code === name;
+}
+
+function syncPdvCapsLockIndicator(event, capsEl) {
+    const isCapsKey = isPdvLockToggleKey(event, 'CapsLock');
+    const modState = readPdvModifierState(event, 'CapsLock');
+
+    if (isCapsKey) {
+        if (event.type === 'keydown') {
+            const next = erpPdvCapsLockOn === null ? ! modState : ! erpPdvCapsLockOn;
+            setPdvLockKeyState(capsEl, next);
+
+            return;
         }
 
-        setPdvLockKeyState(numEl, numOn);
+        if (event.type === 'keyup') {
+            setPdvLockKeyState(capsEl, modState);
+
+            return;
+        }
+    }
+
+    if (modState) {
+        setPdvLockKeyState(capsEl, true);
+
+        return;
+    }
+
+    if (erpPdvCapsLockOn === null) {
+        setPdvLockKeyState(capsEl, false);
+    }
+}
+
+function syncPdvNumLockIndicator(event, numEl) {
+    const isNumKey = isPdvLockToggleKey(event, 'NumLock');
+    const modState = readPdvModifierState(event, 'NumLock');
+
+    if (isNumKey) {
+        if (event.type === 'keydown') {
+            const next = erpPdvNumLockOn === null ? ! modState : ! erpPdvNumLockOn;
+            setPdvLockKeyState(numEl, next);
+
+            return;
+        }
+
+        if (event.type === 'keyup') {
+            setPdvLockKeyState(numEl, modState);
+
+            return;
+        }
+    }
+
+    if (modState) {
+        setPdvLockKeyState(numEl, true);
+
+        return;
+    }
+
+    if (
+        ! modState
+        && event?.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
+        && /^\d$/.test(event.key ?? '')
+    ) {
+        setPdvLockKeyState(numEl, true);
+
+        return;
+    }
+
+    if (erpPdvNumLockOn === null) {
+        setPdvLockKeyState(numEl, false);
+    }
+}
+
+function applyPdvLockKeyIndicatorsFromMemory() {
+    const capsEl = document.getElementById('erp-pdv-status-caps');
+    const numEl = document.getElementById('erp-pdv-status-num');
+
+    if (capsEl && erpPdvCapsLockOn !== null) {
+        setPdvLockKeyState(capsEl, erpPdvCapsLockOn);
+    }
+
+    if (numEl && erpPdvNumLockOn !== null) {
+        setPdvLockKeyState(numEl, erpPdvNumLockOn);
     }
 }
 
@@ -1004,6 +1853,12 @@ function setPdvLockKeyState(el, on) {
     el.classList.toggle('erp-pdv__status-key--on', on);
     el.classList.toggle('erp-pdv__status-key--off', ! on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
+
+    if (el.id === 'erp-pdv-status-caps') {
+        erpPdvCapsLockOn = on;
+    } else if (el.id === 'erp-pdv-status-num') {
+        erpPdvNumLockOn = on;
+    }
 }
 
 function bindPdvIdleMonitor() {
@@ -1053,7 +1908,9 @@ function getErpPdvComponent(page = document.querySelector('.erp-pdv-page')) {
         return null;
     }
 
+    // Filament pode pôr wire:id no .erp-pdv-page, no ancestral ou num filho.
     const wireId = page.getAttribute('wire:id')
+        ?? page.querySelector('[wire\\:id]')?.getAttribute('wire:id')
         ?? page.closest('[wire\\:id]')?.getAttribute('wire:id');
 
     if (wireId) {
@@ -1090,18 +1947,50 @@ function getErpPdvComponent(page = document.querySelector('.erp-pdv-page')) {
 }
 
 function bindErpPdvKeys() {
+    // Rebind do capture: SPA Filament pode ficar com listener velho.
+    window.removeEventListener('keydown', handlePdvModifierCapture, true);
+    document.removeEventListener('keydown', handlePdvModifierCapture, true);
+    window.removeEventListener('keyup', handlePdvCtrlLatchKeyup, true);
+    document.removeEventListener('keyup', handlePdvCtrlLatchKeyup, true);
+    window.removeEventListener('beforeinput', handlePdvDescontoBeforeInput, true);
+    document.removeEventListener('beforeinput', handlePdvDescontoBeforeInput, true);
+    window.addEventListener('keydown', handlePdvModifierCapture, true);
+    document.addEventListener('keydown', handlePdvModifierCapture, true);
+    window.addEventListener('keyup', handlePdvCtrlLatchKeyup, true);
+    document.addEventListener('keyup', handlePdvCtrlLatchKeyup, true);
+    window.addEventListener('beforeinput', handlePdvDescontoBeforeInput, true);
+    document.addEventListener('beforeinput', handlePdvDescontoBeforeInput, true);
+
     if (erpPdvKeysBound) {
         return;
     }
 
     erpPdvKeysBound = true;
 
-    document.addEventListener('keydown', handlePdvKeydown);
+    window.addEventListener('blur', resetPdvCtrlLatch);
+
+    document.addEventListener('keydown', handlePdvKeydown, true);
     document.addEventListener('focusin', (event) => {
         if (event.target?.id === 'erp-pdv-finalizar-cliente') {
             erpPdvFinalizarClienteTyping = true;
+
+            return;
+        }
+
+        if (isPdvManualMoneyInput(event.target)) {
+            window.requestAnimationFrame(() => {
+                event.target.select?.();
+            });
         }
     });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || ! isPdvManualMoneyInput(event.target)) {
+            return;
+        }
+
+        commitPdvMoneyInput(event.target);
+    }, true);
     document.addEventListener('focusout', (event) => {
         if (event.target?.id !== 'erp-pdv-finalizar-cliente') {
             return;
@@ -1123,8 +2012,388 @@ function bindErpPdvKeys() {
     });
 }
 
+/**
+ * Letra do atalho Ctrl (ex.: KeyD → "d"). Preferir code (layout/IME); fallback key.
+ *
+ * @param {KeyboardEvent} event
+ * @returns {string}
+ */
+function resolvePdvCtrlLetter(event) {
+    const code = String(event.code || '');
+
+    if (/^Key[A-Z]$/.test(code)) {
+        return code.slice(3).toLowerCase();
+    }
+
+    const key = String(event.key || '');
+
+    if (key.length === 1) {
+        return key.toLowerCase();
+    }
+
+    return '';
+}
+
+/**
+ * Ctrl/Meta + A/C/V/X = clipboard no input (não bloquear).
+ *
+ * @param {KeyboardEvent} event
+ * @returns {boolean}
+ */
+function isPdvClipboardShortcut(event) {
+    if (event.altKey || (! isPdvCtrlPressed(event) && ! event.metaKey)) {
+        return false;
+    }
+
+    const letter = resolvePdvCtrlLetter(event);
+
+    return ['a', 'c', 'v', 'x'].includes(letter);
+}
+
+/**
+ * Campos onde letra com modificador não pode virar digitação/pesquisa.
+ *
+ * @param {EventTarget|null} target
+ * @returns {boolean}
+ */
+function isPdvSearchTypingTarget(target) {
+    if (! (target instanceof Element)) {
+        return false;
+    }
+
+    const id = target.id || '';
+
+    if (id === 'erp-pdv-search'
+        || id === 'erp-pdv-busca-avancada-search'
+        || id === 'erp-pdv-busca-preco-search'
+        || id === 'erp-pdv-remover-itens-search'
+        || id === 'erp-pdv-serial-search') {
+        return true;
+    }
+
+    return target.closest('.erp-pdv__search-field') !== null;
+}
+
+/**
+ * Resolve o $wire do PDV (ERP ou offline).
+ *
+ * @param {Element|null} page
+ * @returns {object|null}
+ */
+function resolvePdvWireComponent(page) {
+    let component = getErpPdvComponent(page);
+
+    if (! component && window.Livewire?.getByName) {
+        const byName = window.Livewire.getByName('app.filament.pages.pdv-page')
+            || window.Livewire.getByName('pdv');
+
+        if (byName?.length) {
+            component = byName[0];
+        }
+    }
+
+    if (! component) {
+        const pdvRoot = document.querySelector('.erp-pdv');
+
+        if (pdvRoot && window.Alpine) {
+            try {
+                const root = window.Alpine.findClosest(pdvRoot, (node) => node.__livewire);
+
+                if (root?.__livewire?.$wire) {
+                    component = root.__livewire.$wire;
+                }
+            } catch {
+                // ignore
+            }
+        }
+    }
+
+    // Filament: wire:id costuma ficar no ancestral da page class, não no .erp-pdv-page.
+    if (! component && page && window.Livewire?.find) {
+        const wireEl = page.closest('[wire\\:id]') || document.querySelector('.fi-page[wire\\:id], [wire\\:id].erp-pdv-page');
+        const wireId = wireEl?.getAttribute('wire:id');
+
+        if (wireId) {
+            component = window.Livewire.find(wireId) || null;
+        }
+    }
+
+    if (! component && window.Livewire?.all) {
+        try {
+            const all = window.Livewire.all();
+
+            for (const candidate of all) {
+                const name = String(candidate?.name || candidate?.__instance?.name || '');
+
+                if (name.includes('pdv-page') || name === 'pdv') {
+                    component = candidate;
+                    break;
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    if (! component && window.Livewire?.first) {
+        try {
+            component = window.Livewire.first();
+        } catch {
+            // ignore
+        }
+    }
+
+    return component || null;
+}
+
+/**
+ * Modal desconto já aberto?
+ *
+ * @returns {boolean}
+ */
+function isPdvDescontoModalOpen() {
+    return !! document.getElementById('erp-pdv-desconto-title')
+        || !! document.querySelector('.erp-pdv-desconto');
+}
+
+/**
+ * Abre Desconto/Acréscimo — mesmo caminho do menu Opções (wire:click no botão invisível).
+ */
+function openPdvDescontoFromShortcut() {
+    if (isPdvDescontoModalOpen()) {
+        return;
+    }
+
+    const btn = document.getElementById('erp-pdv-desconto-shortcut-btn');
+
+    if (btn) {
+        btn.click();
+
+        return;
+    }
+
+    try {
+        const list = window.Livewire?.getByName?.('app.filament.pages.pdv-page') || [];
+
+        if (list[0] && typeof list[0].call === 'function') {
+            list[0].call('openDescontoItemModal');
+        }
+    } catch (_) {
+        // ignore
+    }
+}
+
+/**
+ * Remove D deixado no Código por atalho Ctrl+D.
+ *
+ * @param {KeyboardEvent} event
+ */
+function stripPdvSearchDescontoLetter(event) {
+    const el = document.getElementById('erp-pdv-search');
+
+    if (! el) {
+        return;
+    }
+
+    const letter = event.code === 'KeyD' ? 'D' : '';
+
+    if (! letter) {
+        return;
+    }
+
+    const v = el.value || '';
+    const lower = letter.toLowerCase();
+
+    if (v === letter || v === lower) {
+        el.value = '';
+    } else if (v.endsWith(letter) || v.endsWith(lower)) {
+        el.value = v.slice(0, -1);
+    } else {
+        return;
+    }
+
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/**
+ * Latch do Control físico (ControlLeft/ControlRight).
+ *
+ * @param {KeyboardEvent} event
+ */
+function syncPdvCtrlLatch(event) {
+    if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+        pdvCtrlLatch = event.type === 'keydown';
+        window.__erpPdvCtrlLatch = pdvCtrlLatch;
+    }
+}
+
+function resetPdvCtrlLatch() {
+    pdvCtrlLatch = false;
+    window.__erpPdvCtrlLatch = false;
+}
+
+/**
+ * @param {KeyboardEvent} event
+ */
+function handlePdvCtrlLatchKeyup(event) {
+    if (! document.querySelector('.erp-pdv')) {
+        return;
+    }
+
+    syncPdvCtrlLatch(event);
+}
+
+/**
+ * Ctrl pressionado (inclui latch, getModifierState — CAPS/IME).
+ *
+ * @param {KeyboardEvent} event
+ * @returns {boolean}
+ */
+function isPdvCtrlPressed(event) {
+    return !!(event.ctrlKey
+        || pdvCtrlLatch
+        || (typeof event.getModifierState === 'function' && event.getModifierState('Control')));
+}
+
+/**
+ * Executa atalho Ctrl+letra no capture (com foco no Código).
+ *
+ * @param {KeyboardEvent} event
+ * @returns {boolean}
+ */
+function tryDispatchPdvCtrlShortcut(event) {
+    const pdvRoot = document.querySelector('.erp-pdv');
+
+    if (! pdvRoot) {
+        return false;
+    }
+
+    if (! isPdvCtrlPressed(event) || event.altKey || event.metaKey) {
+        return false;
+    }
+
+    if (pdvRoot.querySelector('.erp-pdv-overlay') !== null
+        || pdvRoot.querySelector('.erp-pdv-modal') !== null) {
+        return false;
+    }
+
+    if (pdvRoot.dataset.caixaAberto !== '1') {
+        return false;
+    }
+
+    const letter = resolvePdvCtrlLetter(event);
+
+    // Desconto: Ctrl+D — btn.click (igual Opções).
+    if (event.code === 'KeyD' || letter === 'd') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        stripPdvSearchDescontoLetter(event);
+        openPdvDescontoFromShortcut();
+        window.requestAnimationFrame(() => stripPdvSearchDescontoLetter(event));
+        event.__erpPdvCtrlHandled = true;
+
+        return true;
+    }
+
+    const callArgs = ERP_PDV_CTRL_SHORTCUTS[letter];
+
+    if (! callArgs) {
+        return false;
+    }
+
+    if (letter === 't' && pdvRoot.dataset.usaTef !== '1') {
+        return false;
+    }
+
+    if (['s', 'n', 'e', 'b', 'm'].includes(letter) && pdvRoot.dataset.exibeMesas !== '1') {
+        return false;
+    }
+
+    const component = getErpPdvComponent();
+
+    if (! component) {
+        return false;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    component.call(...callArgs);
+    event.__erpPdvCtrlHandled = true;
+
+    return true;
+}
+
+/**
+ * Capture cedo: Ctrl+letra executa ação aqui (não só preventDefault no Código).
+ *
+ * @param {KeyboardEvent} event
+ */
+function handlePdvModifierCapture(event) {
+    if (! document.querySelector('.erp-pdv')) {
+        return;
+    }
+
+    syncPdvCtrlLatch(event);
+
+    if (tryDispatchPdvCtrlShortcut(event)) {
+        return;
+    }
+
+    const ctrl = isPdvCtrlPressed(event);
+
+    if (! ctrl && ! event.altKey && ! event.metaKey) {
+        return;
+    }
+
+    // Ctrl+letra sem mapa ou Alt/Meta: não digitar no Código (clipboard liberado).
+    if (event.key.length === 1
+        && isPdvSearchTypingTarget(event.target)
+        && ! isPdvClipboardShortcut(event)
+        && (ctrl || event.altKey || event.metaKey)) {
+        event.preventDefault();
+    }
+}
+
+/**
+ * Bloqueia insertText d quando Control pressionado (fallback pós-keydown).
+ *
+ * @param {InputEvent} event
+ */
+function handlePdvDescontoBeforeInput(event) {
+    if (! document.querySelector('.erp-pdv')) {
+        return;
+    }
+
+    if (event.inputType !== 'insertText' && event.inputType !== 'insertCompositionText') {
+        return;
+    }
+
+    const data = String(event.data || '').toLowerCase();
+
+    if (data !== 'd') {
+        return;
+    }
+
+    const ctrl = isPdvCtrlPressed(event);
+
+    if (! ctrl) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}
+
 function dispatchPdvShortcut(event, component) {
     const pdvRoot = document.querySelector('.erp-pdv');
+    const caixaAberto = pdvRoot?.dataset.caixaAberto === '1';
+
+    if (event.__erpPdvCtrlHandled) {
+        return true;
+    }
+
+    const ctrlDown = isPdvCtrlPressed(event) && ! event.altKey && ! event.metaKey;
+    const ctrlLetter = ctrlDown ? resolvePdvCtrlLetter(event) : '';
 
     if (event.key === 'Escape') {
         event.preventDefault();
@@ -1133,29 +2402,31 @@ function dispatchPdvShortcut(event, component) {
         return true;
     }
 
-    if (event.ctrlKey && ! event.altKey && ! event.metaKey) {
-        const key = event.key.toLowerCase();
+    // Caixa fechado: só F1 (Opções) e F2 (Abrir Caixa) ficam ativos.
+    if (! caixaAberto) {
+        if (event.key === 'F1' || event.key === 'F2') {
+            const callArgs = ERP_PDV_FN_SHORTCUTS[event.key];
 
-        if (key === 't' && pdvRoot?.dataset.usaTef !== '1') {
-            return false;
+            if (callArgs) {
+                event.preventDefault();
+                component.call(...callArgs);
+
+                return true;
+            }
         }
 
-        if (key === 'd' && pdvRoot?.dataset.permiteDescontoItem !== '1') {
-            return false;
-        }
-
-        if (['s', 'n', 'e', 'b', 'm'].includes(key) && pdvRoot?.dataset.exibeMesas !== '1') {
-            return false;
-        }
-
-        const callArgs = ERP_PDV_CTRL_SHORTCUTS[key];
-
-        if (callArgs) {
+        if (ERP_PDV_FN_SHORTCUTS[event.key]
+            || (ctrlLetter && ERP_PDV_CTRL_SHORTCUTS[ctrlLetter])) {
             event.preventDefault();
-            component.call(...callArgs);
-
-            return true;
+            event.stopPropagation();
         }
+
+        return false;
+    }
+
+    if (ctrlLetter) {
+        // Ctrl+letra: tratado no capture (tryDispatchPdvCtrlShortcut).
+        return false;
     }
 
     if (event.ctrlKey || event.altKey || event.metaKey) {
@@ -1167,10 +2438,6 @@ function dispatchPdvShortcut(event, component) {
         focusPdvSearchField();
 
         return true;
-    }
-
-    if (event.key === 'F3' && pdvRoot?.dataset.exibeF3 !== '1') {
-        return false;
     }
 
     if (event.key === 'F4' && pdvRoot?.dataset.exibeF4 !== '1') {
@@ -1190,7 +2457,8 @@ function dispatchPdvShortcut(event, component) {
 }
 
 function handlePdvKeydown(event) {
-    const page = document.querySelector('.erp-pdv-page');
+    const page = document.querySelector('.erp-pdv-page')
+        ?? document.querySelector('.erp-pdv');
 
     if (! page) {
         return;
@@ -1207,6 +2475,9 @@ function handlePdvKeydown(event) {
     if (! pdvRoot) {
         return;
     }
+
+    // Qualquer tecla no PDV (ex.: F2 Abrir caixa) é gesto válido para esconder a taskbar.
+    ensurePdvFullscreenFromUserGesture();
 
     const overlayOpen = pdvRoot.querySelector('.erp-pdv-overlay') !== null;
     const modalOpen = pdvRoot.querySelector('.erp-pdv-modal') !== null;
@@ -1236,10 +2507,22 @@ function handlePdvKeydown(event) {
     const launchPrecoFocused = document.activeElement?.id === 'erp-pdv-launch-preco';
 
     if (launchQtdFocused || launchPrecoFocused) {
+        // Esc volta o passo (preço → qtd → código); demais teclas não viram atalho.
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('handlePdvEscape');
+        }
+
         return;
     }
 
     if (event.key === 'Delete' && ! pdvRoot.querySelector('.erp-pdv__grid--consulta')) {
+        if (pdvRoot.dataset.caixaAberto !== '1') {
+            event.preventDefault();
+
+            return;
+        }
+
         event.preventDefault();
         component.call('deletarItemCupom');
 
@@ -1286,10 +2569,32 @@ function collectFinalizarAtalhos() {
 }
 
 /**
- * Garante que o valor digitado em uma linha de pagamento esteja formatado e
- * sincronizado com o servidor ANTES de qualquer ação (Enter/F10). Evita a
- * condição de corrida entre a máscara de dinheiro e o wire:model.live, que
- * fazia o último dígito não ser computado (ex.: 5000 virar 500).
+ * Normaliza e sincroniza campos monetarios/decimais BR do PDV antes de Enter/F10/blur.
+ *
+ * @param {HTMLInputElement|null} input
+ */
+function commitPdvMoneyInput(input) {
+    if (! input || ! window.ErpMasks) {
+        return;
+    }
+
+    if (window.ErpMasks.isBrDecimalMask(input.dataset.mask)) {
+        input.value = window.ErpMasks.finalizeMaskValue(input);
+    }
+
+    window.ErpMasks.apply(input, { sync: false });
+    delete input.dataset.erpMaskSynced;
+    window.ErpMasks.syncLivewire(input, input.value, false);
+}
+
+function isPdvManualMoneyInput(input) {
+    return input instanceof HTMLInputElement
+        && input.dataset.erpPdvMoneyInput === '1'
+        && input.closest('.erp-pdv');
+}
+
+/**
+ * Garante valor formatado/sincronizado antes de Enter/F10.
  *
  * @param {HTMLElement|null} input
  */
@@ -1298,52 +2603,91 @@ function commitPdvFinalizarValor(input) {
         return;
     }
 
-    if (! window.ErpMasks) {
-        return;
-    }
-
-    window.ErpMasks.apply(input, { sync: false });
-    delete input.dataset.erpMaskSynced;
-    // Sincronização diferida: entra na mesma requisição do component.call()
-    // seguinte, garantindo que o servidor receba o valor final antes de calcular.
-    window.ErpMasks.syncLivewire(input, input.value, false);
+    commitPdvMoneyInput(input);
 }
 
-/**
- * Mesma proteção do commitPdvFinalizarValor, porém genérica para qualquer
- * input com máscara dentro de um modal (ex.: valor de desconto/acréscimo).
- * Evita que o último dígito digitado não seja computado (10,00 virar 1,00).
- *
- * @param {HTMLElement|null} input
- */
-function commitPdvMaskValue(input) {
-    if (! input || ! window.ErpMasks) {
+function commitPdvFinalizarInformacoes(input) {
+    const el = (input && input.id === 'erp-pdv-finalizar-informacoes')
+        ? input
+        : document.getElementById('erp-pdv-finalizar-informacoes');
+
+    if (! el) {
         return;
     }
 
-    window.ErpMasks.apply(input, { sync: false });
-    delete input.dataset.erpMaskSynced;
-    window.ErpMasks.syncLivewire(input, input.value, false);
+    if (window.ErpMasks && typeof window.ErpMasks.syncLivewire === 'function') {
+        delete el.dataset.erpMaskSynced;
+        window.ErpMasks.syncLivewire(el, el.value ?? '', false);
+
+        return;
+    }
+
+    const component = window.ErpMasks?.getLivewireComponent?.(el)
+        ?? (el.closest('[wire\\:id]') && window.Livewire
+            ? window.Livewire.find(el.closest('[wire\\:id]').getAttribute('wire:id'))
+            : null);
+
+    if (component && typeof component.set === 'function') {
+        component.set('finalizarForm.informacoes_adicionais', el.value ?? '', false);
+    }
+}
+
+function commitPdvMaskValue(input) {
+    if (! input) {
+        return;
+    }
+
+    commitPdvMoneyInput(input);
 }
 
 function findFinalizarOperacaoButton(atalho) {
     return document.querySelector(`.erp-pdv-finalizar__operacao-btn[data-atalho="${atalho}"]`);
 }
 
+function commitAndConfirmFinalizarVenda(component) {
+    if (erpPdvFinalizarSubmitting) {
+        return;
+    }
+
+    erpPdvFinalizarSubmitting = true;
+    commitPdvFinalizarValor(document.activeElement);
+    commitPdvFinalizarInformacoes(document.activeElement);
+
+    const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
+    const unica = footer?.dataset?.operacaoUnica;
+    const call = unica
+        ? component.call('confirmFinalizarComOperacao', unica)
+        : component.call('confirmFinalizarVenda');
+
+    Promise.resolve(call).catch(() => {
+        erpPdvFinalizarSubmitting = false;
+    });
+}
+
 function triggerFinalizarOperacao(component, atalho) {
+    if (erpPdvFinalizarSubmitting) {
+        return false;
+    }
+
     const btn = findFinalizarOperacaoButton(atalho);
 
     if (! btn?.dataset?.operacao) {
         return false;
     }
 
+    erpPdvFinalizarSubmitting = true;
     commitPdvFinalizarValor(document.activeElement);
+    commitPdvFinalizarInformacoes(document.activeElement);
 
     if (btn.classList.contains('erp-pdv-finalizar__operacao-btn--fiscal')) {
         window.setTimeout(startPdvFiscalTransmitProgress, 30);
     }
 
-    component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
+    const call = component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
+
+    Promise.resolve(call).catch(() => {
+        erpPdvFinalizarSubmitting = false;
+    });
 
     return true;
 }
@@ -1407,6 +2751,32 @@ function isFinalizarClienteTyping(event) {
 }
 
 function handlePdvFinalizarModalKeydown(event, component) {
+    const aviso = document.querySelector('.erp-pdv-finalizar-aviso');
+
+    if (aviso) {
+        // Ignora o mesmo Enter que acabou de abrir o aviso (evita fechar na hora).
+        const openedAt = Number(aviso.getAttribute('data-opened-at') || 0);
+
+        if (! openedAt) {
+            aviso.setAttribute('data-opened-at', String(Date.now()));
+        }
+
+        const ageMs = Date.now() - Number(aviso.getAttribute('data-opened-at') || Date.now());
+
+        if (event.key === 'Enter' || event.key === 'Escape') {
+            if (event.key === 'Enter' && ageMs < 400) {
+                event.preventDefault();
+
+                return;
+            }
+
+            event.preventDefault();
+            component.call('fecharFinalizarAlerta');
+        }
+
+        return;
+    }
+
     const valorFocused = document.activeElement?.id?.startsWith('erp-pdv-finalizar-valor-');
     const cpfFocused = document.activeElement?.id === 'erp-pdv-finalizar-cpf';
     const informacoesFocused = document.activeElement?.id === 'erp-pdv-finalizar-informacoes';
@@ -1548,6 +2918,10 @@ function handlePdvFinalizarModalKeydown(event, component) {
         }
 
         if (event.key === 'F6') {
+            if (! document.getElementById('erp-pdv-carne-btn')) {
+                return;
+            }
+
             event.preventDefault();
             component.call('abrirCarneImpressao');
 
@@ -1599,7 +2973,14 @@ function handlePdvFinalizarModalKeydown(event, component) {
         return;
     }
 
-    if (event.key === 'Enter' && (cpfFocused || informacoesFocused || operacaoFocused)) {
+    if (event.key === 'Enter' && operacaoFocused) {
+        event.preventDefault();
+        commitAndConfirmFinalizarVenda(component);
+
+        return;
+    }
+
+    if (event.key === 'Enter' && (cpfFocused || informacoesFocused)) {
         event.preventDefault();
 
         return;
@@ -1653,16 +3034,7 @@ function handlePdvFinalizarModalKeydown(event, component) {
 
     if (event.key === 'F10' || event.key === 'F7') {
         event.preventDefault();
-        commitPdvFinalizarValor(document.activeElement);
-
-        const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
-        const unica = footer?.dataset?.operacaoUnica;
-
-        if (unica) {
-            component.call('confirmFinalizarComOperacao', unica);
-        } else {
-            component.call('confirmFinalizarVenda');
-        }
+        commitAndConfirmFinalizarVenda(component);
 
         return;
     }
@@ -1719,6 +3091,25 @@ function handlePdvModalKeydown(event, component, isFormModal) {
             component.call('confirmUnlockPdv');
         }
 
+        return;
+    }
+
+    if (document.getElementById('erp-pdv-moedas-title')) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('fecharContarMoedas');
+
+            return;
+        }
+
+        if (event.key === 'Enter' || event.key === 'F2') {
+            event.preventDefault();
+            component.call('confirmarContarMoedas');
+
+            return;
+        }
+
+        // Não vazar F10/outros atalhos para o PDV enquanto conta moedas.
         return;
     }
 
@@ -1782,9 +3173,23 @@ function handlePdvModalKeydown(event, component, isFormModal) {
     const finalizarImprimirConfirm = document.getElementById('erp-pdv-finalizar-imprimir-title');
 
     if (finalizarImprimirConfirm) {
+        const sim = document.getElementById('erp-pdv-finalizar-imprimir-sim');
+        const nao = document.getElementById('erp-pdv-finalizar-imprimir-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmFinalizarImprimir', false);
+            component.call('confirmFinalizarImprimir', document.activeElement === sim);
 
             return;
         }
@@ -1792,6 +3197,13 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
             event.preventDefault();
             component.call('confirmFinalizarImprimir', true);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmFinalizarImprimir', false);
 
             return;
         }
@@ -1809,9 +3221,23 @@ function handlePdvModalKeydown(event, component, isFormModal) {
     const imprimirPosVenda = document.getElementById('erp-pdv-imprimir-pos-venda-title');
 
     if (imprimirPosVenda) {
+        const sim = document.getElementById('erp-pdv-imprimir-pos-venda-sim');
+        const nao = document.getElementById('erp-pdv-imprimir-pos-venda-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmImprimirPosVenda', false);
+            component.call('confirmImprimirPosVenda', document.activeElement === sim);
 
             return;
         }
@@ -1823,9 +3249,112 @@ function handlePdvModalKeydown(event, component, isFormModal) {
             return;
         }
 
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirPosVenda', false);
+
+            return;
+        }
+
         if (event.key === 'Escape') {
             event.preventDefault();
             component.call('confirmImprimirPosVenda', false);
+
+            return;
+        }
+
+        return;
+    }
+
+    const imprimirMovimentoCaixa = document.getElementById('erp-pdv-imprimir-movimento-caixa-title');
+
+    if (imprimirMovimentoCaixa) {
+        const sim = document.getElementById('erp-pdv-imprimir-movimento-caixa-sim');
+        const nao = document.getElementById('erp-pdv-imprimir-movimento-caixa-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmImprimirMovimentoCaixa', document.activeElement === sim);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirMovimentoCaixa', true);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirMovimentoCaixa', false);
+
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('confirmImprimirMovimentoCaixa', false);
+
+            return;
+        }
+
+        return;
+    }
+
+    const imprimirResumoCaixa = document.getElementById('erp-pdv-imprimir-resumo-caixa-title');
+
+    if (imprimirResumoCaixa) {
+        const sim = document.getElementById('erp-pdv-imprimir-resumo-caixa-sim');
+        const nao = document.getElementById('erp-pdv-imprimir-resumo-caixa-nao');
+
+        if (event.key === 'Tab' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const focusSim = document.activeElement !== sim;
+
+            (focusSim ? sim : nao)?.focus();
+            sim?.classList.toggle('erp-pdv-modal__btn--primary', focusSim);
+            nao?.classList.toggle('erp-pdv-modal__btn--primary', ! focusSim);
+
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('confirmImprimirResumoCaixa', document.activeElement === sim);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 's' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirResumoCaixa', true);
+
+            return;
+        }
+
+        if (event.key.toLowerCase() === 'n' && ! event.ctrlKey && ! event.altKey && ! event.metaKey) {
+            event.preventDefault();
+            component.call('confirmImprimirResumoCaixa', false);
+
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('confirmImprimirResumoCaixa', false);
 
             return;
         }
@@ -1938,6 +3467,32 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         return;
     }
 
+    // Caixa NÃO usa --form/--small; tratar F2/F10 pelo título, fora de isFormModal.
+    const caixaTitle = document.getElementById('erp-pdv-caixa-title');
+
+    if (caixaTitle) {
+        const isAbrir = (caixaTitle.textContent || '').includes('Abrir');
+
+        if (event.key === 'F10' && ! isAbrir) {
+            event.preventDefault();
+            component.call('confirmFecharCaixa');
+
+            return;
+        }
+
+        if (event.key === 'F2') {
+            event.preventDefault();
+
+            if (isAbrir) {
+                component.call('confirmAbrirCaixa');
+            } else {
+                component.call('imprimirResumoCaixaFechamento');
+            }
+
+            return;
+        }
+    }
+
     if (isFormModal) {
         if (event.key === 'F10') {
             const sangriaModal = document.getElementById('erp-pdv-sangria-title');
@@ -1946,22 +3501,6 @@ function handlePdvModalKeydown(event, component, isFormModal) {
             if (sangriaModal || suprimentoModal) {
                 event.preventDefault();
                 component.call(sangriaModal ? 'gravarSangria' : 'gravarSuprimento');
-
-                return;
-            }
-        }
-
-        if (event.key === 'F2') {
-            const abrirTitle = document.getElementById('erp-pdv-caixa-title');
-
-            if (abrirTitle) {
-                event.preventDefault();
-
-                if (abrirTitle.textContent?.includes('Abrir')) {
-                    component.call('confirmAbrirCaixa');
-                } else {
-                    component.call('confirmFecharCaixa');
-                }
 
                 return;
             }
@@ -2078,6 +3617,7 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
+
     const serialSearch = document.getElementById('erp-pdv-serial-search');
 
     if (serialSearch) {
@@ -2105,6 +3645,30 @@ function handlePdvListModalKeydown(event, component) {
 
     if (buscaSearch) {
         const buscaFocused = document.activeElement?.id === 'erp-pdv-busca-avancada-search';
+        const printable = event.key.length === 1 && ! event.ctrlKey && ! event.altKey && ! event.metaKey;
+
+        if (! buscaFocused && printable) {
+            event.preventDefault();
+            try {
+                buscaSearch.focus({ preventScroll: true });
+            } catch (_) {
+                buscaSearch.focus();
+            }
+
+            const start = buscaSearch.selectionStart ?? buscaSearch.value.length;
+            const end = buscaSearch.selectionEnd ?? buscaSearch.value.length;
+            const inserted = buscaSearch.hasAttribute('data-erp-uppercase')
+                ? event.key.toUpperCase()
+                : event.key;
+            buscaSearch.value = buscaSearch.value.slice(0, start) + inserted + buscaSearch.value.slice(end);
+            const caret = start + inserted.length;
+            try {
+                buscaSearch.setSelectionRange(caret, caret);
+            } catch (_) {}
+            buscaSearch.dispatchEvent(new Event('input', { bubbles: true }));
+
+            return true;
+        }
 
         if (buscaFocused && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
@@ -2322,6 +3886,42 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
+    const vendasEsperaSearch = document.getElementById('erp-pdv-vendas-espera-search');
+
+    if (vendasEsperaSearch) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('cancelVendaEmEspera');
+
+            return true;
+        }
+
+        if (document.activeElement?.id === 'erp-pdv-vendas-espera-search'
+            && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            component.call('moveVendaEsperaSelection', event.key === 'ArrowDown' ? 1 : -1);
+            scrollPdvModalRowIntoView('erp-pdv-vendas-espera-row-');
+
+            return true;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            component.call('recuperarVendaEmEspera');
+
+            return true;
+        }
+
+        if (event.key === 'Delete') {
+            event.preventDefault();
+            component.call('requestExcluirVendaEmEspera');
+
+            return true;
+        }
+
+        return false;
+    }
+
     const tabelaPrecoConfirm = document.getElementById('erp-pdv-tabela-preco-confirm');
 
     if (tabelaPrecoConfirm) {
@@ -2481,7 +4081,11 @@ function focusPdvLaunchField(field) {
         const id = field === 'preco' ? 'erp-pdv-launch-preco' : 'erp-pdv-launch-qtd';
         const input = document.getElementById(id);
 
-        if (input && ! input.disabled && ! input.readOnly) {
+        // Blade @readonly + erp-no-browser-hints colocam readonly; se o JS
+        // recusar focar por readOnly, o campo fica "ativo" mas não editável.
+        if (input && ! input.disabled) {
+            input.removeAttribute('readonly');
+
             try {
                 input.focus({ preventScroll: true });
             } catch (_) {
@@ -2574,8 +4178,53 @@ function focusPdvModalField() {
     const abertura = document.getElementById('erp-pdv-abertura-valor');
 
     if (abertura) {
-        abertura.focus();
-        abertura.select?.();
+        const modal = abertura.closest('.erp-pdv-caixa-modal')
+            ?? abertura.closest('.erp-pdv-modal')
+            ?? document;
+
+        // Garante máscara de dinheiro no modal recém-aberto (Livewire morph).
+        delete abertura.dataset.erpMaskBound;
+        window.ErpMasks?.refresh(modal);
+
+        abertura.value = '0,00';
+        abertura.setAttribute('autocomplete', 'off');
+        abertura.setAttribute('title', '');
+        abertura.removeAttribute('list');
+
+        window.ErpMasks?.apply(abertura, { sync: false });
+
+        const selectAll = () => {
+            try {
+                abertura.focus({ preventScroll: true });
+            } catch (_) {
+                abertura.focus();
+            }
+            // Seleção total (azul) para digitar por cima.
+            abertura.select();
+            if (typeof abertura.setSelectionRange === 'function') {
+                abertura.setSelectionRange(0, abertura.value.length);
+            }
+        };
+
+        if (abertura.dataset.erpAberturaSelectBound !== '1') {
+            abertura.dataset.erpAberturaSelectBound = '1';
+            abertura.addEventListener('focus', () => {
+                window.requestAnimationFrame(selectAll);
+            });
+            // Evita o Chrome “desselecionar” no clique.
+            abertura.addEventListener('mouseup', (event) => {
+                if (abertura.selectionStart === abertura.selectionEnd) {
+                    event.preventDefault();
+                    selectAll();
+                }
+            });
+        }
+
+        window.requestAnimationFrame(() => {
+            selectAll();
+            window.setTimeout(selectAll, 40);
+            window.setTimeout(selectAll, 120);
+        });
 
         return;
     }
@@ -2704,51 +4353,175 @@ window.ErpPdvPrint = {
 initErpPdv();
 
 /**
- * Descanso de tela do letreiro (marquee).
- * Regra: após 30s SEM atividade e SEM venda em andamento (cupom vazio),
- * troca o título "CAIXA ABERTO" pelas mensagens correndo. Qualquer atividade
- * (tecla/mouse) ou item no cupom volta imediatamente para "CAIXA ABERTO".
+ * Descanso de tela:
+ * - Header: letreiro (marquee) se configurado
+ * - Painel da foto: carrossel de promoções (7s) se houver itens mostrar_pdv
+ * Regra: após 30s SEM atividade e SEM venda em andamento (cupom vazio).
  */
 (function initPdvScreensaver() {
     const IDLE_MS = 30000;
+    const PROMO_ROTATE_MS = 7000;
     let idleTimer = null;
+    let promoTimer = null;
     let idle = false;
+    let promoIndex = 0;
 
     const getHeader = () => document.querySelector('.erp-pdv__header');
+    const getSidePanel = () => document.querySelector('.erp-pdv__side-panel');
     const getPdv = () => document.querySelector('.erp-pdv');
+    const getPromoRoot = () => document.querySelector('[data-erp-pdv-promo]');
 
-    function canScreensave() {
+    function vendaEmAndamento() {
         const header = getHeader();
+        const side = getSidePanel();
+
+        return header?.dataset.vendaAndamento === '1' || side?.dataset.vendaAndamento === '1';
+    }
+
+    function hasMarquee(header) {
+        return header?.dataset.marquee === '1' && header.querySelectorAll('.erp-pdv__marquee-text').length > 0;
+    }
+
+    function hasPromo() {
+        const side = getSidePanel();
+        const root = getPromoRoot();
+
+        return side?.dataset.promo === '1' && !! root && root.querySelectorAll('.erp-pdv__promo-slide').length > 0;
+    }
+
+    function caixaAberto() {
         const pdv = getPdv();
 
-        if (! header || header.dataset.marquee !== '1') {
-            return false;
+        return ! pdv || pdv.dataset.caixaAberto === '1';
+    }
+
+    function canIdle() {
+        return caixaAberto() && ! vendaEmAndamento();
+    }
+
+    function stopPromoRotate() {
+        if (promoTimer) {
+            window.clearInterval(promoTimer);
+            promoTimer = null;
+        }
+    }
+
+    function showPromoSlide(index) {
+        const root = getPromoRoot();
+        const slides = root?.querySelectorAll('.erp-pdv__promo-slide');
+
+        if (! slides?.length) {
+            return;
         }
 
-        // Venda em andamento (cupom com itens): mantém "CAIXA ABERTO".
-        if (header.dataset.vendaAndamento === '1') {
-            return false;
+        promoIndex = ((index % slides.length) + slides.length) % slides.length;
+        slides.forEach((slide, i) => {
+            slide.classList.toggle('is-active', i === promoIndex);
+        });
+    }
+
+    function startPromoRotate() {
+        stopPromoRotate();
+        const root = getPromoRoot();
+        const slides = root?.querySelectorAll('.erp-pdv__promo-slide');
+
+        if (! slides?.length) {
+            return;
         }
 
-        // Só substitui quando o caixa está aberto.
-        if (pdv && pdv.dataset.caixaAberto !== '1') {
-            return false;
+        if (slides.length <= 1) {
+            showPromoSlide(0);
+
+            return;
         }
 
-        return true;
+        showPromoSlide(promoIndex);
+        promoTimer = window.setInterval(() => {
+            showPromoSlide(promoIndex + 1);
+        }, PROMO_ROTATE_MS);
+    }
+
+    function syncMarqueeFontSize() {
+        const header = getHeader();
+
+        if (! header || ! hasMarquee(header)) {
+            return;
+        }
+
+        const title = header.querySelector('.erp-pdv__title:not(.erp-pdv__marquee-text)');
+        const marquees = header.querySelectorAll('.erp-pdv__marquee-text');
+
+        if (! title || marquees.length === 0) {
+            return;
+        }
+
+        const wasHidden = getComputedStyle(title).display === 'none';
+        let size = '';
+        let lineHeight = '';
+        let fontWeight = '';
+
+        if (wasHidden) {
+            const prev = {
+                display: title.style.display,
+                visibility: title.style.visibility,
+                position: title.style.position,
+                left: title.style.left,
+            };
+            title.style.display = 'block';
+            title.style.visibility = 'hidden';
+            title.style.position = 'absolute';
+            title.style.left = '-9999px';
+            const cs = getComputedStyle(title);
+            size = cs.fontSize;
+            lineHeight = cs.lineHeight;
+            fontWeight = cs.fontWeight;
+            title.style.display = prev.display;
+            title.style.visibility = prev.visibility;
+            title.style.position = prev.position;
+            title.style.left = prev.left;
+        } else {
+            const cs = getComputedStyle(title);
+            size = cs.fontSize;
+            lineHeight = cs.lineHeight;
+            fontWeight = cs.fontWeight;
+        }
+
+        if (! size) {
+            return;
+        }
+
+        header.style.setProperty('--erp-pdv-banner-font-size', size);
+        marquees.forEach((el) => {
+            el.style.fontSize = size;
+            el.style.lineHeight = lineHeight || '1.15';
+            el.style.fontWeight = fontWeight || '800';
+        });
     }
 
     function apply() {
         const header = getHeader();
+        const side = getSidePanel();
+        const idleOk = idle && canIdle();
 
-        if (! header) {
-            return;
+        if (header) {
+            if (idleOk && hasMarquee(header)) {
+                syncMarqueeFontSize();
+                header.classList.add('is-screensaver');
+            } else {
+                header.classList.remove('is-screensaver', 'is-promo', 'is-marquee');
+            }
         }
 
-        if (idle && canScreensave()) {
-            header.classList.add('is-screensaver');
+        if (side) {
+            if (idleOk && hasPromo()) {
+                side.classList.add('is-promo-idle');
+                startPromoRotate();
+            } else {
+                side.classList.remove('is-promo-idle');
+                stopPromoRotate();
+            }
         } else {
-            header.classList.remove('is-screensaver');
+            stopPromoRotate();
         }
     }
 
@@ -2777,7 +4550,6 @@ initErpPdv();
 
         try {
             if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                // Reaplica o estado após cada re-render (o morph reescreve o header).
                 window.Livewire.hook('morph.updated', apply);
             }
         } catch (e) {

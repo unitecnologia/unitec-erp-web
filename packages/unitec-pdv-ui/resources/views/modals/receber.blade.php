@@ -56,7 +56,9 @@
                     wire:model="receberValor"
                     wire:keydown.enter.prevent="confirmReceberConta"
                     class="erp-pdv-modal__input"
-                    data-mask="money"
+                    data-mask="money-br"
+                    data-erp-pdv-money-input="1"
+                    inputmode="decimal"
                     autocomplete="off"
                 >
             </div>

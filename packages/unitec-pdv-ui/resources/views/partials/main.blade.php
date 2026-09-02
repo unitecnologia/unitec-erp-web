@@ -137,7 +137,7 @@
     </section>
 
     <aside class="erp-pdv__side-panel">
-        <div class="erp-pdv__product-photo" aria-label="Foto do produto">
+        <div class="erp-pdv__product-photo" aria-label="Foto do produto" data-erp-pdv-product-photo>
             @if ($this->pdvPreviewFotoUrl)
                 <img
                     src="{{ $this->pdvPreviewFotoUrl }}"
@@ -148,8 +148,27 @@
             @endif
         </div>
 
-        <fieldset class="erp-pdv__search-box">
-            <legend class="erp-pdv__search-legend">Código:</legend>
+        <div class="erp-pdv__ultimo-troco" aria-label="Resumo da última venda finalizada">
+            <span class="erp-pdv__ultimo-troco-heading">ÚLTIMA VENDA</span>
+            <span class="erp-pdv__ultimo-troco-sep" aria-hidden="true">|</span>
+            <span class="erp-pdv__ultimo-troco-part erp-pdv__ultimo-troco-part--minor">
+                <span class="erp-pdv__ultimo-troco-k">VENDA</span>
+                <span class="erp-pdv__ultimo-troco-v">R$ {{ $this->pdvUltimoVendaTotal }}</span>
+            </span>
+            <span class="erp-pdv__ultimo-troco-sep" aria-hidden="true">|</span>
+            <span class="erp-pdv__ultimo-troco-part erp-pdv__ultimo-troco-part--minor">
+                <span class="erp-pdv__ultimo-troco-k">RECEBIDO</span>
+                <span class="erp-pdv__ultimo-troco-v">R$ {{ $this->pdvUltimoRecebido }}</span>
+            </span>
+            <span class="erp-pdv__ultimo-troco-sep" aria-hidden="true">|</span>
+            <span class="erp-pdv__ultimo-troco-part">
+                <span class="erp-pdv__ultimo-troco-k">TROCO</span>
+                <span class="erp-pdv__ultimo-troco-v erp-pdv__ultimo-troco-v--troco">R$ {{ $this->pdvUltimoTroco }}</span>
+            </span>
+        </div>
+
+        <div class="erp-pdv__search-box erp-pdv__codigo-box">
+            <label class="erp-pdv__search-legend" for="erp-pdv-search">Código:</label>
             {{-- wire:ignore: Livewire não remonta o input após lançar item (mantém foco/caret). --}}
             <div
                 class="erp-pdv__search-field"
@@ -174,13 +193,15 @@
                                 setTimeout(() => this.focusCodigo(), ms);
                             });
                         };
-                        // Garante o termo do input no servidor antes do Enter
-                        // (Livewire 3 e 4: entangle deferred pode atrasar o sync).
                         const termo = this.$refs.codigo ? this.$refs.codigo.value : (this.q || '');
                         this.q = termo;
-                        Promise.resolve(this.$wire.set('pdvSearch', termo))
-                            .then(() => this.$wire.handlePdvSearchEnter())
-                            .finally(done);
+                        if (! termo) {
+                            window.enqueuePdvScan?.('', { allowEmpty: true });
+                            done();
+                            return;
+                        }
+                        window.enqueuePdvScan?.(termo);
+                        done();
                     },
                     init() {
                         const onRefocus = () => this.focusCodigo();
@@ -207,7 +228,7 @@
                     autocomplete="off"
                 >
             </div>
-        </fieldset>
+        </div>
 
         <div class="erp-pdv__totals">
             @if ($this->pdvShowLaunchFields)
@@ -238,7 +259,9 @@
                         wire:model.blur="pdvLaunchPreco"
                         wire:keydown.enter.prevent="handlePdvLaunchPrecoEnter($event.target.value)"
                         class="erp-pdv__total-input"
-                        data-mask="money"
+                        data-mask="money-br"
+                        data-erp-pdv-money-input="1"
+                        inputmode="decimal"
                         @readonly($this->pdvLaunchStep !== 'preco')
                         autocomplete="off"
                     >
@@ -353,6 +376,9 @@
 </div>
 
 <footer class="erp-pdv__status">
+    <span class="erp-pdv__status-empresa" title="{{ $this->pdvStatusBar['empresa'] ?? '—' }}">
+        Empresa: {{ $this->pdvStatusBar['empresa'] ?? '—' }}
+    </span>
     <span>Conta: {{ $this->pdvStatusBar['conta'] }}</span>
     <span>Usuário: {{ $this->pdvStatusBar['usuario'] }}</span>
     <span>Vendedor: {{ $this->pdvStatusBar['vendedor'] }}</span>
