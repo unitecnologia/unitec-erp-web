@@ -3,7 +3,7 @@
 .SYNOPSIS
     Desenvolvimento nativo no Windows - PHP e MySQL na maquina (porta 8000).
 .PARAMETER Port
-    Porta do artisan serve (padrao 8000).
+    Porta do FrankenPHP de desenvolvimento (padrao 8000).
 .PARAMETER BindHost
     Host de bind (padrao 0.0.0.0 = acessivel na rede local, p/ o app Forca de Vendas).
     Use 127.0.0.1 para restringir so a esta maquina.

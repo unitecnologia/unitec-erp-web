@@ -104,10 +104,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { Start-UnitecStack -AppPath '%APP%' -WaitSeconds 30 } catch { Write-Host $_.Exception.Message; exit 1 }"
 
 if errorlevel 1 (
-  echo Falhou Start-UnitecStack - tentando serve direto...
-  taskkill /F /IM php.exe >nul 2>&1
-  start "" /B "%PHPEXE%" artisan serve --host=0.0.0.0 --port=8765
-  timeout /t 3 /nobreak >nul
+  echo.
+  echo [ERRO] FrankenPHP nao iniciou. Sem fallback para php -S / artisan serve.
+  echo Verifique tools\frankenphp\frankenphp.exe e storage\logs.
+  pause
+  exit /b 1
 )
 
 echo.

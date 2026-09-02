@@ -100,24 +100,90 @@ public static class ErpStackManager
             }
         }
 
-        // Fallback: algum php.exe desta instalacao (tools\php) ainda vivo.
-        var embeddedPhpDir = Path.Combine(appPath, "tools", "php");
-        if (!Directory.Exists(embeddedPhpDir))
+        var frankenDir = Path.Combine(appPath, "tools", "frankenphp");
+        if (Directory.Exists(frankenDir))
+        {
+            string frankenFull;
+            try
+            {
+                frankenFull = Path.GetFullPath(frankenDir);
+            }
+            catch
+            {
+                frankenFull = string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(frankenFull))
+            {
+                foreach (var p in Process.GetProcessesByName("frankenphp"))
+                {
+                    try
+                    {
+                        string? modulePath = null;
+                        try { modulePath = p.MainModule?.FileName; } catch { }
+                        if (string.IsNullOrWhiteSpace(modulePath))
+                        {
+                            continue;
+                        }
+
+                        var moduleDir = Path.GetDirectoryName(Path.GetFullPath(modulePath));
+                        if (moduleDir is not null
+                            && moduleDir.StartsWith(frankenFull, StringComparison.OrdinalIgnoreCase)
+                            && !p.HasExited)
+                        {
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Runtime HTTP inválido = listener na porta do ERP sem FrankenPHP desta instalação.
+    /// </summary>
+    public static bool IsInvalidPhpBuiltInServerOnPort(string appPath, int port = ErpPaths.Port)
+    {
+        if (!IsTcpPortOpen(port))
         {
             return false;
         }
 
-        string embeddedFull;
+        // FrankenPHP desta instalação vivo → runtime válido.
+        if (IsFrankenPhpRunning(appPath))
+        {
+            return false;
+        }
+
+        // Porta ocupada sem FrankenPHP = php -S / outro servidor — inválido.
+        return true;
+    }
+
+    private static bool IsFrankenPhpRunning(string appPath)
+    {
+        var frankenDir = Path.Combine(appPath, "tools", "frankenphp");
+        if (!Directory.Exists(frankenDir))
+        {
+            return false;
+        }
+
+        string frankenFull;
         try
         {
-            embeddedFull = Path.GetFullPath(embeddedPhpDir);
+            frankenFull = Path.GetFullPath(frankenDir);
         }
         catch
         {
             return false;
         }
 
-        foreach (var p in Process.GetProcessesByName("php"))
+        foreach (var p in Process.GetProcessesByName("frankenphp"))
         {
             try
             {
@@ -130,7 +196,7 @@ public static class ErpStackManager
 
                 var moduleDir = Path.GetDirectoryName(Path.GetFullPath(modulePath));
                 if (moduleDir is not null
-                    && moduleDir.StartsWith(embeddedFull, StringComparison.OrdinalIgnoreCase)
+                    && moduleDir.StartsWith(frankenFull, StringComparison.OrdinalIgnoreCase)
                     && !p.HasExited)
                 {
                     return true;
@@ -148,7 +214,7 @@ public static class ErpStackManager
     public static Process EnsurePhpServer(string appPath)
     {
         // Serviço (Session 0) e launcher (sessão do usuário) precisam compartilhar
-        // a mesma trava. Mutex Local permite que os dois matem/subam o PHP juntos.
+        // a mesma trava. Mutex Global permite que os dois matem/subam o HTTP juntos.
         using var gate = new Mutex(false, @"Global\UnitecErpEnsurePhp");
         var acquired = false;
         try
@@ -165,7 +231,7 @@ public static class ErpStackManager
             if (!acquired)
             {
                 throw new InvalidOperationException(
-                    "Timeout aguardando EnsurePhpServer (outro processo esta iniciando o PHP).");
+                    "Timeout aguardando EnsurePhpServer (outro processo esta iniciando o HTTP).");
             }
 
             return EnsurePhpServerCore(appPath);
@@ -181,24 +247,37 @@ public static class ErpStackManager
 
     private static Process EnsurePhpServerCore(string appPath)
     {
-        var health = HealthClient.ProbeAsync().GetAwaiter().GetResult();
-        if (health.Ok)
-        {
-            return Process.GetCurrentProcess();
-        }
-
-        // Porta aberta e app saudavel parcialmente: nao reinicia se processo ainda vivo.
-        if (health.PortOpen && IsAppPhpRunning(appPath))
+        if (IsInvalidPhpBuiltInServerOnPort(appPath))
         {
             DesktopLog.Write(appPath,
-                $"PHP ja responde na porta {ErpPaths.Port} (kind={health.Kind}) — mantendo processo.");
+                "RUNTIME INVÁLIDO: porta ocupada sem FrankenPHP ("
+                + ErpPaths.Port + ") — encerrando e exigindo FrankenPHP.");
+            ProcessHelper.KillPidFile(appPath);
+            ProcessHelper.KillAppHttpServers(appPath);
+            WaitPortFree(ErpPaths.Port, 3000);
+        }
+
+        var health = HealthClient.ProbeAsync().GetAwaiter().GetResult();
+        if (health.Ok && IsFrankenPhpRunning(appPath))
+        {
+            DesktopLog.Write(appPath,
+                $"Runtime HTTP: FrankenPHP | Porta: {ErpPaths.Port} (já ativo, kind={health.Kind})");
             return Process.GetCurrentProcess();
         }
 
-        var php = ErpPaths.ResolvePhpExe(appPath);
-        if (!File.Exists(php) && php == "php")
+        if (health.PortOpen && IsFrankenPhpRunning(appPath))
         {
-            throw new InvalidOperationException("PHP embutido nao encontrado em tools\\php.");
+            DesktopLog.Write(appPath,
+                $"FrankenPHP já responde na porta {ErpPaths.Port} (kind={health.Kind}) — mantendo processo.");
+            return Process.GetCurrentProcess();
+        }
+
+        var franken = ErpPaths.ResolveFrankenPhpExe(appPath);
+        if (string.IsNullOrWhiteSpace(franken))
+        {
+            throw new InvalidOperationException(
+                "FrankenPHP não iniciou: binário ausente em tools\\frankenphp\\frankenphp.exe. "
+                + "O ERP exige FrankenPHP (sem fallback para php -S / artisan serve).");
         }
 
         if (!File.Exists(Path.Combine(appPath, "artisan")))
@@ -212,117 +291,230 @@ public static class ErpStackManager
         }
 
         Directory.CreateDirectory(Path.Combine(appPath, "storage", "logs"));
+        Directory.CreateDirectory(Path.Combine(appPath, "storage", "app"));
         Directory.CreateDirectory(Path.Combine(appPath, "bootstrap", "cache"));
 
-        var serverPhp = Path.Combine(
-            appPath, "vendor", "laravel", "framework", "src", "Illuminate", "Foundation", "resources", "server.php");
-        if (!File.Exists(serverPhp))
-        {
-            throw new InvalidOperationException("server.php do Laravel ausente em vendor\\laravel\\framework\\...");
-        }
-
-        var publicDir = Path.Combine(appPath, "public");
-        var publicIndex = Path.Combine(publicDir, "index.php");
+        var publicIndex = Path.Combine(appPath, "public", "index.php");
         if (!File.Exists(publicIndex))
         {
             throw new InvalidOperationException("public\\index.php ausente — instalacao incompleta.");
         }
+
+        EnsureFrankenPhpIni(appPath);
 
         Exception? lastError = null;
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             try
             {
-                return StartPhpServerAttempt(appPath, php, serverPhp, publicDir, attempt);
+                return StartFrankenPhpServerAttempt(appPath, franken, attempt);
             }
             catch (Exception ex)
             {
                 lastError = ex;
-                DesktopLog.Write(appPath, $"EnsurePhpServer tentativa {attempt}/3 falhou: {ex.Message}");
+                DesktopLog.Write(appPath, $"EnsurePhpServer (FrankenPHP) tentativa {attempt}/3 falhou: {ex.Message}");
                 ProcessHelper.KillPidFile(appPath);
-                ProcessHelper.KillAppPhpServers(appPath);
+                ProcessHelper.KillAppHttpServers(appPath);
                 WaitPortFree(ErpPaths.Port, 2000);
                 Thread.Sleep(500);
             }
         }
 
         throw lastError ?? new InvalidOperationException(
-            "php -S nao ficou no ar. Veja storage\\logs\\php-serve-start.log e unitec-erp-desktop.log");
+            "FrankenPHP não iniciou. Veja storage\\logs\\frankenphp-start.log e unitec-erp-desktop.log");
     }
 
-    private static Process StartPhpServerAttempt(
+    private static void EnsureFrankenPhpIni(string appPath)
+    {
+        var frankenDir = Path.Combine(appPath, "tools", "frankenphp");
+        if (!Directory.Exists(frankenDir))
+        {
+            return;
+        }
+
+        var opcacheDir = Path.Combine(frankenDir, "opcache");
+        Directory.CreateDirectory(opcacheDir);
+        var opcachePosix = opcacheDir.Replace('\\', '/');
+        var targetIni = Path.Combine(frankenDir, "php.ini");
+
+        // Nao copiar tools\php\php.ini (CLI 8.4) — FrankenPHP embute PHP 8.5 e no Windows
+        // o OPcache exige file_cache por causa do ASLR.
+        var ini =
+            "; Unitec ERP — php.ini do FrankenPHP (ASLR-safe).\r\n"
+            + "extension_dir = \"ext\"\r\n"
+            + "\r\n"
+            + "zend_extension=opcache\r\n"
+            + "opcache.enable=1\r\n"
+            + "opcache.enable_cli=1\r\n"
+            + "opcache.memory_consumption=256\r\n"
+            + "opcache.interned_strings_buffer=32\r\n"
+            + "opcache.max_accelerated_files=20000\r\n"
+            + "opcache.validate_timestamps=1\r\n"
+            + "opcache.revalidate_freq=0\r\n"
+            + $"opcache.file_cache={opcachePosix}\r\n"
+            + "opcache.file_cache_fallback=1\r\n"
+            + "opcache.jit=0\r\n"
+            + "\r\n"
+            + "extension=curl\r\n"
+            + "extension=fileinfo\r\n"
+            + "extension=gd\r\n"
+            + "extension=intl\r\n"
+            + "extension=mbstring\r\n"
+            + "extension=mysqli\r\n"
+            + "extension=openssl\r\n"
+            + "extension=pdo_mysql\r\n"
+            + "extension=pdo_sqlite\r\n"
+            + "extension=sqlite3\r\n"
+            + "extension=zip\r\n"
+            + "\r\n"
+            + "memory_limit=512M\r\n"
+            + "max_execution_time=300\r\n"
+            + "upload_max_filesize=64M\r\n"
+            + "post_max_size=64M\r\n"
+            + "date.timezone=America/Sao_Paulo\r\n";
+
+        File.WriteAllText(targetIni, ini);
+    }
+
+    private static string PrepareFrankenPhpCaddyfile(string appPath)
+    {
+        var target = ErpPaths.FrankenPhpCaddyfilePath(appPath);
+        var template = Path.Combine(appPath, "tools", "frankenphp", "Caddyfile.template");
+        if (File.Exists(template))
+        {
+            File.Copy(template, target, overwrite: true);
+            return target;
+        }
+
+        var fallback = """
+{
+	admin off
+	frankenphp {
+		num_threads {$FRANKENPHP_NUM_THREADS:8}
+	}
+	auto_https off
+}
+
+:{$UNITEC_PORT:8765} {
+	bind {$UNITEC_BIND:0.0.0.0}
+	root * {$UNITEC_PUBLIC:public/}
+	encode gzip
+	php_server {
+		env SERVER_NAME {$UNITEC_HTTP_HOST:127.0.0.1:8765}
+		env HTTP_HOST {$UNITEC_HTTP_HOST:127.0.0.1:8765}
+	}
+	file_server
+}
+""";
+        File.WriteAllText(target, fallback);
+        return target;
+    }
+
+    private static int ResolveFrankenPhpThreads(string appPath)
+    {
+        try
+        {
+            var envPath = Path.Combine(appPath, ".env");
+            if (File.Exists(envPath))
+            {
+                foreach (var line in File.ReadLines(envPath))
+                {
+                    var t = line.Trim();
+                    if (t.StartsWith("FRANKENPHP_NUM_THREADS=", StringComparison.OrdinalIgnoreCase)
+                        && int.TryParse(t.Split('=', 2)[1].Trim().Trim('"'), out var n)
+                        && n >= 2)
+                    {
+                        return n;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return 8;
+    }
+
+    private static Process StartFrankenPhpServerAttempt(
         string appPath,
-        string php,
-        string serverPhp,
-        string publicDir,
+        string frankenExe,
         int attempt)
     {
         var health = HealthClient.ProbeAsync().GetAwaiter().GetResult();
-        if (health.Ok)
+        if (health.Ok && IsFrankenPhpRunning(appPath))
         {
             return Process.GetCurrentProcess();
         }
 
-        if (health.PortOpen || IsAppPhpRunning(appPath))
-        {
-            DesktopLog.Write(appPath,
-                $"Limpando PHP anterior antes da tentativa {attempt} (port={health.PortOpen} running={IsAppPhpRunning(appPath)})");
-            ProcessHelper.KillPidFile(appPath);
-            ProcessHelper.KillAppPhpServers(appPath);
-            WaitPortFree(ErpPaths.Port, 2500);
-            Thread.Sleep(400);
-        }
-        else
-        {
-            ProcessHelper.KillPidFile(appPath);
-            ProcessHelper.KillAppPhpServers(appPath);
-            WaitPortFree(ErpPaths.Port, 1500);
-        }
+        DesktopLog.Write(appPath,
+            $"Limpando HTTP anterior antes da tentativa FrankenPHP {attempt} (port={health.PortOpen})");
+        ProcessHelper.KillPidFile(appPath);
+        ProcessHelper.KillAppHttpServers(appPath);
+        WaitPortFree(ErpPaths.Port, 2500);
+        Thread.Sleep(400);
 
-        var args = $"-S 127.0.0.1:{ErpPaths.Port} \"{serverPhp}\"";
-        var startLog = Path.Combine(appPath, "storage", "logs", "php-serve-start.log");
-
-        // Tentativa com stderr em arquivo (diagnostico). Processo definitivo sem redirect
-        // (stdout no Windows quebra php://stdout / Livewire).
-        if (attempt > 1)
-        {
-            TryCapturePhpStartFailure(appPath, php, args, publicDir, startLog);
-        }
+        var caddy = PrepareFrankenPhpCaddyfile(appPath);
+        var threads = ResolveFrankenPhpThreads(appPath);
+        var frankenIni = Path.Combine(Path.GetDirectoryName(frankenExe)!, "php.ini");
+        var startLog = Path.Combine(appPath, "storage", "logs", "frankenphp-start.log");
+        var httpHost = $"127.0.0.1:{ErpPaths.Port}";
 
         var psi = new ProcessStartInfo
         {
-            FileName = php,
-            Arguments = args,
-            WorkingDirectory = publicDir,
+            FileName = frankenExe,
+            Arguments = $"run --config \"{caddy}\"",
+            WorkingDirectory = appPath,
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
             RedirectStandardOutput = false,
             RedirectStandardError = false,
         };
+        psi.Environment["UNITEC_BIND"] = "0.0.0.0";
+        psi.Environment["UNITEC_PORT"] = ErpPaths.Port.ToString();
+        psi.Environment["UNITEC_PUBLIC"] = "public/";
+        psi.Environment["UNITEC_HTTP_HOST"] = httpHost;
+        psi.Environment["FRANKENPHP_NUM_THREADS"] = threads.ToString();
+        if (File.Exists(frankenIni))
+        {
+            psi.Environment["PHPRC"] = frankenIni;
+        }
 
         DesktopLog.Write(appPath,
-            $"Iniciando PHP (tentativa {attempt}): {php} -S 127.0.0.1:{ErpPaths.Port} cwd=public (sem redirect stdio)");
+            $"Iniciando FrankenPHP (tentativa {attempt}): threads={threads} porta={ErpPaths.Port}");
+        DesktopLog.Write(appPath, $"Runtime HTTP: FrankenPHP | Porta: {ErpPaths.Port}");
+
         var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("Falha ao iniciar php -S.");
+            ?? throw new InvalidOperationException("Falha ao iniciar FrankenPHP.");
 
         ProcessHelper.WritePidFile(appPath, proc.Id);
+        try
+        {
+            File.WriteAllText(ErpPaths.RuntimeMarkerPath(appPath), "frankenphp");
+        }
+        catch
+        {
+            // ignore
+        }
 
-        for (var i = 0; i < 60; i++)
+        for (var i = 0; i < 80; i++)
         {
             if (proc.HasExited)
             {
-                TryCapturePhpStartFailure(appPath, php, args, publicDir, startLog);
+                AppendFrankenStartLog(startLog, frankenExe, caddy, $"exit={proc.ExitCode}");
                 throw new InvalidOperationException(
-                    $"php -S encerrou logo apos iniciar (exit {proc.ExitCode}). "
-                    + "Veja storage\\logs\\php-serve-start.log");
+                    $"FrankenPHP não iniciou (encerrou com exit {proc.ExitCode}). "
+                    + "Veja storage\\logs\\frankenphp-start.log");
             }
 
             var probe = HealthClient.ProbeAsync().GetAwaiter().GetResult();
-            if (probe.Ok || probe.HttpResponded || probe.PortOpen)
+            if ((probe.Ok || probe.HttpResponded || probe.PortOpen) && !proc.HasExited)
             {
                 DesktopLog.Write(appPath,
-                    $"PHP no ar PID={proc.Id} (ok={probe.Ok} http={probe.HttpResponded} port={probe.PortOpen})");
+                    $"FrankenPHP no ar PID={proc.Id} (ok={probe.Ok} http={probe.HttpResponded} port={probe.PortOpen})");
+                DesktopLog.Write(appPath, $"Runtime HTTP: FrankenPHP | Porta: {ErpPaths.Port}");
                 return proc;
             }
 
@@ -332,67 +524,27 @@ public static class ErpStackManager
         if (!proc.HasExited)
         {
             DesktopLog.Write(appPath,
-                "Timeout no probe — mantendo php -S vivo (PID " + proc.Id + ").");
+                "Timeout no probe — mantendo FrankenPHP vivo (PID " + proc.Id + ").");
             return proc;
         }
 
-        TryCapturePhpStartFailure(appPath, php, args, publicDir, startLog);
+        AppendFrankenStartLog(startLog, frankenExe, caddy, $"exit={proc.ExitCode}");
         throw new InvalidOperationException(
-            "php -S nao ficou no ar. Veja storage\\logs\\php-serve-start.log");
+            "FrankenPHP não iniciou. Veja storage\\logs\\frankenphp-start.log");
     }
 
-    private static void TryCapturePhpStartFailure(
-        string appPath,
-        string php,
-        string args,
-        string publicDir,
-        string startLog)
+    private static void AppendFrankenStartLog(string startLog, string exe, string caddy, string note)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(startLog)!);
-            var psi = new ProcessStartInfo
-            {
-                FileName = php,
-                Arguments = args,
-                WorkingDirectory = publicDir,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-
-            using var probe = Process.Start(psi);
-            if (probe is null)
-            {
-                return;
-            }
-
-            var stdout = probe.StandardOutput.ReadToEnd();
-            var stderr = probe.StandardError.ReadToEnd();
-            if (!probe.WaitForExit(2500))
-            {
-                try { probe.Kill(entireProcessTree: true); } catch { /* ignore */ }
-            }
-
-            var dump =
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] exit={probe.ExitCode}{Environment.NewLine}"
-                + $"cmd: {php} {args}{Environment.NewLine}"
-                + $"cwd: {publicDir}{Environment.NewLine}"
-                + $"stdout:{Environment.NewLine}{stdout}{Environment.NewLine}"
-                + $"stderr:{Environment.NewLine}{stderr}{Environment.NewLine}";
-            File.AppendAllText(startLog, dump);
-            DesktopLog.Write(appPath, "Diagnostico php -S gravado em php-serve-start.log (exit " + probe.ExitCode + ")");
+            File.AppendAllText(startLog,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {note}{Environment.NewLine}"
+                + $"cmd: {exe} run --config {caddy}{Environment.NewLine}");
         }
-        catch (Exception ex)
+        catch
         {
-            DesktopLog.Write(appPath, "Falha ao capturar stderr do php -S: " + ex.Message);
-        }
-        finally
-        {
-            ProcessHelper.KillAppPhpServers(appPath);
-            WaitPortFree(ErpPaths.Port, 1500);
+            // ignore
         }
     }
 
@@ -431,7 +583,7 @@ public static class ErpStackManager
     public static bool StopPhpServer(string appPath, int waitPortFreeMs = 5000)
     {
         ProcessHelper.KillPidFile(appPath);
-        ProcessHelper.KillAppPhpServers(appPath);
+        ProcessHelper.KillAppHttpServers(appPath);
 
         var deadline = Environment.TickCount64 + Math.Max(0, waitPortFreeMs);
         while (Environment.TickCount64 < deadline)

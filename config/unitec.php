@@ -98,8 +98,9 @@ return [
     ],
 
     /*
-    | Runtime web: frankenphp (padr├úo quando tools/frankenphp existe) ou php (php -S fallback).
-    | ERP_LIST_SYNC_POLL=false desliga poll autom├ítico nas listas ERP (benchmark / performance).
+    | Runtime web HTTP: FrankenPHP obrigatório (DEV :8000 e produção :8765).
+    | Sem fallback para php -S / artisan serve.
+    | ERP_LIST_SYNC_POLL=false desliga poll automático nas listas ERP (benchmark / performance).
     */
     'web_server' => env('UNITEC_WEB_SERVER', 'frankenphp'),
     'frankenphp_threads' => max(2, (int) env('FRANKENPHP_NUM_THREADS', 8)),

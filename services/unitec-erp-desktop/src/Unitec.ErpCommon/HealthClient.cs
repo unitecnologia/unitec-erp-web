@@ -27,7 +27,7 @@ public static class HealthClient
         CancellationToken cancellationToken = default)
     {
         // HTTP primeiro (nao depender do TcpClient — no Windows ja deu falso "porta fechada"
-        // com php artisan serve imprimindo "Server running").
+        // com servidor HTTP imprimindo banner de start).
         var urls = BuildProbeUrls(baseUrl);
         Exception? lastHttpError = null;
 

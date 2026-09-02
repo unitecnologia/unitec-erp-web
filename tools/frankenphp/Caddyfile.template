@@ -1,0 +1,18 @@
+{
+	admin off
+	frankenphp {
+		num_threads {$FRANKENPHP_NUM_THREADS:8}
+	}
+	auto_https off
+}
+
+:{$UNITEC_PORT:8765} {
+	bind {$UNITEC_BIND:0.0.0.0}
+	root * {$UNITEC_PUBLIC:public/}
+	encode gzip
+	php_server {
+		env SERVER_NAME {$UNITEC_HTTP_HOST:127.0.0.1:8765}
+		env HTTP_HOST {$UNITEC_HTTP_HOST:127.0.0.1:8765}
+	}
+	file_server
+}

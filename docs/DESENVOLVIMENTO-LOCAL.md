@@ -17,7 +17,7 @@ Ou: `.\scripts\subir.ps1` (mesma coisa)
 
 1. Ajusta o `.env` para `127.0.0.1:3306` e `http://127.0.0.1:8000`
 2. Na **primeira vez**, instala PHP 8.4 + MariaDB em `tools\` (~150 MB)
-3. Sobe MySQL local e `php artisan serve` na porta **8000**
+3. Sobe MySQL local e **FrankenPHP** na porta **8000** (obrigatório; sem `artisan serve` / `php -S`)
 4. Abre http://127.0.0.1:8000/admin
 
 **Login:** USUARIO / **01** (sem empresa no seed — cadastra no primeiro acesso)
@@ -75,4 +75,4 @@ netsh advfirewall firewall add rule name="Unitec ERP HTTP" dir=in action=allow p
 
 ## Linux (futuro)
 
-Se precisar testar em um PC com Linux, instale PHP 8.4, Composer, Node, MySQL/MariaDB e siga o mesmo fluxo (`composer install`, `npm run build`, `php artisan migrate`, `php artisan serve`). Nao ha container Docker neste repositorio.
+Se precisar testar em um PC com Linux, instale PHP 8.4, Composer, Node, MySQL/MariaDB, FrankenPHP e siga o mesmo fluxo (`composer install`, `npm run build`, `php artisan migrate`, subir FrankenPHP na porta 8000). Nao ha container Docker neste repositorio.

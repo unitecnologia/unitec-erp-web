@@ -70,6 +70,21 @@ public static class ErpPaths
         return "php";
     }
 
+    /// <summary>
+    /// Runtime HTTP obrigatório do ERP. Sem este binário o stack deve falhar (sem php -S).
+    /// </summary>
+    public static string? ResolveFrankenPhpExe(string appPath)
+    {
+        var direct = Path.Combine(appPath, "tools", "frankenphp", "frankenphp.exe");
+        return File.Exists(direct) ? direct : null;
+    }
+
+    public static string FrankenPhpCaddyfilePath(string appPath, int port = Port)
+        => Path.Combine(appPath, "storage", "app", $"unitec-erp-frankenphp-{port}.caddyfile");
+
+    public static string RuntimeMarkerPath(string appPath)
+        => Path.Combine(appPath, ".unitec-serve.runtime");
+
     public static string ResolveMysqldExe(string appPath)
     {
         var candidates = new[]

@@ -29,7 +29,7 @@ try {
     $probe = Invoke-WebRequest -Uri "$LocalUrl/up" -UseBasicParsing -TimeoutSec 3
 } catch {
     Write-Host "AVISO: ERP não respondeu em $LocalUrl/up" -ForegroundColor Yellow
-    Write-Host "Suba o ERP antes (Desenvolver.bat / artisan serve)." -ForegroundColor Yellow
+    Write-Host 'Suba o ERP antes (Desenvolver.bat / FrankenPHP).' -ForegroundColor Yellow
 }
 
 $cf = Resolve-Cloudflared

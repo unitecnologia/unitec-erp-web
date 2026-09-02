@@ -17,8 +17,7 @@ $script:UnitecServeHost = '127.0.0.1'
 # para terminais e para o app ForÃ§a de Vendas). A porta 8765 ja e liberada no firewall.
 $script:UnitecServeBindHost = '0.0.0.0'
 $script:UnitecServePort = 8765
-# Numero de workers do servidor embutido do PHP (atende varios aparelhos/terminais
-# simultaneos, ex.: app ForÃ§a de Vendas sincronizando). PHP 8+.
+# Threads do FrankenPHP (HTTP). PHP CLI continua separado para artisan.
 $script:UnitecServeWorkers = 8
 $script:UnitecDefaultAppUrl = 'http://127.0.0.1:8765'
 $script:UnitecServePidFileName = '.unitec-serve.pid'
@@ -1476,6 +1475,322 @@ function Get-UnitecServePidFilePath {
     return Join-Path $AppPath $script:UnitecServePidFileName
 }
 
+function Get-UnitecServeRuntimeMarkerPath {
+    param([string]$AppPath)
+
+    return Join-Path $AppPath '.unitec-serve.runtime'
+}
+
+function Get-UnitecFrankenPhpExe {
+    param([string]$AppPath)
+
+    $direct = Join-Path $AppPath 'tools\frankenphp\frankenphp.exe'
+    if (Test-Path -LiteralPath $direct) {
+        return $direct
+    }
+
+    return $null
+}
+
+function Ensure-UnitecFrankenPhpIni {
+    param([string]$AppPath)
+
+    $frankenDir = Join-Path $AppPath 'tools\frankenphp'
+    if (-not (Test-Path -LiteralPath $frankenDir)) {
+        return $false
+    }
+
+    $opcacheDir = Join-Path $frankenDir 'opcache'
+    if (-not (Test-Path -LiteralPath $opcacheDir)) {
+        New-Item -ItemType Directory -Path $opcacheDir -Force | Out-Null
+    }
+
+    $opcachePosix = ($opcacheDir -replace '\\', '/')
+    $targetIni = Join-Path $frankenDir 'php.ini'
+
+    # Nao copiar tools\php\php.ini (PHP 8.4) no FrankenPHP (PHP embutido 8.5):
+    # no Windows o OPcache interno exige file_cache por causa do ASLR.
+    $ini = @"
+; Unitec ERP — php.ini do FrankenPHP (ASLR-safe). Gerado por Ensure-UnitecFrankenPhpIni.
+extension_dir = "ext"
+
+zend_extension=opcache
+opcache.enable=1
+opcache.enable_cli=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=32
+opcache.max_accelerated_files=20000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=0
+opcache.file_cache=$opcachePosix
+opcache.file_cache_fallback=1
+opcache.jit=0
+
+extension=curl
+extension=fileinfo
+extension=gd
+extension=intl
+extension=mbstring
+extension=mysqli
+extension=openssl
+extension=pdo_mysql
+extension=pdo_sqlite
+extension=sqlite3
+extension=zip
+
+memory_limit=512M
+max_execution_time=300
+upload_max_filesize=64M
+post_max_size=64M
+date.timezone=America/Sao_Paulo
+"@
+
+    Set-Content -LiteralPath $targetIni -Value $ini -Encoding ASCII
+    return $true
+}
+
+function Get-UnitecFrankenPhpCaddyfile {
+    param(
+        [string]$AppPath,
+        [int]$Port = 0
+    )
+
+    if ($Port -le 0) {
+        $Port = [int]$script:UnitecServePort
+    }
+
+    $storageDir = Join-Path $AppPath 'storage\app'
+    if (-not (Test-Path -LiteralPath $storageDir)) {
+        New-Item -ItemType Directory -Path $storageDir -Force | Out-Null
+    }
+
+    $target = Join-Path $storageDir ("unitec-erp-frankenphp-{0}.caddyfile" -f $Port)
+    $template = Join-Path $AppPath 'tools\frankenphp\Caddyfile.template'
+    if (-not (Test-Path -LiteralPath $template)) {
+        throw "FrankenPHP nao iniciou: Caddyfile.template ausente em tools\frankenphp."
+    }
+
+    Copy-Item -LiteralPath $template -Destination $target -Force
+    return $target
+}
+
+function Get-UnitecFrankenPhpThreads {
+    param([string]$AppPath)
+
+    $threads = [string]$script:UnitecServeWorkers
+    $envFile = Join-Path $AppPath '.env'
+    if (Test-Path -LiteralPath $envFile) {
+        $envRaw = Get-Content $envFile -Raw -ErrorAction SilentlyContinue
+        if ($envRaw -and ($envRaw -match '(?m)^\s*FRANKENPHP_NUM_THREADS\s*=\s*(\d+)')) {
+            $threads = $Matches[1]
+        }
+    }
+
+    if ([int]$threads -lt 2) {
+        $threads = '8'
+    }
+
+    return $threads
+}
+
+function Test-UnitecFrankenPhpRunning {
+    param(
+        [string]$AppPath,
+        [int]$Port = 0
+    )
+
+    if ($Port -le 0) {
+        $Port = [int]$script:UnitecServePort
+    }
+
+    $frankenDir = Join-Path $AppPath 'tools\frankenphp'
+    if (-not (Test-Path -LiteralPath $frankenDir)) {
+        return $false
+    }
+
+    $frankenFull = (Get-Item -LiteralPath $frankenDir).FullName.TrimEnd('\')
+    $procs = @(Get-CimInstance Win32_Process -Filter "Name='frankenphp.exe'" -ErrorAction SilentlyContinue)
+    foreach ($p in $procs) {
+        $exe = [string]$p.ExecutablePath
+        if ([string]::IsNullOrWhiteSpace($exe)) {
+            $exe = [string]$p.CommandLine
+        }
+        if ($exe -and $exe.IndexOf($frankenFull, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+        $cmd = [string]$p.CommandLine
+        if ($cmd -and (
+                $cmd -match 'unitec-erp-frankenphp' -or
+                $cmd -match [regex]::Escape($AppPath)
+            )) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-UnitecInvalidPhpBuiltinHttpServer {
+    param(
+        [string]$AppPath = '',
+        [int]$Port = 0
+    )
+
+    if ($Port -le 0) {
+        $Port = [int]$script:UnitecServePort
+    }
+
+    # Runtime invalido apenas se php -S / artisan serve estiver na porta do ERP.
+    $phpProcs = @(Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue)
+    foreach ($p in $phpProcs) {
+        $cmd = [string]$p.CommandLine
+        if ([string]::IsNullOrWhiteSpace($cmd)) {
+            continue
+        }
+        $matchPort = ($cmd -match ("(?i)(-S\s+\S+:{0}\b|--port={0}\b|--port\s+{0}\b)" -f $Port))
+        if (-not $matchPort) {
+            continue
+        }
+        if ($cmd -match '(?i)\s-S\s' -or $cmd -match '(?i)artisan\s+serve') {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Start-UnitecFrankenPhpServer {
+    param(
+        [string]$AppPath,
+        [int]$Port = 0,
+        [string]$BindHost = '',
+        [switch]$Foreground,
+        [int]$WaitSeconds = 25
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    if ($Port -le 0) {
+        $Port = [int]$script:UnitecServePort
+    }
+    if ([string]::IsNullOrWhiteSpace($BindHost)) {
+        $BindHost = [string]$script:UnitecServeBindHost
+    }
+
+    $franken = Get-UnitecFrankenPhpExe -AppPath $AppPath
+    if (-not $franken) {
+        throw "FrankenPHP nao iniciou: binario ausente em tools\frankenphp\frankenphp.exe. O ERP exige FrankenPHP (sem fallback para php -S / artisan serve)."
+    }
+
+    if (-not (Test-Path (Join-Path $AppPath 'vendor\autoload.php'))) {
+        throw 'Sistema incompleto: pasta vendor/ ausente.'
+    }
+
+    if (-not (Test-Path (Join-Path $AppPath 'public\index.php'))) {
+        throw 'public\index.php ausente.'
+    }
+
+    Ensure-UnitecFrankenPhpIni -AppPath $AppPath | Out-Null
+    $threads = Get-UnitecFrankenPhpThreads -AppPath $AppPath
+    $caddy = Get-UnitecFrankenPhpCaddyfile -AppPath $AppPath -Port $Port
+    $frankenIni = Join-Path (Split-Path $franken -Parent) 'php.ini'
+
+    $httpHost = "127.0.0.1:$Port"
+
+    Write-Host ("Runtime HTTP: FrankenPHP | Porta: {0}" -f $Port) -ForegroundColor Cyan
+    Write-Host ("FRANKENPHP_NUM_THREADS={0}" -f $threads) -ForegroundColor DarkGray
+
+    $prevBind = $env:UNITEC_BIND
+    $prevPort = $env:UNITEC_PORT
+    $prevPublic = $env:UNITEC_PUBLIC
+    $prevHost = $env:UNITEC_HTTP_HOST
+    $prevThreads = $env:FRANKENPHP_NUM_THREADS
+    $prevPhpRc = $env:PHPRC
+
+    $env:UNITEC_BIND = $BindHost
+    $env:UNITEC_PORT = "$Port"
+    $env:UNITEC_PUBLIC = 'public/'
+    $env:UNITEC_HTTP_HOST = $httpHost
+    $env:FRANKENPHP_NUM_THREADS = $threads
+    if (Test-Path -LiteralPath $frankenIni) {
+        $env:PHPRC = $frankenIni
+    }
+
+    try {
+        if ($Foreground) {
+            Write-Host ''
+            Write-Host "FrankenPHP em http://${httpHost} - Ctrl+C para parar." -ForegroundColor Green
+            Write-Host ''
+            Set-Content -Path (Get-UnitecServeRuntimeMarkerPath -AppPath $AppPath) -Value 'frankenphp' -Encoding ASCII
+            & $franken run --config $caddy
+            return $true
+        }
+
+        # UseShellExecute=$false para o filho herdar UNITEC_PORT / FRANKENPHP_NUM_THREADS.
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $franken
+        $psi.Arguments = "run --config `"$caddy`""
+        $psi.WorkingDirectory = $AppPath
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $psi.Environment['UNITEC_BIND'] = $BindHost
+        $psi.Environment['UNITEC_PORT'] = "$Port"
+        $psi.Environment['UNITEC_PUBLIC'] = 'public/'
+        $psi.Environment['UNITEC_HTTP_HOST'] = $httpHost
+        $psi.Environment['FRANKENPHP_NUM_THREADS'] = $threads
+        if (Test-Path -LiteralPath $frankenIni) {
+            $psi.Environment['PHPRC'] = $frankenIni
+        }
+
+        $proc = [System.Diagnostics.Process]::Start($psi)
+    } finally {
+        if ($null -eq $prevBind) { Remove-Item Env:UNITEC_BIND -ErrorAction SilentlyContinue } else { $env:UNITEC_BIND = $prevBind }
+        if ($null -eq $prevPort) { Remove-Item Env:UNITEC_PORT -ErrorAction SilentlyContinue } else { $env:UNITEC_PORT = $prevPort }
+        if ($null -eq $prevPublic) { Remove-Item Env:UNITEC_PUBLIC -ErrorAction SilentlyContinue } else { $env:UNITEC_PUBLIC = $prevPublic }
+        if ($null -eq $prevHost) { Remove-Item Env:UNITEC_HTTP_HOST -ErrorAction SilentlyContinue } else { $env:UNITEC_HTTP_HOST = $prevHost }
+        if ($null -eq $prevThreads) { Remove-Item Env:FRANKENPHP_NUM_THREADS -ErrorAction SilentlyContinue } else { $env:FRANKENPHP_NUM_THREADS = $prevThreads }
+        if ($null -eq $prevPhpRc) { Remove-Item Env:PHPRC -ErrorAction SilentlyContinue } else { $env:PHPRC = $prevPhpRc }
+    }
+
+    if ($Foreground) {
+        return $true
+    }
+
+    if ($null -eq $proc) {
+        throw 'FrankenPHP nao iniciou: falha ao criar processo.'
+    }
+
+    Set-Content -Path (Get-UnitecServePidFilePath -AppPath $AppPath) -Value $proc.Id -Encoding ASCII
+    Set-Content -Path (Get-UnitecServeRuntimeMarkerPath -AppPath $AppPath) -Value 'frankenphp' -Encoding ASCII
+
+    $deadline = (Get-Date).AddSeconds([Math]::Max(5, $WaitSeconds))
+    while ((Get-Date) -lt $deadline) {
+        if ($proc.HasExited) {
+            throw ("FrankenPHP nao iniciou (encerrou com exit {0})." -f $proc.ExitCode)
+        }
+
+        if (Test-UnitecInvalidPhpBuiltinHttpServer -AppPath $AppPath -Port $Port) {
+            Stop-UnitecApplicationServer -AppPath $AppPath
+            throw 'RUNTIME INVALIDO: detectado php -S / artisan serve — abortando.'
+        }
+
+        $probeBase = "http://127.0.0.1:$Port"
+        if (Wait-UnitecApplicationReady -AppUrl $probeBase -MaxAttempts 1 -DelaySeconds 0 -Quiet) {
+            Write-Ok ("FrankenPHP ativo em {0}" -f $probeBase)
+            return $true
+        }
+
+        if (Test-UnitecWebServerListening -Port $Port) {
+            Write-Ok ("FrankenPHP escutando em {0}:{1}" -f $BindHost, $Port)
+            return $true
+        }
+
+        Start-Sleep -Milliseconds 400
+    }
+
+    throw "FrankenPHP nao iniciou a tempo na porta $Port."
+}
+
 function Stop-UnitecProcessTree {
     param(
         [Parameter(Mandatory = $true)][int]$ProcessId
@@ -1546,7 +1861,7 @@ function Stop-UnitecApplicationServer {
             }
         } catch {}
 
-        # 1) Mata pelo CommandLine (artisan serve / php -S).
+        # 1) Mata legado php -S / artisan serve nesta instalacao/porta.
         Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
             $cmd = [string]$_.CommandLine
             if ([string]::IsNullOrWhiteSpace($cmd)) {
@@ -1564,6 +1879,32 @@ function Stop-UnitecApplicationServer {
                 }
             }
         }
+
+        # 1b) Mata FrankenPHP desta instalacao.
+        Get-CimInstance Win32_Process -Filter "Name='frankenphp.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+            $cmd = [string]$_.CommandLine
+            $exe = [string]$_.ExecutablePath
+            $match = $false
+            if ($cmd -and (
+                    $cmd.IndexOf($appPathNorm, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+                    $cmd -match 'unitec-erp-frankenphp' -or
+                    $cmd -match ("\:{0}\b" -f $port)
+                )) {
+                $match = $true
+            }
+            if (-not $match -and $exe -and $exe.IndexOf((Join-Path $appPathNorm 'tools\frankenphp'), [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $match = $true
+            }
+            if ($match) {
+                $procId = [int]$_.ProcessId
+                if (-not $killed.ContainsKey($procId)) {
+                    Stop-UnitecProcessTree -ProcessId $procId | Out-Null
+                    $killed[$procId] = $true
+                }
+            }
+        }
+
+        Remove-Item (Get-UnitecServeRuntimeMarkerPath -AppPath $AppPath) -Force -ErrorAction SilentlyContinue
 
         # 2) Mata o que ainda segura a porta (LISTEN / ESTABLISHED) — cobre PID sem CommandLine.
         try {
@@ -1615,7 +1956,22 @@ function Test-UnitecApplicationServerRunning {
     )
 
     # Nao confiar so em TCP: porta "zumbi" (LISTEN com PID morto) aceita connect
-    # mas nao responde HTTP — isso travava o ERP apos crash do artisan serve.
+    # mas nao responde HTTP. Tambem rejeita php -S / artisan serve (runtime invalido).
+    if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
+        $AppPath = Resolve-UnitecAppPath -Path $AppPath
+        $port = [int]$script:UnitecServePort
+        try {
+            $envUrl = Get-UnitecEnvValue -AppPath $AppPath -Key 'APP_URL'
+            if ($envUrl -match ':(\d+)') {
+                $port = [int]$Matches[1]
+            }
+        } catch {}
+
+        if (Test-UnitecInvalidPhpBuiltinHttpServer -AppPath $AppPath -Port $port) {
+            return $false
+        }
+    }
+
     if ([string]::IsNullOrWhiteSpace($AppUrl)) {
         $AppUrl = Get-UnitecDefaultAppUrl
     }
@@ -1665,9 +2021,14 @@ function Start-UnitecApplicationServer {
         Stop-UnitecApplicationServer -AppPath $AppPath
     }
 
+    if (Test-UnitecInvalidPhpBuiltinHttpServer -AppPath $AppPath) {
+        Write-Host 'RUNTIME INVALIDO: php -S / artisan serve detectado — encerrando antes de subir FrankenPHP.' -ForegroundColor Yellow
+        Stop-UnitecApplicationServer -AppPath $AppPath
+    }
+
     # Porta LISTEN com HTTP morto = zumbi. Nao "retorna ok" — forca kill + sobe de novo.
-    if (Test-UnitecApplicationServerRunning -AppPath $AppPath) {
-        Write-Ok ('Unitec ERP ja esta ativo em {0}' -f (Get-UnitecDefaultAppUrl))
+    if ((Test-UnitecApplicationServerRunning -AppPath $AppPath) -and (Test-UnitecFrankenPhpRunning -AppPath $AppPath)) {
+        Write-Ok ('Unitec ERP ja esta ativo em {0} (FrankenPHP)' -f (Get-UnitecDefaultAppUrl))
         return $true
     }
 
@@ -1684,51 +2045,23 @@ function Start-UnitecApplicationServer {
 
     Push-Location $AppPath
     try {
-        Write-Host 'Iniciando Unitec ERP (servidor integrado)...' -ForegroundColor White
+        Write-Host 'Iniciando Unitec ERP (FrankenPHP obrigatorio)...' -ForegroundColor White
 
         $configCached = Test-Path (Join-Path $AppPath 'bootstrap\cache\config.php')
         if (-not $configCached) {
             Invoke-UnitecArtisan -AppPath $AppPath -Arguments @('config:cache') -AllowFailure | Out-Null
         }
 
-        $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
+        Start-UnitecFrankenPhpServer -AppPath $AppPath -Port ([int]$script:UnitecServePort) -BindHost ([string]$script:UnitecServeBindHost) -WaitSeconds 40 | Out-Null
 
-        # Workers: .env > padrao do script. Filament dispara varios pedidos em paralelo.
-        $workers = [string]$script:UnitecServeWorkers
-        $envFile = Join-Path $AppPath '.env'
-        if (Test-Path $envFile) {
-            $envRaw = Get-Content $envFile -Raw
-            if ($envRaw -match '(?m)^\s*PHP_CLI_SERVER_WORKERS\s*=\s*(\d+)') {
-                $workers = $Matches[1]
-            }
-        }
-        if ([int]$workers -lt 1) {
-            $workers = '8'
-        }
-
-        $env:PHP_CLI_SERVER_WORKERS = $workers
-        Write-Host ("PHP_CLI_SERVER_WORKERS={0}" -f $workers) -ForegroundColor DarkGray
-
-        $proc = Start-Process -FilePath $phpExe -ArgumentList @(
-            'artisan', 'serve',
-            "--host=$($script:UnitecServeBindHost)",
-            "--port=$($script:UnitecServePort)"
-        ) -WorkingDirectory $AppPath -WindowStyle Hidden -PassThru
-
-        if ($null -eq $proc) {
-            throw 'Nao foi possivel iniciar o servidor do Unitec ERP.'
-        }
-
-        Set-Content -Path (Get-UnitecServePidFilePath -AppPath $AppPath) -Value $proc.Id -Encoding ASCII
-
-        if (-not (Wait-UnitecApplicationReady -MaxAttempts 20 -DelaySeconds 2 -Quiet)) {
-            throw 'O Unitec ERP nao iniciou a tempo. Consulte instalacao.log'
+        if (-not (Wait-UnitecApplicationReady -MaxAttempts 10 -DelaySeconds 1 -Quiet)) {
+            throw 'FrankenPHP nao iniciou a tempo. Consulte instalacao.log / storage\logs'
         }
 
         # Primeiro clique do usuario nao deve "pagar" a compilacao do OPcache.
         Warm-UnitecApplicationCache -AppPath $AppPath
 
-        Write-Ok ('Unitec ERP ativo em {0}' -f (Get-UnitecDefaultAppUrl))
+        Write-Ok ('Unitec ERP ativo em {0} (Runtime HTTP: FrankenPHP | Porta: {1})' -f (Get-UnitecDefaultAppUrl), $script:UnitecServePort)
         return $true
     } finally {
         Pop-Location
@@ -4028,8 +4361,8 @@ function Sync-UnitecEnvPerformanceSettings {
         SESSION_DRIVER     = 'file'
         CACHE_STORE        = 'file'
         QUEUE_CONNECTION   = 'sync'
-        # artisan serve usa SAPI CLI: sem workers as telas Filament/Livewire enfileiram e ficam lentas.
-        PHP_CLI_SERVER_WORKERS = '8'
+        # FrankenPHP: threads no .env. (Legado PHP_CLI_SERVER_WORKERS nao e mais usado no HTTP.)
+        FRANKENPHP_NUM_THREADS = '8'
     }
 
     $lines = @(Get-Content $envFile -Encoding UTF8)
@@ -4039,7 +4372,7 @@ function Sync-UnitecEnvPerformanceSettings {
     if ($isLocalDev) {
         $values['LOG_LEVEL'] = 'warning'
         $values['BCRYPT_ROUNDS'] = '4'
-        $values['PHP_CLI_SERVER_WORKERS'] = '4'
+        $values['FRANKENPHP_NUM_THREADS'] = '4'
     }
 
     $updated = $false
@@ -6257,14 +6590,18 @@ function Start-UnitecPhpArtisanServer {
         [switch]$Foreground
     )
 
+    # Nome legado: HTTP do ERP e sempre FrankenPHP (nunca artisan serve / php -S).
     if (-not (Test-Path (Join-Path $AppPath 'artisan'))) {
         return $false
     }
 
     if (-not $Foreground) {
-        # Porta TCP aberta nao basta: listener zumbi aceita connect e nao responde HTTP.
-        $probeUrl = "http://127.0.0.1:$Port/admin/login"
-        if (Wait-UnitecApplicationReady -AppUrl "http://127.0.0.1:$Port" -MaxAttempts 1 -DelaySeconds 0 -Quiet) {
+        if (Test-UnitecInvalidPhpBuiltinHttpServer -AppPath $AppPath -Port $Port) {
+            Stop-UnitecApplicationServer -AppPath $AppPath
+        }
+
+        if ((Wait-UnitecApplicationReady -AppUrl "http://127.0.0.1:$Port" -MaxAttempts 1 -DelaySeconds 0 -Quiet) `
+                -and (Test-UnitecFrankenPhpRunning -AppPath $AppPath -Port $Port)) {
             return $true
         }
     }
@@ -6272,50 +6609,11 @@ function Start-UnitecPhpArtisanServer {
     Initialize-UnitecRuntimePath -AppPath $AppPath
     Ensure-UnitecPhpIniForWindowsDev -AppPath $AppPath | Out-Null
 
-    $phpExe = Get-UnitecPhpExecutable -AppPath $AppPath
-    if (-not (Test-Path $phpExe)) {
-        throw "PHP nao encontrado: $phpExe"
+    if (-not $Foreground) {
+        Stop-UnitecApplicationServer -AppPath $AppPath
     }
 
-    # Multiplos workers para suportar acessos simultaneos (terminais + app ForÃ§a de Vendas).
-    $env:PHP_CLI_SERVER_WORKERS = "$($script:UnitecServeWorkers)"
-
-    Push-Location $AppPath
-    try {
-        if ($Foreground) {
-            Write-Host ''
-            Write-Host "Servidor em http://${BindHost}:$Port - Ctrl+C para parar." -ForegroundColor Green
-            Write-Host ''
-
-            & $phpExe artisan serve "--host=$BindHost" "--port=$Port"
-
-            return $true
-        }
-
-        Write-Host "Iniciando servidor PHP embutido (artisan serve) na porta $Port..." -ForegroundColor White
-
-        Start-UnitecHiddenProcess -FilePath $phpExe -ArgumentList @(
-            'artisan', 'serve',
-            "--host=$BindHost",
-            "--port=$Port"
-        ) -WorkingDirectory $AppPath
-
-        $deadline = (Get-Date).AddSeconds(20)
-        while ((Get-Date) -lt $deadline) {
-            if (Test-UnitecWebServerListening -Port $Port) {
-                Write-Ok "Servidor PHP ativo em ${BindHost}:$Port"
-                if (-not [string]::IsNullOrWhiteSpace($AppPath)) {
-                    Warm-UnitecApplicationCache -AppPath $AppPath -AppUrl ("http://127.0.0.1:{0}" -f $Port)
-                }
-                return $true
-            }
-            Start-Sleep -Seconds 2
-        }
-    } finally {
-        Pop-Location
-    }
-
-    return $false
+    return (Start-UnitecFrankenPhpServer -AppPath $AppPath -Port $Port -BindHost $BindHost -Foreground:$Foreground -WaitSeconds 25)
 }
 
 function Ensure-LaragonWebServerRunning {
@@ -6350,7 +6648,8 @@ function Ensure-LaragonWebServerRunning {
     }
 
     if (-not (Test-UnitecWebServerListening) -and -not [string]::IsNullOrWhiteSpace($AppPath)) {
-        Start-UnitecPhpArtisanServer -AppPath $AppPath | Out-Null
+        Write-Host 'Laragon porta 80 indisponivel — subindo FrankenPHP do ERP (porta padrao do stack)...' -ForegroundColor Yellow
+        Start-UnitecApplicationServer -AppPath $AppPath | Out-Null
     }
 
     $webProcs = @(Get-Process httpd, nginx -ErrorAction SilentlyContinue)
@@ -6646,7 +6945,7 @@ function Configure-LaragonPhpIni {
             'memory_limit=256M'
         )
     } else {
-        # artisan serve / php -S usam SAPI CLI: enable_cli=1 e obrigatorio para OPcache valer nas telas.
+        # OPcache no PHP embutido (CLI artisan + FrankenPHP usam o mesmo php.ini quando sincronizado).
         $opcacheDir = ((Join-Path $AppPath 'tools\php\opcache') -replace '\\', '/')
         Ensure-Directory (Join-Path $AppPath 'tools\php\opcache')
 

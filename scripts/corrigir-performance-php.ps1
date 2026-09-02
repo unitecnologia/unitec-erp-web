@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Liga OPcache (incluindo CLI do artisan serve) e sobe limites do PHP embutido.
+    Liga OPcache (incluindo CLI do PHP) e sobe limites do PHP embutido.
 #>
 
 param(
@@ -40,9 +40,9 @@ $null = Sync-UnitecEnvPerformanceSettings -AppPath $AppPath
 
 Write-Host 'OK: php.ini / .env atualizados.' -ForegroundColor Green
 Write-Host '  - opcache.enable=1' -ForegroundColor Gray
-Write-Host '  - opcache.enable_cli=1  (obrigatorio para artisan serve)' -ForegroundColor Gray
+Write-Host '  - opcache.enable_cli=1  (CLI artisan / jobs)' -ForegroundColor Gray
 Write-Host '  - opcache.file_cache + fallback (Windows/ASLR)' -ForegroundColor Gray
-Write-Host '  - PHP_CLI_SERVER_WORKERS no .env' -ForegroundColor Gray
+Write-Host '  - FRANKENPHP_NUM_THREADS no .env (HTTP)' -ForegroundColor Gray
 Write-Host ''
 Write-Host 'Agora rode: Reiniciar Servicos.bat' -ForegroundColor Cyan
 Write-Host ''

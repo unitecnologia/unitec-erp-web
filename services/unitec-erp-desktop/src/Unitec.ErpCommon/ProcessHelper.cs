@@ -162,29 +162,53 @@ public static class ProcessHelper
 
     /// <summary>
     /// Encerra processos php.exe do PHP embutido desta instalacao (pai + workers).
+    /// Mantido para limpar legado php -S; o HTTP oficial e FrankenPHP.
     /// </summary>
     public static void KillAppPhpServers(string appPath)
     {
-        var embeddedPhpDir = Path.Combine(appPath, "tools", "php");
-        string? embeddedPhpFull = null;
+        KillProcessesUnderDir(Path.Combine(appPath, "tools", "php"), "php");
+    }
+
+    /// <summary>
+    /// Encerra FrankenPHP + php -S legado desta instalacao.
+    /// </summary>
+    public static void KillAppHttpServers(string appPath)
+    {
+        KillAppPhpServers(appPath);
+        KillProcessesUnderDir(Path.Combine(appPath, "tools", "frankenphp"), "frankenphp");
+
         try
         {
-            if (Directory.Exists(embeddedPhpDir))
+            var marker = Path.Combine(appPath, ".unitec-serve.runtime");
+            if (File.Exists(marker))
             {
-                embeddedPhpFull = Path.GetFullPath(embeddedPhpDir);
+                File.Delete(marker);
             }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private static void KillProcessesUnderDir(string dir, string processName)
+    {
+        if (!Directory.Exists(dir))
+        {
+            return;
+        }
+
+        string fullDir;
+        try
+        {
+            fullDir = Path.GetFullPath(dir);
         }
         catch
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(embeddedPhpFull))
-        {
-            return;
-        }
-
-        foreach (var p in Process.GetProcessesByName("php"))
+        foreach (var p in Process.GetProcessesByName(processName))
         {
             try
             {
@@ -202,7 +226,7 @@ public static class ProcessHelper
                     continue;
                 }
 
-                if (!moduleDir.StartsWith(embeddedPhpFull, StringComparison.OrdinalIgnoreCase))
+                if (!moduleDir.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
