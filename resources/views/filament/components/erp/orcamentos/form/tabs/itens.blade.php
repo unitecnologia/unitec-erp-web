@@ -35,7 +35,13 @@
                         <tr
                             wire:key="{{ $item['key'] ?? ('orc-item-' . $index) }}"
                             wire:click="selectItemRow({{ $index }})"
-                            @class(['is-selected' => $this->selectedItemIndex === $index])
+                            @unless ($readOnly)
+                                wire:dblclick.stop="startEditItem({{ $index }})"
+                            @endunless
+                            @class([
+                                'is-selected' => $this->selectedItemIndex === $index,
+                                'is-editing' => $this->editingItemIndex === $index,
+                            ])
                         >
                             @unless ($readOnly)
                                 <td class="erp-fv-tv__col-idx">

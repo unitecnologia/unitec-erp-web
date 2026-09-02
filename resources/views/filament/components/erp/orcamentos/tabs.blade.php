@@ -8,7 +8,7 @@
     ];
 @endphp
 
-<div class="erp-orcamentos__tabs-wrap">
+<div class="erp-orcamentos__tabs-wrap erp-list-tabs">
     <div class="erp-orcamentos__tabs">
         @foreach ($statusTabs as $value => $label)
             <button

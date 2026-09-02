@@ -6,12 +6,13 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ManagesOrcamentoEmailModal;
 use App\Filament\Resources\OrcamentoResource\Pages\Concerns\ManagesOrcamentoViewModal;
+use App\Livewire\Erp\OrcamentoListTable;
 use App\Models\Orcamento;
 use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Queries\OrcamentoListQueryBuilder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -84,6 +85,19 @@ class ListOrcamentos extends ListRecords
         );
     }
 
+    public function mountInteractsWithTable(): void
+    {
+    }
+
+    public function erpListSyncPollEnabled(): bool
+    {
+        if (! config('unitec.erp_list_sync_poll_enabled', true)) {
+            return false;
+        }
+
+        return $this->erpListSyncChannel() !== null;
+    }
+
     protected function resetOrcamentoListUiState(): void
     {
         $this->printModalOpen = false;
@@ -132,67 +146,27 @@ class ListOrcamentos extends ListRecords
         return $this->buildListQuery();
     }
 
-    protected function buildListQuery(): Builder
+    protected function listQueryBuilder(): OrcamentoListQueryBuilder
     {
-        $query = parent::getTableQuery()
-            ->visivelNaListaOrcamentos()
-            ->with(['cliente', 'vendedor']);
-
-        if ($this->statusFilter !== 'todos') {
-            $query->where('status', $this->statusFilter);
-        }
-
-        if ($de = $this->normalizePeriodDate($this->periodoDeApplied)) {
-            $query->whereDate('data', '>=', $de);
-        }
-
-        if ($ate = $this->normalizePeriodDate($this->periodoAteApplied)) {
-            $query->whereDate('data', '<=', $ate);
-        }
-
-        if (filled($this->localSearch)) {
-            $this->applyLocalSearch($query, $this->localSearch);
-        }
-
-        return $query;
+        return new OrcamentoListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+        );
     }
 
-    protected function applyLocalSearch(Builder $query, string $term): void
+    protected function buildListQuery(): Builder
     {
-        $term = mb_strtoupper(trim($term), 'UTF-8');
-
-        if ($term === '') {
-            return;
-        }
-
-        $column = in_array($this->searchColumn, ['numero', 'cliente', 'vendedor', 'cidade', 'uf'], true)
-            ? $this->searchColumn
-            : 'cliente';
-
-        $like = '%' . $term . '%';
-
-        match ($column) {
-            'numero' => $query->where('numero', 'like', $like),
-            'cliente' => $query->where(function (Builder $outer) use ($like): void {
-                $outer->where('cliente_nome', 'like', $like)
-                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $like));
-            }),
-            'vendedor' => $query->whereHas('vendedor', fn (Builder $vendedorQuery): Builder => $vendedorQuery->where('nome', 'like', $like)),
-            'cidade' => $query->where(function (Builder $outer) use ($like): void {
-                $outer->where('cliente_cidade', 'like', $like)
-                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('cidade_nome', 'like', $like));
-            }),
-            'uf' => $query->where(function (Builder $outer) use ($like): void {
-                $outer->where('cliente_uf', 'like', $like)
-                    ->orWhereHas('cliente', fn (Builder $clienteQuery): Builder => $clienteQuery->where('uf', 'like', $like));
-            }),
-        };
+        return $this->listQueryBuilder()
+            ->buildForList();
     }
 
     #[Computed]
     public function filteredTotal(): float
     {
-        return (float) $this->buildListQuery()->sum('total');
+        return $this->listQueryBuilder()->sumFilteredTotal();
     }
 
     public function content(Schema $schema): Schema
@@ -201,7 +175,7 @@ class ListOrcamentos extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.orcamentos.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.orcamentos.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.orcamentos.footer-total'),
                 View::make('filament.components.erp.orcamentos.action-bar'),
@@ -210,6 +184,12 @@ class ListOrcamentos extends ListRecords
                 View::make('filament.components.erp.orcamentos.preview-overlay'),
                 View::make('filament.components.erp.orcamentos.view-modal'),
             ]);
+    }
+
+    #[On('erp-orcamento-open-view')]
+    public function onErpOrcamentoOpenView(int $orcamentoId): void
+    {
+        $this->openOrcamentoView($orcamentoId);
     }
 
     public function setStatusFilter(string $filter): void
@@ -222,7 +202,7 @@ class ListOrcamentos extends ListRecords
 
         $this->statusFilter = $filter;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOrcamentoListRefresh();
     }
 
     public function applyPeriodFilter(): void
@@ -268,19 +248,19 @@ class ListOrcamentos extends ListRecords
         }
 
         $this->clearListSelection();
-        $this->resetPage();
-        $this->resetTable();
 
         $this->dispatch(
             'erp-hydrate-orcamentos-dates',
             de: $this->periodoDe,
             ate: $this->periodoAte,
         );
+
+        $this->pushOrcamentoListRefresh(resetSort: true);
     }
 
     protected function notifyPeriodFilterResult(): void
     {
-        $count = $this->buildListQuery()->count();
+        $count = $this->listQueryBuilder()->countFiltered();
 
         if ($count === 0) {
             Notification::make()
@@ -302,69 +282,37 @@ class ListOrcamentos extends ListRecords
             ->send();
     }
 
-    protected function normalizePeriodDate(?string $value): ?string
-    {
-        $value = trim((string) ($value ?? ''));
-
-        if ($value === '') {
-            return null;
-        }
-
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
-            return $this->isValidPeriodIsoDate($value) ? $value : null;
-        }
-
-        // dd/mm/yyyy (não usar Carbon::parse — interpreta m/d/Y estilo US)
-        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $matches) === 1) {
-            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
-
-            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
-        }
-
-        // ddmmyyyy (máscara sem barras / valor digitado)
-        if (preg_match('/^(\d{2})(\d{2})(\d{4})$/', $value, $matches) === 1) {
-            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
-
-            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
-        }
-
-        return null;
-    }
-
-    protected function isValidPeriodIsoDate(string $iso): bool
-    {
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $matches) !== 1) {
-            return false;
-        }
-
-        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
-    }
-
     public function clearSearch(): void
     {
         $this->localSearch = '';
         $this->searchColumn = 'cliente';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOrcamentoListRefresh(resetSort: true);
     }
 
     public function updatedSearchColumn(): void
     {
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOrcamentoListRefresh(resetSort: true);
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->clearListSelection();
+        $this->pushOrcamentoListRefresh(resetSort: true);
     }
 
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushOrcamentoListRefresh();
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOrcamentoListRefresh(resetSort: true);
     }
 
     public function createOrcamento(): void
@@ -372,13 +320,17 @@ class ListOrcamentos extends ListRecords
         $this->redirect(OrcamentoResource::getUrl('create'));
     }
 
-    public function editOrcamento(): void
+    public function editOrcamento(int | string | null $recordId = null): void
     {
-        if (! $this->highlightedRecordIdOrNotify('edit')) {
+        $resolvedId = filled($recordId) ? (int) $recordId : $this->highlightedRecordId;
+
+        if (! $resolvedId) {
+            $this->highlightedRecordIdOrNotify('edit');
+
             return;
         }
 
-        $this->redirect(OrcamentoResource::getUrl('edit', ['record' => $this->highlightedRecordId]));
+        $this->redirect(OrcamentoResource::getUrl('edit', ['record' => $resolvedId]));
     }
 
     public function cancelOrcamento(): void
@@ -407,7 +359,7 @@ class ListOrcamentos extends ListRecords
         $orcamento->update(['status' => Orcamento::STATUS_CANCELADO]);
 
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushOrcamentoListRefresh();
 
         Notification::make()
             ->title('Orçamento cancelado.')
@@ -465,6 +417,69 @@ class ListOrcamentos extends ListRecords
         $this->previewOverlayUrl = null;
     }
 
+    public function pollErpListSync(): void
+    {
+        $channel = $this->erpListSyncChannel();
+
+        if ($channel === null) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $current = ErpDataSyncVersion::current($channel);
+
+        if ($this->erpListSyncVersion === null) {
+            $this->erpListSyncVersion = $current;
+            $this->skipRender();
+
+            return;
+        }
+
+        if (hash_equals($this->erpListSyncVersion, $current)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->erpListSyncVersion = $current;
+        $this->pushOrcamentoListRefresh();
+    }
+
+    public function refreshTable(): void
+    {
+        $this->syncErpListSyncVersionFromStore();
+        $this->pushOrcamentoListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
+    }
+
+    protected function pushOrcamentoListRefresh(bool $resetSort = false): void
+    {
+        $total = $this->listQueryBuilder()->sumFilteredTotal();
+
+        $this->dispatch(
+            'erp-orcamento-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            perPage: (int) ($this->tableRecordsPerPage ?? 50),
+            resetSort: $resetSort,
+        )->to(OrcamentoListTable::class);
+
+        $this->skipRender();
+
+        $this->js(sprintf(
+            '(() => { const el = document.querySelector(".erp-orcamentos__total-value"); if (el) el.textContent = %s; })()',
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
     protected function erpListSelectPrompt(string $action): string
     {
         return match ($action) {
@@ -473,5 +488,41 @@ class ListOrcamentos extends ListRecords
             'enviar' => 'um orçamento para enviar',
             default => $this->defaultErpListSelectPrompt($action),
         };
+    }
+
+    protected function normalizePeriodDate(?string $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            return $this->isValidPeriodIsoDate($value) ? $value : null;
+        }
+
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $matches) === 1) {
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
+        }
+
+        if (preg_match('/^(\d{2})(\d{2})(\d{4})$/', $value, $matches) === 1) {
+            $iso = sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+
+            return $this->isValidPeriodIsoDate($iso) ? $iso : null;
+        }
+
+        return null;
+    }
+
+    protected function isValidPeriodIsoDate(string $iso): bool
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $matches) !== 1) {
+            return false;
+        }
+
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
     }
 }

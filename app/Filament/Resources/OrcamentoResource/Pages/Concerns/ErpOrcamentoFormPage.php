@@ -110,6 +110,9 @@ trait ErpOrcamentoFormPage
 
     public ?int $itemPendingProductId = null;
 
+    /** Índice do item da grade em edição na barra (null = lançamento novo). */
+    public ?int $editingItemIndex = null;
+
     public string $itemQuantidadeInput = '1,000';
 
     public string $itemUnidadeDisplay = '';
@@ -1193,6 +1196,57 @@ trait ErpOrcamentoFormPage
         }
     }
 
+    /**
+     * Duplo clique na linha: carrega o item (em memória) na barra para editar e relançar.
+     * Não remove a linha; confirmação atualiza o mesmo índice.
+     */
+    public function startEditItem(int $index): void
+    {
+        if ($this->orcamentoReadOnly() || ! isset($this->itens[$index])) {
+            return;
+        }
+
+        $row = $this->itens[$index];
+        $productId = (int) ($row['product_id'] ?? 0);
+
+        if ($productId <= 0) {
+            return;
+        }
+
+        $this->editingItemIndex = $index;
+        $this->selectedItemIndex = $index;
+        $this->itemPendingProductId = $productId;
+        $this->itemPendingPrecoVariavel = (bool) ($row['preco_variavel'] ?? false);
+        $this->itemCodigoInput = (string) ($row['product_codigo'] ?? '');
+        $this->itemProdutoSearch = (string) ($row['descricao'] ?? '');
+        $this->itemQuantidadeInput = (string) ($row['quantidade'] ?? '1,000');
+        $this->itemUnidadeDisplay = mb_strtoupper((string) ($row['unidade'] ?? 'UN'), 'UTF-8');
+        $this->itemPrecoInput = (string) ($row['preco_unitario'] ?? '0,00');
+        $this->itemPrecoDisplay = (string) ($row['preco_unitario'] ?? '0,00');
+        $this->itemPendingAcrescimo = (string) ($row['acrescimo'] ?? '0,00');
+        $this->itemPendingDesconto = (string) ($row['desconto'] ?? '0,00');
+        $this->itemTotalEntryDisplay = (string) ($row['total'] ?? '0,00');
+        $this->produtoAtualNome = (string) ($row['descricao'] ?? '');
+        $this->produtoAtualFoto = $row['foto'] ?? null;
+        $this->produtoLookupOpen = false;
+        $this->produtoResults = [];
+        $this->selectedProdutoIndex = null;
+
+        $this->dispatch('orc-focus-qtd');
+        $this->dispatch('erp-orcamento-focus-item-quantidade');
+    }
+
+    public function cancelItemEdit(): void
+    {
+        if ($this->editingItemIndex === null && $this->itemPendingProductId === null) {
+            return;
+        }
+
+        $this->editingItemIndex = null;
+        $this->clearItemEntryRow();
+        $this->dispatch('erp-orcamento-focus-item-codigo');
+    }
+
     public function updateItemField(int $index, string $field, string $value): void
     {
         if ($this->orcamentoReadOnly() || ! isset($this->itens[$index])) {
@@ -1365,12 +1419,25 @@ trait ErpOrcamentoFormPage
         $index = $this->itemDeleteConfirmIndex;
         $this->itemDeleteConfirmIndex = null;
 
+        $wasEditingDeleted = $this->editingItemIndex === $index;
+        if ($this->editingItemIndex !== null && $this->editingItemIndex > $index) {
+            $this->editingItemIndex--;
+        }
+        if ($wasEditingDeleted) {
+            $this->editingItemIndex = null;
+        }
+
         $itens = $this->itens;
         array_splice($itens, $index, 1);
         $this->itens = array_values($itens);
         $this->selectedItemIndex = null;
         $this->recalcAllItens();
         $this->recalcHeaderFromItens();
+
+        if ($wasEditingDeleted) {
+            $this->clearItemEntryRow();
+        }
+
         $this->dispatch('erp-orcamento-focus-item-codigo');
     }
 
@@ -1472,7 +1539,7 @@ trait ErpOrcamentoFormPage
 
     public function updatedItemProdutoSearch(): void
     {
-        if ($this->orcamentoReadOnly() || $this->itemPendingProductId !== null) {
+        if ($this->orcamentoReadOnly()) {
             return;
         }
 
@@ -1482,8 +1549,59 @@ trait ErpOrcamentoFormPage
             $this->itemProdutoSearch = $upper;
         }
 
-        $this->produtoLookupOpen = filled(trim($this->itemProdutoSearch));
+        $term = trim($this->itemProdutoSearch);
+
+        if ($term === '') {
+            $this->produtoLookupOpen = false;
+            $this->produtoResults = [];
+            $this->selectedProdutoIndex = null;
+
+            // Liberar staging para nova busca; não apaga itens nem cancela edição de linha.
+            if ($this->editingItemIndex === null && $this->itemPendingProductId !== null) {
+                $this->releasePendingProductForSearch();
+            }
+
+            return;
+        }
+
+        // Após selecionar um produto, a descrição fica no campo e o pending trava o autocomplete.
+        // Se o texto ainda é a descrição staged, não reabre lista. Se o usuário alterou, libera.
+        if ($this->itemPendingProductId !== null) {
+            $stagedLabel = trim($this->produtoAtualNome);
+
+            if ($stagedLabel !== '' && $term === $stagedLabel) {
+                $this->produtoLookupOpen = false;
+
+                return;
+            }
+
+            if ($this->editingItemIndex === null) {
+                $this->releasePendingProductForSearch();
+            }
+        }
+
+        $this->produtoLookupOpen = true;
         $this->refreshProdutoResults();
+    }
+
+    /**
+     * Limpa só o produto staged na barra para permitir nova pesquisa.
+     * Mantém itemProdutoSearch (texto digitado) e a grade de itens.
+     */
+    protected function releasePendingProductForSearch(): void
+    {
+        $this->itemPendingProductId = null;
+        $this->itemPendingPrecoVariavel = false;
+        $this->itemCodigoInput = '';
+        $this->itemQuantidadeInput = '1,000';
+        $this->itemUnidadeDisplay = '';
+        $this->itemPrecoDisplay = '';
+        $this->itemPrecoInput = '0,00';
+        $this->itemTotalEntryDisplay = '0,00';
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
+        $this->produtoAtualFoto = null;
+        $this->produtoAtualNome = '';
     }
 
     public function handleItemCodigoEnter(): void
@@ -1501,13 +1619,35 @@ trait ErpOrcamentoFormPage
         $this->recalcEntryRowFromPending();
     }
 
+    /**
+     * Aplica mínimo 1,000 e formata ao sair do campo (blur) ou Enter.
+     * Não roda a cada tecla — vazio temporário é permitido em updated/recalc.
+     */
+    public function normalizeItemQuantidadeInput(): void
+    {
+        if ($this->orcamentoReadOnly() || $this->itemPendingProductId === null) {
+            return;
+        }
+
+        $qtd = trim($this->itemQuantidadeInput) === ''
+            ? 0.0
+            : ErpMoney::parseBr($this->itemQuantidadeInput, 3);
+
+        if ($qtd <= 0) {
+            $qtd = 1;
+        }
+
+        $this->itemQuantidadeInput = ErpMoney::formatBr($qtd, 3);
+        $this->recalcEntryRowFromPending();
+    }
+
     public function focoPrecoAposQtd(): void
     {
         if ($this->orcamentoReadOnly() || $this->itemPendingProductId === null) {
             return;
         }
 
-        $this->recalcEntryRowFromPending();
+        $this->normalizeItemQuantidadeInput();
         $this->dispatch('orc-focus-preco');
         $this->dispatch('erp-orcamento-focus-item-preco');
     }
@@ -1527,27 +1667,8 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $product = Product::query()->find($this->itemPendingProductId);
-
-        if (! $product) {
-            $this->clearItemEntryRow();
-
-            return;
-        }
-
+        $this->normalizeItemQuantidadeInput();
         $qtd = ErpMoney::parseBr($this->itemQuantidadeInput, 3);
-
-        if ($qtd <= 0) {
-            Notification::make()
-                ->title('Informe a quantidade do item.')
-                ->warning()
-                ->send();
-            $this->dispatch('orc-focus-qtd');
-            $this->dispatch('erp-orcamento-focus-item-quantidade');
-
-            return;
-        }
-
         $preco = ErpMoney::parseBr($this->itemPrecoInput);
 
         if ($preco <= 0) {
@@ -1567,6 +1688,23 @@ trait ErpOrcamentoFormPage
         $this->isConfirmingPendingItem = true;
 
         try {
+            if ($this->editingItemIndex !== null) {
+                $this->applyEditedItemFromBar($qtd, $preco, $acrescimo, $desconto);
+                $this->clearItemEntryRow();
+                $this->dispatch('orc-focus-barcode');
+                $this->dispatch('erp-orcamento-focus-item-codigo');
+
+                return;
+            }
+
+            $product = Product::query()->find($this->itemPendingProductId);
+
+            if (! $product) {
+                $this->clearItemEntryRow();
+
+                return;
+            }
+
             $this->itemPendingProductId = null;
             $this->itemPendingPrecoVariavel = false;
             $this->appendProductItem($product, $qtd, $preco, $acrescimo, $desconto);
@@ -1578,15 +1716,68 @@ trait ErpOrcamentoFormPage
         }
     }
 
+    /**
+     * Atualiza a linha em edição com os dados da barra (sem nova consulta).
+     */
+    protected function applyEditedItemFromBar(
+        float $qtd,
+        float $preco,
+        float $acrescimo,
+        float $desconto,
+    ): void {
+        $index = $this->editingItemIndex;
+
+        if ($index === null || ! isset($this->itens[$index])) {
+            $this->editingItemIndex = null;
+
+            return;
+        }
+
+        $itens = $this->itens;
+        $row = $itens[$index];
+
+        $row['product_id'] = $this->itemPendingProductId;
+        $row['product_codigo'] = $this->itemCodigoInput !== ''
+            ? $this->itemCodigoInput
+            : (string) ($row['product_codigo'] ?? '');
+        $row['descricao'] = $this->produtoAtualNome !== ''
+            ? $this->produtoAtualNome
+            : mb_strtoupper(trim($this->itemProdutoSearch), 'UTF-8');
+        $row['quantidade'] = ErpMoney::formatBr($qtd, 3);
+        $row['unidade'] = $this->itemUnidadeDisplay !== ''
+            ? $this->itemUnidadeDisplay
+            : (string) ($row['unidade'] ?? 'UN');
+        $row['preco_unitario'] = ErpMoney::formatBr($preco);
+        $row['acrescimo'] = ErpMoney::formatBr($acrescimo);
+        $row['desconto'] = ErpMoney::formatBr($desconto);
+        $row['preco_variavel'] = $this->itemPendingPrecoVariavel;
+        if ($this->produtoAtualFoto !== null) {
+            $row['foto'] = $this->produtoAtualFoto;
+        }
+
+        $itens[$index] = $this->recalcItemRowData($row);
+        $this->itens = $itens;
+        $this->selectedItemIndex = $index;
+        $this->produtoAtualNome = (string) ($itens[$index]['descricao'] ?? '');
+        $this->produtoAtualFoto = $itens[$index]['foto'] ?? null;
+        $this->editingItemIndex = null;
+        $this->recalcHeaderFromItens();
+    }
+
     protected function stageProductForEntry(Product $product): void
     {
         $this->itemPendingProductId = $product->id;
         $this->itemPendingPrecoVariavel = (bool) $product->preco_variavel;
         $this->itemCodigoInput = (string) $product->codigo;
         $this->itemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
-        $this->itemQuantidadeInput = ErpMoney::formatBr(1, 3);
-        $this->itemPendingDesconto = '0,00';
-        $this->itemPendingAcrescimo = '0,00';
+
+        if ($this->editingItemIndex === null) {
+            $this->itemQuantidadeInput = ErpMoney::formatBr(1, 3);
+            $this->itemPendingDesconto = '0,00';
+            $this->itemPendingAcrescimo = '0,00';
+            $this->itemPrecoInput = '0,00';
+        }
+
         $this->produtoAtualNome = mb_strtoupper($product->descricao, 'UTF-8');
         $this->produtoAtualFoto = $product->fotoUrl();
         $this->recalcEntryRowFromPending();
@@ -1603,6 +1794,25 @@ trait ErpOrcamentoFormPage
             return;
         }
 
+        // Vazio durante a digitação: não forçar 1,000 nem reformatar.
+        if (trim($this->itemQuantidadeInput) === '') {
+            return;
+        }
+
+        $qtd = ErpMoney::parseBr($this->itemQuantidadeInput, 3);
+
+        // Edição de linha: recalcula só com dados da barra (sem query).
+        if ($this->editingItemIndex !== null) {
+            $preco = ErpMoney::parseBr($this->itemPrecoInput);
+            $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+            $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+            $total = round(max(0, (max(0.0, $qtd) * $preco) + $acr - $desc), 2);
+            $this->itemPrecoDisplay = ErpMoney::formatBr($preco);
+            $this->itemTotalEntryDisplay = ErpMoney::formatBr($total);
+
+            return;
+        }
+
         $product = Product::query()->find($this->itemPendingProductId);
 
         if (! $product) {
@@ -1611,14 +1821,8 @@ trait ErpOrcamentoFormPage
             return;
         }
 
-        $qtd = ErpMoney::parseBr($this->itemQuantidadeInput, 3);
-
-        if ($qtd <= 0) {
-            $qtd = 1;
-        }
-
         $precoService = app(OrcamentoPrecoService::class);
-        $precoSugerido = $precoService->resolvePreco($product, $qtd);
+        $precoSugerido = $precoService->resolvePreco($product, max(0.0, $qtd));
 
         if (ErpMoney::parseBr($this->itemPrecoInput) <= 0) {
             $this->itemPrecoInput = ErpMoney::formatBr($precoSugerido);
@@ -1627,9 +1831,8 @@ trait ErpOrcamentoFormPage
         $preco = ErpMoney::parseBr($this->itemPrecoInput);
         $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
         $desc = ErpMoney::parseBr($this->itemPendingDesconto);
-        $total = round(max(0, ($qtd * $preco) + $acr - $desc), 2);
+        $total = round(max(0, (max(0.0, $qtd) * $preco) + $acr - $desc), 2);
 
-        $this->itemQuantidadeInput = ErpMoney::formatBr($qtd, 3);
         $this->itemUnidadeDisplay = mb_strtoupper((string) ($product->unidade ?: 'UN'), 'UTF-8');
         $this->itemPrecoDisplay = ErpMoney::formatBr($preco);
         $this->itemTotalEntryDisplay = ErpMoney::formatBr($total);
@@ -1637,6 +1840,7 @@ trait ErpOrcamentoFormPage
 
     protected function clearItemEntryRow(): void
     {
+        $this->editingItemIndex = null;
         $this->itemPendingProductId = null;
         $this->itemPendingPrecoVariavel = false;
         $this->itemCodigoInput = '';
@@ -2426,6 +2630,12 @@ trait ErpOrcamentoFormPage
 
         if ($this->produtoLookupOpen) {
             $this->closeProdutoLookup();
+
+            return;
+        }
+
+        if ($this->editingItemIndex !== null || $this->itemPendingProductId !== null) {
+            $this->cancelItemEdit();
 
             return;
         }

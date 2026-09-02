@@ -18,7 +18,7 @@
         wire:poll.{{ $this->erpListSyncPollIntervalSeconds() }}s.visible="pollErpListSync"
     @endif
 >
-    <div class="erp-orcamentos__filters">
+    <div class="erp-orcamentos__filters erp-list-filters">
         <div class="erp-orcamentos__filters-row">
             <div class="erp-orcamentos__search-group">
                 <span class="erp-orcamentos__locate-label">Localizar</span>

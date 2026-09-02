@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.164',
+    'versao' => '6.4.1.173',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
     // Portal de renovação — nativo (não usa .env).
     'pagamento_url' => 'https://unitecnologiasc.digital',
@@ -96,6 +96,14 @@ return [
         'local_service' => env('CLOUDFLARE_LOCAL_SERVICE', 'http://127.0.0.1:8765'),
         'program_data_dir' => env('CLOUDFLARE_PROGRAM_DATA_DIR', 'C:\\ProgramData\\Unitec\\cloudflared'),
     ],
+
+    /*
+    | Runtime web: frankenphp (padrão quando tools/frankenphp existe) ou php (php -S fallback).
+    | ERP_LIST_SYNC_POLL=false desliga poll automático nas listas ERP (benchmark / performance).
+    */
+    'web_server' => env('UNITEC_WEB_SERVER', 'frankenphp'),
+    'frankenphp_threads' => max(2, (int) env('FRANKENPHP_NUM_THREADS', 8)),
+    'erp_list_sync_poll_enabled' => filter_var(env('ERP_LIST_SYNC_POLL', true), FILTER_VALIDATE_BOOL),
 ];
 
 

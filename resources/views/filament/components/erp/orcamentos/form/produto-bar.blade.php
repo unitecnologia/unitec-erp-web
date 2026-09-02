@@ -55,6 +55,7 @@
                     class="erp-nfe__input"
                     type="text"
                     wire:model.live="itemQuantidadeInput"
+                    wire:blur="normalizeItemQuantidadeInput"
                     wire:keydown.enter.prevent="focoPrecoAposQtd"
                     @disabled($readOnly)
                     inputmode="decimal"

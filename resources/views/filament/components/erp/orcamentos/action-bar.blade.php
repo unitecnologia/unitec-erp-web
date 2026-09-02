@@ -1,4 +1,4 @@
-<div class="erp-orcamentos-actions">
+<div class="erp-orcamentos-actions erp-list-actions">
     <button type="button" wire:click="createOrcamento" class="erp-orcamentos-actions__btn" data-erp-key="F2">
         <span class="erp-orcamentos-actions__icon erp-orcamentos-actions__icon--new">+</span>
         <span class="erp-orcamentos-actions__label"><kbd>F2</kbd> | Novo</span>
