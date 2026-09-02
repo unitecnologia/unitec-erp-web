@@ -1,4 +1,4 @@
-*.log
+﻿*.log
 .DS_Store
 .env
 .env.backup
@@ -49,3 +49,39 @@ Thumbs.db
 .env.*.bak
 /bootstrap/cache/*.php
 !/bootstrap/cache/.gitignore
+
+# Runtime / PID local
+.unitec-serve.pid
+.unitec-serve.runtime
+.unitec-pdv.runtime
+.unitec-pdv.pid
+
+# FrankenPHP local (binários; template pode ser versionado se necessário)
+/tools/frankenphp/**
+!/tools/frankenphp/Caddyfile.template
+!/tools/frankenphp/README.md
+
+# Binários locais do desktop / cópias de serviço
+/bin/
+
+# Pastas locais de importação / dados
+/importar/
+
+# Views compiladas (não versionar)
+/storage/framework/views/**
+!/storage/framework/views/.gitignore
+
+# Sessões/cache locais
+/storage/framework/sessions/**
+!/storage/framework/sessions/.gitignore
+/storage/framework/cache/**
+!/storage/framework/cache/.gitignore
+!/storage/framework/cache/data/.gitignore
+
+# Diagnósticos / benches locais
+/scripts/_diag_*
+/public/_bench_*.php
+
+# Caches/binários PHP locais
+/tools/php/opcache/
+/tools/php/ossl-modules/
