@@ -1,15 +1,15 @@
-﻿<?php
+<?php
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
     'versao' => '6.4.1.175',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
-    // Portal de renovaÃ§Ã£o â€” nativo (nÃ£o usa .env).
+    // Portal de renova├º├úo ÔÇö nativo (n├úo usa .env).
     'pagamento_url' => 'https://unitecnologiasc.digital',
 
     /*
-    | LicenÃ§a remota (portal Unitec) â€” URL nativa abaixo.
-    | Na empresa: sÃ³ habilitar + timeout (sem coluna de URL â€” evita row size no MySQL).
+    | Licen├ºa remota (portal Unitec) ÔÇö URL nativa abaixo.
+    | Na empresa: s├│ habilitar + timeout (sem coluna de URL ÔÇö evita row size no MySQL).
     */
     'licenca_api' => [
         'enabled' => true,
@@ -20,7 +20,7 @@ return [
     ],
 
     /*
-    | Contato exibido em Ajuda â†’ LicenÃ§a do Sistema (nativo, sem .env).
+    | Contato exibido em Ajuda ÔåÆ Licen├ºa do Sistema (nativo, sem .env).
     */
     'licenca_suporte' => [
         'email' => 'sac@unitecnologiasc.com.br',
@@ -30,26 +30,26 @@ return [
 
     /*
     | Zoom da interface no navegador (Chrome/Edge), em porcentagem.
-    | Ex.: 90 = menor, 100 = normal, 110 = maior. Faixa: 50â€“200.
+    | Ex.: 90 = menor, 100 = normal, 110 = maior. Faixa: 50ÔÇô200.
     */
     'browser_zoom' => max(50, min(200, (int) env('UNITEC_BROWSER_ZOOM', 100))),
 
     /*
-    | Ao abrir o ERP: se o schema estiver atrÃ¡s do cÃ³digo (ex. restore de dump
+    | Ao abrir o ERP: se o schema estiver atr├ís do c├│digo (ex. restore de dump
     | antigo), aplica apenas `php artisan migrate --force`. Nunca migrate:fresh.
-    | ERP_AUTO_MIGRATE=false â†’ sÃ³ detecta e avisa, sem alterar o banco.
+    | ERP_AUTO_MIGRATE=false ÔåÆ s├│ detecta e avisa, sem alterar o banco.
     */
     'auto_migrate' => filter_var(env('ERP_AUTO_MIGRATE', true), FILTER_VALIDATE_BOOL),
 
     /*
-    | AtualizaÃ§Ã£o remota de produÃ§Ã£o (UnitecErpServer).
+    | Atualiza├º├úo remota de produ├º├úo (UnitecErpServer).
     |
     | UNITEC_UPDATE_DOWNLOAD_URL = link HTTPS DIRETO do ZIP (recomendado no .env).
-    | PadrÃ£o estÃ¡vel (GitHub Releases, canal "update"):
+    | Padr├úo est├ível (GitHub Releases, canal "update"):
     |   https://github.com/unitecnologia/unitec-erp-web/releases/download/update/Unitec-ERP-Update.zip
     |
     | O ZIP deve conter a pasta unitec-erp-web/ (ou artisan na raiz).
-    | ServiÃ§o baixa o ZIP, extrai em atualizacao/; login pergunta Sim/NÃ£o.
+    | Servi├ºo baixa o ZIP, extrai em atualizacao/; login pergunta Sim/N├úo.
     */
     'update_download_url' => env(
         'UNITEC_UPDATE_DOWNLOAD_URL',
@@ -57,16 +57,16 @@ return [
     ),
     'update_zip_name' => 'Unitec-ERP-Update.zip',
 
-    /** ok | failed Ã¢â‚¬â€ status exibido no alerta de backup do dashboard. */
+    /** ok | failed ├óÔé¼ÔÇØ status exibido no alerta de backup do dashboard. */
     'backup_last_status' => env('UNITEC_BACKUP_LAST_STATUS', 'ok'),
     'backup_last_at' => env('UNITEC_BACKUP_LAST_AT'),
 
-    /** Quantidade demo de NF rejeitadas no dashboard (0 = sÃƒÂ³ dados reais). */
+    /** Quantidade demo de NF rejeitadas no dashboard (0 = s├â┬│ dados reais). */
     'dashboard_demo_nfe_rejeitadas' => env('UNITEC_DASHBOARD_DEMO_NFE_REJEITADAS', 3),
 
     /*
-    | Unitecnologia Device Service Ã¢â‚¬â€ agente local no PC do caixa (localhost:9330).
-    | O navegador chama a API; Laravel sÃƒÂ³ gera o ESC/POS (mike42).
+    | Unitecnologia Device Service ├óÔé¼ÔÇØ agente local no PC do caixa (localhost:9330).
+    | O navegador chama a API; Laravel s├â┬│ gera o ESC/POS (mike42).
     */
     'device_service' => [
         'base_url' => env('UNITEC_DEVICE_SERVICE_URL', 'http://127.0.0.1:9330'),
@@ -75,7 +75,7 @@ return [
     ],
 
     /*
-    | QZ Tray Ã¢â‚¬â€ legado (nÃƒÂ£o usado no fluxo atual; Device Service substitui).
+    | QZ Tray ├óÔé¼ÔÇØ legado (n├â┬úo usado no fluxo atual; Device Service substitui).
     */
     'qz' => [
         'certificate' => env('QZ_CERTIFICATE_PATH', storage_path('app/qz/digital-certificate.txt')),
@@ -83,9 +83,9 @@ return [
     ],
 
     /*
-    | Cloudflare Tunnel â€” provisionamento de subdomÃ­nio (Acesso remoto).
-    | PadrÃ£o Unitec (unierp.uk). Empresa (param_cf_*) e formulÃ¡rio sobrescrevem.
-    | Token tambÃ©m pode ir no .env (CLOUDFLARE_API_TOKEN).
+    | Cloudflare Tunnel ÔÇö provisionamento de subdom├¡nio (Acesso remoto).
+    | Padr├úo Unitec (unierp.uk). Empresa (param_cf_*) e formul├írio sobrescrevem.
+    | Token tamb├®m pode ir no .env (CLOUDFLARE_API_TOKEN).
     */
     'cloudflare' => [
         // Token somente via .env (CLOUDFLARE_API_TOKEN).
@@ -98,8 +98,8 @@ return [
     ],
 
     /*
-    | Runtime web: frankenphp (padrÃ£o quando tools/frankenphp existe) ou php (php -S fallback).
-    | ERP_LIST_SYNC_POLL=false desliga poll automÃ¡tico nas listas ERP (benchmark / performance).
+    | Runtime web: frankenphp (padr├úo quando tools/frankenphp existe) ou php (php -S fallback).
+    | ERP_LIST_SYNC_POLL=false desliga poll autom├ítico nas listas ERP (benchmark / performance).
     */
     'web_server' => env('UNITEC_WEB_SERVER', 'frankenphp'),
     'frankenphp_threads' => max(2, (int) env('FRANKENPHP_NUM_THREADS', 8)),
