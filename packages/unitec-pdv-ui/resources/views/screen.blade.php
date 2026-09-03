@@ -1,16 +1,21 @@
 {{--
-    Tela completa do PDV (miolo + TODOS os modais).
+    Tela completa do PDV (miolo + modais sob demanda).
     FONTE ÚNICA: ERP e PDV offline incluem este arquivo.
     Contratos de $this-> seguem o PDV do ERP (activeModal, overlays, finalizar…).
+    Hot path do bip: não renderizar modais fechados (includeWhen).
 --}}
 @include('pdvui::partials.main')
 
-@include('pdvui::modals.options')
-@include('pdvui::modals.resumo-caixa')
-@include('pdvui::modals.sangria')
-@include('pdvui::modals.suprimento')
-@include('pdvui::modals.caixa')
-@include('pdvui::modals.finalizar')
+@php
+    $modal = $this->activeModal ?? null;
+@endphp
+
+@includeWhen($modal === 'options', 'pdvui::modals.options')
+@includeWhen($modal === 'resumo', 'pdvui::modals.resumo-caixa')
+@includeWhen($modal === 'sangria', 'pdvui::modals.sangria')
+@includeWhen($modal === 'suprimento', 'pdvui::modals.suprimento')
+@includeWhen(in_array($modal, ['abrir_caixa', 'fechar_caixa'], true), 'pdvui::modals.caixa')
+@includeWhen($modal === 'finalizar', 'pdvui::modals.finalizar')
 @include('pdvui::fiscal-progress')
 
 @if ($this->pdvConfirmImprimirPosVenda ?? false)
@@ -33,28 +38,28 @@
     </div>
 @endif
 
-@include('pdvui::modals.excluir-item')
-@include('pdvui::modals.cancelar-venda')
-@include('pdvui::modals.vendedor')
-@include('pdvui::modals.desconto-item')
-@include('pdvui::modals.grade')
-@include('pdvui::modals.serial')
-@include('pdvui::modals.busca-avancada')
-@include('pdvui::modals.remover-itens')
-@include('pdvui::modals.autorizacao')
-@include('pdvui::modals.busca-preco')
-@include('pdvui::modals.importar-menu')
-@include('pdvui::modals.importar-pedido')
-@include('pdvui::modals.importar')
-@include('pdvui::modals.receber')
-@include('pdvui::modals.reimprimir')
-@include('pdvui::modals.consulta-venda')
-@include('pdvui::modals.estorno-venda')
-@include('pdvui::modals.fiscal-mensagem')
-@include('pdvui::modals.tabela-preco')
-@include('pdvui::modals.bloqueio')
-@include('pdvui::modals.sair')
-@include('pdvui::modals.produto-nao-encontrado')
+@includeWhen($modal === 'excluir_item', 'pdvui::modals.excluir-item')
+@includeWhen($this->pdvConfirmCancelarVenda ?? false, 'pdvui::modals.cancelar-venda')
+@includeWhen($modal === 'vendedor', 'pdvui::modals.vendedor')
+@includeWhen($modal === 'desconto_item', 'pdvui::modals.desconto-item')
+@includeWhen($modal === 'grade', 'pdvui::modals.grade')
+@includeWhen($modal === 'serial', 'pdvui::modals.serial')
+@includeWhen($modal === 'busca_avancada', 'pdvui::modals.busca-avancada')
+@includeWhen($modal === 'remover_itens', 'pdvui::modals.remover-itens')
+@includeWhen($modal === 'autorizacao', 'pdvui::modals.autorizacao')
+@includeWhen($modal === 'busca_preco', 'pdvui::modals.busca-preco')
+@includeWhen($modal === 'importar_menu', 'pdvui::modals.importar-menu')
+@includeWhen($modal === 'importar_pedido', 'pdvui::modals.importar-pedido')
+@includeWhen($modal === 'importar', 'pdvui::modals.importar')
+@includeWhen($modal === 'receber', 'pdvui::modals.receber')
+@includeWhen($modal === 'reimprimir', 'pdvui::modals.reimprimir')
+@includeWhen($modal === 'consulta_venda', 'pdvui::modals.consulta-venda')
+@includeWhen($modal === 'estorno_venda', 'pdvui::modals.estorno-venda')
+@includeWhen(filled($this->pdvFiscalOverlayTipo ?? null), 'pdvui::modals.fiscal-mensagem')
+@includeWhen($modal === 'tabela_preco', 'pdvui::modals.tabela-preco')
+@includeWhen($modal === 'bloqueio' || ($this->pdvBloqueado ?? false), 'pdvui::modals.bloqueio')
+@includeWhen($modal === 'sair', 'pdvui::modals.sair')
+@includeWhen(($this->produtoNaoEncontradoCodigo ?? null) !== null, 'pdvui::modals.produto-nao-encontrado')
 
 {{-- Cadastros: ERP usa iframe Filament; offline pode injetar corpo local via slots/flags. --}}
 @if ($this->overlayProductOpen ?? false)

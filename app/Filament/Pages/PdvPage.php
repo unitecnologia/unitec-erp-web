@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\CaixaConta;
 use App\Support\Erp\ErpAccess;
 use App\Filament\Pages\Concerns\ManagesPdvUi;
 use App\Support\Erp\ErpScreen;
@@ -17,6 +18,9 @@ use BackedEnum;
 class PdvPage extends Page
 {
     use ManagesPdvUi;
+
+    /** Liga o Livewire child leve do cupom/bip (hot path). */
+    public bool $pdvHotPathEnabled = true;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
 
@@ -60,6 +64,9 @@ class PdvPage extends Page
 
             return;
         }
+
+        // Normalização de tipo PDV: só no mount (não no render do bip).
+        CaixaConta::ensurePdvOperacional();
 
         if ($user && ! $user->podeOperarComCaixaPdv()) {
             $this->openPdvAcessoNegado(

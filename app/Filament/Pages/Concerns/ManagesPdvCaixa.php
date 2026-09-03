@@ -164,6 +164,7 @@ trait ManagesPdvCaixa
     protected function persistCaixaState(bool $aberto): void
     {
         $this->caixaAberto = $aberto;
+        $this->dispatch('erp-pdv-hot-sync-caixa', aberto: $aberto)->to(\App\Livewire\Erp\PdvHotPath::class);
 
         if (! $aberto) {
             $this->caixaSessaoId = null;
@@ -404,6 +405,8 @@ trait ManagesPdvCaixa
             return;
         }
 
+        CaixaConta::ensurePdvOperacional();
+
         if ($user && ! $user->podeOperarComCaixaPdv($this->resolveEmpresaId())) {
             Notification::make()
                 ->title('Sem caixa PDV liberado.')
@@ -462,6 +465,7 @@ trait ManagesPdvCaixa
         $this->caixaSessaoId = $sessao->id;
         $this->caixaAberto = true;
         session(['erp.pdv.caixa_sessao_id' => $sessao->id]);
+        $this->dispatch('erp-pdv-hot-sync-caixa', aberto: true)->to(\App\Livewire\Erp\PdvHotPath::class);
         $this->aberturaForm['valor'] = ErpMoney::formatBr((float) $sessao->valor_abertura);
         $this->aplicarVendedorDoUsuarioLogado();
         $this->closePdvModal();

@@ -126,7 +126,8 @@ class User extends Authenticatable implements FilamentUser
      */
     public function accessibleCaixaContaIds(?int $empresaId = null): array
     {
-        CaixaConta::ensurePdvOperacional();
+        // Sem escrita aqui: ensurePdvOperacional() no mount do PDV / permissões / abertura.
+        // Evita UPDATE em unitec_caixa_contas a cada render (status bar do bip).
 
         $empresaId = $empresaId ?: (int) ($this->empresa_id ?? 0);
 

@@ -9075,7 +9075,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/unitec-pdv-ui",
-                "reference": "b9045cf19bd69ac8d564e74fc5ea92dcd81667b4"
+                "reference": "79e0d8ea0e578c856232bdf17229ebd2170da328"
             },
             "require": {
                 "illuminate/support": "^11.0 || ^12.0 || ^13.0",

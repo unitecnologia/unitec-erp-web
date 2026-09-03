@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Livewire\Erp\PdvHotPath;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaItem;
 use App\Models\PdvVendaPagamento;
@@ -21,6 +22,7 @@ use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 
 trait ManagesPdvVenda
 {
@@ -760,6 +762,10 @@ trait ManagesPdvVenda
         session()->forget('erp.pdv.cupom');
         $this->forgetCupomIniciadoEm();
         $this->clearImportSession();
+
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
     }
 
     protected function marcarCupomIniciadoSeNecessario(): void
@@ -1112,11 +1118,26 @@ trait ManagesPdvVenda
 
     public function cupomTemItens(): bool
     {
-        return $this->cupomItens !== [];
+        if ($this->cupomItens !== []) {
+            return true;
+        }
+
+        // Hot path grava só na session; pai recarrega sob demanda.
+        if ($this->pdvHotPathEnabled ?? false) {
+            $stored = session('erp.pdv.cupom', []);
+
+            return is_array($stored) && $stored !== [];
+        }
+
+        return false;
     }
 
     public function selectCupomItem(int $index): void
     {
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
+        }
+
         if (! isset($this->cupomItens[$index])) {
             return;
         }
@@ -1202,8 +1223,13 @@ trait ManagesPdvVenda
         $this->dispatch('erp-pdv-focus-search');
     }
 
-    public function handlePdvSearchEnter(): void
+    public function handlePdvSearchEnter(?string $codigo = null): void
     {
+
+        if (is_string($codigo)) {
+            $this->pdvSearch = mb_strtoupper(trim($codigo), 'UTF-8');
+        }
+
         if (! $this->caixaAberto) {
             Notification::make()
                 ->title('Caixa fechado.')
@@ -1213,6 +1239,7 @@ trait ManagesPdvVenda
 
             return;
         }
+
 
         if (trim($this->pdvSearch) === '') {
             // Com aviso de "não encontrado" aberto, Enter não fecha o aviso
@@ -1259,6 +1286,25 @@ trait ManagesPdvVenda
         }
 
         $this->proceedAfterProductSelected($product);
+    }
+
+    #[On('erp-pdv-hot-delegate')]
+    public function handlePdvHotDelegate(string $codigo = ''): void
+    {
+        $this->handlePdvSearchEnter($codigo);
+        $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+    }
+
+    #[On('erp-pdv-hot-empty-enter')]
+    public function handlePdvHotEmptyEnter(): void
+    {
+        $this->handlePdvSearchEnter('');
+    }
+
+    #[On('erp-pdv-hot-select-cupom')]
+    public function handlePdvHotSelectCupom(int $index): void
+    {
+        $this->selectCupomItem($index);
     }
 
     protected function proceedAfterProductSelected(Product $product): void
@@ -1663,6 +1709,7 @@ trait ManagesPdvVenda
             return;
         }
 
+
         $this->addProductToCupom(
             $product,
             $quantidade,
@@ -1685,6 +1732,9 @@ trait ManagesPdvVenda
         $this->syncPdvPreviewFotoForProduct($product);
         $this->pdvItemAddedAt = microtime(true);
         $this->persistCupomToSession();
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
         $this->dispatch('erp-pdv-item-added');
         $this->dispatch('erp-pdv-beep');
         $this->dispatch('erp-pdv-produto-confirmado', nome: mb_strtoupper(
@@ -1710,15 +1760,13 @@ trait ManagesPdvVenda
             queueMicrotask(focusCodigo);
             requestAnimationFrame(focusCodigo);
             [30, 80, 160, 320, 600, 1000, 1800].forEach((ms) => setTimeout(focusCodigo, ms));
-            setTimeout(() => {
-                const component = window.Livewire?.all?.().find((c) => c.el?.querySelector?.('#erp-pdv-search'));
-                component?.call('clearPdvFlashLancamento');
-                window.__erpPdvForceSearchFocusUntil = Date.now() + 3000;
-                [0, 50, 150, 350, 700].forEach((ms) => setTimeout(focusCodigo, ms));
-            }, 600);
         JS);
     }
 
+    /**
+     * Limpa só o flash visual (qtd/preço/subtotal do lançamento).
+     * Preferir clear no browser (sem round-trip); mantido para compatibilidade.
+     */
     public function clearPdvFlashLancamento(): void
     {
         $this->pdvFlashQtd = null;
@@ -1975,6 +2023,10 @@ trait ManagesPdvVenda
             return;
         }
 
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
+        }
+
         if (! $this->cupomTemItens()) {
             Notification::make()
                 ->title('Nenhum item no cupom.')
@@ -1990,6 +2042,10 @@ trait ManagesPdvVenda
 
     public function confirmCancelarCupom(): void
     {
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
+        }
+
         $this->pdvConfirmCancelarVenda = false;
         $this->registrarItensCanceladosCupom($this->cupomItens);
         $this->limparCupom();
@@ -2018,6 +2074,10 @@ trait ManagesPdvVenda
                 ->send();
 
             return;
+        }
+
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
         }
 
         if (! $this->cupomTemItens()) {

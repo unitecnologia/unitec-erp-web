@@ -97,13 +97,9 @@ function bindErpPdvLivewireEvents() {
         window.__erpPdvForceSearchFocusUntil = Date.now() + 3000;
         focusPdvSearchField();
 
+        // Flash é só visual: limpa no browser sem round-trip Livewire (não bloqueia a fila).
         window.setTimeout(() => {
-            const component = findPdvLivewireComponent();
-
-            if (component) {
-                component.call('clearPdvFlashLancamento');
-            }
-
+            clearPdvFlashLancamentoLocal();
             window.__erpPdvForceSearchFocusUntil = Date.now() + 2500;
             focusPdvSearchField();
         }, 600);
@@ -1479,15 +1475,15 @@ async function processPdvScanQueue() {
             }
 
             const code = pdvScanQueue.shift();
-            const component = findPdvLivewireComponent();
+            const component = findPdvScanComponent();
 
             if (! component) {
                 continue;
             }
 
             try {
-                await component.set('pdvSearch', code);
-                await component.call('handlePdvSearchEnter');
+                await component.call('handlePdvSearchEnter', code);
+                syncPdvHotPathChrome();
             } catch (error) {
                 console.error('[PDV scan queue]', code, error);
             }
@@ -1518,6 +1514,105 @@ function resumePdvScanQueueIfNeeded() {
     void processPdvScanQueue();
 }
 
+
+function findPdvHotPathComponent() {
+    const el = document.querySelector('[data-erp-pdv-hot-path]');
+    if (! el) {
+        return null;
+    }
+
+    const wireId = el.getAttribute('wire:id') || el.closest('[wire\\:id]')?.getAttribute('wire:id');
+    if (wireId && window.Livewire?.find) {
+        try {
+            return window.Livewire.find(wireId);
+        } catch (e) {
+            // fall through
+        }
+    }
+
+    return null;
+}
+
+/** Preferência: child leve do bip; fallback: página PDV. */
+function findPdvScanComponent() {
+    return findPdvHotPathComponent() || findPdvLivewireComponent();
+}
+
+function syncPdvHotPathChrome() {
+    const meta = document.querySelector('.erp-pdv__hot-path-meta');
+    if (! meta) {
+        return;
+    }
+
+    const total = meta.getAttribute('data-cupom-total');
+    const grand = document.querySelector('.erp-pdv__total-box--grand .erp-pdv__total-value');
+    if (grand && total) {
+        grand.textContent = 'R$ ' + total;
+    }
+
+    const qtd = meta.getAttribute('data-flash-qtd');
+    const preco = meta.getAttribute('data-flash-preco');
+    const flashTotal = meta.getAttribute('data-flash-total');
+    if (qtd) {
+        const boxes = document.querySelectorAll('.erp-pdv__totals .erp-pdv__total-box:not(.erp-pdv__total-box--grand)');
+        // Layout lateral: últimos 3 boxes antes do grand são qtd/preço/subtotal (quando não em launch).
+        const flashTargets = Array.from(document.querySelectorAll('.erp-pdv__totals .erp-pdv__total-box'))
+            .filter((el) => ! el.classList.contains('erp-pdv__total-box--grand'));
+        if (flashTargets.length >= 3) {
+            const [b0, b1, b2] = flashTargets.slice(-3);
+            [b0, b1, b2].forEach((b) => b.classList.add('erp-pdv__total-box--flash'));
+            const v0 = b0.querySelector('.erp-pdv__total-value');
+            const v1 = b1.querySelector('.erp-pdv__total-value');
+            const v2 = b2.querySelector('.erp-pdv__total-value');
+            if (v0) v0.textContent = qtd;
+            if (v1) v1.textContent = preco || '0,00';
+            if (v2) v2.textContent = flashTotal || '0,00';
+        }
+    }
+
+    const foto = meta.getAttribute('data-preview-foto');
+    const photoWrap = document.querySelector('[data-erp-pdv-product-photo]');
+    if (photoWrap && foto) {
+        let img = photoWrap.querySelector('img');
+        if (! img) {
+            img = document.createElement('img');
+            img.className = 'erp-pdv__product-photo-img';
+            img.alt = 'Foto do produto';
+            photoWrap.appendChild(img);
+        }
+        img.src = foto;
+    }
+}
+
+function clearPdvFlashLancamentoLocal() {
+    const component = findPdvHotPathComponent() || findPdvLivewireComponent();
+
+    // Atualiza snapshot Livewire sem request (não compete com a fila do bip).
+    if (component && typeof component.set === 'function') {
+        try {
+            component.set('pdvFlashQtd', null, false);
+            component.set('pdvFlashPreco', null, false);
+            component.set('pdvFlashTotal', null, false);
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    const flashBoxes = document.querySelectorAll('.erp-pdv__total-box--flash');
+
+    if (flashBoxes.length === 0) {
+        return;
+    }
+
+    flashBoxes.forEach((box, index) => {
+        box.classList.remove('erp-pdv__total-box--flash');
+        const value = box.querySelector('.erp-pdv__total-value');
+
+        if (value) {
+            value.textContent = index === 0 ? '0' : '0,00';
+        }
+    });
+}
 
 function findPdvLivewireComponent() {
     // Mesma resolução do restante do PDV (Livewire.find / wire:id).

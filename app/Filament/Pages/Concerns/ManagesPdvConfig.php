@@ -80,6 +80,14 @@ trait ManagesPdvConfig
         return $this->pdvConfig()->exibirResumoCaixa();
     }
 
+    /**
+     * Menu Opções: atalho F3 Vendedor (ERP usa F3 para outro fluxo; oculto por padrão).
+     */
+    public function getPdvExibirF3VendedorProperty(): bool
+    {
+        return false;
+    }
+
     public function getPdvPermitirDescontoItemProperty(): bool
     {
         return $this->pdvConfig()->permitirDescontoItem();

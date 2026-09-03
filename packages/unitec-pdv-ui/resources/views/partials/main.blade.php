@@ -75,6 +75,11 @@
                         @endforelse
                     </tbody>
                 </table>
+            @elseif ($this->pdvHotPathEnabled ?? false)
+                <livewire:erp.pdv-hot-path
+                    :caixa-aberto="(bool) ($this->caixaAberto ?? false)"
+                    wire:key="erp-pdv-hot-path-{{ $this->caixaSessaoId ?? 0 }}"
+                />
             @else
                 <table class="erp-pdv__grid erp-pdv__grid--cupom">
                     <colgroup>
@@ -133,7 +138,9 @@
             @endif
         </div>
 
-        <div class="erp-pdv__product-line" id="erp-pdv-product-name" aria-live="polite">{{ $this->pdvPreviewProductName }}</div>
+        @if (! ($this->pdvHotPathEnabled ?? false) || ($this->pdvEmConsulta && $this->pdvSearchResults !== []))
+            <div class="erp-pdv__product-line" id="erp-pdv-product-name" aria-live="polite">{{ $this->pdvPreviewProductName }}</div>
+        @endif
     </section>
 
     <aside class="erp-pdv__side-panel">
@@ -174,7 +181,7 @@
                 class="erp-pdv__search-field"
                 wire:ignore
                 x-data="{
-                    q: $wire.entangle('pdvSearch').live,
+                    q: '',
                     focusCodigo() {
                         const el = this.$refs.codigo;
                         if (! el || el.disabled) {
@@ -186,22 +193,32 @@
                             el.setSelectionRange(n, n);
                         } catch (e) {}
                     },
-                    onEnter() {
-                        const done = () => {
-                            this.focusCodigo();
-                            [0, 40, 100, 220, 450, 900].forEach((ms) => {
-                                setTimeout(() => this.focusCodigo(), ms);
-                            });
-                        };
-                        const termo = this.$refs.codigo ? this.$refs.codigo.value : (this.q || '');
-                        this.q = termo;
-                        if (! termo) {
-                            window.enqueuePdvScan?.('', { allowEmpty: true });
-                            done();
+                    looksLikeDescription(value) {
+                        return /[A-Za-zÀ-ÿ]/.test(String(value ?? ''));
+                    },
+                    syncDescriptionSearch() {
+                        const value = String(this.$refs.codigo ? this.$refs.codigo.value : (this.q ?? ''));
+                        this.q = value;
+                        if (! this.looksLikeDescription(value)) {
                             return;
                         }
-                        window.enqueuePdvScan?.(termo);
-                        done();
+                        if (this.$wire && typeof this.$wire.set === 'function') {
+                            this.$wire.set('pdvSearch', value);
+                        }
+                    },
+                    onEnter() {
+                        const input = this.$refs.codigo;
+                        const codigo = String(input ? input.value : (this.q || '')).trim();
+                        if (input) {
+                            input.value = '';
+                        }
+                        this.q = '';
+                        this.focusCodigo();
+                        if (! codigo) {
+                            window.enqueuePdvScan?.('', { allowEmpty: true });
+                            return;
+                        }
+                        window.enqueuePdvScan?.(codigo);
                     },
                     init() {
                         const onRefocus = () => this.focusCodigo();
@@ -209,6 +226,21 @@
                         this._erpPdvSearchCleanup = () => {
                             window.removeEventListener('erp-pdv-refocus-search', onRefocus);
                         };
+                        if (this.$wire && typeof this.$wire.$watch === 'function') {
+                            this.$wire.$watch('pdvSearch', (value) => {
+                                if (! this.looksLikeDescription(value)) {
+                                    return;
+                                }
+                                const next = String(value ?? '');
+                                if (this.q === next) {
+                                    return;
+                                }
+                                this.q = next;
+                                if (this.$refs.codigo) {
+                                    this.$refs.codigo.value = next;
+                                }
+                            });
+                        }
                     },
                     destroy() {
                         this._erpPdvSearchCleanup?.();
@@ -222,6 +254,7 @@
                     class="erp-pdv__search-input"
                     x-model="q"
                     x-bind:disabled="! $wire.caixaAberto"
+                    x-on:input="syncDescriptionSearch()"
                     x-on:keydown.enter.prevent="onEnter()"
                     data-erp-uppercase
                     data-erp-pdv-clickable
