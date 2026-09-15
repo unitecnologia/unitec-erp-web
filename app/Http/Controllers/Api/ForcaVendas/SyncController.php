@@ -17,6 +17,8 @@ class SyncController
 
     public function pull(Request $request): JsonResponse
     {
+        ini_set('memory_limit', '512M');
+
         $user = $request->user();
         $vendedorId = $user?->vendedor_id;
         $empresaId = $user?->empresa_id ? (int) $user->empresa_id : null;

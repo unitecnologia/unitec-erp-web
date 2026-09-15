@@ -3,6 +3,7 @@
 namespace App\Support\ForcaVendas;
 
 use App\Models\ContaReceber;
+use App\Models\Estoque;
 use App\Models\EstoqueReserva;
 use App\Models\ForcaVendasClienteImport;
 use App\Models\ForcaVendasOrder;
@@ -15,11 +16,13 @@ use App\Models\Person;
 use App\Models\PersonVisitaDia;
 use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductEstoqueSaldo;
 use App\Models\ProductPriceTableItem;
 use App\Models\Transportadora;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\ProductEstoqueSaldoService;
@@ -149,10 +152,31 @@ class ForcaVendasSyncService
             $estoqueId = $raw ? (int) $raw : null;
         }
 
-        $saldos = new ProductEstoqueSaldoService();
+        $saldosService = new ProductEstoqueSaldoService();
         $reservados = (new EstoqueReservaService())->totaisReservadosAtivos($estoqueId);
 
-        $query = Product::query();
+        $query = Product::query()->select([
+            'id',
+            'codigo',
+            'codigo_barras',
+            'descricao',
+            'unidade',
+            'marca',
+            'grupo',
+            'preco_venda',
+            'preco_atacado',
+            'preco_especial',
+            'qtd_atacado',
+            'estoque',
+            'usa_tab_preco',
+            'mostrar_no_app',
+            'promo_preco_venda',
+            'promo_data_inicio',
+            'promo_data_fim',
+            'foto_path',
+            'ativo',
+            'updated_at',
+        ]);
 
         if ($since !== null && Schema::hasColumn('products', 'updated_at')) {
             $idsReservaAlterada = EstoqueReserva::query()
@@ -173,11 +197,36 @@ class ForcaVendasSyncService
             });
         }
 
-        return $query
-            ->orderBy('id')
-            ->get()
-            ->map(function (Product $p) use ($reservados, $saldos, $estoqueId): array {
-                $fisico = $saldos->fisico((int) $p->id, $estoqueId);
+        $products = $query->orderBy('id')->get();
+
+        /** @var array<int, array<int, float>> $saldosPorProduto estoque_id => qty */
+        $saldosPorProduto = [];
+        $principalId = null;
+        $usarSaldosDeposito = $estoqueId !== null && $saldosService->tabelaDisponivel();
+
+        if ($usarSaldosDeposito && $products->isNotEmpty()) {
+            $principalId = $this->estoquePrincipalIdParaPull($saldosService);
+
+            $productIds = $products->pluck('id')->all();
+            foreach (array_chunk($productIds, 2000) as $chunkIds) {
+                $rows = ProductEstoqueSaldo::query()
+                    ->whereIn('product_id', $chunkIds)
+                    ->get(['product_id', 'estoque_id', 'quantidade']);
+
+                foreach ($rows as $row) {
+                    $pid = (int) $row->product_id;
+                    $eid = (int) $row->estoque_id;
+                    $saldosPorProduto[$pid][$eid] = (float) $row->quantidade;
+                }
+            }
+        }
+
+        return $products
+            ->map(function (Product $p) use ($reservados, $estoqueId, $usarSaldosDeposito, $saldosPorProduto, $principalId): array {
+                $global = (float) ($p->estoque ?? 0);
+                $fisico = $usarSaldosDeposito
+                    ? $this->fisicoDeSaldosCarregados($global, $estoqueId, $saldosPorProduto[(int) $p->id] ?? [], $principalId)
+                    : $global;
                 $reservado = (float) ($reservados[$p->id] ?? 0);
                 $disponivel = $fisico - $reservado;
 
@@ -208,6 +257,60 @@ class ForcaVendasSyncService
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Espelha {@see ProductEstoqueSaldoService::fisico()} com saldos já carregados.
+     *
+     * @param  array<int, float>  $saldos  estoque_id => quantidade
+     */
+    private function fisicoDeSaldosCarregados(float $global, int $estoqueId, array $saldos, ?int $principalId): float
+    {
+        $saldoDeposito = $saldos[$estoqueId] ?? null;
+        $sumDepots = array_sum($saldos);
+        $naoDistribuido = max(0.0, round($global - $sumDepots, 3));
+
+        if ($saldoDeposito === null) {
+            if ($sumDepots > 0) {
+                return 0.0;
+            }
+
+            return $principalId !== null && $estoqueId === $principalId
+                ? $global
+                : 0.0;
+        }
+
+        $fisico = (float) $saldoDeposito;
+
+        if ($naoDistribuido > 0 && $principalId !== null && $estoqueId === $principalId) {
+            $fisico += $naoDistribuido;
+        }
+
+        return $fisico;
+    }
+
+    /**
+     * Mesma resolução de depósito principal de ProductEstoqueSaldoService::estoquePrincipalId().
+     */
+    private function estoquePrincipalIdParaPull(ProductEstoqueSaldoService $saldosService): ?int
+    {
+        $empresaId = (int) (ErpContext::currentEmpresa()?->id ?? 0);
+        $id = $saldosService->estoqueIdParaEmpresa($empresaId > 0 ? $empresaId : null);
+
+        if ($id !== null) {
+            return $id;
+        }
+
+        if (! Schema::hasTable('estoques')) {
+            return null;
+        }
+
+        $id = Estoque::query()
+            ->where('ativo', true)
+            ->orderBy('id')
+            ->value('id');
+
+        return $id !== null ? (int) $id : null;
     }
 
     /**
