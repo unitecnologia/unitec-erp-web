@@ -4,12 +4,10 @@ return [
     'app_name' => 'UNI SISTEMAS 3.0',
     'versao' => '6.4.1.187',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
-    // Portal de renova├º├úo ÔÇö nativo (n├úo usa .env).
-    'pagamento_url' => 'https://unitecnologiasc.digital',
 
     /*
-    | Licen├ºa remota (portal Unitec) ÔÇö URL nativa abaixo.
-    | Na empresa: s├│ habilitar + timeout (sem coluna de URL ÔÇö evita row size no MySQL).
+    | Licença remota (portal Unitec) — URL nativa abaixo.
+    | Na empresa: só habilitar (timeout vem do config).
     */
     'licenca_api' => [
         'enabled' => true,
@@ -17,6 +15,14 @@ return [
         'timeout' => 8,
         'cache_seconds' => 600,
         'grace_hours' => 24,
+    ],
+
+    /*
+    | Log de backup no portal. Token único do ERP (não é parâmetro por empresa).
+    | O POST usa o CNPJ de cada empresa; a conexão e o token são os mesmos.
+    */
+    'portal_bkp' => [
+        'token' => 'alencar@1234',
     ],
 
     /*
@@ -105,6 +111,15 @@ return [
     'web_server' => env('UNITEC_WEB_SERVER', 'frankenphp'),
     'frankenphp_threads' => max(2, (int) env('FRANKENPHP_NUM_THREADS', 8)),
     'erp_list_sync_poll_enabled' => filter_var(env('ERP_LIST_SYNC_POLL', true), FILTER_VALIDATE_BOOL),
+
+    /*
+    | Unitec OS — em local libera aparelho no register (sem F2 a cada flutter run).
+    | Produção: false (autorização manual em Terminais → Aparelhos).
+    */
+    'os_auto_approve_devices' => filter_var(
+        env('UNITEC_OS_AUTO_APPROVE', env('APP_ENV') === 'local' ? 'true' : 'false'),
+        FILTER_VALIDATE_BOOL
+    ),
 ];
 
 
