@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'forcavendas.pairing' => \App\Http\Middleware\EnsureForcaVendasPairing::class,
             'forcavendas.device' => \App\Http\Middleware\EnsureForcaVendasDeviceApproved::class,
             'vendasinternas.device' => \App\Http\Middleware\EnsureVendasInternasDeviceApproved::class,
+            'unitecos.device' => \App\Http\Middleware\EnsureUnitecOsDeviceApproved::class,
             'pdv.carga.token' => \App\Http\Middleware\EnsurePdvCargaToken::class,
             'pdv.terminal.ativo' => \App\Http\Middleware\EnsurePdvTerminalAtivo::class,
         ]);

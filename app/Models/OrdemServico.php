@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
-    'empresa_id', 'codigo_legado', 'numero', 'situacao',
+    'empresa_id', 'codigo_legado', 'app_local_uuid', 'device_uuid', 'numero', 'situacao',
     'data_inicio', 'hora_inicio', 'previsao_entrega',
     'data_termino', 'hora_termino', 'data_entrega', 'hora_entrega', 'data_emissao',
     'proxima_revisao', 'avisar_revisao',
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'problema', 'observacoes', 'laudo',
     'subtotal', 'subtotal_pecas', 'subtotal_servicos',
     'vl_desc_pecas', 'vl_desc_servicos', 'desc_perc_pecas', 'desc_perc_servicos',
-    'total_servicos', 'total_produtos', 'total_geral',
+    'total_servicos', 'total_produtos', 'total_geral', 'faturamento_pagamentos',
     'envio_whats_status', 'path_pdf_whats', 'numero_whatsapp',
 ])]
 class OrdemServico extends Model
@@ -75,6 +76,15 @@ class OrdemServico extends Model
         return substr((string) $this->hora_inicio, 0, 5);
     }
 
+    public function horaTerminoExibicao(): ?string
+    {
+        if ($this->hora_termino === null) {
+            return null;
+        }
+
+        return substr((string) $this->hora_termino, 0, 5);
+    }
+
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
@@ -83,6 +93,11 @@ class OrdemServico extends Model
     public function isEditable(): bool
     {
         return in_array($this->situacao, [self::SITUACAO_ABERTA, self::SITUACAO_ANDAMENTO], true);
+    }
+
+    public function aguardandoFaturamento(): bool
+    {
+        return $this->situacao === self::SITUACAO_ABERTA && $this->data_termino !== null;
     }
 
     public static function nextNumero(): string
@@ -125,6 +140,131 @@ class OrdemServico extends Model
         return $this->hasMany(OrdemServicoImagem::class, 'ordem_servico_id');
     }
 
+    public function nfse(): HasOne
+    {
+        return $this->hasOne(Nfse::class, 'ordem_servico_id')->latestOfMany();
+    }
+
+    public function nfseNumeroLista(): string
+    {
+        $nfse = $this->relationLoaded('nfse') ? $this->nfse : $this->nfse()->first();
+
+        if ($nfse === null) {
+            return '—';
+        }
+
+        $numero = trim((string) ($nfse->numero_nfse ?? ''));
+
+        if ($numero !== '') {
+            return $numero;
+        }
+
+        $dps = trim((string) ($nfse->numero_dps ?? ''));
+
+        return $dps !== '' ? $dps : '—';
+    }
+
+    /**
+     * Resumo dos meios de pagamento gravados no faturamento (lista).
+     */
+    public function meioPagamentoLista(): string
+    {
+        $raw = $this->faturamento_pagamentos;
+
+        if (! is_array($raw) || $raw === []) {
+            return '—';
+        }
+
+        $formas = [];
+
+        foreach ($raw as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $forma = mb_strtoupper(trim((string) ($item['forma'] ?? '')), 'UTF-8');
+
+            if ($forma === '' || in_array($forma, $formas, true)) {
+                continue;
+            }
+
+            $formas[] = $forma;
+        }
+
+        return $formas === [] ? '—' : implode(' + ', $formas);
+    }
+
+    public function enviouEmail(): bool
+    {
+        $status = mb_strtoupper(trim((string) ($this->envio_whats_status ?? '')), 'UTF-8');
+
+        return $status === 'E'
+            || $status === 'E/W'
+            || str_contains($status, 'EMAIL')
+            || str_contains($status, 'E-MAIL');
+    }
+
+    public function enviouWhatsApp(): bool
+    {
+        $status = mb_strtoupper(trim((string) ($this->envio_whats_status ?? '')), 'UTF-8');
+
+        if ($status === '' || $status === 'E') {
+            return false;
+        }
+
+        if ($status === 'W' || $status === 'E/W') {
+            return true;
+        }
+
+        // Legado / outros status preenchidos = WhatsApp (exceto só e-mail).
+        return ! str_contains($status, 'EMAIL') && ! str_contains($status, 'E-MAIL');
+    }
+
+    /**
+     * Resumo de envio para a grade: E | W | E/W | —.
+     */
+    public function envioListaLabel(): string
+    {
+        $email = $this->enviouEmail();
+        $whats = $this->enviouWhatsApp();
+
+        if ($email && $whats) {
+            return 'E/W';
+        }
+
+        if ($email) {
+            return 'E';
+        }
+
+        if ($whats) {
+            return 'W';
+        }
+
+        return '—';
+    }
+
+    public function registrarEnvioEmail(): void
+    {
+        $this->forceFill([
+            'envio_whats_status' => $this->enviouWhatsApp() ? 'E/W' : 'E',
+        ])->save();
+    }
+
+    public function registrarEnvioWhatsApp(?string $numero = null): void
+    {
+        $payload = [
+            'envio_whats_status' => $this->enviouEmail() ? 'E/W' : 'W',
+        ];
+
+        $fone = trim((string) $numero);
+
+        if ($fone !== '') {
+            $payload['numero_whatsapp'] = $fone;
+        }
+
+        $this->forceFill($payload)->save();
+    }
+
     /**
      * Mapeia situacao char(1) do Firebird para o web.
      */
@@ -164,6 +304,7 @@ class OrdemServico extends Model
             'total_servicos' => 'decimal:2',
             'total_produtos' => 'decimal:2',
             'total_geral' => 'decimal:2',
+            'faturamento_pagamentos' => 'array',
         ];
     }
 }

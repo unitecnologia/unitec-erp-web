@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'ordem_servico_id', 'codigo_legado', 'funcionario_id', 'product_id', 'usuario_id', 'empresa_id',
     'tipo', 'situacao', 'discriminacao',
     'data_inicio', 'hora_inicio', 'data_termino', 'hora_termino',
-    'qtd', 'preco', 'total',
+    'qtd', 'preco', 'desconto', 'acrescimo', 'total',
     'cor', 'tamanho', 'detalhe', 'nome', 'numero', 'grade_legado',
 ])]
 class OrdemServicoItem extends Model
@@ -39,6 +39,8 @@ class OrdemServicoItem extends Model
             'data_termino' => 'date',
             'qtd' => 'decimal:3',
             'preco' => 'decimal:4',
+            'desconto' => 'decimal:2',
+            'acrescimo' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }

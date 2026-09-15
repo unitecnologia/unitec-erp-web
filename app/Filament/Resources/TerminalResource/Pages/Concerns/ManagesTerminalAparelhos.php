@@ -4,6 +4,7 @@ namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
 use App\Models\ForcaVendasDevice;
 use App\Models\Terminal;
+use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
@@ -139,6 +140,10 @@ trait ManagesTerminalAparelhos
             $items = $items->merge($this->mapDevices('vi', 'Vendas Internas', VendasInternasDevice::query(), $empresaId));
         }
 
+        if (Schema::hasTable((new UnitecOsDevice)->getTable())) {
+            $items = $items->merge($this->mapDevices('os', 'Unitec OS', UnitecOsDevice::query(), $empresaId));
+        }
+
         return $items
             ->sortByDesc(fn (array $row): string => (string) ($row['registered_at_sort'] ?? ''))
             ->values()
@@ -211,9 +216,11 @@ trait ManagesTerminalAparelhos
             return;
         }
 
-        $device = $item['origem'] === 'vi'
-            ? VendasInternasDevice::query()->find($item['id'])
-            : ForcaVendasDevice::query()->find($item['id']);
+        $device = match ($item['origem'] ?? '') {
+            'vi' => VendasInternasDevice::query()->find($item['id']),
+            'os' => UnitecOsDevice::query()->find($item['id']),
+            default => ForcaVendasDevice::query()->find($item['id']),
+        };
 
         $uuid = trim((string) ($device?->device_uuid ?? ''));
         $empresaId = (int) ($device?->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);

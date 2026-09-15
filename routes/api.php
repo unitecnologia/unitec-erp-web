@@ -14,6 +14,15 @@ use App\Http\Controllers\Api\ForcaVendas\SyncController as FvSyncController;
 use App\Http\Controllers\Api\Pdv\CargaController as PdvCargaController;
 use App\Http\Controllers\Api\Pdv\PedidosImportaveisController as PdvPedidosImportaveisController;
 use App\Http\Controllers\Api\Pdv\RetornoController as PdvRetornoController;
+use App\Http\Controllers\Api\UnitecOs\AuthController as UnitecOsAuthController;
+use App\Http\Controllers\Api\UnitecOs\CepController as UnitecOsCepController;
+use App\Http\Controllers\Api\UnitecOs\ClienteController as UnitecOsClienteController;
+use App\Http\Controllers\Api\UnitecOs\DeviceController as UnitecOsDeviceController;
+use App\Http\Controllers\Api\UnitecOs\InfoController as UnitecOsInfoController;
+use App\Http\Controllers\Api\UnitecOs\OrdemServicoController as UnitecOsOrdemServicoController;
+use App\Http\Controllers\Api\UnitecOs\OrdemServicoMidiaController as UnitecOsOrdemServicoMidiaController;
+use App\Http\Controllers\Api\UnitecOs\ProdutoController as UnitecOsProdutoController;
+use App\Http\Controllers\Api\UnitecOs\SyncController as UnitecOsSyncController;
 use App\Http\Controllers\Api\VendasInternas\AuthController as ViAuthController;
 use App\Http\Controllers\Api\VendasInternas\DeviceController as ViDeviceController;
 use App\Http\Controllers\Api\VendasInternas\InfoController as ViInfoController;
@@ -138,6 +147,53 @@ Route::prefix('v1/vendas-internas')->group(function (): void {
             Route::post('auth/logout', [ViAuthController::class, 'logout']);
             Route::get('sync/pull', [ViSyncController::class, 'pull']);
             Route::post('sync/push', [ViSyncController::class, 'push']);
+        });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| API — Unitec OS (app de ordens de serviço)
+|--------------------------------------------------------------------------
+| Auth: Sanctum + senha_app_forca_vendas + aparelho aprovado (X-OS-Device).
+| Empresa obrigatória na sessão. Lista/detalhe: mesma empresa + técnico.
+| Aparelhos separados da Força de Vendas (unitec_os_devices).
+*/
+
+Route::prefix('v1/unitec-os')->group(function (): void {
+    Route::middleware('throttle:60,1')->group(function (): void {
+        Route::get('ping', [UnitecOsInfoController::class, 'ping']);
+        Route::post('devices/register', [UnitecOsDeviceController::class, 'register']);
+        Route::get('devices/status', [UnitecOsDeviceController::class, 'status']);
+    });
+
+    // Foto do produto (pública: Image.network não envia token).
+    Route::get('produtos/{product}/foto', ProductPhotoController::class)
+        ->name('unitecos.produto.foto');
+
+    Route::middleware('unitecos.device')->group(function (): void {
+        Route::get('info', [UnitecOsInfoController::class, 'index']);
+        Route::get('users', [UnitecOsInfoController::class, 'users']);
+        Route::post('auth/login', [UnitecOsAuthController::class, 'login']);
+
+        Route::middleware('auth:sanctum')->group(function (): void {
+            Route::get('auth/me', [UnitecOsAuthController::class, 'me']);
+            Route::post('auth/logout', [UnitecOsAuthController::class, 'logout']);
+            Route::get('clientes', [UnitecOsClienteController::class, 'index']);
+            Route::get('produtos', [UnitecOsProdutoController::class, 'index']);
+            Route::get('grupos', [UnitecOsProdutoController::class, 'grupos']);
+            Route::get('sync/pull', [UnitecOsSyncController::class, 'pull']);
+            Route::get('cnpj/{cnpj}', [CnpjController::class, 'show'])
+                ->where('cnpj', '\d{14}');
+            Route::get('cep/{cep}', [UnitecOsCepController::class, 'show'])
+                ->where('cep', '\d{8}');
+            Route::get('ordens', [UnitecOsOrdemServicoController::class, 'index']);
+            Route::post('ordens', [UnitecOsOrdemServicoController::class, 'store']);
+            Route::put('ordens/{id}', [UnitecOsOrdemServicoController::class, 'update'])->whereNumber('id');
+            Route::get('ordens/{id}', [UnitecOsOrdemServicoController::class, 'show'])->whereNumber('id');
+            Route::get('ordens/{id}/midias', [UnitecOsOrdemServicoMidiaController::class, 'index'])->whereNumber('id');
+            Route::post('ordens/{id}/fotos', [UnitecOsOrdemServicoMidiaController::class, 'storeFoto'])->whereNumber('id');
+            Route::post('ordens/{id}/assinatura', [UnitecOsOrdemServicoMidiaController::class, 'storeAssinatura'])->whereNumber('id');
         });
     });
 });
