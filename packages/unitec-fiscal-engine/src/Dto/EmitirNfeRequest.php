@@ -35,5 +35,8 @@ final class EmitirNfeRequest
         public readonly array $pagamentos = [],
         public readonly bool $homologacao = false,
         public readonly ?RespTecnicoDto $respTecnico = null,
+        public readonly ?NfeTransporteDto $transporte = null,
+        /** @var list<string> Chaves NF-e referenciadas (44 dígitos) — obrigatório quando finNFe = 4. */
+        public readonly array $chavesReferenciadas = [],
     ) {}
 }

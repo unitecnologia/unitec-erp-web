@@ -20,5 +20,9 @@ final class ItemDto
         public readonly float $seguro = 0.0,
         public readonly float $acrescimo = 0.0,
         public readonly ?string $infoAdicionais = null,
+        /** Chave do DF-e referenciado (grupo DFeReferenciado) — exigido em devolução (finNFe=4). */
+        public readonly ?string $chaveDfeReferenciado = null,
+        /** nItem do documento original referenciado (opcional, recomendado em devolução). */
+        public readonly ?int $nItemDfeReferenciado = null,
     ) {}
 }

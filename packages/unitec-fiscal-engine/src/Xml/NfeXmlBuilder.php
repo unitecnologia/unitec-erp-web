@@ -74,13 +74,21 @@ final class NfeXmlBuilder
 
         foreach ($request->itens as $item) {
             $totaisImposto = NfeImpostoXmlBuilder::somarTotais($item->imposto, $totaisImposto);
-            $this->appendItem($infNFe, $item, $request->homologacao && $item->numero === 1);
+            $this->appendItem(
+                $infNFe,
+                $this->withDfeReferenciadoDevolucao($item, $request),
+                $request->homologacao && $item->numero === 1,
+            );
         }
 
         $this->appendTotais($infNFe, $request, $totaisImposto);
         $this->appendTransporte($infNFe, $request);
         $this->appendCobranca($infNFe, $request);
-        $this->appendPagamentos($infNFe, $request->pagamentos);
+        // Devolução (finNFe=4): SEFAZ exige tPag=90 (Sem Pagamento).
+        $pagamentos = $request->finNFe === 4
+            ? [new PagamentoDto('90', 0.0)]
+            : $request->pagamentos;
+        $this->appendPagamentos($infNFe, $pagamentos);
         $this->appendInformacoes($infNFe, $request->informacoesComplementares, $request->informacoesFisco);
         $this->appendRespTecnico($infNFe, $request->respTecnico, $chave);
 
@@ -313,6 +321,65 @@ final class NfeXmlBuilder
         NfeImpostoXmlBuilder::appendCofins($imposto, $item->imposto);
 
         IbscbsXmlBuilder::appendItem($imposto, $item->imposto);
+
+        $this->appendDfeReferenciado($det, $item);
+    }
+
+    /**
+     * Em devolução (finNFe=4) a SVRS/SEFAZ valida VC02-14 pelo grupo DFeReferenciado
+     * no item; só NFref no ide gera cStat 321 mesmo com a chave na aba Referência.
+     */
+    private function withDfeReferenciadoDevolucao(ItemDto $item, EmitirNfeRequest $request): ItemDto
+    {
+        if ($item->chaveDfeReferenciado !== null && $item->chaveDfeReferenciado !== '') {
+            return $item;
+        }
+
+        if ($request->finNFe !== 4 || $request->chavesReferenciadas === []) {
+            return $item;
+        }
+
+        $chave = NumberFormatter::onlyDigits((string) $request->chavesReferenciadas[0]);
+        if (strlen($chave) !== 44) {
+            return $item;
+        }
+
+        return new ItemDto(
+            numero: $item->numero,
+            codigo: $item->codigo,
+            descricao: $item->descricao,
+            ncm: $item->ncm,
+            cfop: $item->cfop,
+            unidade: $item->unidade,
+            quantidade: $item->quantidade,
+            valorUnitario: $item->valorUnitario,
+            valorTotal: $item->valorTotal,
+            imposto: $item->imposto,
+            desconto: $item->desconto,
+            frete: $item->frete,
+            seguro: $item->seguro,
+            acrescimo: $item->acrescimo,
+            infoAdicionais: $item->infoAdicionais,
+            chaveDfeReferenciado: $chave,
+            nItemDfeReferenciado: $item->nItemDfeReferenciado ?? $item->numero,
+        );
+    }
+
+    private function appendDfeReferenciado(DOMElement $det, ItemDto $item): void
+    {
+        $chave = NumberFormatter::onlyDigits((string) ($item->chaveDfeReferenciado ?? ''));
+        if (strlen($chave) !== 44) {
+            return;
+        }
+
+        $dfe = $det->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'DFeReferenciado');
+        $det->appendChild($dfe);
+        XmlHelper::append($dfe, 'chaveAcesso', $chave);
+
+        $nItem = $item->nItemDfeReferenciado ?? $item->numero;
+        if ($nItem >= 1 && $nItem <= 990) {
+            XmlHelper::append($dfe, 'nItem', (string) $nItem);
+        }
     }
 
     /**
@@ -508,13 +575,14 @@ final class NfeXmlBuilder
         $infNFe->appendChild($pag);
 
         foreach ($pagamentos as $pagamento) {
-            if ($pagamento->valor <= 0) {
+            $tPag = str_pad($pagamento->tipo, 2, '0', STR_PAD_LEFT);
+            // tPag=90 (Sem Pagamento) exige vPag=0; demais meios ignoram valor zerado.
+            if ($pagamento->valor <= 0 && $tPag !== '90') {
                 continue;
             }
 
             $detPag = $pag->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'detPag');
             $pag->appendChild($detPag);
-            $tPag = str_pad($pagamento->tipo, 2, '0', STR_PAD_LEFT);
             XmlHelper::append($detPag, 'tPag', $tPag);
 
             if ($tPag === '99' || filled($pagamento->descricao)) {
@@ -522,7 +590,7 @@ final class NfeXmlBuilder
                 XmlHelper::append($detPag, 'xPag', XmlHelper::sanitizeText($xPag, 60));
             }
 
-            XmlHelper::append($detPag, 'vPag', NumberFormatter::decimal($pagamento->valor));
+            XmlHelper::append($detPag, 'vPag', NumberFormatter::decimal($tPag === '90' ? 0.0 : $pagamento->valor));
 
             if ($pagamento->isCartao()) {
                 $card = $detPag->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'card');

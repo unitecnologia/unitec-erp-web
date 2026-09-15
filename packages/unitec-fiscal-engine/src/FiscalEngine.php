@@ -109,6 +109,34 @@ final class FiscalEngine
         return $this->nfeEmitter->emitir($request);
     }
 
+    /**
+     * @return array{nfeXml: string, chave: string, enviNfe: string}
+     */
+    public function prepararNfeAssinada(EmitirNfeRequest $request): array
+    {
+        return $this->nfeEmitter->prepararAssinada($request);
+    }
+
+    public function autorizarNfeAssinada(
+        string $nfeXml,
+        \Unitec\FiscalEngine\Certificate\Certificate $certificate,
+        int $tpAmb,
+        string $chave,
+        int $numero,
+        int $serie,
+        int $cNf,
+    ): EmitirNfeResponse {
+        return $this->nfeEmitter->autorizarNfeAssinada(
+            $nfeXml,
+            $certificate,
+            $tpAmb,
+            $chave,
+            $numero,
+            $serie,
+            $cNf,
+        );
+    }
+
     public function cancelarNfe(CancelarNfceRequest $request): CancelarNfceResponse
     {
         return $this->nfeCanceller->cancelar($request);
