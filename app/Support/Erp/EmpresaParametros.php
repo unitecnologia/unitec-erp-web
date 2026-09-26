@@ -185,6 +185,12 @@ final class EmpresaParametros
                 'hint' => 'Marcado: ao transmitir NF-e de saída, baixa o estoque dos produtos. Desmarcado: não movimenta estoque.',
                 'default' => true,
             ],
+
+            'param_forca_vendas_ver_todos_clientes' => [
+                'label' => 'Permitir visualizar todos os clientes',
+                'hint' => 'Marcado: no Força de Vendas cada vendedor sincroniza todos os clientes e pode vender para qualquer um. Desmarcado: só a carteira (Vendedor Força de Vendas na Pessoa).',
+                'default' => false,
+            ],
         ];
     }
 
@@ -1210,6 +1216,7 @@ final class EmpresaParametros
             'pdv' => 'Ajustes no PDV',
             'geral' => 'Ajustes Gerais',
             'fiscal' => 'Ajustes Fiscais',
+            'forca_vendas' => 'Força de Vendas',
         ];
     }
 
@@ -1224,6 +1231,10 @@ final class EmpresaParametros
 
         if (str_starts_with($field, 'param_geral_')) {
             return 'geral';
+        }
+
+        if (str_starts_with($field, 'param_forca_vendas_')) {
+            return 'forca_vendas';
         }
 
         return 'fiscal';
