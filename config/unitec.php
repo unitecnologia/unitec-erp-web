@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.189',
+    'versao' => '6.4.1.212',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -118,6 +118,15 @@ return [
     */
     'os_auto_approve_devices' => filter_var(
         env('UNITEC_OS_AUTO_APPROVE', env('APP_ENV') === 'local' ? 'true' : 'false'),
+        FILTER_VALIDATE_BOOL
+    ),
+
+    /*
+    | Unitec Entregas — em local libera aparelho no register.
+    | Produção: false (autorização manual em Terminais → Aparelhos).
+    */
+    'entregas_auto_approve_devices' => filter_var(
+        env('UNITEC_ENTREGAS_AUTO_APPROVE', env('APP_ENV') === 'local' ? 'true' : 'false'),
         FILTER_VALIDATE_BOOL
     ),
 ];
