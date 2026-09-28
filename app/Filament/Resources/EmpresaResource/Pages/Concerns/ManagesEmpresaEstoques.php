@@ -69,18 +69,47 @@ trait ManagesEmpresaEstoques
             return [];
         }
 
-        return Vendedor::query()
+        $empresaId = (int) $empresa->id;
+        $atualId = (int) ($this->empresaEstoqueForm['vendedor_id'] ?? 0);
+
+        // Depósito amarra operador comercial: ativo + efetua_venda + RH + empresa.
+        $query = Vendedor::query()
             ->where('ativo', true)
-            ->where(function ($query) use ($empresa): void {
-                $query->where('empresa_id', $empresa->id)
-                    ->orWhereHas('empresas', fn ($q) => $q->where('empresas.id', $empresa->id));
-            })
-            ->orderBy('nome')
+            ->where('efetua_venda', true)
+            ->whereHas('rhFuncionario')
+            ->with('rhFuncionario')
+            ->where(function ($query) use ($empresaId): void {
+                $query->where('empresa_id', $empresaId)
+                    ->orWhereHas('empresas', fn ($q) => $q->where('empresas.id', $empresaId));
+            });
+
+        $opcoes = $query
             ->get(['id', 'codigo', 'nome'])
-            ->mapWithKeys(fn (Vendedor $vendedor): array => [
-                $vendedor->id => trim(($vendedor->codigo ? $vendedor->codigo.' — ' : '').$vendedor->nome),
+            ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
+            ->mapWithKeys(fn (Vendedor $v): array => [
+                $v->id => $this->formatEmpresaEstoqueVendedorLabel($v),
             ])
             ->all();
+
+        // Estoque antigo com vendedor legado: só exibe o atual, sem liberar órfãos na lista.
+        if ($atualId > 0 && ! array_key_exists($atualId, $opcoes)) {
+            $atual = Vendedor::query()->with('rhFuncionario')->find($atualId);
+
+            if ($atual) {
+                $opcoes = [$atualId => $this->formatEmpresaEstoqueVendedorLabel($atual)] + $opcoes;
+            }
+        }
+
+        return $opcoes;
+    }
+
+    private function formatEmpresaEstoqueVendedorLabel(Vendedor $vendedor): string
+    {
+        $rh = $vendedor->rhFuncionario;
+        $codigo = trim((string) ($rh?->codigo ?? $vendedor->codigo ?? ''));
+        $nome = trim((string) ($rh?->nome ?? $vendedor->nome ?? ''));
+
+        return trim(($codigo !== '' ? $codigo.' — ' : '').$nome);
     }
 
     public function selectEmpresaEstoque(int $id): void
@@ -198,7 +227,7 @@ trait ManagesEmpresaEstoques
             'empresaEstoqueForm.vendedor_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('vendedores', 'id'),
+                Rule::in(array_map('strval', array_keys($this->empresaEstoqueVendedorOptions()))),
             ],
             'empresaEstoqueForm.ativo' => ['boolean'],
         ], [], [

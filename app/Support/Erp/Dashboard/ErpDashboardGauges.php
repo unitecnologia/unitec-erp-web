@@ -120,7 +120,9 @@ final class ErpDashboardGauges
 
             $query = Vendedor::query()
                 ->where('ativo', true)
+                ->where('efetua_venda', true)
                 ->where('mobile_meta_venda', '>', 0)
+                ->whereHas('rhFuncionario')
                 ->orderBy('nome');
 
             if (is_array($scope)) {

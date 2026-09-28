@@ -68,12 +68,7 @@
 
             <label class="erp-devvenda-field">
                 <span>Vendedor</span>
-                <select wire:model="vendedorId" class="erp-devvenda-input">
-                    <option value="">—</option>
-                    @foreach ($this->vendedorOptions() as $opt)
-                        <option value="{{ $opt['id'] }}">{{ $opt['nome'] }}</option>
-                    @endforeach
-                </select>
+                <input type="text" readonly wire:model="vendedorNome" class="erp-devvenda-input erp-devvenda-input--readonly" placeholder="—">
             </label>
 
             <label class="erp-devvenda-field">

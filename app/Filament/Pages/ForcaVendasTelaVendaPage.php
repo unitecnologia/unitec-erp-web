@@ -1631,7 +1631,7 @@ class ForcaVendasTelaVendaPage extends Page
         $vendedor = $order->vendedor;
 
         if ($vendedor) {
-            $this->aplicarVendedor($vendedor);
+            $this->aplicarVendedor($vendedor, permitirHistorico: true);
         } elseif ($order->vendedor_id) {
             $faltando[] = 'Vendedor';
         } else {
@@ -1909,15 +1909,37 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function carregarOpcoesOperacao(): void
     {
-        $this->vendedorOpcoes = Vendedor::query()
+        $empresaId = ErpContext::currentEmpresaId();
+
+        // Só operadores com RH (evita órfãos legados em vendedores). Value = vendedores.id.
+        $vendedoresQuery = Vendedor::query()
             ->where('ativo', true)
-            ->orderByRaw('CAST(codigo AS UNSIGNED)')
-            ->orderBy('nome')
+            ->where('efetua_venda', true)
+            ->whereHas('rhFuncionario')
+            ->with('rhFuncionario');
+
+        // Escopo da empresa atual via pivot empresa_vendedor.
+        if ($empresaId) {
+            $vendedoresQuery->whereHas(
+                'empresas',
+                fn ($q) => $q->where('empresas.id', (int) $empresaId)
+            );
+        }
+
+        $this->vendedorOpcoes = $vendedoresQuery
             ->get(['id', 'codigo', 'nome'])
-            ->map(fn (Vendedor $v): array => [
-                'id' => (int) $v->id,
-                'label' => trim(($v->codigo ? $v->codigo.' - ' : '').($v->nome ?? '')),
-            ])
+            ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
+            ->values()
+            ->map(function (Vendedor $v): array {
+                $rh = $v->rhFuncionario;
+                $codigo = trim((string) ($rh?->codigo ?? ''));
+                $nome = trim((string) ($rh?->nome ?? $v->nome ?? ''));
+
+                return [
+                    'id' => (int) $v->id,
+                    'label' => trim(($codigo !== '' ? $codigo.' - ' : '').$nome),
+                ];
+            })
             ->all();
 
         $this->caixaOpcoes = CaixaConta::query()
@@ -2346,7 +2368,7 @@ class ForcaVendasTelaVendaPage extends Page
             ? $user->vendedor
             : $user->vendedor()->first();
 
-        if ($vendedor && $vendedor->ativo) {
+        if ($vendedor && $this->vendedorOperacionalValido($vendedor)) {
             $this->aplicarVendedor($vendedor);
 
             return;
@@ -2356,55 +2378,80 @@ class ForcaVendasTelaVendaPage extends Page
         $sessionVendedorId = (int) (session('erp.pdv.vendedor_id') ?? 0);
 
         if ($sessionVendedorId > 0) {
-            $vendedor = Vendedor::query()->where('ativo', true)->find($sessionVendedorId);
-
-            if ($vendedor) {
-                $this->aplicarVendedor($vendedor);
-
-                return;
-            }
-        }
-
-        // 3º: casa pelo nome do usuário logado.
-        $userName = trim((string) ($user->name ?? ''));
-
-        if ($userName !== '') {
             $vendedor = Vendedor::query()
+                ->with('rhFuncionario')
                 ->where('ativo', true)
-                ->whereRaw('UPPER(TRIM(nome)) = ?', [mb_strtoupper($userName)])
-                ->first();
+                ->find($sessionVendedorId);
 
-            if ($vendedor) {
+            if ($vendedor && $this->vendedorOperacionalValido($vendedor)) {
                 $this->aplicarVendedor($vendedor);
 
                 return;
             }
         }
 
-        // Sem vínculo: não chuta outro vendedor.
+        // Sem vínculo válido (ativo + efetua_venda + RH + empresa): não chuta legado/órfão.
         $this->vendedorId = null;
-        $this->vendedorLabel = $userName;
+        $this->vendedorLabel = trim((string) ($user->name ?? ''));
         $this->estoqueId = null;
         $this->estoqueLabel = '';
         $this->caixaId = null;
         $this->caixaLabel = '';
     }
 
-    private function aplicarVendedor(Vendedor $vendedor): void
+    /**
+     * Operador válido para NOVA venda (combo / padrão).
+     */
+    private function vendedorOperacionalValido(Vendedor $vendedor): bool
     {
+        if (! $vendedor->ativo || ! $vendedor->efetua_venda) {
+            return false;
+        }
+
+        $vendedor->loadMissing('rhFuncionario');
+
+        if (! $vendedor->rhFuncionario) {
+            return false;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if (! $empresaId) {
+            return true;
+        }
+
+        if ((int) ($vendedor->empresa_id ?? 0) === (int) $empresaId) {
+            return true;
+        }
+
+        return $vendedor->empresas()->where('empresas.id', (int) $empresaId)->exists();
+    }
+
+    private function aplicarVendedor(Vendedor $vendedor, bool $permitirHistorico = false): void
+    {
+        $vendedor->loadMissing('rhFuncionario');
+        $rh = $vendedor->rhFuncionario;
+        $codigo = trim((string) ($rh?->codigo ?? $vendedor->codigo ?? ''));
+        $nome = trim((string) ($rh?->nome ?? $vendedor->nome ?? ''));
+
         $this->vendedorId = (int) $vendedor->id;
-        $this->vendedorLabel = trim(($vendedor->codigo ? $vendedor->codigo.' - ' : '').($vendedor->nome ?? ''));
+        $this->vendedorLabel = trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
 
-        // Garante que o vendedor logado aparece no select mesmo se a lista foi filtrada.
-        $existe = collect($this->vendedorOpcoes)->contains(
-            fn (array $op): bool => (int) ($op['id'] ?? 0) === $this->vendedorId
-        );
+        $valido = $this->vendedorOperacionalValido($vendedor);
+        $podeInserirNaLista = $valido || $permitirHistorico;
 
-        if (! $existe) {
-            array_unshift($this->vendedorOpcoes, [
-                'id' => $this->vendedorId,
-                'label' => $this->vendedorLabel !== '' ? $this->vendedorLabel : (string) $vendedor->nome,
-            ]);
+        // Não reinserir órfão em operação nova; histórico (pedido em edição) pode aparecer.
+        if ($podeInserirNaLista) {
+            $existe = collect($this->vendedorOpcoes)->contains(
+                fn (array $op): bool => (int) ($op['id'] ?? 0) === $this->vendedorId
+            );
+
+            if (! $existe) {
+                array_unshift($this->vendedorOpcoes, [
+                    'id' => $this->vendedorId,
+                    'label' => $this->vendedorLabel !== '' ? $this->vendedorLabel : (string) $vendedor->nome,
+                ]);
+            }
         }
 
         $this->carregarEstoqueDoVendedor($vendedor);

@@ -24,6 +24,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Support\Erp\ErpContext;
 
 trait ErpOrdemServicoFormPage
 {
@@ -239,17 +240,64 @@ trait ErpOrdemServicoFormPage
     /**
      * @return array<int, array{id: int, nome: string}>
      */
+    /**
+     * Técnicos para NOVAS seleções: ativos, setor_servicos, com RH e empresa atual.
+     * Value = vendedores.id (atendente_id / funcionario_id). Label = código/nome do RH.
+     * Se a OS já tiver atendente legado (órfão/inativo/fora do setor), inclui só esse id
+     * para não sumir o histórico — sem liberá-lo como opção genérica em OS nova.
+     *
+     * @return list<array{id: int, nome: string}>
+     */
     public function atendenteOptions(): array
     {
-        return Vendedor::query()
+        $empresaId = ErpContext::currentEmpresaId();
+        $atualId = (int) ($this->atendenteId ?? 0);
+
+        $query = Vendedor::query()
             ->where('ativo', true)
-            ->orderBy('nome')
-            ->get(['id', 'nome'])
-            ->map(fn (Vendedor $vendedor): array => [
-                'id' => $vendedor->id,
-                'nome' => mb_strtoupper((string) $vendedor->nome, 'UTF-8'),
-            ])
+            ->where('setor_servicos', true)
+            ->whereHas('rhFuncionario')
+            ->with('rhFuncionario');
+
+        if ($empresaId) {
+            $query->whereHas(
+                'empresas',
+                fn ($q) => $q->where('empresas.id', (int) $empresaId)
+            );
+        }
+
+        $opcoes = $query
+            ->get(['id', 'codigo', 'nome'])
+            ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
+            ->values()
+            ->map(fn (Vendedor $v): array => $this->mapAtendenteOption($v))
             ->all();
+
+        if ($atualId > 0 && ! collect($opcoes)->contains(fn (array $op): bool => (int) $op['id'] === $atualId)) {
+            $atual = Vendedor::query()->with('rhFuncionario')->find($atualId);
+
+            if ($atual) {
+                array_unshift($opcoes, $this->mapAtendenteOption($atual));
+            }
+        }
+
+        return $opcoes;
+    }
+
+    /**
+     * @return array{id: int, nome: string}
+     */
+    private function mapAtendenteOption(Vendedor $vendedor): array
+    {
+        $rh = $vendedor->rhFuncionario;
+        $codigo = trim((string) ($rh?->codigo ?? $vendedor->codigo ?? ''));
+        $nome = trim((string) ($rh?->nome ?? $vendedor->nome ?? ''));
+        $label = trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
+
+        return [
+            'id' => (int) $vendedor->id,
+            'nome' => mb_strtoupper($label !== '' ? $label : (string) ($vendedor->nome ?? ''), 'UTF-8'),
+        ];
     }
 
     public function getProductOverlayUrlProperty(): string

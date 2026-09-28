@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\ProductGrade;
 use App\Models\Vendedor;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
@@ -238,19 +239,62 @@ trait ErpOrcamentoFormPage
     }
 
     /**
-     * @return array<int, array{id: int, nome: string}>
+     * Vendedores para NOVAS seleções: ativos, efetua_venda, com RH e empresa atual.
+     * Value = vendedores.id (orcamentos.vendedor_id). Label = código/nome do RH.
+     * Orçamento antigo com vendedor legado: inclui só esse id nas opções desta tela.
+     *
+     * @return list<array{id: int, nome: string}>
      */
     public function vendedorOptions(): array
     {
-        return Vendedor::query()
+        $empresaId = ErpContext::currentEmpresaId();
+        $atualId = (int) ($this->vendedorId ?? 0);
+
+        $query = Vendedor::query()
             ->where('ativo', true)
-            ->orderBy('nome')
-            ->get(['id', 'nome'])
-            ->map(fn (Vendedor $vendedor): array => [
-                'id' => $vendedor->id,
-                'nome' => mb_strtoupper((string) $vendedor->nome, 'UTF-8'),
-            ])
+            ->where('efetua_venda', true)
+            ->whereHas('rhFuncionario')
+            ->with('rhFuncionario');
+
+        if ($empresaId) {
+            $query->whereHas(
+                'empresas',
+                fn ($q) => $q->where('empresas.id', (int) $empresaId)
+            );
+        }
+
+        $opcoes = $query
+            ->get(['id', 'codigo', 'nome'])
+            ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
+            ->values()
+            ->map(fn (Vendedor $v): array => $this->mapVendedorOption($v))
             ->all();
+
+        if ($atualId > 0 && ! collect($opcoes)->contains(fn (array $op): bool => (int) $op['id'] === $atualId)) {
+            $atual = Vendedor::query()->with('rhFuncionario')->find($atualId);
+
+            if ($atual) {
+                array_unshift($opcoes, $this->mapVendedorOption($atual));
+            }
+        }
+
+        return $opcoes;
+    }
+
+    /**
+     * @return array{id: int, nome: string}
+     */
+    private function mapVendedorOption(Vendedor $vendedor): array
+    {
+        $rh = $vendedor->rhFuncionario;
+        $codigo = trim((string) ($rh?->codigo ?? $vendedor->codigo ?? ''));
+        $nome = trim((string) ($rh?->nome ?? $vendedor->nome ?? ''));
+        $label = trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
+
+        return [
+            'id' => (int) $vendedor->id,
+            'nome' => mb_strtoupper($label !== '' ? $label : (string) ($vendedor->nome ?? ''), 'UTF-8'),
+        ];
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Empresa;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Reports\ComissaoVendedoresReport;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -61,7 +62,7 @@ class ComissaoVendedoresReportController extends Controller
                 'vendedor' => $vendedorFiltro,
             ],
             'filterOptions' => [
-                'vendedor' => ['todos' => '<todos>'] + Vendedor::query()->orderBy('nome')->pluck('nome', 'id')->all(),
+                'vendedor' => ['todos' => '<todos>'] + $this->vendedorOptions(),
             ],
             'reportUrl' => route('erp.reports.comissao-vendedores'),
             'closeUrl' => url('/admin'),
@@ -79,6 +80,42 @@ class ComissaoVendedoresReportController extends Controller
         }
 
         return view('reports.comissao-vendedores', $data);
+    }
+
+    /**
+     * Mesma regra da tela de Comissões: operadores atuais válidos.
+     *
+     * @return array<string, string>
+     */
+    private function vendedorOptions(): array
+    {
+        $empresaId = ErpContext::currentEmpresaId();
+
+        $query = Vendedor::query()
+            ->where('ativo', true)
+            ->where('efetua_venda', true)
+            ->whereHas('rhFuncionario')
+            ->with('rhFuncionario');
+
+        if ($empresaId) {
+            $query->whereHas(
+                'empresas',
+                fn ($q) => $q->where('empresas.id', (int) $empresaId)
+            );
+        }
+
+        return $query
+            ->get(['id', 'codigo', 'nome'])
+            ->sortBy(fn (Vendedor $v): int => (int) preg_replace('/\D/', '', (string) ($v->rhFuncionario?->codigo ?? '0')))
+            ->mapWithKeys(function (Vendedor $v): array {
+                $rh = $v->rhFuncionario;
+                $codigo = trim((string) ($rh?->codigo ?? $v->codigo ?? ''));
+                $nome = trim((string) ($rh?->nome ?? $v->nome ?? ''));
+                $label = trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
+
+                return [(string) $v->id => $label !== '' ? $label : (string) ($v->nome ?? '')];
+            })
+            ->all();
     }
 
     /**

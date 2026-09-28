@@ -26,7 +26,7 @@ class VendasInternasSyncService
     /**
      * @return array<string, mixed>
      */
-    public function buildPull(?Carbon $since, ?int $vendedorId = null): array
+    public function buildPull(?Carbon $since, ?int $vendedorId = null, ?int $empresaId = null): array
     {
         return [
             'server_time' => now()->toIso8601String(),
@@ -35,21 +35,24 @@ class VendasInternasSyncService
             'price_tables' => $this->priceTables($since),
             'price_table_items' => $this->priceTableItems($since),
             'customers' => $this->customers($since),
-            'vendedores' => $this->vendedores(),
+            'vendedores' => $this->vendedores($vendedorId, $empresaId),
             'pedidos' => $this->pedidos($since, $vendedorId),
         ];
     }
 
-    public function pullSignature(?int $vendedorId = null): string
+    public function pullSignature(?int $vendedorId = null, ?int $empresaId = null): string
     {
-        $parts = ['vendedor:'.($vendedorId ?? 0)];
+        $parts = [
+            'vendedor:'.($vendedorId ?? 0),
+            'empresa:'.($empresaId ?? 0),
+        ];
 
         foreach ([
             'products' => Product::query(),
             'price_tables' => PriceTable::query(),
             'price_table_items' => ProductPriceTableItem::query(),
             'people' => Person::query()->where('is_cliente', true),
-            'vendedores' => Vendedor::query(),
+            'vendedores' => $this->vendedoresCatalogoQuery($empresaId, $vendedorId),
             'vendas_internas_orders' => VendasInternasOrder::query(),
         ] as $label => $query) {
             $table = $query->getModel()->getTable();
@@ -254,11 +257,16 @@ class VendasInternasSyncService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function vendedores(): array
+    /**
+     * Catálogo de operadores para o app Vendas Internas (mesmo critério do FV).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function vendedores(?int $vendedorId = null, ?int $empresaId = null): array
     {
-        return Vendedor::query()
+        return $this->vendedoresCatalogoQuery($empresaId, $vendedorId)
             ->orderBy('nome')
-            ->get()
+            ->get(['id', 'codigo', 'nome', 'ativo'])
             ->map(fn (Vendedor $v): array => [
                 'id' => $v->id,
                 'codigo' => $v->codigo,
@@ -266,6 +274,33 @@ class VendasInternasSyncService
                 'ativo' => (bool) $v->ativo,
             ])
             ->all();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Vendedor>
+     */
+    private function vendedoresCatalogoQuery(?int $empresaId = null, ?int $vendedorId = null)
+    {
+        $authVendedorId = $vendedorId && $vendedorId > 0 ? (int) $vendedorId : null;
+
+        return Vendedor::query()->where(function ($query) use ($empresaId, $authVendedorId): void {
+            $query->where(function ($base) use ($empresaId): void {
+                $base->where('ativo', true)
+                    ->where('efetua_venda', true)
+                    ->whereHas('rhFuncionario');
+
+                if ($empresaId) {
+                    $base->whereHas(
+                        'empresas',
+                        fn ($q) => $q->where('empresas.id', (int) $empresaId)
+                    );
+                }
+            });
+
+            if ($authVendedorId !== null) {
+                $query->orWhere('id', $authVendedorId);
+            }
+        });
     }
 
     /**

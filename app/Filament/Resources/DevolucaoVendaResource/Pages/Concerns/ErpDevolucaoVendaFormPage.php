@@ -57,6 +57,8 @@ trait ErpDevolucaoVendaFormPage
 
     public ?int $vendedorId = null;
 
+    public string $vendedorNome = '';
+
     /** @var array<int, array<string, mixed>> */
     public array $itens = [];
 
@@ -131,6 +133,7 @@ trait ErpDevolucaoVendaFormPage
         $this->clienteId = null;
         $this->clienteNome = '';
         $this->vendedorId = null;
+        $this->vendedorNome = '';
         $this->itens = [];
         $this->selectedItemIndex = null;
         $this->closeVendaLookup();
@@ -154,6 +157,7 @@ trait ErpDevolucaoVendaFormPage
         $this->clienteId = $record->cliente_id;
         $this->clienteNome = $record->clienteNome();
         $this->vendedorId = $record->vendedor_id;
+        $this->vendedorNome = $this->formatVendedorNome($record->vendedor);
 
         $this->itens = $record->itens
             ->sortBy('item')
@@ -179,17 +183,20 @@ trait ErpDevolucaoVendaFormPage
     /**
      * @return array<int, array{id: int, nome: string}>
      */
-    public function vendedorOptions(): array
+    /**
+     * Vendedor da devolução é herdado da venda — não há seleção livre.
+     * Mantém só o rótulo do vendedor atual (inclui legado) para exibição.
+     */
+    protected function formatVendedorNome(?Vendedor $vendedor): string
     {
-        return Vendedor::query()
-            ->orderBy('nome')
-            ->limit(300)
-            ->get(['id', 'nome'])
-            ->map(fn (Vendedor $v): array => [
-                'id' => (int) $v->id,
-                'nome' => (string) $v->nome,
-            ])
-            ->all();
+        if (! $vendedor) {
+            return '';
+        }
+
+        $codigo = trim((string) ($vendedor->codigo ?? ''));
+        $nome = trim((string) ($vendedor->nome ?? ''));
+
+        return trim(($codigo !== '' ? $codigo.' - ' : '').$nome);
     }
 
     public function updatedVendaSearch(): void
@@ -317,6 +324,7 @@ trait ErpDevolucaoVendaFormPage
         $this->clienteId = $venda->cliente_id;
         $this->clienteNome = (string) ($venda->cliente?->nome_razao ?? '');
         $this->vendedorId = $venda->vendedor_id;
+        $this->vendedorNome = $this->formatVendedorNome($venda->vendedor);
 
         $this->itens = $venda->itens->values()->map(function ($item, int $index) use ($jaDevolvido): ?array {
             $qtdVendida = (float) $item->quantidade;
@@ -355,6 +363,7 @@ trait ErpDevolucaoVendaFormPage
             $this->clienteId = null;
             $this->clienteNome = '';
             $this->vendedorId = null;
+            $this->vendedorNome = '';
 
             return;
         }

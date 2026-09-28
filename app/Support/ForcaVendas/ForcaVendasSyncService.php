@@ -63,7 +63,7 @@ class ForcaVendasSyncService
             'price_table_items' => $this->priceTableItems($since),
             'customers' => $this->customers($since, $vendedorId),
             'visita_dias' => $this->visitaDias($vendedorId),
-            'vendedores' => $this->vendedores(),
+            'vendedores' => $this->vendedores($empresaId, $vendedorId),
             'formas_pagamento' => $this->formasPagamento(),
             'transportadoras' => $this->transportadoras(),
             'grupos' => $this->grupos(),
@@ -91,7 +91,7 @@ class ForcaVendasSyncService
             'price_table_items' => ProductPriceTableItem::query(),
             'people' => $this->peopleSignatureQuery($vendedorId),
             'person_visita_dias' => $this->visitaDiasSignatureQuery($vendedorId),
-            'vendedores' => Vendedor::query(),
+            'vendedores' => $this->vendedoresCatalogoQuery($empresaId, $vendedorId),
             'formas_pagamento' => FormaPagamento::query()->where('disponivel_mobile', true),
             'transportadoras' => Schema::hasTable('transportadoras')
                 ? Transportadora::query()->where('ativo', true)
@@ -448,9 +448,14 @@ class ForcaVendasSyncService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function vendedores(): array
+    /**
+     * Não envia a tabela inteira: só operadores atuais (ativo + efetua_venda + RH + empresa).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function vendedores(?int $empresaId = null, ?int $vendedorId = null): array
     {
-        return Vendedor::query()
+        return $this->vendedoresCatalogoQuery($empresaId, $vendedorId)
             ->with('tabelaVenda:id,codigo,descricao')
             ->orderBy('nome')
             ->get()
@@ -464,6 +469,36 @@ class ForcaVendasSyncService
                 'tabela_venda_descricao' => $v->tabelaVenda?->descricao,
             ])
             ->all();
+    }
+
+    /**
+     * Mesmo escopo do catálogo pull - usado no ETag/signature.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Vendedor>
+     */
+    private function vendedoresCatalogoQuery(?int $empresaId = null, ?int $vendedorId = null)
+    {
+        $authVendedorId = $vendedorId && $vendedorId > 0 ? (int) $vendedorId : null;
+
+        return Vendedor::query()->where(function ($query) use ($empresaId, $authVendedorId): void {
+            $query->where(function ($base) use ($empresaId): void {
+                $base->where('ativo', true)
+                    ->where('efetua_venda', true)
+                    ->whereHas('rhFuncionario');
+
+                if ($empresaId) {
+                    $base->whereHas(
+                        'empresas',
+                        fn ($q) => $q->where('empresas.id', (int) $empresaId)
+                    );
+                }
+            });
+
+            // Garante o operador do usuário logado no payload (nome/tabela no app).
+            if ($authVendedorId !== null) {
+                $query->orWhere('id', $authVendedorId);
+            }
+        });
     }
 
     /**
