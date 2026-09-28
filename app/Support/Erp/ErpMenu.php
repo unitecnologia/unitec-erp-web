@@ -42,7 +42,6 @@ use App\Filament\Resources\RhCargoResource;
 use App\Filament\Resources\RhDepartamentoResource;
 use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Pages\BoletoConfigPage;
-use App\Filament\Pages\MigraFirebirdPage;
 use App\Filament\Resources\BoletoRemessaResource;
 use App\Filament\Resources\BoletoRetornoResource;
 use App\Filament\Resources\ExpedicaoResource;
@@ -458,7 +457,6 @@ class ErpMenu
             static::link('Backup', BackupPage::getUrl(), permission: 'backup.access', icon: 'heroicon-o-circle-stack', iconColor: 'erp-menu-bar__icon--green'),
             static::sep(),
             static::group('Comandos', [
-                static::link('Migra dados FB', MigraFirebirdPage::getUrl(), permission: 'migra_firebird.access', icon: 'heroicon-o-arrow-path', iconColor: 'erp-menu-bar__icon--orange'),
                 static::link('Aquecer Sistema', url('/admin/comandos-sistema').'?foco=aquecer', permission: 'comandos.access', icon: 'heroicon-o-bolt', iconColor: 'erp-menu-bar__icon--amber'),
                 static::link('Info do Sistema', url('/admin/comandos-sistema').'?foco=info', permission: 'comandos.access', icon: 'heroicon-o-information-circle', iconColor: 'erp-menu-bar__icon--blue'),
             ]),

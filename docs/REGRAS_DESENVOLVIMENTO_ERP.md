@@ -19,7 +19,7 @@
 - **Filament ^4** + Livewire + Blade (UI administrativa)
 - **Vite 8** + Tailwind 4 (assets)
 - **Sanctum** (APIs autenticadas)
-- Banco típico de produção: **MySQL/MariaDB** (SQLite pode existir em ambientes locais; Firebird só para **migração** de legado)
+- Banco típico de produção: **MySQL/MariaDB** (SQLite pode existir em ambientes locais)
 
 ## 1.2 Painéis Filament
 
@@ -81,7 +81,7 @@ Prefixo típico: `/api/...`
 ## 1.7 UI
 
 - Visual **moderno web** (Filament / CSS do projeto).
-- Legado Delphi/Firebird é referência de **negócio**, nunca de estética.
+- Legado Delphi é referência de **negócio**, nunca de estética.
 
 ---
 
@@ -173,7 +173,7 @@ Qualquer mudança que toque estes eixos exige plano explícito, autorização e 
 1. **Nunca** alterar tabela/coluna/índice existente sem explicar impacto e obter autorização.
 2. Toda **migration** deve considerar **clientes antigos** (bancos já migrados, dados reais, possíveis NULLs, charset, `defaultStringLength(191)`).
 3. **Não assumir banco limpo** — o que passa em SQLite local vazio pode falhar no MySQL do cliente.
-4. Firebird (`config/firebird.php`) é caminho de **importação/migração**, não o banco operacional do ERP web.
+4. Migração de bases Firebird **não** faz parte do ERP web — fica em ferramenta/projeto externo separado.
 5. Evitar operações destrutivas (`drop`, truncate, rewrite em massa) em scripts “de correção” sem backup e autorização.
 
 ---

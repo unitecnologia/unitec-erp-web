@@ -9,7 +9,6 @@ use App\Filament\Resources\CfopResource;
 use App\Models\Cfop;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
-use App\Support\Erp\Import\CfopFirebirdSync;
 use Database\Seeders\CfopSeeder;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -54,49 +53,10 @@ class ListCfops extends ListRecords
 
         ErpScreen::set('CFOP');
 
-        // Fonte padrão: base web (seed). Firebird não roda no open da tela.
+        // Fonte padrão: base web (seed).
         if (! Cfop::query()->exists()) {
             CfopSeeder::seedFromJson();
         }
-    }
-
-    /**
-     * Sincronização opcional/manual a partir do Firebird (não usada no mount).
-     */
-    public function importCfopsFromFirebird(bool $force = false): void
-    {
-        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'cfops.update')) {
-            return;
-        }
-
-        $result = app(CfopFirebirdSync::class)->ensureImported($force);
-
-        if (($result['imported'] ?? false) && (($result['created'] ?? 0) + ($result['updated'] ?? 0)) > 0) {
-            Notification::make()
-                ->title('CFOPs importados do Firebird.')
-                ->body(($result['created'] ?? 0).' novos, '.($result['updated'] ?? 0).' atualizados.')
-                ->success()
-                ->send();
-            $this->resetTable();
-
-            return;
-        }
-
-        if (! empty($result['message'])) {
-            Notification::make()
-                ->title('Não foi possível importar CFOPs do Firebird.')
-                ->body((string) $result['message'])
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        Notification::make()
-            ->title('Nenhum CFOP novo no Firebird.')
-            ->body('A base web já possui registros. Use force se quiser reimportar.')
-            ->info()
-            ->send();
     }
 
     protected static function erpListPageClass(): string

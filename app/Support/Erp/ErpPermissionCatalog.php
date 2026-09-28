@@ -282,13 +282,6 @@ class ErpPermissionCatalog
           'update' => 'Alterar configuração',
         ],
       ],
-      'migra_firebird' => [
-        'label' => 'Migra dados FB',
-        'group' => 'Configurações',
-        'actions' => [
-          'access' => 'Acessar',
-        ],
-      ],
       'comandos' => [
         'label' => 'Comandos do Sistema',
         'group' => 'Configurações',
