@@ -828,6 +828,79 @@
     color: #dc2626;
 }
 
+.erp-fpgto-hint {
+    margin: 0.35rem 0 0;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.7rem;
+    line-height: 1.35;
+    border-radius: var(--erp-radius-sm, 4px);
+}
+
+.erp-fpgto-hint--warn {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+}
+
+.erp-fpgto-hint--info {
+    color: #1e3a5f;
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+}
+
+.erp-fpgto-avisos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+}
+
+.erp-fpgto-fieldset + .erp-fpgto-fieldset {
+    margin-top: 0.45rem;
+}
+
+.erp-fpgto-modo-prazo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.35rem 0 0.25rem;
+}
+
+.erp-fpgto-radio-grid--inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.1rem;
+}
+
+.erp-fpgto-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.2rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    line-height: 1;
+    color: var(--erp-brand-primary, #1e5a9e);
+    background: #e8f0fa;
+    cursor: help;
+    user-select: none;
+}
+
+.erp-fpgto-modo-bloco {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.erp-fpgto-modo-bloco--disabled {
+    opacity: 0.48;
+    filter: grayscale(0.15);
+    pointer-events: none;
+    user-select: none;
+}
+
 /* Painel de Parcelas */
 .erp-fpgto-parcelas {
     margin-top: 0.6rem;
@@ -1012,22 +1085,17 @@
 }
 
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(1),
-.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(1) { width: 10%; }
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(1) { width: 8%; } /* Data */
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(2),
-.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(2) { width: 10%; }
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(2) { width: 7%; } /* Cód. ajuste */
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(3),
-.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(3) { width: 65%; }
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(3) { width: 8%; } /* Cód. Produto */
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(4),
-.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 15%; }
-
-.erp-impressao-etiquetas-page .fi-ta-header-cell:nth-child(1),
-.erp-impressao-etiquetas-page .fi-ta-row .fi-ta-cell:nth-child(1) { width: 10%; }
-.erp-impressao-etiquetas-page .fi-ta-header-cell:nth-child(2),
-.erp-impressao-etiquetas-page .fi-ta-row .fi-ta-cell:nth-child(2) { width: 15%; }
-.erp-impressao-etiquetas-page .fi-ta-header-cell:nth-child(3),
-.erp-impressao-etiquetas-page .fi-ta-row .fi-ta-cell:nth-child(3) { width: 55%; }
-.erp-impressao-etiquetas-page .fi-ta-header-cell:nth-child(4),
-.erp-impressao-etiquetas-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 20%; }
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 12%; } /* Cód. Barras */
+.erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(5),
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(5) { width: 50%; } /* Produto */
+.erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(6),
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(6) { width: 15%; } /* Qtd. Ajust. */
 
 /* Ajuste Estoque Por Grupo — standalone limpa: esconde ribbon de ícones/menus */
 .fi-body:has(.erp-ajusta-estoque-grupo-page) .erp-menu-bar,
@@ -1064,11 +1132,6 @@
 .erp-list-page.erp-ajusta-estoque-grupo-page .fi-ta-row:hover .fi-ta-cell {
     background: #e8f0fa;
 }
-
-.erp-impressao-etiquetas__layout { display: flex; gap: 0.65rem; align-items: flex-start; }
-.erp-impressao-etiquetas__main { flex: 1; min-width: 0; }
-.erp-impressao-etiquetas__sidebar { display: flex; flex-direction: column; gap: 0.45rem; width: 7.5rem; flex-shrink: 0; }
-.erp-impressao-etiquetas__side-btn { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.55rem 0.35rem; border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-md); background: var(--erp-bg-panel); cursor: pointer; font-size: var(--erp-font-size-xs); font-weight: 700; }
 
 /* Ajuste Estoque Por Grupo — toolbar moderna */
 .erp-ajusta-estoque-grupo {
@@ -1849,6 +1912,43 @@
     background: linear-gradient(180deg, #f8fbff 0%, #eef5fc 100%);
 }
 
+.erp-ajuste-modal__modo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 0.55rem;
+    padding: 0.2rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+    background: #e8f0fa;
+}
+
+.erp-ajuste-modal__modo-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.28rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+}
+
+.erp-ajuste-modal__modo-opt:has(input:checked) {
+    background: #1d4ed8;
+    color: #fff;
+    box-shadow: 0 1px 2px rgb(29 78 216 / 28%);
+}
+
+.erp-ajuste-modal__modo-opt input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .erp-ajuste-modal__section-head {
     display: flex;
     align-items: baseline;
@@ -1981,18 +2081,18 @@
 
 .erp-ajuste-modal__sugestao {
     display: grid;
-    grid-template-columns: 4.2rem minmax(0, 1fr) auto;
-    gap: 0.45rem;
+    grid-template-columns: 3.2rem 6.4rem minmax(0, 1fr) 4.6rem;
+    gap: 0.28rem;
     align-items: center;
     width: 100%;
-    padding: 0.4rem 0.55rem;
+    padding: 0.35rem 0.45rem;
     border: none;
     border-bottom: 1px solid #e8eef6;
     background: transparent;
     text-align: left;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
 }
 
 .erp-ajuste-modal__sugestao:last-child {
@@ -2026,12 +2126,28 @@
     color: #fff;
 }
 
+.erp-ajuste-modal__sugestao-barras {
+    font-size: 0.66rem;
+    font-weight: 650;
+    color: #475569;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.erp-ajuste-modal__sugestao.is-selected .erp-ajuste-modal__sugestao-barras {
+    color: #e2e8f0;
+}
+
 .erp-ajuste-modal__sugestao-desc {
     font-weight: 600;
     color: #0f172a;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .erp-ajuste-modal__sugestao.is-selected .erp-ajuste-modal__sugestao-desc {
@@ -2039,10 +2155,12 @@
 }
 
 .erp-ajuste-modal__sugestao-est {
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 700;
     color: #475569;
     white-space: nowrap;
+    text-align: right;
+    justify-self: end;
 }
 
 .erp-ajuste-modal__sugestao.is-selected .erp-ajuste-modal__sugestao-est {
@@ -2150,22 +2268,944 @@
 .erp-ajusta-precos__hint,
 .erp-unidades__hint--top { margin: 0 0 0.45rem; padding: 0.45rem 0.65rem; background: var(--erp-bg-panel); border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-sm); font-size: var(--erp-font-size-xs); color: var(--erp-text-muted); }
 
-.erp-etiquetas-novo { padding: 0.5rem 0.65rem; }
-.erp-etiquetas-novo__panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.65rem; padding: 0.65rem; background: var(--erp-bg-toolbar); border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-md); margin-bottom: 0.65rem; }
-.erp-etiquetas-novo__title { grid-column: 1 / -1; font-weight: 800; color: var(--erp-brand-primary); text-transform: uppercase; font-size: var(--erp-font-size-xs); }
-.erp-etiquetas-novo__field { display: flex; flex-direction: column; gap: 0.25rem; font-size: var(--erp-font-size-xs); font-weight: 600; }
-.erp-etiquetas-novo__radio-group { display: flex; flex-direction: column; gap: 0.25rem; font-size: var(--erp-font-size-xs); border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-sm); padding: 0.35rem 0.55rem; }
-.erp-etiquetas-novo__input, .erp-etiquetas-novo__select { font-family: inherit; font-size: var(--erp-font-size-xs); border: 1px solid var(--erp-border); border-radius: var(--erp-radius-sm); padding: 0.35rem 0.55rem; background: var(--erp-bg-panel); }
-.erp-etiquetas-novo__input--search { grid-column: 1 / -1; }
-.erp-etiquetas-novo__actions-top { grid-column: 1 / -1; display: flex; gap: 0.45rem; justify-content: flex-end; }
-.erp-etiquetas-novo__btn { padding: 0.4rem 1rem; border: 1px solid var(--erp-border); border-radius: var(--erp-radius-sm); background: var(--erp-bg-panel); cursor: pointer; font-weight: 700; font-size: var(--erp-font-size-xs); }
-.erp-etiquetas-novo__btn--primary { background: linear-gradient(180deg, var(--erp-action-primary) 0%, var(--erp-action-primary-dark) 100%); color: var(--erp-text-inverse); border-color: var(--erp-action-primary-dark); }
-.erp-etiquetas-novo__tables { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem; }
-.erp-etiquetas-novo__table-block { border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-md); padding: 0.55rem; min-height: 10rem; background: #fff; }
-.erp-etiquetas-novo__subtitle { display: block; font-size: var(--erp-font-size-xs); font-weight: 700; color: var(--erp-brand-primary); margin-bottom: 0.45rem; }
-.erp-etiquetas-novo__table-placeholder { font-size: var(--erp-font-size-xs); color: var(--erp-text-muted); padding: 1rem; text-align: center; }
-.erp-etiquetas-novo__footer { display: flex; justify-content: flex-start; }
-.erp-etiquetas-novo__exit { background: none; border: none; font-size: var(--erp-font-size-xs); font-weight: 700; cursor: pointer; color: var(--erp-brand-primary); }
+/* ── Impressão de Etiquetas (janela modal sobre ERP) ─────────────── */
+
+.fi-body:has(.erp-etiquetas-modal) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.48) !important;
+}
+
+.fi-body:has(.erp-etiquetas-modal) .erp-menu-bar,
+.fi-body:has(.erp-etiquetas-modal) .erp-shortcut-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-etiquetas-modal) .erp-title-bar {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.fi-body:has(.erp-etiquetas-modal) .erp-status-bar {
+    display: none !important;
+}
+
+.fi-body:has(.erp-etiquetas-modal) .fi-layout,
+.fi-body:has(.erp-etiquetas-modal) .fi-main-ctn,
+.fi-body:has(.erp-etiquetas-modal) .fi-main,
+.fi-main:has(.erp-etiquetas-modal) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: transparent !important;
+}
+
+/* Neutraliza erp-grid: .fi-main > * { flex: 1 1 0 } que esticava a página */
+.fi-body:has(.erp-etiquetas-modal) .fi-main > *,
+.fi-main:has(.erp-etiquetas-modal) > *,
+.fi-main:has(.erp-etiquetas-modal) > :has(.erp-etiquetas-modal) {
+    display: block !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+}
+
+/*
+ * Container real da janela (fi-page com titlebar azul).
+ * Antes: width/height 100% + max-width:none preenchiam a tela
+ * por causa do flex:1 1 0 do erp-grid no pai.
+ */
+.fi-page.erp-etiquetas-modal.erp-etiquetas-novo-page.erp-list-page,
+.fi-page.erp-etiquetas-modal.erp-etiquetas-novo-page,
+.fi-page.erp-etiquetas-modal {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 40 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: min(70vw, 1100px) !important;
+    height: min(74vh, 720px) !important;
+    max-width: calc(100vw - 60px) !important;
+    max-height: calc(100vh - 60px) !important;
+    margin: auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #7f96b3 !important;
+    border-radius: 8px !important;
+    background: #e8eef6 !important;
+    box-shadow: 0 18px 48px rgba(15, 40, 71, 0.35) !important;
+    inset: 0 !important;
+}
+
+.erp-etiquetas-modal .fi-header,
+.erp-etiquetas-modal .fi-page-header-main-ctn > .fi-page-header,
+.erp-etiquetas-modal .fi-page-header-main-ctn > .fi-page-header-actions-ctn {
+    display: none !important;
+}
+
+.erp-etiquetas-modal .fi-page-header-main-ctn,
+.erp-etiquetas-modal .fi-page-main,
+.erp-etiquetas-modal .fi-page-content,
+.erp-etiquetas-modal .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    background: #e8eef6 !important;
+}
+
+.erp-list-page.erp-etiquetas-modal .fi-sc > div:has(.erp-etiquetas-novo),
+.erp-etiquetas-modal .fi-sc > div:has(.erp-etiquetas-novo) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-etiquetas-novo-window__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    gap: 0.75rem;
+    padding: 0.32rem 0.5rem 0.32rem 0.7rem;
+    background: linear-gradient(180deg, #2a6bb5 0%, #1e5a9e 100%);
+    color: #fff;
+    border-radius: 7px 7px 0 0;
+}
+
+.erp-etiquetas-novo-window__title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.erp-etiquetas-novo-window__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-etiquetas-novo-window__close:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.erp-etiquetas-novo {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+    gap: 0.4rem;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #e8eef6;
+    border-radius: 7px;
+}
+
+.erp-etiquetas-novo__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem 0.35rem;
+    overflow: hidden;
+}
+
+.erp-etiquetas-novo__params {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.45rem 0.65rem;
+    flex-shrink: 0;
+    padding: 0.4rem 0.55rem;
+    background: var(--erp-bg-toolbar, #e8f0f8);
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: 4px;
+}
+
+.erp-etiquetas-novo__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 700;
+    color: #334155;
+    min-width: 0;
+}
+
+.erp-etiquetas-novo__field--qty {
+    width: 6.5rem;
+}
+
+.erp-etiquetas-novo__field span {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__input,
+.erp-etiquetas-novo__select {
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    border: 1px solid #98a8b8;
+    border-radius: 3px;
+    padding: 0.22rem 0.4rem;
+    min-height: 1.7rem;
+    background: #fff;
+    color: #0f172a;
+    box-sizing: border-box;
+}
+
+.erp-etiquetas-novo__select {
+    min-width: 11rem;
+    max-width: 14rem;
+}
+
+.erp-etiquetas-novo__field--printer {
+    width: auto;
+    flex: 0 0 auto;
+}
+
+.erp-etiquetas-novo__printer-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.erp-etiquetas-novo__printer-wrap .erp-etiquetas-novo__select {
+    width: 12rem;
+    min-width: 12rem;
+    max-width: 12rem;
+    flex: 0 0 12rem;
+    border-radius: 3px;
+}
+
+.erp-etiquetas-novo__printer-wrap .erp-etiquetas-novo__lupa {
+    width: 1.7rem;
+    height: 1.7rem;
+    flex-shrink: 0;
+    border: 1px solid #98a8b8;
+    border-radius: 3px;
+}
+
+.erp-etiquetas-novo__btn--save-prefs {
+    align-self: flex-end;
+    margin-left: auto;
+    min-height: 1.7rem;
+    padding: 0.22rem 0.75rem;
+    background: #fff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__btn--save-prefs:hover {
+    background: #e8f0f8;
+}
+
+.erp-etiquetas-novo__filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.4rem 0.55rem;
+    flex-shrink: 0;
+    padding: 0.3rem 0.45rem;
+    background: #f3f7fb;
+    border: 1px solid #98a8b8;
+    border-radius: 3px;
+}
+
+.erp-etiquetas-novo__field--doc {
+    width: 9.5rem;
+}
+
+.erp-etiquetas-novo__field--date {
+    width: 8.5rem;
+}
+
+.erp-etiquetas-novo__field--date .erp-etiquetas-novo__input {
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-etiquetas-novo__lookup {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 0;
+}
+
+.erp-etiquetas-novo__lookup .erp-etiquetas-novo__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.erp-etiquetas-novo__lupa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    flex-shrink: 0;
+    padding: 0;
+    border: 1px solid #98a8b8;
+    border-left: 0;
+    border-radius: 0 3px 3px 0;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.erp-etiquetas-novo__lupa:hover {
+    background: #e8f0f8;
+}
+
+.erp-etiquetas-novo__lookup-panel {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    z-index: 30;
+    width: min(22rem, 70vw);
+    background: #fff;
+    border: 1px solid #7f96b3;
+    border-radius: 4px;
+    box-shadow: 0 8px 20px rgba(15, 40, 71, 0.18);
+    overflow: hidden;
+}
+
+.erp-etiquetas-novo__lookup-panel--nf {
+    width: min(34rem, 92vw);
+    left: 0;
+    right: auto;
+}
+
+.erp-etiquetas-novo__lookup-head {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem;
+    background: #e8f0f8;
+    border-bottom: 1px solid #c7d5e8;
+}
+
+.erp-etiquetas-novo__lookup-head--nf {
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+}
+
+.erp-etiquetas-novo__lookup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__lookup-field--nf {
+    flex: 1 1 auto;
+}
+
+.erp-etiquetas-novo__input--lookup-date {
+    width: 8.2rem;
+    min-width: 8.2rem;
+}
+
+.erp-etiquetas-novo__lookup-head .erp-etiquetas-novo__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: 3px;
+}
+
+.erp-etiquetas-novo__lookup-head--nf .erp-etiquetas-novo__btn {
+    align-self: flex-end;
+    min-height: 1.7rem;
+}
+
+.erp-etiquetas-novo__lookup-list {
+    max-height: 12rem;
+    overflow: auto;
+}
+
+.erp-etiquetas-novo__lookup-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.1rem 0.55rem;
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.72rem;
+    color: #0f172a;
+}
+
+.erp-etiquetas-novo__lookup-item--nf {
+    grid-template-columns: 5.5rem 4.6rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+}
+
+.erp-etiquetas-novo__lookup-item--nf strong {
+    grid-row: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-etiquetas-novo__lookup-item--nf span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-etiquetas-novo__lookup-item strong {
+    grid-row: 1 / span 2;
+    align-self: center;
+    color: #1e5a9e;
+    font-size: 0.78rem;
+}
+
+.erp-etiquetas-novo__lookup-item span {
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-etiquetas-novo__lookup-item:hover {
+    background: #e8f0fa;
+}
+
+.erp-etiquetas-novo__lookup-empty {
+    padding: 0.75rem 0.55rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.erp-etiquetas-novo__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 1.7rem;
+    padding: 0 0.15rem 0.05rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.erp-etiquetas-novo__btn--add {
+    align-self: flex-end;
+    min-height: 1.7rem;
+    padding: 0.22rem 0.65rem;
+    background: #e8f0f8;
+    border-color: #7f96b3;
+    color: #0f3460;
+}
+
+.erp-etiquetas-novo__btn--add:hover {
+    background: #d4e0ef;
+    border-color: #1e5a9e;
+    color: #1e5a9e;
+}
+
+.erp-etiquetas-novo__produto-busca {
+    flex-shrink: 0;
+}
+
+.erp-etiquetas-novo__produto-box {
+    position: relative;
+    padding: 0.45rem 0.55rem 0.4rem;
+    border: 1px solid #98a8b8;
+    border-radius: 4px;
+    background: #f3f7fb;
+}
+
+.erp-etiquetas-novo__produto-legend {
+    display: block;
+    margin-bottom: 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__produto-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.4rem;
+}
+
+.erp-etiquetas-novo__produto-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__produto-wrap {
+    position: relative;
+    min-width: 0;
+}
+
+.erp-etiquetas-novo__produto-wrap .erp-etiquetas-novo__input--search {
+    width: 100%;
+}
+
+.erp-etiquetas-novo__suggest {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    min-width: min(36rem, 92vw);
+    max-height: min(16rem, 40vh);
+    margin: 0;
+    padding: 0.2rem;
+    overflow: auto;
+    list-style: none;
+    border: 1px solid #c5d4e8;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgb(15 23 42 / 18%);
+}
+
+.erp-etiquetas-novo__suggest li {
+    margin: 0;
+}
+
+.erp-etiquetas-novo__suggest button {
+    display: grid;
+    grid-template-columns: 3.2rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.3rem 0.45rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #0f172a;
+    text-align: left;
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    cursor: pointer;
+}
+
+.erp-etiquetas-novo__suggest button:hover {
+    background: #eff6ff;
+}
+
+.erp-etiquetas-novo__suggest button.is-selected {
+    background: #93c5fd;
+    box-shadow: inset 3px 0 0 #1d4ed8;
+    color: #0f172a;
+}
+
+.erp-etiquetas-novo__suggest-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.2rem;
+    padding: 0.05rem 0.28rem;
+    border-radius: 4px;
+    background: #1e5a9e;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-etiquetas-novo__suggest button.is-selected .erp-etiquetas-novo__suggest-code {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.erp-etiquetas-novo__suggest-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+    color: #0f172a;
+    text-transform: uppercase;
+}
+
+.erp-etiquetas-novo__input--search {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-etiquetas-novo__btn {
+    padding: 0.28rem 0.85rem;
+    border: 1px solid #98a8b8;
+    border-radius: 3px;
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.erp-etiquetas-novo__btn--small {
+    padding: 0.22rem 0.55rem;
+    flex-shrink: 0;
+}
+
+.erp-etiquetas-novo__btn--primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #1e5a9e 100%);
+    color: #fff;
+    border-color: #164a85;
+}
+
+.erp-etiquetas-novo__btn:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__btn--primary:hover {
+    color: #fff;
+    filter: brightness(1.05);
+}
+
+.erp-etiquetas-novo__main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.erp-etiquetas-novo__panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.erp-etiquetas-novo__panel-head {
+    flex: 0 0 auto;
+    padding: 0.28rem 0.55rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-etiquetas-novo__grid-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.erp-etiquetas-novo__grid {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.74rem;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+}
+
+.erp-etiquetas-novo__grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.26rem 0.28rem;
+    background: #1e5a9e;
+    border-bottom: 1px solid #164a85;
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+.erp-etiquetas-novo__grid thead th:last-child {
+    border-right: none;
+}
+
+.erp-etiquetas-novo__grid thead th.is-sel,
+.erp-etiquetas-novo__grid thead th.is-qty,
+.erp-etiquetas-novo__grid thead th.is-unid,
+.erp-etiquetas-novo__grid thead th.is-validade,
+.erp-etiquetas-novo__grid thead th.is-action {
+    text-align: center;
+}
+
+.erp-etiquetas-novo__grid thead th.is-price {
+    text-align: right;
+}
+
+.erp-etiquetas-novo__grid tbody td {
+    height: 1.7rem;
+    padding: 0.1rem 0.28rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #edf2f7;
+    color: #0f172a;
+    vertical-align: middle;
+    overflow: hidden;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.erp-etiquetas-novo__grid tbody td:last-child {
+    border-right: none;
+}
+
+.erp-etiquetas-novo__grid tbody tr {
+    cursor: pointer;
+}
+
+.erp-etiquetas-novo__grid tbody tr:nth-child(even) td {
+    background: var(--erp-row-zebra, #f8fafc);
+}
+
+.erp-etiquetas-novo__grid tbody tr:hover td {
+    background: #eef4fb;
+}
+
+.erp-etiquetas-novo__grid tbody tr.is-selected td {
+    background: #dceaf8;
+}
+
+.erp-etiquetas-novo__grid tbody tr.is-selected:hover td {
+    background: #d2e4f6;
+}
+
+.erp-etiquetas-novo__grid .is-sel { width: 4%; text-align: center; }
+.erp-etiquetas-novo__grid .is-qty { width: 7%; text-align: center; }
+.erp-etiquetas-novo__grid .is-code { width: 7%; }
+.erp-etiquetas-novo__grid .is-barcode { width: 14%; }
+.erp-etiquetas-novo__grid .is-desc { width: 40%; min-width: 0; }
+.erp-etiquetas-novo__grid .is-price { width: 9%; text-align: right; font-variant-numeric: tabular-nums; }
+.erp-etiquetas-novo__grid .is-unid { width: 6%; text-align: center; }
+.erp-etiquetas-novo__grid .is-validade { width: 9%; text-align: center; }
+.erp-etiquetas-novo__grid .is-action { width: 4%; text-align: center; }
+
+.erp-etiquetas-novo__grid .is-desc,
+.erp-etiquetas-novo__grid td.is-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-etiquetas-novo__sel {
+    display: block;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin: 0 auto;
+    cursor: pointer;
+    accent-color: #1e5a9e;
+}
+
+.erp-etiquetas-novo__empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 8rem;
+    padding: 1rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: center;
+    user-select: none;
+}
+
+.erp-etiquetas-novo__qty-input {
+    display: block;
+    width: 2.75rem;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0.08rem 0.15rem;
+    border: 1px solid #98a8b8;
+    border-radius: 2px;
+    font: inherit;
+    font-size: 0.72rem;
+    text-align: center;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.erp-etiquetas-novo__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 1px solid #dbe3ee;
+    border-radius: 3px;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-etiquetas-novo__icon-btn--danger {
+    color: #b45353;
+    border-color: #e8c4c4;
+}
+
+.erp-etiquetas-novo__icon-btn--danger:hover {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+.erp-etiquetas-novo__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem 0.75rem;
+    flex: 0 0 auto;
+    padding: 0.35rem 0.45rem;
+    background: var(--erp-bg-toolbar, #e8f0f8);
+    border: 1px solid #98a8b8;
+}
+
+.erp-etiquetas-novo__footer-left {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+}
+
+.erp-etiquetas-novo__total {
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-etiquetas-novo__total strong {
+    color: var(--erp-brand-primary, #1e5a9e);
+    font-weight: 800;
+}
+
+.erp-etiquetas-novo__footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+}
+
+.erp-etiquetas-novo__exit {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 800;
+    cursor: pointer;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-etiquetas-novo__exit:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+    .fi-page.erp-etiquetas-modal.erp-etiquetas-novo-page.erp-list-page,
+    .fi-page.erp-etiquetas-modal.erp-etiquetas-novo-page,
+    .fi-page.erp-etiquetas-modal {
+        width: min(94vw, 1100px) !important;
+        height: min(80vh, 720px) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 24px) !important;
+    }
+}
 
 .erp-comando { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 16rem; padding: 1rem; gap: 1rem; }
 .erp-comando__box { width: min(100%, 28rem); padding: 1.25rem; background: var(--erp-bg-toolbar); border: 1px solid var(--erp-border-light); border-radius: var(--erp-radius-md); text-align: center; }
@@ -2173,7 +3213,6 @@
 .erp-comando__btn { min-width: 8rem; padding: 0.55rem 1.25rem; border: 1px solid #93c5fd; border-radius: var(--erp-radius-sm); background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%); font-weight: 800; cursor: pointer; font-size: var(--erp-font-size-sm); }
 .erp-comando__footer { width: min(100%, 28rem); display: flex; justify-content: flex-end; }
 .erp-comando__exit { background: none; border: none; font-weight: 700; cursor: pointer; color: var(--erp-brand-primary); }
-
 
 .erp-bandeiras-modal__dialog {
     width: min(100%, 36rem);
@@ -2270,12 +3309,6 @@
     font-size: 1rem;
     font-weight: 800;
     color: var(--erp-brand-primary, #1e5a9e);
-}
-
-@media (max-width: 900px) {
-    .erp-etiquetas-novo__tables { grid-template-columns: 1fr; }
-    .erp-impressao-etiquetas__layout { flex-direction: column; }
-    .erp-impressao-etiquetas__sidebar { flex-direction: row; width: 100%; }
 }
 
 .erp-fpgto-cartao-lookups {

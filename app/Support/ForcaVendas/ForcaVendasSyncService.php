@@ -3,6 +3,7 @@
 namespace App\Support\ForcaVendas;
 
 use App\Models\ContaReceber;
+use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\EstoqueReserva;
 use App\Models\ForcaVendasClienteImport;
@@ -12,6 +13,8 @@ use App\Models\FormaPagamento;
 use App\Models\Grupo;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
+use App\Models\Pedido;
+use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\PersonVisitaDia;
 use App\Models\PriceTable;
@@ -22,9 +25,12 @@ use App\Models\Transportadora;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\PersonCpfCnpjUnicidade;
+use App\Support\Erp\PersonDocumentoDuplicadoException;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Pix\PixProviderManager;
 use Illuminate\Support\Carbon;
@@ -50,6 +56,9 @@ class ForcaVendasSyncService
      */
     public function buildPull(?Carbon $since, ?int $vendedorId = null, ?int $empresaId = null): array
     {
+        $verTodosClientes = $this->vendedoresVeemTodosClientes($empresaId);
+        $carteiraVendedorId = $this->carteiraVendedorId($vendedorId, $empresaId);
+
         return [
             'server_time' => now()->toIso8601String(),
             'since' => $since?->toIso8601String(),
@@ -57,17 +66,19 @@ class ForcaVendasSyncService
                 // Mesma regra do login: flag PIX da empresa do usuário autenticado.
                 'pix_api_habilitada' => app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId),
                 'empresa_id' => $empresaId,
+                'ver_todos_clientes' => $verTodosClientes,
+                'desconto_reais_item_modo' => $this->descontoReaisItemModo($empresaId),
             ],
             'products' => $this->products($since, $vendedorId),
             'price_tables' => $this->priceTables($since),
             'price_table_items' => $this->priceTableItems($since),
-            'customers' => $this->customers($since, $vendedorId),
-            'visita_dias' => $this->visitaDias($vendedorId),
+            'customers' => $this->customers($since, $carteiraVendedorId),
+            'visita_dias' => $this->visitaDias($carteiraVendedorId),
             'vendedores' => $this->vendedores($empresaId, $vendedorId),
             'formas_pagamento' => $this->formasPagamento(),
             'transportadoras' => $this->transportadoras(),
             'grupos' => $this->grupos(),
-            'financeiro' => $this->financeiro($since, $vendedorId),
+            'financeiro' => $this->financeiro($since, $carteiraVendedorId),
             'historico_vendas' => $this->historicoVendas($since, $vendedorId),
             'historico_orcamentos' => $this->historicoOrcamentos($since, $vendedorId),
             'pedidos_fv' => $this->pedidosFv($since, $vendedorId),
@@ -79,18 +90,22 @@ class ForcaVendasSyncService
      */
     public function pullSignature(?int $vendedorId = null, ?int $empresaId = null): string
     {
+        $verTodosClientes = $this->vendedoresVeemTodosClientes($empresaId);
+        $carteiraVendedorId = $this->carteiraVendedorId($vendedorId, $empresaId);
+
         // Histórico por vendedor + empresa (flag PIX não pode reutilizar cache de outra empresa).
         $parts = [
             'vendedor:'.($vendedorId ?? 0),
             'empresa:'.($empresaId ?? 0),
+            'fv_todos_clientes:'.(int) $verTodosClientes,
         ];
 
         foreach ([
             'products' => Product::query(),
             'price_tables' => PriceTable::query(),
             'price_table_items' => ProductPriceTableItem::query(),
-            'people' => $this->peopleSignatureQuery($vendedorId),
-            'person_visita_dias' => $this->visitaDiasSignatureQuery($vendedorId),
+            'people' => $this->peopleSignatureQuery($carteiraVendedorId),
+            'person_visita_dias' => $this->visitaDiasSignatureQuery($carteiraVendedorId),
             'vendedores' => $this->vendedoresCatalogoQuery($empresaId, $vendedorId),
             'formas_pagamento' => FormaPagamento::query()->where('disponivel_mobile', true),
             'transportadoras' => Schema::hasTable('transportadoras')
@@ -104,7 +119,7 @@ class ForcaVendasSyncService
                         fn ($query) => $query->where('mostrar_no_app', true),
                     )
                 : null,
-            'contas_receber' => $this->financeiroSignatureQuery($vendedorId),
+            'contas_receber' => $this->financeiroSignatureQuery($carteiraVendedorId),
             'vendas' => Venda::query(),
             'orcamentos' => Orcamento::query(),
             'forca_vendas_orders' => ForcaVendasOrder::query(),
@@ -137,6 +152,7 @@ class ForcaVendasSyncService
         $parts[] = "vendedor_estoque:{$estoqueVendedor}";
 
         $parts[] = 'pix_api:'.(int) app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId);
+        $parts[] = 'desc_reais_item:'.$this->descontoReaisItemModo($empresaId);
 
         return sha1(implode('|', $parts));
     }
@@ -176,7 +192,7 @@ class ForcaVendasSyncService
             'foto_path',
             'ativo',
             'updated_at',
-        ]);
+        ])->where('ativo', true);
 
         if ($since !== null && Schema::hasColumn('products', 'updated_at')) {
             $idsReservaAlterada = EstoqueReserva::query()
@@ -406,6 +422,7 @@ class ForcaVendasSyncService
                 'price_table_id' => $c->price_table_id,
                 'vendedor_fv_id' => $c->vendedor_fv_id,
                 'vendedor_loja_id' => $c->vendedor_loja_id,
+                'observacoes' => $c->observacoes,
                 'ativo' => (bool) $c->ativo,
                 'updated_at' => optional($c->updated_at)->toIso8601String(),
             ])
@@ -446,10 +463,12 @@ class ForcaVendasSyncService
     }
 
     /**
-     * @return array<int, array<string, mixed>>
-     */
-    /**
+     * Catálogo de operadores para o app (lookup de nome/tabela).
      * Não envia a tabela inteira: só operadores atuais (ativo + efetua_venda + RH + empresa).
+     * Sempre inclui o vendedor do usuário autenticado (mesmo se legado inconsistente),
+     * para nome/tabela_venda_id continuarem resolvíveis no SQLite local.
+     * setor_vendas não é exigido — no app o operador vem do login; exigir a flag
+     * poderia excluir operadores válidos já em uso.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -472,7 +491,7 @@ class ForcaVendasSyncService
     }
 
     /**
-     * Mesmo escopo do catálogo pull - usado no ETag/signature.
+     * Mesmo escopo do catálogo pull — usado no ETag/signature.
      *
      * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Vendedor>
      */
@@ -525,6 +544,11 @@ class ForcaVendasSyncService
                 ),
                 'nfce' => (bool) $f->nfce,
                 'max_parcelas' => $f->max_parcelas,
+                'intervalo_parcelas' => $f->intervalo_parcelas,
+                // App antigo ignora; app novo usa para não aplicar financeiro residual.
+                'modo_prazo' => Schema::hasColumn('formas_pagamento', 'modo_prazo')
+                    ? FormaPagamento::normalizeModoPrazo((string) ($f->modo_prazo ?? ''))
+                    : FormaPagamento::MODO_PRAZO_TABELA,
                 'tabelas_prazo' => $f->tabelasPrazo
                     ->map(fn ($t): array => [
                         'id' => $t->id,
@@ -637,7 +661,7 @@ class ForcaVendasSyncService
     private function historicoVendas(?Carbon $since, ?int $vendedorId = null): array
     {
         $query = Venda::query()
-            ->with(['forcaVendasOrder.orcamento'])
+            ->with(['forcaVendasOrder.orcamento', 'forcaVendasOrder.pedido'])
             ->where('data', '>=', now()->subDays(self::HISTORICO_DIAS)->toDateString());
 
         // Cada vendedor enxerga apenas o prÃ³prio histÃ³rico de vendas.
@@ -652,7 +676,8 @@ class ForcaVendasSyncService
             ->map(fn (Venda $v): array => [
                 'id' => $v->id,
                 'numero' => $v->numero,
-                'numero_orcamento' => $v->forcaVendasOrder?->orcamento?->numero,
+                'numero_orcamento' => $v->forcaVendasOrder?->pedido?->numero
+                    ?? $v->forcaVendasOrder?->orcamento?->numero,
                 'data' => optional($v->data)->toDateString(),
                 'cliente_id' => $v->cliente_id,
                 'vendedor_id' => $v->vendedor_id,
@@ -693,6 +718,7 @@ class ForcaVendasSyncService
 
         return $this->applySince($query, $since, 'orcamentos')
             ->orderByDesc('data')
+            ->orderByDesc('id')
             ->limit(1000)
             ->get()
             ->map(function (Orcamento $o): array {
@@ -739,6 +765,7 @@ class ForcaVendasSyncService
     {
         $query = ForcaVendasOrder::query()
             ->with([
+                'pedido.itens.product:id,descricao',
                 'orcamento.itens.product:id,descricao',
                 'venda:id,numero',
             ])
@@ -754,9 +781,11 @@ class ForcaVendasSyncService
             ->get()
             ->map(function (ForcaVendasOrder $order): array {
                 $payload = is_array($order->payload) ? $order->payload : [];
-                $orcamento = $order->orcamento;
+                $doc = $order->tipo === ForcaVendasOrder::TIPO_PEDIDO
+                    ? ($order->pedido ?? $order->orcamento)
+                    : ($order->orcamento ?? $order->pedido);
 
-                $itens = $orcamento?->itens
+                $itens = $doc?->itens
                     ->map(fn ($item): array => [
                         'product_id' => $item->product_id,
                         'descricao' => $item->descricao ?: $item->product?->descricao,
@@ -769,16 +798,16 @@ class ForcaVendasSyncService
 
                 return [
                     'uuid' => $order->uuid,
-                    'numero' => $orcamento?->numero,
+                    'numero' => $doc?->numero,
                     'numero_pedido' => $order->venda?->numero,
                     'situacao' => $order->situacao,
                     'status' => $order->status,
                     'tipo' => $order->tipo,
                     'total' => (float) $order->total,
                     'cliente_id' => $order->cliente_id,
-                    'observacoes' => $orcamento?->observacoes,
-                    'desconto_valor' => (float) ($orcamento?->desconto_valor ?? 0),
-                    'forma_pagamento' => $orcamento?->forma_pagamento ?? ($payload['forma_pagamento'] ?? null),
+                    'observacoes' => $doc?->observacoes,
+                    'desconto_valor' => (float) ($doc?->desconto_valor ?? 0),
+                    'forma_pagamento' => $doc?->forma_pagamento ?? ($payload['forma_pagamento'] ?? null),
                     'condicao_pagamento' => $payload['condicao_pagamento'] ?? null,
                     'itens' => $itens,
                     'data' => optional($order->dataAberturaAt())->toDateString(),
@@ -794,18 +823,30 @@ class ForcaVendasSyncService
      */
     private function orderPushResult(ForcaVendasOrder $order, bool $duplicado = false): array
     {
-        $order->loadMissing(['orcamento:id,numero', 'venda:id,numero']);
+        $order->loadMissing(['orcamento:id,numero', 'pedido:id,numero', 'venda:id,numero']);
 
-        return [
+        $isPedido = $order->tipo === ForcaVendasOrder::TIPO_PEDIDO;
+        $numero = $isPedido
+            ? ($order->pedido?->numero ?? $order->orcamento?->numero)
+            : ($order->orcamento?->numero ?? $order->pedido?->numero);
+
+        $result = [
             'uuid' => $order->uuid,
             'status' => $order->status,
             'situacao' => $order->situacao,
-            'orcamento_id' => $order->orcamento_id,
-            'numero' => $order->orcamento?->numero,
+            'numero' => $numero,
             'numero_pedido' => $order->venda?->numero,
             'total' => (float) $order->total,
             'duplicado' => $duplicado,
         ];
+
+        if ($isPedido) {
+            $result['pedido_id'] = $order->pedido_id;
+        } else {
+            $result['orcamento_id'] = $order->orcamento_id;
+        }
+
+        return $result;
     }
 
     /**
@@ -879,6 +920,7 @@ class ForcaVendasSyncService
     {
         return $order->status === ForcaVendasOrder::STATUS_ERRO
             && $order->orcamento_id === null
+            && $order->pedido_id === null
             && $order->venda_id === null
             && $order->situacao !== ForcaVendasOrder::SITUACAO_CANCELADO;
     }
@@ -910,9 +952,10 @@ class ForcaVendasSyncService
                     ? ErpTimezone::toLocal($clientCreatedAt)
                     : ErpTimezone::toLocal();
                 $dataPedido = $momentoLocal->toDateString();
+                $tipo = (string) ($order['tipo'] ?? ForcaVendasOrder::TIPO_ORCAMENTO);
+                $isPedido = $tipo === ForcaVendasOrder::TIPO_PEDIDO;
 
-                $orcamento = Orcamento::query()->create([
-                    'numero' => Orcamento::nextNumero(),
+                $docAttrs = [
                     'data' => $dataPedido,
                     'hora' => $momentoLocal->format('H:i:s'),
                     'cliente_id' => $clienteId,
@@ -924,9 +967,21 @@ class ForcaVendasSyncService
                     'validade_dias' => (int) ($order['validade_dias'] ?? 0),
                     'observacoes' => $order['observacoes'] ?? null,
                     'total' => 0,
-                    'status' => Orcamento::STATUS_ABERTO,
-                    'plataforma' => Orcamento::PLATAFORMA_FV,
-                ]);
+                ];
+
+                if ($isPedido) {
+                    $documento = Pedido::query()->create(array_merge($docAttrs, [
+                        'numero' => Pedido::nextNumero(),
+                        'status' => Pedido::STATUS_ABERTO,
+                        'plataforma' => Pedido::PLATAFORMA_FV,
+                    ]));
+                } else {
+                    $documento = Orcamento::query()->create(array_merge($docAttrs, [
+                        'numero' => Orcamento::nextNumero(),
+                        'status' => Orcamento::STATUS_ABERTO,
+                        'plataforma' => Orcamento::PLATAFORMA_FV,
+                    ]));
+                }
 
                 $linha = 1;
 
@@ -943,8 +998,7 @@ class ForcaVendasSyncService
                     $totalItem = round(($quantidade * $preco) - $descItem, 2);
                     $subtotal += $totalItem;
 
-                    OrcamentoItem::query()->create([
-                        'orcamento_id' => $orcamento->id,
+                    $itemAttrs = [
                         'item' => $linha,
                         'product_id' => $productId,
                         'product_grade_id' => $item['product_grade_id'] ?? null,
@@ -953,23 +1007,31 @@ class ForcaVendasSyncService
                         'total' => $totalItem,
                         'desconto' => $descItem,
                         'descricao' => $item['descricao'] ?? null,
-                    ]);
+                    ];
+
+                    if ($isPedido) {
+                        PedidoItem::query()->create(array_merge($itemAttrs, [
+                            'pedido_id' => $documento->id,
+                        ]));
+                    } else {
+                        OrcamentoItem::query()->create(array_merge($itemAttrs, [
+                            'orcamento_id' => $documento->id,
+                        ]));
+                    }
 
                     $linha++;
                 }
 
                 $total = round($subtotal - $descontoValor, 2);
 
-                $orcamento->update([
+                $documento->update([
                     'subtotal' => $subtotal,
                     'total' => $total,
                 ]);
 
                 // Pedido com restrição financeira fica em "financeiro" até liberação
                 // no Monitor de Vendas. Demais chegam como "pendente".
-                $tipo = (string) ($order['tipo'] ?? ForcaVendasOrder::TIPO_ORCAMENTO);
-                $restricaoFinanceira = $tipo === ForcaVendasOrder::TIPO_PEDIDO
-                    && ! empty($order['restricao_financeira']);
+                $restricaoFinanceira = $isPedido && ! empty($order['restricao_financeira']);
 
                 $fvOrder = ForcaVendasOrder::query()->create([
                     'uuid' => $uuid,
@@ -979,7 +1041,8 @@ class ForcaVendasSyncService
                     'tipo' => $tipo,
                     'cliente_id' => $clienteId,
                     'vendedor_id' => $user->vendedor_id,
-                    'orcamento_id' => $orcamento->id,
+                    'orcamento_id' => $isPedido ? null : $documento->id,
+                    'pedido_id' => $isPedido ? $documento->id : null,
                     'venda_id' => null,
                     'total' => $total,
                     'latitude' => $order['latitude'] ?? null,
@@ -989,12 +1052,17 @@ class ForcaVendasSyncService
                         ? ForcaVendasOrder::SITUACAO_FINANCEIRO
                         : ForcaVendasOrder::SITUACAO_PENDENTE,
                     'payload' => $order,
-                    'client_created_at' => $clientCreatedAt,
+                    // App envia ISO-8601 (UTC com Z ou offset local). DATETIME do MySQL
+                    // não guarda fuso: persistir já normalizado em America/Sao_Paulo
+                    // (mesmo $momentoLocal usado em pedido.data/hora). Sem created_at → null
+                    // e a grade cai no fallback received_at via dataAberturaAt().
+                    'client_created_at' => $clientCreatedAt ? $momentoLocal : null,
                     'received_at' => now(),
                 ]);
 
-                if ($tipo === ForcaVendasOrder::TIPO_PEDIDO) {
-                    (new EstoqueReservaService())->reservarPedido($fvOrder, $orcamento, $user);
+                if ($isPedido) {
+                    /** @var Pedido $documento */
+                    (new EstoqueReservaService())->reservarPedido($fvOrder, $documento, $user);
 
                     try {
                         app(\App\Support\Gestor\GestorPushService::class)->notifyPedidoPendente($fvOrder);
@@ -1003,10 +1071,11 @@ class ForcaVendasSyncService
                     }
                 }
 
-                return array_merge(
-                    $this->orderPushResult($fvOrder),
-                    ['orcamento_id' => $orcamento->id],
-                );
+                $extra = $isPedido
+                    ? ['pedido_id' => $documento->id]
+                    : ['orcamento_id' => $documento->id];
+
+                return array_merge($this->orderPushResult($fvOrder), $extra);
             });
         } catch (\Throwable $e) {
             ForcaVendasOrder::query()->updateOrCreate(
@@ -1123,6 +1192,119 @@ class ForcaVendasSyncService
     }
 
     /**
+     * Atualiza somente o e-mail de um cliente já existente.
+     * Outros campos do cadastro não são gravados, mesmo se vierem no payload.
+     *
+     * @param  array<int, array<string, mixed>>  $updates
+     * @return array<int, array<string, mixed>>
+     */
+    public function applyCustomerEmailUpdates(array $updates, User $user): array
+    {
+        $results = [];
+        $carteira = $this->carteiraVendedorId(
+            $user->vendedor_id ? (int) $user->vendedor_id : null,
+            $user->empresa_id ? (int) $user->empresa_id : null,
+        );
+
+        foreach ($updates as $update) {
+            $uuid = (string) ($update['uuid'] ?? '');
+            $personId = (int) ($update['person_id'] ?? 0);
+
+            if ($uuid === '' || $personId <= 0) {
+                $results[] = [
+                    'uuid' => $uuid !== '' ? $uuid : null,
+                    'status' => 'erro',
+                    'erro' => 'Identificação do cliente ausente.',
+                ];
+
+                continue;
+            }
+
+            if (! array_key_exists('email', $update)) {
+                $results[] = [
+                    'uuid' => $uuid,
+                    'status' => 'erro',
+                    'erro' => 'E-mail ausente.',
+                ];
+
+                continue;
+            }
+
+            $normalizado = $this->normalizarEmailCliente($update['email']);
+
+            if ($normalizado['erro'] !== null) {
+                $results[] = [
+                    'uuid' => $uuid,
+                    'status' => 'erro',
+                    'erro' => $normalizado['erro'],
+                ];
+
+                continue;
+            }
+
+            $person = Person::query()->whereKey($personId)->where('is_cliente', true)->first();
+
+            if ($person === null) {
+                $results[] = [
+                    'uuid' => $uuid,
+                    'status' => 'erro',
+                    'erro' => 'Cliente não encontrado.',
+                ];
+
+                continue;
+            }
+
+            if ($carteira !== null && (int) $person->vendedor_fv_id !== $carteira) {
+                $results[] = [
+                    'uuid' => $uuid,
+                    'status' => 'erro',
+                    'erro' => 'Cliente fora da carteira.',
+                ];
+
+                continue;
+            }
+
+            $person->forceFill(['email' => $normalizado['email']])->save();
+
+            $results[] = [
+                'uuid' => $uuid,
+                'status' => 'importado',
+                'person_id' => $person->id,
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * Vazio limpa o e-mail. Valor preenchido precisa do formato básico.
+     *
+     * @return array{email: ?string, erro: ?string}
+     */
+    private function normalizarEmailCliente(mixed $email): array
+    {
+        if ($email === null) {
+            return ['email' => null, 'erro' => null];
+        }
+
+        if (! is_string($email)) {
+            return ['email' => null, 'erro' => 'E-mail inválido.'];
+        }
+
+        $email = trim($email);
+
+        if ($email === '') {
+            return ['email' => null, 'erro' => null];
+        }
+
+        if (mb_strlen($email) > 255 || preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/u', $email) !== 1) {
+            return ['email' => null, 'erro' => 'E-mail inválido.'];
+        }
+
+        return ['email' => $email, 'erro' => null];
+    }
+
+    /**
      * @param  array<string, mixed>  $customer
      */
     private function findExistingCustomerByDocument(array $customer): ?Person
@@ -1133,10 +1315,13 @@ class ForcaVendasSyncService
             return null;
         }
 
-        return Person::query()
-            ->where('is_cliente', true)
-            ->whereRaw("REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', '') = ?", [$digits])
-            ->first();
+        $person = app(PersonCpfCnpjUnicidade::class)->encontrar($digits);
+
+        if ($person && ! $person->is_cliente) {
+            $person->forceFill(['is_cliente' => true])->save();
+        }
+
+        return $person;
     }
 
     /**
@@ -1149,6 +1334,22 @@ class ForcaVendasSyncService
 
         if ($uf === '') {
             $uf = 'SC';
+        }
+
+        if ($cpfCnpj !== '') {
+            try {
+                app(PersonCpfCnpjUnicidade::class)->assertDisponivel($cpfCnpj);
+            } catch (PersonDocumentoDuplicadoException $e) {
+                if ($e->existente) {
+                    if (! $e->existente->is_cliente) {
+                        $e->existente->forceFill(['is_cliente' => true])->save();
+                    }
+
+                    return $e->existente;
+                }
+
+                throw $e;
+            }
         }
 
         return Person::query()->create([
@@ -1224,6 +1425,53 @@ class ForcaVendasSyncService
                 $visita->delete();
             }
         }
+    }
+
+    /**
+     * Quando a empresa libera base aberta, o sync de clientes/visitas/financeiro
+     * não filtra por carteira (vendedor_fv_id). Histórico/pedidos continuam do vendedor.
+     */
+    private function carteiraVendedorId(?int $vendedorId, ?int $empresaId): ?int
+    {
+        if ($vendedorId === null) {
+            return null;
+        }
+
+        if ($this->vendedoresVeemTodosClientes($empresaId)) {
+            return null;
+        }
+
+        return $vendedorId;
+    }
+
+    private function vendedoresVeemTodosClientes(?int $empresaId): bool
+    {
+        if ($empresaId === null || $empresaId <= 0) {
+            return false;
+        }
+
+        if (! Schema::hasColumn('empresas', 'param_forca_vendas_ver_todos_clientes')) {
+            return false;
+        }
+
+        return (bool) Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_forca_vendas_ver_todos_clientes');
+    }
+
+    private function descontoReaisItemModo(?int $empresaId): string
+    {
+        if ($empresaId === null || $empresaId <= 0) {
+            return EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO;
+        }
+
+        if (! Schema::hasColumn('empresas', 'param_monitor_vendas_desconto_reais_item_modo')) {
+            return EmpresaParametros::DESCONTO_REAIS_ITEM_UNITARIO;
+        }
+
+        return EmpresaParametros::normalizarDescontoReaisItemModo(
+            Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_desconto_reais_item_modo'),
+        );
     }
 
     /**

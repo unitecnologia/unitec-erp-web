@@ -49,6 +49,9 @@ class ListFormasPagamento extends ListRecords
 
     public string $prazosRapidos = '';
 
+    /** Em criação: impede sobrescrever Tipo de Movimento após ajuste manual. */
+    public bool $tipoMovimentoManual = false;
+
     public function mount(): void
     {
         parent::mount();
@@ -145,6 +148,7 @@ class ListFormasPagamento extends ListRecords
 
         $this->resetForm();
         $this->form['codigo'] = (int) (FormaPagamento::max('codigo') ?? 0) + 1;
+        $this->tipoMovimentoManual = false;
         $this->showForm = true;
     }
 
@@ -167,6 +171,7 @@ class ListFormasPagamento extends ListRecords
         }
 
         $this->formId = $record->id;
+        $this->tipoMovimentoManual = true;
         $this->form = [
             'codigo' => $record->codigo,
             'descricao' => $record->descricao,
@@ -176,6 +181,9 @@ class ListFormasPagamento extends ListRecords
             'prazo_cartao' => $record->prazo_cartao,
             'max_parcelas' => $record->max_parcelas,
             'intervalo_parcelas' => $record->intervalo_parcelas,
+            'modo_prazo' => FormaPagamento::normalizeModoPrazo(
+                (string) ($record->modo_prazo ?? FormaPagamento::MODO_PRAZO_TABELA)
+            ),
             'atalho' => $record->atalho,
             'tipo_movimento' => \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
                 (string) ($record->tipo_movimento ?: 'nenhum')
@@ -187,6 +195,7 @@ class ListFormasPagamento extends ListRecords
             'aparece_contas_receber' => $record->aparece_contas_receber,
             'nfce' => $record->nfce,
             'disponivel_mobile' => $record->disponivel_mobile,
+            'gerar_qrcode_pdv' => (bool) ($record->gerar_qrcode_pdv ?? false),
             'parcelas' => $this->normalizeParcelas($record->parcelas ?? []),
         ];
         $this->showForm = true;
@@ -218,6 +227,7 @@ class ListFormasPagamento extends ListRecords
             'form.prazo_cartao' => ['nullable', 'integer', 'min:0'],
             'form.max_parcelas' => ['nullable', 'integer', 'min:0'],
             'form.intervalo_parcelas' => ['nullable', 'integer', 'min:0'],
+            'form.modo_prazo' => ['nullable', Rule::in(array_keys(FormaPagamento::modoPrazoLabels()))],
             'form.atalho' => ['nullable', 'string', 'max:5'],
             'form.tipo_movimento' => ['required', Rule::in(array_keys(FormaPagamento::tipoMovimentoLabels()))],
         ], [
@@ -227,6 +237,7 @@ class ListFormasPagamento extends ListRecords
             'form.descricao' => 'nome',
             'form.tipo_movimento' => 'tipo de movimento',
             'form.max_parcelas' => 'nº máximo de parcelas',
+            'form.modo_prazo' => 'forma de definir o prazo',
             'form.conta_destino_id' => 'conta de destino',
         ])['form'];
 
@@ -250,8 +261,15 @@ class ListFormasPagamento extends ListRecords
             'aparece_contas_receber' => (bool) ($this->form['aparece_contas_receber'] ?? false),
             'nfce' => (bool) ($this->form['nfce'] ?? false),
             'disponivel_mobile' => (bool) ($this->form['disponivel_mobile'] ?? false),
+            'gerar_qrcode_pdv' => (bool) ($this->form['gerar_qrcode_pdv'] ?? false),
             'parcelas' => $this->normalizeParcelas($this->form['parcelas'] ?? []),
         ];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('formas_pagamento', 'modo_prazo')) {
+            $payload['modo_prazo'] = FormaPagamento::normalizeModoPrazo(
+                (string) ($data['modo_prazo'] ?? FormaPagamento::MODO_PRAZO_TABELA)
+            );
+        }
 
         // Cartão com movimento Contas a Receber: mantém a flag alinhada ao rádio.
         if (
@@ -283,11 +301,55 @@ class ListFormasPagamento extends ListRecords
 
     public function updatedFormTipo(mixed $value): void
     {
+        // Só sugere na criação; edição e escolha manual não são sobrescritas.
+        if ($this->formId !== null || $this->tipoMovimentoManual) {
+            return;
+        }
+
         $tipo = is_string($value) ? mb_strtolower(trim($value), 'UTF-8') : '';
 
         $this->form['tipo_movimento'] = $tipo !== ''
             ? FormaPagamento::defaultTipoMovimento($tipo)
-            : ($this->form['tipo_movimento'] ?? 'nenhum');
+            : 'nenhum';
+    }
+
+    public function updatedFormTipoMovimento(mixed $value): void
+    {
+        $this->tipoMovimentoManual = true;
+    }
+
+    /**
+     * Avisos informativos (não bloqueiam gravação).
+     *
+     * @return list<string>
+     */
+    public function formaPagamentoAvisos(): array
+    {
+        $tipo = mb_strtolower(trim((string) ($this->form['tipo'] ?? '')), 'UTF-8');
+        $movimento = \App\Support\Erp\Financeiro\FormaPagamentoDestino::normalize(
+            (string) ($this->form['tipo_movimento'] ?? 'nenhum')
+        );
+        $contaDestino = (int) ($this->form['conta_destino_id'] ?? 0);
+        $mobile = (bool) ($this->form['disponivel_mobile'] ?? false);
+        $avisos = [];
+
+        if ($movimento === 'nenhum') {
+            $avisos[] = 'Esta forma de pagamento não movimentará Caixa nem Contas a Receber.';
+        }
+
+        if ($tipo === 'dinheiro' && $movimento === 'nenhum') {
+            $avisos[] = 'Dinheiro com movimento “Nenhum” costuma ser configuração incorreta: vendas à vista não gerarão lançamento de caixa.';
+        }
+
+        if ($mobile && $movimento === 'nenhum') {
+            $avisos[] = 'Disponível no Mobile com movimento “Nenhum”: pedidos do Força de Vendas não gerarão Caixa nem Contas a Receber.';
+        }
+
+        if ($contaDestino > 0 && in_array($movimento, ['caixa', 'deposito'], true)) {
+            $avisos[] = 'Conta de Destino definida: ela pode prevalecer sobre o caixa padrão do usuário/vendedor.';
+        }
+
+        return array_values(array_unique($avisos));
     }
 
     public function closeForm(): void
@@ -311,6 +373,7 @@ class ListFormasPagamento extends ListRecords
     {
         $this->formId = null;
         $this->prazosRapidos = '';
+        $this->tipoMovimentoManual = false;
         $this->resetErrorBag();
         $this->form = [
             'codigo' => null,
@@ -321,6 +384,7 @@ class ListFormasPagamento extends ListRecords
             'prazo_cartao' => 0,
             'max_parcelas' => 1,
             'intervalo_parcelas' => 30,
+            'modo_prazo' => FormaPagamento::MODO_PRAZO_TABELA,
             'atalho' => null,
             'tipo_movimento' => 'nenhum',
             'ativo' => true,
@@ -330,6 +394,7 @@ class ListFormasPagamento extends ListRecords
             'aparece_contas_receber' => false,
             'nfce' => false,
             'disponivel_mobile' => false,
+            'gerar_qrcode_pdv' => false,
             'parcelas' => [],
         ];
     }

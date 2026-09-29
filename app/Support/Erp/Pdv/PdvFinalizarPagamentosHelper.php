@@ -182,6 +182,93 @@ final class PdvFinalizarPagamentosHelper
     }
 
     /**
+     * Prazo financeiro do carnê (max_parcelas + intervalo_parcelas).
+     *
+     * Com modo_prazo explícito:
+     * - financeiro → max>=1 e intervalo>0 (inclui 1×30 intencional)
+     * - tabela → nunca usa max/intervalo para auto-prazo
+     *
+     * Sem modo (legado / app antigo): mantém a heurística histórica
+     * excluindo o default de instalação (1 × 30).
+     */
+    public static function isPrazoFinanceiroValido(
+        int $maxParcelas,
+        int $intervaloParcelas,
+        ?string $modoPrazo = null,
+    ): bool {
+        $modo = mb_strtolower(trim((string) $modoPrazo), 'UTF-8');
+
+        if ($modo === 'tabela') {
+            return false;
+        }
+
+        if ($modo === 'financeiro') {
+            return $maxParcelas >= 1 && $intervaloParcelas > 0;
+        }
+
+        // Legado sem modo_prazo (compatibilidade).
+        if ($maxParcelas < 1 || $intervaloParcelas <= 0) {
+            return false;
+        }
+
+        if ($maxParcelas === 1 && $intervaloParcelas === 30) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Gera dias absolutos a partir do prazo financeiro: 1..max → intervalo*i.
+     *
+     * @return list<int>
+     */
+    public static function diasDePrazoFinanceiro(int $maxParcelas, int $intervaloParcelas): array
+    {
+        $max = max(1, $maxParcelas);
+        $intervalo = max(0, $intervaloParcelas);
+        $dias = [];
+
+        for ($i = 1; $i <= $max; $i++) {
+            $dias[] = $intervalo * $i;
+        }
+
+        return $dias;
+    }
+
+    /**
+     * Prioridade do carnê (boleto/cheque/crediário):
+     * 1) tabela fixa do cliente
+     * 2) prazo financeiro da forma (se modo_prazo permitir)
+     * 3) null → fallback UI atual (F2/F8/defaults)
+     *
+     * @param  list<int>|null  $diasTabelaCliente
+     * @return list<int>|null
+     */
+    public static function resolverDiasCarnePrioridade(
+        ?array $diasTabelaCliente,
+        int $maxParcelas,
+        int $intervaloParcelas,
+        ?string $modoPrazo = null,
+    ): ?array {
+        $doCliente = collect($diasTabelaCliente ?? [])
+            ->map(fn ($d): int => (int) $d)
+            ->filter(fn (int $d): bool => $d >= 0)
+            ->values()
+            ->all();
+
+        if ($doCliente !== []) {
+            return $doCliente;
+        }
+
+        if (! self::isPrazoFinanceiroValido($maxParcelas, $intervaloParcelas, $modoPrazo)) {
+            return null;
+        }
+
+        return self::diasDePrazoFinanceiro($maxParcelas, $intervaloParcelas);
+    }
+
+    /**
      * Ao escolher crediário/cheque/boleto, zera as demais formas e concentra o valor na linha escolhida.
      *
      * @param  array<int, array{forma: string, atalho: string, valor: string}>  $pagamentos

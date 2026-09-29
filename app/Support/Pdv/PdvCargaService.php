@@ -510,6 +510,9 @@ class PdvCargaService
                 'max_parcelas' => (int) $f->max_parcelas,
                 'prazo_cartao' => (int) $f->prazo_cartao,
                 'intervalo_parcelas' => (int) $f->intervalo_parcelas,
+                'modo_prazo' => Schema::hasColumn('formas_pagamento', 'modo_prazo')
+                    ? FormaPagamento::normalizeModoPrazo((string) ($f->modo_prazo ?? ''))
+                    : FormaPagamento::MODO_PRAZO_TABELA,
                 'aparece_venda' => (bool) $f->aparece_venda,
                 'aparece_contas_receber' => (bool) $f->aparece_contas_receber,
                 'nfce' => (bool) $f->nfce,

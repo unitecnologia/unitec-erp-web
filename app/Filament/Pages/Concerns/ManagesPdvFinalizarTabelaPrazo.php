@@ -218,23 +218,72 @@ trait ManagesPdvFinalizarTabelaPrazo
             ? TabelaPrazo::query()->find($cliente->tabela_prazo_id)
             : null;
 
+        $diasCliente = null;
+
         if ($tabela && filled($tabela->dias)) {
-            $this->finalizarTabelaPrazoId = (int) $tabela->id;
-            $dias = PdvFinalizarPagamentosHelper::diasDeString((string) $tabela->dias);
+            $parsed = PdvFinalizarPagamentosHelper::diasDeString((string) $tabela->dias);
 
-            if ($dias !== []) {
-                $this->finalizarParcelasQtd = (string) count($dias);
-                $this->finalizarParcelasIntervalo = (string) $this->estimarIntervalo($dias);
-                $this->gerarParcelasCrediarioPorDias($dias);
-
-                return;
+            if ($parsed !== []) {
+                $this->finalizarTabelaPrazoId = (int) $tabela->id;
+                $diasCliente = $parsed;
             }
+        }
+
+        $forma = $this->resolveFormaPagamentoCarneAtiva();
+        $dias = PdvFinalizarPagamentosHelper::resolverDiasCarnePrioridade(
+            $diasCliente,
+            (int) ($forma?->max_parcelas ?? 0),
+            (int) ($forma?->intervalo_parcelas ?? 0),
+            $forma?->modo_prazo,
+        );
+
+        if ($dias !== null && $dias !== []) {
+            // Sem tabela do cliente: não amarra a uma tabela pré-definida (F8 continua livre).
+            if ($diasCliente === null) {
+                $this->finalizarTabelaPrazoId = null;
+            }
+
+            $this->finalizarParcelasQtd = (string) count($dias);
+            $this->finalizarParcelasIntervalo = (string) $this->estimarIntervalo($dias);
+            $this->gerarParcelasCrediarioPorDias($dias);
+
+            return;
         }
 
         if ($this->finalizarParcelasRows === []) {
             $this->finalizarParcelasQtd = '1';
             $this->finalizarParcelasIntervalo = '30';
         }
+    }
+
+    /**
+     * Forma do carnê com valor (boleto/cheque/crediário) — lê max/intervalo no DB
+     * para não usar valores coercidos do array de pagamento (ex.: intervalo ?: 30).
+     */
+    protected function resolveFormaPagamentoCarneAtiva(): ?FormaPagamento
+    {
+        foreach ($this->finalizarPagamentos as $pagamento) {
+            if (! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+                continue;
+            }
+
+            if (ErpMoney::parseBr($pagamento['valor'] ?? '0') <= 0) {
+                continue;
+            }
+
+            $descricao = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+            if ($descricao === '') {
+                return null;
+            }
+
+            return FormaPagamento::query()
+                ->whereRaw('UPPER(descricao) = ?', [$descricao])
+                ->orderByDesc('ativo')
+                ->first();
+        }
+
+        return null;
     }
 
     /**
