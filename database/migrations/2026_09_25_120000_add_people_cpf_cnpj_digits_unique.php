@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\Schema;
  * Unicidade definitiva de CPF/CNPJ em people via coluna gerada STORED + UNIQUE.
  * Vários NULL (sem documento) são permitidos.
  *
- * Se houver o mesmo documento em mais de uma pessoa, a atualização para
+ * Vazio, só zeros (000000000000 e equivalentes) ou tamanho diferente de
+ * CPF (11) / CNPJ (14) viram NULL. O texto de cpf_cnpj não é alterado.
+ *
+ * Se houver o mesmo CPF/CNPJ real em mais de uma pessoa, a atualização para
  * com erro. Nenhum cadastro é apagado, mesclado ou corrigido.
  */
 return new class extends Migration
@@ -20,7 +23,14 @@ return new class extends Migration
      */
     public static function digitsExpression(string $column = 'cpf_cnpj'): string
     {
-        return "NULLIF(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL({$column}, ''), '.', ''), '-', ''), '/', ''), ' ', ''), '')";
+        $stripped = "REPLACE(REPLACE(REPLACE(REPLACE(IFNULL({$column}, ''), '.', ''), '-', ''), '/', ''), ' ', '')";
+
+        return 'CASE'
+            .' WHEN '.$stripped." = '' THEN NULL"
+            .' WHEN REPLACE('.$stripped.", '0', '') = '' THEN NULL"
+            .' WHEN LENGTH('.$stripped.') NOT IN (11, 14) THEN NULL'
+            .' ELSE '.$stripped
+            .' END';
     }
 
     public function up(): void
@@ -29,32 +39,20 @@ return new class extends Migration
             return;
         }
 
-        if (! Schema::hasColumn('people', 'cpf_cnpj_digits')) {
-            $expression = self::digitsExpression('cpf_cnpj');
-            $driver = Schema::getConnection()->getDriverName();
+        $criouAgora = false;
 
-            if (in_array($driver, ['mysql', 'mariadb'], true)) {
-                Schema::table('people', function (Blueprint $table) use ($expression): void {
-                    $table->string('cpf_cnpj_digits', 14)
-                        ->nullable()
-                        ->storedAs($expression)
-                        ->after('cpf_cnpj');
-                });
-            } elseif ($driver === 'sqlite') {
-                // Ambiente de teste: mesma semântica STORED (SQLite 3.31+).
-                Schema::table('people', function (Blueprint $table) use ($expression): void {
-                    $table->string('cpf_cnpj_digits', 14)
-                        ->nullable()
-                        ->storedAs($expression);
-                });
-            } else {
-                throw new RuntimeException(
-                    "Migration people.cpf_cnpj_digits não suportada no driver [{$driver}]. Use MySQL/MariaDB (produção) ou SQLite (testes)."
-                );
-            }
+        if (! Schema::hasColumn('people', 'cpf_cnpj_digits')) {
+            $this->criarColunaDigitos();
+            $criouAgora = true;
         }
 
         if (! $this->hasUniqueOnCpfCnpjDigits()) {
+            // Cliente que parou nesta migration já tem a coluna antiga,
+            // em que 000000000000 conta como documento e impede o índice.
+            if (! $criouAgora) {
+                $this->realinharColunaDigitos();
+            }
+
             $this->abortarSeDocumentoDuplicado();
 
             Schema::table('people', function (Blueprint $table): void {
@@ -79,6 +77,52 @@ return new class extends Migration
                 $table->dropColumn('cpf_cnpj_digits');
             }
         });
+    }
+
+    private function criarColunaDigitos(): void
+    {
+        $expression = self::digitsExpression('cpf_cnpj');
+        $driver = Schema::getConnection()->getDriverName();
+
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            Schema::table('people', function (Blueprint $table) use ($expression): void {
+                $table->string('cpf_cnpj_digits', 14)
+                    ->nullable()
+                    ->storedAs($expression)
+                    ->after('cpf_cnpj');
+            });
+
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            Schema::table('people', function (Blueprint $table) use ($expression): void {
+                $table->string('cpf_cnpj_digits', 14)
+                    ->nullable()
+                    ->storedAs($expression);
+            });
+
+            return;
+        }
+
+        throw new RuntimeException(
+            "Migration people.cpf_cnpj_digits não suportada no driver [{$driver}]. Use MySQL/MariaDB (produção) ou SQLite (testes)."
+        );
+    }
+
+    private function realinharColunaDigitos(): void
+    {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
+        // MySQL/MariaDB aceitam recriar coluna STORED em tabela com dados.
+        // O texto de cpf_cnpj permanece; só a coluna calculada muda.
+        $table = Schema::getConnection()->getTablePrefix().'people';
+        DB::statement("ALTER TABLE `{$table}` DROP COLUMN `cpf_cnpj_digits`");
+        $this->criarColunaDigitos();
     }
 
     private function abortarSeDocumentoDuplicado(): void

@@ -155,8 +155,22 @@ class PersonCpfCnpjDigitsUniqueTest extends TestCase
     {
         $migration = require database_path('migrations/2026_09_25_120000_add_people_cpf_cnpj_digits_unique.php');
         $expr = $migration::digitsExpression();
-        $this->assertStringContainsString('NULLIF(REPLACE', $expr);
+        $this->assertStringContainsString('CASE', $expr);
+        $this->assertStringContainsString('REPLACE(', $expr);
+        $this->assertStringContainsString('NOT IN (11, 14)', $expr);
         $this->assertStringNotContainsString('REGEXP_REPLACE', $expr);
+    }
+
+    public function test_zeros_repetidos_viram_null_e_nao_bloqueiam_o_indice(): void
+    {
+        $a = $this->criar(['cpf_cnpj' => '000000000000']);
+        $b = $this->criar(['cpf_cnpj' => '000.000.000-000']);
+
+        $this->assertTrue($this->indiceUnicoExiste());
+        $this->assertNull($a->fresh()->cpf_cnpj_digits);
+        $this->assertNull($b->fresh()->cpf_cnpj_digits);
+        $this->assertSame('000000000000', $a->fresh()->cpf_cnpj);
+        $this->assertSame('000.000.000-000', $b->fresh()->cpf_cnpj);
     }
 
     private function indiceUnicoExiste(): bool
