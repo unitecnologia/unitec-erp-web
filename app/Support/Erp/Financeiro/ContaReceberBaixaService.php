@@ -76,7 +76,8 @@ final class ContaReceberBaixaService
      *     recebido_em?: string|null,
      *     numero_cheque?: string|null,
      *     plano_conta_id?: int|null,
-     *     multa?: float
+     *     multa?: float,
+     *     grupo?: array{juros_editado?: bool, multa_editada?: bool, desconto_editado?: bool, valor_editado?: bool}
      * }  $opcoes
      * @return array{ok: int, total: float, parciais: int}
      */
@@ -120,6 +121,7 @@ final class ContaReceberBaixaService
             : null;
         $numeroCheque = trim((string) ($opcoes['numero_cheque'] ?? ''));
         $personalizada = count($ids) === 1 && $valorInformado !== null;
+        $grupo = is_array($opcoes['grupo'] ?? null) ? $opcoes['grupo'] : null;
         $planoContaId = filled($opcoes['plano_conta_id'] ?? null) ? (int) $opcoes['plano_conta_id'] : null;
         $planoNome = null;
 
@@ -154,6 +156,7 @@ final class ContaReceberBaixaService
             $valorInformado,
             $numeroCheque,
             $personalizada,
+            $grupo,
             $planoContaId,
             $planoNome,
             &$ok,
@@ -165,8 +168,36 @@ final class ContaReceberBaixaService
                 ->lockForUpdate()
                 ->get();
 
+            $rateio = is_array($grupo)
+                ? $this->ratearGrupo(
+                    $contas,
+                    $recebidoEm,
+                    $jurosInformado,
+                    $multaInformada,
+                    $descontoInformado,
+                    (float) ($valorInformado ?? 0),
+                    is_array($grupo) ? $grupo : [],
+                )
+                : null;
+
             foreach ($contas as $conta) {
-                if ($personalizada) {
+                $item = is_array($rateio) ? ($rateio[(int) $conta->id] ?? null) : null;
+
+                if (is_array($rateio)) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    $informada = true;
+                    $juros = $item['juros'];
+                    $desconto = $item['desconto'];
+                    $percJ = $item['perc_juros'];
+                    $percD = $item['perc_desconto'];
+                    $multa = $item['multa'];
+                    $valorAReceber = $item['valor_a_receber'];
+                    $valorRecebido = $item['valor_recebido'];
+                } elseif ($personalizada) {
+                    $informada = true;
                     $saldo = round((float) $conta->saldo, 2);
 
                     if ($saldo <= 0) {
@@ -203,6 +234,7 @@ final class ContaReceberBaixaService
                         throw new InvalidArgumentException('Valor recebido maior que o saldo.');
                     }
                 } else {
+                    $informada = false;
                     $jurosAntes = round((float) $conta->juros, 2);
                     $multa = ContaReceberJurosCarteira::calcularMulta($conta, \Carbon\Carbon::parse($recebidoEm));
                     $conta->multa = round((float) $conta->multa + $multa, 2);
@@ -238,9 +270,9 @@ final class ContaReceberBaixaService
                     $multa,
                 );
 
-                $conta->juros = round((float) $conta->juros + ($personalizada ? $juros : 0), 2);
-                $conta->multa = round((float) $conta->multa + ($personalizada ? $multa : 0), 2);
-                $conta->desconto = round((float) $conta->desconto + ($personalizada ? $desconto : 0), 2);
+                $conta->juros = round((float) $conta->juros + ($informada ? $juros : 0), 2);
+                $conta->multa = round((float) $conta->multa + ($informada ? $multa : 0), 2);
+                $conta->desconto = round((float) $conta->desconto + ($informada ? $desconto : 0), 2);
                 $conta->valor_recebido = round((float) $conta->valor_recebido + $valorRecebido, 2);
                 $conta->recebido_em = $recebidoEm;
                 $conta->save();
@@ -270,6 +302,172 @@ final class ContaReceberBaixaService
             'total' => round($total, 2),
             'parciais' => $parciais,
         ];
+    }
+
+    /**
+     * Reparte juros, multa, desconto e valor do formulário entre os títulos do grupo.
+     * O que não foi editado continua com a sugestão de cada título.
+     *
+     * @param  \Illuminate\Support\Collection<int, ContaReceber>  $contas
+     * @param  array{juros_editado?: bool, multa_editada?: bool, desconto_editado?: bool, valor_editado?: bool}  $flags
+     * @return array<int, array{juros: float, multa: float, desconto: float, perc_juros: float, perc_desconto: float, valor_a_receber: float, valor_recebido: float}>
+     */
+    private function ratearGrupo(
+        $contas,
+        string $recebidoEm,
+        float $jurosTotal,
+        float $multaTotal,
+        float $descontoTotal,
+        float $valorTotal,
+        array $flags,
+    ): array {
+        $data = \Carbon\Carbon::parse($recebidoEm);
+        $linhas = [];
+
+        foreach ($contas as $conta) {
+            $saldo = round((float) $conta->saldo, 2);
+            if ($saldo <= 0) {
+                continue;
+            }
+
+            $podeMulta = round((float) $conta->multa, 2) <= 0.009;
+            $linhas[] = [
+                'id' => (int) $conta->id,
+                'saldo' => $saldo,
+                'juros' => ContaReceberJurosCarteira::jurosAdicional($conta, $data),
+                'multa' => $podeMulta ? ContaReceberJurosCarteira::calcularMulta($conta, $data) : 0.0,
+                'peso_multa' => $podeMulta ? $saldo : 0.0,
+            ];
+        }
+
+        if ($linhas === []) {
+            return [];
+        }
+
+        if (! empty($flags['juros_editado'])) {
+            $this->distribuirProporcional($linhas, 'juros', $jurosTotal, 'saldo');
+        }
+
+        if (! empty($flags['multa_editada'])) {
+            $this->distribuirProporcional($linhas, 'multa', $multaTotal, 'peso_multa');
+        }
+
+        foreach ($linhas as $i => $linha) {
+            $base = round($linha['saldo'] + $linha['juros'] + $linha['multa'], 2);
+            $linhas[$i]['base'] = $base;
+            $linhas[$i]['desconto'] = 0.0;
+        }
+
+        if (! empty($flags['desconto_editado'])) {
+            $this->distribuirProporcional($linhas, 'desconto', $descontoTotal, 'base');
+            foreach ($linhas as $i => $linha) {
+                $linhas[$i]['desconto'] = round(min((float) $linha['desconto'], (float) $linha['base']), 2);
+            }
+        }
+
+        $somaDevido = 0.0;
+        foreach ($linhas as $i => $linha) {
+            $devido = round(max(0, (float) $linha['base'] - (float) $linha['desconto']), 2);
+            $linhas[$i]['devido'] = $devido;
+            $somaDevido = round($somaDevido + $devido, 2);
+        }
+
+        if (! empty($flags['valor_editado'])) {
+            if ($valorTotal <= 0) {
+                throw new InvalidArgumentException('Informe o valor recebido.');
+            }
+
+            if ($valorTotal > $somaDevido + 0.009) {
+                throw new InvalidArgumentException('Valor recebido maior que o saldo.');
+            }
+
+            $this->distribuirProporcional($linhas, 'valor', $valorTotal, 'devido');
+            foreach ($linhas as $i => $linha) {
+                $linhas[$i]['valor'] = round(min((float) $linha['valor'], (float) $linha['devido']), 2);
+            }
+
+            $falta = round($valorTotal - array_sum(array_map(fn (array $linha): float => (float) $linha['valor'], $linhas)), 2);
+            if ($falta > 0) {
+                foreach ($linhas as $i => $linha) {
+                    $espaco = round((float) $linha['devido'] - (float) $linha['valor'], 2);
+                    if ($espaco <= 0) {
+                        continue;
+                    }
+
+                    $add = min($espaco, $falta);
+                    $linhas[$i]['valor'] = round((float) $linha['valor'] + $add, 2);
+                    $falta = round($falta - $add, 2);
+                    if ($falta <= 0) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            foreach ($linhas as $i => $linha) {
+                $linhas[$i]['valor'] = $linha['devido'];
+            }
+        }
+
+        $saida = [];
+        foreach ($linhas as $linha) {
+            if ((float) $linha['valor'] <= 0) {
+                continue;
+            }
+
+            $saida[(int) $linha['id']] = [
+                'juros' => round((float) $linha['juros'], 2),
+                'multa' => round((float) $linha['multa'], 2),
+                'desconto' => round((float) $linha['desconto'], 2),
+                'perc_juros' => (float) $linha['saldo'] > 0 ? round(((float) $linha['juros'] / (float) $linha['saldo']) * 100, 4) : 0.0,
+                'perc_desconto' => (float) $linha['base'] > 0 ? round(((float) $linha['desconto'] / (float) $linha['base']) * 100, 4) : 0.0,
+                'valor_a_receber' => (float) $linha['devido'],
+                'valor_recebido' => round((float) $linha['valor'], 2),
+            ];
+        }
+
+        if ($saida === []) {
+            throw new InvalidArgumentException('Informe o valor recebido.');
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $linhas
+     */
+    private function distribuirProporcional(array &$linhas, string $campo, float $total, string $peso): void
+    {
+        $total = round(max(0, $total), 2);
+
+        foreach ($linhas as $i => $linha) {
+            $linhas[$i][$campo] = 0.0;
+        }
+
+        $indices = [];
+        $pesoTotal = 0.0;
+        foreach ($linhas as $i => $linha) {
+            $p = round((float) ($linha[$peso] ?? 0), 2);
+            if ($p > 0) {
+                $indices[] = $i;
+                $pesoTotal = round($pesoTotal + $p, 2);
+            }
+        }
+
+        if ($indices === [] || $total <= 0 || $pesoTotal <= 0) {
+            return;
+        }
+
+        $acumulado = 0.0;
+        $ultimo = $indices[array_key_last($indices)];
+        foreach ($indices as $i) {
+            if ($i === $ultimo) {
+                $linhas[$i][$campo] = round(max(0, $total - $acumulado), 2);
+            } else {
+                $parte = round($total * ((float) $linhas[$i][$peso] / $pesoTotal), 2);
+                $linhas[$i][$campo] = $parte;
+                $acumulado = round($acumulado + $parte, 2);
+            }
+        }
     }
 
     private function registrarPagamento(

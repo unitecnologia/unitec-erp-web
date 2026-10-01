@@ -10,6 +10,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 trait ManagesContaReceberBaixaModal
@@ -47,6 +48,12 @@ trait ManagesContaReceberBaixaModal
     public string $baixaCheque = '';
 
     public bool $baixaValorEditado = false;
+
+    public bool $baixaJurosEditado = false;
+
+    public bool $baixaDescontoEditado = false;
+
+    public bool $baixaVencimentosMistos = false;
 
     /** @var array<string, string> */
     public array $baixaDados = [];
@@ -119,6 +126,8 @@ trait ManagesContaReceberBaixaModal
         $this->baixaFormaPagamentoId = (int) ($this->baixaFormasOptions[0]['id'] ?? 0);
         $this->baixaUnica = count($this->baixaContaIds) === 1;
         $this->baixaValorEditado = false;
+        $this->baixaJurosEditado = false;
+        $this->baixaDescontoEditado = false;
         $this->baixaCheque = '';
         $this->baixaData = ErpTimezone::toLocal()->toDateString();
         $this->baixaJuros = '0,00';
@@ -127,16 +136,7 @@ trait ManagesContaReceberBaixaModal
         $this->baixaMultaEditada = false;
         $this->baixaDesconto = '0,00';
         $this->baixaValorRecebido = $this->baixaResumoTotal;
-
-        if ($this->baixaUnica) {
-            $conta = $pendentes->first();
-            $saldo = round((float) $conta->saldo, 2);
-            $dataPagamento = \Carbon\Carbon::parse($this->baixaData);
-            $jurosSugerido = round(max(0, ContaReceberJurosCarteira::calcularValor($conta, $dataPagamento) - (float) $conta->juros), 2);
-            $this->baixaJuros = ErpMoney::formatBr($jurosSugerido);
-            $this->baixaValorRecebido = ErpMoney::formatBr(round($saldo + $jurosSugerido, 2));
-            $this->preencherBaixaUnica($conta);
-        }
+        $this->preencherBaixa($pendentes);
 
         $this->baixaModalOpen = true;
     }
@@ -148,27 +148,58 @@ trait ManagesContaReceberBaixaModal
 
     public function updatedBaixaData(): void
     {
-        $this->atualizarDiasAtraso($this->baixaVencimentoIso);
+        if ($this->baixaVencimentosMistos) {
+            $this->baixaDiasAtraso = '—';
+        } else {
+            $this->atualizarDiasAtraso($this->baixaVencimentoIso);
+        }
 
-        if (! $this->baixaUnica || $this->baixaMultaEditada) {
+        $atualizarMulta = ! $this->baixaMultaEditada;
+        $atualizarJuros = ! $this->baixaUnica && ! $this->baixaJurosEditado;
+
+        if (! $atualizarMulta && ! $atualizarJuros) {
             return;
         }
 
-        $conta = ContaReceber::query()->find((int) ($this->baixaContaIds[0] ?? 0));
-        if (! $conta) {
+        $contas = ContaReceber::query()->whereIn('id', $this->baixaContaIds)->get();
+        if ($contas->isEmpty()) {
             return;
         }
 
         $data = $this->baixaData !== '' ? \Carbon\Carbon::parse($this->baixaData) : null;
-        $this->baixaMulta = ErpMoney::formatBr(ContaReceberJurosCarteira::calcularMulta($conta, $data));
+
+        if ($atualizarMulta) {
+            $multa = round($contas->sum(fn (ContaReceber $conta): float => ContaReceberJurosCarteira::calcularMulta($conta, $data)), 2);
+            $this->baixaMulta = ErpMoney::formatBr($multa);
+        }
+
+        if ($atualizarJuros) {
+            $juros = round($contas->sum(fn (ContaReceber $conta): float => ContaReceberJurosCarteira::jurosAdicional($conta, $data)), 2);
+            $this->baixaJuros = ErpMoney::formatBr($juros);
+            $this->baixaPercJuros = $this->percentualSobre($juros, ErpMoney::parseBr($this->baixaSaldo));
+        }
+
         $this->recalcularBaixaReceber();
+    }
+
+    public function updatingBaixaMulta(mixed $value): void
+    {
+        if ($this->baixaUnica || $this->dinheiroMudou($value, $this->baixaMulta)) {
+            $this->baixaMultaEditada = true;
+        }
     }
 
     public function updatedBaixaMulta(mixed $value): void
     {
-        $this->baixaMultaEditada = true;
         $this->baixaMulta = ErpMoney::formatBr(ErpMoney::parseBr($value));
         $this->recalcularBaixaReceber();
+    }
+
+    public function updatingBaixaPercJuros(mixed $value): void
+    {
+        if ($this->dinheiroMudou($value, $this->baixaPercJuros)) {
+            $this->baixaJurosEditado = true;
+        }
     }
 
     public function updatedBaixaPercJuros(mixed $value): void
@@ -180,6 +211,13 @@ trait ManagesContaReceberBaixaModal
         $this->recalcularBaixaReceber();
     }
 
+    public function updatingBaixaJuros(mixed $value): void
+    {
+        if ($this->dinheiroMudou($value, $this->baixaJuros)) {
+            $this->baixaJurosEditado = true;
+        }
+    }
+
     public function updatedBaixaJuros(mixed $value): void
     {
         $juros = ErpMoney::parseBr($value);
@@ -187,6 +225,13 @@ trait ManagesContaReceberBaixaModal
         $this->baixaJuros = ErpMoney::formatBr($juros);
         $this->baixaPercJuros = $this->percentualSobre($juros, $saldo);
         $this->recalcularBaixaReceber();
+    }
+
+    public function updatingBaixaPercDesconto(mixed $value): void
+    {
+        if ($this->dinheiroMudou($value, $this->baixaPercDesconto)) {
+            $this->baixaDescontoEditado = true;
+        }
     }
 
     public function updatedBaixaPercDesconto(mixed $value): void
@@ -198,6 +243,13 @@ trait ManagesContaReceberBaixaModal
         $this->recalcularBaixaReceber();
     }
 
+    public function updatingBaixaDesconto(mixed $value): void
+    {
+        if ($this->dinheiroMudou($value, $this->baixaDesconto)) {
+            $this->baixaDescontoEditado = true;
+        }
+    }
+
     public function updatedBaixaDesconto(mixed $value): void
     {
         $desconto = ErpMoney::parseBr($value);
@@ -207,9 +259,15 @@ trait ManagesContaReceberBaixaModal
         $this->recalcularBaixaReceber();
     }
 
+    public function updatingBaixaValorRecebido(mixed $value): void
+    {
+        if ($this->baixaUnica || $this->dinheiroMudou($value, $this->baixaValorRecebido)) {
+            $this->baixaValorEditado = true;
+        }
+    }
+
     public function updatedBaixaValorRecebido(mixed $value): void
     {
-        $this->baixaValorEditado = true;
         $this->baixaValorRecebido = ErpMoney::formatBr(ErpMoney::parseBr($value));
     }
 
@@ -250,6 +308,9 @@ trait ManagesContaReceberBaixaModal
         $this->baixaData = '';
         $this->baixaCheque = '';
         $this->baixaValorEditado = false;
+        $this->baixaJurosEditado = false;
+        $this->baixaDescontoEditado = false;
+        $this->baixaVencimentosMistos = false;
         $this->baixaDados = [];
         $this->baixaSaldo = '0,00';
         $this->baixaPercJuros = '0,00';
@@ -265,35 +326,76 @@ trait ManagesContaReceberBaixaModal
         $this->baixaDestinosPorForma = [];
     }
 
-    protected function preencherBaixaUnica(ContaReceber $conta): void
+    /**
+     * @param  Collection<int, ContaReceber>  $contas
+     */
+    protected function preencherBaixa(Collection $contas): void
     {
-        $conta->loadMissing('cliente:id,nome_razao');
+        $contas->loadMissing('cliente:id,nome_razao');
         $this->carregarDestinosBaixa();
 
-        $saldo = round((float) $conta->saldo, 2);
-        $cliente = trim((string) ($conta->cliente?->nome_razao ?? ''));
+        $saldo = round($contas->sum(fn (ContaReceber $conta): float => (float) $conta->saldo), 2);
+        $nomes = $contas
+            ->map(fn (ContaReceber $conta): string => mb_strtoupper(trim((string) ($conta->cliente?->nome_razao ?? '')), 'UTF-8'))
+            ->filter()
+            ->unique()
+            ->values();
+        $cliente = $nomes->count() === 1 ? (string) $nomes->first() : ($nomes->isEmpty() ? '—' : 'VÁRIOS');
+
+        if ($contas->count() === 1) {
+            $conta = $contas->first();
+            $documento = mb_strtoupper(trim((string) ($conta->documento ?: '—')), 'UTF-8');
+            $emissao = $conta->emissao?->format('d/m/Y') ?? '—';
+            $vencimento = $conta->vencimento?->format('d/m/Y') ?? '—';
+            $this->baixaVencimentosMistos = false;
+            $this->baixaVencimentoIso = $conta->vencimento?->toDateString() ?? '';
+            $this->atualizarDiasAtraso($this->baixaVencimentoIso);
+        } else {
+            $documento = $contas->count().' TÍTULOS';
+            $emissoes = $contas->map(fn (ContaReceber $conta): string => $conta->emissao?->format('d/m/Y') ?? '')->unique();
+            $vencimentos = $contas->map(fn (ContaReceber $conta): string => $conta->vencimento?->format('d/m/Y') ?? '')->unique();
+            $emissao = $emissoes->count() === 1 && (string) $emissoes->first() !== '' ? (string) $emissoes->first() : '—';
+            $vencimento = $vencimentos->count() === 1 && (string) $vencimentos->first() !== '' ? (string) $vencimentos->first() : '—';
+            $isos = $contas->map(fn (ContaReceber $conta): string => $conta->vencimento?->toDateString() ?? '')->unique();
+            $this->baixaVencimentosMistos = $isos->count() !== 1 || (string) $isos->first() === '';
+            $this->baixaVencimentoIso = $this->baixaVencimentosMistos ? '' : (string) $isos->first();
+            if ($this->baixaVencimentosMistos) {
+                $this->baixaDiasAtraso = '—';
+            } else {
+                $this->atualizarDiasAtraso($this->baixaVencimentoIso);
+            }
+        }
 
         $this->baixaDados = [
-            'cliente' => $cliente !== '' ? mb_strtoupper($cliente, 'UTF-8') : '—',
-            'documento' => mb_strtoupper(trim((string) ($conta->documento ?: '—')), 'UTF-8'),
-            'emissao' => $conta->emissao?->format('d/m/Y') ?? '—',
-            'vencimento' => $conta->vencimento?->format('d/m/Y') ?? '—',
-            'valor' => ErpMoney::formatBr((float) $conta->valor),
-            'valor_recebido' => ErpMoney::formatBr((float) $conta->valor_recebido),
+            'cliente' => $cliente,
+            'documento' => $documento,
+            'emissao' => $emissao,
+            'vencimento' => $vencimento,
+            'valor' => ErpMoney::formatBr(round($contas->sum(fn (ContaReceber $conta): float => (float) $conta->valor), 2)),
+            'valor_recebido' => ErpMoney::formatBr(round($contas->sum(fn (ContaReceber $conta): float => (float) $conta->valor_recebido), 2)),
             'saldo' => ErpMoney::formatBr($saldo),
         ];
         $this->baixaSaldo = ErpMoney::formatBr($saldo);
+        $this->baixaResumoTotal = $this->baixaSaldo;
+
         $data = $this->baixaData !== '' ? \Carbon\Carbon::parse($this->baixaData) : null;
-        $this->baixaMultaPct = number_format(ContaReceberJurosCarteira::percentuaisEfetivos($conta)['multa_pct'], 2, ',', '.');
-        $this->baixaMulta = ErpMoney::formatBr(ContaReceberJurosCarteira::calcularMulta($conta, $data));
+        $pcts = $contas
+            ->map(fn (ContaReceber $conta): string => number_format(ContaReceberJurosCarteira::percentuaisEfetivos($conta)['multa_pct'], 2, ',', '.'))
+            ->unique();
+        $this->baixaMultaPct = $pcts->count() === 1 ? (string) $pcts->first() : '—';
+
+        $juros = round($contas->sum(fn (ContaReceber $conta): float => ContaReceberJurosCarteira::jurosAdicional($conta, $data)), 2);
+        $multa = round($contas->sum(fn (ContaReceber $conta): float => ContaReceberJurosCarteira::calcularMulta($conta, $data)), 2);
+        $this->baixaJuros = ErpMoney::formatBr($juros);
+        $this->baixaMulta = ErpMoney::formatBr($multa);
         $this->baixaMultaEditada = false;
-        $this->baixaPercJuros = $this->percentualSobre(ErpMoney::parseBr($this->baixaJuros), $saldo);
+        $this->baixaPercJuros = $this->percentualSobre($juros, $saldo);
         $this->baixaPercDesconto = '0,00';
-        $this->baixaVencimentoIso = $conta->vencimento?->toDateString() ?? '';
-        $this->atualizarDiasAtraso($this->baixaVencimentoIso);
+        $this->baixaDesconto = '0,00';
         $this->syncContaDestinoBaixa();
         $this->baixaPlanosOptions = $this->planosCreditoBaixaOptions();
-        $this->baixaPlanoContaId = $this->sugerirPlanoBaixa($conta);
+        $planosTitulo = $contas->map(fn (ContaReceber $conta): int => (int) ($conta->plano_conta_id ?? 0))->unique();
+        $this->baixaPlanoContaId = $this->sugerirPlanoBaixa($planosTitulo->count() === 1 ? $contas->first() : null);
         $this->recalcularBaixaReceber();
     }
 
@@ -361,10 +463,10 @@ trait ManagesContaReceberBaixaModal
             ->all();
     }
 
-    protected function sugerirPlanoBaixa(ContaReceber $conta): string
+    protected function sugerirPlanoBaixa(?ContaReceber $conta): string
     {
         $ids = array_map(fn (array $plano): int => (int) $plano['id'], $this->baixaPlanosOptions);
-        $doTitulo = (int) ($conta->plano_conta_id ?? 0);
+        $doTitulo = (int) ($conta?->plano_conta_id ?? 0);
 
         if ($doTitulo > 0 && in_array($doTitulo, $ids, true)) {
             return (string) $doTitulo;
@@ -403,26 +505,31 @@ trait ManagesContaReceberBaixaModal
             return;
         }
 
-        $opcoes = [];
+        if ((int) $this->baixaPlanoContaId <= 0) {
+            Notification::make()
+                ->title('Selecione o plano de contas.')
+                ->warning()
+                ->send();
 
-        if ($this->baixaUnica) {
-            if ((int) $this->baixaPlanoContaId <= 0) {
-                Notification::make()
-                    ->title('Selecione o plano de contas.')
-                    ->warning()
-                    ->send();
+            return;
+        }
 
-                return;
-            }
+        $opcoes = [
+            'juros' => ErpMoney::parseBr($this->baixaJuros),
+            'multa' => ErpMoney::parseBr($this->baixaMulta),
+            'desconto' => ErpMoney::parseBr($this->baixaDesconto),
+            'valor_recebido' => ErpMoney::parseBr($this->baixaValorRecebido),
+            'recebido_em' => $this->baixaData,
+            'numero_cheque' => $this->baixaCheque,
+            'plano_conta_id' => (int) $this->baixaPlanoContaId,
+        ];
 
-            $opcoes = [
-                'juros' => ErpMoney::parseBr($this->baixaJuros),
-                'multa' => ErpMoney::parseBr($this->baixaMulta),
-                'desconto' => ErpMoney::parseBr($this->baixaDesconto),
-                'valor_recebido' => ErpMoney::parseBr($this->baixaValorRecebido),
-                'recebido_em' => $this->baixaData,
-                'numero_cheque' => $this->baixaCheque,
-                'plano_conta_id' => (int) $this->baixaPlanoContaId,
+        if (! $this->baixaUnica) {
+            $opcoes['grupo'] = [
+                'juros_editado' => $this->baixaJurosEditado,
+                'multa_editada' => $this->baixaMultaEditada,
+                'desconto_editado' => $this->baixaDescontoEditado,
+                'valor_editado' => $this->baixaValorEditado,
             ];
         }
 
@@ -468,6 +575,11 @@ trait ManagesContaReceberBaixaModal
             ->body('Total recebido: R$ '.ErpMoney::formatBr((float) $resultado['total']))
             ->success()
             ->send();
+    }
+
+    protected function dinheiroMudou(mixed $novo, string $atual): bool
+    {
+        return abs(round(ErpMoney::parseBr($novo), 2) - round(ErpMoney::parseBr($atual), 2)) > 0.001;
     }
 
     /**

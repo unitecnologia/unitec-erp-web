@@ -155,6 +155,14 @@ final class ContaReceberJurosCarteira
     }
 
     /**
+     * Juros ainda não lançados no título (o que a baixa individual sugere em R$).
+     */
+    public static function jurosAdicional(ContaReceber $conta, ?Carbon $naData = null): float
+    {
+        return round(max(0, self::calcularValor($conta, $naData) - (float) $conta->juros), 2);
+    }
+
+    /**
      * Valor de juros em R$ pelo atraso (após carência), sobre o valor do título.
      */
     public static function calcularValor(ContaReceber $conta, ?Carbon $naData = null): float

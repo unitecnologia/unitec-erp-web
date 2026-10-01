@@ -23,7 +23,6 @@
             </div>
 
             <div class="erp-lookup-modal__body erp-receber-baixa-modal__body">
-                @if ($this->baixaUnica)
                     <section class="erp-receber-baixa-modal__card">
                         <h4 class="erp-receber-baixa-modal__card-title">Dados do título</h4>
                         <div class="erp-receber-baixa-modal__kv erp-receber-baixa-modal__kv--full">
@@ -132,36 +131,6 @@
                             <input type="text" class="erp-receber-baixa-modal__select" wire:model="baixaCheque" maxlength="40">
                         </label>
                     </div>
-                @else
-                    <div class="erp-receber-baixa-modal__resumo">
-                        <div class="erp-receber-baixa-modal__resumo-item">
-                            <span class="erp-receber-baixa-modal__label">Quantidade</span>
-                            <strong class="erp-receber-baixa-modal__value">{{ $this->baixaResumoQtd }}</strong>
-                        </div>
-                        <div class="erp-receber-baixa-modal__resumo-item">
-                            <span class="erp-receber-baixa-modal__label">Total a receber</span>
-                            <strong class="erp-receber-baixa-modal__value erp-receber-baixa-modal__value--money">
-                                R$ {{ $this->baixaResumoTotal }}
-                            </strong>
-                        </div>
-                    </div>
-
-                    <label class="erp-receber-baixa-modal__field">
-                        <span class="erp-receber-baixa-modal__label">Meio de pagamento</span>
-                        <select
-                            class="erp-receber-baixa-modal__select"
-                            wire:model.live="baixaFormaPagamentoId"
-                            autofocus
-                        >
-                            @foreach ($this->baixaFormasOptions as $forma)
-                                <option value="{{ $forma['id'] }}">{{ $forma['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <p class="erp-receber-baixa-modal__hint">
-                        A baixa usa o saldo em aberto de cada título selecionado.
-                    </p>
-                @endif
             </div>
 
             <div class="erp-receber-baixa-modal__footer">
