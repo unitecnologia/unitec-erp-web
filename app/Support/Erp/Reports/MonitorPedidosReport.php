@@ -147,6 +147,7 @@ final class MonitorPedidosReport
         $ordersByVenda = ForcaVendasOrder::query()
             ->whereIn('venda_id', $vendaIds)
             ->when($empresaId !== null && $empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->with('pedido:id,observacoes')
             ->get()
             ->keyBy(static fn (ForcaVendasOrder $order): int => (int) $order->venda_id);
 
@@ -250,7 +251,7 @@ final class MonitorPedidosReport
                 order: $order,
                 baseDate: $pedido->data,
             ),
-            obsPedido: (string) ($pedido->observacoes ?? ''),
+            obsPedido: (string) ($pedido->observacoes ?: (is_array($order->payload) ? ($order->payload['observacoes'] ?? '') : '')),
             itens: $itens,
             status: self::statusFromOrder($order),
         );
@@ -319,7 +320,7 @@ final class MonitorPedidosReport
                 order: $order,
                 baseDate: $venda->data,
             ),
-            obsPedido: '',
+            obsPedido: (string) ($order?->pedido?->observacoes ?: (is_array($order?->payload) ? ($order->payload['observacoes'] ?? '') : '')),
             itens: $itens,
             status: $order ? self::statusFromOrder($order) : self::statusFromVenda($venda),
         );

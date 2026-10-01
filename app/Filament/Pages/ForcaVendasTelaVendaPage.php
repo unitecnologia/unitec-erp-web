@@ -99,6 +99,9 @@ class ForcaVendasTelaVendaPage extends Page
 
     public string $clienteWhatsapp = '';
 
+    /** Observação cadastrada em people.observacoes. Preenchida em aplicarCliente(). */
+    public string $clienteObservacoes = '';
+
     public string $clienteBusca = '';
 
     /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, doc_tipo?: string, limite?: string, utilizado?: string, vencidas?: string, tem_vencidas?: bool}> */
@@ -213,6 +216,10 @@ class ForcaVendasTelaVendaPage extends Page
 
     public string $observacoes = '';
 
+    public bool $observacaoPedidoModalOpen = false;
+
+    public bool $observacaoClienteModalOpen = false;
+
     public string $aberturaData = '';
 
     public string $aberturaHora = '';
@@ -300,6 +307,9 @@ class ForcaVendasTelaVendaPage extends Page
         $this->acrescimoPedidoValor = '0,00';
         $this->fecharMargemVenda();
         $this->observacoes = '';
+        $this->clienteObservacoes = '';
+        $this->observacaoPedidoModalOpen = false;
+        $this->observacaoClienteModalOpen = false;
         $this->aberturaData = $agora->format('d/m/Y');
         $this->aberturaHora = $agora->format('H:i:s');
         $this->meiosPagamento = [];
@@ -363,6 +373,72 @@ class ForcaVendasTelaVendaPage extends Page
     public function sair(): void
     {
         $this->redirect(ForcaVendasMonitorResource::getUrl('index'));
+    }
+
+    public function abrirObservacaoPedido(): void
+    {
+        $this->observacoes = $this->observacaoPedidoCaixaAlta($this->observacoes);
+        $this->observacaoPedidoModalOpen = true;
+        $this->dispatch('erp-fv-focus-obs-pedido');
+    }
+
+    public function fecharObservacaoPedido(?string $texto = null): void
+    {
+        $this->observacoes = $this->observacaoPedidoCaixaAlta($texto ?? $this->observacoes);
+        $this->observacaoPedidoModalOpen = false;
+        $this->persistirObservacaoPedidoGravada();
+    }
+
+    private function observacaoPedidoCaixaAlta(?string $texto): string
+    {
+        return trim(mb_strtoupper((string) $texto, 'UTF-8'));
+    }
+
+    /**
+     * Pedido já aberto: grava só pedidos.observacoes (e o mesmo texto no payload).
+     * Venda nova continua só em memória até o F3/F4.
+     */
+    private function persistirObservacaoPedidoGravada(): void
+    {
+        if (! $this->pedidoId) {
+            return;
+        }
+
+        $order = ForcaVendasOrder::query()->with('pedido')->find($this->pedidoId);
+        $pedido = $order?->pedido;
+
+        if (! $order || ! $pedido) {
+            return;
+        }
+
+        try {
+            app(ForcaVendasTelaVendaService::class)->assertEditavel($order);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $texto = $this->observacoes !== '' ? $this->observacoes : null;
+        $pedido->update(['observacoes' => $texto]);
+
+        $payload = is_array($order->payload) ? $order->payload : [];
+        $payload['observacoes'] = $texto;
+        $order->update(['payload' => $payload]);
+    }
+
+    public function abrirObservacaoCliente(): void
+    {
+        if (trim($this->clienteObservacoes) === '' || Person::isCodigoConsumidorFinal($this->clienteCodigo)) {
+            $this->observacaoClienteModalOpen = false;
+
+            return;
+        }
+
+        $this->observacaoClienteModalOpen = true;
+    }
+
+    public function fecharObservacaoCliente(): void
+    {
+        $this->observacaoClienteModalOpen = false;
     }
 
     public function updatedClienteBusca(string $value): void
@@ -3274,6 +3350,8 @@ class ForcaVendasTelaVendaPage extends Page
         $this->clienteUf = (string) ($person->uf ?? '');
         $this->clienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
         $this->clienteWhatsapp = (string) ($person->whatsapp ?? $person->celular1 ?? '');
+        $this->clienteObservacoes = trim((string) ($person->observacoes ?? ''));
+        $this->observacaoClienteModalOpen = false;
 
         // Sempre realinha a tabela: cliente (se tiver) senão vendedor.
         $this->carregarTabelaPrecoPadrao();

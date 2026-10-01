@@ -1626,6 +1626,64 @@
     border-radius: 999px;
 }
 
+.erp-fv-tela-venda-page .erp-fv-tv__obs-cliente {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    height: 2.15rem;
+    margin: 0 0.05rem;
+    padding: 0 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__obs-cliente:hover {
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #60a5fa;
+}
+
+/* Com o botão de obs, quem cede espaço é a razão social. CPF/CNPJ fica inteiro. */
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--cod,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--doc,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--fone {
+    flex-shrink: 0;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--doc {
+    width: 11.75rem;
+    flex-basis: 11.75rem;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--grow {
+    flex: 1 1 0;
+    min-width: 6rem;
+}
+
+.erp-fv-tela-venda-page #erp-fv-obs-pedido {
+    text-transform: uppercase;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-obs__text {
+    width: 100%;
+    min-height: 9rem !important;
+    resize: vertical;
+    line-height: 1.4;
+    font-weight: 550;
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-obs__text[readonly],
+.erp-fv-tela-venda-page .erp-fv-tv-obs__text[data-erp-locked] {
+    resize: none;
+    background: #f8fafc !important;
+    cursor: default;
+}
+
 /* Sair */
 .erp-fv-tela-venda-page .erp-fv-tv-btn--exit {
     margin-left: auto;

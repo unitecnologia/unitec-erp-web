@@ -40,13 +40,17 @@
         </span>
         <span class="erp-nfe-actions__label"><kbd>F4</kbd> Fechar</span>
     </button>
-    <button type="button" wire:click="cancelarVenda" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--cancel" data-erp-key="F5">
+
+    <button type="button" wire:click="abrirObservacaoPedido" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--obs" title="Observação do pedido">
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 6l12 12M18 6 6 18"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                <path d="M14 3v6h6"/>
+                <path d="M8 13h8"/>
+                <path d="M8 17h5"/>
             </svg>
         </span>
-        <span class="erp-nfe-actions__label"><kbd>F5</kbd> Cancelar</span>
+        <span class="erp-nfe-actions__label">Observação do pedido</span>
     </button>
 
     <button type="button" wire:click="sair" class="erp-nfe-actions__btn erp-fv-tv-btn erp-fv-tv-btn--exit">

@@ -8,7 +8,7 @@
     class="erp-fv-tv-root"
     x-data
     x-init="$nextTick(() => {
-        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen)) return;
+        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen) || @js($this->observacaoPedidoModalOpen) || @js($this->observacaoClienteModalOpen)) return;
         // Após lançar item / fechar modal o Livewire remonta: não roubar o foco de volta ao cliente.
         if (@js(count($this->itens) > 0) || window.__erpFvTvInitialFocusDone) {
             return;
@@ -31,7 +31,22 @@
         const canhotoOpen = !!$wire.finalizarCartaoCanhotoAberta;
         const boletoPickOpen = !!$wire.boletoContaPickOpen;
         const boletoSucessoOpen = !!(typeof $wire.boletoSucessoDetalhe === 'string' && $wire.boletoSucessoDetalhe);
+        const obsPedidoOpen = !!$wire.observacaoPedidoModalOpen;
+        const obsClienteOpen = !!$wire.observacaoClienteModalOpen;
         const tecla = ($event.key || '');
+
+        if (obsPedidoOpen || obsClienteOpen) {
+            if ($event.key === 'Escape') {
+                $event.preventDefault();
+                if (obsPedidoOpen) {
+                    const el = document.getElementById('erp-fv-obs-pedido');
+                    $wire.fecharObservacaoPedido(el ? el.value : null);
+                } else {
+                    $wire.fecharObservacaoCliente();
+                }
+            }
+            return;
+        }
 
         // Ctrl+D: sempre bloquear favorito do Chrome (mesmo com foco em input).
         if ($event.ctrlKey && (tecla === 'd' || tecla === 'D')) {
@@ -217,6 +232,7 @@
         })
     "
     x-on:erp-fv-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-fv-desconto-preco'); el?.focus(); el?.select?.(); })"
+    x-on:erp-fv-focus-obs-pedido.window="$nextTick(() => { const el = document.getElementById('erp-fv-obs-pedido'); el?.focus(); })"
     x-on:erp-fv-focus-excluir-item-sim.window="$nextTick(() => document.getElementById('erp-fv-excluir-sim')?.focus())"
     x-on:erp-fv-focus-importar-orcamento.window="$nextTick(() => { const el = document.getElementById('erp-fv-importar-orc-search'); el?.focus(); el?.select?.(); })"
     x-on:erp-fv-scroll-importar-orcamento.window="
@@ -226,7 +242,7 @@
         })
     "
 >
-    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
+    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || $this->observacaoPedidoModalOpen || $this->observacaoClienteModalOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
         @include('filament.components.erp.forca-vendas.tela-venda.venda')
     </div>
 
@@ -242,6 +258,7 @@
     @include('filament.components.erp.forca-vendas.tela-venda.excluir-item')
     @include('filament.components.erp.forca-vendas.tela-venda.importar-orcamento')
     @include('filament.components.erp.forca-vendas.tela-venda.margem-venda')
+    @include('filament.components.erp.forca-vendas.tela-venda.observacoes')
     @include('filament.components.erp.boleto-pos-documento')
 
     <div
