@@ -127,6 +127,12 @@ class NfseGravarService
                     $fiscal = $this->snapshotFiscalDoProduto($produto);
                 }
 
+                $tamanhoObra = NfseObra::erroTamanho($fiscal['c_trib_nac'], $item);
+
+                if ($tamanhoObra !== null) {
+                    throw new NfseNaoGravada($tamanhoObra);
+                }
+
                 $nfse->itens()->create([
                     'product_id' => $productId,
                     'ordem' => $indice + 1,
@@ -137,6 +143,7 @@ class NfseGravarService
                     'valor' => $item['valor'],
                     'total' => $item['total'],
                     ...$fiscal,
+                    ...NfseObra::colunas($fiscal['c_trib_nac'], $item),
                 ]);
             }
 

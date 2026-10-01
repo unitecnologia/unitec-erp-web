@@ -955,3 +955,46 @@
     }
 }
 
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra {
+    margin-top: 0.65rem;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__bloco {
+    padding: 0.65rem 0.75rem 0.35rem;
+    border: 1px solid #d7e2ef;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__bloco + .erp-nfse-obra__bloco {
+    margin-top: 0.5rem;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__title {
+    margin: 0 0 0.45rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__servico {
+    margin-left: 0.35rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__opcoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1.1rem;
+    margin: 0.15rem 0 0.55rem;
+    font-size: 0.8rem;
+    color: #0f172a;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-obra__opcao {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+

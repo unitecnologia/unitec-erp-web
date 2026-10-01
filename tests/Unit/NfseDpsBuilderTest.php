@@ -24,6 +24,7 @@ class NfseDpsBuilderTest extends TestCase
             'uf' => 'SC',
         ]);
         $empresa->id = 1;
+        $empresa->setAttribute('nfse_ambiente', 'producao_restrita');
 
         $nota = new Nfse([
             'status' => Nfse::STATUS_ABERTA,
@@ -89,8 +90,64 @@ class NfseDpsBuilderTest extends TestCase
         $this->assertSame('114011000', $dps['servicos'][0]['cNBS']);
         $this->assertSame('001', $dps['servicos'][0]['cTribMun']);
         $this->assertSame('100301', $dps['servicos'][0]['cIndOp']);
+        $this->assertArrayNotHasKey('obra', $dps['servicos'][0]);
         $this->assertArrayNotHasKey('ibs', $dps);
         $this->assertArrayNotHasKey('cbs', $dps);
         $this->assertArrayNotHasKey('xml', $dps);
+    }
+
+    public function test_inclui_somente_a_identificacao_de_obra_escolhida(): void
+    {
+        $empresa = new Empresa([
+            'cnpj' => '00.000.000/0001-91',
+            'razao_social' => 'PRESTADOR',
+            'cidade_codigo' => '4106902',
+            'uf' => 'PR',
+        ]);
+        $empresa->id = 1;
+        $empresa->setAttribute('nfse_ambiente', 'producao_restrita');
+
+        $nota = new Nfse([
+            'status' => Nfse::STATUS_ABERTA,
+            'serie_dps' => '1',
+            'numero_dps' => 8,
+            'competencia' => '2026-10-01',
+            'data_emissao' => '2026-10-01',
+            'tomador_nome' => 'TOMADOR',
+            'valor_servicos' => '10.00',
+            'desconto' => '0.00',
+            'iss' => '0.00',
+            'total' => '10.00',
+            'municipio_prestacao_codigo' => '4106902',
+        ]);
+        $nota->setRelation('empresa', $empresa);
+
+        $item = new NfseItem([
+            'descricao' => 'OBRA',
+            'quantidade' => '1.000',
+            'valor' => '10.00',
+            'total' => '10.00',
+            'c_trib_nac' => '070202',
+            'c_nbs' => '123456789',
+            'obra_tipo' => 'cObra',
+            'obra_c_obra' => '123456789012',
+            'obra_c_cib' => 'ABCD1234',
+            'obra_cep' => '80010000',
+            'obra_logradouro' => 'Rua da Obra',
+            'obra_numero' => '100',
+            'obra_bairro' => 'Centro',
+            'obra_insc_imob_fisc' => 'IPTU1',
+        ]);
+        $nota->setRelation('itens', collect([$item]));
+
+        $dps = app(NfseDpsBuilder::class)->montar($nota);
+
+        $this->assertSame([
+            'inscImobFisc' => 'IPTU1',
+            'tipo' => 'cObra',
+            'cObra' => '123456789012',
+        ], $dps['servicos'][0]['obra']);
+        $this->assertArrayNotHasKey('cCIB', $dps['servicos'][0]['obra']);
+        $this->assertArrayNotHasKey('end', $dps['servicos'][0]['obra']);
     }
 }

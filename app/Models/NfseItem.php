@@ -26,6 +26,15 @@ class NfseItem extends Model
         'c_nbs',
         'c_trib_mun',
         'c_ind_op',
+        'obra_insc_imob_fisc',
+        'obra_tipo',
+        'obra_c_obra',
+        'obra_c_cib',
+        'obra_cep',
+        'obra_logradouro',
+        'obra_numero',
+        'obra_complemento',
+        'obra_bairro',
     ];
 
     public function nfse(): BelongsTo

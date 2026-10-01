@@ -153,6 +153,22 @@ class NfseDpsBuilder
             $servico['cIndOp'] = $indicador;
         }
 
+        $obra = NfseObra::paraXml($item->c_trib_nac, [
+            'obra_tipo' => $item->obra_tipo,
+            'obra_insc_imob_fisc' => $item->obra_insc_imob_fisc,
+            'obra_c_obra' => $item->obra_c_obra,
+            'obra_c_cib' => $item->obra_c_cib,
+            'obra_cep' => $item->obra_cep,
+            'obra_logradouro' => $item->obra_logradouro,
+            'obra_numero' => $item->obra_numero,
+            'obra_complemento' => $item->obra_complemento,
+            'obra_bairro' => $item->obra_bairro,
+        ]);
+
+        if ($obra !== null) {
+            $servico['obra'] = $obra;
+        }
+
         return $servico;
     }
 

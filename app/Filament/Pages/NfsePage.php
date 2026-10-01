@@ -20,6 +20,7 @@ use App\Support\Erp\Nfse\NfseDanfseViewData;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\Nfse\NfseGravarService;
 use App\Support\Erp\Nfse\NfseNaoGravada;
+use App\Support\Erp\Nfse\NfseObra;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Erp\Nfse\NfseTransmitirService;
@@ -201,6 +202,8 @@ class NfsePage extends Page
     public string $nfseServicoDesconto = '';
 
     public string $nfseServicoAcrescimo = '';
+
+    public string $nfseServicoCtribNac = '';
 
     public bool $nfseDescontoModalOpen = false;
 
@@ -951,6 +954,24 @@ class NfsePage extends Page
     public function motivoBloqueioTransmissaoUi(): ?string
     {
         return $this->motivoBloqueioTransmissao();
+    }
+
+    /**
+     * Índices dos serviços cujo código nacional exige o grupo obra.
+     *
+     * @return list<int>
+     */
+    public function nfseLinhasExigemObra(): array
+    {
+        $indices = [];
+
+        foreach ($this->nfseServicos as $index => $linha) {
+            if (NfseObra::exige($linha['c_trib_nac'] ?? null)) {
+                $indices[] = (int) $index;
+            }
+        }
+
+        return $indices;
     }
 
     public function nfseSomenteLeitura(): bool
@@ -2102,6 +2123,7 @@ class NfsePage extends Page
             'acrescimo' => $this->nfseFormatarDecimal($valorAcrescimo, 2),
             'total' => $this->nfseFormatarDecimal($total, 2),
             'total_decimal' => $total,
+            'c_trib_nac' => $this->textoFiscalNfse($this->nfseServicoCtribNac),
         ]);
         $this->nfseServicos = array_values($this->nfseServicos);
         $this->nfseServicoLinhaIndex = 0;
@@ -2416,6 +2438,7 @@ class NfsePage extends Page
         $this->nfseServicoDescricao = $descricao;
         $this->nfseServicoSelecionadoLabel = $descricao;
         $this->nfseServicoUnidade = (string) ($sugestao['unidade'] ?? '');
+        $this->nfseServicoCtribNac = (string) ($sugestao['c_trib_nac'] ?? '');
         $this->nfseServicoQuantidade = $this->nfseFormatarDecimal('1', 3);
         $this->nfseServicoValor = (string) ($sugestao['preco'] ?? '0,00');
         $this->nfseServicoDesconto = '0,00';
@@ -2446,6 +2469,7 @@ class NfsePage extends Page
         $this->nfseServicoValor = '';
         $this->nfseServicoDesconto = '';
         $this->nfseServicoAcrescimo = '';
+        $this->nfseServicoCtribNac = '';
     }
 
     protected function nfseServicoSelecionadoCorresponde(string $term): bool
@@ -2486,7 +2510,7 @@ class NfsePage extends Page
             })
             ->orderBy('descricao')
             ->limit(12)
-            ->get(['id', 'codigo', 'descricao', 'preco_venda', 'unidade']);
+            ->get(['id', 'codigo', 'descricao', 'preco_venda', 'unidade', 'c_trib_nac']);
 
         return $products
             ->map(fn (Product $product): array => $this->mapearNfseServico($product))
@@ -2507,6 +2531,7 @@ class NfsePage extends Page
             'descricao' => (string) ($product->descricao ?? ''),
             'unidade' => (string) ($product->unidade ?? ''),
             'preco' => $this->nfseFormatarDecimal($preco, 2),
+            'c_trib_nac' => $product->c_trib_nac,
         ];
     }
 
@@ -2919,6 +2944,12 @@ class NfsePage extends Page
             if (trim((string) ($linha['descricao'] ?? '')) === '' || strlen($nacional) !== 6 || strlen($nbs) !== 9 || $quantidade === null || bccomp($quantidade, '0', 3) !== 1) {
                 return 'Faltam dados fiscais do serviço.';
             }
+
+            $obra = NfseObra::pendencia($linha['c_trib_nac'] ?? null, $linha, (string) ($linha['descricao'] ?? ''));
+
+            if ($obra !== null) {
+                return $obra;
+            }
         }
 
         if (! CepLookupService::isValidIbgeCode($this->nfseMunicipioPrestacaoCodigo())) {
@@ -3034,6 +3065,15 @@ class NfsePage extends Page
                 'c_nbs' => $this->textoFiscalNfse($linha['c_nbs'] ?? null),
                 'c_trib_mun' => $this->textoFiscalNfse($linha['c_trib_mun'] ?? null),
                 'c_ind_op' => $this->textoFiscalNfse($linha['c_ind_op'] ?? null),
+                'obra_tipo' => $linha['obra_tipo'] ?? null,
+                'obra_insc_imob_fisc' => $linha['obra_insc_imob_fisc'] ?? null,
+                'obra_c_obra' => $linha['obra_c_obra'] ?? null,
+                'obra_c_cib' => $linha['obra_c_cib'] ?? null,
+                'obra_cep' => $linha['obra_cep'] ?? null,
+                'obra_logradouro' => $linha['obra_logradouro'] ?? null,
+                'obra_numero' => $linha['obra_numero'] ?? null,
+                'obra_complemento' => $linha['obra_complemento'] ?? null,
+                'obra_bairro' => $linha['obra_bairro'] ?? null,
             ];
             $somaTotais = $this->nfseSomarDecimal($somaTotais, $total);
             $somaBrutos = $this->nfseSomarDecimal($somaBrutos, $brutoComAcre);
@@ -3180,6 +3220,15 @@ class NfsePage extends Page
                 'c_nbs' => $item->c_nbs,
                 'c_trib_mun' => $item->c_trib_mun,
                 'c_ind_op' => $item->c_ind_op,
+                'obra_tipo' => $item->obra_tipo,
+                'obra_insc_imob_fisc' => $item->obra_insc_imob_fisc,
+                'obra_c_obra' => $item->obra_c_obra,
+                'obra_c_cib' => $item->obra_c_cib,
+                'obra_cep' => $item->obra_cep,
+                'obra_logradouro' => $item->obra_logradouro,
+                'obra_numero' => $item->obra_numero,
+                'obra_complemento' => $item->obra_complemento,
+                'obra_bairro' => $item->obra_bairro,
             ];
         }
 

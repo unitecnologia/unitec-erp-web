@@ -514,6 +514,12 @@
                             </tbody>
                         </table>
                     </div>
+                    @php
+                        $nfseObraLinhas = $this->nfseLinhasExigemObra();
+                    @endphp
+                    @if ($nfseObraLinhas !== [])
+                        @include('filament.components.erp.nfse.obra', ['linhas' => $nfseObraLinhas])
+                    @endif
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__panel" x-show="mainTab === 'tributos'" x-cloak>

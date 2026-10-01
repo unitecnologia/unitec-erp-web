@@ -236,9 +236,58 @@ class NfseDpsXmlGerador
 
         if ($codigo->childNodes->length > 0) {
             $serv->appendChild($codigo);
+            $obra = $this->obra($doc, $item);
+
+            if ($obra !== null) {
+                $serv->appendChild($obra);
+            }
         }
 
         return $serv->childNodes->length > 0 ? $serv : null;
+    }
+
+    /**
+     * TCInfoObra: inscrição opcional e exatamente uma identificação.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function obra(DOMDocument $doc, array $item): ?DOMElement
+    {
+        $obra = $item['obra'] ?? null;
+
+        if (! is_array($obra)) {
+            return null;
+        }
+
+        $tipo = $obra['tipo'] ?? null;
+        $no = $doc->createElementNS(self::NS, 'obra');
+        $this->campo($doc, $no, 'inscImobFisc', $this->texto($obra['inscImobFisc'] ?? null));
+
+        if ($tipo === 'cObra') {
+            $this->campo($doc, $no, 'cObra', $this->texto($obra['cObra'] ?? null));
+        } elseif ($tipo === 'cCIB') {
+            $this->campo($doc, $no, 'cCIB', $this->texto($obra['cCIB'] ?? null));
+        } elseif ($tipo === 'end' && is_array($obra['end'] ?? null)) {
+            $endereco = $obra['end'];
+            $end = $doc->createElementNS(self::NS, 'end');
+            $this->campo($doc, $end, 'CEP', $this->digitos($endereco['CEP'] ?? null, 8));
+            $this->campo($doc, $end, 'xLgr', $this->texto($endereco['xLgr'] ?? null));
+            $this->campo($doc, $end, 'nro', $this->texto($endereco['nro'] ?? null));
+            $this->campo($doc, $end, 'xCpl', $this->texto($endereco['xCpl'] ?? null));
+            $this->campo($doc, $end, 'xBairro', $this->texto($endereco['xBairro'] ?? null));
+
+            if ($end->childNodes->length > 0) {
+                $no->appendChild($end);
+            }
+        }
+
+        foreach ($no->childNodes as $filho) {
+            if (in_array($filho->localName, ['cObra', 'cCIB', 'end'], true)) {
+                return $no;
+            }
+        }
+
+        return null;
     }
 
     /**
