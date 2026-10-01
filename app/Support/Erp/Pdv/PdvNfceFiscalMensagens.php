@@ -11,13 +11,15 @@ final class PdvNfceFiscalMensagens
     /**
      * @return array{titulo: string, corpo: string|null, modal: bool}
      */
-    public static function resolver(FiscalEngineException $exception): array
+    public static function resolver(FiscalEngineException $exception, string $documento = 'nfce'): array
     {
         $codigo = $exception->sefazCodigo ?? self::extrairCStatDaMensagem($exception->getMessage());
+        $documento = strtolower(trim($documento)) === 'nfe' ? 'nfe' : 'nfce';
+        $rotulo = $documento === 'nfe' ? 'NF-e' : 'NFC-e';
 
         return match ($codigo) {
             self::CSTAT_PRAZO_CANCELAMENTO, '220' => [
-                'titulo' => 'Não é possível cancelar esta NFC-e',
+                'titulo' => "Não é possível cancelar esta {$rotulo}",
                 'corpo' => "O prazo legal de 30 minutos para o cancelamento direto em Santa Catarina já expirou.\n\n"
                     . "O que fazer agora?\n\n"
                     . 'Para regularizar esta operação de forma legal perante a SEFAZ-SC, você deve emitir uma '
@@ -26,9 +28,12 @@ final class PdvNfceFiscalMensagens
                 'modal' => true,
             ],
             '539' => [
-                'titulo' => 'Rejeição: duplicidade de NFC-e (número já usado na SEFAZ)',
-                'corpo' => 'Este número/série já foi autorizado anteriormente com outra chave. '
-                    . 'O sistema avançou a numeração — tente finalizar a venda novamente.',
+                'titulo' => "Rejeição: duplicidade de {$rotulo} (número já usado na SEFAZ)",
+                'corpo' => $documento === 'nfe'
+                    ? 'Este número/série já foi autorizado anteriormente com outra chave. '
+                        . 'O sistema avançou a numeração desta NF-e — transmita novamente.'
+                    : 'Este número/série já foi autorizado anteriormente com outra chave. '
+                        . 'O sistema avançou a numeração — tente finalizar a venda novamente.',
                 'modal' => false,
             ],
             default => [

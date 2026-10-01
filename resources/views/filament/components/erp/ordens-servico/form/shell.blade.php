@@ -41,3 +41,22 @@
     $jsVersion = file_exists($jsPath) ? filemtime($jsPath) : time();
 @endphp
 <script src="{{ asset('js/erp-os-form.js') }}?v={{ $jsVersion }}" defer></script>
+<script data-navigate-track>
+    if (! window.__erpOsPreviewCloseBound) {
+        window.__erpOsPreviewCloseBound = true;
+        window.addEventListener('message', (event) => {
+            if (event.data?.type !== 'erp-os-preview-close') {
+                return;
+            }
+            if (window.Livewire?.dispatch) {
+                window.Livewire.dispatch('close-os-preview');
+                return;
+            }
+            const overlay = document.querySelector('.erp-os-preview-overlay');
+            const componentId = overlay?.dataset.livewireId;
+            if (componentId && window.Livewire?.find) {
+                window.Livewire.find(componentId)?.call('closePreviewOverlay');
+            }
+        });
+    }
+</script>

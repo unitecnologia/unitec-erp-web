@@ -143,10 +143,6 @@ class CreateProduct extends CreateRecord
         }
 
         $this->flashOrcamentoReturnContextAfterProductSave();
-
-        if ($this->embedsInPdv) {
-            $this->closePdvEmbedOverlay();
-        }
     }
 
     public function cancelForm(): void
@@ -168,6 +164,12 @@ class CreateProduct extends CreateRecord
     {
         if ($this->embedsInNotaFornecedor) {
             NotaFornecedorProductPrefill::forget();
+        }
+
+        if ($this->embedsInPdv) {
+            $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('index')));
+
+            return;
         }
 
         if ($this->embedsInParentOverlay()) {

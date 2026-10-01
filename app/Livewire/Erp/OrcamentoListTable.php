@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Erp;
 
+use App\Models\Orcamento;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\OrcamentoListRowFormatter;
 use App\Support\Erp\Queries\OrcamentoListQueryBuilder;
@@ -31,6 +32,62 @@ class OrcamentoListTable extends Component
     public ?string $sortColumn = null;
 
     public string $sortDirection = 'desc';
+
+    /**
+     * Troca de aba de status: 1 request (grade + total + URL).
+     */
+    public function setStatusFilter(string $filter): void
+    {
+        $allowed = [
+            'todos',
+            Orcamento::STATUS_ABERTO,
+            Orcamento::STATUS_FECHADO,
+            Orcamento::STATUS_CANCELADO,
+            Orcamento::STATUS_IMPORTADO,
+        ];
+
+        if (! in_array($filter, $allowed, true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->resetPage();
+
+        $total = (new OrcamentoListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+        ))->sumFilteredTotal();
+
+        $this->js(sprintf(
+            '(() => {
+                const status = %s;
+                const totalLabel = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("statusFilter", status, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (status === "todos") {
+                        url.searchParams.delete("status");
+                    } else {
+                        url.searchParams.set("status", status);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+                const el = document.querySelector(".erp-orcamentos__total-value");
+                if (el) el.textContent = totalLabel;
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.orcamento-resource.pages.list-orcamentos', JSON_UNESCAPED_UNICODE),
+        ));
+    }
 
     #[On('erp-orcamento-list-refresh')]
     public function refreshFromParent(

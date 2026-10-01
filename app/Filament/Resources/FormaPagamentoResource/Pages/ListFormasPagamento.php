@@ -66,7 +66,7 @@ class ListFormasPagamento extends ListRecords
 
     protected function erpUppercaseIgnoredProperties(): array
     {
-        return ['form.tipo', 'form.tipo_movimento'];
+        return ['form.tipo', 'form.tipo_movimento', 'form.modo_prazo'];
     }
 
     protected function erpListEntityName(): string
@@ -203,7 +203,7 @@ class ListFormasPagamento extends ListRecords
 
     public function saveFormaPagamento(): void
     {
-        foreach (['tipo', 'tipo_movimento'] as $enumField) {
+        foreach (['tipo', 'tipo_movimento', 'modo_prazo'] as $enumField) {
             if (is_string($this->form[$enumField] ?? null)) {
                 $this->form[$enumField] = mb_strtolower(trim($this->form[$enumField]), 'UTF-8');
             }
@@ -232,6 +232,7 @@ class ListFormasPagamento extends ListRecords
             'form.tipo_movimento' => ['required', Rule::in(array_keys(FormaPagamento::tipoMovimentoLabels()))],
         ], [
             'form.max_parcelas.min' => 'O nº máximo de parcelas deve ser zero ou maior.',
+            'form.modo_prazo.in' => 'Selecione Financeiro ou Tabela de Prazo.',
         ], [
             'form.codigo' => 'código',
             'form.descricao' => 'nome',

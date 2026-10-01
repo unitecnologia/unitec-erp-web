@@ -200,7 +200,19 @@
     </div>
 
     @if (! empty($autoPrint))
-        <script>window.addEventListener('load', () => window.print());</script>
+        <script>
+            window.addEventListener('afterprint', () => {
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'erp-nfe-danfe-print-done' }, '*');
+
+                    return;
+                }
+
+                window.close();
+            });
+
+            window.addEventListener('load', () => window.print(), { once: true });
+        </script>
     @endif
 </body>
 </html>

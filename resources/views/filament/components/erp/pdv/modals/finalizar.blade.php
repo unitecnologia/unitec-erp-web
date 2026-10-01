@@ -232,6 +232,70 @@
                             </footer>
                         </div>
                     </div>
+                @endif
+
+                @if ($this->finalizarPixQrAberta)
+                    <div
+                        class="erp-pdv-canhoto-overlay erp-pdv-pix-qr-overlay"
+                        role="dialog"
+                        aria-labelledby="erp-pdv-pix-qr-title"
+                        @if ($this->finalizarPixCobrancaId && ! $this->finalizarPixQrGerando && $this->finalizarPixErro === '' && $this->finalizarPixStatus !== 'Pago')
+                            wire:poll.2s="pollFinalizarPixQrcode"
+                        @endif
+                    >
+                        <div class="erp-pdv-parcelas erp-pdv-pix-qr">
+                            <header class="erp-pdv-parcelas__header">
+                                <h3 id="erp-pdv-pix-qr-title">Pagamento Pix | QR Code</h3>
+                                <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarPixQrcode" title="Fechar">✕</button>
+                            </header>
+
+                            <div class="erp-pdv-pix-qr__body">
+                                <div class="erp-pdv-pix-qr__valor">
+                                    <span>Valor</span>
+                                    <strong>R$ {{ $this->finalizarPixValorLabel !== '' ? $this->finalizarPixValorLabel : '0,00' }}</strong>
+                                </div>
+
+                                @if ($this->finalizarPixErro !== '')
+                                    <p class="erp-pdv-pix-qr__erro">{{ $this->finalizarPixErro }}</p>
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarPixQrcodePdvAgora">
+                                        Tentar novamente
+                                    </button>
+                                @elseif (filled($this->finalizarPixQrImagem))
+                                    <img
+                                        class="erp-pdv-pix-qr__img"
+                                        src="{{ $this->finalizarPixQrImagem }}"
+                                        alt="QR Code Pix"
+                                    >
+                                @elseif (filled($this->finalizarPixCopiaCola))
+                                    <p class="erp-pdv-pix-qr__hint">QR gerado. Use o Pix Copia e Cola abaixo.</p>
+                                @else
+                                    <p class="erp-pdv-pix-qr__hint">{{ $this->finalizarPixStatus !== '' ? $this->finalizarPixStatus : 'Gerando QR Code…' }}</p>
+                                @endif
+
+                                @if (filled($this->finalizarPixCopiaCola))
+                                    <label class="erp-pdv-pix-qr__copia">
+                                        <span>Pix Copia e Cola</span>
+                                        <textarea readonly rows="3" onclick="this.select()">{{ $this->finalizarPixCopiaCola }}</textarea>
+                                    </label>
+                                @endif
+
+                                <p class="erp-pdv-pix-qr__status" aria-live="polite">{{ $this->finalizarPixStatus }}</p>
+                            </div>
+
+                            <footer class="erp-pdv-parcelas__footer">
+                                <div class="erp-pdv-parcelas__footer-actions">
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarPixQrcode">
+                                        <kbd>ESC</kbd> Cancelar
+                                    </button>
+                                    @if ($this->finalizarPixCobrancaId && $this->finalizarPixErro === '' && ! $this->finalizarPixQrGerando)
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="pollFinalizarPixQrcode">
+                                            Consultar pagamento
+                                        </button>
+                                    @endif
+                                </div>
+                            </footer>
+                        </div>
+                    </div>
                 @elseif ($this->finalizarTabelaPrazoEmConsulta)
                     <div class="erp-pdv-parcelas-overlay" role="dialog" aria-labelledby="erp-pdv-parcelas-title">
                         <div class="erp-pdv-parcelas">
@@ -385,11 +449,6 @@
                                     <strong>{{ $this->finalizarParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarParcelasTotalLabel : '' }}</strong>
                                 </div>
                                 <div class="erp-pdv-parcelas__footer-actions">
-                                    @if ($this->finalizarParcelasEhBoleto)
-                                        <button type="button" class="erp-pdv-modal__btn" disabled title="Em breve">
-                                            <kbd>F5</kbd> Boleto
-                                        </button>
-                                    @endif
                                     @if ($this->finalizarParcelasEhCrediario)
                                         <button type="button" id="erp-pdv-carne-btn" class="erp-pdv-modal__btn" wire:click="abrirCarneImpressao">
                                             <kbd>F6</kbd> Carnê
@@ -614,6 +673,7 @@
             <footer
                 class="erp-pdv-modal__footer erp-pdv-finalizar__footer-actions"
                 data-operacao-unica="{{ $this->pdvFinalizarOperacaoUnica ?? '' }}"
+                data-pix-qr="{{ $this->finalizarTemPixGerarQrcodeComValor() && ! $this->finalizarPixQrConfirmado ? '1' : '0' }}"
             >
                 <div class="erp-pdv-finalizar__operacao-botoes">
                     @foreach ($this->pdvFinalizarOperacaoBotoes as $botao)

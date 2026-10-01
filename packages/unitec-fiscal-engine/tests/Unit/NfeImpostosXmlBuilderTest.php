@@ -164,6 +164,55 @@ final class NfeImpostosXmlBuilderTest extends TestCase
         $this->assertSame(0.0, $built['valorIcms']);
     }
 
+    public function test_icms20_emite_p_red_bc_antes_de_vbc(): void
+    {
+        $builder = new NfeXmlBuilder();
+        $request = $this->makeSimpleNfeRequest(new ItemImpostoDto(
+            origem: 0,
+            csosn: '102',
+            vBc: 70.59,
+            vIcms: 12.00,
+            pIcms: 17,
+            cstIcms: '20',
+            crt: 3,
+            pRedBc: 29.412,
+            modBc: '3',
+        ));
+
+        $built = $builder->build($request);
+        $xml = $built['dom']->saveXML() ?: '';
+
+        $this->assertStringContainsString('<ICMS20>', $xml);
+        $this->assertMatchesRegularExpression(
+            '/<ICMS20>.*?<modBC>3<\/modBC><pRedBC>29\.4120<\/pRedBC><vBC>70\.59<\/vBC><pICMS>17\.0000<\/pICMS><vICMS>12\.00<\/vICMS>.*?<\/ICMS20>/s',
+            $xml,
+        );
+    }
+
+    public function test_icmssn900_emite_p_red_bc_depois_de_vbc(): void
+    {
+        $builder = new NfeXmlBuilder();
+        $request = $this->makeSimpleNfeRequest(new ItemImpostoDto(
+            origem: 4,
+            csosn: '900',
+            vBc: 245.94,
+            vIcms: 41.81,
+            pIcms: 17,
+            crt: 4,
+            pRedBc: 29.412,
+            modBc: '3',
+        ));
+
+        $built = $builder->build($request);
+        $xml = $built['dom']->saveXML() ?: '';
+
+        $this->assertStringContainsString('<ICMSSN900>', $xml);
+        $this->assertMatchesRegularExpression(
+            '/<ICMSSN900><orig>4<\/orig><CSOSN>900<\/CSOSN><modBC>3<\/modBC><vBC>245\.94<\/vBC><pRedBC>29\.4120<\/pRedBC><pICMS>17\.0000<\/pICMS><vICMS>41\.81<\/vICMS><\/ICMSSN900>/s',
+            $xml,
+        );
+    }
+
     /**
      * @param  list<ItemDto>|ItemImpostoDto  $itensOrImposto
      */

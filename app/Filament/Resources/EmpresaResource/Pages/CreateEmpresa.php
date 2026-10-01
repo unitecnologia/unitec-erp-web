@@ -6,6 +6,7 @@ use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
 use App\Models\Empresa;
 use App\Models\User;
+use App\Support\Erp\Boleto\BoletoContaApiDefaults;
 use App\Support\Erp\EmpresaVendaProntaBootstrap;
 use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
@@ -73,6 +74,14 @@ class CreateEmpresa extends CreateRecord
 
         // Estoque LOJA + caixa PDV + terminal Pedido + operador do usuário logado.
         EmpresaVendaProntaBootstrap::forEmpresa($empresa, $user instanceof User ? $user : null);
+
+        // Contas API Boleto (Ailos + Sicredi) já com homologação Unitec.
+        // A flag "Habilitar API Boleto" permanece desligada até o cliente ativar.
+        BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
+        $this->syncEmpresaNfeEmitentes();
+        if (! filter_var($empresa->param_boleto_habilitar ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $empresa->forceFill(['param_boleto_habilitar' => false])->saveQuietly();
+        }
 
         // Pronto para vender (não fiscal). NFC-e/certificado fica para depois.
         ErpOnboarding::complete();

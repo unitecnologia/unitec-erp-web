@@ -354,9 +354,17 @@
                 </thead>
                 <tbody>
                     @foreach ($itens as $item)
+                        @php
+                            $infoAdProd = trim((string) ($item['info_adicionais'] ?? ''));
+                        @endphp
                         <tr>
                             <td class="danfe__item-cell danfe__item-cell--center">{{ $item['codigo'] }}</td>
-                            <td class="danfe__item-cell danfe__item-cell--desc">{{ $item['descricao'] }}</td>
+                            <td class="danfe__item-cell danfe__item-cell--desc">
+                                {{ $item['descricao'] }}
+                                @if ($infoAdProd !== '')
+                                    <div class="danfe__item-infadprod">Informação adicional do produto: {{ $infoAdProd }}</div>
+                                @endif
+                            </td>
                             <td class="danfe__item-cell danfe__item-cell--center">{{ $item['ncm'] }}</td>
                             <td class="danfe__item-cell danfe__item-cell--center">{{ $item['cst'] }}</td>
                             <td class="danfe__item-cell danfe__item-cell--center">{{ $item['cfop'] }}</td>

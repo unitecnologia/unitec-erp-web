@@ -67,25 +67,27 @@
 @endif
 
 <div
-    class="erp-produtos-window{{ $isStandaloneFullscreen ? ' erp-produtos-window--fullscreen' : '' }}"
+    class="erp-produtos-window{{ $isStandaloneFullscreen ? ' erp-produtos-window--fullscreen' : '' }}{{ $this->embedsInPdv ? ' erp-produtos-window--pdv-embed' : '' }}"
     @if ($this->isEditingProduct()) wire:keydown.f7.window="openProductCardex" @endif
 >
-    <header class="erp-produtos-window__titlebar">
-        <span class="erp-produtos-window__title">Cadastro de Produtos</span>
-        <button
-            type="button"
-            class="erp-produtos-window__close"
-            wire:click="cancelForm"
-            aria-label="Fechar"
-            title="ESC | Sair"
-        >&times;</button>
-    </header>
+    @unless ($this->embedsInPdv)
+        <header class="erp-produtos-window__titlebar">
+            <span class="erp-produtos-window__title">Cadastro de Produtos</span>
+            <button
+                type="button"
+                class="erp-produtos-window__close"
+                wire:click="cancelForm"
+                aria-label="Fechar"
+                title="ESC | Sair"
+            >&times;</button>
+        </header>
+    @endunless
 
     <div class="erp-produtos-window__body">
         @include('filament.components.erp.produtos.form.shell')
     </div>
 
-    @if ($isStandaloneFullscreen)
+    @if ($isStandaloneFullscreen || $this->embedsInPdv)
         @include('filament.components.erp.produtos.form.action-bar')
     @endif
 </div>

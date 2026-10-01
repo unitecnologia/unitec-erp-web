@@ -73,6 +73,7 @@ class ContadorCloudSyncLog extends Model
         return match ($evento) {
             'autorizado' => 'Autorizado',
             'cancelado' => 'Cancelado',
+            'contingencia' => 'Contingência',
             default => $evento,
         };
     }

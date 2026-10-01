@@ -4,6 +4,7 @@ namespace App\Filament\Resources\EmpresaResource\Pages\Concerns;
 
 use App\Models\ContadorCloudSyncLog;
 use App\Models\Empresa;
+use App\Support\ContadorCloud\ContadorCloudMesAtualBackfillService;
 use App\Support\ContadorCloud\ContadorCloudSyncService;
 use App\Support\Erp\EmpresaParametros;
 use Filament\Notifications\Notification;
@@ -11,6 +12,8 @@ use Filament\Notifications\Notification;
 trait ManagesEmpresaPortalContadorLog
 {
     public bool $portalContadorLogModalOpen = false;
+
+    public bool $portalContadorEnviarMesConfirmOpen = false;
 
     /** @var array<int, array<string, mixed>> */
     public array $portalContadorLogRows = [];
@@ -109,6 +112,59 @@ trait ManagesEmpresaPortalContadorLog
             ->body($mensagem)
             ->success()
             ->send();
+    }
+
+    public function pedirConfirmacaoEnviarMesPortalContador(): void
+    {
+        $this->portalContadorEnviarMesConfirmOpen = true;
+    }
+
+    public function cancelarEnviarMesPortalContador(): void
+    {
+        $this->portalContadorEnviarMesConfirmOpen = false;
+    }
+
+    public function confirmarEnviarMesPortalContador(): void
+    {
+        // Mantém o modal aberto com "Enviando…" até terminar; fecha depois.
+        $this->enviarMesAtualPortalContador();
+        $this->portalContadorEnviarMesConfirmOpen = false;
+    }
+
+    public function enviarMesAtualPortalContador(): void
+    {
+        $empresa = $this->resolveEmpresaRecordForPortalContador();
+
+        if (! $empresa) {
+            Notification::make()
+                ->title('Portal do Contador')
+                ->body('Salve a empresa antes de enviar os documentos ao portal.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresa->refresh();
+        $this->reloadPortalContadorFormData($empresa);
+
+        $resultado = app(ContadorCloudMesAtualBackfillService::class)->enviarMesAtual($empresa);
+
+        if ($this->portalContadorLogModalOpen) {
+            $this->refreshPortalContadorLog();
+        }
+
+        $notification = Notification::make()
+            ->title('Portal do Contador')
+            ->body($resultado['message']);
+
+        if ($resultado['ok']) {
+            $notification->success()->send();
+
+            return;
+        }
+
+        $notification->warning()->send();
     }
 
     public function closePortalContadorLogModal(): void

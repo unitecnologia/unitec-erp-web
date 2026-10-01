@@ -12,7 +12,11 @@
                 <tr
                     wire:key="local-cliente-{{ $row['id'] }}"
                     wire:click="highlightLocalClienteResult({{ $index }})"
-                    wire:dblclick.prevent="selectLocalClienteResult({{ $index }})"
+                    x-on:dblclick.prevent="
+                        const panel = $el.closest('.erp-cliente-filter-lookup');
+                        if (panel) panel.style.display = 'none';
+                        $wire.selectLocalClienteResult({{ $index }});
+                    "
                     @class(['erp-cliente-filter-lookup__row', 'erp-cliente-filter-lookup__row--active' => $this->selectedLocalClienteIndex === $index])
                 >
                     <td>{{ $row['nome'] }}</td>

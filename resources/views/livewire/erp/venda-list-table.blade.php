@@ -1,6 +1,6 @@
 @php
     $columns = [
-        ['key' => 'numero', 'label' => 'Numero', 'sortable' => true, 'align' => 'center'],
+        ['key' => 'numero', 'label' => 'Pedido', 'sortable' => true, 'align' => 'center'],
         ['key' => 'data', 'label' => 'Data', 'sortable' => true, 'align' => 'center'],
         ['key' => 'hora_abertura', 'label' => 'Hora ab.', 'sortable' => true, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-hora_abertura', 'cellClass' => 'fi-ta-cell-hora_abertura'],
         ['key' => 'hora', 'label' => 'Hora fe.', 'sortable' => true, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-hora', 'cellClass' => 'fi-ta-cell-hora'],
@@ -14,6 +14,8 @@
         ['key' => 'tipo', 'label' => 'Tipo', 'sortable' => false, 'align' => 'center'],
         ['key' => 'pdv_numero', 'label' => 'Nº Dav', 'sortable' => false, 'align' => 'center'],
         ['key' => 'nfce', 'label' => 'NFC-e', 'sortable' => false, 'align' => 'center'],
+        ['key' => 'nfe', 'label' => 'NF-e', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-nfe', 'cellClass' => 'fi-ta-cell-nfe'],
+        ['key' => 'nfse', 'label' => 'NFS-e', 'sortable' => false, 'align' => 'center', 'headerClass' => 'fi-ta-header-cell-nfse', 'cellClass' => 'fi-ta-cell-nfse'],
         ['key' => 'ver_itens', 'label' => '', 'sortable' => false, 'align' => 'center', 'html' => true, 'headerClass' => 'fi-ta-header-cell-ver-itens', 'cellClass' => 'fi-ta-cell-ver-itens'],
     ];
 @endphp

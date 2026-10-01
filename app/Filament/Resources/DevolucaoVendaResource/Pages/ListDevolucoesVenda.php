@@ -4,10 +4,13 @@ namespace App\Filament\Resources\DevolucaoVendaResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\DevolucaoVendaResource;
+use App\Models\ClienteCreditoMovimentacao;
 use App\Models\DevolucaoVenda;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Vendas\FinalizarDevolucaoVendaService;
+use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -44,6 +47,10 @@ class ListDevolucoesVenda extends ListRecords
     public string $periodoDeApplied = '';
 
     public string $periodoAteApplied = '';
+
+    public bool $creditoDevolucaoEstornoModal = false;
+
+    public ?int $creditoDevolucaoEstornoId = null;
 
     public function mount(): void
     {
@@ -332,9 +339,28 @@ class ListDevolucoesVenda extends ListRecords
         }
 
         if ($record->situacao === DevolucaoVenda::SITUACAO_FINALIZADA) {
+            $temCredito = ClienteCreditoMovimentacao::query()
+                ->where('origem_tipo', ClienteCreditoMovimentacao::ORIGEM_DEVOLUCAO)
+                ->where('origem_id', $record->id)
+                ->where('tipo', ClienteCreditoMovimentacao::TIPO_CREDITO)
+                ->whereNull('estorna_id')
+                ->whereNotIn('id', function ($query): void {
+                    $query->select('estorna_id')
+                        ->from('cliente_credito_movimentacoes')
+                        ->whereNotNull('estorna_id');
+                })
+                ->exists();
+
+            if ($temCredito) {
+                $this->creditoDevolucaoEstornoId = (int) $record->id;
+                $this->creditoDevolucaoEstornoModal = true;
+
+                return;
+            }
+
             Notification::make()
                 ->title('Não é possível cancelar uma devolução finalizada.')
-                ->body('Estoque e financeiro já foram aplicados. Use um estorno específico se necessário.')
+                ->body('Estoque e financeiro já foram aplicados. Não há crédito de cliente pendente para estornar.')
                 ->warning()
                 ->send();
 
@@ -347,5 +373,61 @@ class ListDevolucoesVenda extends ListRecords
         $this->resetTable();
 
         Notification::make()->title('Devolução cancelada.')->success()->send();
+    }
+
+    public function confirmarEstornoCreditoDevolucao(): void
+    {
+        $id = $this->creditoDevolucaoEstornoId;
+        $this->creditoDevolucaoEstornoModal = false;
+        $this->creditoDevolucaoEstornoId = null;
+
+        if (! $id) {
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'devolucoes_venda.update')) {
+            return;
+        }
+
+        $record = DevolucaoVenda::query()->find($id);
+
+        if (! $record || $record->situacao !== DevolucaoVenda::SITUACAO_FINALIZADA) {
+            Notification::make()->title('Devolução não encontrada para estorno.')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $estornados = (new FinalizarDevolucaoVendaService())->estornarCreditoGerado(
+                $record,
+                Auth::id() ? (int) Auth::id() : null,
+            );
+        } catch (DomainException $exception) {
+            Notification::make()
+                ->title('Não foi possível estornar o crédito desta devolução.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($estornados < 1) {
+            Notification::make()->title('Este crédito já estava estornado.')->warning()->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Crédito da devolução estornado.')
+            ->body('O extrato ganhou um movimento inverso. O lançamento original não foi apagado. Estoque e caixa desta devolução não foram desfeitos.')
+            ->success()
+            ->send();
+    }
+
+    public function cancelarEstornoCreditoDevolucao(): void
+    {
+        $this->creditoDevolucaoEstornoModal = false;
+        $this->creditoDevolucaoEstornoId = null;
     }
 }

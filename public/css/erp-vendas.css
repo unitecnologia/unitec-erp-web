@@ -207,15 +207,24 @@
     display: none !important;
 }
 
+/* ── Abas estilo fichário (padrão Orçamentos) ── */
+
 .erp-vendas-page .erp-vendas__tabs-wrap {
     flex-shrink: 0;
-    margin: 0;
+    margin: 0 0 -1px;
     padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-vendas-page .erp-vendas__tabs {
     margin: 0;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
 .erp-vendas-page .erp-vendas__tab {
@@ -226,9 +235,34 @@
     line-height: 1.1;
     min-height: 0;
     font-family: inherit;
-    font-weight: 700;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: #64748b;
+    background: #e8edf3;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
     cursor: pointer;
     appearance: none;
+    transition: none;
+}
+
+.erp-vendas-page .erp-vendas__tab:hover:not(.erp-vendas__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
+}
+
+.erp-vendas-page .erp-vendas__tab--active {
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 .erp-vendas-page .fi-sc > div:not(.fi-hidden) {
@@ -416,36 +450,41 @@
 .erp-vendas-page .erp-vendas__type-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.15rem;
     padding: 0.4rem 0.65rem;
-    align-items: center;
+    align-items: flex-end;
 }
 
 .erp-vendas-page .erp-vendas__type-tab {
     font-family: inherit;
     font-size: var(--erp-font-size-xs);
     font-weight: 600;
-    padding: 0.35rem 0.85rem;
-    border: 1px solid var(--erp-border-light);
-    border-radius: var(--erp-radius-sm);
-    background: var(--erp-bg-panel);
-    color: var(--erp-text);
+    padding: 0.2rem 0.65rem;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
     cursor: pointer;
-    transition: background var(--erp-transition), border-color var(--erp-transition), color var(--erp-transition);
+    transition: none;
+    box-shadow: none;
 }
 
-.erp-vendas-page .erp-vendas__type-tab:hover {
-    background: var(--erp-hover);
-    border-color: var(--erp-brand-primary);
-    color: var(--erp-brand-primary);
+.erp-vendas-page .erp-vendas__type-tab:hover:not(.erp-vendas__type-tab--active) {
+    background: #dde4ec;
+    border-color: #b0bcc9;
+    color: #475569;
 }
 
 .erp-vendas-page .erp-vendas__type-tab--active {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
-    border-color: var(--erp-brand-accent);
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
     font-weight: 700;
-    color: var(--erp-text-inverse);
-    box-shadow: var(--erp-shadow-sm);
+    color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: none;
 }
 
 .erp-vendas-page .erp-vendas__footer .erp-vendas__total {
@@ -509,7 +548,7 @@
     overflow: hidden;
 }
 
-/* Larguras de colunas — ordem: Nº, Data, Hora ab., Hora fe., Cliente, …, NFC-e, olho */
+/* Larguras de colunas — ordem: Nº, Data, Hora ab., Hora fe., Cliente, …, NFC-e, NF-e, NFS-e, olho */
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(1),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -580,18 +619,26 @@
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-vendas-page .fi-ta-header-cell-vendedor_nome,
 .erp-vendas-page .fi-ta-cell-vendedor_nome {
-    width: 6.5rem !important;
-    min-width: 6.5rem;
-    max-width: 6.5rem;
+    width: 10rem !important;
+    min-width: 10rem;
+    max-width: 12rem;
+    white-space: nowrap;
 }
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(7),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-vendas-page .fi-ta-header-cell-plataforma,
 .erp-vendas-page .fi-ta-cell-plataforma {
-    width: 5rem !important;
-    min-width: 5rem;
-    max-width: 5.25rem;
+    width: 9rem !important;
+    min-width: 9rem;
+    max-width: 9.5rem;
+    white-space: nowrap;
+}
+
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(7) .fi-badge {
+    max-width: none;
+    overflow: visible;
+    white-space: nowrap;
 }
 
 .erp-vendas-page .fi-ta-header-cell:nth-child(8),
@@ -742,14 +789,23 @@
 .erp-vendas-page .fi-ta-header-cell:nth-child(14),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(14),
 .erp-vendas-page .fi-ta-header-cell-pdvVenda\.nfce\.numero,
-.erp-vendas-page .fi-ta-cell-pdvVenda\.nfce\.numero {
-    width: 7.25rem !important;
-    min-width: 7.25rem;
-    max-width: 7.5rem;
-}
-
+.erp-vendas-page .fi-ta-cell-pdvVenda\.nfce\.numero,
 .erp-vendas-page .fi-ta-header-cell:nth-child(15),
 .erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15),
+.erp-vendas-page .fi-ta-header-cell-nfe,
+.erp-vendas-page .fi-ta-cell-nfe,
+.erp-vendas-page .fi-ta-header-cell:nth-child(16),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(16),
+.erp-vendas-page .fi-ta-header-cell-nfse,
+.erp-vendas-page .fi-ta-cell-nfse {
+    width: 5.75rem !important;
+    min-width: 5.75rem;
+    max-width: 6rem;
+    white-space: nowrap;
+}
+
+.erp-vendas-page .fi-ta-header-cell:nth-child(17),
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(17),
 .erp-vendas-page .fi-ta-header-cell-ver-itens,
 .erp-vendas-page .fi-ta-cell-ver-itens {
     width: 1.75rem !important;
@@ -759,7 +815,7 @@
     overflow: visible;
 }
 
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15) .fi-ta-col,
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(17) .fi-ta-col,
 .erp-vendas-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -815,18 +871,18 @@
 }
 
 .erp-vendas-page .fi-ta-header-cell-ver-itens,
-.erp-vendas-page .fi-ta-header-cell:nth-child(15) {
+.erp-vendas-page .fi-ta-header-cell:nth-child(17) {
     padding: 0 !important;
     box-shadow: var(--erp-vendas-scrollbar-size, 17px) 0 0 0 #164a85;
 }
 
 .erp-vendas-page .fi-ta-cell-ver-itens,
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15) {
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(17) {
     position: relative;
 }
 
 .erp-vendas-page .fi-ta-cell-ver-itens::after,
-.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(15)::after {
+.erp-vendas-page .fi-ta-row .fi-ta-cell:nth-child(17)::after {
     content: '';
     position: absolute;
     top: 0;

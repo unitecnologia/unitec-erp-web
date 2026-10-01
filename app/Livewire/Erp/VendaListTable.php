@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Erp;
 
+use App\Models\Venda;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\Queries\VendaListQueryBuilder;
 use App\Support\Erp\VendaListRowFormatter;
@@ -37,6 +38,115 @@ class VendaListTable extends Component
     public ?string $sortColumn = null;
 
     public string $sortDirection = 'desc';
+
+    /**
+     * Troca de aba de status: 1 request (grade + total + URL).
+     */
+    public function setStatusFilter(string $filter): void
+    {
+        $allowed = [
+            'todos',
+            Venda::STATUS_ABERTO,
+            Venda::STATUS_GRAVADO,
+            Venda::STATUS_FECHADO,
+            Venda::STATUS_CANCELADO,
+        ];
+
+        if (! in_array($filter, $allowed, true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->resetPage();
+
+        $total = (new VendaListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            tipoFilter: $this->tipoFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            localSearchHoraDe: $this->localSearchHoraDe,
+            localSearchHoraAte: $this->localSearchHoraAte,
+        ))->sumFilteredTotal();
+
+        $this->js(sprintf(
+            '(() => {
+                const status = %s;
+                const totalLabel = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("statusFilter", status, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (status === "todos") {
+                        url.searchParams.delete("status");
+                    } else {
+                        url.searchParams.set("status", status);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+                const el = document.querySelector(".erp-vendas__total-value");
+                if (el) el.textContent = totalLabel;
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.venda-resource.pages.list-vendas', JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    public function setTipoFilter(string $filter): void
+    {
+        $allowed = ['todos', Venda::TIPO_PEDIDO, Venda::TIPO_CUPOM];
+
+        if (! in_array($filter, $allowed, true)) {
+            return;
+        }
+
+        $this->tipoFilter = $filter;
+        $this->resetPage();
+
+        $total = (new VendaListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            tipoFilter: $this->tipoFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            localSearchHoraDe: $this->localSearchHoraDe,
+            localSearchHoraAte: $this->localSearchHoraAte,
+        ))->sumFilteredTotal();
+
+        $this->js(sprintf(
+            '(() => {
+                const tipo = %s;
+                const totalLabel = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("tipoFilter", tipo, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (tipo === "todos") {
+                        url.searchParams.delete("tipo");
+                    } else {
+                        url.searchParams.set("tipo", tipo);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+                const el = document.querySelector(".erp-vendas__total-value");
+                if (el) el.textContent = totalLabel;
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.venda-resource.pages.list-vendas', JSON_UNESCAPED_UNICODE),
+        ));
+    }
 
     #[On('erp-venda-list-refresh')]
     public function refreshFromParent(

@@ -40,7 +40,7 @@ return new class extends Migration
 
     private function backfillEmpresaId(): void
     {
-        if (! Schema::hasColumn('vendas', 'empresa_id')) {
+        if (! Schema::hasColumn('vendas', 'empresa_id') || Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 

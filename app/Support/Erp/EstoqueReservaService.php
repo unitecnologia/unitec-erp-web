@@ -4,8 +4,8 @@ namespace App\Support\Erp;
 
 use App\Models\EstoqueReserva;
 use App\Models\ForcaVendasOrder;
-use App\Models\Orcamento;
-use App\Models\OrcamentoItem;
+use App\Models\Pedido;
+use App\Models\PedidoItem;
 use App\Models\Product;
 use App\Models\ProductComposition;
 use App\Models\User;
@@ -77,7 +77,7 @@ final class EstoqueReservaService
     /**
      * Cria reservas para todos os itens de um pedido importado (tipo pedido).
      */
-    public function reservarPedido(ForcaVendasOrder $order, Orcamento $orcamento, User $user): void
+    public function reservarPedido(ForcaVendasOrder $order, Pedido $pedido, User $user): void
     {
         if ($order->tipo !== ForcaVendasOrder::TIPO_PEDIDO) {
             return;
@@ -87,13 +87,13 @@ final class EstoqueReservaService
             return;
         }
 
-        $orcamento->loadMissing('itens.product', 'cliente');
+        $pedido->loadMissing('itens.product', 'cliente');
         $vendedor = $order->vendedor_id ? Vendedor::query()->find($order->vendedor_id) : null;
         $estoqueId = $vendedor?->estoque_id ? (int) $vendedor->estoque_id : null;
-        $clienteNome = $orcamento->cliente?->nome_razao
+        $clienteNome = $pedido->cliente?->nome_razao
             ?? ($order->payload['cliente_nome'] ?? null);
 
-        foreach ($orcamento->itens as $item) {
+        foreach ($pedido->itens as $item) {
             $linhas = $this->expandirLinhasReserva($item);
 
             foreach ($linhas as $linha) {
@@ -122,15 +122,15 @@ final class EstoqueReservaService
                     'estoque_id' => $estoqueId,
                     'quantidade' => $quantidade,
                     'forca_vendas_order_id' => $order->id,
-                    'orcamento_id' => $orcamento->id,
-                    'orcamento_item_id' => $item->id,
+                    'pedido_id' => $pedido->id,
+                    'pedido_item_id' => $item->id,
                     'vendedor_id' => $vendedor?->id,
                     'vendedor_nome' => $vendedor?->nome,
                     'user_id' => $user->id,
                     'empresa_id' => $user->empresa_id,
                     'plataforma' => EstoqueReserva::PLATAFORMA_MOBILE,
                     'cliente_nome' => $clienteNome,
-                    'pedido_numero' => $orcamento->numero,
+                    'pedido_numero' => $pedido->numero,
                     'status' => EstoqueReserva::STATUS_ATIVA,
                 ]);
             }
@@ -187,7 +187,7 @@ final class EstoqueReservaService
     /**
      * @return array<int, array{product: Product, quantidade: float}>
      */
-    private function expandirLinhasReserva(OrcamentoItem $item): array
+    private function expandirLinhasReserva(PedidoItem $item): array
     {
         $product = $item->product;
 

@@ -14,6 +14,10 @@ use App\Http\Controllers\Api\ForcaVendas\SyncController as FvSyncController;
 use App\Http\Controllers\Api\Pdv\CargaController as PdvCargaController;
 use App\Http\Controllers\Api\Pdv\PedidosImportaveisController as PdvPedidosImportaveisController;
 use App\Http\Controllers\Api\Pdv\RetornoController as PdvRetornoController;
+use App\Http\Controllers\Api\Entregas\AuthController as EntregasAuthController;
+use App\Http\Controllers\Api\Entregas\DeviceController as EntregasDeviceController;
+use App\Http\Controllers\Api\Entregas\InfoController as EntregasInfoController;
+use App\Http\Controllers\Api\Entregas\SyncController as EntregasSyncController;
 use App\Http\Controllers\Api\UnitecOs\AuthController as UnitecOsAuthController;
 use App\Http\Controllers\Api\UnitecOs\CepController as UnitecOsCepController;
 use App\Http\Controllers\Api\UnitecOs\ClienteController as UnitecOsClienteController;
@@ -30,6 +34,8 @@ use App\Http\Controllers\Api\VendasInternas\SyncController as ViSyncController;
 use App\Http\Controllers\Api\MeliHubPairController;
 use App\Http\Controllers\Webhooks\MercadoLivreWebhookController;
 use App\Http\Controllers\Webhooks\MercadoPagoWebhookController;
+use App\Http\Controllers\Webhooks\AilosPixWebhookController;
+use App\Http\Controllers\Api\Integracoes\Ailos\AilosAuthCallbackController;
 use Illuminate\Support\Facades\Route;
 
 // Health check do launcher/serviço — JSON simples, sem Blade/Livewire/DB.
@@ -40,6 +46,20 @@ Route::get('health', static fn () => response()->json([
 
 Route::post('webhooks/mercadolivre', [MercadoLivreWebhookController::class, 'handle'])
     ->name('webhooks.mercadolivre');
+
+// Webhook público Ailos Pix (produção). Sem auth — Ailos chama direto.
+// Confirma CONCLUIDA via API (OAuth2+mTLS) antes de baixar.
+Route::post('webhooks/ailos', [AilosPixWebhookController::class, 'handle'])
+    ->middleware('throttle:180,1')
+    ->name('webhooks.ailos');
+
+Route::prefix('integracoes/ailos')->middleware('throttle:120,1')->group(function (): void {
+    Route::post('auth/callback', [AilosAuthCallbackController::class, 'callback'])
+        ->name('integracoes.ailos.auth.callback');
+    // Query string evita problema de {state} com pontos no path (1.homologacao.uuid).
+    Route::get('auth/jwt', [AilosAuthCallbackController::class, 'jwt'])
+        ->name('integracoes.ailos.auth.jwt');
+});
 
 Route::prefix('meli/hub')->middleware('throttle:60,1')->group(function (): void {
     Route::post('pair', [MeliHubPairController::class, 'store'])->name('meli.hub.pair.store');
@@ -71,6 +91,11 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
     // Webhook público do Mercado Pago (sem auth; valida consultando a API do MP).
     Route::post('webhooks/mercadopago', [MercadoPagoWebhookController::class, 'handle'])
         ->name('forcavendas.webhooks.mercadopago');
+
+    // Webhook Ailos Pix (sem auth; confirma status via GET /cob/{txid} antes de baixar).
+    Route::post('webhooks/ailos-pix', [AilosPixWebhookController::class, 'handle'])
+        ->middleware('throttle:120,1')
+        ->name('forcavendas.webhooks.ailos-pix');
 
     // Exigem aparelho autorizado pelo administrador.
     Route::middleware('forcavendas.device')->group(function (): void {
@@ -194,6 +219,36 @@ Route::prefix('v1/unitec-os')->group(function (): void {
             Route::get('ordens/{id}/midias', [UnitecOsOrdemServicoMidiaController::class, 'index'])->whereNumber('id');
             Route::post('ordens/{id}/fotos', [UnitecOsOrdemServicoMidiaController::class, 'storeFoto'])->whereNumber('id');
             Route::post('ordens/{id}/assinatura', [UnitecOsOrdemServicoMidiaController::class, 'storeAssinatura'])->whereNumber('id');
+        });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| API — Unitec Entregas (app de motoristas / cargas)
+|--------------------------------------------------------------------------
+| Auth: Sanctum + senha_app_forca_vendas + aparelho aprovado (X-ENT-Device).
+| Ping público. Info/users/login exigem device aprovado.
+| me/logout: device + Sanctum.
+*/
+
+Route::prefix('v1/entregas')->group(function (): void {
+    Route::middleware('throttle:60,1')->group(function (): void {
+        Route::get('ping', [EntregasInfoController::class, 'ping']);
+        Route::post('devices/register', [EntregasDeviceController::class, 'register']);
+        Route::get('devices/status', [EntregasDeviceController::class, 'status']);
+    });
+
+    Route::middleware('entregas.device')->group(function (): void {
+        Route::get('info', [EntregasInfoController::class, 'index']);
+        Route::get('users', [EntregasInfoController::class, 'users']);
+        Route::post('auth/login', [EntregasAuthController::class, 'login']);
+
+        Route::middleware('auth:sanctum')->group(function (): void {
+            Route::get('auth/me', [EntregasAuthController::class, 'me']);
+            Route::post('auth/logout', [EntregasAuthController::class, 'logout']);
+            Route::get('sync/pull', [EntregasSyncController::class, 'pull']);
+            Route::post('sync/push', [EntregasSyncController::class, 'push']);
         });
     });
 });

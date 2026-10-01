@@ -467,6 +467,28 @@
     border: 1px solid var(--erp-border-light, #c7d5e8);
 }
 
+/* grid-wrap pai precisa ser flex-column para o hot-path filho poder crescer */
+.erp-pdv__main-panel > .erp-pdv__grid-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+/* hot-path (root do Livewire filho) ocupa toda a altura disponível */
+[data-erp-pdv-hot-path] {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* grid-wrap interno do hot-path herda flex:1 corretamente */
+[data-erp-pdv-hot-path] > .erp-pdv__grid-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+
 .erp-pdv__search-box {
     flex-shrink: 0;
     margin: 0;
@@ -576,6 +598,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.erp-pdv__col-excluir {
+    width: 2.1rem;
 }
 
 .erp-pdv__col-item {
@@ -706,6 +732,52 @@
     cursor: pointer;
 }
 
+.erp-pdv__item-del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        color 0.12s ease,
+        box-shadow 0.12s ease;
+}
+
+.erp-pdv__item-del:hover {
+    color: #dc2626;
+    background: #fee2e2;
+    border-color: #fecaca;
+    box-shadow: 0 1px 3px rgba(220, 38, 38, 0.18);
+}
+
+.erp-pdv__item-del:focus-visible {
+    outline: 2px solid #dc2626;
+    outline-offset: 1px;
+}
+
+.erp-pdv__item-del:active {
+    background: #fecaca;
+    color: #b91c1c;
+}
+
+.erp-pdv__grid--cupom .erp-pdv__grid-row--selected .erp-pdv__item-del {
+    color: #1e3a8a;
+}
+
+.erp-pdv__grid--cupom .erp-pdv__grid-row--selected .erp-pdv__item-del:hover {
+    color: #dc2626;
+}
+
 .erp-pdv__grid--cupom .erp-pdv__grid-row--selected td,
 .erp-pdv__grid--consulta .erp-pdv__grid-row--selected td {
     background: #93c5fd;
@@ -830,6 +902,158 @@
 .erp-pdv-canhoto {
     width: min(52rem, 100%);
     max-height: min(94%, 38rem);
+}
+
+.erp-pdv-pix-qr {
+    width: min(28rem, 100%);
+    max-height: min(94%, 36rem);
+}
+
+/* Acima do overlay fiscal da NFC-e (z-index 280) — senão o QR “some”. */
+.erp-pdv-canhoto-overlay:has(.erp-pdv-pix-qr),
+.erp-pdv-pix-qr-overlay {
+    z-index: 290;
+}
+
+.erp-pdv-pix-qr__body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem 0.35rem;
+    text-align: center;
+}
+
+.erp-pdv-pix-qr__valor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.erp-pdv-pix-qr__valor span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-pdv-pix-qr__valor strong {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f2744;
+}
+
+.erp-pdv-pix-qr__img {
+    width: min(14rem, 70vw);
+    height: auto;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    padding: 0.45rem;
+}
+
+.erp-pdv-pix-qr__copia {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+}
+
+.erp-pdv-pix-qr__copia span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.erp-pdv-pix-qr__copia textarea {
+    width: 100%;
+    resize: none;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    padding: 0.45rem 0.55rem;
+    border-radius: 8px;
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #0f172a;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.erp-pdv-pix-qr__status {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1e3a5f;
+}
+
+.erp-pdv-pix-qr__countdown {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+}
+
+.erp-pdv-pix-qr__countdown-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.erp-pdv-pix-qr__countdown-row span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-pdv-pix-qr__countdown-row strong {
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #0f2744;
+}
+
+.erp-pdv-pix-qr__bar {
+    width: 100%;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #dbe4f0;
+    overflow: hidden;
+}
+
+.erp-pdv-pix-qr__bar-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1d4ed8, #2563eb);
+    transition: width 0.35s linear;
+}
+
+.erp-pdv-pix-qr__bar-fill.is-low {
+    background: linear-gradient(90deg, #b91c1c, #dc2626);
+}
+
+.erp-pdv-pix-qr__hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.erp-pdv-pix-qr__erro {
+    margin: 0;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
 }
 
 .erp-pdv-parcelas {
@@ -2202,7 +2426,7 @@
     min-height: clamp(2.25rem, 5.5vh, 3.5rem);
     padding: 0.35rem 0.75rem;
     background: #fff;
-    border-top: 2px solid var(--erp-brand-primary, #1e5a9e);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
     color: #1e5a9e;
     font-size: clamp(1.1rem, 2.4vw, 2rem);
     font-weight: 800;
@@ -2267,10 +2491,28 @@
     color: #fff;
     cursor: pointer;
     font-family: inherit;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        filter 0.12s ease;
 }
 
 .erp-pdv__tool-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, #7a7a7a 0%, #5a5a5a 100%);
+    background: linear-gradient(180deg, #858585 0%, #5f5f5f 100%);
+    border-color: #5b7290;
+    box-shadow: 0 4px 10px -3px rgba(0, 0, 0, 0.35);
+}
+
+.erp-pdv__tool-btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+.erp-pdv__tool-btn:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
+    filter: brightness(0.92);
 }
 
 .erp-pdv__tool-btn:disabled {
@@ -2281,6 +2523,8 @@
 
 .erp-pdv__tool-btn:disabled:hover {
     background: linear-gradient(180deg, #6a6a6a 0%, #4a4a4a 100%);
+    border-color: #3d4f62;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .erp-pdv__tool-btn--exit {
@@ -2288,8 +2532,10 @@
     background: linear-gradient(180deg, #8e3a3a 0%, #6b1f1f 100%);
 }
 
-.erp-pdv__tool-btn--exit:hover {
+.erp-pdv__tool-btn--exit:hover:not(:disabled) {
     background: linear-gradient(180deg, #a04545 0%, #7a2525 100%);
+    border-color: #8b2e2e;
+    box-shadow: 0 4px 10px -3px rgba(107, 31, 31, 0.55);
 }
 
 .erp-pdv__tool-icon {
@@ -2779,52 +3025,103 @@
     inset: 0;
     z-index: 130;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
-    padding: 0.5rem;
+    padding: 0.4rem;
 }
 
 .erp-pdv-overlay__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(8, 24, 48, 0.52);
 }
 
 .erp-pdv-overlay__panel {
     position: relative;
     z-index: 1;
-    width: min(98vw, 72rem);
-    height: calc(100vh - 8rem);
-    background: #b8c8d8;
-    border: 2px solid var(--erp-border-light, #c7d5e8);
-    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.4);
+    width: min(98vw, 90rem);
+    height: min(96dvh, calc(100vh - 1rem));
+    max-height: calc(100dvh - 1rem);
+    background: #d4e0ee;
+    border: 1px solid #8fa8c8;
+    border-radius: 12px;
+    box-shadow:
+        0 28px 56px rgba(15, 52, 96, 0.32),
+        0 0 0 1px rgba(255, 255, 255, 0.28) inset;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+/*
+ * Cadastro de Produtos: não usar ~96dvh (esticava o form no iframe).
+ * Altura ≈ conteúdo natural (~597px) + header do overlay (~37px).
+ */
+.erp-pdv-overlay[aria-label="Produtos"] .erp-pdv-overlay__panel {
+    height: min(635px, calc(100dvh - 1rem));
+    max-height: calc(100dvh - 1rem);
+}
+
+/*
+ * Cadastro de Clientes (PDV):
+ * - listagem: painel alto (grade);
+ * - create/edit: classe --person-form + altura inline pelo erp-pdv.js
+ *   (acompanha o conteúdo da aba, sem vazio fixo abaixo do rodapé).
+ */
+.erp-pdv-overlay[data-erp-pdv-overlay-type="person"]:not(.erp-pdv-overlay--person-form) .erp-pdv-overlay__panel,
+.erp-pdv-overlay[aria-label="Cadastro de Clientes"]:not(.erp-pdv-overlay--person-form) .erp-pdv-overlay__panel,
+.erp-pdv-overlay--person-list .erp-pdv-overlay__panel {
+    height: min(96dvh, calc(100vh - 1rem));
+    max-height: calc(100dvh - 1rem);
+}
+
+.erp-pdv-overlay--person-form .erp-pdv-overlay__panel {
+    max-height: calc(100dvh - 1rem);
+}
+
+.erp-pdv-overlay--person-form .erp-pdv-overlay__iframe {
+    flex: 0 0 auto;
+    min-height: 0;
 }
 
 .erp-pdv-overlay__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.3rem 0.5rem;
+    padding: 0.45rem 0.75rem;
     background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
     color: #fff;
     font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    flex-shrink: 0;
 }
 
 .erp-pdv-overlay__close {
     border: 0;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.12);
     color: #fff;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 1.05rem;
+    line-height: 1;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.erp-pdv-overlay__close:hover {
+    background: rgba(255, 255, 255, 0.22);
 }
 
 .erp-pdv-overlay__iframe {
     flex: 1;
     width: 100%;
     border: 0;
-    background: #b8c8d8;
+    background: #d4e0ee;
+    min-height: 0;
 }
 
 .erp-pdv-cad-cliente {
@@ -2977,6 +3274,40 @@
     min-height: 0;
 }
 
+.fi-body.erp-pdv-embed-body .erp-produtos-page,
+.fi-body:has(.erp-produtos-page.erp-pdv-embed) .erp-produtos-page {
+    min-height: 100%;
+    padding: 0.35rem;
+    box-sizing: border-box;
+}
+
+.fi-body.erp-pdv-embed-body .erp-produtos-page .erp-produtos,
+.fi-body:has(.erp-produtos-page.erp-pdv-embed) .erp-produtos {
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #8fa8c8;
+}
+
+.fi-body.erp-pdv-embed-body .erp-pessoas-page,
+.fi-body:has(.erp-pessoas-page.erp-pdv-embed) .erp-pessoas-page {
+    min-height: 100%;
+    padding: 0.35rem;
+    box-sizing: border-box;
+}
+
+.fi-body.erp-pdv-embed-body .erp-pessoas-page .erp-pessoas,
+.fi-body:has(.erp-pessoas-page.erp-pdv-embed) .erp-pessoas {
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #8fa8c8;
+}
+
 .fi-body.erp-pdv-embed-body .erp-pcad,
 .fi-body:has(.erp-pdv-embed) .erp-pcad {
     flex: 1;
@@ -3097,20 +3428,33 @@
     background: rgba(255, 255, 255, 0.95) !important;
     color: var(--erp-text, #0f172a) !important;
     box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1)) !important;
-    transition: background var(--erp-transition, 0.15s ease), transform var(--erp-transition, 0.15s ease);
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        filter 0.12s ease !important;
 }
 
 .erp-pdv__tool-btn:hover:not(:disabled) {
     background: #fff !important;
     border-color: var(--erp-brand-primary, #1e5a9e) !important;
-    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -4px rgba(30, 90, 158, 0.45) !important;
+}
+
+.erp-pdv__tool-btn:focus-visible {
+    outline: 2px solid #2563eb !important;
+    outline-offset: 2px !important;
+}
+
+.erp-pdv__tool-btn:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.18) !important;
+    filter: brightness(0.97);
 }
 
 .erp-pdv__tool-btn:disabled {
     opacity: 0.42 !important;
     cursor: not-allowed !important;
     filter: grayscale(0.55);
-    transform: none !important;
 }
 
 .erp-pdv-modal__window {
@@ -3161,12 +3505,29 @@
     cursor: pointer !important;
     box-shadow: var(--erp-shadow-sm) !important;
     transition:
-        background var(--erp-transition, 0.15s ease),
-        transform var(--erp-transition, 0.15s ease),
-        box-shadow var(--erp-transition, 0.15s ease),
-        border-color var(--erp-transition, 0.15s ease),
-        filter var(--erp-transition, 0.15s ease) !important;
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        transform 0.12s ease,
+        filter 0.12s ease !important;
     white-space: nowrap;
+}
+
+.erp-pdv-modal__btn:focus-visible {
+    outline: 2px solid #2563eb !important;
+    outline-offset: 2px !important;
+}
+
+.erp-pdv-modal__btn:active:not(:disabled) {
+    transform: translateY(1px) !important;
+    box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.28) !important;
+}
+
+.erp-pdv-modal__btn:disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    filter: none !important;
 }
 
 .erp-pdv-modal__btn:not(.erp-pdv-modal__btn--primary):not(.erp-pdv-modal__btn--danger) {
@@ -3175,9 +3536,10 @@
     color: var(--erp-text, #0f172a) !important;
 }
 
-.erp-pdv-modal__btn:not(.erp-pdv-modal__btn--primary):not(.erp-pdv-modal__btn--danger):hover {
+.erp-pdv-modal__btn:not(.erp-pdv-modal__btn--primary):not(.erp-pdv-modal__btn--danger):hover:not(:disabled) {
     background: var(--erp-hover, #dbeafe) !important;
     border-color: var(--erp-brand-primary, #1e5a9e) !important;
+    box-shadow: 0 4px 10px -4px rgba(30, 90, 158, 0.35) !important;
     transform: translateY(-1px);
 }
 
@@ -3191,10 +3553,15 @@
     color: var(--erp-text-inverse, #fff) !important;
 }
 
-.erp-pdv-modal__btn--primary:hover {
-    filter: brightness(1.05);
+.erp-pdv-modal__btn--primary:hover:not(:disabled) {
+    filter: brightness(1.08);
     transform: translateY(-1px);
     box-shadow: var(--erp-shadow-md) !important;
+}
+
+.erp-pdv-modal__btn--primary:active:not(:disabled) {
+    filter: brightness(0.96);
+    transform: translateY(1px) !important;
 }
 
 .erp-pdv-modal__btn--danger {
@@ -3210,14 +3577,16 @@
 /* Botao Concluir / Pedido (finalizar venda) em verde */
 #erp-pdv-finalizar-concluir.erp-pdv-modal__btn--primary,
 .erp-pdv-finalizar__operacao-btn--pedido.erp-pdv-modal__btn--primary,
-.erp-pdv-finalizar__operacao-btn--pedido:not(.erp-pdv-finalizar__operacao-btn--fiscal) {
+.erp-pdv-finalizar__operacao-btn--pedido:not(.erp-pdv-finalizar__operacao-btn--fiscal),
+.erp-pdv-finalizar__operacao-btn--concluir {
     background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
     border-color: #15803d !important;
     color: #fff !important;
 }
 
 #erp-pdv-finalizar-concluir.erp-pdv-modal__btn--primary:hover,
-.erp-pdv-finalizar__operacao-btn--pedido:hover {
+.erp-pdv-finalizar__operacao-btn--pedido:hover,
+.erp-pdv-finalizar__operacao-btn--concluir:hover {
     filter: brightness(1.05);
 }
 
@@ -3265,10 +3634,19 @@
     opacity: 0.92;
 }
 
-.erp-pdv-modal__btn--danger:hover {
-    filter: brightness(1.05);
+.erp-pdv-modal__btn--danger:hover:not(:disabled) {
+    filter: brightness(1.08);
     transform: translateY(-1px);
     box-shadow: var(--erp-shadow-md) !important;
+}
+
+.erp-pdv-modal__btn--danger:focus-visible {
+    outline-color: #dc2626 !important;
+}
+
+.erp-pdv-modal__btn--danger:active:not(:disabled) {
+    filter: brightness(0.96);
+    transform: translateY(1px) !important;
 }
 
 .erp-pdv-modal__btn kbd {
@@ -3593,6 +3971,23 @@
     border-radius: 8px;
     font-size: 0.78rem;
     font-weight: 600;
+}
+
+.erp-pdv-finalizar__credito {
+    display: flex;
+    margin: 0.35rem 0 0.5rem;
+    padding: 0.45rem 0.65rem;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 8px;
+    color: #047857;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-pdv-finalizar__forma-disponivel {
+    color: #047857;
+    font-weight: 650;
 }
 
 .erp-pdv-tabela-preco-list {
@@ -4881,7 +5276,29 @@
     font-size: 0.84rem;
     font-weight: 700;
     cursor: pointer;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        transform 0.12s ease,
+        filter 0.12s ease;
+}
+
+.erp-pdv-caixa-modal__btn:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+.erp-pdv-caixa-modal__btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.28);
+}
+
+.erp-pdv-caixa-modal__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .erp-pdv-caixa-modal__btn kbd {
@@ -4898,8 +5315,9 @@
 
 .erp-pdv-caixa-modal__btn--ghost {
     background: #f1f5f9;
-    border-color: #e2e8f0;
+    border-color: #cbd5e1;
     color: #334155;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .erp-pdv-caixa-modal__btn--ghost kbd {
@@ -4907,8 +5325,14 @@
     color: #475569;
 }
 
-.erp-pdv-caixa-modal__btn--ghost:hover {
+.erp-pdv-caixa-modal__btn--ghost:hover:not(:disabled) {
     background: #e2e8f0;
+    border-color: #94a3b8;
+    box-shadow: 0 4px 10px -4px rgba(15, 23, 42, 0.22);
+}
+
+.erp-pdv-caixa-modal__btn--ghost:focus-visible {
+    outline-color: #64748b;
 }
 
 .erp-pdv-caixa-modal__btn--primary {
@@ -4922,9 +5346,17 @@
     color: #fff;
 }
 
-.erp-pdv-caixa-modal__btn--primary:hover {
+.erp-pdv-caixa-modal__btn--primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    border-color: #1d4ed8;
     transform: translateY(-1px);
-    box-shadow: 0 10px 22px -10px rgba(30, 90, 158, 0.8);
+    box-shadow: 0 10px 22px -8px rgba(30, 90, 158, 0.85);
+}
+
+.erp-pdv-caixa-modal__btn--primary:active:not(:disabled) {
+    filter: brightness(0.96);
+    transform: translateY(1px);
+    box-shadow: 0 3px 8px -4px rgba(30, 90, 158, 0.55);
 }
 
 .erp-pdv-caixa-modal__btn--danger {
@@ -4938,8 +5370,21 @@
     color: #fff;
 }
 
-.erp-pdv-caixa-modal__btn--danger:hover {
+.erp-pdv-caixa-modal__btn--danger:hover:not(:disabled) {
+    filter: brightness(1.08);
+    border-color: #9a3412;
     transform: translateY(-1px);
+    box-shadow: 0 10px 22px -8px rgba(194, 65, 12, 0.85);
+}
+
+.erp-pdv-caixa-modal__btn--danger:focus-visible {
+    outline-color: #ea580c;
+}
+
+.erp-pdv-caixa-modal__btn--danger:active:not(:disabled) {
+    filter: brightness(0.96);
+    transform: translateY(1px);
+    box-shadow: 0 3px 8px -4px rgba(194, 65, 12, 0.55);
 }
 
 @media (max-width: 420px) {
@@ -5020,6 +5465,24 @@
 
 .erp-pdv-vendas-espera__grid .erp-pdv__grid-row--marked:hover td {
     background: #1e40af;
+}
+
+.erp-pdv-vendas-espera__motivo {
+    margin-top: 0.65rem;
+}
+.erp-pdv-vendas-espera__motivo .erp-pdv-modal__input {
+    width: 100%;
+}
+.erp-pdv-vendas-espera__counter {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+.erp-pdv-vendas-espera__counter--warn {
+    color: #dc2626;
+}
+.erp-pdv-vendas-espera__counter--ok {
+    color: #15803d;
 }
 
 @media (max-width: 720px) {
@@ -5176,19 +5639,38 @@
     gap: 0.4rem;
     min-height: 2.35rem;
     padding: 0.5rem 0.9rem !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 10px !important;
     background: #f1f5f9 !important;
     color: #334155 !important;
-    box-shadow: none !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
     font: inherit;
     font-size: 0.82rem;
     font-weight: 750;
     cursor: pointer;
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        transform 0.12s ease,
+        filter 0.12s ease !important;
 }
 
-.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn:hover {
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn:hover:not(:disabled) {
     background: #e2e8f0 !important;
+    border-color: #94a3b8 !important;
+    box-shadow: 0 4px 10px -4px rgba(15, 23, 42, 0.22) !important;
+    transform: translateY(-1px);
+}
+
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn:focus-visible {
+    outline: 2px solid #2563eb !important;
+    outline-offset: 2px !important;
+}
+
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn:active:not(:disabled) {
+    transform: translateY(1px) !important;
+    box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.28) !important;
 }
 
 .erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn--primary {
@@ -5198,10 +5680,28 @@
     box-shadow: 0 8px 18px -10px rgba(30, 90, 158, 0.75) !important;
 }
 
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn--primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 10px 22px -8px rgba(30, 90, 158, 0.85) !important;
+    transform: translateY(-1px);
+}
+
 .erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn--danger {
     border-color: transparent !important;
     background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%) !important;
     color: #fff !important;
+}
+
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn--danger:hover:not(:disabled) {
+    filter: brightness(1.08);
+    border-color: #991b1b !important;
+    box-shadow: 0 10px 22px -8px rgba(185, 28, 28, 0.7) !important;
+    transform: translateY(-1px);
+}
+
+.erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn--danger:focus-visible {
+    outline-color: #ef4444 !important;
 }
 
 .erp-pdv-modal:not(.erp-pdv-modal--payment):not(.erp-pdv-caixa-modal):not(.erp-pdv-vendedor-modal):not(.erp-pdv-resumo-modal):not(.erp-pdv-modal--menu) .erp-pdv-modal__btn kbd {
@@ -5983,10 +6483,26 @@
     color: #1d4ed8;
     cursor: pointer;
     white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        transform 0.12s ease;
 }
 .erp-pdv-fechamento-moedas-btn:hover {
     background: #dbeafe;
-    border-color: #2563eb;
+    border-color: #1d4ed8;
+    box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.4);
+    transform: translateY(-1px);
+}
+.erp-pdv-fechamento-moedas-btn:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+.erp-pdv-fechamento-moedas-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
 }
 .erp-pdv-resumo-cancel-grid {
     display: grid;
@@ -6783,10 +7299,28 @@
     cursor: pointer;
     font-family: inherit;
     overflow: visible;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        filter 0.12s ease;
 }
 
 .erp-pdv__tool-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, #7a7a7a 0%, #5a5a5a 100%);
+    background: linear-gradient(180deg, #858585 0%, #5f5f5f 100%);
+    border-color: #5b7290;
+    box-shadow: 0 4px 10px -3px rgba(0, 0, 0, 0.35);
+}
+
+.erp-pdv__tool-btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+.erp-pdv__tool-btn:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
+    filter: brightness(0.92);
 }
 
 .erp-pdv__tool-icon {
@@ -6965,3 +7499,542 @@
     text-overflow: ellipsis !important;
 }
 
+
+/* ===== Boleto sucesso (PDV / FV / OS — mesmo padrão Contas a Receber) ===== */
+.erp-boleto-sucesso-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(15 23 42 / 45%);
+}
+.erp-boleto-sucesso-overlay.is-visible {
+    display: grid;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__box {
+    width: min(32rem, calc(100vw - 2rem));
+    padding: 1.35rem 1.25rem 1.1rem;
+    border-radius: 0.75rem;
+    border: 2px solid #16a34a;
+    background: #fff;
+    text-align: center;
+    box-shadow: 0 16px 40px rgb(15 23 42 / 28%);
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 0.75rem;
+    border-radius: 999px;
+    background: #16a34a;
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #16a34a;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__codigo {
+    margin: 0.55rem 0 1rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-word;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.55rem;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn {
+    min-width: 6.75rem;
+    padding: 0.55rem 1rem;
+    border: 0;
+    border-radius: 0.45rem;
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--print { background: #1d4ed8; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--print:hover { background: #1e40af; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--email { background: #0f766e; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--email:hover { background: #0d5f59; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--exit { background: #64748b; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__btn--exit:hover { background: #475569; }
+.erp-boleto-sucesso-overlay .erp-nfe-fiscal-overlay__hint {
+    margin: 0.85rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+/* Enviar boleto (teleport body — PDV / FV / OS) */
+.erp-boleto-enviar-modal-standalone {
+    position: fixed;
+    inset: 0;
+    z-index: 420;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.erp-boleto-enviar-modal-standalone .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+.erp-boleto-enviar-modal-standalone .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-md, 8px);
+    background: var(--erp-bg-app, #e3ecf7);
+    box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
+    overflow: hidden;
+}
+.erp-boleto-enviar-modal-standalone .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.45rem 0.3rem 0.65rem;
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.erp-boleto-enviar-modal-standalone .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: #fff;
+    min-height: 0;
+    overflow: auto;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1e3a8a;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__input,
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__textarea {
+    width: 100%;
+    border: 1px solid #94a3b8;
+    border-radius: 0.35rem;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.9rem;
+    color: #0f172a;
+    background: #fff;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__textarea {
+    resize: vertical;
+    min-height: 7rem;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__error {
+    font-size: 0.75rem;
+    color: #b91c1c;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__attachment {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #16a34a;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__attachments-empty {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+.erp-boleto-enviar-modal-standalone .erp-nfe-whatsapp-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.75rem 0.65rem;
+    background: var(--erp-bg-app, #e3ecf7);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #94a3b8;
+    border-radius: 0.4rem;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__btn--primary,
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__btn[data-erp-key="F5"] {
+    border-color: #1d4ed8;
+    background: #1d4ed8;
+    color: #fff;
+}
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__btn[data-erp-key="WhatsApp"] {
+    border-color: #0f766e;
+    background: #0f766e;
+    color: #fff;
+}
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    border-color: #64748b;
+    background: #64748b;
+    color: #fff;
+}
+.erp-boleto-enviar-modal-standalone .erp-pcad-actions__label kbd {
+    font: inherit;
+    font-weight: 800;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    align-items: center;
+    justify-content: center;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 35%);
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-panel {
+    position: relative;
+    z-index: 1;
+    width: min(18rem, calc(100% - 2rem));
+    padding: 1rem;
+    border-radius: 0.55rem;
+    background: #fff;
+    text-align: center;
+    box-shadow: 0 10px 28px rgb(15 23 42 / 25%);
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-spinner {
+    width: 1.6rem;
+    height: 1.6rem;
+    margin: 0 auto 0.65rem;
+    border: 3px solid #cbd5e1;
+    border-top-color: #1d4ed8;
+    border-radius: 999px;
+    animation: erp-boleto-enviar-spin 0.8s linear infinite;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-status {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-track {
+    margin: 0.65rem 0 0.45rem;
+    height: 0.35rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-bar {
+    width: 40%;
+    height: 100%;
+    border-radius: inherit;
+    background: #1d4ed8;
+    animation: erp-boleto-enviar-bar 1.1s ease-in-out infinite;
+}
+.erp-boleto-enviar-modal-standalone .erp-orc-email-modal__busy-hint {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+@keyframes erp-boleto-enviar-spin { to { transform: rotate(360deg); } }
+@keyframes erp-boleto-enviar-bar {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(280%); }
+}
+
+/* Progresso emissão boleto (PDV / FV / OS) */
+.erp-boleto-emit-progress {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 450;
+    place-items: center;
+    padding: 1rem;
+}
+.erp-boleto-emit-progress.is-visible {
+    display: grid;
+}
+.erp-boleto-emit-progress__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 45%);
+}
+.erp-boleto-emit-progress__panel {
+    position: relative;
+    z-index: 1;
+    width: min(26rem, calc(100vw - 2rem));
+    padding: 1.25rem 1.15rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    box-shadow: 0 16px 40px rgb(15 23 42 / 28%);
+    text-align: center;
+}
+.erp-boleto-emit-progress__spinner {
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: 0 auto 0.75rem;
+    border: 3px solid #cbd5e1;
+    border-top-color: #1d4ed8;
+    border-radius: 999px;
+    animation: erp-boleto-enviar-spin 0.8s linear infinite;
+}
+.erp-boleto-emit-progress__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+.erp-boleto-emit-progress__status {
+    margin: 0.45rem 0 0.75rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    min-height: 1.25rem;
+}
+.erp-boleto-emit-progress__track {
+    height: 0.4rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+.erp-boleto-emit-progress__bar {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #16a34a);
+    transition: width 0.35s ease;
+}
+.erp-boleto-emit-progress__steps {
+    list-style: none;
+    margin: 0.85rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    text-align: left;
+}
+.erp-boleto-emit-progress__steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.erp-boleto-emit-progress__steps li::before {
+    content: '';
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #cbd5e1;
+    flex: 0 0 auto;
+}
+.erp-boleto-emit-progress__steps li.is-active {
+    color: #1d4ed8;
+}
+.erp-boleto-emit-progress__steps li.is-active::before {
+    background: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+.erp-boleto-emit-progress__steps li.is-done {
+    color: #15803d;
+}
+.erp-boleto-emit-progress__steps li.is-done::before {
+    background: #16a34a;
+}
+.erp-boleto-emit-progress__hint {
+    margin: 0.85rem 0 0;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.erp-pdv-menu-fiscal__aviso {
+    margin: 0.35rem 0.85rem 0;
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    background: #fff8e1;
+    border: 1px solid #f0d060;
+    color: #7a5b00;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-pdv-shell-modal__body .erp-pdv-menu-fiscal__aviso {
+    margin: 0.65rem 0 0;
+}
+
+.erp-pdv-shell-modal .erp-pdv-modal__window--menu-fiscal-id {
+    width: min(40rem, calc(100vw - 1.5rem));
+    max-width: 40rem;
+}
+
+.erp-pdv-modal__window--menu-fiscal-xml {
+    width: min(28rem, calc(100vw - 1.5rem));
+    max-width: 28rem;
+}
+
+.erp-pdv-modal__window--menu-fiscal-registros {
+    width: min(32rem, calc(100vw - 1.5rem));
+    max-width: 32rem;
+}
+
+.erp-pdv-modal__window--menu-fiscal-dav {
+    width: min(46rem, calc(100vw - 1.5rem));
+    max-width: 46rem;
+}
+
+.erp-pdv-menu-fiscal-id__block + .erp-pdv-menu-fiscal-id__block {
+    margin-top: 0.55rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid #e8eef5;
+}
+
+.erp-pdv-menu-fiscal-id__block h3 {
+    margin: 0 0 0.28rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.erp-pdv-menu-fiscal-id__rows {
+    display: grid;
+    gap: 0.1rem;
+    margin: 0;
+}
+
+.erp-pdv-menu-fiscal-id__rows div {
+    display: grid;
+    grid-template-columns: 9.4rem minmax(0, 1fr);
+    column-gap: 0.45rem;
+    align-items: baseline;
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.erp-pdv-menu-fiscal-id__rows dt {
+    margin: 0;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-pdv-menu-fiscal-id__rows dd {
+    margin: 0;
+    color: #0f172a;
+}
+
+.erp-pdv-menu-fiscal-id__rows .is-endereco dd {
+    white-space: nowrap;
+}
+
+.erp-pdv-menu-fiscal__detalhe {
+    display: block;
+    margin-top: 0.02rem;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+.erp-pdv-menu-fiscal-ui__choices {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.82rem;
+}
+
+.erp-pdv-menu-fiscal-ui__choices label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-pdv-menu-fiscal-ui__grade-wrap {
+    max-height: 11rem;
+    overflow: auto;
+    border: 1px solid #dbe4ee;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.erp-pdv-menu-fiscal-ui__grade {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.erp-pdv-menu-fiscal-ui__grade th,
+.erp-pdv-menu-fiscal-ui__grade td {
+    padding: 0.35rem 0.45rem;
+    text-align: left;
+    border-bottom: 1px solid #e8eef5;
+    white-space: nowrap;
+}
+
+.erp-pdv-menu-fiscal-ui__grade th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+}
+
+.erp-pdv-menu-fiscal-xml__fields {
+    display: grid;
+    gap: 0.35rem;
+}
+
+@media (max-width: 720px) {
+    .erp-pdv-menu-fiscal-id__rows .is-endereco dd {
+        white-space: normal;
+    }
+}

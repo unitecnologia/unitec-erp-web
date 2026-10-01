@@ -342,6 +342,7 @@ bind-address=0.0.0.0
 skip-name-resolve
 character-set-server=utf8mb4
 collation-server=utf8mb4_unicode_ci
+innodb_default_row_format=dynamic
 innodb_buffer_pool_size=256M
 innodb_log_buffer_size=8M
 max_connections=200
@@ -791,6 +792,7 @@ function Ensure-UnitecRuntimeInstalled {
 
     Ensure-Directory (Get-UnitecToolsPath $AppPath)
     $null = Ensure-UnitecPhp84 -AppPath $AppPath -SourceRoot $SourceRoot
+    $null = Ensure-UnitecFrankenPhpRuntime -AppPath $AppPath -SourceRoot $SourceRoot
 
     if ($SkipMysql) {
         return
@@ -1330,7 +1332,20 @@ function Invoke-UnitecArtisan {
                 $detail = "codigo $exitCode"
             }
 
-            throw ("artisan {0} falhou: {1}" -f ($Arguments -join ' '), $detail)
+            # Grava log completo; MessageBox do Windows nao mostra scroll do migrate inteiro.
+            try {
+                $errLogDir = Join-Path $AppPath 'storage\logs'
+                if (-not (Test-Path $errLogDir)) {
+                    New-Item -ItemType Directory -Path $errLogDir -Force | Out-Null
+                }
+                $errLog = Join-Path $errLogDir 'artisan-last-error.txt'
+                Set-Content -Path $errLog -Value $detail -Encoding UTF8
+            } catch {
+                $errLog = Join-Path $AppPath 'instalacao.log'
+            }
+
+            $short = Get-UnitecArtisanFailureSummary -Detail $detail -ExitCode $exitCode -LogPath $errLog
+            throw ("artisan {0} falhou: {1}" -f ($Arguments -join ' '), $short)
         }
 
         return @{
@@ -1481,6 +1496,297 @@ function Get-UnitecServeRuntimeMarkerPath {
     return Join-Path $AppPath '.unitec-serve.runtime'
 }
 
+function Publish-UnitecFrankenPhpToStaging {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$StagingDir
+    )
+
+    $SourceRoot = [System.IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
+    $StagingDir = [System.IO.Path]::GetFullPath($StagingDir).TrimEnd('\')
+    $srcFranken = Join-Path $SourceRoot 'tools\frankenphp'
+    $srcExe = Join-Path $srcFranken 'frankenphp.exe'
+    $destFranken = Join-Path $StagingDir 'tools\frankenphp'
+
+    if (-not (Test-Path -LiteralPath $srcExe)) {
+        throw "FrankenPHP ausente em $srcExe. Necessario para o instalador do cliente."
+    }
+
+    Ensure-Directory (Join-Path $StagingDir 'tools')
+    if (Test-Path -LiteralPath $destFranken) {
+        Remove-Item -LiteralPath $destFranken -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # tools/ inteiro e excluido do staging (MariaDB/PHP vem de zip). FrankenPHP precisa ir no pacote.
+    # Nao copiar opcache/ (cache local de DEV; caminhos longos quebram o Inno Setup).
+    robocopy $srcFranken $destFranken /E /MT:8 /R:2 /W:2 /NFL /NDL /NJH /NJS /NC /NS /XD opcache | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        throw "Falha ao copiar FrankenPHP para o staging (robocopy $LASTEXITCODE)."
+    }
+
+    $opcacheStaging = Join-Path $destFranken 'opcache'
+    if (Test-Path -LiteralPath $opcacheStaging) {
+        Remove-Item -LiteralPath $opcacheStaging -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $destFranken 'frankenphp.exe'))) {
+        throw 'FrankenPHP nao foi copiado para o staging (frankenphp.exe ausente).'
+    }
+
+    Write-Host ">> FrankenPHP embutido no staging ($destFranken)." -ForegroundColor Green
+}
+
+function Publish-UnitecRuntimeUpdateToStaging {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$StagingDir
+    )
+
+    $SourceRoot = [System.IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
+    $StagingDir = [System.IO.Path]::GetFullPath($StagingDir).TrimEnd('\')
+
+    $srcFranken = Join-Path $SourceRoot 'tools\frankenphp'
+    $srcFrankenExe = Join-Path $srcFranken 'frankenphp.exe'
+    if (-not (Test-Path -LiteralPath $srcFrankenExe)) {
+        throw "runtime-update: FrankenPHP ausente em $srcFrankenExe"
+    }
+
+    # Preferir publish fresco em dist\erp-desktop (bin\ pode estar locked pelo servico no DEV).
+    $distRoot = Join-Path $SourceRoot 'dist\erp-desktop'
+    $distServer = Join-Path $distRoot 'server'
+    $distLauncher = Join-Path $distRoot 'launcher'
+    $distUpdater = Join-Path $distRoot 'updater'
+    $binFallback = Join-Path $SourceRoot 'bin'
+
+    $serverExeCandidate = Join-Path $distServer 'UnitecErpServer.exe'
+    if (-not (Test-Path -LiteralPath $serverExeCandidate)) {
+        $serverExeCandidate = Join-Path $binFallback 'UnitecErpServer.exe'
+    }
+    if (-not (Test-Path -LiteralPath $serverExeCandidate)) {
+        throw 'runtime-update: UnitecErpServer.exe ausente (rode scripts\build-erp-desktop.ps1)'
+    }
+
+    $destRoot = Join-Path $StagingDir 'runtime-update'
+    $destFranken = Join-Path $destRoot 'frankenphp'
+    $destBin = Join-Path $destRoot 'bin'
+
+    if (Test-Path -LiteralPath $destRoot) {
+        Remove-Item -LiteralPath $destRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Ensure-Directory $destFranken
+    Ensure-Directory $destBin
+
+    robocopy $srcFranken $destFranken /E /MT:8 /R:2 /W:2 /NFL /NDL /NJH /NJS /NC /NS /XD opcache | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        throw "runtime-update: falha ao copiar FrankenPHP (robocopy $LASTEXITCODE)."
+    }
+    $opcacheStaging = Join-Path $destFranken 'opcache'
+    if (Test-Path -LiteralPath $opcacheStaging) {
+        Remove-Item -LiteralPath $opcacheStaging -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    $binSources = @()
+    if (Test-Path -LiteralPath $distServer) { $binSources += $distServer }
+    if (Test-Path -LiteralPath $distLauncher) { $binSources += $distLauncher }
+    if (Test-Path -LiteralPath $distUpdater) { $binSources += $distUpdater }
+    if ($binSources.Count -eq 0) { $binSources += $binFallback }
+
+    foreach ($src in $binSources) {
+        Get-ChildItem -LiteralPath $src -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -notin @('.pdb') } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destBin $_.Name) -Force }
+    }
+
+    # Nomes amigaveis do launcher/updater (com espaco) se o publish nao trouxe.
+    $launcherFriendly = Join-Path $distLauncher 'Unitec ERP.exe'
+    if (Test-Path -LiteralPath $launcherFriendly) {
+        Copy-Item -LiteralPath $launcherFriendly -Destination (Join-Path $destBin 'Unitec ERP.exe') -Force
+    }
+    $updaterFriendly = Join-Path $distUpdater 'Unitec Atualizador.exe'
+    if (Test-Path -LiteralPath $updaterFriendly) {
+        Copy-Item -LiteralPath $updaterFriendly -Destination (Join-Path $destBin 'Unitec Atualizador.exe') -Force
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $destFranken 'frankenphp.exe'))) {
+        throw 'runtime-update: frankenphp.exe ausente apos copia.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $destBin 'UnitecErpServer.exe'))) {
+        throw 'runtime-update: UnitecErpServer.exe ausente apos copia.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $destBin 'Unitec.ErpCommon.dll'))) {
+        throw 'runtime-update: Unitec.ErpCommon.dll ausente apos copia.'
+    }
+
+    $scriptSrc = Join-Path $SourceRoot 'scripts\apply-desktop-runtime-update.ps1'
+    if (-not (Test-Path -LiteralPath $scriptSrc)) {
+        throw "runtime-update: script ausente $scriptSrc"
+    }
+
+    Write-Host ">> runtime-update embutido (FrankenPHP + bin desktop) em $destRoot" -ForegroundColor Green
+}
+
+function Publish-UnitecDeviceServiceDist {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceRoot,
+        [switch]$Force
+    )
+
+    $SourceRoot = [System.IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
+    $project = Join-Path $SourceRoot 'services\unitec-device-service\src\Unitec.DeviceService\Unitec.DeviceService.csproj'
+    $dist = Join-Path $SourceRoot 'services\unitec-device-service\dist'
+    $exe = Join-Path $dist 'Unitec.DeviceService.exe'
+    $runtimeConfig = Join-Path $dist 'Unitec.DeviceService.runtimeconfig.json'
+
+    if (-not (Test-Path -LiteralPath $project)) {
+        throw "Device Service projeto ausente: $project"
+    }
+
+    $needsPublish = [bool]$Force
+    if (-not (Test-Path -LiteralPath $exe)) {
+        $needsPublish = $true
+    } elseif (Test-Path -LiteralPath $runtimeConfig) {
+        $rt = Get-Content -LiteralPath $runtimeConfig -Raw -ErrorAction SilentlyContinue
+        # Publish framework-dependent / hibrido quebrado: sem includedFrameworks.
+        if ([string]::IsNullOrWhiteSpace($rt) -or ($rt -notmatch '"includedFrameworks"')) {
+            $needsPublish = $true
+        }
+    } else {
+        $needsPublish = $true
+    }
+
+    if (-not $needsPublish) {
+        Write-Host '>> Device Service dist ja self-contained (balanca/impressao).' -ForegroundColor Gray
+        return $exe
+    }
+
+    $dotnet = Join-Path ${env:ProgramFiles} 'dotnet\dotnet.exe'
+    if (-not (Test-Path -LiteralPath $dotnet)) {
+        $cmd = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($cmd -and (Test-Path -LiteralPath $cmd.Source)) {
+            $dotnet = $cmd.Source
+        } else {
+            throw 'dotnet SDK nao encontrado. Instale .NET 8 SDK para publicar o Device Service.'
+        }
+    }
+
+    Get-Process -Name 'Unitec.DeviceService' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+
+    if (Test-Path -LiteralPath $dist) {
+        Remove-Item -LiteralPath $dist -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Ensure-Directory $dist
+
+    Write-Host '>> Publicando Device Service self-contained (win-x64)...' -ForegroundColor White
+    & $dotnet publish $project -c Release -r win-x64 --self-contained true -o $dist /p:PublishSingleFile=false
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Publish do Device Service falhou.'
+    }
+
+    if (-not (Test-Path -LiteralPath $exe)) {
+        throw "Device Service nao gerou EXE: $exe"
+    }
+
+    $rtOk = Get-Content -LiteralPath $runtimeConfig -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($rtOk) -or ($rtOk -notmatch '"includedFrameworks"')) {
+        throw 'Device Service publish nao ficou self-contained (runtimeconfig sem includedFrameworks).'
+    }
+
+    Write-Host ">> Device Service self-contained pronto: $exe" -ForegroundColor Green
+    return $exe
+}
+
+function Ensure-UnitecFrankenPhpRuntime {
+    param(
+        [string]$AppPath,
+        [string]$SourceRoot = ''
+    )
+
+    $AppPath = Resolve-UnitecAppPath -Path $AppPath
+    if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+        $SourceRoot = $AppPath
+    }
+
+    $destExe = Join-Path $AppPath 'tools\frankenphp\frankenphp.exe'
+    if (Test-Path -LiteralPath $destExe) {
+        Ensure-UnitecFrankenPhpIni -AppPath $AppPath | Out-Null
+        return $destExe
+    }
+
+    $candidates = @(
+        (Join-Path $SourceRoot 'tools\frankenphp'),
+        (Join-Path $AppPath 'installer\assets\frankenphp'),
+        (Join-Path $SourceRoot 'installer\assets\frankenphp')
+    )
+
+    foreach ($srcDir in $candidates) {
+        $srcExe = Join-Path $srcDir 'frankenphp.exe'
+        if (-not (Test-Path -LiteralPath $srcExe)) {
+            continue
+        }
+
+        $destDir = Join-Path $AppPath 'tools\frankenphp'
+        Ensure-Directory (Join-Path $AppPath 'tools')
+        if (Test-Path -LiteralPath $destDir) {
+            Remove-Item -LiteralPath $destDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        robocopy $srcDir $destDir /E /MT:4 /R:2 /W:2 /NFL /NDL /NJH /NJS /NC /NS | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            throw "Falha ao instalar FrankenPHP a partir de $srcDir (robocopy $LASTEXITCODE)."
+        }
+
+        if (Test-Path -LiteralPath $destExe) {
+            Ensure-UnitecFrankenPhpIni -AppPath $AppPath | Out-Null
+            Write-Ok 'FrankenPHP instalado em tools\frankenphp.'
+            return $destExe
+        }
+    }
+
+    $zipCandidates = @(
+        (Join-Path $AppPath 'installer\assets\frankenphp-win.zip'),
+        (Join-Path $SourceRoot 'installer\assets\frankenphp-win.zip')
+    )
+
+    foreach ($zip in $zipCandidates) {
+        if (-not (Test-Path -LiteralPath $zip)) {
+            continue
+        }
+
+        $destDir = Join-Path $AppPath 'tools\frankenphp'
+        Ensure-Directory (Join-Path $AppPath 'tools')
+        if (Test-Path -LiteralPath $destDir) {
+            Remove-Item -LiteralPath $destDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        Ensure-Directory $destDir
+        Expand-Archive -LiteralPath $zip -DestinationPath $destDir -Force
+
+        $nested = Get-ChildItem -LiteralPath $destDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'frankenphp.exe') } |
+            Select-Object -First 1
+        if ($nested) {
+            Get-ChildItem -LiteralPath $nested.FullName -Force | ForEach-Object {
+                Move-Item -LiteralPath $_.FullName -Destination $destDir -Force
+            }
+            Remove-Item -LiteralPath $nested.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        if (Test-Path -LiteralPath $destExe) {
+            Ensure-UnitecFrankenPhpIni -AppPath $AppPath | Out-Null
+            Write-Ok 'FrankenPHP extraido do pacote (frankenphp-win.zip).'
+            return $destExe
+        }
+    }
+
+    throw 'FrankenPHP nao iniciado: binario ausente em tools\frankenphp\frankenphp.exe e sem copia no pacote do instalador.'
+}
+
 function Get-UnitecFrankenPhpExe {
     param([string]$AppPath)
 
@@ -1544,6 +1850,16 @@ upload_max_filesize=64M
 post_max_size=64M
 date.timezone=America/Sao_Paulo
 "@
+
+    $caFile = Join-Path $AppPath 'tools\php\extras\ssl\cacert.pem'
+    if (Test-Path -LiteralPath $caFile) {
+        $caPosix = ($caFile -replace '\\', '/')
+        $ini += @"
+
+curl.cainfo = "$caPosix"
+openssl.cafile = "$caPosix"
+"@
+    }
 
     Set-Content -LiteralPath $targetIni -Value $ini -Encoding ASCII
     return $true
@@ -1678,7 +1994,11 @@ function Start-UnitecFrankenPhpServer {
 
     $franken = Get-UnitecFrankenPhpExe -AppPath $AppPath
     if (-not $franken) {
-        throw "FrankenPHP nao iniciou: binario ausente em tools\frankenphp\frankenphp.exe. O ERP exige FrankenPHP (sem fallback para php -S / artisan serve)."
+        try {
+            $franken = Ensure-UnitecFrankenPhpRuntime -AppPath $AppPath -SourceRoot $AppPath
+        } catch {
+            throw "FrankenPHP nao iniciou: binario ausente em tools\frankenphp\frankenphp.exe. O ERP exige FrankenPHP (sem fallback para php -S / artisan serve)."
+        }
     }
 
     if (-not (Test-Path (Join-Path $AppPath 'vendor\autoload.php'))) {
@@ -2390,6 +2710,47 @@ function Initialize-UnitecRuntime {
     Start-UnitecStack -AppPath $AppPath -WaitSeconds $WaitSeconds
 }
 
+function Get-UnitecArtisanFailureSummary {
+    param(
+        [string]$Detail,
+        [int]$ExitCode = 1,
+        [string]$LogPath = ''
+    )
+
+    $lines = @()
+    if (-not [string]::IsNullOrWhiteSpace($Detail)) {
+        $lines = @($Detail -split "\r?\n" | ForEach-Object { $_.TrimEnd() } | Where-Object { $_ -ne '' })
+    }
+
+    $interesting = @(
+        $lines | Where-Object {
+            $_ -match 'SQLSTATE|Row size too large|QueryException|Illuminate\\Database|ERROR|ErrorException|SQLSTATE\['
+        }
+    )
+
+    if ($interesting.Count -eq 0) {
+        $interesting = @($lines | Select-Object -Last 12)
+    } else {
+        $interesting = @($interesting | Select-Object -Last 8)
+    }
+
+    $body = ($interesting -join [Environment]::NewLine)
+    if ([string]::IsNullOrWhiteSpace($body)) {
+        $body = "codigo $ExitCode"
+    }
+
+    if ($body.Length -gt 900) {
+        $body = $body.Substring($body.Length - 900)
+    }
+
+    $hint = 'Detalhes completos em C:\UNITECNOLOGIA_WEB\storage\logs\artisan-last-error.txt (e instalacao.log).'
+    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
+        $hint = "Detalhes completos em:`n$LogPath"
+    }
+
+    return ($body + [Environment]::NewLine + [Environment]::NewLine + $hint)
+}
+
 function Show-UnitecLeigoMessage {
     param(
         [string]$Title = 'Unitec ERP',
@@ -2943,7 +3304,21 @@ function Copy-UnitecProjectTree {
         '.codex',
         '.phpunit.cache',
         'vendor',
-        'public\storage'
+        'public\storage',
+        # Codigo-fonte .NET nao vai ao cliente; dist self-contained sim (instalador).
+        'services\unitec-device-service\src',
+        'services\unitec-device-service\tests',
+        # Fonte do launcher/servidor Desktop: cliente usa so bin\Unitec ERP.exe.
+        'services\unitec-erp-desktop',
+        # Apps mobile (Forca de Vendas / OS / etc.): fonte Flutter — nao vai no instalador.
+        'apps',
+        # Residuos/DEV: nunca no pacote do cliente.
+        'atualizacao',
+        'tests',
+        'docs',
+        'suporte',
+        'importar',
+        'staging'
     )
 
     if ($UpdateMode -or $ExcludeTools) {
@@ -2957,17 +3332,7 @@ function Copy-UnitecProjectTree {
         $excludeDirs += @(
             'bin',
             'storage',
-            'installer',
-            'tests',
-            'docs',
-            'suporte',
-            'staging',
-            'atualizacao',
-            'importar',
-            'apps',
-            # Device Service: src/tests sao sujeira de build/dev.
-            'services\unitec-device-service\src',
-            'services\unitec-device-service\tests'
+            'installer'
         )
 
         if (-not $IncludeDeviceService) {
@@ -3138,6 +3503,24 @@ function Copy-UnitecProjectTree {
     }
 
     Remove-PublicStorageLink -Root $targetFull
+
+    # Guarda final: apps mobile / DEV nunca ficam no pacote do cliente.
+    foreach ($devOnly in @(
+        (Join-Path $targetFull 'apps'),
+        (Join-Path $targetFull 'atualizacao'),
+        (Join-Path $targetFull 'tests'),
+        (Join-Path $targetFull 'docs'),
+        (Join-Path $targetFull 'suporte'),
+        (Join-Path $targetFull 'importar'),
+        (Join-Path $targetFull 'staging'),
+        (Join-Path $targetFull 'services\unitec-erp-desktop'),
+        (Join-Path $targetFull 'services\unitec-device-service\src'),
+        (Join-Path $targetFull 'services\unitec-device-service\tests')
+    )) {
+        if (Test-Path -LiteralPath $devOnly) {
+            Remove-Item -LiteralPath $devOnly -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Get-UnitecStagingRequiredPaths {
@@ -3149,10 +3532,16 @@ function Get-UnitecStagingRequiredPaths {
         'scripts\unitec-install-lib.ps1',
         'scripts\verificar-pc.ps1',
         'public\build',
+        'tools\frankenphp\frankenphp.exe',
+        'tools\frankenphp\Caddyfile.template',
+        'bin\UnitecErpServer.exe',
+        'bin\Unitec.ErpCommon.dll',
         'installer\assets\mariadb-win.zip',
         'installer\assets\php-8.4-win.zip',
         'installer\assets\vc_redist.x64.exe',
-        'installer\assets\cacert.pem'
+        'installer\assets\cacert.pem',
+        'services\unitec-device-service\dist\Unitec.DeviceService.exe',
+        'scripts\install-device-service-startup.ps1'
     )
 }
 
@@ -3174,14 +3563,29 @@ function Ensure-UnitecAppIconAsset {
 
     try {
         Add-Type -AssemblyName System.Drawing
-        $icon = [System.Drawing.SystemIcons]::Application
+        # Fallback: gera icone azul+#U verde (mesma marca do instalador).
+        $bmp = New-Object System.Drawing.Bitmap 256, 256
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.Clear([System.Drawing.Color]::FromArgb(255, 15, 52, 96))
+        $green = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 13, 122, 62))
+        $g.FillRectangle($green, 32, 32, 80, 80)
+        $green.Dispose()
+        $font = New-Object System.Drawing.Font 'Segoe UI', 58, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+        $sf = New-Object System.Drawing.StringFormat
+        $sf.Alignment = [System.Drawing.StringAlignment]::Center
+        $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+        $g.DrawString('U', $font, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 32, 32, 80, 80), $sf)
+        $font.Dispose(); $sf.Dispose(); $g.Dispose()
+        $iconHandle = $bmp.GetHicon()
+        $icon = [System.Drawing.Icon]::FromHandle($iconHandle)
         $stream = [System.IO.File]::Create($TargetPath)
         try {
             $icon.Save($stream)
         } finally {
             $stream.Close()
+            $bmp.Dispose()
         }
-        Write-Warn "icone padrao gerado em $TargetPath (substitua por unitec-erp.ico da marca)."
+        Write-Warn "icone Unitec gerado em $TargetPath"
     } catch {
         throw "icone do instalador ausente: $TargetPath"
     }
@@ -3225,7 +3629,25 @@ function Assert-UnitecStagingReady {
 
     $stagingTools = Join-Path $Root 'tools'
     if (Test-Path $stagingTools) {
-        throw ('Staging nao deve incluir tools\ (runtime e extraido na instalacao). Remova: {0}' -f $stagingTools)
+        $allowedTools = @('frankenphp')
+        $extraTools = @(Get-ChildItem -LiteralPath $stagingTools -Force -ErrorAction SilentlyContinue |
+            Where-Object { $allowedTools -notcontains $_.Name } |
+            Select-Object -ExpandProperty Name)
+        if ($extraTools.Count -gt 0) {
+            throw ('Staging so pode incluir tools\frankenphp (MariaDB/PHP vem de zip). Remova: tools\{0}' -f ($extraTools -join ', tools\'))
+        }
+        $frankenExe = Join-Path $stagingTools 'frankenphp\frankenphp.exe'
+        if (-not (Test-Path -LiteralPath $frankenExe)) {
+            throw 'Staging incompleto: tools\frankenphp\frankenphp.exe ausente.'
+        }
+    } else {
+        throw 'Staging incompleto: tools\frankenphp ausente (obrigatorio no instalador).'
+    }
+
+    foreach ($rel in @('bin\UnitecErpServer.exe', 'bin\Unitec.ErpCommon.dll')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root $rel))) {
+            throw ("Staging incompleto: {0} ausente (obrigatorio no instalador). Rode scripts\build-erp-desktop.ps1." -f $rel)
+        }
     }
 
     $fileCount = (Get-ChildItem $Root -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
@@ -4462,7 +4884,7 @@ function Invoke-UnitecDatabaseMigrate {
         }
 
         $migrateCommand = if ($useFresh) { 'migrate:fresh' } else { 'migrate' }
-        $result = Invoke-UnitecArtisan -AppPath $AppPath -Arguments @($migrateCommand, '--force')
+        $result = Invoke-UnitecArtisan -AppPath $AppPath -Arguments @($migrateCommand, '--force', '--no-ansi')
 
         if ($LogToInstallFile -and $result.Output) {
             foreach ($line in ($result.Output -split "\r?\n")) {
@@ -5665,15 +6087,15 @@ function Import-UnitecBundledSeedDatabase {
 
     $AppPath = Resolve-UnitecAppPath -Path $AppPath
 
-    if (-not (Test-UnitecBundledSeedPresent -AppPath $AppPath)) {
-        throw 'Pacote de seed ausente (installer\seed\unitec_erp.sql + INCLUDE_DEV_DATA.flag).'
+    $sqlPath = Get-UnitecBundledSeedSqlPath -AppPath $AppPath
+    if (-not (Test-Path -LiteralPath $sqlPath) -or ((Get-Item -LiteralPath $sqlPath).Length -lt 1024)) {
+        throw 'Pacote de seed ausente (installer\seed\unitec_erp.sql).'
     }
 
     if ([string]::IsNullOrWhiteSpace($DbPassword)) {
         $DbPassword = Get-UnitecDefaultDbPassword
     }
 
-    $sqlPath = Get-UnitecBundledSeedSqlPath -AppPath $AppPath
     $mysqlExe = Resolve-UnitecMysqlClientExe -AppPath $AppPath
 
     if (-not $mysqlExe) {
@@ -5709,7 +6131,8 @@ function Import-UnitecBundledSeedDatabase {
         ("--password={0}" -f $DbPassword),
         '--protocol=TCP',
         '--default-character-set=utf8mb4',
-        '--max_allowed_packet=512M'
+        '--max_allowed_packet=512M',
+        $DbName
     )
 
     $proc = Start-Process -FilePath $mysqlExe `

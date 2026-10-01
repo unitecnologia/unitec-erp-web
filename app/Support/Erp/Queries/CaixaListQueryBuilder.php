@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\CaixaLancamento;
+use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
@@ -130,7 +131,7 @@ class CaixaListQueryBuilder
      */
     protected function localSearchColumns(): array
     {
-        return ['codigo', 'emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
+        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
     }
 
     protected function applyLocalSearch(Builder $query, string $term): void
@@ -143,14 +144,14 @@ class CaixaListQueryBuilder
 
         $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
             ? $this->searchColumn
-            : 'codigo';
+            : 'documento';
 
         $prefixLike = $term.'%';
 
         match ($column) {
             'codigo' => $this->applyLocalSearchByCodigo($query, $term),
             'emissao' => $this->applyLocalSearchByEmissao($query, $term),
-            'documento' => $query->where('documento', 'like', $prefixLike),
+            'documento' => $this->applyLocalSearchByDocumento($query, $term),
             'historico' => $query->where('historico', 'like', $prefixLike),
             'plano_contas' => $query->where('plano_contas', 'like', $prefixLike),
             'conta' => $query->whereHas('conta', fn (Builder $contaQuery): Builder => $contaQuery->where('nome', 'like', $prefixLike)),
@@ -158,6 +159,22 @@ class CaixaListQueryBuilder
             'saida' => $this->applyLocalSearchByMoney($query, $term, 'saida'),
             default => null,
         };
+    }
+
+    protected function applyLocalSearchByDocumento(Builder $query, string $term): void
+    {
+        $query->where(function (Builder $inner) use ($term): void {
+            $inner->where('documento', 'like', $term.'%');
+
+            if (preg_match('/^\d+$/', $term) !== 1) {
+                return;
+            }
+
+            foreach (ContaReceberPedidoExibicao::orderIdsDoNumero((int) $term) as $orderId) {
+                $inner->orWhere('documento', 'FV-'.$orderId)
+                    ->orWhere('documento', 'like', 'FV-'.$orderId.'/%');
+            }
+        });
     }
 
     protected function applyLocalSearchByCodigo(Builder $query, string $term): void

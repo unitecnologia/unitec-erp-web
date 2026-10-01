@@ -2,24 +2,22 @@
 
 namespace App\Filament\Resources\EmpresaResource\Pages\Concerns;
 
+use App\Models\Contador;
 use App\Models\Empresa;
+use App\Support\ContadorCloud\ContadorCloudClient;
+use App\Support\ContadorCloud\ContadorCloudConfig;
 use App\Support\ContadorCloud\ContadorCloudHttpHelper;
 use App\Support\ContadorCloud\ContadorCloudPairingClient;
+use App\Support\Erp\EmpresaParametros;
 use Filament\Notifications\Notification;
 
 trait ManagesEmpresaPortalContadorVinculo
 {
-    public bool $portalContadorVinculoModalOpen = false;
-
     public string $portalContadorVinculoStatus = '';
 
     public string $portalContadorVinculoId = '';
 
-    public string $portalContadorVinculoCodigo = '';
-
     public string $portalContadorVinculoAuthorizeUrl = '';
-
-    public string $portalContadorVinculoMessage = '';
 
     public function startPortalContadorVinculo(): void
     {
@@ -45,11 +43,80 @@ trait ManagesEmpresaPortalContadorVinculo
             return;
         }
 
-        $portalBaseUrl = ContadorCloudHttpHelper::resolvePortalBaseUrl(
-            (string) ($this->data['param_portal_contador_url'] ?? ''),
-        );
+        $portalBaseUrl = $this->ensurePortalContadorUrlPadrao($empresa);
+        $client = app(ContadorCloudPairingClient::class);
+        $contador = $this->resolveContadorVinculadoParaPortal();
 
-        $result = app(ContadorCloudPairingClient::class)->solicitarVinculo($empresa, $portalBaseUrl);
+        // Preferência: vínculo automático (CNPJ do contador) — token na hora.
+        if ($contador instanceof Contador) {
+            if (blank($contador->cnpj_cpf)) {
+                Notification::make()
+                    ->title('Portal do Contador')
+                    ->body('O contador selecionado não tem CNPJ/CPF no cadastro. Preencha o documento ou use o vínculo manual.')
+                    ->warning()
+                    ->send();
+            } else {
+                $auto = $client->vincularAutomatico($empresa, $contador, $portalBaseUrl);
+
+                if ($auto['ok'] && is_array($auto['data'])) {
+                    $this->portalContadorVinculoId = (string) (
+                        $auto['data']['vinculoId']
+                        ?? $auto['data']['credenciais']['vinculoId']
+                        ?? ''
+                    );
+                    $this->portalContadorVinculoAuthorizeUrl = '';
+                    $this->portalContadorVinculoStatus = 'authorized';
+
+                    // Garante que o contador escolhido no form já esteja gravado na empresa.
+                    $this->persistPortalContadorFields($empresa, [
+                        'param_portal_contador_contador_id' => (int) $contador->getKey(),
+                    ]);
+                    $this->data['param_portal_contador_contador_id'] = (int) $contador->getKey();
+
+                    $this->applyPortalContadorCredenciais($empresa, $auto['data']);
+
+                    $probe = app(ContadorCloudClient::class)
+                        ->testConnection(ContadorCloudConfig::fromFormData($this->data ?? []));
+
+                    if ($probe['ok']) {
+                        Notification::make()
+                            ->title('Portal do Contador')
+                            ->body('Conectado automaticamente. Token validado — envio liberado.')
+                            ->success()
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('Portal do Contador')
+                            ->body('Credenciais gravadas, mas o token foi rejeitado: '.$probe['message'])
+                            ->warning()
+                            ->send();
+                    }
+
+                    return;
+                }
+
+                $autoCode = (string) ($auto['code'] ?? '');
+
+                // Auto existe mas falhou (segredo, contador, payload): não abrir tela manual.
+                if ($autoCode !== 'auto_indisponivel') {
+                    Notification::make()
+                        ->title('Portal do Contador')
+                        ->body($auto['message'])
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                Notification::make()
+                    ->title('Portal do Contador')
+                    ->body('Vínculo automático indisponível no portal. Abrindo autorização manual…')
+                    ->warning()
+                    ->send();
+            }
+        }
+
+        $result = $client->solicitarVinculo($empresa, $portalBaseUrl);
 
         if (! $result['ok'] || ! is_array($result['data'])) {
             Notification::make()
@@ -63,25 +130,54 @@ trait ManagesEmpresaPortalContadorVinculo
 
         $data = $result['data'];
         $this->portalContadorVinculoId = (string) ($data['vinculoId'] ?? '');
-        $this->portalContadorVinculoCodigo = (string) ($data['codigo'] ?? '');
         $this->portalContadorVinculoAuthorizeUrl = (string) ($data['authorizeUrl'] ?? '');
         $this->portalContadorVinculoStatus = 'pending';
-        $this->portalContadorVinculoMessage = 'Aguardando o contador autorizar no portal.';
-        $this->portalContadorVinculoModalOpen = true;
 
-        $this->data['param_portal_contador_vinculo_id'] = $this->portalContadorVinculoId;
-        $this->persistPortalContadorFields($empresa, [
+        // Novo vínculo: limpa credenciais antigas para não parecer "Conectado" com token morto.
+        $fields = [
             'param_portal_contador_vinculo_id' => $this->portalContadorVinculoId,
-        ]);
+            'param_portal_contador_token' => '',
+            'param_portal_contador_empresa_id' => '',
+            'param_portal_contador_contador_nome_portal' => '',
+            'param_portal_contador_vinculado_em' => null,
+            'param_portal_contador_habilitar' => true,
+        ];
+
+        foreach ($fields as $field => $value) {
+            $this->data[$field] = $value;
+        }
+
+        $this->persistPortalContadorFields($empresa, $fields);
+
+        if ($this->portalContadorVinculoAuthorizeUrl !== '') {
+            $this->js('window.open('.json_encode($this->portalContadorVinculoAuthorizeUrl).', "_blank", "noopener")');
+        }
+
+        Notification::make()
+            ->title('Portal do Contador')
+            ->body(
+                $contador instanceof Contador
+                    ? 'Vínculo automático indisponível. Portal aberto — aguarde o contador autorizar.'
+                    : 'Selecione o Contador vinculado acima para auto-conexão. Portal aberto — aguarde autorização.'
+            )
+            ->success()
+            ->send();
+    }
+
+    protected function resolveContadorVinculadoParaPortal(): ?Contador
+    {
+        $id = (int) ($this->data['param_portal_contador_contador_id'] ?? 0);
+
+        if ($id <= 0) {
+            return null;
+        }
+
+        return Contador::query()->find($id);
     }
 
     public function pollPortalContadorVinculo(): void
     {
-        if (! $this->portalContadorVinculoModalOpen || $this->portalContadorVinculoStatus !== 'pending') {
-            return;
-        }
-
-        if ($this->portalContadorVinculoId === '') {
+        if ($this->portalContadorVinculoStatus !== 'pending' || $this->portalContadorVinculoId === '') {
             return;
         }
 
@@ -102,7 +198,12 @@ trait ManagesEmpresaPortalContadorVinculo
 
         if (! $result['ok'] && ($result['data']['status'] ?? null) === 'expired') {
             $this->portalContadorVinculoStatus = 'expired';
-            $this->portalContadorVinculoMessage = $result['message'];
+
+            Notification::make()
+                ->title('Portal do Contador')
+                ->body($result['message'])
+                ->warning()
+                ->send();
 
             return;
         }
@@ -116,7 +217,34 @@ trait ManagesEmpresaPortalContadorVinculo
 
         if ($status === 'authorized') {
             $this->applyPortalContadorCredenciais($empresa, $result['data']);
-            $this->portalContadorVinculoMessage = 'Vínculo autorizado com sucesso.';
+
+            $token = trim((string) ($this->data['param_portal_contador_token'] ?? ''));
+            if ($token === '') {
+                $this->portalContadorVinculoStatus = 'pending';
+
+                Notification::make()
+                    ->title('Portal do Contador')
+                    ->body('Portal autorizou, mas não devolveu token. Peça ao contador para autorizar de novo ou use token manual no avançado.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $probe = app(\App\Support\ContadorCloud\ContadorCloudClient::class)
+                ->testConnection(\App\Support\ContadorCloud\ContadorCloudConfig::fromFormData($this->data ?? []));
+
+            $this->portalContadorVinculoAuthorizeUrl = '';
+
+            if (! $probe['ok']) {
+                Notification::make()
+                    ->title('Portal do Contador')
+                    ->body('Vínculo gravado, mas o token foi rejeitado pela API: '.$probe['message'])
+                    ->warning()
+                    ->send();
+
+                return;
+            }
 
             Notification::make()
                 ->title('Portal do Contador')
@@ -128,23 +256,22 @@ trait ManagesEmpresaPortalContadorVinculo
         }
 
         if ($status === 'rejected') {
-            $this->portalContadorVinculoMessage = 'O contador recusou a solicitação de vínculo.';
+            Notification::make()
+                ->title('Portal do Contador')
+                ->body('O contador recusou a solicitação de vínculo.')
+                ->warning()
+                ->send();
 
             return;
         }
 
         if ($status === 'expired') {
-            $this->portalContadorVinculoMessage = 'A solicitação expirou. Clique em Conectar novamente.';
-
-            return;
+            Notification::make()
+                ->title('Portal do Contador')
+                ->body('A solicitação expirou. Clique em Conectar novamente.')
+                ->warning()
+                ->send();
         }
-
-        $this->portalContadorVinculoMessage = 'Aguardando o contador autorizar no portal.';
-    }
-
-    public function closePortalContadorVinculoModal(): void
-    {
-        $this->portalContadorVinculoModalOpen = false;
     }
 
     public function desvincularPortalContador(): void
@@ -167,6 +294,10 @@ trait ManagesEmpresaPortalContadorVinculo
         foreach ($fields as $field => $value) {
             $this->data[$field] = $value;
         }
+
+        $this->portalContadorVinculoStatus = '';
+        $this->portalContadorVinculoId = '';
+        $this->portalContadorVinculoAuthorizeUrl = '';
 
         $this->persistPortalContadorFields($empresa, $fields);
 
@@ -194,7 +325,11 @@ trait ManagesEmpresaPortalContadorVinculo
             return 'Conectado ao portal do contador.';
         }
 
-        return 'Não conectado — use o botão abaixo para autorizar no portal.';
+        if ($this->portalContadorVinculoStatus === 'pending') {
+            return 'Aguardando autorização do contador no portal…';
+        }
+
+        return 'Não conectado — use o botão abaixo para conectar.';
     }
 
     /**
@@ -208,13 +343,15 @@ trait ManagesEmpresaPortalContadorVinculo
             (string) ($credenciais['apiUrl'] ?? $this->data['param_portal_contador_url'] ?? ''),
         );
 
+        if ($portalBaseUrl === '') {
+            $portalBaseUrl = EmpresaParametros::defaultPortalContadorUrl();
+        }
+
         $fields = [
             'param_portal_contador_habilitar' => true,
             'param_portal_contador_token' => trim((string) ($credenciais['token'] ?? '')),
             'param_portal_contador_empresa_id' => trim((string) ($credenciais['empresaId'] ?? '')),
-            'param_portal_contador_url' => filled($credenciais['apiUrl'] ?? null)
-                ? ContadorCloudHttpHelper::normalizeUrl((string) $credenciais['apiUrl'])
-                : ContadorCloudHttpHelper::resolveSyncUrl($portalBaseUrl),
+            'param_portal_contador_url' => $portalBaseUrl,
             'param_portal_contador_vinculo_id' => $this->portalContadorVinculoId,
             'param_portal_contador_contador_nome_portal' => trim((string) ($contador['nome'] ?? '')),
             'param_portal_contador_vinculado_em' => now(),
@@ -229,6 +366,26 @@ trait ManagesEmpresaPortalContadorVinculo
         }
 
         $this->persistPortalContadorFields($empresa, $fields);
+    }
+
+    /**
+     * Garante URL base do portal no form/DB antes do vínculo (evita Conectar sem URL).
+     */
+    protected function ensurePortalContadorUrlPadrao(Empresa $empresa): string
+    {
+        $current = trim((string) ($this->data['param_portal_contador_url'] ?? ''));
+
+        if ($current === '') {
+            $portalBaseUrl = EmpresaParametros::defaultPortalContadorUrl();
+            $this->data['param_portal_contador_url'] = $portalBaseUrl;
+            $this->persistPortalContadorFields($empresa, [
+                'param_portal_contador_url' => $portalBaseUrl,
+            ]);
+
+            return $portalBaseUrl;
+        }
+
+        return ContadorCloudHttpHelper::resolvePortalBaseUrl($current);
     }
 
     /**

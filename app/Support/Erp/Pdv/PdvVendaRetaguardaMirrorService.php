@@ -9,6 +9,8 @@ use App\Models\VendaItem;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class PdvVendaRetaguardaMirrorService
 {
@@ -21,6 +23,8 @@ final class PdvVendaRetaguardaMirrorService
             $existing = Venda::query()->find($pdvVenda->venda_id);
 
             if ($existing) {
+                $this->sincronizarOrigemMovimentacoesEstoque($pdvVenda, $existing);
+
                 return $existing;
             }
         }
@@ -64,8 +68,35 @@ final class PdvVendaRetaguardaMirrorService
         }
 
         $pdvVenda->update(['venda_id' => $venda->id]);
+        $this->sincronizarOrigemMovimentacoesEstoque($pdvVenda, $venda);
 
         return $venda;
+    }
+
+    /**
+     * A baixa de estoque no PDV ocorre antes do espelho retaguarda.
+     * Atualiza o extrato para o número da venda que o usuário vê na lista (ex.: 479),
+     * não o número sequencial do caixa PDV (ex.: 1).
+     */
+    private function sincronizarOrigemMovimentacoesEstoque(PdvVenda $pdvVenda, Venda $venda): void
+    {
+        if (! Schema::hasTable('estoque_movimentacoes')) {
+            return;
+        }
+
+        $numero = ltrim((string) ($venda->numero ?? ''), '0');
+        if ($numero === '') {
+            $numero = (string) ($venda->numero ?? $venda->id);
+        }
+
+        DB::table('estoque_movimentacoes')
+            ->where('origem_tipo', 'pdv_venda')
+            ->where('origem_id', (int) $pdvVenda->id)
+            ->update([
+                'origem_tipo' => 'venda',
+                'origem_id' => (int) $venda->id,
+                'origem_numero' => $numero,
+            ]);
     }
 
     public function estornar(PdvVenda $pdvVenda): void

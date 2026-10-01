@@ -48,5 +48,10 @@
             wire:click="clearProductPhoto"
             @disabled(! $this->productFotoPreviewUrl)
         >Limpar Imagem</button>
+        <button
+            type="button"
+            class="erp-pcad-form__btn"
+            wire:click="openProductImageSearch"
+        >Pesquisar online</button>
     </div>
 </div>

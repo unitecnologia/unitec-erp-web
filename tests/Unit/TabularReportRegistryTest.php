@@ -16,9 +16,10 @@ class TabularReportRegistryTest extends TestCase
 
         $this->assertArrayHasKey('curva-abc', $map);
         $this->assertArrayHasKey('historico-vendas', $map);
+        $this->assertArrayHasKey('visitas-realizadas-sem-venda', $map);
         $this->assertArrayHasKey('contas-receber', $map);
         $this->assertArrayHasKey('plano-contas', $map);
-        $this->assertCount(33, $map);
+        $this->assertCount(37, $map);
         $this->assertTrue(ReportRegistry::has('conferencia-estoque'));
         $this->assertFalse(ReportRegistry::has('inexistente'));
     }

@@ -18,13 +18,47 @@ final class ErpDashboardFiscalDocsChart
      */
     public static function data(int|array|null $empresaScope = null): array
     {
-        return static::fromDatabase($empresaScope) ?? [
+        return static::fromDatabase($empresaScope) ?? static::withoutZeroSlices([
             'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
             'values' => [0.0, 0.0, 0.0, 0.0],
             'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
             'unit' => 'count',
             'empty' => true,
-        ];
+        ]);
+    }
+
+    /**
+     * Remove categorias com quantidade 0 para a legenda não sugerir pendência inexistente.
+     *
+     * @param  array{labels: list<string>, values: list<float>, colors: list<string>, unit: string, empty?: bool}  $chart
+     * @return array{labels: list<string>, values: list<float>, colors: list<string>, unit: string, empty?: bool}
+     */
+    public static function withoutZeroSlices(array $chart): array
+    {
+        $labels = array_values($chart['labels'] ?? []);
+        $values = array_values($chart['values'] ?? []);
+        $colors = array_values($chart['colors'] ?? []);
+
+        $keptLabels = [];
+        $keptValues = [];
+        $keptColors = [];
+
+        foreach ($values as $i => $value) {
+            if ((float) $value <= 0.0) {
+                continue;
+            }
+
+            $keptLabels[] = (string) ($labels[$i] ?? '');
+            $keptValues[] = (float) $value;
+            $keptColors[] = (string) ($colors[$i] ?? '#64748b');
+        }
+
+        $chart['labels'] = $keptLabels;
+        $chart['values'] = $keptValues;
+        $chart['colors'] = $keptColors;
+        $chart['empty'] = ($chart['empty'] ?? false) || $keptValues === [];
+
+        return $chart;
     }
 
     /**
@@ -50,7 +84,7 @@ final class ErpDashboardFiscalDocsChart
 
             $empty = ($nfeAut + $nfePend + $nfceAut + $nfcePend) <= 0;
 
-            return [
+            return static::withoutZeroSlices([
                 'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
                 'values' => [
                     (float) $nfeAut,
@@ -61,7 +95,7 @@ final class ErpDashboardFiscalDocsChart
                 'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
                 'unit' => 'count',
                 'empty' => $empty,
-            ];
+            ]);
         } catch (Throwable) {
             return null;
         }

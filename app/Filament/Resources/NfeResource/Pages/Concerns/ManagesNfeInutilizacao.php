@@ -177,7 +177,7 @@ trait ManagesNfeInutilizacao
 
     protected function notifyNfeInutilizarFiscalError(FiscalEngineException $exception): void
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe');
 
         if ($this->nfeModalOpen) {
             $this->closeNfeFiscalOverlay();

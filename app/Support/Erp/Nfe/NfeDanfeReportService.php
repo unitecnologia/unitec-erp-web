@@ -11,6 +11,8 @@ use App\Models\Transportadora;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Compra\CompraDanfeReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use DOMDocument;
+use DOMElement;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 
@@ -41,8 +43,14 @@ class NfeDanfeReportService
         $cliente = $nfe->cliente;
         $keyParts = $this->danfe->extractNfeKeyParts($nfe->chave);
 
-        $subtotalProdutos = (float) ($nfe->subtotal > 0 ? $nfe->subtotal : $nfe->itens->sum('total'));
-        $totalNota = (float) ($nfe->total > 0 ? $nfe->total : $subtotalProdutos);
+        // Preferência: valores oficiais do XML autorizado (ICMSTot / det/prod). Sem recalcular.
+        $xmlMoney = $this->extractAuthorizedXmlMoney((string) ($nfe->xml ?? ''));
+
+        $subtotalProdutos = $xmlMoney['v_prod']
+            ?? (float) ($nfe->subtotal > 0 ? $nfe->subtotal : $nfe->itens->sum(fn (NfeItem $item): float => $this->itemVProd($item)));
+        $totalNota = $xmlMoney['v_nf']
+            ?? (float) ($nfe->total > 0 ? $nfe->total : $subtotalProdutos);
+        $descontoXml = $xmlMoney['v_desc'] ?? null;
         $movimento = (string) ($nfe->movimento ?? '1');
         $isSaida = $movimento !== '0';
         $logoDataUri = $this->danfe->logoDataUri($empresa);
@@ -66,8 +74,8 @@ class NfeDanfeReportService
             'dataEmissao' => $nfe->data_emissao?->format('d/m/Y') ?? '',
             'dataEntrada' => $nfe->data_saida?->format('d/m/Y') ?? ($nfe->data_emissao?->format('d/m/Y') ?? ''),
             'horaEntrada' => filled($nfe->hora_saida) ? substr((string) $nfe->hora_saida, 0, 5) : '',
-            'itens' => $this->buildItens($nfe),
-            'totais' => $this->buildTotais($nfe, $subtotalProdutos, $totalNota),
+            'itens' => $this->buildItens($nfe, $xmlMoney['itens'] ?? null),
+            'totais' => $this->buildTotais($nfe, $subtotalProdutos, $totalNota, $descontoXml),
             'transportador' => $this->buildTransportador($nfe),
             'volumes' => $this->buildVolumes($nfe),
             'duplicatas' => $this->buildDuplicatas($nfe),
@@ -274,23 +282,27 @@ class NfeDanfeReportService
     }
 
     /**
+     * @param  array<int, array{v_prod: float, v_desc: float, v_un_com: float|null}>|null  $xmlItens
      * @return array<int, array<string, string>>
      */
-    protected function buildItens(Nfe $nfe): array
+    protected function buildItens(Nfe $nfe, ?array $xmlItens = null): array
     {
         $rows = [];
 
-        foreach ($nfe->itens as $item) {
-            $rows[] = $this->buildItemRow($item);
+        foreach ($nfe->itens as $index => $item) {
+            $nItem = (int) ($item->item ?? ($index + 1));
+            $xmlItem = $xmlItens[$nItem] ?? $xmlItens[$index + 1] ?? null;
+            $rows[] = $this->buildItemRow($item, $xmlItem);
         }
 
         return $rows;
     }
 
     /**
+     * @param  array{v_prod: float, v_desc: float, v_un_com: float|null}|null  $xmlItem
      * @return array<string, string>
      */
-    protected function buildItemRow(NfeItem $item): array
+    protected function buildItemRow(NfeItem $item, ?array $xmlItem = null): array
     {
         $product = $item->product;
         $codigo = $product?->codigo ?? $item->cod_barra ?? '';
@@ -302,24 +314,30 @@ class NfeDanfeReportService
         }
 
         $quantidade = (float) $item->quantidade;
-        $valorUnitario = (float) $item->valor_unitario;
-        $total = (float) ($item->total > 0 ? $item->total : ($quantidade * $valorUnitario));
-        $baseIcms = (float) ($item->base_icms > 0 ? $item->base_icms : $total);
+        $valorUnitario = $xmlItem['v_un_com'] ?? (float) $item->valor_unitario;
+        // DANFE: Valor Total = det/prod/vProd (bruto). NÃO usar item.total (líquido após desconto).
+        $vProd = $xmlItem['v_prod'] ?? $this->itemVProd($item);
+        $vDesc = $xmlItem['v_desc'] ?? (float) ($item->desconto ?? 0);
+        $baseIcms = (float) ($item->base_icms > 0 ? $item->base_icms : $vProd);
         $aliqIcms = (float) ($item->aliq_icms ?? 0);
         $valorIcms = (float) ($item->valor_icms > 0 ? $item->valor_icms : ($aliqIcms > 0 ? round($baseIcms * ($aliqIcms / 100), 2) : 0));
+
+        $infoAdicionais = trim((string) ($item->info_adicionais ?? ''));
 
         return [
             'item' => (string) ($item->item ?? ''),
             'codigo' => $codigoFormatado,
             'descricao' => $item->descricao ?: ($product?->descricao ?? '—'),
+            // det/infAdProd — impresso sob a descrição no quadro de produtos (não em Inf. Complementares).
+            'info_adicionais' => $infoAdicionais,
             'ncm' => (string) ($item->ncm ?? $product?->ncm ?? ''),
             'cst' => (string) ($item->cst ?? $item->csosn ?? $product?->cst_icms ?? ''),
             'cfop' => (string) ($item->cfop ?? ''),
             'un' => (string) ($item->unidade ?: 'UN'),
             'quant' => number_format($quantidade, 4, ',', '.'),
             'valor_unit' => number_format($valorUnitario, 4, ',', '.'),
-            'valor_total' => number_format($total, 2, ',', '.'),
-            'desconto' => number_format((float) ($item->desconto ?? 0), 2, ',', '.'),
+            'valor_total' => number_format($vProd, 2, ',', '.'),
+            'desconto' => number_format($vDesc, 2, ',', '.'),
             'base_icms' => number_format($baseIcms, 2, ',', '.'),
             'valor_icms' => number_format($valorIcms, 2, ',', '.'),
             'valor_ipi' => number_format((float) ($item->valor_ipi ?? 0), 2, ',', '.'),
@@ -331,9 +349,10 @@ class NfeDanfeReportService
     /**
      * @return array<string, string>
      */
-    protected function buildTotais(Nfe $nfe, float $subtotalProdutos, float $totalNota): array
+    protected function buildTotais(Nfe $nfe, float $subtotalProdutos, float $totalNota, ?float $descontoXml = null): array
     {
-        $desconto = (float) ($nfe->desconto ?? 0);
+        // Cabeçalho: ICMSTot/vDesc (XML) ou desconto persistido — nunca reconstruir.
+        $desconto = $descontoXml ?? (float) ($nfe->desconto ?? 0);
         $frete = (float) ($nfe->frete ?? 0);
         $seguro = (float) ($nfe->seguro ?? 0);
         $outros = (float) ($nfe->outros ?? 0);
@@ -383,14 +402,14 @@ class NfeDanfeReportService
             }
         }
 
-        $totalProdutos = $subtotalProdutos + $desconto;
-
+        // Cabeçalho Valor Total dos Produtos = ICMSTot/vProd (já em $subtotalProdutos).
+        // NUNCA somar desconto (bug antigo: 45 + 22,10 = 67,10).
         return [
             'base_icms' => number_format($baseIcms, 2, ',', '.'),
             'valor_icms' => number_format($valorIcms, 2, ',', '.'),
             'base_icms_st' => number_format($baseSt, 2, ',', '.'),
             'valor_icms_st' => number_format($valorSt, 2, ',', '.'),
-            'total_produtos' => number_format($totalProdutos, 2, ',', '.'),
+            'total_produtos' => number_format($subtotalProdutos, 2, ',', '.'),
             'frete' => number_format($frete, 2, ',', '.'),
             'seguro' => number_format($seguro, 2, ',', '.'),
             'desconto' => number_format($desconto, 2, ',', '.'),
@@ -400,6 +419,84 @@ class NfeDanfeReportService
             'total_cofins' => number_format($totalCofins, 2, ',', '.'),
             'total_nota' => number_format($totalNota, 2, ',', '.'),
         ];
+    }
+
+    /**
+     * Lê apenas campos monetários do XML autorizado para o DANFE.
+     *
+     * @return array{
+     *     v_prod: float,
+     *     v_desc: float,
+     *     v_nf: float,
+     *     itens: array<int, array{v_prod: float, v_desc: float, v_un_com: float|null}>
+     * }|null
+     */
+    protected function extractAuthorizedXmlMoney(string $xml): ?array
+    {
+        $xml = trim($xml);
+        if ($xml === '') {
+            return null;
+        }
+
+        $dom = new DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        $loaded = $dom->loadXML($xml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if (! $loaded) {
+            return null;
+        }
+
+        $icmsTot = $dom->getElementsByTagName('ICMSTot')->item(0);
+        if (! $icmsTot instanceof DOMElement) {
+            return null;
+        }
+
+        $itens = [];
+        foreach ($dom->getElementsByTagName('det') as $det) {
+            if (! $det instanceof DOMElement) {
+                continue;
+            }
+
+            $prod = $det->getElementsByTagName('prod')->item(0);
+            if (! $prod instanceof DOMElement) {
+                continue;
+            }
+
+            $nItem = (int) ($det->getAttribute('nItem') ?: (count($itens) + 1));
+            $vUnRaw = $this->xmlChildText($prod, 'vUnCom');
+            $itens[$nItem] = [
+                'v_prod' => $this->xmlMoney($this->xmlChildText($prod, 'vProd')),
+                'v_desc' => $this->xmlMoney($this->xmlChildText($prod, 'vDesc')),
+                'v_un_com' => $vUnRaw !== '' ? $this->xmlMoney($vUnRaw) : null,
+            ];
+        }
+
+        return [
+            'v_prod' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vProd')),
+            'v_desc' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vDesc')),
+            'v_nf' => $this->xmlMoney($this->xmlChildText($icmsTot, 'vNF')),
+            'itens' => $itens,
+        ];
+    }
+
+    /** SEFAZ: vProd = qCom × vUnCom (bruto). Não usar total líquido do item. */
+    protected function itemVProd(NfeItem $item): float
+    {
+        return round((float) $item->quantidade * (float) $item->valor_unitario, 2);
+    }
+
+    protected function xmlChildText(DOMElement $parent, string $tag): string
+    {
+        $node = $parent->getElementsByTagName($tag)->item(0);
+
+        return $node ? trim((string) $node->textContent) : '';
+    }
+
+    protected function xmlMoney(string $value): float
+    {
+        return round((float) str_replace(',', '.', $value !== '' ? $value : '0'), 2);
     }
 
     /**
@@ -531,6 +628,7 @@ class NfeDanfeReportService
     protected function buildInformacoesComplementares(Nfe $nfe, ?Empresa $empresa): string
     {
         $obs = filled($nfe->obs_contribuinte) ? trim((string) $nfe->obs_contribuinte) : '';
+        $textoIbpt = '';
 
         if ($obs === '' || (! str_contains($obs, 'Lei 12.741') && ! str_contains($obs, 'Trib. aprox.'))) {
             $totais = [
@@ -545,17 +643,40 @@ class NfeDanfeReportService
             ];
 
             $textoIbpt = app(\App\Support\Erp\Fiscal\IbptLookupService::class)->formatarTextoLei12741($totais);
-
-            if ($textoIbpt !== '') {
-                $obs = $obs === '' ? $textoIbpt : rtrim($obs, " .\n").'. '.$textoIbpt;
-            }
         }
+
+        $crt = match (strtolower((string) ($empresa?->regime_tributario ?? 'simples'))) {
+            'simples' => 1,
+            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
+            'mei', 'simei' => 4,
+            'presumido', 'real', 'normal' => 3,
+            default => 1,
+        };
+
+        $mensagensLegais = app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class);
+        $creditoSn = $mensagensLegais->resumirCreditoSnDosItens($nfe->itens ?? []);
+        $obs = $mensagensLegais->comporInfCpl(
+            $obs,
+            $mensagensLegais->mensagens([
+                'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFE,
+                'crt' => $crt,
+                'p_cred_sn' => $creditoSn['p_cred_sn'],
+                'v_cred_icms_sn' => $creditoSn['v_cred_icms_sn'],
+            ]),
+            $textoIbpt,
+        );
 
         $partes = array_filter([
             $obs !== '' ? $obs : null,
             filled($nfe->obs_fisco) ? trim((string) $nfe->obs_fisco) : null,
-            filled($nfe->chave) ? 'CHAVE NF-e: ' . $this->onlyDigits($nfe->chave) : null,
-            filled($nfe->protocolo) ? 'PROTOCOLO: ' . $nfe->protocolo : null,
+            // Em devolução a origem/chave referenciada já vão em obs_contribuinte.
+            // Não misturar chave/protocolo da própria NF-e como se fossem da origem.
+            (! $this->isDevolucao($nfe) && filled($nfe->chave))
+                ? 'CHAVE NF-e: ' . $this->onlyDigits($nfe->chave)
+                : null,
+            (! $this->isDevolucao($nfe) && filled($nfe->protocolo))
+                ? 'PROTOCOLO: ' . $nfe->protocolo
+                : null,
             $empresa ? 'EMITENTE: ' . mb_strtoupper((string) ($empresa->razao_social ?: $empresa->nome), 'UTF-8') : null,
         ]);
 
@@ -594,6 +715,13 @@ class NfeDanfeReportService
         }
 
         return substr($digits, 0, 5) . '-' . substr($digits, 5);
+    }
+
+    protected function isDevolucao(Nfe $nfe): bool
+    {
+        $finalidade = strtolower(trim((string) ($nfe->finalidade ?? '')));
+
+        return in_array($finalidade, ['devolucao', '4'], true);
     }
 
     protected function onlyDigits(?string $value): string

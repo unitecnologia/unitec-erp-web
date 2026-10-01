@@ -21,6 +21,7 @@
                         @include('filament.components.erp.empresas.form.tri-checkbox', [
                             'field' => $field,
                             'label' => $meta['label'],
+                            'hint' => $meta['hint'] ?? null,
                         ])
                     @elseif ($field === 'param_geral_bloquear_estoque_negativo')
                         @php
@@ -29,7 +30,7 @@
                                 FILTER_VALIDATE_BOOLEAN,
                             );
                         @endphp
-                        <label class="erp-pcad__check">
+                        <label class="erp-pcad__check" @if (filled($meta['hint'] ?? null)) title="{{ $meta['hint'] }}" @endif>
                             {{-- wire:key remonta o input: Livewire morph não atualiza a property checked --}}
                             <input
                                 type="checkbox"
@@ -39,14 +40,53 @@
                             >
                             <span>{{ $meta['label'] }}</span>
                         </label>
-                    @else
+                    @elseif ($field === 'param_monitor_vendas_escolher_empresa_emitente_nfe')
                         <label class="erp-pcad__check">
+                            <input type="checkbox" wire:model.live="data.{{ $field }}">
+                            <span>
+                                {{ $meta['label'] }}
+                                @if (filled($meta['hint'] ?? null))
+                                    <span
+                                        class="erp-produtos-impostos__label--hint"
+                                        title="{{ $meta['hint'] }}"
+                                        role="img"
+                                        aria-label="{{ $meta['hint'] }}"
+                                    ></span>
+                                @endif
+                            </span>
+                        </label>
+                        @include('filament.components.erp.empresas.form.partials.nfe-emitentes-config')
+                    @else
+                        <label class="erp-pcad__check" @if (filled($meta['hint'] ?? null)) title="{{ $meta['hint'] }}" @endif>
                             <input type="checkbox" wire:model="data.{{ $field }}">
                             <span>{{ $meta['label'] }}</span>
                         </label>
                     @endif
                 @endforeach
             </div>
+            @if ($groupKey === 'monitor_vendas')
+                @php($modoDescontoReais = EmpresaParametros::monitorVendasDescontoReaisItemModoField())
+                <div class="erp-empresas-parametros__desconto-reais">
+                    <label class="erp-pcad-form__label" for="param-param_monitor_vendas_desconto_reais_item_modo">
+                        {{ $modoDescontoReais['label'] }}
+                        <span
+                            class="erp-produtos-impostos__label--hint"
+                            title="{{ $modoDescontoReais['hint'] }}"
+                            role="img"
+                            aria-label="{{ $modoDescontoReais['hint'] }}"
+                        ></span>
+                    </label>
+                    <select
+                        id="param-param_monitor_vendas_desconto_reais_item_modo"
+                        wire:model="data.param_monitor_vendas_desconto_reais_item_modo"
+                        class="erp-pcad-form__select"
+                    >
+                        @foreach ($modoDescontoReais['options'] as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
         </fieldset>
     @endforeach
 </div>

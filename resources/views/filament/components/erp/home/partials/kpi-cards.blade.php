@@ -9,19 +9,26 @@
 >
     @foreach ($kpis as $kpi)
         @php
-            $hasAction = filled($kpi['action_url'] ?? null);
+            $hasWireAction = filled($kpi['action_wire'] ?? null);
+            $hasUrlAction = filled($kpi['action_url'] ?? null);
             $hasReport = filled($kpi['report_url'] ?? null);
             $tone = $kpi['tone'] ?? 'blue';
+            $actionLabel = $kpi['action_label'] ?? 'Renovar';
         @endphp
 
-        @if ($hasAction)
-            <a
-                href="{{ $kpi['action_url'] }}"
-                class="erp-dash-kpi erp-dash-kpi--link erp-dash-kpi--{{ $tone }}"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
+        @if ($hasWireAction)
+            <article class="erp-dash-kpi erp-dash-kpi--action erp-dash-kpi--{{ $tone }}">
                 <span class="erp-dash-kpi__accent" aria-hidden="true"></span>
+                <button
+                    type="button"
+                    class="erp-dash-kpi__action"
+                    wire:click="{{ $kpi['action_wire'] }}"
+                    wire:loading.attr="disabled"
+                    wire:target="{{ $kpi['action_wire'] }}"
+                >
+                    <span wire:loading.remove wire:target="{{ $kpi['action_wire'] }}">{{ $actionLabel }}</span>
+                    <span wire:loading wire:target="{{ $kpi['action_wire'] }}">…</span>
+                </button>
                 <div class="erp-dash-kpi__icon-wrap">
                     <x-filament::icon :icon="$kpi['icon']" class="erp-dash-kpi__icon" />
                 </div>
@@ -29,7 +36,24 @@
                     <p class="erp-dash-kpi__label">{{ $kpi['label'] }}</p>
                     <p class="erp-dash-kpi__value">{{ $kpi['value'] }}</p>
                     <p class="erp-dash-kpi__hint">{{ $kpi['hint'] ?? '' }}</p>
-                    <span class="erp-dash-kpi__action">{{ $kpi['action_label'] ?? 'Clique aqui para renovar' }}</span>
+                </div>
+            </article>
+        @elseif ($hasUrlAction)
+            <a
+                href="{{ $kpi['action_url'] }}"
+                class="erp-dash-kpi erp-dash-kpi--link erp-dash-kpi--action erp-dash-kpi--{{ $tone }}"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                <span class="erp-dash-kpi__accent" aria-hidden="true"></span>
+                <span class="erp-dash-kpi__action">{{ $actionLabel }}</span>
+                <div class="erp-dash-kpi__icon-wrap">
+                    <x-filament::icon :icon="$kpi['icon']" class="erp-dash-kpi__icon" />
+                </div>
+                <div class="erp-dash-kpi__body">
+                    <p class="erp-dash-kpi__label">{{ $kpi['label'] }}</p>
+                    <p class="erp-dash-kpi__value">{{ $kpi['value'] }}</p>
+                    <p class="erp-dash-kpi__hint">{{ $kpi['hint'] ?? '' }}</p>
                 </div>
             </a>
         @else

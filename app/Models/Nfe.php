@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -251,6 +252,15 @@ class Nfe extends Model
     public function eventos(): HasMany
     {
         return $this->hasMany(NfeEvento::class)->orderBy('created_at');
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (Nfe $nfe): void {
+            if (filled($nfe->devolucao_compra_id) && filled($nfe->numero)) {
+                EstoqueMovimentacaoDocumento::sincronizarNfeDevolucaoCompra($nfe);
+            }
+        });
     }
 
     protected function casts(): array

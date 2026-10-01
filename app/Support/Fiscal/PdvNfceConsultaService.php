@@ -12,6 +12,9 @@ use Unitec\FiscalEngine\FiscalEngine;
 
 final class PdvNfceConsultaService
 {
+    /** Teto seguro para motivo da SEFAZ (coluna TEXT). */
+    private const MOTIVO_REJEICAO_MAX = 2000;
+
     public function __construct(
         private readonly PdvNfceFiscalPayloadBuilder $payloadBuilder = new PdvNfceFiscalPayloadBuilder(),
         private readonly FiscalEngine $engine = new FiscalEngine(),
@@ -55,14 +58,16 @@ final class PdvNfceConsultaService
             $updates['cancelada_em'] = $nfce->cancelada_em ?? now();
         } elseif ($response->denegada) {
             $updates['status'] = PdvVendaNfce::STATUS_REJEITADA;
-            $updates['motivo_rejeicao'] = $response->statusMotivo;
+            $updates['motivo_rejeicao'] = $this->normalizarMotivoRejeicao($response->statusMotivo);
         } elseif ($response->statusCodigo !== '' && $response->statusCodigo !== '100') {
             // Qualquer outro cStat relevante: marca rejeitada para não deixar
             // status antigo (pendente/contingência) incoerente com a SEFAZ.
             $updates['status'] = PdvVendaNfce::STATUS_REJEITADA;
-            $updates['motivo_rejeicao'] = $response->statusMotivo !== ''
-                ? $response->statusMotivo.' [cStat '.$response->statusCodigo.']'
-                : 'Consulta SEFAZ retornou cStat '.$response->statusCodigo;
+            $updates['motivo_rejeicao'] = $this->normalizarMotivoRejeicao(
+                $response->statusMotivo !== ''
+                    ? $response->statusMotivo.' [cStat '.$response->statusCodigo.']'
+                    : 'Consulta SEFAZ retornou cStat '.$response->statusCodigo
+            );
         }
 
         if (filled($response->xml) && $response->autorizada) {
@@ -80,5 +85,15 @@ final class PdvNfceConsultaService
         }
 
         return $nfce;
+    }
+
+    private function normalizarMotivoRejeicao(?string $motivo): ?string
+    {
+        $motivo = trim((string) $motivo);
+        if ($motivo === '') {
+            return null;
+        }
+
+        return mb_substr($motivo, 0, self::MOTIVO_REJEICAO_MAX, 'UTF-8');
     }
 }

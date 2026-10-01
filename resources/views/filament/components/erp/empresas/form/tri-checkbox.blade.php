@@ -7,7 +7,7 @@
     };
 @endphp
 
-<div class="erp-empresas-parametros__tri">
+<div class="erp-empresas-parametros__tri" @if (filled($hint ?? null)) title="{{ $hint }}" @endif>
     <button
         type="button"
         wire:click="cycleTriStatePermission('{{ $field }}')"

@@ -2,8 +2,10 @@
 
 namespace App\Support\Gestor;
 
+use App\Models\EntregasDevice;
 use App\Models\ForcaVendasDevice;
 use App\Models\ForcaVendasOrder;
+use App\Models\Terminal;
 use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
 use App\Support\Erp\ErpContext;
@@ -11,7 +13,7 @@ use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\Erp\ErpSchema;
 use Throwable;
 
 /**
@@ -52,7 +54,7 @@ final class GestorAprovacaoService
     private function countPedidosPendentes(int $empresaId): int
     {
         try {
-            if (! Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+            if (! ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
                 return 0;
             }
 
@@ -60,7 +62,7 @@ final class GestorAprovacaoService
                 ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
                 ->where('situacao', ForcaVendasOrder::SITUACAO_FINANCEIRO);
 
-            if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
+            if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
                 $q->where(function ($builder) use ($empresaId): void {
                     $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                 });
@@ -77,12 +79,12 @@ final class GestorAprovacaoService
         $total = 0;
 
         try {
-            if (Schema::hasTable((new ForcaVendasDevice)->getTable())) {
+            if (ErpSchema::hasTable((new ForcaVendasDevice)->getTable())) {
                 $q = ForcaVendasDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', ForcaVendasDevice::STATUS_APROVADO);
 
-                if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -95,12 +97,12 @@ final class GestorAprovacaoService
         }
 
         try {
-            if (Schema::hasTable((new VendasInternasDevice)->getTable())) {
+            if (ErpSchema::hasTable((new VendasInternasDevice)->getTable())) {
                 $q = VendasInternasDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', VendasInternasDevice::STATUS_APROVADO);
 
-                if ($empresaId > 0 && Schema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -113,12 +115,30 @@ final class GestorAprovacaoService
         }
 
         try {
-            if (Schema::hasTable((new UnitecOsDevice)->getTable())) {
+            if (ErpSchema::hasTable((new UnitecOsDevice)->getTable())) {
                 $q = UnitecOsDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', UnitecOsDevice::STATUS_APROVADO);
 
-                if ($empresaId > 0 && Schema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
+                    $q->where(function ($builder) use ($empresaId): void {
+                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    });
+                }
+
+                $total += (int) $q->count();
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
+        try {
+            if (ErpSchema::hasTable((new EntregasDevice)->getTable())) {
+                $q = EntregasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', EntregasDevice::STATUS_APROVADO);
+
+                if ($empresaId > 0 && ErpSchema::hasColumn((new EntregasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -177,18 +197,23 @@ final class GestorAprovacaoService
             throw new \RuntimeException('Aparelho já autorizado.');
         }
 
+        if ($device instanceof EntregasDevice && $device->isApproved()) {
+            throw new \RuntimeException('Aparelho já autorizado.');
+        }
+
         $empresaId = (int) ($device->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
         $devices = app(DeviceLicenseService::class);
 
         $origin = match (true) {
+            $device instanceof EntregasDevice => 'entregas',
             $device instanceof UnitecOsDevice => 'unitec_os',
             $device instanceof VendasInternasDevice => 'vendas_internas',
             default => 'forca_vendas',
         };
 
-        // Unitec OS: autoriza só em unitec_os_devices (aba Aparelhos).
+        // Unitec OS / Entregas: autoriza só na tabela de devices (aba Aparelhos).
         // Não cria terminal "Telefone" na lista Dispositivo.
-        if ($origin !== 'unitec_os' && $empresaId > 0 && $devices->isAvailable()) {
+        if (! in_array($origin, ['unitec_os', 'entregas'], true) && $empresaId > 0 && $devices->isAvailable()) {
             $devices->register(
                 empresaId: $empresaId,
                 deviceUuid: (string) $device->device_uuid,
@@ -224,12 +249,43 @@ final class GestorAprovacaoService
     }
 
     /**
+     * Remove o aparelho de vez (libera vaga de telefone na licença).
+     */
+    public function excluirAparelho(string $origem, int $deviceId): void
+    {
+        $device = $this->findDevice($origem, $deviceId);
+
+        if ($device->current_token_id) {
+            DB::table('personal_access_tokens')->where('id', $device->current_token_id)->delete();
+        }
+
+        $uuid = trim((string) ($device->device_uuid ?? ''));
+        $empresaId = (int) ($device->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
+
+        $device->delete();
+
+        if ($uuid === '' || $empresaId < 1 || ! ErpSchema::hasColumn('terminais', 'device_uuid')) {
+            return;
+        }
+
+        $query = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('device_uuid', $uuid);
+
+        if (ErpSchema::hasColumn('terminais', 'categoria_licenca')) {
+            $query->where('categoria_licenca', DeviceLicenseService::CATEGORY_TELEFONE);
+        }
+
+        $query->delete();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function listarPedidosPendentes(int $empresaId): array
     {
         try {
-            if (! Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+            if (! ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
                 return [];
             }
 
@@ -240,7 +296,7 @@ final class GestorAprovacaoService
                 ->orderByDesc('id')
                 ->limit(40);
 
-            if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
+            if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
                 $q->where(function ($builder) use ($empresaId): void {
                     $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                 });
@@ -251,8 +307,8 @@ final class GestorAprovacaoService
                 $descontoPct = $this->descontoPercentual($payload, (float) $order->total);
                 $abertura = $order->dataAberturaAt();
                 $resumo = $order->financeiroResumo();
-                $dav = $order->orcamento?->numero
-                    ? (string) (int) preg_replace('/\D/', '', (string) $order->orcamento->numero)
+                $dav = $order->pedido?->numero
+                    ? (string) (int) preg_replace('/\D/', '', (string) $order->pedido->numero)
                     : '#'.$order->id;
 
                 return [
@@ -284,14 +340,14 @@ final class GestorAprovacaoService
         $out = [];
 
         try {
-            if (Schema::hasTable((new ForcaVendasDevice)->getTable())) {
+            if (ErpSchema::hasTable((new ForcaVendasDevice)->getTable())) {
                 $q = ForcaVendasDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', ForcaVendasDevice::STATUS_APROVADO)
                     ->orderByDesc('id')
                     ->limit(20);
 
-                if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -306,14 +362,14 @@ final class GestorAprovacaoService
         }
 
         try {
-            if (Schema::hasTable((new VendasInternasDevice)->getTable())) {
+            if (ErpSchema::hasTable((new VendasInternasDevice)->getTable())) {
                 $q = VendasInternasDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', VendasInternasDevice::STATUS_APROVADO)
                     ->orderByDesc('id')
                     ->limit(20);
 
-                if ($empresaId > 0 && Schema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -328,14 +384,14 @@ final class GestorAprovacaoService
         }
 
         try {
-            if (Schema::hasTable((new UnitecOsDevice)->getTable())) {
+            if (ErpSchema::hasTable((new UnitecOsDevice)->getTable())) {
                 $q = UnitecOsDevice::query()
                     ->whereNull('revoked_at')
                     ->where('status', '!=', UnitecOsDevice::STATUS_APROVADO)
                     ->orderByDesc('id')
                     ->limit(20);
 
-                if ($empresaId > 0 && Schema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
+                if ($empresaId > 0 && ErpSchema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
                         $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
                     });
@@ -343,6 +399,28 @@ final class GestorAprovacaoService
 
                 foreach ($q->get() as $device) {
                     $out[] = $this->mapDevice('os', $device);
+                }
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
+        try {
+            if (ErpSchema::hasTable((new EntregasDevice)->getTable())) {
+                $q = EntregasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', EntregasDevice::STATUS_APROVADO)
+                    ->orderByDesc('id')
+                    ->limit(20);
+
+                if ($empresaId > 0 && ErpSchema::hasColumn((new EntregasDevice)->getTable(), 'empresa_id')) {
+                    $q->where(function ($builder) use ($empresaId): void {
+                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    });
+                }
+
+                foreach ($q->get() as $device) {
+                    $out[] = $this->mapDevice('ent', $device);
                 }
             }
         } catch (Throwable) {
@@ -379,11 +457,12 @@ final class GestorAprovacaoService
         return null;
     }
 
-    private function mapDevice(string $origem, ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice $device): array
+    private function mapDevice(string $origem, ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice $device): array
     {
         $label = match ($origem) {
             'vi' => 'Vendas Internas',
             'os' => 'Unitec OS',
+            'ent' => 'Unitec Entregas',
             default => 'Força de Vendas',
         };
 
@@ -400,11 +479,12 @@ final class GestorAprovacaoService
         ];
     }
 
-    private function findDevice(string $origem, int $deviceId): ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice
+    private function findDevice(string $origem, int $deviceId): ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice
     {
         return match ($origem) {
             'vi' => VendasInternasDevice::query()->whereKey($deviceId)->firstOrFail(),
             'os' => UnitecOsDevice::query()->whereKey($deviceId)->firstOrFail(),
+            'ent' => EntregasDevice::query()->whereKey($deviceId)->firstOrFail(),
             default => ForcaVendasDevice::query()->whereKey($deviceId)->firstOrFail(),
         };
     }

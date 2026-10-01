@@ -30,6 +30,7 @@ trait ManagesAjusteEstoqueForm
 
         $this->resetAjusteForm();
         $this->showAjusteForm = true;
+        $this->dispatch('erp-ajuste-focus-codigo-interno');
     }
 
     public function editAjuste(): void
@@ -44,29 +45,12 @@ trait ManagesAjusteEstoqueForm
             return;
         }
 
-        $ajuste = AjusteEstoque::query()->with('product')->find($recordId);
-
-        if (! $ajuste || ! $ajuste->product) {
-            Notification::make()->title('Ajuste não encontrado.')->warning()->send();
-
-            return;
-        }
-
-        $product = $ajuste->product;
-        $this->ajusteFormId = $ajuste->id;
-        $this->ajusteForm = [
-            'codigo_display' => (string) $ajuste->id,
-            'data' => $ajuste->data->format('Y-m-d'),
-            'product_id' => $product->id,
-            'codigo_interno' => (string) $product->codigo,
-            'codigo_barras' => (string) ($product->codigo_barras ?? ''),
-            'referencia' => (string) ($product->referencia ?? ''),
-            'descricao_busca' => $product->descricao,
-            'estoque_atual' => $this->formatEstoqueBr((float) $product->estoque - (float) $ajuste->qtd_ajust),
-            'quantidade' => $this->formatQtdAjustBr((float) $ajuste->qtd_ajust),
-        ];
-        $this->fecharSugestoesProduto();
-        $this->showAjusteForm = true;
+        // Ajuste já gravado movimenta estoque na hora — não reabre para alteração.
+        Notification::make()
+            ->title('Ajuste já finalizado.')
+            ->body('Não é possível alterar um ajuste após a gravação. Se necessário, exclua e lance um novo.')
+            ->warning()
+            ->send();
     }
 
     public function closeAjusteForm(): void
@@ -93,6 +77,10 @@ trait ManagesAjusteEstoqueForm
         $productId = (int) ($this->ajusteForm['product_id'] ?? 0);
         $data = trim((string) ($this->ajusteForm['data'] ?? ''));
         $quantidade = BrDecimal::parse($this->ajusteForm['quantidade'] ?? 0, 3);
+        $modo = (string) ($this->ajusteForm['modo'] ?? 'somar');
+        if (! in_array($modo, ['somar', 'substituir'], true)) {
+            $modo = 'somar';
+        }
 
         if ($productId <= 0) {
             Notification::make()->title('Selecione um produto.')->warning()->send();
@@ -106,23 +94,26 @@ trait ManagesAjusteEstoqueForm
             return;
         }
 
-        if ($quantidade == 0.0) {
+        if ($modo === 'somar' && $quantidade == 0.0) {
             Notification::make()->title('Informe a quantidade do ajuste.')->warning()->send();
 
             return;
         }
 
         try {
-            $service = new AjusteEstoqueService();
-
             if ($this->ajusteFormId) {
-                $ajuste = AjusteEstoque::query()->findOrFail($this->ajusteFormId);
-                $service->atualizar($ajuste, $data, $quantidade);
-                $message = 'Ajuste atualizado.';
-            } else {
-                $service->criar($productId, $data, $quantidade);
-                $message = 'Ajuste gravado.';
+                Notification::make()
+                    ->title('Ajuste já finalizado.')
+                    ->body('Não é possível alterar um ajuste após a gravação.')
+                    ->warning()
+                    ->send();
+
+                return;
             }
+
+            $service = new AjusteEstoqueService();
+            $service->criar($productId, $data, $quantidade, $modo);
+            $message = 'Ajuste gravado.';
 
             $this->closeAjusteForm();
             $this->clearListSelection();
@@ -136,30 +127,11 @@ trait ManagesAjusteEstoqueForm
 
     public function deleteAjuste(): void
     {
-        if ($this->showAjusteForm) {
-            return;
-        }
-
-        $recordId = $this->highlightedRecordIdOrNotify('delete');
-
-        if (! $recordId) {
-            return;
-        }
-
-        $ajuste = AjusteEstoque::query()->find($recordId);
-
-        if (! $ajuste) {
-            return;
-        }
-
-        try {
-            (new AjusteEstoqueService())->excluir($ajuste);
-            $this->clearListSelection();
-            $this->resetTable();
-            Notification::make()->title('Ajuste excluído.')->success()->send();
-        } catch (\Throwable $e) {
-            Notification::make()->title('Não foi possível excluir.')->body($e->getMessage())->warning()->send();
-        }
+        Notification::make()
+            ->title('Exclusão não permitida.')
+            ->body('Ajuste finalizado não pode ser excluído.')
+            ->warning()
+            ->send();
     }
 
     public function updatedAjusteFormDescricaoBusca(): void
@@ -168,59 +140,32 @@ trait ManagesAjusteEstoqueForm
             return;
         }
 
-        $term = mb_strtoupper(trim((string) ($this->ajusteForm['descricao_busca'] ?? '')), 'UTF-8');
+        $raw = (string) ($this->ajusteForm['descricao_busca'] ?? '');
+        $term = mb_strtoupper(trim($raw), 'UTF-8');
 
-        if (mb_strlen($term) < 2) {
-            $this->fecharSugestoesProduto();
-
-            return;
+        if ($term !== $raw) {
+            $this->ajusteForm['descricao_busca'] = $term;
         }
 
-        $like = '%' . $term . '%';
-
-        $this->produtoSugestoes = Product::query()
-            ->where('ativo', true)
-            ->where(function ($query) use ($term, $like): void {
-                $query->where('descricao', 'like', $like)
-                    ->orWhere('codigo', 'like', $like)
-                    ->orWhere('referencia', 'like', $like)
-                    ->orWhere('codigo_barras', 'like', $like)
-                    ->orWhere('codigo_barras_caixa', 'like', $like);
-
-                if (is_numeric($term)) {
-                    $query->orWhere('codigo', (int) $term);
-                }
-            })
-            ->orderBy('descricao')
-            ->limit(12)
-            ->get(['id', 'codigo', 'descricao', 'estoque', 'codigo_barras', 'referencia'])
-            ->map(fn (Product $product): array => [
-                'id' => $product->id,
-                'codigo' => $product->codigo,
-                'descricao' => $product->descricao,
-                'estoque' => $this->formatEstoqueBr((float) $product->estoque),
-                'codigo_barras' => $product->codigo_barras,
-                'referencia' => $product->referencia,
-            ])
-            ->all();
-
-        $this->selectedProdutoSugestaoIndex = 0;
+        $this->carregarSugestoesProduto($term);
     }
 
     public function moverSugestaoProduto(int $delta): void
     {
-        if ($this->produtoSugestoes === []) {
-            return;
-        }
-
-        $count = count($this->produtoSugestoes);
-        $index = $this->selectedProdutoSugestaoIndex + $delta;
-        $this->selectedProdutoSugestaoIndex = max(0, min($count - 1, $index));
-        $this->dispatch('erp-ajuste-scroll-produto-sugestao', index: $this->selectedProdutoSugestaoIndex);
+        // Navegação ↑↓ é feita no cliente (Alpine) para ficar imediata.
     }
 
     public function confirmarProdutoSugestao(): void
     {
+        if ($this->ajusteFormId) {
+            return;
+        }
+
+        if ($this->produtoSugestoes === []) {
+            $term = mb_strtoupper(trim((string) ($this->ajusteForm['descricao_busca'] ?? '')), 'UTF-8');
+            $this->carregarSugestoesProduto($term);
+        }
+
         if ($this->produtoSugestoes === []) {
             return;
         }
@@ -238,6 +183,66 @@ trait ManagesAjusteEstoqueForm
     {
         $this->produtoSugestoes = [];
         $this->selectedProdutoSugestaoIndex = 0;
+    }
+
+    /**
+     * Ranking: código exato → descrição começa com o termo → palavra no meio → contém → demais.
+     */
+    private function carregarSugestoesProduto(string $term): void
+    {
+        if (mb_strlen($term) < 2) {
+            $this->fecharSugestoesProduto();
+
+            return;
+        }
+
+        $like = '%'.$term.'%';
+        $prefix = $term.'%';
+        $word = '% '.$term.'%';
+        $wordEnd = '% '.$term;
+        $somenteDigitos = ctype_digit($term);
+
+        $this->produtoSugestoes = Product::query()
+            ->where('ativo', true)
+            ->where(function ($query) use ($term, $like, $somenteDigitos): void {
+                $query->where('descricao', 'like', $like)
+                    ->orWhere('referencia', 'like', $like);
+
+                if ($somenteDigitos) {
+                    $query->orWhere('codigo', $term)
+                        ->orWhereRaw('CAST(codigo AS CHAR) = ?', [$term])
+                        ->orWhere('codigo', 'like', $like)
+                        ->orWhere('codigo_barras', $term)
+                        ->orWhere('codigo_barras', 'like', $like)
+                        ->orWhere('codigo_barras_caixa', $term);
+                }
+            })
+            ->orderByRaw(
+                'CASE
+                    WHEN codigo = ? OR CAST(codigo AS CHAR) = ? THEN 0
+                    WHEN descricao LIKE ? THEN 1
+                    WHEN descricao LIKE ? OR descricao LIKE ? THEN 2
+                    WHEN descricao LIKE ? THEN 3
+                    WHEN referencia LIKE ? THEN 4
+                    ELSE 5
+                END',
+                [$term, $term, $prefix, $word, $wordEnd, $like, $prefix]
+            )
+            ->orderByRaw('CASE WHEN LOCATE(?, descricao) = 0 THEN 9999 ELSE LOCATE(?, descricao) END', [$term, $term])
+            ->orderBy('descricao')
+            ->limit(12)
+            ->get(['id', 'codigo', 'descricao', 'estoque', 'codigo_barras'])
+            ->map(static fn (Product $product): array => [
+                'id' => (int) $product->id,
+                'codigo' => (string) $product->codigo,
+                'descricao' => (string) $product->descricao,
+                'estoque' => number_format((float) $product->estoque, 3, ',', '.'),
+                'codigo_barras' => (string) ($product->codigo_barras ?? ''),
+            ])
+            ->all();
+
+        $this->selectedProdutoSugestaoIndex = 0;
+        $this->dispatch('erp-ajuste-sugestoes-ready');
     }
 
     public function resolveProdutoCodigoInterno(): void
@@ -314,6 +319,7 @@ trait ManagesAjusteEstoqueForm
             'descricao_busca' => '',
             'estoque_atual' => '',
             'quantidade' => '0',
+            'modo' => 'somar',
         ];
     }
 
@@ -332,6 +338,7 @@ trait ManagesAjusteEstoqueForm
         $this->ajusteForm['descricao_busca'] = $product->descricao;
         $this->ajusteForm['estoque_atual'] = $this->formatEstoqueBr((float) $product->estoque);
         $this->fecharSugestoesProduto();
+        $this->dispatch('erp-ajuste-focus-qtd');
     }
 
     protected function findProductByCodigo(string $codigo): ?Product

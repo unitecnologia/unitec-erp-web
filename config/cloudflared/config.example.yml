@@ -15,4 +15,6 @@ credentials-file: C:\ProgramData\Unitec\cloudflared\TUNNEL_ID.json
 ingress:
   - hostname: erp.unierp.uk
     service: http://127.0.0.1:8765
+    originRequest:
+      httpHostHeader: erp.unierp.uk
   - service: http_status:404

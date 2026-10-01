@@ -10,6 +10,8 @@ use App\Filament\Resources\RhFuncionarioResource\Pages\Concerns\ManagesRhFuncion
 use App\Models\RhFuncionario;
 use App\Support\Erp\ErpOnboarding;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Rh\OperadorFromFuncionarioSync;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
@@ -175,6 +177,39 @@ class ListRhFuncionarios extends ListRecords
             return;
         }
 
-        $this->deleteSimpleRecord(RhFuncionario::class, 'Funcionário excluído.');
+        $recordId = $this->highlightedRecordIdOrNotify('delete');
+
+        if (! $recordId) {
+            return;
+        }
+
+        $record = RhFuncionario::query()->find($recordId);
+
+        if (! $record) {
+            Notification::make()
+                ->title('Funcionário não encontrado.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // Preserva histórico: só desativa o vendedor vinculado (sem DELETE).
+        if (filled($record->vendedor_id)) {
+            (new OperadorFromFuncionarioSync)->desativarOperador(
+                $record,
+                $record->vendedor()->first()
+            );
+        }
+
+        $record->delete();
+
+        $this->clearListSelection();
+        $this->resetTable();
+
+        Notification::make()
+            ->title('Funcionário excluído.')
+            ->success()
+            ->send();
     }
 }

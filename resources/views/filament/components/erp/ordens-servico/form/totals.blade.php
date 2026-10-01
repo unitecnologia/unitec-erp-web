@@ -1,47 +1,45 @@
-<div class="erp-os-totals">
-    <div class="erp-os-totals__block">
-        <div class="erp-os-totals__title">SubTotal</div>
-        <div class="erp-os-totals__rows">
-            <span class="erp-os-totals__label">Peças</span>
-            <input type="text" readonly wire:model="subtotalPecas" class="erp-os-totals__value">
-            <span class="erp-os-totals__label">Serviços</span>
-            <input type="text" readonly wire:model="subtotalServicos" class="erp-os-totals__value">
-            <span class="erp-os-totals__label">Geral</span>
-            <input type="text" readonly wire:model="subtotalGeral" class="erp-os-totals__value">
-        </div>
-    </div>
+<div class="erp-os-totals erp-orc-totals">
+    <span class="erp-orc-totals__label">Sub. Peças</span>
+    <input type="text" readonly wire:model="subtotalPecas" class="erp-orc-totals__value">
 
-    <div class="erp-os-totals__block">
-        <div class="erp-os-totals__title">Descontos</div>
-        <div class="erp-os-totals__rows">
-            <span class="erp-os-totals__label">Peças</span>
-            <input
-                type="text"
-                wire:model="descPecas"
-                wire:blur="applyDescontoPecas"
-                @disabled($this->osReadOnly())
-                class="erp-os-totals__value erp-os-totals__value--edit"
-            >
-            <span class="erp-os-totals__label">Serviços</span>
-            <input
-                type="text"
-                wire:model="descServicos"
-                wire:blur="applyDescontoServicos"
-                @disabled($this->osReadOnly())
-                class="erp-os-totals__value erp-os-totals__value--edit"
-            >
-        </div>
-    </div>
+    <span class="erp-orc-totals__label">Sub. Serviços</span>
+    <input type="text" readonly wire:model="subtotalServicos" class="erp-orc-totals__value">
 
-    <div class="erp-os-totals__block">
-        <div class="erp-os-totals__title erp-os-totals__title--emphasis">Total</div>
-        <div class="erp-os-totals__rows">
-            <span class="erp-os-totals__label">Peças</span>
-            <input type="text" readonly wire:model="totalPecas" class="erp-os-totals__value erp-os-totals__value--total">
-            <span class="erp-os-totals__label">Serviços</span>
-            <input type="text" readonly wire:model="totalServicos" class="erp-os-totals__value erp-os-totals__value--total">
-            <span class="erp-os-totals__label">Geral</span>
-            <input type="text" readonly wire:model="totalGeral" class="erp-os-totals__value erp-os-totals__value--total">
-        </div>
-    </div>
+    <span class="erp-orc-totals__label">Sub. Geral</span>
+    <input type="text" readonly wire:model="subtotalGeral" class="erp-orc-totals__value">
+
+    <span class="erp-orc-totals__label">Desc. Peças</span>
+    <input
+        type="text"
+        wire:model="descPecas"
+        wire:blur="applyDescontoPecas"
+        wire:keydown.enter.prevent="applyDescontoPecas"
+        data-mask="money-br"
+        inputmode="decimal"
+        autocomplete="off"
+        @disabled($this->osReadOnly())
+        class="erp-orc-totals__value erp-orc-totals__value--edit"
+    >
+
+    <span class="erp-orc-totals__label">Desc. Serviços</span>
+    <input
+        type="text"
+        wire:model="descServicos"
+        wire:blur="applyDescontoServicos"
+        wire:keydown.enter.prevent="applyDescontoServicos"
+        data-mask="money-br"
+        inputmode="decimal"
+        autocomplete="off"
+        @disabled($this->osReadOnly())
+        class="erp-orc-totals__value erp-orc-totals__value--edit"
+    >
+
+    <span class="erp-orc-totals__label erp-orc-totals__label--total">Total Peças</span>
+    <input type="text" readonly wire:model="totalPecas" class="erp-orc-totals__value erp-orc-totals__value--total">
+
+    <span class="erp-orc-totals__label">Total Serviços</span>
+    <input type="text" readonly wire:model="totalServicos" class="erp-orc-totals__value erp-orc-totals__value--total">
+
+    <span class="erp-orc-totals__label">Total Geral</span>
+    <input type="text" readonly wire:model="totalGeral" class="erp-orc-totals__value erp-orc-totals__value--total">
 </div>

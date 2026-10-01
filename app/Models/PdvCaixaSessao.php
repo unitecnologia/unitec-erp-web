@@ -19,6 +19,7 @@ class PdvCaixaSessao extends Model
         'aberto_em',
         'fechado_em',
         'itens_cancelados',
+        'vendas_espera_descartadas',
     ];
 
     protected function casts(): array
@@ -29,6 +30,7 @@ class PdvCaixaSessao extends Model
             'aberto_em' => 'datetime',
             'fechado_em' => 'datetime',
             'itens_cancelados' => 'array',
+            'vendas_espera_descartadas' => 'array',
         ];
     }
 

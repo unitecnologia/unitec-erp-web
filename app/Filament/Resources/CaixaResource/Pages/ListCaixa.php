@@ -40,7 +40,7 @@ class ListCaixa extends ListRecords
     public string $localSearch = '';
 
     #[Url(as: 'campo')]
-    public string $searchColumn = 'codigo';
+    public string $searchColumn = 'documento';
 
     #[Url(as: 'conta')]
     public string $contaFilter = 'todas';
@@ -71,6 +71,10 @@ class ListCaixa extends ListRecords
     public function mount(): void
     {
         parent::mount();
+
+        if ($this->searchColumn === 'codigo') {
+            $this->searchColumn = 'documento';
+        }
 
         ErpScreen::set('Caixa');
 
@@ -211,7 +215,7 @@ class ListCaixa extends ListRecords
     public function clearSearch(): void
     {
         $this->localSearch = '';
-        $this->searchColumn = 'codigo';
+        $this->searchColumn = 'documento';
         $this->clearListSelection();
         $this->pushCaixaListRefresh(resetSort: true);
     }

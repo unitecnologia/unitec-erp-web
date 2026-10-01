@@ -22,6 +22,11 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'senha',
     'senha_app_forca_vendas',
+    'acesso_app_forca_vendas',
+    'acesso_app_vendas_internas',
+    'acesso_app_unitec_os',
+    'acesso_app_entregas',
+    'acesso_app_gestao',
     'empresa_id',
     'is_admin',
     'ativo',
@@ -31,6 +36,25 @@ use Laravel\Sanctum\HasApiTokens;
 #[Hidden(['password', 'remember_token', 'senha', 'senha_app_forca_vendas'])]
 class User extends Authenticatable implements FilamentUser
 {
+    public const APP_FORCA_VENDAS = 'forca_vendas';
+
+    public const APP_VENDAS_INTERNAS = 'vendas_internas';
+
+    public const APP_UNITEC_OS = 'unitec_os';
+
+    public const APP_ENTREGAS = 'entregas';
+
+    public const APP_GESTAO = 'gestao';
+
+    /** @var array<string, string> */
+    public const APP_ACCESS_COLUMNS = [
+        self::APP_FORCA_VENDAS => 'acesso_app_forca_vendas',
+        self::APP_VENDAS_INTERNAS => 'acesso_app_vendas_internas',
+        self::APP_UNITEC_OS => 'acesso_app_unitec_os',
+        self::APP_ENTREGAS => 'acesso_app_entregas',
+        self::APP_GESTAO => 'acesso_app_gestao',
+    ];
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -43,7 +67,40 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'ativo' => 'boolean',
+            'acesso_app_forca_vendas' => 'boolean',
+            'acesso_app_vendas_internas' => 'boolean',
+            'acesso_app_unitec_os' => 'boolean',
+            'acesso_app_entregas' => 'boolean',
+            'acesso_app_gestao' => 'boolean',
         ];
+    }
+
+    public function podeAcessarApp(string $app): bool
+    {
+        $column = self::APP_ACCESS_COLUMNS[$app] ?? null;
+
+        return $column !== null && (bool) $this->{$column};
+    }
+
+    /**
+     * Usuários ativos com senha do app e flag do app marcado.
+     * Não se aplica ao Gestão (usa senha do ERP / panel Filament).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public function scopeComAcessoApp($query, string $app)
+    {
+        $column = self::APP_ACCESS_COLUMNS[$app] ?? null;
+        if ($column === null || $app === self::APP_GESTAO) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query
+            ->where('ativo', true)
+            ->where($column, true)
+            ->whereNotNull('senha_app_forca_vendas')
+            ->where('senha_app_forca_vendas', '!=', '');
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -54,6 +111,10 @@ class User extends Authenticatable implements FilamentUser
 
         if ($panel->getId() !== 'gestor') {
             return true;
+        }
+
+        if (! $this->podeAcessarApp(self::APP_GESTAO)) {
+            return false;
         }
 
         if ($this->is_admin) {

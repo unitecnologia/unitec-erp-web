@@ -521,6 +521,16 @@
     box-shadow: inset 0 1px 1px rgba(15, 52, 96, 0.05);
 }
 
+/* Cliente (número / razão social): fonte proporcional à altura do campo */
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--cod .erp-nfe__input,
+.erp-fv-tela-venda-page .erp-fv-tv__panel--cliente .erp-fv-tv__row--primary .erp-fv-tv__field--grow .erp-nfe__input {
+    min-height: 2.15rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 1rem;
+    font-weight: 650;
+    line-height: 1.25;
+}
+
 .erp-fv-tela-venda-page .erp-fv-tv__field .erp-nfe__input:focus,
 .erp-fv-tela-venda-page .erp-fv-tv__field textarea.erp-nfe__input:focus {
     outline: none;
@@ -941,7 +951,7 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
 }
 
 .erp-fv-tv__grid th {
@@ -950,12 +960,13 @@
     z-index: 1;
     background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
     color: #fff;
-    font-size: 0.68rem;
+    font-size: 0.76rem;
+    line-height: 1.15;
     font-weight: 800;
     text-align: left;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    padding: 0.4rem 0.5rem;
+    padding: 0.18rem 0.45rem;
     border-bottom: 1px solid #0a2548;
     border-right: 1px solid #2a6bb0;
     white-space: nowrap;
@@ -967,7 +978,7 @@
 }
 
 .erp-fv-tv__grid td {
-    padding: 0.12rem 0.14rem;
+    padding: 0.04rem 0.14rem;
     border-bottom: 1px solid #c5d4e8;
     border-right: 1px solid #c5d4e8;
     color: #0f172a;
@@ -1002,6 +1013,55 @@
     text-align: center !important;
 }
 
+.erp-fv-tv__col-del {
+    width: 2.1rem;
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+.erp-fv-tv__del-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    margin: 0 auto;
+    padding: 0;
+    border: 1px solid #fca5a5;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #fff 0%, #fef2f2 100%);
+    color: #b91c1c;
+    cursor: pointer;
+    vertical-align: middle;
+    line-height: 0;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.erp-fv-tv__del-btn svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    display: block;
+    flex-shrink: 0;
+}
+
+.erp-fv-tv__del-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #991b1b;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__del-btn {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(254, 202, 202, 0.85);
+    color: #fecaca;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__del-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #991b1b;
+}
+
 .erp-fv-tv__col-cod {
     width: 4.6rem;
     font-variant-numeric: tabular-nums;
@@ -1010,8 +1070,10 @@
     white-space: nowrap;
 }
 
+.erp-fv-tv__grid th.erp-fv-tv__col-del,
 .erp-fv-tv__grid th.erp-fv-tv__col-idx,
 .erp-fv-tv__grid th.erp-fv-tv__col-cod,
+.erp-fv-tv__grid td.erp-fv-tv__col-del,
 .erp-fv-tv__grid td.erp-fv-tv__col-idx,
 .erp-fv-tv__grid td.erp-fv-tv__col-cod {
     text-align: center !important;
@@ -1023,6 +1085,10 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     font-weight: 650;
+}
+
+.erp-fv-tv__col-custo {
+    width: 5.2rem;
 }
 
 .erp-fv-tv__grid th.erp-fv-tv__col-num {
@@ -1044,7 +1110,7 @@
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    padding: 0.1rem 0.28rem;
+    padding: 0.05rem 0.28rem;
     border: 1px solid #8fa8c8;
     border-radius: 2px;
     background: #fff;
@@ -1105,8 +1171,8 @@
     text-align: right;
 }
 
-.erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val { color: #b91c1c; }
-.erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val { color: #1d4ed8; }
+.erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val { color: #15803d; }
+.erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val { color: #b91c1c; }
 
 .erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell {
     border-color: rgb(255 255 255 / 45%) !important;
@@ -1119,10 +1185,16 @@
     color: #bfdbfe !important;
 }
 
-.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__money-val,
-.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val,
-.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val {
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__money-val {
     color: #fff !important;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-acr .erp-fv-tv__money-val {
+    color: #bbf7d0 !important;
+}
+
+.erp-fv-tv__grid tbody tr.is-selected .erp-fv-tv__cell.erp-fv-tv__val-desc .erp-fv-tv__money-val {
+    color: #fecaca !important;
 }
 
 .erp-fv-tv__empty td {
@@ -1134,8 +1206,8 @@
     background: #e8eef6 !important;
 }
 
-.erp-fv-tv__val-acr { color: #b91c1c; }
-.erp-fv-tv__val-desc { color: #1d4ed8; }
+.erp-fv-tv__val-acr { color: #15803d; }
+.erp-fv-tv__val-desc { color: #b91c1c; }
 .erp-fv-tv__val-liq { font-weight: 750; color: #0f172a; }
 
 /* ---- Painel lateral (foto + totais) ---- */
@@ -1143,7 +1215,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     background: #dce8f4;
 }
 
@@ -1220,7 +1292,11 @@
 }
 
 .erp-fv-tv__totais {
+    position: relative;
+    z-index: 5;
+    overflow: visible;
     border-top: 1px solid #9eb6d4;
+    border-radius: 0 0 10px 10px;
 }
 
 .erp-fv-tv__totais-head {
@@ -1484,13 +1560,24 @@
     font-weight: 800;
 }
 
-/* Remover item */
-.erp-fv-tela-venda-page .erp-fv-tv-btn--warn {
+/* Importar orçamento */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--import {
+    border-color: #3b82f6;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+}
+
+.erp-fv-tela-venda-page .erp-fv-tv-btn--import .erp-fv-tv-btn__icon {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+    color: #fff;
+}
+
+/* Pedido pendente */
+.erp-fv-tela-venda-page .erp-fv-tv-btn--pendente {
     border-color: #f0b429;
     background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
 }
 
-.erp-fv-tela-venda-page .erp-fv-tv-btn--warn .erp-fv-tv-btn__icon {
+.erp-fv-tela-venda-page .erp-fv-tv-btn--pendente .erp-fv-tv-btn__icon {
     background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
     color: #fff;
 }
@@ -1857,14 +1944,45 @@
     justify-content: space-between;
 }
 
-.erp-pdv-finalizar__operacao-btn--faturar {
-    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
-    border-color: #1e40af !important;
+/* Concluir (F10): verde sólido, sobrescreve o botão cinza do modal PDV */
+.erp-fv-fin .erp-pdv-modal__btn.erp-pdv-finalizar__operacao-btn--concluir,
+.erp-pdv-modal .erp-pdv-finalizar__operacao-btn--concluir,
+#erp-fv-finalizar-op-concluir.erp-pdv-modal__btn {
+    min-height: 2.85rem !important;
+    min-width: min(100%, 14rem) !important;
+    padding: 0.65rem 1.35rem !important;
+    border: 1px solid #15803d !important;
+    border-radius: 0.5rem !important;
+    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%) !important;
     color: #fff !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    box-shadow: 0 4px 12px -3px rgba(22, 163, 74, 0.55) !important;
 }
 
-.erp-pdv-finalizar__operacao-btn--faturar:hover {
-    filter: brightness(1.06);
+.erp-fv-fin .erp-pdv-modal__btn.erp-pdv-finalizar__operacao-btn--concluir:hover:not(:disabled),
+.erp-pdv-modal .erp-pdv-finalizar__operacao-btn--concluir:hover:not(:disabled),
+#erp-fv-finalizar-op-concluir.erp-pdv-modal__btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%) !important;
+    border-color: #166534 !important;
+    filter: none !important;
+    box-shadow: 0 6px 16px -4px rgba(22, 163, 74, 0.6) !important;
+    transform: translateY(-1px);
+}
+
+.erp-fv-fin .erp-pdv-modal__btn.erp-pdv-finalizar__operacao-btn--concluir:active:not(:disabled),
+#erp-fv-finalizar-op-concluir.erp-pdv-modal__btn:active:not(:disabled) {
+    transform: translateY(1px) !important;
+    box-shadow: 0 2px 6px -2px rgba(22, 163, 74, 0.45) !important;
+}
+
+.erp-fv-fin .erp-pdv-finalizar__operacao-btn--concluir kbd,
+#erp-fv-finalizar-op-concluir kbd {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    color: #fff !important;
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
 }
 
 .erp-fv-fin__footer .erp-pdv-finalizar__operacao-btn:disabled {
@@ -2045,3 +2163,344 @@
     font-size: 0.72rem;
     color: #64748b;
 }
+/* Transportadora na finalização FV */
+.erp-fv-fin__transporte-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 1 auto !important;
+    min-width: 11rem !important;
+    max-width: 22rem;
+    background: linear-gradient(180deg, #64748b 0%, #475569 100%) !important;
+    border-color: #334155 !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+.erp-fv-fin__transporte-btn.is-filled {
+    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%) !important;
+    border-color: #0369a1 !important;
+}
+.erp-fv-fin__transporte-btn:hover:not(:disabled) {
+    filter: brightness(1.06);
+}
+.erp-fv-fin__transporte-btn kbd {
+    background: rgba(255,255,255,0.18) !important;
+    color: #fff !important;
+}
+.erp-fv-fin__transporte-resumo {
+    display: block;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.92;
+}
+
+.erp-fv-transporte-modal__window {
+    width: min(56rem, calc(100vw - 1.5rem)) !important;
+    max-height: calc(100vh - 2rem);
+}
+.erp-fv-transporte-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem !important;
+    background: #fff;
+}
+.erp-fv-transporte__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 0.65rem;
+    align-items: flex-end;
+}
+.erp-fv-transporte__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+.erp-fv-transporte__label {
+    font-size: 0.72rem;
+    font-weight: 750;
+    color: #0f3460;
+}
+.erp-fv-transporte__input,
+.erp-fv-transporte__select {
+    min-height: 2.1rem;
+    padding: 0.3rem 0.45rem;
+    border: 1.5px solid #7fa0c4;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+.erp-fv-transporte__field--transportador { flex: 1 1 18rem; min-width: 14rem; }
+.erp-fv-transporte__field--frete { flex: 0 1 12rem; min-width: 10rem; }
+.erp-fv-transporte__field--placa { width: 7rem; }
+.erp-fv-transporte__field--uf { width: 4.5rem; }
+.erp-fv-transporte__field--qtd { width: 5.5rem; }
+.erp-fv-transporte__field--especie { flex: 1 1 7rem; min-width: 6rem; }
+.erp-fv-transporte__field--peso { width: 6.5rem; }
+.erp-fv-transporte__field--marca { flex: 1 1 7rem; min-width: 6rem; }
+.erp-fv-transporte__field--numero { width: 5.5rem; }
+.erp-fv-transporte__transportador {
+    display: flex;
+    gap: 0.35rem;
+    align-items: stretch;
+}
+.erp-fv-transporte__codigo { width: 4.2rem; flex: 0 0 auto; text-align: center; }
+.erp-fv-transporte__nome-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+.erp-fv-transporte__nome { width: 100%; }
+.erp-fv-transporte__num { text-align: right; }
+.erp-fv-transporte__suggest {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    max-height: 14rem;
+    overflow: auto;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+.erp-fv-transporte__suggest button {
+    display: grid;
+    grid-template-columns: 3.2rem 1fr auto;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0.45rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+.erp-fv-transporte__suggest button:hover,
+.erp-fv-transporte__suggest button.is-selected {
+    background: #dbeafe;
+}
+.erp-fv-transporte__suggest-code {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #1e3a8a;
+}
+.erp-fv-transporte__suggest-nome {
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.erp-fv-transporte__suggest-doc {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+}
+.erp-fv-transporte__suggest-doc.is-cnpj { color: #0f766e; }
+.erp-fv-transporte-modal__footer {
+    justify-content: flex-end;
+    gap: 0.55rem;
+}
+
+/* ---- Margem da venda (modal) ---- */
+.erp-fv-tv-margem__window {
+    width: min(90vw, 96rem);
+    max-width: calc(100vw - 1.25rem);
+    max-height: min(90dvh, 42rem);
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-fv-tv-margem__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-fv-tv-margem__hint {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.erp-fv-tv-margem__scroll {
+    min-height: 0;
+    max-height: min(52dvh, 22rem);
+    overflow: auto;
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.erp-fv-tv-margem__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.78rem;
+}
+
+.erp-fv-tv-margem__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.4rem 0.45rem;
+    background: #e8f0fa;
+    border-bottom: 1px solid #b8cae0;
+    border-right: 1px solid #c5d4e8;
+    color: #1e3a5f;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.erp-fv-tv-margem__table thead th:last-child {
+    border-right: 0;
+}
+
+.erp-fv-tv-margem__table tbody td {
+    padding: 0.38rem 0.45rem;
+    border-bottom: 1px solid #e8eef6;
+    border-right: 1px solid #c5d4e8;
+    color: #0f172a;
+    vertical-align: middle;
+}
+
+.erp-fv-tv-margem__table tbody td:last-child {
+    border-right: 0;
+}
+
+.erp-fv-tv-margem__table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.erp-fv-tv-margem__th--code,
+.erp-fv-tv-margem__td--code {
+    width: 4.75rem;
+    text-align: left;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-tv-margem__th--prod,
+.erp-fv-tv-margem__td--prod {
+    width: auto;
+    text-align: left;
+}
+
+.erp-fv-tv-margem__td--prod {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 650;
+}
+
+.erp-fv-tv-margem__th--num,
+.erp-fv-tv-margem__td--num {
+    width: 4rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-tv-margem__th--money,
+.erp-fv-tv-margem__td--money {
+    width: 5.75rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-tv-margem__th--lucro,
+.erp-fv-tv-margem__td--lucro {
+    width: 6.75rem;
+}
+
+.erp-fv-tv-margem__th--pct,
+.erp-fv-tv-margem__td--pct {
+    width: 4.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.erp-fv-tv-margem__td--neg {
+    color: #b91c1c;
+}
+
+.erp-fv-tv-margem__td--pos {
+    color: #047857;
+}
+
+.erp-fv-tv-margem__empty {
+    text-align: center;
+    color: #64748b;
+    padding: 1.25rem 0.5rem !important;
+}
+
+.erp-fv-tv-margem__totais {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.erp-fv-tv-margem__total {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+    background: #f8fbff;
+}
+
+.erp-fv-tv-margem__total--lucro,
+.erp-fv-tv-margem__total--margem {
+    background: #eef7f2;
+    border-color: #a7d4bf;
+}
+
+.erp-fv-tv-margem__total-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #475569;
+}
+
+.erp-fv-tv-margem__total-value {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+@media (max-width: 52rem) {
+    .erp-fv-tv-margem__totais {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .erp-fv-tv-margem__th--money,
+    .erp-fv-tv-margem__td--money {
+        width: 5.1rem;
+    }
+
+    .erp-fv-tv-margem__th--lucro,
+    .erp-fv-tv-margem__td--lucro {
+        width: 6rem;
+    }
+}
+

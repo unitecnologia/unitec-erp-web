@@ -728,6 +728,85 @@
     grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 42%);
 }
 
+.erp-empresas-parametros__blocks {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(15rem, 1.4fr) minmax(10.5rem, 0.72fr);
+    gap: 0.4rem;
+    padding: 0.15rem 0 0.4rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    align-items: start;
+}
+
+.erp-empresas-parametros__block.erp-pcad__group {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0.28rem 0.4rem 0.42rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-muted, #e2eaf4);
+    min-width: 0;
+    box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__block .erp-pcad__group-title {
+    color: #000;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0 0.2rem;
+    margin-bottom: 0.02rem;
+}
+
+.erp-empresas-parametros__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    margin-top: 0.28rem;
+    min-width: 0;
+}
+
+.erp-empresas-parametros__item-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.erp-empresas-parametros__item-row--select {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.erp-empresas-parametros__item .erp-pcad-form__label {
+    width: auto;
+    margin: 0;
+    text-align: right;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: #1e3a5f;
+}
+
+.erp-empresas-parametros__item-row--select .erp-pcad-form__label,
+.erp-empresas-parametros__item > .erp-pcad-form__label {
+    text-align: left;
+    margin-bottom: 0.08rem;
+}
+
+.erp-empresas-parametros__item .erp-pcad-form__input,
+.erp-empresas-parametros__item .erp-pcad-form__select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 1.45rem;
+    padding: 0.12rem 0.28rem;
+    border-radius: 5px;
+    font-size: 0.72rem;
+}
+
+.erp-empresas-parametros__item-row:not(.erp-empresas-parametros__item-row--select) .erp-pcad-form__input {
+    text-align: right;
+}
+
 .erp-empresas-parametros__field .erp-pcad-form__label {
     width: auto;
     margin: 0;
@@ -807,9 +886,9 @@
 
 .erp-empresas-parametros__perm-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.35rem;
-    align-items: stretch;
+    align-items: start;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -843,6 +922,27 @@
     margin-top: 0.1rem;
     flex: 1;
     min-width: 0;
+}
+
+.erp-empresas-parametros__desconto-reais {
+    display: grid;
+    gap: 0.2rem;
+    margin-top: 0.45rem;
+}
+
+.erp-empresas-form-page .erp-empresas-parametros__desconto-reais .erp-pcad-form__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: left;
+    white-space: normal;
+    color: #000;
+}
+
+.erp-empresas-parametros__desconto-reais .erp-pcad-form__select {
+    width: 100%;
+    min-height: 1.7rem;
+    font-size: 0.72rem;
 }
 
 .erp-empresas-parametros__checks--inline {
@@ -1136,6 +1236,35 @@
     height: 100%;
 }
 
+.erp-empresas-nfe-emitentes {
+    width: 100%;
+    margin: 0.35rem 0 0.55rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 5px;
+    background: #f8fafc;
+}
+
+.erp-empresas-nfe-emitentes__title {
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--erp-text, #0f172a);
+    line-height: 1.3;
+}
+
+.erp-empresas-nfe-emitentes__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    max-height: 12rem;
+    overflow: auto;
+}
+
+.erp-empresas-nfe-emitentes__item {
+    margin: 0;
+}
+
 .erp-empresas-estoques__toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -1211,6 +1340,229 @@
     color: #64748b;
     font-style: italic;
     padding: 1rem 0.5rem !important;
+}
+
+/* —— Parâmetros → API Boleto (lista de contas + modal) —— */
+.erp-empresas-boleto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-height: 0;
+    height: 100%;
+}
+
+.erp-empresas-boleto__header {
+    flex: 0 0 auto;
+}
+
+.erp-empresas-boleto__header .erp-empresas-parametros__hint {
+    margin: 0.15rem 0 0;
+}
+
+.erp-empresas-boleto__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    align-items: center;
+}
+
+.erp-empresas-boleto__btn-nova {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 1.85rem;
+    padding: 0.28rem 0.85rem;
+    border: 1px solid #1e5a9e;
+    border-radius: 0.4rem;
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.1;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(30, 90, 158, 0.28);
+}
+
+.erp-empresas-boleto__btn-nova:hover {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    border-color: #1d4ed8;
+}
+
+.erp-empresas-boleto__grid-wrap {
+    flex: 1 1 auto;
+    min-height: 10rem;
+    overflow: auto;
+    border: 1px solid #8fa8c8;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.erp-empresas-boleto__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.78rem;
+}
+
+.erp-empresas-boleto__grid th,
+.erp-empresas-boleto__grid td {
+    padding: 0.35rem 0.45rem;
+    border-bottom: 1px solid #dbe4f0;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-empresas-boleto__grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #e8f0fa 0%, #d5e3f4 100%);
+    color: #0f3460;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-empresas-boleto__col-banco {
+    width: 4.5rem;
+}
+
+.erp-empresas-boleto__col-ambiente {
+    width: 7.5rem;
+}
+
+.erp-empresas-boleto__col-status {
+    width: 5.5rem;
+}
+
+.erp-empresas-boleto__col-acoes {
+    width: 14.5rem;
+    overflow: visible !important;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+
+.erp-empresas-boleto__acoes {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    align-items: center;
+    justify-content: flex-start;
+    white-space: nowrap;
+}
+
+.erp-empresas-boleto__acoes .erp-empresas-boleto__link {
+    flex: 0 0 auto;
+}
+
+.erp-empresas-boleto__badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.25rem;
+    background: #dbeafe;
+    color: #1e40af;
+    vertical-align: middle;
+}
+
+.erp-empresas-boleto__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid #93c5fd;
+    border-radius: 0.3rem;
+    background: #eff6ff;
+    color: #1e40af;
+    cursor: pointer;
+    line-height: 1.1;
+}
+
+.erp-empresas-boleto__link:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+}
+
+.erp-empresas-boleto__link--danger {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.erp-empresas-boleto__link--danger:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+.erp-empresas-boleto__empty {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    padding: 1rem 0.5rem !important;
+    white-space: normal !important;
+    overflow: visible !important;
+}
+
+.erp-empresas-form-page .erp-boleto-conta-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 260;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-empresas-form-page .erp-boleto-conta-modal .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 35%);
+}
+
+.erp-empresas-form-page .erp-boleto-conta-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(56rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    background: var(--erp-bg-app, #e3ecf7);
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+.erp-empresas-form-page .erp-boleto-conta-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.85rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.erp-empresas-form-page .erp-boleto-conta-modal__footer {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 0.45rem;
+    justify-content: flex-end;
+    padding: 0.55rem 0.85rem;
+    border-top: 1px solid #c7d5e8;
+    background: #eef3f9;
+}
+
+.erp-empresas-parametros__form-grid--boleto .erp-empresas-parametros__field--full {
+    grid-column: 1 / -1;
 }
 
 .erp-empresas-parametros__section-title {
@@ -1931,8 +2283,15 @@
     padding: 0.12rem 0.3rem;
 }
 
+@media (max-width: 1100px) {
+    .erp-empresas-parametros__blocks {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
 @media (max-width: 900px) {
     .erp-empresas-parametros__top,
+    .erp-empresas-parametros__blocks,
     .erp-empresas-parametros__perm-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -1940,6 +2299,7 @@
 
 @media (max-width: 768px) {
     .erp-empresas-parametros__top,
+    .erp-empresas-parametros__blocks,
     .erp-empresas-parametros__perm-grid,
     .erp-empresas-parametros__form-grid {
         grid-template-columns: 1fr;
@@ -2042,13 +2402,15 @@
     line-height: 1;
 }
 
-.erp-empresas-impostos .erp-produtos-impostos__label--hint {
+.erp-empresas-impostos .erp-produtos-impostos__label--hint,
+.erp-empresas-parametros .erp-produtos-impostos__label--hint {
     color: #1d4ed8 !important;
     border-bottom: 1px dotted #3b82f6;
     cursor: help;
 }
 
-.erp-empresas-impostos .erp-produtos-impostos__label--hint::after {
+.erp-empresas-impostos .erp-produtos-impostos__label--hint::after,
+.erp-empresas-parametros .erp-produtos-impostos__label--hint::after {
     content: '?';
     display: inline-block;
     margin-left: 0.12rem;
@@ -2699,4 +3061,235 @@
 .erp-empresas-parametros__check input {
     margin-top: 0.12rem;
     flex-shrink: 0;
+}
+
+/* Confirmacao Portal Contador — padrao PDV atencao (centrado, amarelo) */
+.erp-empresas-atencao-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    pointer-events: auto;
+}
+
+.erp-empresas-atencao-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgba(15, 52, 96, 0.35);
+    backdrop-filter: blur(1px);
+}
+
+.erp-empresas-atencao-overlay__box {
+    position: relative;
+    z-index: 1;
+    width: min(90vw, 30rem);
+    background: #fffbeb;
+    border: 3px solid #f59e0b;
+    border-radius: 16px;
+    box-shadow: 0 22px 60px rgba(245, 158, 11, 0.4);
+    padding: 1.8rem 2rem 1.5rem;
+    text-align: center;
+    animation: erp-empresas-atencao-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes erp-empresas-atencao-pulse {
+    from { transform: scale(1); box-shadow: 0 22px 60px rgba(245, 158, 11, 0.4); }
+    to   { transform: scale(1.03); box-shadow: 0 26px 72px rgba(245, 158, 11, 0.55); }
+}
+
+.erp-empresas-atencao-overlay__icon {
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: 0 auto 0.6rem;
+    border-radius: 50%;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 3.2rem;
+}
+
+.erp-empresas-atencao-overlay__title {
+    margin: 0 0 0.4rem;
+    color: #b45309;
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+}
+
+.erp-empresas-atencao-overlay__msg {
+    margin: 0.35rem 0 1rem;
+    color: #78350f;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.erp-empresas-atencao-overlay__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.erp-empresas-atencao-overlay__btn {
+    min-width: 6.5rem;
+    min-height: 2.5rem;
+    padding: 0.45rem 1rem;
+    border-radius: 10px;
+    border: 1px solid #92400e;
+    background: #fff;
+    color: #78350f;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-empresas-atencao-overlay__btn:hover {
+    background: #fef3c7;
+}
+
+.erp-empresas-atencao-overlay__btn--primary {
+    border-color: #b45309;
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #fff;
+}
+
+.erp-empresas-atencao-overlay__btn--primary:hover {
+    background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
+}
+
+.erp-empresas-atencao-overlay__hint {
+    margin: 0.85rem 0 0;
+    color: #a16207;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* —— Parâmetros → API PIX (painel compacto) —— */
+.erp-empresas-pix {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 40rem;
+    padding: 0.05rem 0 0.15rem;
+}
+
+.erp-empresas-pix__panel {
+    margin: 0;
+    padding: 0.55rem 0.7rem 0.65rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(30, 90, 158, 0.06);
+    min-width: 0;
+}
+
+.erp-empresas-pix__panel-title {
+    margin: 0 0 0.4rem;
+    padding: 0 0 0.3rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--erp-accent, #1d4ed8);
+    line-height: 1.2;
+}
+
+.erp-empresas-pix__checks {
+    margin: 0 0 0.35rem;
+}
+
+.erp-empresas-pix__hint {
+    margin: 0 0 0.55rem;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.erp-empresas-pix__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 0.75rem;
+    min-width: 0;
+}
+
+.erp-empresas-pix__grid--stack {
+    margin-top: 0.55rem;
+    grid-template-columns: 1fr;
+}
+
+.erp-empresas-pix__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.erp-empresas-pix__field--full {
+    grid-column: 1 / -1;
+}
+
+.erp-empresas-pix__field .erp-pcad-form__label {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.2;
+}
+
+.erp-empresas-pix__field .erp-pcad-form__input,
+.erp-empresas-pix__field .erp-pcad-form__select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    text-align: left;
+    min-height: 2rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.84rem;
+    border-radius: 0.4rem;
+}
+
+.erp-empresas-pix__file-row {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.erp-empresas-pix__file-row .erp-pcad-form__input {
+    flex: 1 1 auto;
+}
+
+.erp-empresas-pix__btn-clear {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.erp-empresas-pix__meta {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.72rem;
+    line-height: 1.3;
+}
+
+@media (max-width: 640px) {
+    .erp-empresas-pix {
+        max-width: none;
+    }
+
+    .erp-empresas-pix__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-empresas-pix__file-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
 }

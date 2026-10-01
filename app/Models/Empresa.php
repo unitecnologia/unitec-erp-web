@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\QueryException;
 
 #[Fillable([
     'codigo',
@@ -42,12 +43,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'msg_cobranca_whatsapp',
     'logo_path',
     'ativo',
+    'configuracao_inicial_concluida',
 ])]
 class Empresa extends Model
 {
     public const PESSOA_FISICA = 'fisica';
 
     public const PESSOA_JURIDICA = 'juridica';
+
+    public const TIPO_ATIVIDADE_PRESTADOR_SERVICOS = 'prestador_servicos';
 
     public function __construct(array $attributes = [])
     {
@@ -64,6 +68,7 @@ class Empresa extends Model
         $casts = [
             'codigo' => 'integer',
             'ativo' => 'boolean',
+            'configuracao_inicial_concluida' => 'boolean',
         ];
 
         foreach (EmpresaParametros::numericFields() as $field => $meta) {
@@ -72,6 +77,10 @@ class Empresa extends Model
             } elseif ($meta['type'] === 'decimal') {
                 $casts[$field] = 'decimal:2';
             }
+        }
+
+        foreach (array_keys(EmpresaParametros::planoContaFields()) as $field) {
+            $casts[$field] = 'integer';
         }
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
@@ -103,7 +112,6 @@ class Empresa extends Model
             ...EmpresaParametros::mercadoLivreBooleanFields(),
             ...EmpresaParametros::ifoodBooleanFields(),
             ...EmpresaParametros::sistemaBooleanFields(),
-            ...EmpresaParametros::expedicaoBooleanFields(),
         ] as $field => $meta) {
             $casts[$field] = 'boolean';
         }
@@ -125,7 +133,7 @@ class Empresa extends Model
         $casts['param_balanca_digitos'] = 'integer';
         $casts['param_ui_zoom'] = 'integer';
         $casts['param_ui_density'] = 'string';
-        $casts['param_expedicao_max_pedidos_controle'] = 'integer';
+        $casts['param_monitor_vendas_desconto_reais_item_modo'] = 'string';
 
         return $casts;
     }
@@ -135,9 +143,41 @@ class Empresa extends Model
         return $this->hasMany(User::class);
     }
 
+    public function boletoContasApi(): HasMany
+    {
+        return $this->hasMany(BoletoContaApi::class);
+    }
+
     public function usuariosLiberados(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'empresa_user')->withTimestamps();
+    }
+
+    /**
+     * Empresas autorizadas a emitir NF-e no Monitor em nome dos pedidos desta empresa (Matriz).
+     * Configuração comercial — independente de empresa_user.
+     */
+    public function nfeEmitentes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'empresa_nfe_emitente',
+            'empresa_id',
+            'emitente_empresa_id',
+        )->withTimestamps();
+    }
+
+    /**
+     * Empresas (Matrizes) que autorizaram esta empresa como emitente de NF-e no Monitor.
+     */
+    public function nfeEmitenteDe(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'empresa_nfe_emitente',
+            'emitente_empresa_id',
+            'empresa_id',
+        )->withTimestamps();
     }
 
     public function estoques(): HasMany
@@ -182,6 +222,7 @@ class Empresa extends Model
         return [
             'normal' => 'NORMAL',
             'simples' => 'SIMPLES',
+            'mei' => 'MEI (SIMEI)',
             'presumido' => 'PRESUMIDO',
             'real' => 'REAL',
         ];
@@ -190,6 +231,11 @@ class Empresa extends Model
     /**
      * @return array<string, string>
      */
+    public function isPrestadorServicos(): bool
+    {
+        return ($this->tipo_atividade ?? '') === self::TIPO_ATIVIDADE_PRESTADOR_SERVICOS;
+    }
+
     public static function tiposAtividade(): array
     {
         return [
@@ -210,5 +256,24 @@ class Empresa extends Model
     public static function ufs(): array
     {
         return Person::ufs();
+    }
+
+    /**
+     * Uma leitura de empresas.id = 1. Sem cache: o login consulta de novo a cada acesso.
+     */
+    public static function configuracaoInicialPendente(): bool
+    {
+        try {
+            $empresa = static::query()->whereKey(1)->first(['id', 'configuracao_inicial_concluida']);
+        } catch (QueryException $exception) {
+            $message = $exception->getMessage();
+            if (($exception->errorInfo[0] ?? '') === '42S22' || str_contains($message, 'configuracao_inicial_concluida')) {
+                return false;
+            }
+
+            throw $exception;
+        }
+
+        return $empresa !== null && ! $empresa->configuracao_inicial_concluida;
     }
 }

@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Pedidos da retaguarda sem documento fiscal — listagem/detalhe para o PDV offline.
- * Inclui vendas tipo pedido e DAVs Força pendentes (orcamento ainda sem venda).
+ * Inclui vendas tipo pedido e DAVs Força pendentes (pedido ainda sem venda).
  */
 class PedidosImportaveisController
 {
@@ -119,6 +119,7 @@ class PedidosImportaveisController
             'venda_id' => $venda->id,
             'forca_order_id' => null,
             'orcamento_id' => null,
+            'pedido_id' => null,
             'numero' => $venda->numero,
             'data' => $venda->data?->format('d/m/Y') ?? '',
             'total' => ErpMoney::formatBr($venda->total),
@@ -147,8 +148,8 @@ class PedidosImportaveisController
 
         $orderQuery = ForcaVendasOrder::query()
             ->with([
-                'orcamento.itens.product',
-                'orcamento.cliente:id,nome_razao',
+                'pedido.itens.product',
+                'pedido.cliente:id,nome_razao',
                 'vendedor:id,nome',
             ])
             ->whereKey($id)
@@ -163,13 +164,13 @@ class PedidosImportaveisController
         }
 
         $order = $orderQuery->first();
-        $orcamento = $order?->orcamento;
+        $pedido = $order?->pedido;
 
-        if (! $order || ! $orcamento || $orcamento->itens->isEmpty()) {
+        if (! $order || ! $pedido || $pedido->itens->isEmpty()) {
             return response()->json(['message' => 'Pedido indisponível para importação.'], 404);
         }
 
-        $itens = $orcamento->itens->map(function ($item): array {
+        $itens = $pedido->itens->map(function ($item): array {
             $product = $item->product;
             $descricao = trim((string) ($item->descricao ?? ''));
             if ($descricao === '') {
@@ -189,22 +190,23 @@ class PedidosImportaveisController
             ];
         })->values()->all();
 
-        $forma = $this->formaForca($order, $orcamento);
-        $data = $order->dataAberturaAt() ?? $orcamento->created_at;
+        $forma = $this->formaForca($order, $pedido);
+        $data = $order->dataAberturaAt() ?? $pedido->created_at;
 
         return response()->json([
             'origem' => 'forca',
             'venda_id' => null,
             'forca_order_id' => $order->id,
-            'orcamento_id' => $orcamento->id,
-            'numero' => $orcamento->numero,
+            'orcamento_id' => null,
+            'pedido_id' => $pedido->id,
+            'numero' => $pedido->numero,
             'data' => $data?->format('d/m/Y') ?? '',
-            'total' => ErpMoney::formatBr($orcamento->total ?? $order->total),
+            'total' => ErpMoney::formatBr($pedido->total ?? $order->total),
             'forma' => $forma,
             'cancelado' => false,
             'cliente' => [
-                'id' => $orcamento->cliente?->id ?? $order->cliente_id,
-                'nome' => mb_strtoupper((string) ($orcamento->cliente?->nome_razao ?? $order->clienteNome()), 'UTF-8'),
+                'id' => $pedido->cliente?->id ?? $order->cliente_id,
+                'nome' => mb_strtoupper((string) ($pedido->cliente?->nome_razao ?? $order->clienteNome()), 'UTF-8'),
             ],
             'vendedor' => $order->vendedor
                 ? [
@@ -229,11 +231,11 @@ class PedidosImportaveisController
         }
 
         $query = ForcaVendasOrder::query()
-            ->with(['orcamento.cliente:id,nome_razao', 'vendedor:id,nome'])
+            ->with(['pedido.cliente:id,nome_razao', 'vendedor:id,nome'])
             ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO)
             ->where('situacao', ForcaVendasOrder::SITUACAO_PENDENTE)
             ->whereNull('venda_id')
-            ->whereHas('orcamento.itens')
+            ->whereHas('pedido.itens')
             ->orderByDesc('id')
             ->limit(100);
 
@@ -245,7 +247,7 @@ class PedidosImportaveisController
 
         if ($numero !== '') {
             $like = '%'.$numero.'%';
-            $query->whereHas('orcamento', function ($q) use ($like, $numero): void {
+            $query->whereHas('pedido', function ($q) use ($like, $numero): void {
                 $q->where('numero', 'like', $like);
                 if (ctype_digit($numero)) {
                     $q->orWhere('numero', ltrim($numero, '0') ?: '0');
@@ -254,7 +256,7 @@ class PedidosImportaveisController
         }
 
         if ($dataDe !== null || $dataAte !== null) {
-            $query->whereHas('orcamento', function ($q) use ($dataDe, $dataAte): void {
+            $query->whereHas('pedido', function ($q) use ($dataDe, $dataAte): void {
                 if ($dataDe !== null) {
                     $q->whereDate('created_at', '>=', $dataDe);
                 }
@@ -296,31 +298,31 @@ class PedidosImportaveisController
      */
     private function mapForcaListRow(ForcaVendasOrder $order): array
     {
-        $orcamento = $order->orcamento;
-        $data = $order->dataAberturaAt() ?? $orcamento?->created_at;
-        $forma = $this->formaForca($order, $orcamento);
+        $pedido = $order->pedido;
+        $data = $order->dataAberturaAt() ?? $pedido?->created_at;
+        $forma = $this->formaForca($order, $pedido);
 
         return [
             'origem' => 'forca',
             'venda_id' => null,
             'forca_order_id' => $order->id,
-            'numero' => $orcamento?->numero ?? ('#'.$order->id),
-            'cliente' => mb_strtoupper((string) ($orcamento?->cliente?->nome_razao ?? $order->clienteNome()), 'UTF-8'),
+            'numero' => $pedido?->numero ?? ('#'.$order->id),
+            'cliente' => mb_strtoupper((string) ($pedido?->cliente?->nome_razao ?? $order->clienteNome()), 'UTF-8'),
             'data' => $data?->format('d/m/Y') ?? '',
             'data_iso' => $data?->toDateString() ?? '',
             'sort_id' => $order->id,
             'forma' => $forma,
-            'total' => ErpMoney::formatBr($orcamento?->total ?? $order->total),
+            'total' => ErpMoney::formatBr($pedido?->total ?? $order->total),
             'cancelado' => false,
         ];
     }
 
-    private function formaForca(ForcaVendasOrder $order, mixed $orcamento): string
+    private function formaForca(ForcaVendasOrder $order, mixed $pedido): string
     {
         $payload = is_array($order->payload) ? $order->payload : [];
         $forma = trim((string) ($payload['forma_pagamento'] ?? ''));
-        if ($forma === '' && $orcamento !== null) {
-            $forma = trim((string) ($orcamento->forma_pagamento ?? ''));
+        if ($forma === '' && $pedido !== null) {
+            $forma = trim((string) ($pedido->forma_pagamento ?? ''));
         }
 
         return $this->formaLabel($forma);

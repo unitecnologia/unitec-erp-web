@@ -137,9 +137,12 @@ class FormaPagamentoFormClarityTest extends TestCase
     {
         $cartao = FormaPagamento::uiCamposPorTipo('cartao_credito');
         $this->assertTrue($cartao['taxa_cartao']);
+        $this->assertTrue($cartao['prazo_cartao']);
         $this->assertTrue($cartao['tabelas_prazo']);
+        $this->assertTrue($cartao['max_parcelas']);
+        $this->assertTrue($cartao['intervalo_parcelas']);
         $this->assertTrue($cartao['usa_tef']);
-        $this->assertFalse($cartao['modo_prazo']); // cartão/canhoto fora
+        $this->assertTrue($cartao['modo_prazo']);
         $this->assertFalse($cartao['gerar_qrcode_pdv']);
 
         $boleto = FormaPagamento::uiCamposPorTipo('boleto');

@@ -38,7 +38,7 @@ class VendaResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('numero')
-                    ->label('Numero')
+                    ->label('Pedido')
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold)

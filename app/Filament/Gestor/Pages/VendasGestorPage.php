@@ -34,7 +34,7 @@ class VendasGestorPage extends Page
     {
         $this->mountGestorShell();
         $service = app(GestorExecutivoService::class);
-        $this->snapshot = $service->snapshot();
+        $this->snapshot = $service->vendasSnapshot();
         $this->charts = $service->vendasCharts();
     }
 

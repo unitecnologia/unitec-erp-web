@@ -248,8 +248,8 @@
 
 .erp-lb__qr,
 .erp-licenca-bloqueada__qr {
-    width: 8rem !important;
-    height: 8rem !important;
+    width: 11rem !important;
+    height: 11rem !important;
     margin: 0.5rem auto 0.3rem !important;
     display: block !important;
     border-radius: 8px !important;
@@ -362,7 +362,7 @@
 
     .erp-lb__qr,
     .erp-licenca-bloqueada__qr {
-        width: 6.5rem !important;
-        height: 6.5rem !important;
+        width: 9rem !important;
+        height: 9rem !important;
     }
 }

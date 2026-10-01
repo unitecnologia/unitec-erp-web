@@ -560,33 +560,80 @@
     gap: 0.55rem !important;
 }
 
-.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] {
-    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%) !important;
-    border-color: #fca5a5 !important;
-    color: var(--erp-text-inverse, #fff) !important;
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"],
+.erp-terminais-form-page .erp-pcad-actions__btn--danger {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
+    border-color: #dc2626 !important;
+    color: #fff !important;
 }
 
-.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"]:hover {
-    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%) !important;
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"]:hover,
+.erp-terminais-form-page .erp-pcad-actions__btn--danger:hover {
+    background: linear-gradient(180deg, #fca5a5 0%, #ef4444 100%) !important;
 }
 
+.erp-terminais-form-page .erp-pcad-actions__btn--primary,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F2"],
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] {
+    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
+    border-color: #15803d !important;
+    color: #fff !important;
+}
+
+.erp-terminais-form-page .erp-pcad-actions__btn--primary:hover,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F2"]:hover,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"]:hover {
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%) !important;
+}
+
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--primary .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--primary .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--primary .erp-pcad-actions__icon,
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--danger .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--danger .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__btn--danger .erp-pcad-actions__icon,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__icon,
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] .erp-pcad-actions__label,
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"] .erp-pcad-actions__icon,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__icon,
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] .erp-pcad-actions__label,
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] .erp-pcad-actions__icon,
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
-.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
-    color: var(--erp-text-inverse, #fff) !important;
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd,
+.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__icon {
+    color: #fff !important;
 }
 
-.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"] {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%) !important;
-    border-color: #86efac !important;
-    color: var(--erp-text-inverse, #fff) !important;
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__icon {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.22) !important;
+    color: inherit !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
 }
 
-.erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F10"]:hover {
-    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%) !important;
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__icon svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    display: block;
+}
+
+.erp-terminais-form-page .erp-terminais-pcad__footer .erp-pcad-actions__label kbd {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    color: #fff !important;
 }
 
 @media (max-width: 768px) {

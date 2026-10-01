@@ -6,7 +6,46 @@
     class="erp-backup"
     wire:ignore.self
     x-data="{
-        async runBackup() {
+        arquivos: $wire.entangle('arquivos'),
+        listaAtualizando: false,
+        portalTestando: false,
+        portalOk: null,
+        portalLinhas: [],
+        async testarPortal() {
+            if (this.portalTestando || $wire.running || $wire.progressActive) return;
+            this.portalTestando = true;
+            this.portalLinhas = [];
+            this.portalOk = null;
+            try {
+                const res = await $wire.testarConexaoPortal();
+                this.portalOk = !!(res && res.ok);
+                this.portalLinhas = Array.isArray(res && res.linhas) ? res.linhas : ['Sem resposta do portal.'];
+            } catch (e) {
+                this.portalOk = false;
+                this.portalLinhas = ['Não foi possível testar a conexão com o portal.'];
+            } finally {
+                this.portalTestando = false;
+            }
+        },
+        arm() {
+            const self = this;
+            window.__erpBackupRun = function () { self.runBackup(true); };
+            window.__erpBackupRestore = function () { self.runRestore(true); };
+        },
+        async refreshLista() {
+            if (this.listaAtualizando) return;
+            this.listaAtualizando = true;
+            try {
+                const rows = await $wire.refreshArquivos();
+                const fromReturn = Array.isArray(rows) ? rows : null;
+                const fromWire = Array.isArray($wire.arquivos) ? $wire.arquivos : null;
+                this.arquivos = fromReturn ?? fromWire ?? [];
+            } finally {
+                this.listaAtualizando = false;
+            }
+        },
+        async runBackup(fromClick) {
+            if (fromClick !== true) return;
             if ($wire.running || $wire.progressActive) return;
             try {
                 await $wire.atualizarProgresso(8, 'Iniciando backup…', 'Preparando ambiente', 'preparar');
@@ -19,11 +58,13 @@
 
                 await $wire.atualizarProgresso(90, 'Finalizando…', 'Atualizando status e lista', 'finalizar');
                 await $wire.finalizarBackup(dump);
+                await this.refreshLista();
             } catch (e) {
                 await $wire.failBackup((e && e.message) ? e.message : 'Erro inesperado ao gerar backup.');
             }
         },
-        async runRestore() {
+        async runRestore(fromClick) {
+            if (fromClick !== true) return;
             if ($wire.running || $wire.progressActive) return;
             try {
                 await $wire.atualizarProgresso(8, 'Iniciando restauração…', 'Validando confirmação e arquivo', 'preparar');
@@ -36,15 +77,13 @@
 
                 await $wire.atualizarProgresso(90, 'Finalizando…', 'Atualizando status e lista', 'finalizar');
                 await $wire.finalizarRestore(result);
+                await this.refreshLista();
             } catch (e) {
                 await $wire.failRestore((e && e.message) ? e.message : 'Erro inesperado ao restaurar backup.');
             }
         }
     }"
-    x-init="
-        window.__erpBackupRun = () => runBackup();
-        window.__erpBackupRestore = () => runRestore();
-    "
+    x-init="arm()"
     x-on:keydown.escape.window="
         if ($wire.running || $wire.progressActive) { $event.preventDefault(); return; }
         $event.preventDefault();
@@ -70,6 +109,20 @@
         </button>
     </header>
 
+    <div
+        class="erp-backup__feedback"
+        :class="portalOk ? 'erp-backup__feedback--ok' : 'erp-backup__feedback--erro'"
+        x-show="portalLinhas.length > 0"
+        x-cloak
+        role="status"
+    >
+        <ul class="erp-backup__portal-test">
+            <template x-for="(linha, idx) in portalLinhas" :key="idx">
+                <li x-text="linha"></li>
+            </template>
+        </ul>
+    </div>
+
     <div class="erp-backup__body">
         @if (filled($this->feedbackMsg))
             <div
@@ -93,6 +146,7 @@
 
         <section class="erp-backup__card">
             <h2 class="erp-backup__section-title">Configuração</h2>
+            <p class="erp-backup__section-note">Única para todas as empresas (o banco é compartilhado).</p>
 
             <div class="erp-backup__fields">
                 <div class="erp-backup__field erp-backup__field--full">
@@ -133,20 +187,6 @@
                     >
                 </label>
 
-                <label class="erp-backup__field erp-backup__field--full">
-                    <span class="erp-backup__label">Token Portal — Log de BKP</span>
-                    <input
-                        type="password"
-                        wire:model="portalBkpToken"
-                        class="erp-backup__input"
-                        placeholder="Token copiado no portal, aba Log de BKP"
-                        autocomplete="off"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        @disabled($this->running || $this->progressActive)
-                    >
-                </label>
-
                 <label class="erp-backup__toggle">
                     <input
                         type="checkbox"
@@ -157,7 +197,7 @@
                     <span class="erp-backup__toggle-track" aria-hidden="true"></span>
                     <span class="erp-backup__toggle-copy">
                         <span class="erp-backup__toggle-title">Backup automático</span>
-                        <span class="erp-backup__toggle-hint">Executa no intervalo configurado</span>
+                        <span class="erp-backup__toggle-hint">Executa no intervalo · vale para o sistema inteiro</span>
                     </span>
                 </label>
             </div>
@@ -179,7 +219,7 @@
                 </div>
                 <div class="erp-backup__stat">
                     <span class="erp-backup__stat-label">Retenção</span>
-                    <span class="erp-backup__stat-value">{{ DatabaseBackupService::RETENTION_DAYS }} dias</span>
+                    <span class="erp-backup__stat-value">{{ DatabaseBackupService::KEEP_AUTOMATIC_BACKUPS }} backups</span>
                 </div>
                 <div class="erp-backup__stat erp-backup__stat--wide">
                     <span class="erp-backup__stat-label">Conteúdo</span>
@@ -200,10 +240,10 @@
                 <button
                     type="button"
                     class="erp-backup__text-btn"
-                    wire:click="refreshArquivos"
-                    @disabled($this->running || $this->progressActive)
+                    x-on:click="refreshLista()"
+                    :disabled="listaAtualizando"
                 >
-                    Atualizar lista
+                    <span x-text="listaAtualizando ? 'Atualizando…' : 'Atualizar lista'"></span>
                 </button>
             </div>
 
@@ -221,41 +261,38 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($this->arquivos as $arquivo)
+                        <template x-for="arquivo in arquivos" :key="arquivo.path">
                             <tr>
-                                <td class="erp-backup__file" title="{{ $arquivo['path'] }}">{{ $arquivo['name'] }}</td>
+                                <td class="erp-backup__file" :title="arquivo.path" x-text="arquivo.name"></td>
                                 <td>
-                                    <span @class([
-                                        'erp-backup__kind',
-                                        'erp-backup__kind--env' => ($arquivo['kind'] ?? '') === 'env',
-                                        'erp-backup__kind--sql' => ($arquivo['kind'] ?? 'sql') === 'sql',
-                                    ])>{{ ($arquivo['kind'] ?? 'sql') === 'env' ? '.env' : 'SQL' }}</span>
+                                    <span
+                                        class="erp-backup__kind"
+                                        :class="arquivo.kind === 'env' ? 'erp-backup__kind--env' : 'erp-backup__kind--sql'"
+                                        x-text="arquivo.kind === 'env' ? '.env' : 'SQL'"
+                                    ></span>
                                 </td>
-                                <td class="erp-backup__muted">{{ $arquivo['modified_at'] }}</td>
-                                <td class="erp-backup__size">{{ $arquivo['size_label'] }}</td>
+                                <td class="erp-backup__muted" x-text="arquivo.modified_at"></td>
+                                <td class="erp-backup__size" x-text="arquivo.size_label"></td>
                                 @if (erp_can('backup.restore'))
                                     <td class="erp-backup__action">
-                                        @if (($arquivo['kind'] ?? 'sql') === 'sql')
-                                            <button
-                                                type="button"
-                                                class="erp-backup__row-btn"
-                                                wire:click="abrirRestoreModal({{ \Illuminate\Support\Js::from($arquivo['path']) }})"
-                                                @disabled($this->running || $this->progressActive)
-                                                title="Restaurar este backup"
-                                            >
-                                                Restaurar
-                                            </button>
-                                        @else
-                                            <span class="erp-backup__muted">—</span>
-                                        @endif
+                                        <button
+                                            type="button"
+                                            class="erp-backup__row-btn"
+                                            x-show="arquivo.kind === 'sql'"
+                                            x-on:click="$wire.abrirRestoreModal(arquivo.path)"
+                                            :disabled="$wire.running || $wire.progressActive"
+                                            title="Restaurar este backup"
+                                        >
+                                            Restaurar
+                                        </button>
+                                        <span class="erp-backup__muted" x-show="arquivo.kind !== 'sql'">—</span>
                                     </td>
                                 @endif
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ erp_can('backup.restore') ? 5 : 4 }}" class="erp-backup__empty">Nenhum backup encontrado nesta pasta.</td>
-                            </tr>
-                        @endforelse
+                        </template>
+                        <tr x-show="arquivos.length === 0">
+                            <td colspan="{{ erp_can('backup.restore') ? 5 : 4 }}" class="erp-backup__empty">Nenhum backup encontrado nesta pasta.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -267,7 +304,7 @@
             <button
                 type="button"
                 class="erp-backup__btn erp-backup__btn--primary"
-                x-on:click="runBackup()"
+                x-on:click="runBackup(true)"
                 :disabled="$wire.running || $wire.progressActive"
                 data-erp-key="F2"
             >
@@ -285,6 +322,15 @@
                 Restaurar backup
             </button>
         @endif
+        <button
+            type="button"
+            class="erp-backup__btn erp-backup__btn--secondary"
+            x-on:click="testarPortal()"
+            :disabled="portalTestando || $wire.running || $wire.progressActive"
+        >
+            <span x-show="!portalTestando">Testar portal</span>
+            <span x-show="portalTestando" x-cloak>Testando…</span>
+        </button>
         @if (erp_can('backup.update'))
             <button
                 type="button"

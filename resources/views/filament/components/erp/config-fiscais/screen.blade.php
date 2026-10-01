@@ -4,6 +4,7 @@
         'certificado' => 'Certificado',
         'nfce' => 'NFC-e',
         'nfe' => 'NF-e',
+        'nfse' => 'NFS-e',
         'pdv_offline' => 'PDVs Offline',
         'resp_tecnico' => 'Técnico Responsável',
     ];
@@ -53,6 +54,8 @@
                         @include('filament.components.erp.config-fiscais.tabs.nfce')
                     @elseif ($this->activeTab === 'nfe')
                         @include('filament.components.erp.config-fiscais.tabs.nfe')
+                    @elseif ($this->activeTab === 'nfse')
+                        @include('filament.components.erp.config-fiscais.tabs.nfse')
                     @elseif ($this->activeTab === 'pdv_offline')
                         @include('filament.components.erp.config-fiscais.tabs.pdv-offline')
                     @elseif ($this->activeTab === 'resp_tecnico')

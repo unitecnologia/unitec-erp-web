@@ -22,8 +22,9 @@ if (Test-Online) {
 
 if (-not (Test-Path $exe)) {
     $project = Join-Path $root 'services\unitec-device-service\src\Unitec.DeviceService\Unitec.DeviceService.csproj'
-    Write-Host 'Publicando...'
-    & dotnet publish $project -c Release -r win-x64 --self-contained false -o $dist
+    Write-Host 'Publicando Device Service (self-contained)...'
+    New-Item -ItemType Directory -Path $dist -Force | Out-Null
+    & dotnet publish $project -c Release -r win-x64 --self-contained true -o $dist /p:PublishSingleFile=false
 }
 
 if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {

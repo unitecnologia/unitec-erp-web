@@ -285,19 +285,34 @@
 
 .erp-cfop-page .erp-cfop__tab {
     min-width: 3.6rem;
-    padding: 0.14rem 0.4rem;
-    border: 0;
-    border-radius: 3px;
-    background: transparent;
-    color: #334155;
-    font-size: 0.66rem;
-    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: none;
+    box-shadow: none;
+}
+
+.erp-cfop-page .erp-cfop__tab:hover:not(.erp-cfop__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
 .erp-cfop-page .erp-cfop__tab--active {
-    background: #1e5a9e;
-    color: #fff;
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    font-weight: 700;
+    box-shadow: none;
 }
 
 /* Actions — finos, horizontais (padrão Contas Caixa) */

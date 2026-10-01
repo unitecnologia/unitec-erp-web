@@ -59,6 +59,17 @@ final class NfeImpostoXmlBuilder
         }
 
         $cst = $imp->cstPisResolvido();
+        if (in_array($cst, ['49', '99'], true)) {
+            $grupo = $pis->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'PISOutr');
+            $pis->appendChild($grupo);
+            XmlHelper::append($grupo, 'CST', $cst);
+            XmlHelper::append($grupo, 'vBC', NumberFormatter::decimal($imp->vBcPis));
+            XmlHelper::append($grupo, 'pPIS', NumberFormatter::decimal($imp->pPis, 4));
+            XmlHelper::append($grupo, 'vPIS', NumberFormatter::decimal($imp->vPis));
+
+            return;
+        }
+
         if (! in_array($cst, ['04', '05', '06', '07', '08', '09'], true)) {
             $cst = '07';
         }
@@ -85,6 +96,17 @@ final class NfeImpostoXmlBuilder
         }
 
         $cst = $imp->cstCofinsResolvido();
+        if (in_array($cst, ['49', '99'], true)) {
+            $grupo = $cofins->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'COFINSOutr');
+            $cofins->appendChild($grupo);
+            XmlHelper::append($grupo, 'CST', $cst);
+            XmlHelper::append($grupo, 'vBC', NumberFormatter::decimal($imp->vBcCofins));
+            XmlHelper::append($grupo, 'pCOFINS', NumberFormatter::decimal($imp->pCofins, 4));
+            XmlHelper::append($grupo, 'vCOFINS', NumberFormatter::decimal($imp->vCofins));
+
+            return;
+        }
+
         if (! in_array($cst, ['04', '05', '06', '07', '08', '09'], true)) {
             $cst = '07';
         }
@@ -211,8 +233,27 @@ final class NfeImpostoXmlBuilder
             return;
         }
 
-        XmlHelper::append($grupo, 'modBC', '3');
+        XmlHelper::append($grupo, 'modBC', $imp->modBc !== null && $imp->modBc !== '' ? $imp->modBc : '3');
+
+        $emitirPRedBc = $imp->pRedBc > 0 && (
+            $imp->cstIcmsResolvido() === '20'
+            || ($imp->usesSimples() && $imp->csosnResolvido() === '900')
+        );
+
+        // XSD ICMSSN900: modBC → vBC → pRedBC → pICMS → vICMS
+        // XSD ICMS20:     modBC → pRedBC → vBC → pICMS → vICMS
+        $pRedBcAposVBc = $imp->usesSimples() && $imp->csosnResolvido() === '900';
+
+        if ($emitirPRedBc && ! $pRedBcAposVBc) {
+            XmlHelper::append($grupo, 'pRedBC', NumberFormatter::decimal($imp->pRedBc, 4));
+        }
+
         XmlHelper::append($grupo, 'vBC', NumberFormatter::decimal($valores['vBc']));
+
+        if ($emitirPRedBc && $pRedBcAposVBc) {
+            XmlHelper::append($grupo, 'pRedBC', NumberFormatter::decimal($imp->pRedBc, 4));
+        }
+
         XmlHelper::append($grupo, 'pICMS', NumberFormatter::decimal($valores['pIcms'], 4));
         XmlHelper::append($grupo, 'vICMS', NumberFormatter::decimal($valores['vIcms']));
     }

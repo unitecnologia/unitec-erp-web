@@ -153,6 +153,7 @@ $null = Ensure-UnitecCloudflaredAsset -SourceRoot $ProjectRoot
 
 if ($IncludeDeviceService) {
     Write-Host '>> Device Service dist SERA incluido neste pacote (-IncludeDeviceService)' -ForegroundColor Yellow
+    Publish-UnitecDeviceServiceDist -SourceRoot $ProjectRoot | Out-Null
 } else {
     Write-Host '>> Device Service dist excluido (pacote slim; use -IncludeDeviceService se o EXE mudou)' -ForegroundColor White
 }
@@ -175,6 +176,11 @@ if ($IncludeDeviceService) {
 }
 Copy-UnitecProjectTree @copyArgs
 
+# Pacote de update normalmente exclui bin/ e tools/. Embutimos runtime-update/
+# (FrankenPHP + UnitecErpServer) para clientes ainda no legado php -S 127.0.0.1.
+Write-Host '>> Embutindo runtime-update (FrankenPHP + desktop bin)...' -ForegroundColor White
+Publish-UnitecRuntimeUpdateToStaging -SourceRoot $ProjectRoot -StagingDir $StagingDir
+
 if (Test-Path (Join-Path $StagingDir '.env')) {
     Remove-Item (Join-Path $StagingDir '.env') -Force
 }
@@ -187,20 +193,69 @@ if (Test-Path $cacheDir) {
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-$dirtyCache = @()
-if (Test-Path $cacheDir) {
-    $dirtyCache = Get-ChildItem $cacheDir -Filter *.php -ErrorAction SilentlyContinue |
-        Where-Object {
-            $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-            $text -and (
-                $text.Contains('C:\Projetos\unitec-erp-web') -or
-                $text.Contains('C:/Projetos/unitec-erp-web') -or
-                $text.Contains('C:\\Projetos\\unitec-erp-web')
-            )
-        }
+# Pacote --no-dev: laravel/pail (e afins) nao pode ir ao cliente.
+$forbiddenDevDirs = @(
+    'vendor\laravel\pail',
+    'vendor\laravel\pao',
+    'vendor\laravel\sail',
+    'vendor\nunomaduro\collision',
+    'vendor\filp\whoops',
+    'vendor\phpunit\phpunit'
+)
+$devVendorHits = $forbiddenDevDirs |
+    ForEach-Object { Join-Path $StagingDir $_ } |
+    Where-Object { Test-Path $_ }
+if ($devVendorHits) {
+    throw ("Pacote contaminado com require-dev: " + ($devVendorHits -join ', '))
 }
-if ($dirtyCache) {
-    throw 'Pacote contaminado: bootstrap/cache ainda referencia C:\Projetos\unitec-erp-web (sujeira de DEV)'
+
+# So a lista "packages" de producao (nao dev-package-names).
+# Usa PHP json_decode: ConvertFrom-Json do PowerShell falha com chaves duplicadas (PDF/Pdf).
+$installedJson = Join-Path $StagingDir 'vendor\composer\installed.json'
+$forbiddenPkgNames = @('laravel/pail', 'laravel/pao', 'laravel/sail', 'nunomaduro/collision', 'filp/whoops', 'phpunit/phpunit')
+if (Test-Path $installedJson) {
+    $phpExe = Join-Path $ProjectRoot 'tools\php\php.exe'
+    if (-not (Test-Path $phpExe)) { $phpExe = 'php' }
+    $forbiddenCsv = ($forbiddenPkgNames -join ',')
+    $phpCheck = @'
+$j = json_decode(file_get_contents($argv[1]), true);
+if (!is_array($j)) { fwrite(STDERR, "installed.json invalido\n"); exit(2); }
+$pkgs = $j['packages'] ?? (array_is_list($j) ? $j : []);
+$forbid = array_filter(array_map('trim', explode(',', $argv[2])));
+foreach ($pkgs as $p) {
+    $name = (string)($p['name'] ?? '');
+    if ($name !== '' && in_array($name, $forbid, true)) {
+        fwrite(STDERR, "packages[] contem $name\n");
+        exit(3);
+    }
+}
+echo "ok\n";
+exit(0);
+'@
+    $tmpPhp = Join-Path $env:TEMP ('unitec-check-installed-' + [guid]::NewGuid().ToString('N') + '.php')
+    Set-Content -Path $tmpPhp -Value $phpCheck -Encoding UTF8
+    try {
+        $out = & $phpExe $tmpPhp $installedJson $forbiddenCsv 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        Remove-Item $tmpPhp -Force -ErrorAction SilentlyContinue
+    }
+    if ($code -eq 3) {
+        throw ("Pacote contaminado: vendor/composer/installed.json packages[] contem dependencia DEV ($out). Rode composer install --no-dev")
+    }
+    if ($code -ne 0) {
+        throw "Falha ao validar vendor/composer/installed.json (exit=$code): $out"
+    }
+    Write-Host '>> installed.json packages[] sem dependencias DEV conhecidas' -ForegroundColor Green
+}
+
+# Nenhum *.php de cache pode ir no ZIP (packages.php/services.php inclusive).
+$cachePhpLeft = @()
+if (Test-Path $cacheDir) {
+    $cachePhpLeft = @(Get-ChildItem $cacheDir -Filter '*.php' -File -ErrorAction SilentlyContinue)
+}
+if ($cachePhpLeft.Count -gt 0) {
+    throw ("Pacote contaminado: bootstrap/cache ainda tem PHP: " + (($cachePhpLeft | ForEach-Object Name) -join ', '))
 }
 
 # Guardas extras: sujeira de DEV nao pode ir ao cliente.

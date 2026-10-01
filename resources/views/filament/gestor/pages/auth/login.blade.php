@@ -7,6 +7,12 @@
         </header>
 
         <div class="gestor-login__card">
+            @if (filled($deviceLimitError))
+                <div class="gestor-login__alert" role="alert">
+                    <strong class="gestor-login__alert-title">Acesso bloqueado pela licença</strong>
+                    <p class="gestor-login__alert-body">{{ $deviceLimitError }}</p>
+                </div>
+            @endif
             <div class="gestor-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true">
                 {{ $this->content }}
             </div>
@@ -212,9 +218,20 @@
 
             function succeed(url) {
                 showBoot();
-                var target = (typeof url === 'string' && url.trim() !== '')
-                    ? url
-                    : @json(url('/gestor'));
+                var target = (function (raw) {
+                    var fallback = '/gestor';
+                    var value = (typeof raw === 'string' && raw.trim() !== '') ? raw.trim() : fallback;
+                    try {
+                        var parsed = new URL(value, window.location.origin);
+                        var host = (parsed.hostname || '').toLowerCase();
+                        if (host === '127.0.0.1' || host === 'localhost' || host === '[::1]') {
+                            return parsed.pathname + parsed.search + parsed.hash;
+                        }
+                        return parsed.href;
+                    } catch (e) {
+                        return value.charAt(0) === '/' ? value : fallback;
+                    }
+                })(url);
                 window.setTimeout(function () {
                     window.location.replace(target);
                 }, 120);

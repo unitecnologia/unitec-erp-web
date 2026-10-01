@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
@@ -58,8 +59,30 @@ class ForcaVendasFaturamentoService
      *
      * @return array{venda: Venda, contas_receber: list<ContaReceber>}
      */
-    public function faturar(ForcaVendasOrder $order, Pedido $pedido): array
+    public function faturar(ForcaVendasOrder $order, Pedido $pedido, ?callable $aoAvancar = null): array
     {
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(fn (): array => $this->faturar($order, $pedido, $aoAvancar));
+        }
+
+        $avancar = static function (string $etapa) use ($aoAvancar): void {
+            if ($aoAvancar !== null) {
+                $aoAvancar($etapa);
+            }
+        };
+
+        $avancar('Validando pedido');
+
+        $order = ForcaVendasOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
+
+        if (! $order instanceof ForcaVendasOrder) {
+            throw new \RuntimeException('Pedido não encontrado.');
+        }
+
+        if ($order->venda_id || $order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
+            throw new \RuntimeException('Pedido já foi faturado.');
+        }
+
         if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
             throw new \RuntimeException('Pedido aguarda liberação financeira antes de faturar.');
         }
@@ -68,9 +91,23 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException('Pedido cancelado não pode ser faturado.');
         }
 
+        if (! in_array((string) $order->situacao, [
+            ForcaVendasOrder::SITUACAO_PENDENTE,
+            ForcaVendasOrder::SITUACAO_CONFIRMADO,
+        ], true)) {
+            throw new \RuntimeException('Pedido não pode ser faturado.');
+        }
+
+        $pedido = $order->pedido;
+
+        if (! $pedido instanceof Pedido) {
+            throw new \RuntimeException('Pedido sem DAV para faturar.');
+        }
+
         $pedido->loadMissing('itens');
 
-        $dataVenda = ErpTimezone::toLocal($order->dataAberturaAt());
+        $abertura = ErpTimezone::toLocal($order->dataAberturaAt());
+        $fechamento = ErpTimezone::toLocal(now());
 
         $vendedor = $order->vendedor_id
             ? Vendedor::query()->find($order->vendedor_id)
@@ -99,11 +136,16 @@ class ForcaVendasFaturamentoService
         $estoqueId = $this->resolveEstoqueId($empresaId, $vendedor);
         $isTelaErp = $this->isTelaVendaErp($order);
 
+        $avancar('Gerando venda');
+
         $venda = Venda::query()->create([
             'empresa_id' => $empresaId,
             'numero' => Venda::nextNumero(),
-            'data' => $dataVenda->toDateString(),
-            'hora' => $dataVenda->format('H:i:s'),
+            'data' => $abertura->toDateString(),
+            'hora' => $fechamento->format('H:i:s'),
+            'hora_abertura' => $order->dataAberturaAt() !== null
+                ? $abertura->format('H:i:s')
+                : null,
             'cliente_id' => $pedido->cliente_id,
             'vendedor_id' => $vendedor?->id,
             'vendedor_nome' => $vendedor?->nome,
@@ -117,6 +159,8 @@ class ForcaVendasFaturamentoService
         if ($pixPago !== null) {
             $pixPago->forceFill(['venda_id' => $venda->id])->save();
         }
+
+        $avancar('Movimentando estoque');
 
         $stock = new PdvStockService();
         $docSaida = $this->documentoBase($order);
@@ -159,7 +203,11 @@ class ForcaVendasFaturamentoService
             }
         }
 
+        $avancar('Gerando financeiro');
+
         $contas = $this->gerarContasReceber($venda, $pedido, $order, $pixPago);
+
+        $avancar('Finalizando pedido');
 
         (new EstoqueReservaService())->consumirPedido($order);
 
@@ -227,28 +275,60 @@ class ForcaVendasFaturamentoService
      *
      * @throws \RuntimeException
      */
-    public function estornar(ForcaVendasOrder $order, ?string $motivo = null): void
+    public function estornar(
+        ForcaVendasOrder $order,
+        ?string $motivo = null,
+        ?callable $aoAvancar = null,
+        bool $reabrir = false,
+    ): void
     {
-        $venda = $order->venda_id ? Venda::query()->find($order->venda_id) : null;
+        $avancar = function (string $nome) use ($aoAvancar): void {
+            if ($aoAvancar !== null) {
+                $aoAvancar($nome);
+            }
+        };
 
-        if ($venda === null) {
+        if (! $order->venda_id) {
             throw new \RuntimeException('Pedido sem venda gerada para cancelar.');
         }
 
-        if ($venda->status === Venda::STATUS_CANCELADO) {
-            throw new \RuntimeException('Esta venda já está cancelada.');
-        }
-
-        $this->garantirSemBoletoEmitido($order);
-        $this->garantirTitulosNaoRecebidos($order);
-        $this->garantirEntregaNaoExpedida($venda);
-
         $motivoLogistica = trim((string) $motivo);
         if ($motivoLogistica === '') {
-            $motivoLogistica = 'Cancelamento no Monitor de Vendas.';
+            $motivoLogistica = $reabrir
+                ? 'Reabertura do pedido no Monitor de Vendas.'
+                : 'Cancelamento no Monitor de Vendas.';
         }
 
-        DB::transaction(function () use ($order, $venda, $motivoLogistica): void {
+        DB::transaction(function () use ($order, $motivoLogistica, $avancar, $reabrir): void {
+            /** @var ForcaVendasOrder|null $order */
+            $order = ForcaVendasOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
+            $venda = $order?->venda_id
+                ? Venda::query()->whereKey((int) $order->venda_id)->lockForUpdate()->first()
+                : null;
+
+            if (! $order instanceof ForcaVendasOrder || ! $venda instanceof Venda) {
+                throw new \RuntimeException('Pedido sem venda gerada para cancelar.');
+            }
+
+            if ($venda->status === Venda::STATUS_CANCELADO
+                || (! $reabrir && $order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO)) {
+                throw new \RuntimeException('Pedido já está cancelado.');
+            }
+
+            $this->garantirEntregaNaoExpedida($venda);
+
+            if ($reabrir) {
+                $this->reabrirVendaEstornada($order, $venda, $motivoLogistica, $avancar);
+
+                return;
+            }
+
+            $avancar('Verificando financeiro');
+            $this->garantirTitulosNaoRecebidos($order);
+
+            $avancar('Verificando boleto bancário');
+            $this->garantirSemBoletoEmitido($order);
+
             $stock = new PdvStockService();
             $vendedor = $order->vendedor_id
                 ? Vendedor::query()->find($order->vendedor_id)
@@ -258,53 +338,156 @@ class ForcaVendasFaturamentoService
                 : ($venda->empresa_id ? (int) $venda->empresa_id : ErpContext::currentEmpresaId());
             $estoqueId = $this->resolveEstoqueId($empresaId, $vendedor);
 
+            $avancar('Devolvendo estoque');
             $this->estornarEstoque($order, $venda, $stock, $estoqueId, $empresaId);
 
+            $avancar('Estornando financeiro');
             $this->estornarLancamentosCaixaDoPedido($order, $empresaId);
-            $this->contasDoPedido($order)->delete();
+            $this->contasDoPedido($order)
+                ->where(function (Builder $query): void {
+                    $query->whereNull('valor_recebido')->orWhere('valor_recebido', '<=', 0);
+                })
+                ->delete();
 
+            $avancar('Cancelando venda');
             $venda->update(['status' => Venda::STATUS_CANCELADO]);
 
             (new LogisticaVendaHookService())->onVendaCancelada($venda, $motivoLogistica);
 
+            $avancar('Finalizando pedido');
             $order->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
                 'canceled_at' => now(),
             ])->save();
+
+            $order->load('pedido');
+
+            if ($order->pedido && $order->pedido->status !== Pedido::STATUS_CANCELADO) {
+                $order->pedido->update(['status' => Pedido::STATUS_CANCELADO]);
+            }
         });
     }
 
     /**
-     * Bloqueia se houver boleto emitido (aberto com linha digitável) nos CR do pedido.
+     * Mesmo estorno do cancelamento, mas o pedido volta a pendente e editável.
      *
-     * @throws \RuntimeException
+     * @param  callable(string): void  $avancar
      */
-    private function garantirSemBoletoEmitido(ForcaVendasOrder $order): void
+    private function reabrirVendaEstornada(
+        ForcaVendasOrder $order,
+        Venda $venda,
+        string $motivoLogistica,
+        callable $avancar,
+    ): void {
+        $this->garantirEntregaNaoExpedida($venda);
+
+        $avancar('Estornando financeiro');
+        $this->garantirTitulosNaoRecebidos($order);
+        $this->garantirSemBoletoEmitido($order);
+        $this->contasDoPedido($order)
+            ->where(function (Builder $query): void {
+                $query->whereNull('valor_recebido')->orWhere('valor_recebido', '<=', 0);
+            })
+            ->delete();
+
+        $stock = new PdvStockService();
+        $vendedor = $order->vendedor_id
+            ? Vendedor::query()->find($order->vendedor_id)
+            : null;
+        $empresaId = $order->empresa_id
+            ? (int) $order->empresa_id
+            : ($venda->empresa_id ? (int) $venda->empresa_id : ErpContext::currentEmpresaId());
+        $estoqueId = $this->resolveEstoqueId($empresaId, $vendedor);
+
+        $avancar('Estornando Livro Caixa');
+        $this->estornarLancamentosCaixaDoPedido($order, $empresaId);
+
+        $avancar('Devolvendo estoque');
+        $this->estornarEstoque($order, $venda, $stock, $estoqueId, $empresaId);
+
+        $avancar('Recriando reserva');
+        $order->loadMissing('pedido.itens.product', 'user');
+
+        if ($order->tipo === ForcaVendasOrder::TIPO_PEDIDO && $order->pedido) {
+            if (! $order->user) {
+                throw new \RuntimeException('Não foi possível recriar a reserva: pedido sem usuário.');
+            }
+
+            (new EstoqueReservaService())->reservarPedido($order, $order->pedido, $order->user);
+        }
+
+        $avancar('Reabrindo pedido');
+        $venda->update(['status' => Venda::STATUS_CANCELADO]);
+        (new LogisticaVendaHookService())->onVendaCancelada($venda, $motivoLogistica);
+
+        $order->forceFill([
+            'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
+            'venda_id' => null,
+            'confirmed_at' => null,
+            'faturado_at' => null,
+            'canceled_at' => null,
+        ])->save();
+
+        $order->load('pedido');
+
+        if ($order->pedido && $order->pedido->status !== Pedido::STATUS_ABERTO) {
+            $order->pedido->update(['status' => Pedido::STATUS_ABERTO]);
+        }
+    }
+
+    /**
+     * Boletos abertos com identificação bancária ligados às contas do pedido.
+     *
+     * @return \Illuminate\Support\Collection<int, Boleto>
+     */
+    public function boletosBancariosAtivos(ForcaVendasOrder $order): \Illuminate\Support\Collection
     {
         if (! Schema::hasTable((new Boleto)->getTable())
             || ! Schema::hasTable((new ContaReceber)->getTable())) {
-            return;
+            return collect();
         }
 
         $contaIds = $this->contasDoPedido($order)->pluck('id')->all();
 
         if ($contaIds === []) {
+            return collect();
+        }
+
+        return Boleto::query()
+            ->whereIn('conta_receber_id', $contaIds)
+            ->where('status', Boleto::STATUS_ABERTO)
+            ->where(function (Builder $query): void {
+                $query->where(function (Builder $linha): void {
+                    $linha->whereNotNull('linha_digitavel')->where('linha_digitavel', '!=', '');
+                })->orWhere(function (Builder $nosso): void {
+                    $nosso->whereNotNull('nosso_numero')
+                        ->where('nosso_numero', '!=', '')
+                        ->where('nosso_numero', '!=', '0');
+                })->orWhere(function (Builder $externo): void {
+                    $externo->whereNotNull('id_externo')
+                        ->where('id_externo', '!=', '')
+                        ->where('id_externo', '!=', '0');
+                });
+            })
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Bloqueia se ainda houver boleto bancário ativo (status aberto com identificação).
+     *
+     * @throws \RuntimeException
+     */
+    private function garantirSemBoletoEmitido(ForcaVendasOrder $order): void
+    {
+        if ($this->boletosBancariosAtivos($order)->isEmpty()) {
             return;
         }
 
-        $temBoleto = Boleto::query()
-            ->whereIn('conta_receber_id', $contaIds)
-            ->where('status', Boleto::STATUS_ABERTO)
-            ->whereNotNull('linha_digitavel')
-            ->where('linha_digitavel', '!=', '')
-            ->exists();
-
-        if ($temBoleto) {
-            throw new \RuntimeException(
-                'Não é possível cancelar: existe boleto emitido para este pedido. '
-                .'Baixe/cancele o boleto antes de cancelar o pedido.'
-            );
-        }
+        throw new \RuntimeException(
+            'Não é possível cancelar: existe boleto emitido para este pedido. '
+            .'Baixe/cancele o boleto antes de cancelar o pedido.'
+        );
     }
 
     /**
@@ -312,7 +495,7 @@ class ForcaVendasFaturamentoService
      *
      * @throws \RuntimeException
      */
-    private function garantirTitulosNaoRecebidos(ForcaVendasOrder $order): void
+    public function garantirTitulosNaoRecebidos(ForcaVendasOrder $order): void
     {
         if (! Schema::hasTable((new ContaReceber)->getTable())) {
             return;
@@ -335,7 +518,7 @@ class ForcaVendasFaturamentoService
      *
      * @throws \RuntimeException
      */
-    private function garantirEntregaNaoExpedida(Venda $venda): void
+    public function garantirEntregaNaoExpedida(Venda $venda): void
     {
         if (! Schema::hasTable((new Entrega)->getTable())) {
             return;
@@ -531,7 +714,6 @@ class ForcaVendasFaturamentoService
         $diasTabelaCliente = $this->diasTabelaPrazoCliente($clienteId);
         $baixa = app(ContaReceberBaixaService::class);
         $hoje = ErpTimezone::toLocal()->startOfDay();
-        $numeroPedido = $pedido->numero ?? ('#'.$order->id);
         $base = $this->documentoBase($order);
         $formaLabel = mb_strtoupper(trim((string) (
             $formaModel?->descricao
@@ -540,6 +722,7 @@ class ForcaVendasFaturamentoService
         )), 'UTF-8');
         $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
         $prefixoHist = $this->isTelaVendaErp($order) ? 'VENDA ERP ' : 'VENDA APP ';
+        $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
 
         // Caixa do vendedor (Permissões do usuário vinculado); nunca o operador do Monitor.
         $caixaContaId = $this->resolveCaixaContaId($order);
@@ -550,9 +733,11 @@ class ForcaVendasFaturamentoService
                 valor: $total,
                 data: $hoje->toDateString(),
                 documento: $base,
-                historico: $prefixoHist.$numeroPedido.' (PIX)',
+                historico: $prefixoHist.'FV (PIX)',
                 caixaContaId: $caixaContaId,
                 empresaId: $empresaId,
+                planoContaId: $planoVenda['id'] ?? null,
+                planoNome: $planoVenda['nome'] ?? null,
             );
 
             return [];
@@ -580,11 +765,13 @@ class ForcaVendasFaturamentoService
                 valor: $total,
                 data: $hoje->toDateString(),
                 documento: $base,
-                historico: $prefixoHist.$numeroPedido.' ('.$formaLabel.')',
+                historico: $prefixoHist.'FV ('.$formaLabel.')',
                 caixaContaId: $formaModel->conta_destino_id
                     ? (int) $formaModel->conta_destino_id
                     : $caixaContaId,
                 empresaId: $empresaId,
+                planoContaId: $planoVenda['id'] ?? null,
+                planoNome: $planoVenda['nome'] ?? null,
             );
 
             return [];
@@ -603,9 +790,11 @@ class ForcaVendasFaturamentoService
                     valor: $total,
                     data: $hoje->toDateString(),
                     documento: $base,
-                    historico: $prefixoHist.$numeroPedido.' ('.$formaLabel.')',
+                    historico: $prefixoHist.'FV ('.$formaLabel.')',
                     caixaContaId: $caixaContaId,
                     empresaId: $empresaId,
+                    planoContaId: $planoVenda['id'] ?? null,
+                    planoNome: $planoVenda['nome'] ?? null,
                 );
 
                 return [];
@@ -632,7 +821,7 @@ class ForcaVendasFaturamentoService
                     : ErpContext::currentEmpresaId(),
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
-                'historico' => 'PEDIDO APP '.$numeroPedido
+                'historico' => 'PEDIDO APP FV'
                     .($n > 1 ? ' ('.($i + 1).'/'.$n.')' : ''),
                 'documento' => $documento,
                 'cliente_id' => $clienteId,
@@ -772,6 +961,10 @@ class ForcaVendasFaturamentoService
                 ? 'ESTORNO '.$historicoOrig
                 : 'ESTORNO '.$base;
 
+            $planoVenda = EmpresaParametros::planoVendaLancamento(
+                $ref->empresa_id ? (int) $ref->empresa_id : $empresaId
+            );
+
             $baixa->registrarSaidaCaixa(
                 valor: $liquido,
                 data: $hoje,
@@ -781,6 +974,8 @@ class ForcaVendasFaturamentoService
                 empresaId: $ref->empresa_id
                     ? (int) $ref->empresa_id
                     : $empresaId,
+                planoContaId: $planoVenda['id'] ?? null,
+                planoNome: $planoVenda['nome'] ?? null,
             );
         }
     }
@@ -809,11 +1004,14 @@ class ForcaVendasFaturamentoService
     /**
      * Dias de vencimento do carnê no faturamento Monitor/app.
      *
-     * Prioridade:
-     * 1) prazo já negociado no payload (canhoto / condicao_pagamento / tabela_prazo_dias)
+     * Com modo_prazo explícito:
+     * 1) canhoto do cartão (cartao_canhoto.dias), se houver
      * 2) tabela fixa do cliente
-     * 3) prazo financeiro da forma (max_parcelas + intervalo_parcelas) via Helper
-     * 4) fallback legado [0] (à vista / mesmo dia)
+     * 3) financeiro → só max_parcelas + intervalo_parcelas
+     * 4) tabela → tabela_prazo_dias somente se existir na mesma forma; senão erro
+     *
+     * Sem modo_prazo (legado): payload negociado, depois tabela do cliente,
+     * depois prazo financeiro da heurística, depois [0].
      *
      * @param  array<string, mixed>  $payload
      * @param  list<int>|null  $diasTabelaCliente
@@ -824,6 +1022,45 @@ class ForcaVendasFaturamentoService
         ?FormaPagamento $forma = null,
         ?array $diasTabelaCliente = null,
     ): array {
+        if ($this->formaEhAVistaSemPrazo($forma)) {
+            return [0];
+        }
+
+        $modo = mb_strtolower(trim((string) ($forma?->modo_prazo ?? '')), 'UTF-8');
+
+        if ($modo === FormaPagamento::MODO_PRAZO_FINANCEIRO || $modo === FormaPagamento::MODO_PRAZO_TABELA) {
+            $canhoto = $this->diasCanhotoDoPayload($payload);
+
+            if ($canhoto !== []) {
+                return $canhoto;
+            }
+
+            $doCliente = $this->diasLista($diasTabelaCliente);
+
+            if ($doCliente !== []) {
+                return $doCliente;
+            }
+
+            if ($modo === FormaPagamento::MODO_PRAZO_FINANCEIRO) {
+                $resolved = PdvFinalizarPagamentosHelper::resolverDiasCarnePrioridade(
+                    null,
+                    (int) ($forma?->max_parcelas ?? 0),
+                    (int) ($forma?->intervalo_parcelas ?? 0),
+                    FormaPagamento::MODO_PRAZO_FINANCEIRO,
+                );
+
+                return ($resolved !== null && $resolved !== []) ? $resolved : [0];
+            }
+
+            $recebido = $this->diasTabelaPrazoDoPayload($payload);
+
+            if ($recebido !== [] && $this->tabelaPrazoConfereComForma($forma, $recebido)) {
+                return $recebido;
+            }
+
+            throw new \RuntimeException('Não existe prazo válido para a forma selecionada.');
+        }
+
         $negociado = $this->diasNegociadosDoPayload($payload);
 
         if ($negociado !== []) {
@@ -841,24 +1078,93 @@ class ForcaVendasFaturamentoService
     }
 
     /**
+     * Dinheiro, PIX e Troca são à vista. O modo de prazo gravado na forma não se aplica.
+     */
+    private function formaEhAVistaSemPrazo(?FormaPagamento $forma): bool
+    {
+        $tipo = mb_strtolower(trim((string) ($forma?->tipo ?? '')), 'UTF-8');
+
+        return in_array($tipo, ['dinheiro', 'pix', 'troca'], true);
+    }
+
+    /**
+     * Canhoto da POS (parcelas do cartão). Não é prazo de boleto.
+     *
      * @param  array<string, mixed>  $payload
      * @return list<int>
      */
-    private function diasNegociadosDoPayload(array $payload): array
+    private function diasCanhotoDoPayload(array $payload): array
     {
-        // 1º Canhoto POS da Tela de Venda.
         $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
 
-        if (is_array($canhotoDias) && $canhotoDias !== []) {
-            $dias = collect($canhotoDias)
-                ->map(fn ($d): int => (int) $d)
-                ->filter(fn (int $d): bool => $d >= 0)
-                ->values()
-                ->all();
+        if (! is_array($canhotoDias) || $canhotoDias === []) {
+            return [];
+        }
 
-            if ($dias !== []) {
-                return $dias;
+        return $this->diasLista($canhotoDias);
+    }
+
+    /**
+     * @param  list<int|string>|null  $dias
+     * @return list<int>
+     */
+    private function diasLista(?array $dias): array
+    {
+        return collect($dias ?? [])
+            ->map(fn ($d): int => (int) $d)
+            ->filter(fn (int $d): bool => $d >= 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<int>
+     */
+    private function diasTabelaPrazoDoPayload(array $payload): array
+    {
+        $prazoRaw = $payload['tabela_prazo_dias'] ?? '';
+
+        if (is_array($prazoRaw)) {
+            return $this->diasLista($prazoRaw);
+        }
+
+        return $this->diasDeString((string) $prazoRaw);
+    }
+
+    /**
+     * A lista inteira precisa ser igual a uma tabela da mesma forma.
+     *
+     * @param  list<int>  $dias
+     */
+    private function tabelaPrazoConfereComForma(?FormaPagamento $forma, array $dias): bool
+    {
+        if ($forma === null || $dias === []) {
+            return false;
+        }
+
+        $tabelas = $forma->relationLoaded('tabelasPrazo')
+            ? $forma->tabelasPrazo
+            : $forma->tabelasPrazo()->get(['dias']);
+
+        foreach ($tabelas as $tabela) {
+            $cadastrada = PdvFinalizarPagamentosHelper::diasDeString((string) $tabela->dias);
+
+            if ($cadastrada === $dias) {
+                return true;
             }
+        }
+
+        return false;
+    }
+
+    private function diasNegociadosDoPayload(array $payload): array
+    {
+        // 1º Canhoto POS. Não é prazo de boleto.
+        $canhoto = $this->diasCanhotoDoPayload($payload);
+
+        if ($canhoto !== []) {
+            return $canhoto;
         }
 
         $avulso = $this->diasDeString((string) ($payload['condicao_pagamento'] ?? ''));

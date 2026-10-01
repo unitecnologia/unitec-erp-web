@@ -6,12 +6,12 @@ use App\Models\Orcamento;
 use App\Models\Person;
 use App\Models\Vendedor;
 use App\Support\ForcaVendas\ForcaVendasSyncService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Tests\TestCase;
 
 class ForcaVendasHistoricoOrcamentosTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     public function test_pull_traz_orcamentos_do_vendedor_dos_ultimos_30_dias(): void
     {

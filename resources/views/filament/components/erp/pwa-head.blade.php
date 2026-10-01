@@ -5,6 +5,8 @@
 @endphp
 
 <link rel="manifest" href="{{ asset('manifest-erp.webmanifest') }}?v={{ $pwaVersion }}">
+<link rel="icon" href="{{ asset('favicon.png') }}?v={{ $pwaVersion }}" type="image/png" sizes="any">
+<link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v={{ $pwaVersion }}" type="image/x-icon">
 <meta name="theme-color" content="#0f3460">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">

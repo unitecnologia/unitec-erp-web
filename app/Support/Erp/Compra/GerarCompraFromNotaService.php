@@ -5,11 +5,13 @@ namespace App\Support\Erp\Compra;
 use App\Models\Compra;
 use App\Models\CompraItem;
 use App\Models\NotaFornecedor;
+use App\Models\NotaFornecedorItem;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorFornecedorCadastro;
+use App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +69,9 @@ final class GerarCompraFromNotaService
             throw new DomainException('Nenhum item com quantidade válida para gerar a compra.');
         }
 
+        (new NotaFornecedorItensSyncService())->sync($nota);
+        $nota->refresh();
+
         $fornecedorId = $this->resolveFornecedorId($nota);
         $empresaId = $nota->empresa_id ? (int) $nota->empresa_id : null;
         $total = round(array_sum(array_column($itens, 'total')), 2);
@@ -95,13 +100,23 @@ final class GerarCompraFromNotaService
             ]);
 
             foreach ($itens as $item) {
+                $notaItemId = $this->resolveNotaFornecedorItemId($nota, $item);
+
                 CompraItem::query()->create([
                     'compra_id' => $compra->id,
                     'product_id' => $item['product_id'],
+                    'nota_fornecedor_item_id' => $notaItemId,
                     'quantidade' => $item['quantidade'],
                     'valor_unitario' => $item['valor_unitario'],
                     'total' => $item['total'],
                 ]);
+
+                if ($notaItemId) {
+                    NotaFornecedorItem::query()
+                        ->whereKey($notaItemId)
+                        ->whereNull('product_id')
+                        ->update(['product_id' => $item['product_id']]);
+                }
 
                 $product = Product::query()->find($item['product_id']);
 
@@ -210,10 +225,46 @@ final class GerarCompraFromNotaService
                 'total' => $totalLinha,
                 'und' => mb_strtoupper(trim((string) ($row['und'] ?? '')), 'UTF-8'),
                 'grupo' => trim((string) ($row['grupo'] ?? '')),
+                'n_item' => isset($row['n_item']) ? (int) $row['n_item'] : null,
+                'c_prod' => trim((string) ($row['codigo'] ?? '')),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array{n_item?: int|null, c_prod?: string, product_id: int}  $item
+     */
+    private function resolveNotaFornecedorItemId(NotaFornecedor $nota, array $item): ?int
+    {
+        $nItem = (int) ($item['n_item'] ?? 0);
+
+        if ($nItem > 0) {
+            $id = NotaFornecedorItem::query()
+                ->where('nota_fornecedor_id', $nota->id)
+                ->where('n_item', $nItem)
+                ->value('id');
+
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        $cProd = trim((string) ($item['c_prod'] ?? ''));
+
+        if ($cProd !== '' && $cProd !== '—') {
+            $id = NotaFornecedorItem::query()
+                ->where('nota_fornecedor_id', $nota->id)
+                ->where('c_prod', $cProd)
+                ->value('id');
+
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
     }
 
     private function resolveFornecedorId(NotaFornecedor $nota): ?int

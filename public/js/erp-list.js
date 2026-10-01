@@ -88,20 +88,23 @@ function bindRowSelection(page, config) {
 
     // Destaque visual no cliente (highlightRecord usa skipRender e não remonta a grade).
     // Não competir com wire:click do olho/botões (capture dispara highlightRecord em paralelo).
-    page.addEventListener('click', (event) => {
-        if (isErpListInteractiveTarget(event.target)) {
-            return;
-        }
+    // Monitor e telas com rowSelection:false só selecionam pela flag/checkbox.
+    if (config.rowSelection !== false) {
+        page.addEventListener('click', (event) => {
+            if (isErpListInteractiveTarget(event.target)) {
+                return;
+            }
 
-        const row = event.target.closest('.fi-ta-row');
+            const row = event.target.closest('.fi-ta-row');
 
-        if (! isDataRow(page, row)) {
-            return;
-        }
+            if (! isDataRow(page, row)) {
+                return;
+            }
 
-        selectErpListRow(page, row);
-        syncHighlightToLivewire(page, row);
-    }, true);
+            selectErpListRow(page, row);
+            syncHighlightToLivewire(page, row);
+        }, true);
+    }
 
     page.addEventListener('dblclick', (event) => {
         if (page.dataset.erpListDblEdit === '0') {
@@ -272,7 +275,7 @@ function ensureKeyboardShortcutsBound() {
         }
 
         // Modal de lançamento / confirmação da NF-e e cadastro de Contador: atalhos da lista não devem rodar.
-        if (document.querySelector('.erp-nfe-lancamento-modal, .erp-nfe-item-delete-modal, .erp-contador-form-modal, .erp-pagar-form-modal, .erp-receber-form-modal, .erp-aviso-modal, .erp-devcompra-lancamento-modal')) {
+        if (document.querySelector('.erp-nfe-lancamento-modal, .erp-nfse-lancamento-modal, .erp-nfe-item-delete-modal, .erp-contador-form-modal, .erp-pagar-form-modal, .erp-receber-form-modal, .erp-aviso-modal, .erp-devcompra-lancamento-modal, .erp-orc-email-modal.is-visible, .erp-orc-print-modal, .erp-contas-caixa-modal')) {
             return;
         }
 
@@ -333,6 +336,11 @@ function ensureKeyboardShortcutsBound() {
         }
 
         event.preventDefault();
+
+        // Abre o shell do envio na hora (antes do roundtrip Livewire).
+        if (method === 'openEmailModal' && typeof window.__erpOsShowEmailModalShell === 'function') {
+            window.__erpOsShowEmailModalShell();
+        }
 
         if (extra?.params) {
             component.call(method, ...extra.params);

@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Support\Erp\Backup\DatabaseBackupService;
+use App\Support\Erp\Backup\PortalBkpReporter;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
@@ -31,8 +32,6 @@ class BackupPage extends Page
     public int $intervaloHoras = 24;
 
     public bool $habilitarAutomatico = false;
-
-    public string $portalBkpToken = '';
 
     public string $ultimoEm = '';
 
@@ -127,18 +126,16 @@ class BackupPage extends Page
 
     public function loadFromEmpresa(): void
     {
-        $empresaId = Auth::user()?->empresa_id;
-        $empresa = ErpSystemConfig::empresa($empresaId);
+        $empresa = ErpSystemConfig::empresaForBackup();
 
-        $this->pastaDestino = ErpSystemConfig::backupDestinationPath($empresaId);
-        $this->intervaloHoras = ErpSystemConfig::backupIntervalHours($empresaId);
-        $this->habilitarAutomatico = ErpSystemConfig::backupEnabled($empresaId);
-        $this->portalBkpToken = (string) ($empresa?->param_portal_bkp_token ?? '');
-        $this->ultimoEm = (string) (ErpSystemConfig::backupLastAt($empresaId) ?? '');
-        $this->ultimoStatus = ErpSystemConfig::backupLastStatus($empresaId);
+        $this->pastaDestino = ErpSystemConfig::backupDestinationPath();
+        $this->intervaloHoras = ErpSystemConfig::backupIntervalHours();
+        $this->habilitarAutomatico = ErpSystemConfig::backupEnabled();
+        $this->ultimoEm = (string) (ErpSystemConfig::backupLastAt() ?? '');
+        $this->ultimoStatus = ErpSystemConfig::backupLastStatus();
 
         if ($this->pastaDestino === '') {
-            $this->pastaDestino = app(DatabaseBackupService::class)->resolveDestination($empresaId);
+            $this->pastaDestino = app(DatabaseBackupService::class)->resolveDestination();
         }
 
         if ($empresa && filled($empresa->param_backup_ultimo_em)) {
@@ -150,9 +147,31 @@ class BackupPage extends Page
         }
     }
 
-    public function refreshArquivos(): void
+    /**
+     * @return list<array{name: string, path: string, kind: string, size: int, size_label: string, modified_at: string, modified_ts: int}>
+     */
+    public function refreshArquivos(): array
     {
-        $this->arquivos = app(DatabaseBackupService::class)->listBackups(Auth::user()?->empresa_id);
+        $empresa = ErpSystemConfig::empresaForBackup();
+        $this->ultimoStatus = ErpSystemConfig::backupLastStatus();
+        $this->ultimoEm = (string) (ErpSystemConfig::backupLastAt() ?? '');
+
+        if ($empresa && filled($empresa->param_backup_ultimo_em)) {
+            try {
+                $this->ultimoEm = \Illuminate\Support\Carbon::parse((string) $empresa->param_backup_ultimo_em)->format('d/m/Y H:i:s');
+            } catch (Throwable) {
+                $this->ultimoEm = (string) $empresa->param_backup_ultimo_em;
+            }
+        }
+
+        $service = app(DatabaseBackupService::class);
+        $pasta = trim($this->pastaDestino);
+
+        $this->arquivos = $pasta !== ''
+            ? $service->listBackupsInPath($pasta)
+            : $service->listBackups(Auth::user()?->empresa_id);
+
+        return $this->arquivos;
     }
 
     public function resolveMysqldumpLabel(): void
@@ -565,15 +584,34 @@ class BackupPage extends Page
         $this->setFeedback('erro', $message !== '' ? $message : 'Falha ao restaurar backup.');
     }
 
+    /**
+     * @return array{ok: bool, linhas: list<string>}
+     */
+    public function testarConexaoPortal(): array
+    {
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.access')) {
+            return [
+                'ok' => false,
+                'linhas' => ['Sem permissão para testar o portal.'],
+            ];
+        }
+
+        $result = app(PortalBkpReporter::class)->testConnections();
+        $this->setFeedback(
+            $result['ok'] ? 'ok' : 'erro',
+            implode(' ', $result['linhas']),
+        );
+
+        return $result;
+    }
+
     public function salvarConfig(): void
     {
         if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.update')) {
             return;
         }
 
-        $empresa = ErpSystemConfig::empresa(Auth::user()?->empresa_id);
-
-        if (! $empresa) {
+        if (! ErpSystemConfig::empresaForBackup()) {
             $this->setFeedback('erro', 'Empresa não encontrada.');
 
             return;
@@ -582,17 +620,17 @@ class BackupPage extends Page
         $pasta = trim($this->pastaDestino);
         $intervalo = max(1, (int) $this->intervaloHoras);
 
-        $empresa->forceFill([
+        ErpSystemConfig::syncBackupConfigToAll([
             'param_backup_pasta_destino' => $pasta !== '' ? $pasta : null,
             'param_backup_intervalo_horas' => $intervalo,
             'param_backup_habilitar' => (bool) $this->habilitarAutomatico,
-            'param_portal_bkp_token' => trim($this->portalBkpToken),
-        ])->save();
+        ]);
 
         $this->intervaloHoras = $intervalo;
-        $this->pastaDestino = $pasta !== '' ? $pasta : app(DatabaseBackupService::class)->resolveDestination($empresa->id);
+        $this->pastaDestino = $pasta !== '' ? $pasta : app(DatabaseBackupService::class)->resolveDestination();
+        $this->refreshArquivos();
 
-        $this->setFeedback('ok', 'Configuração de backup salva.');
+        $this->setFeedback('ok', 'Configuração de backup salva (válida para todas as empresas).');
     }
 
     public function selecionarPasta(): void
@@ -654,7 +692,15 @@ class BackupPage extends Page
 
         if (PHP_OS_FAMILY === 'Windows') {
             $normalized = str_replace('/', '\\', $path);
-            pclose(popen('start "" explorer "'.$normalized.'"', 'r'));
+
+            try {
+                $this->openWindowsExplorerOnActiveScreen($normalized);
+            } catch (Throwable $e) {
+                report($e);
+                // Fallback legado se o helper de tela falhar.
+                pclose(popen('start "" explorer "'.$normalized.'"', 'r'));
+            }
+
             $this->setFeedback('ok', 'Pasta aberta no Explorer.');
 
             return;
@@ -715,69 +761,256 @@ class BackupPage extends Page
 
     protected function salvarConfigSilencioso(): void
     {
-        $empresa = ErpSystemConfig::empresa(Auth::user()?->empresa_id);
-
-        if (! $empresa) {
+        if (! ErpSystemConfig::empresaForBackup()) {
             return;
         }
 
         $pasta = trim($this->pastaDestino);
 
-        $empresa->forceFill([
+        ErpSystemConfig::syncBackupConfigToAll([
             'param_backup_pasta_destino' => $pasta !== '' ? $pasta : null,
             'param_backup_intervalo_horas' => max(1, (int) $this->intervaloHoras),
             'param_backup_habilitar' => (bool) $this->habilitarAutomatico,
-        ])->save();
+        ]);
     }
 
+    /**
+     * Abre FolderBrowserDialog no monitor da janela ativa (ERP/browser),
+     * evitando coordenadas antigas de segundo monitor / fora da WorkingArea.
+     */
     protected function pickWindowsFolder(string $initialPath, string $description = 'Selecione a pasta para salvar os backups'): ?string
     {
         $initialPath = str_replace(['"', "'"], '', $initialPath);
         $description = str_replace(['"', "'"], '', $description);
         $script = <<<'PS1'
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+if (-not ('UnitecWin32' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class UnitecWin32 {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT {
+    public int Left; public int Top; public int Right; public int Bottom;
+  }
+}
+'@
+}
+
+$fg = [UnitecWin32]::GetForegroundWindow()
+$cx = 0
+$cy = 0
+if ($fg -ne [IntPtr]::Zero) {
+  $rect = New-Object UnitecWin32+RECT
+  if ([UnitecWin32]::GetWindowRect($fg, [ref]$rect)) {
+    $cx = [int](($rect.Left + $rect.Right) / 2)
+    $cy = [int](($rect.Top + $rect.Bottom) / 2)
+  }
+}
+if ($cx -eq 0 -and $cy -eq 0) {
+  $pt = [System.Windows.Forms.Cursor]::Position
+  $cx = [int]$pt.X
+  $cy = [int]$pt.Y
+}
+
+$point = New-Object System.Drawing.Point $cx, $cy
+$screen = [System.Windows.Forms.Screen]::FromPoint($point)
+$wa = $screen.WorkingArea
+# Nunca reutilizar centro fora da WorkingArea atual (ex.: monitor desconectado).
+if ($cx -lt $wa.Left -or $cx -ge $wa.Right -or $cy -lt $wa.Top -or $cy -ge $wa.Bottom) {
+  $cx = $wa.Left + [int]($wa.Width / 2)
+  $cy = $wa.Top + [int]($wa.Height / 2)
+}
+
+[void][System.Windows.Forms.Application]::EnableVisualStyles()
+
+$owner = New-Object System.Windows.Forms.Form
+$owner.Text = 'Unitec ERP'
+$owner.ShowInTaskbar = $false
+$owner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+$owner.Opacity = 0.01
+$owner.Width = 8
+$owner.Height = 8
+$owner.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+$owner.Location = New-Object System.Drawing.Point ($cx - 4), ($cy - 4)
+$owner.TopMost = $true
+$owner.Show()
+[System.Windows.Forms.Application]::DoEvents()
+
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $dialog.Description = $env:UNITEC_BACKUP_DIALOG_DESC
 $dialog.ShowNewFolderButton = $true
+try { $dialog.AutoUpgradeEnabled = $true } catch { }
 $initial = $env:UNITEC_BACKUP_INITIAL
 if ($initial -and (Test-Path -LiteralPath $initial)) {
-    $dialog.SelectedPath = $initial
+  $dialog.SelectedPath = $initial
 }
-[void][System.Windows.Forms.Application]::EnableVisualStyles()
-$result = $dialog.ShowDialog()
-if ($result -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.SelectedPath) {
+
+try {
+  $result = $dialog.ShowDialog($owner)
+  if ($result -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.SelectedPath) {
     [Console]::Out.Write($dialog.SelectedPath)
+  }
+} finally {
+  $owner.Close()
+  $owner.Dispose()
+  $dialog.Dispose()
 }
 PS1;
 
-        $process = new \Symfony\Component\Process\Process([
-            'powershell.exe',
-            '-NoProfile',
-            '-STA',
-            '-ExecutionPolicy', 'Bypass',
-            '-Command', $script,
-        ]);
-        $process->setTimeout(300);
-        $process->setEnv([
+        $output = $this->runWindowsStaPowerShell($script, [
             'UNITEC_BACKUP_INITIAL' => $initialPath,
             'UNITEC_BACKUP_DIALOG_DESC' => $description,
-            'SystemRoot' => (string) (getenv('SystemRoot') ?: 'C:\\Windows'),
-            'WINDIR' => (string) (getenv('WINDIR') ?: 'C:\\Windows'),
-        ]);
-        $process->run();
+        ], 300);
 
-        if (! $process->isSuccessful()) {
-            $error = trim($process->getErrorOutput().' '.$process->getOutput());
-
-            throw new \RuntimeException($error !== '' ? $error : 'Falha ao abrir o diálogo de pasta.');
-        }
-
-        $path = trim($process->getOutput());
+        $path = trim($output);
 
         if ($path === '') {
             return null;
         }
 
         return str_replace('/', '\\', $path);
+    }
+
+    /**
+     * Abre o Explorer ancorado ao monitor da janela ativa (ERP),
+     * para não surgir atrás / em coordenadas de outro monitor.
+     */
+    protected function openWindowsExplorerOnActiveScreen(string $path): void
+    {
+        $path = str_replace(['"', "'"], '', $path);
+        $script = <<<'PS1'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+if (-not ('UnitecWin32' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class UnitecWin32 {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT {
+    public int Left; public int Top; public int Right; public int Bottom;
+  }
+}
+'@
+}
+
+$fg = [UnitecWin32]::GetForegroundWindow()
+$cx = 0
+$cy = 0
+if ($fg -ne [IntPtr]::Zero) {
+  $rect = New-Object UnitecWin32+RECT
+  if ([UnitecWin32]::GetWindowRect($fg, [ref]$rect)) {
+    $cx = [int](($rect.Left + $rect.Right) / 2)
+    $cy = [int](($rect.Top + $rect.Bottom) / 2)
+  }
+}
+if ($cx -eq 0 -and $cy -eq 0) {
+  $pt = [System.Windows.Forms.Cursor]::Position
+  $cx = [int]$pt.X
+  $cy = [int]$pt.Y
+}
+
+$point = New-Object System.Drawing.Point $cx, $cy
+$screen = [System.Windows.Forms.Screen]::FromPoint($point)
+$wa = $screen.WorkingArea
+if ($cx -lt $wa.Left -or $cx -ge $wa.Right -or $cy -lt $wa.Top -or $cy -ge $wa.Bottom) {
+  $cx = $wa.Left + [int]($wa.Width / 2)
+  $cy = $wa.Top + [int]($wa.Height / 2)
+}
+
+$anchor = New-Object System.Windows.Forms.Form
+$anchor.ShowInTaskbar = $false
+$anchor.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+$anchor.Opacity = 0.01
+$anchor.Width = 8
+$anchor.Height = 8
+$anchor.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+$anchor.Location = New-Object System.Drawing.Point ($cx - 4), ($cy - 4)
+$anchor.TopMost = $true
+$anchor.Show()
+[System.Windows.Forms.Application]::DoEvents()
+
+try {
+  $target = $env:UNITEC_BACKUP_OPEN_PATH
+  Start-Process -FilePath 'explorer.exe' -ArgumentList @($target) | Out-Null
+  Start-Sleep -Milliseconds 400
+  try {
+    $shell = New-Object -ComObject Shell.Application
+    foreach ($win in @($shell.Windows())) {
+      try {
+        if ([IntPtr]$win.HWND -eq [IntPtr]::Zero) { continue }
+        $locPath = ''
+        try { $locPath = [string]$win.Document.Folder.Self.Path } catch { }
+        if ($locPath -and ($locPath.TrimEnd('\') -ieq $target.TrimEnd('\'))) {
+          [void][UnitecWin32]::SetForegroundWindow([IntPtr]$win.HWND)
+          break
+        }
+      } catch { }
+    }
+  } catch { }
+} finally {
+  $anchor.Close()
+  $anchor.Dispose()
+}
+PS1;
+
+        $this->runWindowsStaPowerShell($script, [
+            'UNITEC_BACKUP_OPEN_PATH' => $path,
+        ], 30);
+    }
+
+    /**
+     * Executa script PowerShell STA a partir de arquivo temporário (evita quebra de quoting).
+     *
+     * @param  array<string, string>  $env
+     */
+    protected function runWindowsStaPowerShell(string $script, array $env = [], int $timeoutSeconds = 60): string
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'unitec_bkp_');
+        if ($tmp === false) {
+            throw new \RuntimeException('Não foi possível criar script temporário do seletor de pasta.');
+        }
+
+        $ps1 = $tmp.'.ps1';
+        @unlink($tmp);
+
+        try {
+            if (file_put_contents($ps1, $script) === false) {
+                throw new \RuntimeException('Não foi possível gravar script temporário do seletor de pasta.');
+            }
+
+            $process = new \Symfony\Component\Process\Process([
+                'powershell.exe',
+                '-NoProfile',
+                '-STA',
+                '-ExecutionPolicy', 'Bypass',
+                '-File', $ps1,
+            ]);
+            $process->setTimeout($timeoutSeconds);
+            $process->setEnv(array_merge([
+                'SystemRoot' => (string) (getenv('SystemRoot') ?: 'C:\\Windows'),
+                'WINDIR' => (string) (getenv('WINDIR') ?: 'C:\\Windows'),
+            ], $env));
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                $error = trim($process->getErrorOutput().' '.$process->getOutput());
+
+                throw new \RuntimeException($error !== '' ? $error : 'Falha ao executar PowerShell do seletor de pasta.');
+            }
+
+            return (string) $process->getOutput();
+        } finally {
+            if (is_file($ps1)) {
+                @unlink($ps1);
+            }
+        }
     }
 }

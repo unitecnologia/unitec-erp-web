@@ -133,6 +133,18 @@ return new class extends Migration
 
     private function hasForeignReference(string $table, string $column, string $referenced): bool
     {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            foreach (Schema::getForeignKeys($table) as $fk) {
+                $columns = $fk['columns'] ?? [];
+                $foreign = (string) ($fk['foreign_table'] ?? '');
+                if (in_array($column, $columns, true) && ($foreign === $referenced || str_ends_with($foreign, $referenced))) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $prefixed = DB::getTablePrefix() . $table;
         $referencedPrefixed = DB::getTablePrefix() . $referenced;
 
@@ -147,6 +159,25 @@ return new class extends Migration
 
     private function dropForeignByReference(string $table, string $column, string $referenced): void
     {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            foreach (Schema::getForeignKeys($table) as $fk) {
+                $columns = $fk['columns'] ?? [];
+                $foreign = (string) ($fk['foreign_table'] ?? '');
+                $name = (string) ($fk['name'] ?? '');
+                if ($name === '' || ! in_array($column, $columns, true)) {
+                    continue;
+                }
+                if ($foreign !== $referenced && ! str_ends_with($foreign, $referenced)) {
+                    continue;
+                }
+                Schema::table($table, function (Blueprint $blueprint) use ($name): void {
+                    $blueprint->dropForeign($name);
+                });
+            }
+
+            return;
+        }
+
         $prefixed = DB::getTablePrefix() . $table;
         $referencedPrefixed = DB::getTablePrefix() . $referenced;
 

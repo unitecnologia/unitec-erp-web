@@ -41,9 +41,19 @@ class AjusteEstoqueResource extends Resource
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('product.codigo')
-                    ->label('Código')
+                TextColumn::make('id')
+                    ->label('Cód. ajuste')
+                    ->sortable()
                     ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('product.codigo')
+                    ->label('Cód. Produto')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('product.codigo_barras')
+                    ->label('Cód. Barras')
+                    ->alignCenter()
+                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('product.descricao')
                     ->label('Produto')

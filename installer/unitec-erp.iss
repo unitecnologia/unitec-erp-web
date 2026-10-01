@@ -2,15 +2,15 @@
 ; Compilar apos: .\scripts\build-setup.ps1
 ;
 ; Fluxo:
-; - Pasta nova (sem .env / sem tools\mysql\data) → instalação do zero
-; - Pasta já existente → recupera (atualiza arquivos, NÃO apaga o banco)
+; - Pasta nova (sem .env / sem tools\mysql\data) Ã¢â€ â€™ instalaÃƒÂ§ÃƒÂ£o do zero
+; - Pasta jÃƒÂ¡ existente Ã¢â€ â€™ recupera (atualiza arquivos, NÃƒÆ’O apaga o banco)
 ;
 ; Atalhos: somente bin\Unitec ERP.exe
 ; Auto-start: servico Windows UnitecErpServer (Automatic)
 ; Sem PowerShell no atalho do cliente.
 
 #define MyAppName "UNI SISTEMAS 3.0"
-#define MyAppVersion "6.4.1.164"
+#define MyAppVersion "6.4.1.220"
 #define MyAppVerName "UNI SISTEMAS 3.0"
 #define MyAppPublisher "UNITECNOLOGIA"
 #define MyAppURL "https://unitecnologiasc.com.br/"
@@ -46,7 +46,7 @@ SetupIconFile={#MyAppIcon}
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
-; Sem task de atalho no Inno — evita duplicar com New-UnitecDesktopShortcuts.
+; Sem task de atalho no Inno Ã¢â‚¬â€ evita duplicar com New-UnitecDesktopShortcuts.
 
 [Files]
 ; Nao sobrescreve dados do cliente em pacote padrao.
@@ -60,13 +60,13 @@ Name: "{group}\Unitec ERP"; Filename: "{app}\bin\Unitec ERP.exe"; Parameters: "-
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
-; Nao apaga a pasta inteira no desinstalar — preserva banco (tools\mysql\data) e .env.
+; Nao apaga a pasta inteira no desinstalar Ã¢â‚¬â€ preserva banco (tools\mysql\data) e .env.
 [UninstallDelete]
 Type: files; Name: "{app}\.unitec-serve.pid"
 
 [Messages]
 brazilianportuguese.WelcomeLabel2=Este assistente instala o Unitec ERP ({#MyAppVerName}).%n%nSe a pasta C:\UNITECNOLOGIA_WEB ja existir, o instalador RECUPERA o sistema sem apagar o banco de dados.%n%nSe for a primeira vez, instala do zero.%n%nO sistema abre em janela de aplicativo (Chrome/Edge).%n%nRequisitos: Windows 10 ou superior, 64 bits, 2 GB livres em C:
-brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin (instalacao nova):%n  Usuario: USUARIO%n  Senha: 01
+brazilianportuguese.FinishedLabel=Instalacao concluida!%n%nUse o atalho "Unitec ERP" na Area de Trabalho.%n%nLogin (instalacao nova):%n  Usuario: USUARIO%n  Senha: 01%n%nA empresa Unitec e os dados fiscais ja vem preenchidos. Edite o CNPJ se for outro cliente.
 
 [Code]
 var
@@ -80,7 +80,7 @@ var
 
 function IsExistingUnitecInstall(): Boolean;
 begin
-  { Sinais duraveis de instalacao anterior — nao usa so index.php (Setup sempre copia). }
+  { Sinais duraveis de instalacao anterior Ã¢â‚¬â€ nao usa so index.php (Setup sempre copia). }
   Result :=
     FileExists(ExpandConstant('{#MyAppDir}\.env')) or
     FileExists(ExpandConstant('{#MyAppDir}\.env.backup')) or

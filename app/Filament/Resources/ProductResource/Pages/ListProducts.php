@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use App\Filament\Concerns\EmbedsInPdvOverlay;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\ProductResource;
@@ -26,6 +27,7 @@ use Livewire\Attributes\Url;
 
 class ListProducts extends ListRecords
 {
+    use EmbedsInPdvOverlay;
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use ManagesProductCardex;
@@ -90,7 +92,8 @@ class ListProducts extends ListRecords
 
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->pushProductListRefresh(resetSort: true);
+        // Precisa re-renderizar o pai: o dropdown marca o campo no HTML do screen.
+        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
     }
 
     protected function normalizeStatusFilter(mixed $value): string
@@ -151,6 +154,10 @@ class ListProducts extends ListRecords
             $params['q'] = $searchValue;
         }
 
+        if ($this->embedsInPdv) {
+            $params['pdv'] = '1';
+        }
+
         $query = http_build_query($params);
 
         return ProductResource::getUrl('index') . ($query !== '' ? '?' . $query : '');
@@ -163,11 +170,30 @@ class ListProducts extends ListRecords
 
     public function getPageClasses(): array
     {
-        return [
+        $classes = [
             ...parent::getPageClasses(),
             'erp-list-page',
             static::erpListPageClass(),
         ];
+
+        if ($this->embedsInPdv) {
+            $classes[] = 'erp-pdv-embed';
+        }
+
+        return $classes;
+    }
+
+    public function closeScreen(): void
+    {
+        if ($this->embedsInParentOverlay()) {
+            $this->closeEmbedOverlay();
+
+            return;
+        }
+
+        ErpScreen::set('Principal');
+
+        $this->redirect(filament()->getUrl());
     }
 
     protected function erpListEntityName(): string
@@ -236,7 +262,35 @@ class ListProducts extends ListRecords
 
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->pushProductListRefresh();
+        $this->pushProductListRefresh(skipParentRender: false);
+    }
+
+    /**
+     * Contagens das abas Ativos / Inativos / Todos (respeita a busca atual).
+     *
+     * @return array{ativos: int, inativos: int, todos: int}
+     */
+    public function productStatusCounts(): array
+    {
+        $empresa = $this->currentEmpresa();
+        $searchColumn = $this->searchColumn;
+        $localSearch = $this->localSearch;
+
+        $countFor = static function (string $status) use ($empresa, $searchColumn, $localSearch): int {
+            return (new ProductListQueryBuilder(
+                statusFilter: $status,
+                searchColumn: $searchColumn,
+                localSearch: $localSearch,
+                empresa: $empresa,
+                applyDefaultOrder: false,
+            ))->build()->count();
+        };
+
+        return [
+            'ativos' => $countFor('ativos'),
+            'inativos' => $countFor('inativos'),
+            'todos' => $countFor('todos'),
+        ];
     }
 
     public function updatedSearchColumn(): void
@@ -253,7 +307,7 @@ class ListProducts extends ListRecords
     public function search(): void
     {
         $this->clearListSelection();
-        $this->pushProductListRefresh(resetSort: true);
+        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function clearSearch(): void
@@ -261,7 +315,7 @@ class ListProducts extends ListRecords
         $this->localSearch = '';
         $this->searchColumn = $this->isSeriaisView() ? 'descricao' : 'descricao';
         $this->clearListSelection();
-        $this->pushProductListRefresh(resetSort: true);
+        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function pollErpListSync(): void
@@ -290,10 +344,10 @@ class ListProducts extends ListRecords
         }
 
         $this->erpListSyncVersion = $current;
-        $this->pushProductListRefresh();
+        $this->pushProductListRefresh(skipParentRender: false);
     }
 
-    protected function pushProductListRefresh(bool $resetSort = false): void
+    protected function pushProductListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
     {
         $this->dispatch(
             'erp-product-list-refresh',
@@ -305,7 +359,9 @@ class ListProducts extends ListRecords
             resetSort: $resetSort,
         )->to(ProductListTable::class);
 
-        $this->skipRender();
+        if ($skipParentRender) {
+            $this->skipRender();
+        }
     }
 
     public function refreshTable(): void
@@ -382,7 +438,7 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $this->redirect(ProductResource::getUrl('create'));
+        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('create')));
     }
 
     public function editProduct(int | string | null $recordId = null): void
@@ -408,7 +464,7 @@ class ListProducts extends ListRecords
             return;
         }
 
-        $this->redirect(ProductResource::getUrl('edit', ['record' => $resolvedId]));
+        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $resolvedId])));
     }
 
     public function deleteProduct(int | string | null $recordId = null): void
@@ -513,7 +569,7 @@ class ListProducts extends ListRecords
             ->success()
             ->send();
 
-        $this->redirect(ProductResource::getUrl('edit', ['record' => $clone]));
+        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $clone])));
     }
 
     public function printProducts(): void

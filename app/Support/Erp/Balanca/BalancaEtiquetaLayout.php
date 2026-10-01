@@ -4,8 +4,7 @@ namespace App\Support\Erp\Balanca;
 
 /**
  * Layouts de etiqueta/código de barras EAN de balança (modelos 01–05).
- * Paridade com param_pdv_modelo_balanca do PDV Delphi (01–04) + 05 (6 dígitos + total)
- * observado em etiquetas reais de açougue/balança.
+ * Configurado em Balanças via param_balanca_etiqueta_modelo (01–04 Delphi + 05 6 dígitos + total).
  */
 final class BalancaEtiquetaLayout
 {

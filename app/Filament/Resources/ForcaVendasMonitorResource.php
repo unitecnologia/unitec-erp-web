@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ForcaVendasMonitorResource\Pages;
 use App\Models\ForcaVendasOrder;
+use App\Models\Nfe;
+use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpTimezone;
 use BackedEnum;
@@ -40,7 +42,17 @@ class ForcaVendasMonitorResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('tipo', 'pedido');
+        return parent::getEloquentQuery()
+            ->where('tipo', 'pedido')
+            ->with([
+                'pedido',
+                'cliente',
+                'vendedor',
+                'user',
+                'venda',
+                'empresa:id,param_pix_habilitar',
+            ])
+            ->withExists(['pixCobrancasPedido as tem_pix_api']);
     }
 
     public static function table(Table $table): Table
@@ -52,18 +64,29 @@ class ForcaVendasMonitorResource extends Resource
                     ->view('filament.components.erp.forca-vendas.monitor-select-cell')
                     ->alignCenter(),
                 TextColumn::make('numero_pedido')
-                    ->label('Nº DAV')
-                    ->state(fn (ForcaVendasOrder $record): string => $record->orcamento?->numero
-                        ? (string) (int) preg_replace('/\D/', '', (string) $record->orcamento->numero)
-                        : '#' . $record->id)
+                    ->label('Nº Pedido')
+                    ->state(fn (ForcaVendasOrder $record): string => $record->venda?->numero
+                        ? (string) (int) preg_replace('/\D/', '', (string) $record->venda->numero)
+                        : '—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('nf_nfc')
+                    ->label('NF/NFC')
+                    ->state(fn (ForcaVendasOrder $record): string => self::documentoFiscalNumero($record))
+                    ->html()
+                    ->alignStart()
+                    ->placeholder('—'),
                 TextColumn::make('situacao')
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(fn (ForcaVendasOrder $record): string => $record->situacaoLabel())
                     ->color(fn (ForcaVendasOrder $record): string => $record->situacaoColor())
                     ->alignCenter(),
+                ViewColumn::make('local')
+                    ->label('Local')
+                    ->view('filament.components.erp.forca-vendas.monitor-local-cell')
+                    ->alignCenter()
+                    ->disabledClick(),
                 TextColumn::make('cliente')
                     ->label('Cliente')
                     ->grow()
@@ -73,6 +96,8 @@ class ForcaVendasMonitorResource extends Resource
                 TextColumn::make('vendedor')
                     ->label('Vendedor')
                     ->wrap(false)
+                    ->extraHeaderAttributes(['class' => 'erp-fv-mon-vendedor'])
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-vendedor'])
                     ->state(fn (ForcaVendasOrder $record): string => $record->vendedor?->nome
                         ?? $record->user?->name
                         ?? '—'),
@@ -108,15 +133,15 @@ class ForcaVendasMonitorResource extends Resource
                     ->label('Desc.')
                     ->state(fn (ForcaVendasOrder $record): float => self::totalDesconto($record))
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
-                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell erp-fv-mon-money-cell--desc']),
                 ViewColumn::make('acrescimo')
-                    ->label('Acmo.')
+                    ->label('Acre.')
                     ->state(fn (ForcaVendasOrder $record): float => self::totalAcrescimo($record))
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
-                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
+                    ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell erp-fv-mon-money-cell--acre']),
                 ViewColumn::make('tt_bruto')
                     ->label('TT Bruto')
-                    ->state(fn (ForcaVendasOrder $record): float => (float) ($record->orcamento?->subtotal ?? $record->total))
+                    ->state(fn (ForcaVendasOrder $record): float => self::totalBruto($record))
                     ->view('filament.components.erp.forca-vendas.monitor-money-cell')
                     ->extraCellAttributes(['class' => 'erp-fv-mon-money-cell']),
                 ViewColumn::make('total')
@@ -127,6 +152,16 @@ class ForcaVendasMonitorResource extends Resource
                 TextColumn::make('meio_pgto')
                     ->label('Meio Pgto')
                     ->state(fn (ForcaVendasOrder $record): string => self::meioPagamentoLabel($record))
+                    ->formatStateUsing(function (string $state, ForcaVendasOrder $record): string {
+                        $label = e($state);
+
+                        if (! self::meioPagamentoEhPix($record)) {
+                            return $label;
+                        }
+
+                        return '<span class="erp-fv-mon-meio--pix">'.$label.'</span>';
+                    })
+                    ->html()
                     ->placeholder('—')
                     ->wrap(false),
                 TextColumn::make('plataforma')
@@ -135,6 +170,11 @@ class ForcaVendasMonitorResource extends Resource
                     ->badge()
                     ->color(fn (ForcaVendasOrder $record): string => self::plataformaColor($record))
                     ->alignCenter(),
+                ViewColumn::make('envio')
+                    ->label('Env.')
+                    ->view('filament.components.erp.forca-vendas.monitor-envio-cell')
+                    ->alignCenter()
+                    ->disabledClick(),
                 TextColumn::make('financeiro')
                     ->label('Financeiro')
                     ->alignCenter()
@@ -194,7 +234,11 @@ class ForcaVendasMonitorResource extends Resource
             return 'Mercado Livre';
         }
 
-        return self::isVendasInternas($record) ? 'Vendas Internas' : 'Força de Vendas';
+        if (self::isVendasInternas($record)) {
+            return 'Vendas Internas';
+        }
+
+        return self::isTelaVenda($record) ? 'Tela de Vendas' : 'Força de Vendas';
     }
 
     public static function plataformaColor(ForcaVendasOrder $record): string
@@ -203,7 +247,11 @@ class ForcaVendasMonitorResource extends Resource
             return 'warning';
         }
 
-        return self::isVendasInternas($record) ? 'info' : 'gray';
+        if (self::isVendasInternas($record)) {
+            return 'info';
+        }
+
+        return self::isTelaVenda($record) ? 'primary' : 'gray';
     }
 
     public static function isMercadoLivre(ForcaVendasOrder $record): bool
@@ -224,12 +272,89 @@ class ForcaVendasMonitorResource extends Resource
         return ($payload['origem'] ?? '') === 'vendas_internas';
     }
 
+    /** Pedido gerado na Tela de Venda do ERP (não no app mobile). */
+    public static function isTelaVenda(ForcaVendasOrder $record): bool
+    {
+        if ((string) ($record->device_uuid ?? '') === 'monitor-web') {
+            return true;
+        }
+
+        $origem = (string) ((is_array($record->payload) ? $record->payload : [])['origem'] ?? '');
+
+        return str_starts_with($origem, 'monitor_tela_venda');
+    }
+
+    /**
+     * Número da NF-e ou NFC-e vinculada ao pedido (venda/DAV), se houver.
+     */
+    public static function documentoFiscalNumero(ForcaVendasOrder $record): string
+    {
+        $venda = $record->relationLoaded('venda')
+            ? $record->venda
+            : ($record->venda_id ? $record->venda()->with(['nfes', 'pdvVenda.nfce'])->first() : null);
+
+        if (! $venda) {
+            return '—';
+        }
+
+        $nfe = $venda->relationLoaded('nfes')
+            ? $venda->nfes
+            : $venda->nfes()->get();
+
+        $nfeAtiva = $nfe
+            ->filter(fn (Nfe $n): bool => $n->status !== Nfe::STATUS_CANCELADA
+                && $n->status !== Nfe::STATUS_INUTILIZADA)
+            ->sortByDesc(fn (Nfe $n): int => match ($n->status) {
+                Nfe::STATUS_TRANSMITIDA => 3,
+                Nfe::STATUS_CONTINGENCIA => 2,
+                default => 1,
+            })
+            ->first();
+
+        if ($nfeAtiva) {
+            $num = self::formatNotaNumero((string) ($nfeAtiva->numero ?? ''));
+            // Modelo 55 = NF-e → NF; modelo 65 = NFC-e → NC
+            $pref = ((string) ($nfeAtiva->modelo ?? '') === '65') ? 'NC' : 'NF';
+
+            return $num !== '' ? self::formatDocPrefHtml($pref, $num) : '—';
+        }
+
+        $nfce = $venda->pdvVenda?->nfce;
+
+        if ($nfce && ! in_array($nfce->status, [
+            PdvVendaNfce::STATUS_CANCELADA,
+            PdvVendaNfce::STATUS_REJEITADA,
+        ], true)) {
+            $num = self::formatNotaNumero((string) ($nfce->numero ?? ''));
+
+            return $num !== '' ? self::formatDocPrefHtml('NC', $num) : '—';
+        }
+
+        return '—';
+    }
+
+    protected static function formatDocPrefHtml(string $prefix, string $numero): string
+    {
+        return '<span class="erp-doc-pref"><span class="erp-doc-pref__letra">'.e($prefix).'-</span><span class="erp-doc-pref__num">'.e($numero).'</span></span>';
+    }
+
+    protected static function formatNotaNumero(string $numero): string
+    {
+        $digits = preg_replace('/\D/', '', $numero) ?? '';
+
+        if ($digits === '') {
+            return trim($numero) !== '' ? trim($numero) : '';
+        }
+
+        return (string) (int) $digits;
+    }
+
     /**
      * Desconto do pedido: soma dos itens (rateio da tela de venda) ou cabeçalho do DAV/payload.
      */
     public static function totalDesconto(ForcaVendasOrder $record): float
     {
-        $somaItens = round((float) ($record->orcamento?->itens?->sum('desconto') ?? 0), 2);
+        $somaItens = round((float) ($record->pedido?->itens?->sum('desconto') ?? 0), 2);
 
         if ($somaItens > 0) {
             return $somaItens;
@@ -238,10 +363,21 @@ class ForcaVendasMonitorResource extends Resource
         $payload = is_array($record->payload) ? $record->payload : [];
 
         return round((float) (
-            $record->orcamento?->desconto_valor
+            $record->pedido?->desconto_valor
             ?? $payload['desconto_valor']
             ?? 0
         ), 2);
+    }
+
+    /**
+     * Bruto = líquido dos itens − acréscimos + descontos.
+     * (O subtotal do pedido já embute acréscimo/desconto das linhas.)
+     */
+    public static function totalBruto(ForcaVendasOrder $record): float
+    {
+        $subtotal = (float) ($record->pedido?->subtotal ?? $record->total);
+
+        return round($subtotal - self::totalAcrescimo($record) + self::totalDesconto($record), 2);
     }
 
     /**
@@ -278,7 +414,7 @@ class ForcaVendasMonitorResource extends Resource
         $payload = is_array($record->payload) ? $record->payload : [];
         $forma = trim((string) (
             $payload['forma_pagamento']
-            ?? $record->orcamento?->forma_pagamento
+            ?? $record->pedido?->forma_pagamento
             ?? ''
         ));
 
@@ -297,5 +433,47 @@ class ForcaVendasMonitorResource extends Resource
             'CREDIARIO' => 'Crediário',
             default => $forma,
         };
+    }
+
+    public static function meioPagamentoEhPix(ForcaVendasOrder $record): bool
+    {
+        $label = mb_strtoupper(self::meioPagamentoLabel($record), 'UTF-8');
+
+        if ($label === '—' || ! str_contains($label, 'PIX')) {
+            return false;
+        }
+
+        if (! $record->relationLoaded('empresa') || ! (bool) ($record->empresa?->param_pix_habilitar ?? false)) {
+            return false;
+        }
+
+        return (bool) ($record->tem_pix_api ?? false);
+    }
+
+    /**
+     * URL do Google Maps com as coordenadas GPS gravadas no pedido (aparelho).
+     * Retorna null se latitude/longitude forem inválidas ou ausentes.
+     */
+    public static function googleMapsUrl(ForcaVendasOrder $record): ?string
+    {
+        $latRaw = $record->latitude;
+        $lngRaw = $record->longitude;
+
+        if ($latRaw === null || $lngRaw === null || $latRaw === '' || $lngRaw === '') {
+            return null;
+        }
+
+        if (! is_numeric($latRaw) || ! is_numeric($lngRaw)) {
+            return null;
+        }
+
+        $lat = (float) $latRaw;
+        $lng = (float) $lngRaw;
+
+        if ($lat < -90.0 || $lat > 90.0 || $lng < -180.0 || $lng > 180.0) {
+            return null;
+        }
+
+        return 'https://www.google.com/maps?q='.rawurlencode(sprintf('%.7f,%.7f', $lat, $lng));
     }
 }

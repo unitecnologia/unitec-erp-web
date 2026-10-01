@@ -38,7 +38,14 @@ $certs = [];
 while (openssl_error_string() !== false) {
 }
 
-if (! @openssl_pkcs12_read($content, $certs, $password)) {
+try {
+    $ok = @openssl_pkcs12_read($content, $certs, $password);
+} catch (Throwable $e) {
+    $ok = false;
+    $fail($e->getMessage());
+}
+
+if (! $ok) {
     $err = '';
     while (($e = openssl_error_string()) !== false) {
         $err = $e;

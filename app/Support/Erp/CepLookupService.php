@@ -2,6 +2,8 @@
 
 namespace App\Support\Erp;
 
+use App\Support\Erp\License\LicencaHttpClient;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -19,13 +21,13 @@ class CepLookupService
         }
 
         try {
-            $response = Http::timeout(6)->get("https://viacep.com.br/ws/{$digits}/json/");
+            $response = $this->http()->get("https://viacep.com.br/ws/{$digits}/json/");
         } catch (\Throwable) {
-            throw new RuntimeException('Não foi possível consultar o CEP. Verifique a conexão e tente novamente.');
+            return $this->lookupFromAwesomeApi($digits, viaCepHttpError: false);
         }
 
         if (! $response->ok()) {
-            throw new RuntimeException('Serviço de CEP indisponível no momento. Tente novamente.');
+            return $this->lookupFromAwesomeApi($digits, viaCepHttpError: true);
         }
 
         $data = $response->json();
@@ -55,6 +57,62 @@ class CepLookupService
         $digits = preg_replace('/\D/', '', (string) $code) ?? '';
 
         return strlen($digits) === 7;
+    }
+
+    /**
+     * HTTP de saída com CA bundle explícito (FrankenPHP/Windows não herda curl.cainfo).
+     */
+    protected function http(): PendingRequest
+    {
+        return Http::withOptions(LicencaHttpClient::options())
+            ->timeout(6)
+            ->connectTimeout(4)
+            ->acceptJson();
+    }
+
+    /**
+     * @return array{cep: string, endereco: string, bairro: string, cidade_nome: string, uf: string, cidade_codigo: string}
+     */
+    protected function lookupFromAwesomeApi(string $digits, bool $viaCepHttpError): array
+    {
+        try {
+            $response = $this->http()->get("https://cep.awesomeapi.com.br/json/{$digits}");
+        } catch (\Throwable) {
+            throw new RuntimeException('Não foi possível consultar o CEP. Verifique a conexão e tente novamente.');
+        }
+
+        if (! $response->ok()) {
+            throw new RuntimeException(
+                $viaCepHttpError
+                    ? 'Serviço de CEP indisponível no momento. Tente novamente.'
+                    : 'Não foi possível consultar o CEP. Verifique a conexão e tente novamente.'
+            );
+        }
+
+        $data = $response->json();
+
+        if (! is_array($data) || ($data['erro'] ?? false)) {
+            throw new RuntimeException(
+                $viaCepHttpError
+                    ? 'Serviço de CEP indisponível no momento. Tente novamente.'
+                    : 'Não foi possível consultar o CEP. Verifique a conexão e tente novamente.'
+            );
+        }
+
+        $cidadeCodigo = preg_replace('/\D/', '', (string) ($data['city_ibge'] ?? '')) ?? '';
+
+        if (! self::isValidIbgeCode($cidadeCodigo)) {
+            throw new RuntimeException('CEP encontrado, mas o código IBGE do município não foi retornado.');
+        }
+
+        return [
+            'cep' => $this->formatCep($digits),
+            'endereco' => mb_strtoupper((string) ($data['address'] ?? ''), 'UTF-8'),
+            'bairro' => mb_strtoupper((string) ($data['district'] ?? ''), 'UTF-8'),
+            'cidade_nome' => mb_strtoupper((string) ($data['city'] ?? ''), 'UTF-8'),
+            'uf' => mb_strtoupper((string) ($data['state'] ?? ''), 'UTF-8'),
+            'cidade_codigo' => $cidadeCodigo,
+        ];
     }
 
     protected function formatCep(string $digits): string

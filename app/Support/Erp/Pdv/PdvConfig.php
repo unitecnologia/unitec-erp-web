@@ -40,15 +40,6 @@ final class PdvConfig
         return (bool) ($this->empresa?->param_pdv_pesquisa_partes_descricao ?? false);
     }
 
-    /**
-     * Texto do letreiro (marquee) exibido no topo do PDV. Vazio = mostra o
-     * nome da empresa (comportamento padrÃ£o).
-     */
-    public function marqueeTexto(): string
-    {
-        return trim((string) ($this->empresa?->param_pdv_marquee_texto ?? ''));
-    }
-
     public function bloquearEstoqueNegativo(): bool
     {
         return (bool) ($this->empresa?->param_geral_bloquear_estoque_negativo ?? false);
@@ -214,12 +205,13 @@ final class PdvConfig
 
     public function planoContaCodigo(string $tipo): ?int
     {
+        // Códigos padrão do plano de contas (antes eram parâmetros da empresa).
         $codigo = match ($tipo) {
-            'abertura', 'suprimento' => $this->empresa?->param_plano_abertura_caixa,
-            'venda' => $this->empresa?->param_plano_venda,
-            'estorno' => $this->empresa?->param_plano_devolucao,
-            'sangria' => $this->empresa?->param_plano_sangria,
-            'receber', 'recebimento' => $this->empresa?->param_plano_ficha_cliente,
+            'abertura', 'suprimento' => 14,
+            'venda' => 2,
+            'estorno' => 9,
+            'sangria' => 11,
+            'receber', 'recebimento' => 10,
             default => null,
         };
 
@@ -250,8 +242,7 @@ final class PdvConfig
     public function modeloBalanca(): int
     {
         $modelo = $this->empresa?->param_balanca_etiqueta_modelo
-            ?? $this->empresa?->param_pdv_modelo_balanca
-            ?? 4;
+            ?? BalancaEtiquetaLayout::DEFAULT_MODELO;
 
         return BalancaEtiquetaLayout::normalizeModelo($modelo);
     }
@@ -306,12 +297,11 @@ final class PdvConfig
     }
 
     /**
-     * Exibe PDV no menu da retaguarda.
-     * Coluna param_geral_usar_pdv_retaguarda foi removida ? permanece habilitado.
+     * Exibe PDV no menu da retaguarda (param_geral_usar_pdv_erp).
      */
     public function usarPdvRetaguarda(): bool
     {
-        return true;
+        return PdvErpPolicy::habilitado($this->empresa);
     }
 
     public function impressoraNome(): ?string

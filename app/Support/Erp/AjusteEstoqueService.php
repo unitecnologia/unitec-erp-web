@@ -4,6 +4,7 @@ namespace App\Support\Erp;
 
 use App\Models\AjusteEstoque;
 use App\Models\Empresa;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,11 +15,24 @@ final class AjusteEstoqueService
         private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
     ) {}
 
-    public function criar(int $productId, string $data, float $qtdAjust): AjusteEstoque
+    public function criar(int $productId, string $data, float $qtdInformada, string $modo = 'somar'): AjusteEstoque
     {
-        return DB::transaction(function () use ($productId, $data, $qtdAjust): AjusteEstoque {
+        return DB::transaction(function () use ($productId, $data, $qtdInformada, $modo): AjusteEstoque {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->firstOrFail();
             [$estoqueId, $empresa] = $this->resolverDeposito();
+
+            $atual = $this->saldos->fisico((int) $product->id, $estoqueId);
+            $qtdAjust = $modo === 'substituir'
+                ? round($qtdInformada - $atual, 3)
+                : round($qtdInformada, 3);
+
+            if (abs($qtdAjust) < 0.0005) {
+                throw new \DomainException(
+                    $modo === 'substituir'
+                        ? 'O estoque já está com o valor informado.'
+                        : 'Informe a quantidade do ajuste.'
+                );
+            }
 
             $this->garantirEstoquePermitido($product, $qtdAjust, $estoqueId);
 
@@ -28,7 +42,7 @@ final class AjusteEstoqueService
                 'qtd_ajust' => $qtdAjust,
             ]);
 
-            $this->aplicarDelta($productId, $qtdAjust, $estoqueId, $empresa);
+            $this->aplicarDelta($productId, $qtdAjust, $estoqueId, $empresa, (int) $ajuste->id);
 
             return $ajuste;
         });
@@ -36,25 +50,7 @@ final class AjusteEstoqueService
 
     public function atualizar(AjusteEstoque $ajuste, string $data, float $qtdAjust): AjusteEstoque
     {
-        return DB::transaction(function () use ($ajuste, $data, $qtdAjust): AjusteEstoque {
-            $ajuste = AjusteEstoque::query()->whereKey($ajuste->getKey())->lockForUpdate()->firstOrFail();
-            $product = Product::query()->whereKey($ajuste->product_id)->lockForUpdate()->firstOrFail();
-            [$estoqueId, $empresa] = $this->resolverDeposito();
-
-            $qtdAnterior = (float) $ajuste->qtd_ajust;
-            $deltaLiquido = $qtdAjust - $qtdAnterior;
-
-            $this->garantirEstoquePermitido($product, $deltaLiquido, $estoqueId);
-
-            $this->aplicarDelta((int) $product->id, $deltaLiquido, $estoqueId, $empresa);
-
-            $ajuste->update([
-                'data' => $data,
-                'qtd_ajust' => $qtdAjust,
-            ]);
-
-            return $ajuste->fresh();
-        });
+        throw new \DomainException('Não é possível alterar um ajuste após a gravação. Exclua e lance um novo, se necessário.');
     }
 
     public function excluir(AjusteEstoque $ajuste): void
@@ -67,7 +63,14 @@ final class AjusteEstoqueService
                 [$estoqueId, $empresa] = $this->resolverDeposito();
                 $qtdReversao = -1 * (float) $ajuste->qtd_ajust;
                 $this->garantirEstoquePermitido($product, $qtdReversao, $estoqueId);
-                $this->aplicarDelta((int) $product->id, $qtdReversao, $estoqueId, $empresa);
+                $this->aplicarDelta(
+                    (int) $product->id,
+                    $qtdReversao,
+                    $estoqueId,
+                    $empresa,
+                    (int) $ajuste->id,
+                    EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                );
             }
 
             $ajuste->delete();
@@ -79,16 +82,30 @@ final class AjusteEstoqueService
         return (int) (AjusteEstoque::query()->max('id') ?? 0) + 1;
     }
 
-    private function aplicarDelta(int $productId, float $delta, ?int $estoqueId, ?Empresa $empresa): void
-    {
+    private function aplicarDelta(
+        int $productId,
+        float $delta,
+        ?int $estoqueId,
+        ?Empresa $empresa,
+        ?int $ajusteId = null,
+        string $tipo = EstoqueMovimentacao::TIPO_AJUSTE,
+    ): void {
         if (abs($delta) < 0.0005) {
             return;
         }
 
+        $ctx = EstoqueMovimentacaoContext::make(
+            $tipo,
+            empresaId: $empresa?->id !== null ? (int) $empresa->id : null,
+            origemTipo: 'ajuste_estoque',
+            origemId: $ajusteId,
+            origemNumero: $ajusteId !== null ? (string) $ajusteId : null,
+        );
+
         if ($delta > 0) {
-            $this->saldos->incrementar($productId, $delta, $estoqueId, $empresa);
+            $this->saldos->incrementar($productId, $delta, $estoqueId, $empresa, $ctx);
         } else {
-            $this->saldos->decrementar($productId, abs($delta), $estoqueId, $empresa);
+            $this->saldos->decrementar($productId, abs($delta), $estoqueId, $empresa, $ctx);
         }
     }
 

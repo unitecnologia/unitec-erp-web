@@ -170,6 +170,10 @@ trait InteractsWithGestorShell
             return false;
         }
 
+        if (! $user->podeAcessarApp(\App\Models\User::APP_GESTAO)) {
+            return false;
+        }
+
         return ErpAccess::can($user, 'produtos.access')
             || ErpAccess::can($user, 'ajusta_preco.access')
             || ErpAccess::can($user, 'ajuste_estoque.access')

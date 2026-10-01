@@ -15,7 +15,7 @@ use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Gestor\GestorAprovacaoService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
+use App\Support\Erp\ErpSchema;
 use Throwable;
 
 /**
@@ -56,7 +56,16 @@ final class GestorExecutivoService
         $estoqueBaixo = $this->countEstoqueBaixo($empresaId);
 
         try {
-            $saude = ErpDashboardGauges::saudeSnapshot($empresaId > 0 ? $empresaId : null);
+            $saude = ErpDashboardGauges::saudeSnapshot(
+                $empresaId > 0 ? $empresaId : null,
+                [
+                    'saldo' => $caixa,
+                    'receber_vencido' => $receberVencido,
+                    'pagar_vencido' => $pagarVencido,
+                    'faturamento_mes' => $fatMes,
+                    // obrigacoes_7d: sem equivalente no snapshot — factorCaixa consulta normalmente.
+                ],
+            );
         } catch (Throwable) {
             $saude = $this->saudeRapida(
                 caixa: $caixa,
@@ -112,6 +121,48 @@ final class GestorExecutivoService
             'saude' => $saude,
             'metas_vendedores' => array_slice($metas, 0, 6),
             'pulso' => $pulso,
+        ];
+    }
+
+    /**
+     * KPIs leves da tela /gestor/vendas (somente campos usados na view).
+     * Não substitui snapshot() do Dashboard/Estoque.
+     *
+     * @return array{
+     *     faturamento_hoje: float,
+     *     variacao_dia_hint: string,
+     *     faturamento_mes: float,
+     *     pedidos_pendentes: int,
+     *     entregas_pendentes: int,
+     *     metas_vendedores: list<array<string, mixed>>
+     * }
+     */
+    public function vendasSnapshot(?int $empresaId = null): array
+    {
+        $empresaId = $empresaId ?: $this->empresaId();
+        $empresaArg = $empresaId > 0 ? $empresaId : null;
+        $hoje = ErpFinanceiroMetricas::hoje();
+        $ontem = $hoje->copy()->subDay();
+        $inicioMes = $hoje->copy()->startOfMonth();
+
+        $fatHoje = ErpDashboardSalesMetrics::faturamentoDia($hoje, $empresaArg);
+        $fatOntem = ErpDashboardSalesMetrics::faturamentoDia($ontem, $empresaArg);
+        $fatMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $hoje, $empresaArg);
+
+        $metas = [];
+        try {
+            $metas = ErpDashboardGauges::buildVendedores($empresaId > 0 ? $empresaId : null);
+        } catch (Throwable) {
+            $metas = [];
+        }
+
+        return [
+            'faturamento_hoje' => $fatHoje,
+            'variacao_dia_hint' => ErpDashboardSalesMetrics::hintVariacaoDia($fatHoje, $fatOntem),
+            'faturamento_mes' => $fatMes,
+            'pedidos_pendentes' => $this->countPedidosPendentes($empresaId),
+            'entregas_pendentes' => $this->countEntregasPendentes($empresaId),
+            'metas_vendedores' => array_slice($metas, 0, 6),
         ];
     }
 
@@ -184,7 +235,7 @@ final class GestorExecutivoService
     private function countPedidosPendentes(int $empresaId): int
     {
         try {
-            if (! Schema::hasTable((new ForcaVendasOrder)->getTable())) {
+            if (! ErpSchema::hasTable((new ForcaVendasOrder)->getTable())) {
                 return 0;
             }
 
@@ -192,7 +243,7 @@ final class GestorExecutivoService
                 ->where('situacao', ForcaVendasOrder::SITUACAO_PENDENTE)
                 ->where('tipo', ForcaVendasOrder::TIPO_PEDIDO);
 
-            if ($empresaId > 0 && Schema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
+            if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
                 $q->where('empresa_id', $empresaId);
             }
 
@@ -205,14 +256,14 @@ final class GestorExecutivoService
     private function countEntregasPendentes(int $empresaId = 0): int
     {
         try {
-            if (! Schema::hasTable((new Entrega)->getTable())) {
+            if (! ErpSchema::hasTable((new Entrega)->getTable())) {
                 return 0;
             }
 
             $q = Entrega::query()
                 ->whereIn('status', Entrega::statusControleFiltro('pendentes'));
 
-            if ($empresaId > 0 && Schema::hasColumn((new Entrega)->getTable(), 'empresa_id')) {
+            if ($empresaId > 0 && ErpSchema::hasColumn((new Entrega)->getTable(), 'empresa_id')) {
                 $q->where('empresa_id', $empresaId);
             }
 
@@ -225,7 +276,7 @@ final class GestorExecutivoService
     private function countEstoqueBaixo(int $empresaId = 0): int
     {
         try {
-            if (! Schema::hasTable((new Product)->getTable())) {
+            if (! ErpSchema::hasTable((new Product)->getTable())) {
                 return 0;
             }
 

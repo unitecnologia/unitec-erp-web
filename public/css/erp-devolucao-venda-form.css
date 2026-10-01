@@ -16,11 +16,24 @@
 
 .fi-body:has(.erp-devolucao-venda-form-page) .fi-main {
     display: flex !important;
-    flex: 1 1 0 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0.75rem !important;
+    flex: 1 1 auto !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    min-height: 0 !important;
+    padding: 0.75rem 0.75rem 0.85rem !important;
     background: transparent !important;
+    overflow: hidden !important;
+}
+
+.fi-body:has(.erp-devolucao-venda-form-page) .fi-main > * {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    width: min(1240px, calc(100vw - 1.5rem)) !important;
+    max-width: min(1240px, calc(100vw - 1.5rem)) !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    margin-inline: auto !important;
     overflow: hidden !important;
 }
 
@@ -30,14 +43,17 @@
 .erp-devolucao-venda-form-page .fi-sc > div {
     display: flex !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
+    flex: 0 1 auto !important;
     width: 100% !important;
+    max-width: 100% !important;
     min-height: 0 !important;
-    height: 100% !important;
-    align-items: center !important;
-    justify-content: center !important;
+    height: auto !important;
+    max-height: none !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
     padding: 0 !important;
     background: transparent !important;
+    overflow: hidden !important;
 }
 
 .erp-devolucao-venda-form-page .fi-header,
@@ -46,116 +62,279 @@
 }
 
 .erp-devvenda-window {
-    width: min(1280px, calc(100vw - 1.5rem));
-    height: min(860px, calc(100dvh - 5.5rem));
+    flex: 0 0 auto;
+    align-self: center;
+    width: 100%;
+    height: calc(100dvh - 7.5rem);
+    max-height: calc(100dvh - 7.5rem);
+    min-height: 28rem;
     max-width: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-radius: 10px;
+    background: #f4f7fb;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+}
+
+.erp-devvenda-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+}
+
+.erp-devvenda-titlebar__title {
+    color: #fff;
+    font-size: 0.94rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.erp-devvenda-close {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-devvenda-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-devvenda-titlebar__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.05rem;
+}
+
+.erp-devvenda-titlebar__sub {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.erp-devvenda-layout {
+    display: flex;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.55rem;
+    padding: 0.55rem 0.55rem 0;
 }
 
 .erp-devvenda-shell {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: 1 1 73%;
+    min-width: 0;
     min-height: 0;
-    gap: 0.55rem;
-    padding: 0.65rem;
-    overflow: hidden;
+    gap: 0.5rem;
+    padding: 0;
+    overflow: visible;
+}
+
+.erp-devvenda-side {
+    flex: 0 0 27%;
+    max-width: 28%;
+    min-width: 15.5rem;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-devvenda-side__title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 0.4rem;
+    color: #1e5a9e;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.erp-devvenda-side__title svg,
+.erp-devvenda-panel__title svg,
+.erp-devvenda-field > span svg,
+.erp-devvenda-actions__icon svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .erp-devvenda-panel {
     background: #fff;
-    border: 1px solid #94a3b8;
-    border-radius: 8px;
-    padding: 0.65rem 0.75rem;
+    border: 1px solid #d7e2ee;
+    border-radius: 10px;
+    padding: 0.55rem 0.65rem;
+    box-shadow: none;
+}
+
+.erp-devvenda-panel:has(.erp-devvenda-lookup) {
+    position: relative;
+    z-index: 6;
+    overflow: visible;
 }
 
 .erp-devvenda-panel--itens {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 12rem;
     display: flex;
     flex-direction: column;
 }
 
 .erp-devvenda-panel__title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     margin: 0 0 0.45rem;
     font-size: 0.78rem;
     font-weight: 800;
-    color: #1e3a5f;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    color: #1e5a9e;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .erp-devvenda-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem 0.65rem;
-    margin-bottom: 0.45rem;
+    display: grid;
+    gap: 0.4rem 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.erp-devvenda-grid--linha1 {
+    grid-template-columns: 5.6rem minmax(10rem, 1.4fr) 8.4rem 6.6rem;
+}
+
+.erp-devvenda-grid--linha2 {
+    grid-template-columns: minmax(12rem, 1.6fr) minmax(9rem, 0.8fr);
+}
+
+.erp-devvenda-grid--linha3 {
+    grid-template-columns: 8.5rem minmax(12rem, 1fr);
+    margin-bottom: 0;
 }
 
 .erp-devvenda-field {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    min-width: 7rem;
-}
-
-.erp-devvenda-field--grow {
-    flex: 1 1 16rem;
-}
-
-.erp-devvenda-field--full {
-    width: 100%;
+    gap: 0.12rem;
+    min-width: 0;
 }
 
 .erp-devvenda-field > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: 0.68rem;
     font-weight: 700;
     color: #1e5a9e;
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .erp-devvenda-input {
-    height: 2rem;
-    border: 1px solid #94a3b8;
-    border-radius: 4px;
+    height: 1.85rem;
+    width: 100%;
+    border: 1px solid #d5deea;
+    border-radius: 7px;
     padding: 0 0.45rem;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     background: #fff;
     color: #0f172a;
 }
 
-.erp-devvenda-input--sm {
-    width: 8.5rem;
+.erp-devvenda-input:disabled {
+    background: #f8fafc;
+    color: #64748b;
 }
 
 .erp-devvenda-input--readonly {
-    background: #eef3f9;
+    background: #f8fafc;
+}
+
+.erp-devvenda-input--lookup {
+    padding-right: 1.8rem;
 }
 
 .erp-devvenda-input--cell {
-    width: 100%;
-    height: 1.75rem;
+    height: 1.7rem;
+    padding: 0 0.4rem;
     text-align: right;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    background: #fff;
+}
+
+.erp-devvenda-input--cell:focus {
+    outline: 2px solid rgba(30, 90, 158, 0.22);
+    border-color: #1e5a9e;
 }
 
 .erp-devvenda-lookup {
     position: relative;
+    z-index: 7;
+}
+
+.erp-devvenda-lookup__btn {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 1.7rem;
+    height: calc(1.85rem - 2px);
+    border: 0;
+    border-radius: 0 7px 7px 0;
+    background: #1e5a9e;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.erp-devvenda-lookup__btn svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.erp-devvenda-lookup__btn:disabled {
+    opacity: 0.55;
+    cursor: default;
 }
 
 .erp-devvenda-lookup__list {
     position: absolute;
-    z-index: 40;
+    z-index: 80;
     left: 0;
     right: 0;
     top: calc(100% + 2px);
     max-height: 14rem;
     overflow: auto;
     background: #fff;
-    border: 1px solid #64748b;
-    border-radius: 6px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
 }
 
 .erp-devvenda-lookup__item {
@@ -214,45 +393,155 @@
 }
 
 .erp-devvenda-itens__table-wrap {
-    flex: 1 1 0;
-    min-height: 10rem;
+    flex: 1 1 auto;
+    min-height: 8rem;
     overflow: auto;
-    border: 1px solid #94a3b8;
-    border-radius: 6px;
+    border: 1px solid #d7e2ee;
+    border-radius: 8px;
+    background: #fff;
 }
 
 .erp-devvenda-itens__table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
+    min-width: 40rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-size: 0.78rem;
 }
 
 .erp-devvenda-itens__table th {
     position: sticky;
     top: 0;
-    background: #dbe6f3;
-    color: #1e3a5f;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    padding: 0.35rem 0.4rem;
-    border-bottom: 1px solid #94a3b8;
+    z-index: 1;
+    background: #f3f7fb;
+    color: #475569;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    padding: 0.42rem 0.45rem;
+    border-bottom: 1px solid #d7e2ee;
     text-align: left;
+    white-space: nowrap;
 }
 
 .erp-devvenda-itens__table td {
-    padding: 0.25rem 0.4rem;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 0.28rem 0.45rem;
+    border-bottom: 1px solid #eef2f6;
     vertical-align: middle;
+    color: #0f172a;
 }
 
-.erp-devvenda-itens__table tr.is-selected {
-    background: #dbeafe;
+.erp-devvenda-itens__table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
-.erp-devvenda-itens__table .col-cod { width: 5.5rem; }
-.erp-devvenda-itens__table .col-qty { width: 7rem; text-align: right; }
-.erp-devvenda-itens__table .col-price { width: 7rem; text-align: right; }
-.erp-devvenda-itens__table .col-total { width: 7rem; text-align: right; font-weight: 700; }
+.erp-devvenda-itens__table tbody tr {
+    cursor: pointer;
+}
+
+.erp-devvenda-itens__table tbody tr:hover td {
+    background: #f8fafc;
+}
+
+.erp-devvenda-itens__table tr.is-selected td {
+    background: #eaf3fb;
+}
+
+.erp-devvenda-itens__table tr.is-selected td:first-child {
+    box-shadow: inset 3px 0 0 #1e5a9e;
+}
+
+.erp-devvenda-itens__table .col-cod {
+    width: 8.1rem;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.erp-devvenda-itens__table .col-desc span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.erp-devvenda-itens__table .col-qty,
+.erp-devvenda-itens__table .col-price,
+.erp-devvenda-itens__table .col-total {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-devvenda-itens__table th.col-edit,
+.erp-devvenda-itens__table th.col-price {
+    color: #1e5a9e;
+}
+
+.erp-devvenda-itens__table .col-qty { width: 7.15rem; }
+.erp-devvenda-itens__table .col-price { width: 5.6rem; }
+.erp-devvenda-itens__table .col-total {
+    width: 5.6rem;
+    font-weight: 700;
+    color: #1e5a9e;
+}
+.erp-devvenda-itens__table .col-act {
+    width: 2.6rem;
+    text-align: center;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+}
+
+.erp-devvenda-itens__static {
+    display: inline-block;
+    min-width: 3.4rem;
+    color: #475569;
+}
+
+.erp-devvenda-itens__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}
+
+.erp-devvenda-itens__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 0;
+    border-radius: 7px;
+    background: #fef2f2;
+    color: #dc2626;
+    cursor: pointer;
+}
+
+.erp-devvenda-itens__remove svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.erp-devvenda-itens__remove:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.erp-devvenda-itens__remove:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
 
 .erp-devvenda-itens__empty {
     text-align: center;
@@ -262,61 +551,270 @@
 
 .erp-devvenda-total {
     display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.85rem;
     margin-top: 0.45rem;
-    font-size: 0.95rem;
-    color: #1e3a5f;
+    padding: 0.45rem 0.55rem;
+    border-radius: 8px;
+    background: #f3f7fb;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #334155;
 }
 
 .erp-devvenda-total strong {
+    min-width: 7.2rem;
+    text-align: right;
     font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+    color: #1e5a9e;
+}
+
+.erp-devvenda-vale {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    margin: 0 auto;
+    width: min(18.4rem, 100%);
+    padding: 0.85rem 0.8rem 0.95rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    color: #111827;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.erp-devvenda-vale__loja {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    text-align: center;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px dashed #d1d5db;
+}
+
+.erp-devvenda-vale__icone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.15rem;
+    height: 2.15rem;
+    margin-bottom: 0.28rem;
+    border: 1.5px solid #111;
+    border-radius: 50%;
+    color: #111;
+}
+
+.erp-devvenda-vale__icone svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.erp-devvenda-vale__loja strong {
+    margin-top: 0.1rem;
+    font-size: 0.92rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.erp-devvenda-vale__loja span {
+    max-width: 16.2rem;
+    color: #6b7280;
+    font-size: 0.64rem;
+    line-height: 1.28;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.erp-devvenda-vale__loja span.is-cep {
+    white-space: nowrap;
+}
+
+.erp-devvenda-vale h4 {
+    margin: 0.55rem 0 0.4rem;
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.erp-devvenda-vale__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.68rem;
+}
+
+.erp-devvenda-vale__meta div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.erp-devvenda-vale__meta-linha {
+    justify-content: space-between !important;
+}
+
+.erp-devvenda-vale__meta strong {
+    font-weight: 800;
+    text-align: right;
+    text-transform: uppercase;
+}
+
+.erp-devvenda-vale__itens {
+    width: 100%;
+    margin-top: 0.35rem;
+    border-collapse: collapse;
+}
+
+.erp-devvenda-vale__itens th {
+    padding: 0.15rem 0 0.22rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-align: left;
+}
+
+.erp-devvenda-vale__itens td {
+    padding: 0.14rem 0;
+    text-align: left;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+}
+
+.erp-devvenda-vale__itens tr.is-empty td {
+    padding: 0.4rem 0.2rem 0.2rem;
+    color: #9ca3af;
+    text-align: center;
+    text-transform: none !important;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.erp-devvenda-vale__itens th:nth-child(2),
+.erp-devvenda-vale__itens td:nth-child(2),
+.erp-devvenda-vale__itens th:nth-child(3),
+.erp-devvenda-vale__itens td:nth-child(3) {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.erp-devvenda-vale__itens tr.is-empty td {
+    text-align: center;
+}
+
+.erp-devvenda-vale__total {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0.28rem 0 0;
+    padding-top: 0.28rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.erp-devvenda-vale__barcode {
+    display: block;
+    width: 12.4rem;
+    height: 2.65rem;
+    margin: 0.7rem auto 0.05rem;
+    shape-rendering: crispEdges;
+}
+
+.erp-devvenda-vale__codigo {
+    margin: 0.05rem 0 0;
+    text-align: center;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-devvenda-vale__hint {
+    margin: 0.08rem 0 0;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.64rem;
+}
+
+.erp-devvenda-vale__hint:first-of-type {
+    margin-top: 0.4rem;
 }
 
 .erp-devvenda-actions {
-    flex-shrink: 0;
+    flex: 0 0 auto;
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.4rem;
-    padding: 0.5rem 0.65rem 0.65rem;
-    background: linear-gradient(180deg, #1e5a9e 0%, #164a82 100%);
+    padding: 0.45rem 0.65rem 0.7rem;
+    background: #f4f7fb;
 }
 
 .erp-devvenda-actions__btn {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    min-height: 2.5rem;
-    padding: 0.35rem 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-    font-size: 0.8rem;
+    min-height: 2.15rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
 }
 
-.erp-devvenda-actions__btn:hover {
-    background: rgba(255, 255, 255, 0.22);
+.erp-devvenda-actions__btn:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .erp-devvenda-actions__btn--save {
-    background: #15803d;
-    border-color: #166534;
+    background: #16a34a;
+    border-color: #15803d;
+    color: #fff;
+}
+
+.erp-devvenda-actions__btn--finish {
+    background: #1d4ed8;
+    border-color: #1e40af;
+    color: #fff;
+}
+
+.erp-devvenda-actions__btn--print {
+    background: #fff;
+    color: #334155;
 }
 
 .erp-devvenda-actions__btn--exit {
     margin-left: auto;
-    background: #b91c1c;
-    border-color: #991b1b;
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #fff;
 }
 
 .erp-devvenda-actions__icon {
     display: inline-flex;
-    width: 1.1rem;
+    width: 1rem;
     justify-content: center;
+}
+
+.erp-devvenda-actions__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
 }
 
 .erp-devvenda-actions__label kbd {
@@ -324,14 +822,159 @@
     font-weight: 800;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
+    .fi-body:has(.erp-devolucao-venda-form-page) .fi-main > * {
+        width: calc(100vw - 1.25rem) !important;
+        max-width: calc(100vw - 1.25rem) !important;
+    }
+
     .erp-devvenda-window {
         width: 100%;
-        height: calc(100dvh - 4.5rem);
+        height: calc(100dvh - 6.5rem);
+        max-height: calc(100dvh - 6.5rem);
+        min-height: 0;
+    }
+
+    .erp-devvenda-layout {
+        overflow: auto;
+    }
+
+    .erp-devvenda-grid--linha1,
+    .erp-devvenda-grid--linha2,
+    .erp-devvenda-grid--linha3 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .erp-devvenda-side {
+        flex-basis: 16.5rem;
     }
 
     .erp-devvenda-actions__btn--exit {
-        margin-left: 0;
-        width: 100%;
+        margin-left: auto;
     }
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    #erp-devvenda-vale,
+    #erp-devvenda-vale * {
+        visibility: visible;
+    }
+
+    #erp-devvenda-vale {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 72mm;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+.erp-devvenda-credito {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-devvenda-credito__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.erp-devvenda-credito__window {
+    position: relative;
+    width: min(28rem, 100%);
+    padding: 1.1rem 1.15rem 0.9rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+}
+
+.erp-devvenda-credito__window h2 {
+    margin: 0 0 0.55rem;
+    color: #0f3460;
+    font-size: 1rem;
+}
+
+.erp-devvenda-credito__window p {
+    margin: 0 0 0.45rem;
+    color: #1e293b;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.erp-devvenda-credito__resumo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0 0 0.75rem;
+    padding: 0.65rem 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.erp-devvenda-credito__resumo div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.erp-devvenda-credito__resumo dt {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+
+.erp-devvenda-credito__resumo dd {
+    margin: 0;
+    color: #0f172a;
+    font-size: 0.86rem;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-devvenda-credito__hint {
+    color: #64748b !important;
+    font-size: 0.8rem !important;
+}
+
+.erp-devvenda-credito footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+}
+
+.erp-devvenda-credito__btn {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    padding: 0.42rem 0.7rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-devvenda-credito__btn--primary {
+    border-color: #0f3460;
+    background: #1e5a9e;
+    color: #fff;
 }

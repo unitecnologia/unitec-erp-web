@@ -152,12 +152,17 @@
     @endif
 
     @if (count($viewTabs) > 1 || $this->viewTab === 'desdobramentos')
-        <div class="erp-pagar__view-tabs">
+        <div
+            class="erp-pagar__view-tabs"
+            wire:ignore
+            x-data="{ statusAtivo: @js($this->viewTab ?: 'dados') }"
+        >
             @foreach ($viewTabs as $value => $label)
                 <button
                     type="button"
-                    wire:click="setViewTab('{{ $value }}')"
-                    @class(['erp-pagar__view-tab', 'erp-pagar__view-tab--active' => $this->viewTab === $value])
+                    class="erp-pagar__view-tab"
+                    :class="{ 'erp-pagar__view-tab--active': statusAtivo === @js($value) }"
+                    @click="statusAtivo = @js($value); $wire.setViewTab(@js($value))"
                 >{{ $label }}</button>
             @endforeach
         </div>

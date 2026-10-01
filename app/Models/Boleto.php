@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'empresa_id', 'conta_receber_id', 'person_id', 'nosso_numero', 'numero_documento', 'linha_digitavel',
+    'empresa_id', 'boleto_conta_api_id', 'conta_receber_id', 'person_id', 'nosso_numero', 'numero_documento', 'linha_digitavel',
+    'codigo_barras',
     'emissao', 'vencimento', 'processamento', 'valor', 'valor_juros', 'valor_desconto', 'valor_abatimento',
     'percentual_multa', 'data_juros', 'data_desconto', 'data_abatimento', 'data_protesto',
     'sacado_nome', 'sacado_documento', 'sacado_logradouro', 'sacado_numero', 'sacado_bairro',
-    'sacado_cidade', 'sacado_uf', 'sacado_cep', 'instrucao1', 'instrucao2', 'path_pdf', 'status', 'codigo_legado',
+    'sacado_cidade', 'sacado_uf', 'sacado_cep', 'instrucao1', 'instrucao2', 'path_pdf',
+    'pix_qr_base64', 'pix_copia_cola',
+    'status', 'codigo_legado', 'id_externo', 'pago_em', 'valor_pago',
 ])]
 class Boleto extends Model
 {
@@ -26,6 +29,11 @@ class Boleto extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function boletoContaApi(): BelongsTo
+    {
+        return $this->belongsTo(BoletoContaApi::class, 'boleto_conta_api_id');
     }
 
     public function contaReceber(): BelongsTo
@@ -58,10 +66,12 @@ class Boleto extends Model
             'data_desconto' => 'date',
             'data_abatimento' => 'date',
             'data_protesto' => 'date',
+            'pago_em' => 'datetime',
             'valor' => 'decimal:2',
             'valor_juros' => 'decimal:2',
             'valor_desconto' => 'decimal:2',
             'valor_abatimento' => 'decimal:2',
+            'valor_pago' => 'decimal:2',
             'percentual_multa' => 'decimal:4',
         ];
     }

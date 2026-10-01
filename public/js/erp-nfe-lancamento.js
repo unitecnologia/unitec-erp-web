@@ -735,6 +735,51 @@ function showNfeFiscalSucessoOverlayUi(payload) {
 window.__erpNfeShowFiscalErroOverlay = showNfeFiscalErroOverlayUi;
 window.__erpNfeShowFiscalSucessoOverlay = showNfeFiscalSucessoOverlayUi;
 
+/** Força o espelho após saveNfe: o morph do lançamento às vezes não aplica display. */
+function showNfeEspelhoModalUi(payload) {
+    const data = payload && typeof payload === 'object' ? payload : {};
+    const modal = document.querySelector('[data-erp-nfe-espelho-modal]')
+        || document.getElementById('erp-nfe-espelho-modal');
+
+    if (! modal) {
+        return;
+    }
+
+    const url = String(data.url ?? '').trim();
+    const frame = modal.querySelector('.erp-nfe-espelho-modal__frame');
+
+    if (frame && url !== '') {
+        frame.src = url;
+    }
+
+    modal.style.display = 'flex';
+    modal.classList.add('is-visible');
+    modal.setAttribute('aria-hidden', 'false');
+    modal.removeAttribute('hidden');
+}
+
+function hideNfeEspelhoModalUi() {
+    const modal = document.querySelector('[data-erp-nfe-espelho-modal]')
+        || document.getElementById('erp-nfe-espelho-modal');
+
+    if (! modal) {
+        return;
+    }
+
+    modal.style.display = 'none';
+    modal.classList.remove('is-visible');
+    modal.setAttribute('aria-hidden', 'true');
+
+    const frame = modal.querySelector('.erp-nfe-espelho-modal__frame');
+
+    if (frame) {
+        frame.src = 'about:blank';
+    }
+}
+
+window.__erpNfeShowEspelhoModal = showNfeEspelhoModalUi;
+window.__erpNfeHideEspelhoModal = hideNfeEspelhoModalUi;
+
 /** Remove disabled residual do F3 (ex.: loading antigo). Após F2 o evento força liberar. */
 function syncNfeTransmitButtonState(forceEnable = false) {
     const btn = document.querySelector('[data-erp-nfe-transmit-btn]');

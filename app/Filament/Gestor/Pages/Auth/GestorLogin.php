@@ -3,7 +3,10 @@
 namespace App\Filament\Gestor\Pages\Auth;
 
 use App\Filament\Pages\Auth\Login as ErpLogin;
+use App\Models\Empresa;
+use App\Support\Erp\RequestOrigin;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Support\Enums\Width;
 
 class GestorLogin extends ErpLogin
@@ -11,6 +14,22 @@ class GestorLogin extends ErpLogin
     protected string $view = 'filament.gestor.pages.auth.login';
 
     protected Width|string|null $maxWidth = Width::Large;
+
+    public ?string $deviceLimitError = null;
+
+    public function mount(): void
+    {
+        if (Empresa::configuracaoInicialPendente()) {
+            $this->redirect(RequestOrigin::toBrowserUrl(Filament::getPanel('admin')->getLoginUrl()));
+
+            return;
+        }
+
+        $flash = session()->pull('device_limit_error');
+        $this->deviceLimitError = filled($flash) ? (string) $flash : null;
+
+        parent::mount();
+    }
 
     protected function getAuthenticateFormAction(): Action
     {

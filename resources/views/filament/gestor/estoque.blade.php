@@ -82,6 +82,5 @@
         </div>
         @include('filament.gestor.partials.bottom-nav')
     </div>
-    @include('filament.gestor.partials.persist-snapshot')
     <script src="{{ asset('js/gestor-gauge.js') }}?v=1" defer></script>
 </x-filament-panels::page>

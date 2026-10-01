@@ -32,7 +32,7 @@
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['emissao'] ?? '—' }}</span>
                     </div>
                     <div class="erp-caixa-view-modal__field">
-                        <span class="erp-caixa-view-modal__label">Documento</span>
+                        <span class="erp-caixa-view-modal__label">Pedido</span>
                         <span class="erp-caixa-view-modal__value">{{ $this->viewModalData['documento'] ?? '—' }}</span>
                     </div>
                     <div class="erp-caixa-view-modal__field erp-caixa-view-modal__field--wide">

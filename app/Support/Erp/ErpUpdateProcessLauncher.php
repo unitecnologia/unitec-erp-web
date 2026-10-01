@@ -139,8 +139,11 @@ final class ErpUpdateProcessLauncher
             return true;
         }
 
+        $lower = strtolower($path);
+
         return $path !== '' && is_file($path)
-            && ! str_contains(strtolower($path), 'php-cgi')
-            && ! str_contains(strtolower($path), 'php-fpm');
+            && ! str_contains($lower, 'php-cgi')
+            && ! str_contains($lower, 'php-fpm')
+            && ! str_contains($lower, 'frankenphp');
     }
 }

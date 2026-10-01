@@ -4,13 +4,17 @@
     /** @var OrdemServico $record */
     $situacao = (string) ($record->situacao ?? '');
     $label = mb_strtoupper($record->situacaoLabel(), 'UTF-8');
-
-    $class = match ($situacao) {
-        OrdemServico::SITUACAO_ABERTA, OrdemServico::SITUACAO_ANDAMENTO => 'erp-orcamentos__status--aberto',
-        OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE => 'erp-orcamentos__status--fechado',
-        OrdemServico::SITUACAO_CANCELADA => 'erp-orcamentos__status--cancelado',
-        default => 'erp-orcamentos__status--aberto',
+    $chip = match ($situacao) {
+        OrdemServico::SITUACAO_ABERTA => 'aberta',
+        OrdemServico::SITUACAO_ANDAMENTO => 'andamento',
+        OrdemServico::SITUACAO_FINALIZADA => 'finalizada',
+        OrdemServico::SITUACAO_ENTREGUE => 'entregue',
+        OrdemServico::SITUACAO_CANCELADA => 'cancelada',
+        default => 'aberta',
     };
 @endphp
 
-<span class="erp-orcamentos__status {{ $class }}">{{ $label }}</span>
+<span class="erp-os__status-chip erp-os__status-chip--{{ $chip }}">{{ $label }}</span>
+@if ($record->aguardandoFaturamento())
+    <span class="erp-os__status-chip erp-os__status-chip--faturar">Faturar</span>
+@endif

@@ -17,6 +17,9 @@ class WhatsAppPhoneTest extends TestCase
     {
         $this->assertSame('5547996449859', WhatsAppPhone::normalize('47996449859'));
         $this->assertSame('5547984002117', WhatsAppPhone::normalize('(47) 98400-2117'));
+        $this->assertSame('5547999999999', WhatsAppPhone::normalize('(47) 99999-9999'));
+        $this->assertSame('5547999999999', WhatsAppPhone::normalize('+55 (47) 99999-9999'));
+        $this->assertSame('5547999999999', WhatsAppPhone::normalize('47 99999-9999'));
     }
 
     public function test_normalize_does_not_add_nine_for_landline(): void

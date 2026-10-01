@@ -249,7 +249,7 @@
                 <input
                     id="pprod-preco-venda"
                     type="text"
-                    wire:model.blur="data.preco_venda"
+                    wire:model="data.preco_venda"
                     data-mask="money-br"
                     data-erp-prod-enter
                     class="erp-pcad-form__input erp-produtos-form__input--num erp-produtos-form__input--preco-venda"
@@ -333,4 +333,63 @@
             </div>
         </div>
     </section>
+
+    @if (! empty($this->data['is_servico']))
+        <section class="erp-produtos-form__section erp-produtos-form__section--nfse">
+            <h3 class="erp-produtos-form__section-title">Serviço</h3>
+            <div class="erp-produtos-form__grid erp-produtos-form__grid--nfse">
+                <div class="erp-produtos-form__cell erp-produtos-form__cell--required">
+                    <label for="pprod-c-trib-nac">Cód. tributação nacional</label>
+                    <input
+                        id="pprod-c-trib-nac"
+                        type="text"
+                        wire:model="data.c_trib_nac"
+                        inputmode="numeric"
+                        maxlength="8"
+                        autocomplete="off"
+                        class="erp-pcad-form__input"
+                        title="Código de Tributação Nacional, 6 dígitos"
+                    >
+                </div>
+                <div class="erp-produtos-form__cell erp-produtos-form__cell--required">
+                    <label for="pprod-c-nbs">NBS</label>
+                    <input
+                        id="pprod-c-nbs"
+                        type="text"
+                        wire:model="data.c_nbs"
+                        inputmode="numeric"
+                        maxlength="12"
+                        autocomplete="off"
+                        class="erp-pcad-form__input"
+                        title="NBS, 9 dígitos"
+                    >
+                </div>
+                <div class="erp-produtos-form__cell">
+                    <label for="pprod-c-trib-mun">Cód. municipal</label>
+                    <input
+                        id="pprod-c-trib-mun"
+                        type="text"
+                        wire:model="data.c_trib_mun"
+                        maxlength="20"
+                        autocomplete="off"
+                        class="erp-pcad-form__input"
+                        title="Código de Tributação Municipal, opcional"
+                    >
+                </div>
+                <div class="erp-produtos-form__cell">
+                    <label for="pprod-c-ind-op">Indicador da operação</label>
+                    <input
+                        id="pprod-c-ind-op"
+                        type="text"
+                        wire:model="data.c_ind_op"
+                        inputmode="numeric"
+                        maxlength="6"
+                        autocomplete="off"
+                        class="erp-pcad-form__input"
+                        title="Indicador da operação, opcional"
+                    >
+                </div>
+            </div>
+        </section>
+    @endif
 </div>

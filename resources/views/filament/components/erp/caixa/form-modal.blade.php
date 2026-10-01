@@ -27,7 +27,7 @@
                         <input type="date" wire:model="caixaForm.emissao">
                     </label>
                     <label>
-                        <span>Documento</span>
+                        <span>Pedido</span>
                         <input type="text" wire:model="caixaForm.documento" maxlength="40" placeholder="Opcional">
                     </label>
                     <label class="erp-caixa-form-modal__field--full">

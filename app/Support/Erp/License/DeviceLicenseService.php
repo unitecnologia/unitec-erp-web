@@ -296,6 +296,35 @@ final class DeviceLicenseService
             return $this->attachBrowserDevice($empresaId, $deviceUuid, $origin, $deviceName, $platform);
         }
 
+        $nome = $this->deviceTerminalName($deviceName, $deviceUuid);
+
+        // Reinstalação do app: novo device_uuid, mesmo nome (unique empresa_id+nome).
+        $byName = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('nome', $nome)
+            ->when(
+                Schema::hasColumn('terminais', 'categoria_licenca'),
+                static fn ($q) => $q->where('categoria_licenca', $category)
+            )
+            ->first();
+
+        if ($byName !== null) {
+            if (! $byName->ativo) {
+                throw new DeviceLicenseLimitExceeded(
+                    'Este dispositivo está desativado em Configurações → Terminais. Solicite a liberação ao administrador.'
+                );
+            }
+
+            $byName->forceFill([
+                'device_uuid' => $deviceUuid,
+                'categoria_licenca' => $category,
+                'device_registered_at' => $byName->device_registered_at ?? now(),
+            ])->save();
+            $this->touchDevice($byName, $origin, $deviceName, $platform);
+
+            return $byName->fresh() ?? $byName;
+        }
+
         $limit = $this->limitFor($empresaId, $category);
 
         $this->assertCapacity($empresaId, $category, $limit);
@@ -303,7 +332,7 @@ final class DeviceLicenseService
         $terminal = new Terminal;
         $terminal->forceFill([
             'empresa_id' => $empresaId,
-            'nome' => $this->deviceTerminalName($deviceName, $deviceUuid),
+            'nome' => $nome,
             'ip' => request()?->ip(),
             'ativo' => true,
             'eh_caixa' => false,

@@ -9,9 +9,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Product>Unitec ERP</Product>
     <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\unitec-erp.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
     <ProjectReference Include="..\Unitec.ErpCommon\Unitec.ErpCommon.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\unitec-erp.ico" />
   </ItemGroup>
 </Project>

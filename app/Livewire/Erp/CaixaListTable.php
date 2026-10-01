@@ -3,6 +3,7 @@
 namespace App\Livewire\Erp;
 
 use App\Support\Erp\CaixaListRowFormatter;
+use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -74,9 +75,13 @@ class CaixaListTable extends Component
 
     public function render(): View
     {
+        $records = $this->records();
+        $formatter = app(CaixaListRowFormatter::class);
+        $formatter->pedidosMonitor = ContaReceberPedidoExibicao::mapa($records);
+
         return view('livewire.erp.caixa-list-table', [
-            'records' => $this->records(),
-            'formatter' => app(CaixaListRowFormatter::class),
+            'records' => $records,
+            'formatter' => $formatter,
         ]);
     }
 

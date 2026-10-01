@@ -30,7 +30,11 @@ class ErpPermissionCatalog
       'pessoas' => [
         'label' => 'Pessoas / Contatos',
         'group' => 'Pessoas',
-        'actions' => static::crudPrintActions(),
+        'actions' => [
+          ...static::crudPrintActions(),
+          'credito_gerar' => 'Gerar crédito do cliente',
+          'credito_estornar' => 'Estornar crédito do cliente',
+        ],
       ],
       'entregadores' => [
         'label' => 'Entregadores',
@@ -178,6 +182,16 @@ class ErpPermissionCatalog
           'baixa' => 'Baixar título',
         ],
       ],
+      'comissoes' => [
+        'label' => 'Comissões',
+        'group' => 'Financeiro',
+        'actions' => [
+          'access' => 'Acessar',
+          'create' => 'Calcular',
+          'update' => 'Fechar / Cancelar',
+          'print' => 'Imprimir',
+        ],
+      ],
       'contas_receber' => [
         'label' => 'Contas a Receber',
         'group' => 'Financeiro',
@@ -252,6 +266,13 @@ class ErpPermissionCatalog
           'print' => 'Imprimir DANFE (F7)',
         ],
       ],
+      'nfse' => [
+        'label' => 'NFS-e',
+        'group' => 'Fiscal',
+        'actions' => [
+          'access' => 'Acessar',
+        ],
+      ],
       'empresa' => [
         'label' => 'Empresa',
         'group' => 'Configurações',
@@ -317,6 +338,11 @@ class ErpPermissionCatalog
           'update' => 'Alterar status / operar',
           'print' => 'Imprimir',
         ],
+      ],
+      'cargas' => [
+        'label' => 'Carga / Romaneio',
+        'group' => 'Logística',
+        'actions' => static::crudPrintActions(),
       ],
       'transportadoras' => [
         'label' => 'Motorista / Transportador',

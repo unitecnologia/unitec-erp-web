@@ -15,9 +15,23 @@
         <span class="erp-orcamentos-actions__icon">↻</span>
         <span class="erp-orcamentos-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    <button type="button" wire:click="modulePending('Imprimir OS')" class="erp-orcamentos-actions__btn" data-erp-key="F6">
+    <button type="button" wire:click="openPrintModal" class="erp-orcamentos-actions__btn" data-erp-key="F6">
         <span class="erp-orcamentos-actions__icon">🖨</span>
         <span class="erp-orcamentos-actions__label"><kbd>F6</kbd> | Imprimir</span>
+    </button>
+    <button type="button" wire:click="emitirNfseDaOs" class="erp-orcamentos-actions__btn" data-erp-key="F7" title="Abrir NFS-e com os dados desta OS fechada">
+        <span class="erp-orcamentos-actions__icon">🧾</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F7</kbd> | NFS-e</span>
+    </button>
+    <button
+        type="button"
+        wire:click="openSendModal"
+        class="erp-orcamentos-actions__btn"
+        data-erp-key="F9"
+        title="Enviar OS por e-mail ou WhatsApp"
+    >
+        <span class="erp-orcamentos-actions__icon">✉</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F9</kbd> | Enviar</span>
     </button>
     <button type="button" wire:click="closeScreen" class="erp-orcamentos-actions__btn erp-orcamentos-actions__btn--close">
         <span class="erp-orcamentos-actions__icon erp-orcamentos-actions__icon--close">✕</span>

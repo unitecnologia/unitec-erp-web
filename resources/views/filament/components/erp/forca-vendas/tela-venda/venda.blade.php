@@ -356,17 +356,71 @@
         <div class="erp-fv-tv__row erp-fv-tv__row--produto">
             <label class="erp-fv-tv__field erp-fv-tv__field--barcode erp-fv-tv__field--suggest">
                 <span>Código / barras / nome</span>
-                <div class="erp-fv-tv__barcode-wrap">
+                <div
+                    class="erp-fv-tv__barcode-wrap"
+                    x-data="{
+                        ativo: 0,
+                        itens() {
+                            const lista = this.$refs.lista;
+                            return lista ? lista.querySelectorAll('[role=option]') : [];
+                        },
+                        mover(d) {
+                            const itens = this.itens();
+                            const total = itens.length;
+                            if (total === 0) return;
+                            const atual = itens[this.ativo];
+                            if (atual) {
+                                atual.classList.remove('is-selected');
+                                atual.setAttribute('aria-selected', 'false');
+                            }
+                            this.ativo = Math.max(0, Math.min(total - 1, this.ativo + d));
+                            const prox = itens[this.ativo];
+                            if (prox) {
+                                prox.classList.add('is-selected');
+                                prox.setAttribute('aria-selected', 'true');
+                                prox.scrollIntoView({ block: 'nearest' });
+                            }
+                        },
+                        confirmar() {
+                            const itens = this.itens();
+                            const el = itens[this.ativo] || null;
+                            const id = el ? Number(el.dataset.id || 0) : 0;
+                            if (id > 0) {
+                                $wire.selecionarProduto(id);
+                                return;
+                            }
+                            $wire.confirmarCodigoProduto();
+                        },
+                        reset() {
+                            this.ativo = 0;
+                        },
+                        marcar(i) {
+                            const itens = this.itens();
+                            const prev = itens[this.ativo];
+                            if (prev) {
+                                prev.classList.remove('is-selected');
+                                prev.setAttribute('aria-selected', 'false');
+                            }
+                            this.ativo = i;
+                            const cur = itens[this.ativo];
+                            if (cur) {
+                                cur.classList.add('is-selected');
+                                cur.setAttribute('aria-selected', 'true');
+                            }
+                        }
+                    }"
+                    x-on:erp-fv-produto-sugestoes-ready.window="reset()"
+                >
                     <input
                         id="fv-tv-barcode"
                         class="erp-nfe__input erp-fv-tv__input--barcode"
                         type="text"
                         x-ref="barcode"
                         wire:model.live.debounce.200ms="codigoBarras"
-                        wire:keydown.enter.prevent="confirmarCodigoProduto"
                         wire:keydown.escape.prevent="fecharSugestoesProduto"
-                        x-on:keydown.arrow-down.prevent="$wire.moverSugestaoProduto(1)"
-                        x-on:keydown.arrow-up.prevent="$wire.moverSugestaoProduto(-1)"
+                        x-on:keydown.enter.prevent="confirmar()"
+                        x-on:keydown.arrow-down.prevent="mover(1)"
+                        x-on:keydown.arrow-up.prevent="mover(-1)"
                         autocomplete="off"
                         placeholder="Código, barras ou nome do produto — Enter"
                         role="combobox"
@@ -375,16 +429,24 @@
                         aria-controls="fv-tv-produto-sugestoes"
                     >
                     @if ($this->produtoSugestoesOpen && $this->produtoSugestoes !== [])
-                        <ul id="fv-tv-produto-sugestoes" class="erp-fv-tv__suggest erp-fv-tv__suggest--produto" role="listbox" aria-label="Produtos encontrados">
+                        <ul
+                            id="fv-tv-produto-sugestoes"
+                            class="erp-fv-tv__suggest erp-fv-tv__suggest--produto"
+                            role="listbox"
+                            aria-label="Produtos encontrados"
+                            x-ref="lista"
+                        >
                             @foreach ($this->produtoSugestoes as $index => $sug)
                                 <li wire:key="fv-tv-prod-sug-{{ $sug['id'] }}" role="presentation">
                                     <button
                                         type="button"
                                         id="fv-tv-produto-sug-{{ $index }}"
                                         role="option"
-                                        aria-selected="{{ $this->selectedProdutoSugestaoIndex === $index ? 'true' : 'false' }}"
+                                        data-id="{{ $sug['id'] }}"
+                                        aria-selected="{{ $index === 0 ? 'true' : 'false' }}"
                                         wire:click="selecionarProduto({{ $sug['id'] }})"
-                                        @class(['is-selected' => $this->selectedProdutoSugestaoIndex === $index])
+                                        x-on:mouseenter="marcar({{ $index }})"
+                                        @class(['is-selected' => $index === 0])
                                     >
                                         <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
                                         <span class="erp-fv-tv__suggest-nome">{{ $sug['nome'] }}</span>
@@ -447,15 +509,24 @@
 </section>
 
 <div class="erp-fv-tv__body">
+    @php
+        $exibirCustoGrade = $this->exibirCustoProdutoGrade;
+        $custosGrade = $exibirCustoGrade ? $this->custosUnitariosGrade : [];
+        $colspanGrade = $exibirCustoGrade ? 11 : 10;
+    @endphp
     <div class="erp-fv-tv__grid-wrap">
         <table class="erp-fv-tv__grid">
             <thead>
                 <tr>
+                    <th class="erp-fv-tv__col-del" title="Excluir item" aria-label="Excluir"></th>
                     <th class="erp-fv-tv__col-idx">#</th>
                     <th class="erp-fv-tv__col-cod">Código</th>
                     <th>Produto</th>
                     <th class="erp-fv-tv__col-num">Qtde</th>
                     <th class="erp-fv-tv__col-num">Vlr. unit.</th>
+                    @if ($exibirCustoGrade)
+                        <th class="erp-fv-tv__col-num erp-fv-tv__col-custo">Custo</th>
+                    @endif
                     <th class="erp-fv-tv__col-num">TT bruto</th>
                     <th class="erp-fv-tv__col-num">Acrés.</th>
                     <th class="erp-fv-tv__col-num">Desc.</th>
@@ -469,6 +540,23 @@
                         class="{{ $this->itemSelecionado === $i ? 'is-selected' : '' }}"
                         wire:click="selecionarItem({{ $i }})"
                     >
+                        <td class="erp-fv-tv__col-del">
+                            <button
+                                type="button"
+                                class="erp-fv-tv__del-btn"
+                                wire:click.stop="pedirConfirmacaoExcluirItemPorIndice({{ $i }})"
+                                title="Excluir item"
+                                aria-label="Excluir item {{ $i + 1 }}"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 6h18"/>
+                                    <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                    <path d="M10 11v6"/>
+                                    <path d="M14 11v6"/>
+                                </svg>
+                            </button>
+                        </td>
                         <td class="erp-fv-tv__col-idx">
                             <div class="erp-fv-tv__cell erp-fv-tv__cell--center">{{ $i + 1 }}</div>
                         </td>
@@ -491,6 +579,14 @@
                                 <span class="erp-fv-tv__money-val">{{ $this->formatMoney($item['preco_unitario']) }}</span>
                             </div>
                         </td>
+                        @if ($exibirCustoGrade)
+                            <td class="erp-fv-tv__col-num erp-fv-tv__col-custo">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ $this->formatMoney((float) ($custosGrade[(int) ($item['product_id'] ?? 0)] ?? 0)) }}</span>
+                                </div>
+                            </td>
+                        @endif
                         <td class="erp-fv-tv__col-num">
                             <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
                                 <span class="erp-fv-tv__money-rs">R$</span>
@@ -518,7 +614,7 @@
                     </tr>
                 @empty
                     <tr class="erp-fv-tv__empty">
-                        <td colspan="9">Nenhum item — informe o código e pressione Enter</td>
+                        <td colspan="{{ $colspanGrade }}">Nenhum item — informe o código e pressione Enter</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -562,6 +658,13 @@
                 <span>Total líquido</span>
                 <strong>R$ {{ $this->formatMoney($this->totalLiquido()) }}</strong>
             </div>
+            @if ((bool) (\App\Support\Erp\ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false))
+                <div class="erp-fv-tv__mais-opcoes">
+                    @include('filament.components.erp.forca-vendas.mais-opcoes-menu', [
+                        'onMargem' => 'abrirMargemVenda',
+                    ])
+                </div>
+            @endif
             <div class="erp-fv-tv__itens-count">{{ count($this->itens) }} {{ count($this->itens) === 1 ? 'item' : 'itens' }}</div>
         </div>
     </aside>

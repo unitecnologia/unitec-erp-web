@@ -14,13 +14,13 @@ use App\Models\OrcamentoItem;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 class ErpFormActionsTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     protected function actingAsErpUser(): User
     {

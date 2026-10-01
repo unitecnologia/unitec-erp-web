@@ -93,7 +93,7 @@ CNF;
                 return ['ok' => false, 'error' => 'Falha ao gravar .pfx temporário.'];
             }
 
-            $php = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+            $php = ErpUpdateProcessLauncher::resolvePhpBinary(base_path());
             $reader = base_path('scripts/openssl-pkcs12-read.php');
             if (! is_file($reader)) {
                 return ['ok' => false, 'error' => 'scripts/openssl-pkcs12-read.php ausente.'];
@@ -101,6 +101,9 @@ CNF;
 
             $result = Process::env(array_merge($env, [
                 'UNITEC_PFX_PASSWORD' => $password,
+                // Garante providers legacy no subprocesso mesmo se o CNF padrão falhar.
+                'OPENSSL_CONF' => $env['OPENSSL_CONF'] ?? '',
+                'OPENSSL_MODULES' => $env['OPENSSL_MODULES'] ?? '',
             ]))->timeout(30)->run([
                 $php,
                 $reader,
@@ -209,5 +212,20 @@ CNF;
         }
 
         return $last;
+    }
+
+    /**
+     * OpenSSL 3 no processo atual (FrankenPHP/php.exe sem legacy carregado no boot)
+     * falha em .pfx A1 antigos com mensagens como "mac verify failure",
+     * "unsupported", "digital envelope routines", etc. Nessas situações o
+     * subprocesso com OPENSSL_MODULES=legacy.dll é a leitura confiável.
+     *
+     * Se o módulo legacy estiver presente, sempre tenta o subprocesso após falha
+     * do openssl_pkcs12_read no processo atual. Senha errada também falha no
+     * subprocesso (rápido); PFX com MAC/cipher legado só abre no legacy.
+     */
+    public static function shouldRetryViaSubprocess(string $opensslError = ''): bool
+    {
+        return self::resolveModulesDirectory() !== null;
     }
 }

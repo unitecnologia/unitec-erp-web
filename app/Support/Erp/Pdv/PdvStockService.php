@@ -2,10 +2,13 @@
 
 namespace App\Support\Erp\Pdv;
 
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Models\ProductComposition;
 use App\Models\ProductGrade;
 use App\Models\ProductSerial;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\ProductEstoqueSaldoService;
 
@@ -23,6 +26,7 @@ final class PdvStockService
         ?string $docSaida = null,
         ?int $estoqueId = null,
         ?\App\Models\Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -33,7 +37,7 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId, $empresa);
+            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId, $empresa, $movimentacao);
 
             return;
         }
@@ -48,7 +52,7 @@ final class PdvStockService
             }
         }
 
-        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId, $empresa);
+        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId, $empresa, $this->ctxBaixa($movimentacao, $empresa, $docSaida));
 
         if ($product->controla_lote_validade) {
             (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, $quantidade);
@@ -126,8 +130,14 @@ final class PdvStockService
         return null;
     }
 
-    private function baixaComposicao(Product $product, float $quantidade, ?string $docSaida, ?int $estoqueId = null, ?\App\Models\Empresa $empresa = null): void
-    {
+    private function baixaComposicao(
+        Product $product,
+        float $quantidade,
+        ?string $docSaida,
+        ?int $estoqueId = null,
+        ?\App\Models\Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
             ->with('componentProduct')
@@ -141,13 +151,77 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId, $empresa);
+            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId, $empresa, $movimentacao);
         }
     }
 
-    private function decrementarEstoqueProduto(Product $product, float $quantidade, ?int $estoqueId = null, ?\App\Models\Empresa $empresa = null): void
+    private function decrementarEstoqueProduto(
+        Product $product,
+        float $quantidade,
+        ?int $estoqueId = null,
+        ?\App\Models\Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
+        $this->saldos->decrementar((int) $product->id, $quantidade, $estoqueId, $empresa, $movimentacao);
+    }
+
+    private function ctxBaixa(
+        ?EstoqueMovimentacaoContext $movimentacao,
+        ?\App\Models\Empresa $empresa,
+        ?string $docSaida,
+    ): EstoqueMovimentacaoContext {
+        $empresaId = $empresa?->id !== null ? (int) $empresa->id : null;
+        if ($empresaId === null || $empresaId <= 0) {
+            $empresaId = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? 0) ?: null;
+        }
+
+        if ($movimentacao !== null) {
+            if ($movimentacao->empresaId !== null && $movimentacao->empresaId > 0) {
+                return $movimentacao;
+            }
+
+            return EstoqueMovimentacaoContext::make(
+                $movimentacao->tipo,
+                empresaId: $empresaId,
+                origemTipo: $movimentacao->origemTipo,
+                origemId: $movimentacao->origemId,
+                origemNumero: $movimentacao->origemNumero,
+                usuarioId: $movimentacao->usuarioId,
+                observacao: $movimentacao->observacao,
+            );
+        }
+
+        return EstoqueMovimentacaoContext::make(
+            EstoqueMovimentacao::TIPO_VENDA,
+            empresaId: $empresaId,
+            observacao: $docSaida,
+        );
+    }
+
+    private function ctxEstorno(?EstoqueMovimentacaoContext $movimentacao): EstoqueMovimentacaoContext
     {
-        $this->saldos->decrementar((int) $product->id, $quantidade, $estoqueId, $empresa);
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? 0) ?: null;
+
+        if ($movimentacao !== null) {
+            if ($movimentacao->empresaId !== null && $movimentacao->empresaId > 0) {
+                return $movimentacao;
+            }
+
+            return EstoqueMovimentacaoContext::make(
+                $movimentacao->tipo,
+                empresaId: $empresaId,
+                origemTipo: $movimentacao->origemTipo,
+                origemId: $movimentacao->origemId,
+                origemNumero: $movimentacao->origemNumero,
+                usuarioId: $movimentacao->usuarioId,
+                observacao: $movimentacao->observacao,
+            );
+        }
+
+        return EstoqueMovimentacaoContext::make(
+            EstoqueMovimentacao::TIPO_DEVOLUCAO_VENDA,
+            empresaId: $empresaId,
+        );
     }
 
     private function baixaSerial(int $productSerialId, ?string $docSaida): void
@@ -168,6 +242,7 @@ final class PdvStockService
         ?int $productGradeId = null,
         ?int $productSerialId = null,
         ?int $estoqueId = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -178,12 +253,12 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->estornoComposicao($product, $quantidade, $estoqueId);
+            $this->estornoComposicao($product, $quantidade, $estoqueId, $movimentacao);
 
             return;
         }
 
-        $this->saldos->incrementar((int) $product->id, $quantidade, $estoqueId);
+        $this->saldos->incrementar((int) $product->id, $quantidade, $estoqueId, null, $this->ctxEstorno($movimentacao));
 
         if ($product->controla_lote_validade) {
             (new \App\Support\Erp\ProductLoteService())->devolver($product, $quantidade);
@@ -201,8 +276,12 @@ final class PdvStockService
         }
     }
 
-    private function estornoComposicao(Product $product, float $quantidade, ?int $estoqueId = null): void
-    {
+    private function estornoComposicao(
+        Product $product,
+        float $quantidade,
+        ?int $estoqueId = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
             ->with('componentProduct')
@@ -216,7 +295,7 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->estornoItemVenda($comp, $qtd, null, null, $estoqueId);
+            $this->estornoItemVenda($comp, $qtd, null, null, $estoqueId, $movimentacao);
         }
     }
 

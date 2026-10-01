@@ -1,7 +1,14 @@
 @php
     use App\Models\ForcaVendasOrder;
+    use Illuminate\Support\Carbon;
 
     $situacaoOptions = ForcaVendasOrder::situacaoLabels();
+    $periodoDeValor = filled($this->periodoDe)
+        ? Carbon::parse($this->periodoDe)->format('d/m/Y')
+        : '';
+    $periodoAteValor = filled($this->periodoAte)
+        ? Carbon::parse($this->periodoAte)->format('d/m/Y')
+        : '';
 @endphp
 
 <div class="erp-fv-mon-root" wire:poll.5s="pollRefresh">
@@ -41,21 +48,37 @@
 
             <div class="erp-fv-mon__field erp-fv-mon__field--periodo">
                 <span>Período</span>
-                <div class="erp-fv-mon__periodo">
+                <div
+                    class="erp-fv-mon__periodo"
+                    wire:ignore
+                    data-erp-date-group
+                    data-erp-date-auto-apply="1"
+                    data-erp-date-apply-method="applyPeriodFilterAuto"
+                >
                     <input
-                        type="date"
+                        type="text"
+                        data-erp-date
                         data-wire-field="periodoDe"
                         data-erp-date-wire="iso"
-                        value="{{ $this->periodoDe }}"
-                        class="erp-nfe__period-input"
+                        data-erp-date-initial="{{ $this->periodoDe }}"
+                        value="{{ $periodoDeValor }}"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        placeholder="dd/mm/aaaa"
+                        class="erp-nfe__period-input erp-date-input"
                     >
                     <span class="erp-fv-mon__periodo-sep">Até</span>
                     <input
-                        type="date"
+                        type="text"
+                        data-erp-date
                         data-wire-field="periodoAte"
                         data-erp-date-wire="iso"
-                        value="{{ $this->periodoAte }}"
-                        class="erp-nfe__period-input"
+                        data-erp-date-initial="{{ $this->periodoAte }}"
+                        value="{{ $periodoAteValor }}"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        placeholder="dd/mm/aaaa"
+                        class="erp-nfe__period-input erp-date-input"
                     >
                 </div>
             </div>
@@ -207,7 +230,7 @@
                     @else
                         <input type="text" wire:model="filtroValor" wire:keydown.enter="consultar"
                                class="erp-nfe__input erp-fv-mon__filtro-valor" autocomplete="off"
-                               placeholder="{{ $this->filtroCampo === 'dav' ? 'Digite o nº da DAV e Enter' : 'Digite e Enter' }}">
+                               placeholder="{{ $this->filtroCampo === 'pedido' || $this->filtroCampo === 'dav' ? 'Digite o nº do pedido e Enter' : 'Digite e Enter' }}">
                     @endif
                 </div>
             </div>

@@ -1,4 +1,10 @@
-<div class="erp-pdv-overlay" role="dialog" aria-modal="true" aria-label="{{ $title }}">
+<div
+    class="erp-pdv-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="{{ $title }}"
+    data-erp-pdv-overlay-type="{{ $type }}"
+>
     <div
         class="erp-pdv-overlay__backdrop"
         wire:click="{{ $type === 'product' ? 'closeProductOverlay' : 'closePersonOverlay' }}"

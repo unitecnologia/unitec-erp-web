@@ -169,3 +169,16 @@
         </div>
     </div>
 @endif
+
+@include('filament.components.erp.aviso-modal', [
+    'open' => $this->nfceContadorPendenciaAvisoOpen,
+    'tone' => 'warning',
+    'titleId' => 'erp-nfce-contador-pendencia-title',
+    'title' => 'NÃO É POSSÍVEL GERAR O PDF',
+    'lines' => $this->nfceContadorPendenciaAvisoLines,
+    'hint' => 'Este aviso só some ao clicar em OK.',
+    'primaryLabel' => 'OK',
+    'primaryAction' => 'closeNfceContadorPendenciaAviso',
+    'escapeAction' => 'closeNfceContadorPendenciaAviso',
+    'backdropAction' => 'closeNfceContadorPendenciaAviso',
+])

@@ -221,77 +221,61 @@ class NotaFornecedorDanfeReportService
         $prot = $dom->getElementsByTagName('infProt')->item(0);
 
         $itens = [];
-        $index = 0;
         $somaBasePis = 0.0;
         $somaBaseCofins = 0.0;
         $somaBaseIpi = 0.0;
 
-        foreach ($infNfe->getElementsByTagName('det') as $det) {
-            if (! $det instanceof DOMElement) {
-                continue;
-            }
+        $parsedItens = (new NotaFornecedorFiscalSnapshotParser())->parseItens($xml) ?? [];
 
-            $index++;
-            $prod = $det->getElementsByTagName('prod')->item(0);
-            $imposto = $det->getElementsByTagName('imposto')->item(0);
+        foreach ($parsedItens as $parsedItem) {
+            $danfe = $parsedItem['danfe'];
+            $icmsVals = $danfe['icms'];
+            $ipiVals = $danfe['ipi'];
+            $pisVals = $danfe['pis'];
+            $cofinsVals = $danfe['cofins'];
+            $ibscbsItem = $danfe['ibscbs'];
+            $qCom = (float) $danfe['quant_num'];
+            $vUnCom = (float) $danfe['valor_unit_num'];
+            $vProd = (float) $danfe['valor_total_num'];
+            $vDesc = (float) $danfe['desconto_num'];
 
-            if (! $prod instanceof DOMElement) {
-                continue;
-            }
-
-            $impostoEl = $imposto instanceof DOMElement ? $imposto : null;
-            $icmsVals = $this->extractIcms($impostoEl);
-            $ipiVals = $this->extractIpi($impostoEl);
-            $pisVals = $this->extractPis($impostoEl);
-            $cofinsVals = $this->extractCofins($impostoEl);
-            $qCom = (float) str_replace(',', '.', $this->child($prod, 'qCom') ?: '0');
-            $vUnCom = (float) str_replace(',', '.', $this->child($prod, 'vUnCom') ?: '0');
-            $vProd = (float) str_replace(',', '.', $this->child($prod, 'vProd') ?: '0');
-            $vDesc = (float) str_replace(',', '.', $this->child($prod, 'vDesc') ?: '0');
-            $ean = preg_replace('/\D/', '', $this->child($prod, 'cEAN') ?: $this->child($prod, 'cEANTrib') ?: '') ?? '';
-            $nItem = trim((string) ($det->getAttribute('nItem') ?: ''));
-            $cfopXml = $this->child($prod, 'CFOP');
-            $temSt = $this->itemTemSt($icmsVals, $cfopXml);
-            $tipoIcms = $this->resolveTipoIcms($icmsVals, $temSt);
-            $cest = preg_replace('/\D/', '', $this->child($prod, 'CEST') ?: '') ?? '';
-            $ibscbsItem = $this->extractIbscbsItem($impostoEl);
-
-            $somaBasePis += $pisVals['v_bc'];
-            $somaBaseCofins += $cofinsVals['v_bc'];
-            $somaBaseIpi += $ipiVals['v_bc'];
+            $somaBasePis += (float) ($pisVals['v_bc'] ?? 0);
+            $somaBaseCofins += (float) ($cofinsVals['v_bc'] ?? 0);
+            $somaBaseIpi += (float) ($ipiVals['v_bc'] ?? 0);
 
             $itens[] = [
-                'item' => $nItem !== '' ? $nItem : (string) $index,
-                'codigo' => $this->child($prod, 'cProd') ?: '—',
-                'ean' => $ean,
-                'descricao' => mb_strtoupper($this->child($prod, 'xProd') ?: '—', 'UTF-8'),
-                'ncm' => $this->child($prod, 'NCM'),
-                'cest' => $cest,
-                'cst' => $icmsVals['cst'],
-                'cfop' => $cfopXml,
-                'un' => $this->child($prod, 'uCom') ?: 'UN',
+                'item' => (string) $danfe['item'],
+                'codigo' => (string) $danfe['codigo'],
+                'ean' => (string) $danfe['ean'],
+                'descricao' => (string) $danfe['descricao'],
+                'info_adicionais' => (string) $danfe['info_adicionais'],
+                'ncm' => (string) $danfe['ncm'],
+                'cest' => (string) $danfe['cest'],
+                'cst' => (string) $danfe['cst'],
+                'cfop' => (string) $danfe['cfop'],
+                'un' => (string) $danfe['un'],
                 'quant' => number_format($qCom, 4, ',', '.'),
                 'quant_num' => $qCom,
                 'valor_unit' => number_format($vUnCom, 4, ',', '.'),
                 'valor_total' => number_format($vProd, 2, ',', '.'),
                 'desconto' => number_format($vDesc, 2, ',', '.'),
-                'base_icms' => number_format($icmsVals['v_bc'], 2, ',', '.'),
-                'valor_icms' => number_format($icmsVals['v_icms'], 2, ',', '.'),
-                'base_icms_st' => number_format($icmsVals['v_bc_st'], 2, ',', '.'),
-                'valor_icms_st' => number_format($icmsVals['v_icms_st'], 2, ',', '.'),
-                'valor_ipi' => number_format($ipiVals['v_ipi'], 2, ',', '.'),
-                'valor_pis' => number_format($pisVals['v_pis'], 2, ',', '.'),
-                'valor_cofins' => number_format($cofinsVals['v_cofins'], 2, ',', '.'),
-                'aliq_icms' => number_format($icmsVals['p_icms'], 2, ',', '.'),
-                'aliq_ipi' => number_format($ipiVals['p_ipi'], 2, ',', '.'),
-                'tem_st' => $temSt,
-                'tipo_icms' => $tipoIcms,
-                'base_ibs_cbs' => number_format($ibscbsItem['v_bc'], 2, ',', '.'),
-                'valor_ibs' => number_format($ibscbsItem['v_ibs'], 2, ',', '.'),
-                'valor_cbs' => number_format($ibscbsItem['v_cbs'], 2, ',', '.'),
-                'aliq_ibs' => number_format($ibscbsItem['p_ibs'], 4, ',', '.'),
-                'aliq_cbs' => number_format($ibscbsItem['p_cbs'], 4, ',', '.'),
-                'lotes' => $this->extractRastros($prod),
+                'base_icms' => number_format((float) ($icmsVals['v_bc'] ?? 0), 2, ',', '.'),
+                'valor_icms' => number_format((float) ($icmsVals['v_icms'] ?? 0), 2, ',', '.'),
+                'base_icms_st' => number_format((float) ($icmsVals['v_bc_st'] ?? 0), 2, ',', '.'),
+                'valor_icms_st' => number_format((float) ($icmsVals['v_icms_st'] ?? 0), 2, ',', '.'),
+                'valor_ipi' => number_format((float) ($ipiVals['v_ipi'] ?? 0), 2, ',', '.'),
+                'valor_pis' => number_format((float) ($pisVals['v_pis'] ?? 0), 2, ',', '.'),
+                'valor_cofins' => number_format((float) ($cofinsVals['v_cofins'] ?? 0), 2, ',', '.'),
+                'aliq_icms' => number_format((float) ($icmsVals['p_icms'] ?? 0), 2, ',', '.'),
+                'aliq_ipi' => number_format((float) ($ipiVals['p_ipi'] ?? 0), 2, ',', '.'),
+                'tem_st' => (bool) $danfe['tem_st'],
+                'tipo_icms' => (string) $danfe['tipo_icms'],
+                'base_ibs_cbs' => number_format((float) ($ibscbsItem['v_bc'] ?? 0), 2, ',', '.'),
+                'valor_ibs' => number_format((float) ($ibscbsItem['v_ibs'] ?? 0), 2, ',', '.'),
+                'valor_cbs' => number_format((float) ($ibscbsItem['v_cbs'] ?? 0), 2, ',', '.'),
+                'aliq_ibs' => number_format((float) ($ibscbsItem['p_ibs'] ?? 0), 4, ',', '.'),
+                'aliq_cbs' => number_format((float) ($ibscbsItem['p_cbs'] ?? 0), 4, ',', '.'),
+                'lotes' => $danfe['lotes'],
             ];
         }
 

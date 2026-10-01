@@ -17,6 +17,7 @@ use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use App\Support\Erp\ErpSchema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -24,6 +25,20 @@ final class ErpDashboardGauges
 {
     /** @var array<string, array<string, mixed>> */
     private static array $gaugeMemo = [];
+
+    /**
+     * Preload opcional para evitar consultas duplicadas (Financeiro / Dashboard).
+     * Chaves: saldo, receber_vencido, pagar_vencido, obrigacoes_7d, faturamento_mes.
+     *
+     * @var array{
+     *     saldo?: float,
+     *     receber_vencido?: float,
+     *     pagar_vencido?: float,
+     *     obrigacoes_7d?: float,
+     *     faturamento_mes?: float
+     * }|null
+     */
+    private static ?array $saudePreload = null;
 
     /**
      * @param  int|list<int>|null  $empresaScope
@@ -78,26 +93,41 @@ final class ErpDashboardGauges
      *
      * @return array{percent: float, tone: string, label: string, short: string, message: string, factors: list<array<string, mixed>>}
      */
-    public static function saudeSnapshot(?int $empresaId = null): array
+    /**
+     * @param  array{
+     *     saldo?: float,
+     *     receber_vencido?: float,
+     *     pagar_vencido?: float,
+     *     obrigacoes_7d?: float,
+     *     faturamento_mes?: float
+     * }|null  $preload
+     * @return array{percent: float, tone: string, label: string, short: string, message: string, factors: list<array<string, mixed>>}
+     */
+    public static function saudeSnapshot(?int $empresaId = null, ?array $preload = null): array
     {
-        $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
-        $hoje = ErpFinanceiroMetricas::hoje();
-        $inicio = $hoje->copy()->startOfMonth();
-        $fim = $hoje;
-        $scope = ($empresaId && $empresaId > 0) ? $empresaId : null;
+        self::$saudePreload = $preload;
+        try {
+            $empresaId ??= ErpDashboardCertificadoAlert::resolveEmpresaId();
+            $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+            $hoje = ErpFinanceiroMetricas::hoje();
+            $inicio = $hoje->copy()->startOfMonth();
+            $fim = $hoje;
+            $scope = ($empresaId && $empresaId > 0) ? $empresaId : null;
 
-        $gauge = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
-        $status = static::healthStatus((float) ($gauge['percent'] ?? 0));
+            $gauge = static::saudeEmpresa($empresa, $inicio, $fim, $scope);
+            $status = static::healthStatus((float) ($gauge['percent'] ?? 0));
 
-        return [
-            'percent' => (float) ($gauge['percent'] ?? 0),
-            'tone' => (string) ($gauge['tone'] ?? $status['tone']),
-            'label' => (string) ($status['label'] ?? $gauge['label'] ?? 'Saúde'),
-            'short' => (string) ($status['short'] ?? ''),
-            'message' => (string) ($status['message'] ?? ($gauge['meta_label'] ?? '')),
-            'factors' => (array) ($gauge['detail']['factors'] ?? []),
-        ];
+            return [
+                'percent' => (float) ($gauge['percent'] ?? 0),
+                'tone' => (string) ($gauge['tone'] ?? $status['tone']),
+                'label' => (string) ($status['label'] ?? $gauge['label'] ?? 'Saúde'),
+                'short' => (string) ($status['short'] ?? ''),
+                'message' => (string) ($status['message'] ?? ($gauge['meta_label'] ?? '')),
+                'factors' => (array) ($gauge['detail']['factors'] ?? []),
+            ];
+        } finally {
+            self::$saudePreload = null;
+        }
     }
 
     /**
@@ -399,10 +429,15 @@ final class ErpDashboardGauges
         try {
             $receita = 0.0;
             $custo = 0.0;
+            // selectRaw não aplica prefixo de tabela: qualificar com o nome físico.
+            $prefix = DB::getTablePrefix();
+            $prodTable = $prefix.(new Product)->getTable();
+            $vendaItensTable = $prefix.(new VendaItem)->getTable();
+            $pdvItensTable = $prefix.(new PdvVendaItem)->getTable();
             $unitCostSql = 'CASE'
-                .' WHEN COALESCE(products.preco_custo, 0) > 0 THEN products.preco_custo'
-                .' WHEN COALESCE(products.e_medio, 0) > 0 THEN products.e_medio'
-                .' WHEN COALESCE(products.preco_compra, 0) > 0 THEN products.preco_compra'
+                ." WHEN COALESCE(`{$prodTable}`.preco_custo, 0) > 0 THEN `{$prodTable}`.preco_custo"
+                ." WHEN COALESCE(`{$prodTable}`.e_medio, 0) > 0 THEN `{$prodTable}`.e_medio"
+                ." WHEN COALESCE(`{$prodTable}`.preco_compra, 0) > 0 THEN `{$prodTable}`.preco_compra"
                 .' ELSE 0 END';
 
             // Vendas da retaguarda são a fonte canônica: incluem os espelhos
@@ -420,8 +455,8 @@ final class ErpDashboardGauges
 
                 $agg = $vendaQuery
                     ->selectRaw(
-                        'COALESCE(SUM(venda_itens.total), 0) as receita,'.
-                        'COALESCE(SUM(venda_itens.quantidade * ('.$unitCostSql.')), 0) as custo'
+                        "COALESCE(SUM(`{$vendaItensTable}`.total), 0) as receita,".
+                        "COALESCE(SUM(`{$vendaItensTable}`.quantidade * ({$unitCostSql})), 0) as custo"
                     )
                     ->first();
 
@@ -466,8 +501,8 @@ final class ErpDashboardGauges
 
                 $agg = $pdvQuery
                     ->selectRaw(
-                        'COALESCE(SUM(pdv_venda_itens.total), 0) as receita,'.
-                        'COALESCE(SUM(pdv_venda_itens.quantidade * ('.$unitCostSql.')), 0) as custo'
+                        "COALESCE(SUM(`{$pdvItensTable}`.total), 0) as receita,".
+                        "COALESCE(SUM(`{$pdvItensTable}`.quantidade * ({$unitCostSql})), 0) as custo"
                     )
                     ->first();
 
@@ -720,11 +755,17 @@ final class ErpDashboardGauges
     private static function factorCaixa(int|array|null $empresaScope = null): array
     {
         try {
-            $saldo = ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
+            $preload = self::$saudePreload;
+            $saldo = array_key_exists('saldo', $preload ?? [])
+                ? (float) $preload['saldo']
+                : ErpFinanceiroMetricas::saldoCaixa(null, $empresaScope);
             $hoje = ErpFinanceiroMetricas::hoje();
             $obrigacoes = 0.0;
 
-            if (ErpSchema::hasTable((new ContaPagar)->getTable())) {
+            if (array_key_exists('obrigacoes_7d', $preload ?? [])) {
+                // Mesmo conceito: pagar_vencido + pagar_7d (vencidos + até 7 dias).
+                $obrigacoes = (float) $preload['obrigacoes_7d'];
+            } elseif (ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 // Inclui vencidos + a vencer em até 7 dias (pressão de caixa).
                 $pagarQuery = ContaPagar::query()
                     ->where('saldo', '>', 0)
@@ -774,10 +815,15 @@ final class ErpDashboardGauges
     {
         try {
             $collector = ErpDashboardCollector::current();
+            $preload = self::$saudePreload;
             // Mesma base do KPI "Faturamento" / Executivo (vendas + PDV sem venda_id).
-            $realizado = $collector !== null
-                ? $collector->faturamentoPeriodo($inicio, $fim)
-                : ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim, $empresaScope);
+            if (array_key_exists('faturamento_mes', $preload ?? [])) {
+                $realizado = (float) $preload['faturamento_mes'];
+            } elseif ($collector !== null) {
+                $realizado = $collector->faturamentoPeriodo($inicio, $fim);
+            } else {
+                $realizado = ErpDashboardSalesMetrics::faturamentoPeriodo($inicio, $fim, $empresaScope);
+            }
             $meta = static::resolveMetaVendas($empresa, $empresaScope);
 
             if ($meta > 0) {
@@ -899,7 +945,10 @@ final class ErpDashboardGauges
             $abertoQuery = ContaPagar::query()->where('saldo', '>', 0);
             ErpFinanceiroMetricas::applyEmpresaColumn($abertoQuery, (new ContaPagar)->getTable(), $empresaScope);
             $aberto = (float) $abertoQuery->sum('saldo');
-            $vencido = (float) ErpFinanceiroMetricas::pagarVencido(null, $empresaScope)['valor'];
+            $preload = self::$saudePreload;
+            $vencido = array_key_exists('pagar_vencido', $preload ?? [])
+                ? (float) $preload['pagar_vencido']
+                : (float) ErpFinanceiroMetricas::pagarVencido(null, $empresaScope)['valor'];
 
             if ($aberto <= 0.01) {
                 return [
@@ -940,7 +989,10 @@ final class ErpDashboardGauges
             $abertoQuery = ContaReceber::query()->where('saldo', '>', 0);
             ErpFinanceiroMetricas::applyEmpresaColumn($abertoQuery, (new ContaReceber)->getTable(), $empresaScope);
             $aberto = (float) $abertoQuery->sum('saldo');
-            $vencido = (float) ErpFinanceiroMetricas::receberVencido(null, $empresaScope)['valor'];
+            $preload = self::$saudePreload;
+            $vencido = array_key_exists('receber_vencido', $preload ?? [])
+                ? (float) $preload['receber_vencido']
+                : (float) ErpFinanceiroMetricas::receberVencido(null, $empresaScope)['valor'];
 
             if ($aberto <= 0.01) {
                 return [

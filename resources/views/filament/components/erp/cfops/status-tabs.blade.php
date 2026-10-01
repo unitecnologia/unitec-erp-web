@@ -4,18 +4,22 @@
         'ativos' => 'Ativos',
         'inativos' => 'Inativos',
     ];
+
+    $statusAtual = filled($this->statusFilter) ? (string) $this->statusFilter : 'todos';
 @endphp
 
-<div class="erp-cfop__status-wrap">
+<div
+    class="erp-cfop__status-wrap erp-list-tabs"
+    wire:ignore
+    x-data="{ statusAtivo: @js($statusAtual) }"
+>
     <div class="erp-cfop__status">
         @foreach ($statusTabs as $value => $label)
             <button
                 type="button"
-                wire:click="setStatusFilter('{{ $value }}')"
-                @class([
-                    'erp-cfop__tab',
-                    'erp-cfop__tab--active' => $this->statusFilter === $value,
-                ])
+                class="erp-cfop__tab"
+                :class="{ 'erp-cfop__tab--active': statusAtivo === @js($value) }"
+                @click="statusAtivo = @js($value); $wire.setStatusFilter(@js($value))"
             >{{ $label }}</button>
         @endforeach
     </div>

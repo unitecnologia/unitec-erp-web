@@ -17,12 +17,21 @@ class ErpAccess
       return false;
     }
 
+    $empresa = ErpContext::currentEmpresa();
+
+    if (
+      EmpresaModulos::requerPrestadorServicosPorPermissao($permission)
+      && ! EmpresaModulos::empresaPrestadorServicos($empresa)
+    ) {
+      return false;
+    }
+
     // Administrador tem acesso total — módulos da empresa não podem esconder telas.
     if ($user->is_admin) {
       return true;
     }
 
-    if (! EmpresaModulos::enabledForPermission(ErpContext::currentEmpresa(), $permission)) {
+    if (! EmpresaModulos::enabledForPermission($empresa, $permission)) {
       return false;
     }
 

@@ -75,6 +75,19 @@ final class PdvDavCupomLayout
 
         $lines[] = self::line(self::labelDots('Cliente', $clienteLinha, $w));
         $lines[] = self::line(self::labelDots('Telefone', $telefoneCliente, $w));
+
+        $docCliente = trim((string) ($person?->cpf_cnpj ?? ''));
+        $ieCliente = trim((string) ($person?->rg_ie ?? ''));
+        $cnpjIe = $docCliente;
+        if ($ieCliente !== '') {
+            $cnpjIe = trim($docCliente.' IE: '.$ieCliente);
+        } elseif ($docCliente !== '') {
+            $cnpjIe = $docCliente.' IE:';
+        }
+        if ($cnpjIe !== '') {
+            $lines[] = self::line(self::labelDots('CNPJ', $cnpjIe, $w));
+        }
+
         $lines[] = self::line(self::labelDots('Emitido em', $at->format('d/m/Y'), $w));
         $lines[] = self::line(self::labelDots('Hora', $at->format('H:i:s'), $w));
         $lines[] = self::line(self::labelDots('Vendedor', $vendedor, $w));

@@ -33,70 +33,36 @@
     text-transform: uppercase;
 }
 
-/* Abas por status */
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente {
-    background: #f59e0b;
-    color: #1f2937;
-    border-color: #d97706;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente.erp-nfe__tab--active {
-    background: #d97706;
-    color: #ffffff;
-    border-color: #b45309;
-    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras {
-    background: #3b82f6;
-    color: #ffffff;
-    border-color: #2563eb;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras.erp-nfe__tab--active {
-    background: #1d4ed8;
-    color: #ffffff;
-    border-color: #1e40af;
-    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita {
-    background: #22c55e;
-    color: #ffffff;
-    border-color: #16a34a;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita.erp-nfe__tab--active {
-    background: #15803d;
-    color: #ffffff;
-    border-color: #166534;
-    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida {
-    background: #94a3b8;
-    color: #1e293b;
-    border-color: #64748b;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida.erp-nfe__tab--active {
-    background: #64748b;
-    color: #ffffff;
-    border-color: #475569;
-    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--todas {
-    background: #1e5a9e;
-    color: #ffffff;
-    border-color: #164a82;
-}
-
+/* Abas estilo fichário (padrão Orçamentos; remove cores por status) */
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--todas,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--pendente.erp-nfe__tab--active,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--gerou_compras.erp-nfe__tab--active,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--aceita.erp-nfe__tab--active,
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--desconhecida.erp-nfe__tab--active,
 .erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--todas.erp-nfe__tab--active {
-    background: #164a82;
-    color: #ffffff;
-    border-color: #0f3a66;
-    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+    background: inherit;
+    color: inherit;
+    border-color: inherit;
+    box-shadow: none;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab {
+    color: #64748b;
+    background: #e8edf3;
+    border-color: #c5d0dc;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .erp-nfe__tab--active {
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 /* Chips de situação — mesmo padrão visual da NF-e */

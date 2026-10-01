@@ -74,16 +74,12 @@ class CreatePerson extends CreateRecord
         }
 
         $this->flashOrcamentoReturnContextAfterPersonSave();
-
-        if ($this->embedsInPdv) {
-            $this->closePdvEmbedOverlay();
-        }
     }
 
     protected function getRedirectUrl(): string
     {
         if ($this->embedsInPdv) {
-            return static::getResource()::getUrl('create') . '?tipo=clientes&pdv=1';
+            return $this->getPersonListRedirectUrl();
         }
 
         if ($this->embedsInOrcamento) {

@@ -22,8 +22,12 @@ $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';
 if ($Publish) {
     & sc.exe stop $serviceName | Out-Null
     Start-Sleep -Seconds 2
-    Write-Host 'Publicando Device Service...'
-    & dotnet publish $project -c Release -r win-x64 --self-contained false -o $dist
+    Write-Host 'Publicando Device Service (self-contained)...'
+    if (Test-Path $dist) {
+        Remove-Item -LiteralPath $dist -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType Directory -Path $dist -Force | Out-Null
+    & dotnet publish $project -c Release -r win-x64 --self-contained true -o $dist /p:PublishSingleFile=false
     if ($LASTEXITCODE -ne 0) { throw 'Publish do Device Service falhou.' }
 }
 

@@ -275,8 +275,8 @@
                                 </div>
 
                                 <label class="erp-rh-oper__check erp-rh-oper__check--inline">
-                                    <input type="checkbox" wire:model="rhFuncionarioForm.usar_agendamento">
-                                    Usar agendamento
+                                    <input type="checkbox" wire:model="rhFuncionarioForm.entregador">
+                                    Entregador (aparece em Cargas / Entregas)
                                 </label>
 
                                 <fieldset class="erp-rh-oper__section">

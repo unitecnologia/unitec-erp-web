@@ -4,13 +4,15 @@ namespace App\Support\MercadoLivre;
 
 use App\Models\Empresa;
 use App\Models\ForcaVendasOrder;
-use App\Models\Orcamento;
-use App\Models\OrcamentoItem;
+use App\Models\Pedido;
+use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\PersonCpfCnpjUnicidade;
+use App\Support\Erp\PersonDocumentoDuplicadoException;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -195,8 +197,8 @@ final class MeliOrderIngestService
         $nickname = trim((string) ($buyer['nickname'] ?? ''));
         $identificacao = 'ML #'.$meliOrderId.($nickname !== '' ? ' — '.$nickname : '');
 
-        $orcamento = Orcamento::query()->create([
-            'numero' => Orcamento::nextNumero(),
+        $pedido = Pedido::query()->create([
+            'numero' => Pedido::nextNumero(),
             'data' => $momentoLocal->toDateString(),
             'hora' => $momentoLocal->format('H:i:s'),
             'cliente_id' => $cliente->id,
@@ -208,15 +210,15 @@ final class MeliOrderIngestService
             'validade_dias' => 0,
             'observacoes' => 'Pedido Mercado Livre #'.$meliOrderId,
             'total' => $total,
-            'status' => Orcamento::STATUS_ABERTO,
-            'plataforma' => Orcamento::PLATAFORMA_MELI,
+            'status' => Pedido::STATUS_ABERTO,
+            'plataforma' => 'meli',
         ]);
 
         $linha = 1;
 
         foreach ($linkedItems as $item) {
-            OrcamentoItem::query()->create([
-                'orcamento_id' => $orcamento->id,
+            PedidoItem::query()->create([
+                'pedido_id' => $pedido->id,
                 'item' => $linha,
                 'product_id' => (int) $item['product_id'],
                 'product_grade_id' => null,
@@ -254,7 +256,8 @@ final class MeliOrderIngestService
             'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
             'cliente_id' => $cliente->id,
             'vendedor_id' => null,
-            'orcamento_id' => $orcamento->id,
+            'orcamento_id' => null,
+            'pedido_id' => $pedido->id,
             'venda_id' => null,
             'total' => $total,
             'status' => ForcaVendasOrder::STATUS_IMPORTADO,
@@ -269,7 +272,7 @@ final class MeliOrderIngestService
             $reservaUser = $this->resolveReservaUser($empresa);
 
             if ($reservaUser) {
-                (new EstoqueReservaService())->reservarPedido($fvOrder, $orcamento, $reservaUser);
+                (new EstoqueReservaService())->reservarPedido($fvOrder, $pedido, $reservaUser);
             }
         } catch (\Throwable $e) {
             Log::warning('meli.order.reserva_failed', [
@@ -380,13 +383,24 @@ final class MeliOrderIngestService
         $doc = preg_replace('/\D/', '', (string) ($billing['doc_number'] ?? ''));
 
         if ($doc !== '') {
-            $existing = Person::query()
-                ->where('cpf_cnpj', $doc)
-                ->where('is_cliente', true)
-                ->first();
+            $existing = app(PersonCpfCnpjUnicidade::class)->encontrar($doc);
 
             if ($existing) {
+                if (! $existing->is_cliente) {
+                    $existing->forceFill(['is_cliente' => true])->save();
+                }
+
                 return $existing;
+            }
+
+            try {
+                app(PersonCpfCnpjUnicidade::class)->assertDisponivel($doc);
+            } catch (PersonDocumentoDuplicadoException $e) {
+                if ($e->existente) {
+                    return $e->existente;
+                }
+
+                throw $e;
             }
 
             return Person::query()->create([

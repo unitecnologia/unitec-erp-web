@@ -5,6 +5,8 @@
         'atrasadas' => 'Atrasadas',
         'pagas' => 'Pagas',
     ];
+
+    $situacaoAtual = filled($this->situacaoFilter) ? (string) $this->situacaoFilter : 'todos';
 @endphp
 
 <div class="erp-pagar__footer">
@@ -24,15 +26,22 @@
     </div>
 
     <div class="erp-pagar__footer-filters">
-        <div class="erp-pagar__filter-group" role="group" aria-label="Situação">
+        <div
+            class="erp-pagar__filter-group"
+            role="group"
+            aria-label="Situação"
+            wire:ignore
+            x-data="{ statusAtivo: @js($situacaoAtual) }"
+        >
             <span class="erp-pagar__filter-group-label">Situação</span>
             <div class="erp-pagar__filter-segment">
                 @foreach ($situacaoFilters as $value => $label)
                     <button
                         type="button"
-                        wire:click="setSituacaoFilter('{{ $value }}')"
-                        @class(['erp-pagar__filter-chip', 'erp-pagar__filter-chip--active' => $this->situacaoFilter === $value])
-                        @if ($this->situacaoFilter === $value) aria-pressed="true" @else aria-pressed="false" @endif
+                        class="erp-pagar__filter-chip"
+                        :class="{ 'erp-pagar__filter-chip--active': statusAtivo === @js($value) }"
+                        :aria-pressed="statusAtivo === @js($value) ? 'true' : 'false'"
+                        @click="statusAtivo = @js($value); $wire.setSituacaoFilter(@js($value))"
                     >{{ $label }}</button>
                 @endforeach
             </div>

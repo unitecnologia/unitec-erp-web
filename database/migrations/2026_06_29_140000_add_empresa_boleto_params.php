@@ -60,7 +60,7 @@ return new class extends Migration
                 match ($tipo) {
                     'boolean' => $table->boolean($coluna)->default(false),
                     'text' => $table->text($coluna)->nullable(),
-                    default => $table->string($coluna)->nullable(),
+                    default => $table->text($coluna)->nullable(),
                 };
             }
         });

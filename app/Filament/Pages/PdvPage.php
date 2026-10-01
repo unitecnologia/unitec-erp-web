@@ -6,6 +6,7 @@ use App\Models\CaixaConta;
 use App\Support\Erp\ErpAccess;
 use App\Filament\Pages\Concerns\ManagesPdvUi;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Pdv\PdvErpPolicy;
 use App\Support\Erp\Pdv\TerminalResolver;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -34,7 +35,7 @@ class PdvPage extends Page
 
     public static function canAccess(): bool
     {
-        return ErpAccess::currentCan('pdv.access');
+        return PdvErpPolicy::habilitado() && ErpAccess::currentCan('pdv.access');
     }
 
     public static function getRoutePath(\Filament\Panel $panel): string

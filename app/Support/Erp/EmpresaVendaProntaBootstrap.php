@@ -229,33 +229,68 @@ final class EmpresaVendaProntaBootstrap
             return;
         }
 
-        if ($vendedor->rhFuncionario()->exists()) {
-            return;
-        }
-
-        $cargoId = null;
-
-        if (Schema::hasTable('rh_cargos')) {
-            $cargo = RhCargo::query()->firstOrCreate(
-                ['nome' => 'OPERADOR'],
-                [
-                    'codigo' => RhCargo::nextCodigo(),
-                    'ativo' => true,
-                ],
-            );
-            $cargoId = $cargo->id;
-        }
+        $cargoOperadorId = self::ensureRhCargosPadrao();
 
         $nome = mb_strtoupper(trim((string) $user->name) ?: (string) $vendedor->nome, 'UTF-8');
+        $existente = $vendedor->rhFuncionario()->first();
+
+        if ($existente) {
+            $existente->fill([
+                'nome' => filled($existente->nome) ? $existente->nome : $nome,
+                'cargo_id' => $existente->cargo_id ?: $cargoOperadorId,
+                'user_id' => $user->id,
+                'ativo' => true,
+                'cpf' => filled($existente->cpf) ? $existente->cpf : '00000000000',
+            ]);
+
+            if ($existente->isDirty()) {
+                $existente->save();
+            }
+
+            return;
+        }
 
         RhFuncionario::query()->create([
             'codigo' => RhFuncionario::nextCodigo(),
             'nome' => $nome,
-            'cargo_id' => $cargoId,
+            'cpf' => '00000000000',
+            'cargo_id' => $cargoOperadorId,
             'user_id' => $user->id,
             'vendedor_id' => $vendedor->id,
             'ativo' => true,
             'data_admissao' => now()->toDateString(),
         ]);
+    }
+
+    /**
+     * Cargos padrão do instalador: OPERADOR (1) e ADMINISTRADOR (2).
+     */
+    private static function ensureRhCargosPadrao(): ?int
+    {
+        if (! Schema::hasTable('rh_cargos')) {
+            return null;
+        }
+
+        $operador = RhCargo::query()->firstOrCreate(
+            ['nome' => 'OPERADOR'],
+            [
+                'codigo' => '1',
+                'ativo' => true,
+            ],
+        );
+
+        if ((string) $operador->codigo === '' || (string) $operador->codigo === '0') {
+            $operador->forceFill(['codigo' => '1', 'ativo' => true])->save();
+        }
+
+        RhCargo::query()->firstOrCreate(
+            ['nome' => 'ADMINISTRADOR'],
+            [
+                'codigo' => '2',
+                'ativo' => true,
+            ],
+        );
+
+        return (int) $operador->id;
     }
 }

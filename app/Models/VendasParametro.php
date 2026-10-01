@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Crypt;
     'forma_emissao',
     'tipo_emissao',
     'caminho_certificado',
+    'certificado_pfx',
     'senha_certificado',
     'numero_serie_certificado',
     'crypt_lib',
@@ -63,6 +65,9 @@ use Illuminate\Support\Facades\Crypt;
     'resp_tecnico_fone',
     'resp_tecnico_id_csrt',
     'resp_tecnico_csrt',
+])]
+#[Hidden([
+    'certificado_pfx',
 ])]
 class VendasParametro extends Model
 {
@@ -121,6 +126,14 @@ class VendasParametro extends Model
     public function ensureNumeroPeloMenos(int $minimo): void
     {
         $this->ensureSequenciaPeloMenos('numero', $minimo);
+    }
+
+    /**
+     * Garante que o próximo número NF-e seja pelo menos $minimo (ex.: após rejeição 539).
+     */
+    public function ensureNumeroNfePeloMenos(int $minimo): void
+    {
+        $this->ensureSequenciaPeloMenos('numero_nfe', $minimo);
     }
 
     /**
@@ -280,6 +293,7 @@ class VendasParametro extends Model
     {
         return [
             'dfe_bloqueado_ate' => 'datetime',
+            'certificado_pfx' => 'encrypted',
         ];
     }
 }

@@ -19,6 +19,10 @@ class CreateOrdemServico extends CreateRecord
 
         ErpScreen::set('Lançamento OS');
         $this->initializeOsFormDefaults();
+
+        if ($this->clienteId === null && blank(trim($this->clienteSearch))) {
+            $this->dispatch('erp-os-focus-cliente');
+        }
     }
 
     protected function getRedirectUrl(): string

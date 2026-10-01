@@ -173,18 +173,6 @@ class EmpresaResource extends Resource
                 ->dehydratedWhenHidden();
         }
 
-        foreach (EmpresaParametros::expedicaoFields() as $field => $meta) {
-            $fields[] = TextInput::make($field)
-                ->hidden()
-                ->dehydratedWhenHidden();
-        }
-
-        foreach (EmpresaParametros::expedicaoBooleanFields() as $field => $meta) {
-            $fields[] = Checkbox::make($field)
-                ->hidden()
-                ->dehydratedWhenHidden();
-        }
-
         foreach (EmpresaParametros::moduleEnableFields() as $field => $meta) {
             $fields[] = Checkbox::make($field)
                 ->hidden()

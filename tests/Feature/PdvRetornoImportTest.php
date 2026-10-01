@@ -11,13 +11,13 @@ use App\Models\Product;
 use App\Models\Terminal;
 use App\Models\User;
 use App\Models\Venda;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PdvRetornoImportTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     protected function setUp(): void
     {

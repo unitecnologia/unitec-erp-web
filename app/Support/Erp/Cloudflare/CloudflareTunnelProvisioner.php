@@ -4,7 +4,8 @@ namespace App\Support\Erp\Cloudflare;
 
 use App\Models\Empresa;
 use App\Support\Erp\CloudflaredStatus;
-use Illuminate\Support\Facades\Http;
+use App\Support\Erp\EmpresaParametros;
+use App\Support\Erp\License\LicencaHttpClient;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -66,6 +67,8 @@ final class CloudflareTunnelProvisioner
             // Sem Tunnel ID, ou ID vindo de restore/outro PC sem o JSON local:
             // Cloudflare não devolve o secret — precisa criar túnel novo neste PC.
             $orphanTunnelId = $existingTunnelId;
+            // Valida o hostname ANTES de criar túnel, senão fica órfão se o DNS recusar.
+            $this->assertHostnameAssignable($creds, $hostname, $orphanTunnelId);
             $created = $this->createLocalTunnel(
                 $creds,
                 $this->tunnelName($empresa, $subdomain, $orphanTunnelId !== '')
@@ -76,7 +79,7 @@ final class CloudflareTunnelProvisioner
             $recreatedMissingCredentials = $orphanTunnelId !== '';
         }
 
-        $this->ensureDnsCname($creds, $hostname, $tunnelId);
+        $this->ensureDnsCname($creds, $hostname, $tunnelId, $existingTunnelId);
         $this->writeLocalFiles($programData, $tunnelId, $creds['account_id'], $tunnelSecret, $hostname, $localService);
 
         CloudflaredStatus::ensureExeInProgramData();
@@ -256,50 +259,84 @@ final class CloudflareTunnelProvisioner
     }
 
     /**
+     * Recusa hostname de outro cliente ainda vivo, sem criar túnel órfão.
+     *
      * @param  array{api_token: string, account_id: string, zone_id: string, base_domain: string}  $creds
      */
-    private function ensureDnsCname(array $creds, string $hostname, string $tunnelId): void
+    private function assertHostnameAssignable(array $creds, string $hostname, string $previousTunnelId): void
     {
-        $target = strtolower($tunnelId.'.cfargotunnel.com');
-        $list = $this->request(
-            $creds['api_token'],
-            'get',
-            "https://api.cloudflare.com/client/v4/zones/{$creds['zone_id']}/dns_records",
-            query: [
-                'type' => 'CNAME',
-                'name' => $hostname,
-            ]
-        );
-
-        $records = $list['result'] ?? [];
-        if (! is_array($records)) {
-            $records = [];
+        $record = $this->findCnameRecord($creds, $hostname);
+        if ($record === null) {
+            return;
         }
 
-        foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
+        $content = strtolower(trim((string) ($record['content'] ?? '')));
+        if ($content === '') {
+            return;
+        }
 
-            $content = strtolower(trim((string) ($record['content'] ?? '')));
-            $recordId = trim((string) ($record['id'] ?? ''));
-
-            if ($content === $target) {
-                // Já aponta para este túnel.
-                if ($recordId !== '' && ! ($record['proxied'] ?? false)) {
-                    $this->request(
-                        $creds['api_token'],
-                        'patch',
-                        "https://api.cloudflare.com/client/v4/zones/{$creds['zone_id']}/dns_records/{$recordId}",
-                        ['proxied' => true]
-                    );
-                }
-
+        if (str_ends_with($content, '.cfargotunnel.com')) {
+            $oldTunnelId = $this->tunnelIdFromCnameTarget($content);
+            if ($this->canReclaimHostname($creds, $oldTunnelId, $previousTunnelId)) {
                 return;
             }
 
-            // Pós-restore / recriação: CNAME ainda aponta para outro túnel Unitec — reapontar.
-            if ($recordId !== '' && str_ends_with($content, '.cfargotunnel.com')) {
+            throw new RuntimeException(
+                "O hostname {$hostname} já pertence a outro túnel Cloudflare ({$content}). "
+                .'Escolha outro subdomínio ou remova o CNAME manualmente na zona DNS — '
+                .'esta instalação não altera DNS de outro cliente.'
+            );
+        }
+
+        throw new RuntimeException(
+            "O hostname {$hostname} já existe no DNS apontando para \"{$content}\". Escolha outro subdomínio."
+        );
+    }
+
+    /**
+     * @param  array{api_token: string, account_id: string, zone_id: string, base_domain: string}  $creds
+     */
+    private function ensureDnsCname(array $creds, string $hostname, string $tunnelId, string $previousTunnelId = ''): void
+    {
+        $target = strtolower($tunnelId.'.cfargotunnel.com');
+        $record = $this->findCnameRecord($creds, $hostname);
+
+        if ($record === null) {
+            $this->request(
+                $creds['api_token'],
+                'post',
+                "https://api.cloudflare.com/client/v4/zones/{$creds['zone_id']}/dns_records",
+                [
+                    'type' => 'CNAME',
+                    'name' => $hostname,
+                    'content' => $target,
+                    'proxied' => true,
+                    'ttl' => 1,
+                ]
+            );
+
+            return;
+        }
+
+        $content = strtolower(trim((string) ($record['content'] ?? '')));
+        $recordId = trim((string) ($record['id'] ?? ''));
+
+        if ($content === $target) {
+            if ($recordId !== '' && ! ($record['proxied'] ?? false)) {
+                $this->request(
+                    $creds['api_token'],
+                    'patch',
+                    "https://api.cloudflare.com/client/v4/zones/{$creds['zone_id']}/dns_records/{$recordId}",
+                    ['proxied' => true]
+                );
+            }
+
+            return;
+        }
+
+        if ($recordId !== '' && str_ends_with($content, '.cfargotunnel.com')) {
+            $oldTunnelId = $this->tunnelIdFromCnameTarget($content);
+            if ($this->canReclaimHostname($creds, $oldTunnelId, $previousTunnelId)) {
                 $this->request(
                     $creds['api_token'],
                     'patch',
@@ -317,22 +354,109 @@ final class CloudflareTunnelProvisioner
             }
 
             throw new RuntimeException(
-                "O hostname {$hostname} já existe no DNS apontando para \"{$content}\". Escolha outro subdomínio."
+                "O hostname {$hostname} já pertence a outro túnel Cloudflare ({$content}). "
+                .'Escolha outro subdomínio ou remova o CNAME manualmente na zona DNS — '
+                .'esta instalação não altera DNS de outro cliente.'
             );
         }
 
-        $this->request(
+        throw new RuntimeException(
+            "O hostname {$hostname} já existe no DNS apontando para \"{$content}\". Escolha outro subdomínio."
+        );
+    }
+
+    /**
+     * @param  array{api_token: string, account_id: string, zone_id: string, base_domain: string}  $creds
+     * @return array<string, mixed>|null
+     */
+    private function findCnameRecord(array $creds, string $hostname): ?array
+    {
+        $list = $this->request(
             $creds['api_token'],
-            'post',
+            'get',
             "https://api.cloudflare.com/client/v4/zones/{$creds['zone_id']}/dns_records",
-            [
+            query: [
                 'type' => 'CNAME',
                 'name' => $hostname,
-                'content' => $target,
-                'proxied' => true,
-                'ttl' => 1,
             ]
         );
+
+        $records = $list['result'] ?? [];
+        if (! is_array($records)) {
+            return null;
+        }
+
+        foreach ($records as $record) {
+            if (is_array($record) && trim((string) ($record['id'] ?? '')) !== '') {
+                return $record;
+            }
+        }
+
+        return null;
+    }
+
+    private function tunnelIdFromCnameTarget(string $content): string
+    {
+        $host = strtolower(trim($content));
+        $suffix = '.cfargotunnel.com';
+        if (! str_ends_with($host, $suffix)) {
+            return '';
+        }
+
+        return trim(substr($host, 0, -strlen($suffix)));
+    }
+
+    /**
+     * CNAME de túnel apagado, inexistente ou o próprio ID antigo desta empresa pode ser reapontado.
+     *
+     * @param  array{api_token: string, account_id: string, zone_id: string, base_domain: string}  $creds
+     */
+    private function canReclaimHostname(array $creds, string $oldTunnelId, string $previousTunnelId): bool
+    {
+        if ($oldTunnelId === '') {
+            return false;
+        }
+
+        if ($previousTunnelId !== '' && strcasecmp($oldTunnelId, $previousTunnelId) === 0) {
+            return true;
+        }
+
+        return $this->tunnelIsGoneOrDeleted($creds, $oldTunnelId);
+    }
+
+    /**
+     * @param  array{api_token: string, account_id: string, zone_id: string, base_domain: string}  $creds
+     */
+    private function tunnelIsGoneOrDeleted(array $creds, string $tunnelId): bool
+    {
+        $payload = $this->request(
+            $creds['api_token'],
+            'get',
+            "https://api.cloudflare.com/client/v4/accounts/{$creds['account_id']}/cfd_tunnel/{$tunnelId}",
+            failOnError: false
+        );
+
+        $ok = (bool) ($payload['_ok'] ?? true);
+        $status = (int) ($payload['_http_status'] ?? 0);
+        if (! $ok && ($status === 404 || $status === 400)) {
+            return true;
+        }
+
+        if (! $ok) {
+            return false;
+        }
+
+        $result = $payload['result'] ?? [];
+        if (! is_array($result)) {
+            return false;
+        }
+
+        $deletedAt = trim((string) ($result['deleted_at'] ?? ''));
+        if ($deletedAt === '' || str_starts_with($deletedAt, '0001-01-01')) {
+            return false;
+        }
+
+        return true;
     }
 
     private function writeLocalFiles(
@@ -368,6 +492,23 @@ final class CloudflareTunnelProvisioner
 
         $configPath = $programData.DIRECTORY_SEPARATOR.'config.yml';
         $credentialsPathYaml = str_replace('\\', '/', $credentialsPath);
+
+        // Callback Ailos central (JWT) — mesmo túnel da loja quando o DNS aponta para cá.
+        $callbackHost = strtolower((string) parse_url(
+            EmpresaParametros::BOLETO_AILOS_AUTH_CALLBACK_URL,
+            PHP_URL_HOST
+        ));
+        $extraIngress = '';
+        if ($callbackHost !== '' && $callbackHost !== strtolower($hostname)) {
+            $extraIngress = <<<INGRESS
+  - hostname: {$callbackHost}
+    service: {$localService}
+    originRequest:
+      httpHostHeader: {$callbackHost}
+
+INGRESS;
+        }
+
         $yml = <<<YML
 # Gerado pelo Unitec ERP — não editar à mão se for reprovisionar pela tela.
 tunnel: {$tunnelId}
@@ -376,7 +517,9 @@ credentials-file: {$credentialsPathYaml}
 ingress:
   - hostname: {$hostname}
     service: {$localService}
-  - service: http_status:404
+    originRequest:
+      httpHostHeader: {$hostname}
+{$extraIngress}  - service: http_status:404
 YML;
 
         if (@file_put_contents($configPath, $yml) === false) {
@@ -389,9 +532,17 @@ YML;
      * @param  array<string, mixed>  $query
      * @return array<string, mixed>
      */
-    private function request(string $token, string $method, string $url, ?array $json = null, array $query = []): array
-    {
-        $pending = Http::withToken($token)
+    private function request(
+        string $token,
+        string $method,
+        string $url,
+        ?array $json = null,
+        array $query = [],
+        bool $failOnError = true,
+    ): array {
+        // FrankenPHP/Windows não herda curl.cainfo — CA bundle explícito (mesmo padrão CEP/licença).
+        $pending = LicencaHttpClient::make()
+            ->withToken($token)
             ->acceptJson()
             ->timeout(45)
             ->withHeaders(['Content-Type' => 'application/json']);
@@ -411,6 +562,13 @@ YML;
         }
 
         if (! $response->successful() || ($body['success'] ?? false) !== true) {
+            if (! $failOnError) {
+                $body['_ok'] = false;
+                $body['_http_status'] = $response->status();
+
+                return $body;
+            }
+
             $errors = $body['errors'] ?? [];
             $messages = [];
             if (is_array($errors)) {
@@ -424,6 +582,9 @@ YML;
 
             throw new RuntimeException('Cloudflare API: '.$detail);
         }
+
+        $body['_ok'] = true;
+        $body['_http_status'] = $response->status();
 
         return $body;
     }

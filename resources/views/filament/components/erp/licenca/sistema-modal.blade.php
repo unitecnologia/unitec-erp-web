@@ -154,15 +154,6 @@
                         <span wire:loading.remove wire:target="ativarOnline">Ativar Online</span>
                         <span wire:loading wire:target="ativarOnline">Consultando portal…</span>
                     </button>
-
-                    @if (filled($this->pagamentoUrl))
-                        <a
-                            href="{{ $this->pagamentoUrl }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="erp-licenca-sistema-modal__btn erp-licenca-sistema-modal__btn--ghost"
-                        >Abrir portal</a>
-                    @endif
                 </div>
             @else
                 <div class="erp-licenca-sistema-modal__offline">

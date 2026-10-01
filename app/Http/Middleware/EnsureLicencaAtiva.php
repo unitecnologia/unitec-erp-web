@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Filament\Pages\LicencaBloqueadaPage;
 use App\Models\Empresa;
 use App\Support\Erp\License\LicencaRemotaService;
+use App\Support\Gestor\GestorLoginDiag;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -44,6 +45,11 @@ class EnsureLicencaAtiva
         }
 
         if ($allowed === false) {
+            GestorLoginDiag::log('bloqueio_licenca', [
+                'user_id' => $request->user()?->getAuthIdentifier(),
+                'target_url' => LicencaBloqueadaPage::getUrl(),
+            ]);
+
             return redirect()->to(LicencaBloqueadaPage::getUrl());
         }
 
@@ -54,6 +60,12 @@ class EnsureLicencaAtiva
         if ($snapshot->isAllowed()) {
             return $next($request);
         }
+
+        GestorLoginDiag::log('bloqueio_licenca', [
+            'user_id' => $request->user()?->getAuthIdentifier(),
+            'target_url' => LicencaBloqueadaPage::getUrl(),
+            'from_cache_gate' => true,
+        ]);
 
         return redirect()->to(LicencaBloqueadaPage::getUrl());
     }

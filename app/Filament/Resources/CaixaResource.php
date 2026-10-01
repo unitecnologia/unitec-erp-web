@@ -38,9 +38,9 @@ class CaixaResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('codigo')
-                    ->label('>>Código')
-                    ->sortable()
+                TextColumn::make('documento')
+                    ->label('Pedido')
+                    ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('emissao')
@@ -48,10 +48,6 @@ class CaixaResource extends Resource
                     ->date('d/m/Y')
                     ->sortable()
                     ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('documento')
-                    ->label('Documento')
-                    ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('historico')
                     ->label('Histórico')

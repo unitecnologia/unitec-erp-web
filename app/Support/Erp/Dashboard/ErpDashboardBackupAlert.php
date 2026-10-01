@@ -2,6 +2,10 @@
 
 namespace App\Support\Erp\Dashboard;
 
+use App\Support\Erp\ErpSystemConfig;
+use App\Support\Erp\ErpTimezone;
+use Throwable;
+
 final class ErpDashboardBackupAlert
 {
     /**
@@ -9,31 +13,45 @@ final class ErpDashboardBackupAlert
      */
     public static function resolve(): array
     {
-        $status = (string) config('unitec.backup_last_status', 'ok');
+        $status = mb_strtolower(trim(ErpSystemConfig::backupLastStatus()), 'UTF-8');
+        $failed = in_array($status, ['failed', 'erro', 'error', 'falha'], true);
+        $at = self::formatBackupAt(ErpSystemConfig::backupLastAt());
 
-        if ($status === 'failed') {
+        if ($failed) {
             return [
                 'tone' => 'red',
                 'title' => 'Backup automático falhou',
-                'time' => self::timeLabel(true),
+                'time' => $at ?? 'Sem data registrada',
+            ];
+        }
+
+        if ($status === '' || $at === null) {
+            return [
+                'tone' => 'amber',
+                'title' => 'Backup automático sem registro',
+                'time' => 'Ainda não há backup concluído',
             ];
         }
 
         return [
             'tone' => 'green',
             'title' => 'Backup automático concluído',
-            'time' => self::timeLabel(false),
+            'time' => $at,
         ];
     }
 
-    private static function timeLabel(bool $failed): string
+    private static function formatBackupAt(?string $raw): ?string
     {
-        $at = config('unitec.backup_last_at');
+        $raw = trim((string) $raw);
 
-        if (filled($at)) {
-            return (string) $at;
+        if ($raw === '') {
+            return null;
         }
 
-        return $failed ? 'Hoje' : 'Ontem';
+        try {
+            return ErpTimezone::toLocal($raw)->format('d/m/Y H:i:s');
+        } catch (Throwable) {
+            return $raw;
+        }
     }
 }

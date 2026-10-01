@@ -36,7 +36,9 @@ final class NotaFornecedorXmlDownloadService
         $nota->refresh();
 
         if ($this->hasItens($nota->xml)) {
-            return $nota;
+            (new \App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService())->sync($nota);
+
+            return $nota->fresh() ?? $nota;
         }
 
         $parametros = VendasParametro::forEmpresa((int) $empresa->id);
@@ -342,6 +344,9 @@ final class NotaFornecedorXmlDownloadService
     private function persistXml(NotaFornecedor $nota, string $xml): NotaFornecedor
     {
         $nota->forceFill(['xml' => $xml])->save();
+        $nota = $nota->fresh() ?? $nota;
+
+        (new \App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService())->sync($nota);
 
         return $nota->fresh() ?? $nota;
     }

@@ -9,6 +9,7 @@
             'localizacoes' => 'Localizações',
             'trocas' => 'Trocas',
             'dados_anp' => 'Dados ANP',
+            'movimentacoes' => 'Movimentações',
         ] as $key => $label)
             <button
                 type="button"
@@ -98,6 +99,8 @@
                     </table>
                 </div>
             </div>
+        @elseif ($sub === 'movimentacoes')
+            @include('filament.components.erp.produtos.form.movimentacoes')
         @else
             <div class="erp-produtos-anp" wire:key="estoque-panel-anp">
                 <p class="erp-produtos-estoques__hint">

@@ -10,6 +10,12 @@
     value="{{ $key }}"
     @checked($marcado)
     wire:click.stop="alternarSelecionado({{ $record->getKey() }})"
-    wire:key="fv-sel-{{ $key }}"
-    @click.stop
+    wire:key="fv-sel-{{ $key }}-{{ $marcado ? '1' : '0' }}"
+    x-data
+    @click.stop="
+        const row = $el.closest('.fi-ta-row');
+        if (row) {
+            row.classList.toggle('erp-row-selected', $el.checked);
+        }
+    "
 />

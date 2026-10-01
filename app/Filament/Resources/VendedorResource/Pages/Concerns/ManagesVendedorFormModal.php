@@ -694,7 +694,6 @@ JS);
             'inss' => '',
             'estoque' => '',
             'estoque_id' => '',
-            'usar_agendamento' => false,
             'usuario_id' => '',
             'setor_vendas' => true,
             'tabela_venda_id' => $this->defaultTabelaVendaId(),
@@ -752,7 +751,6 @@ JS);
             'inss' => (string) $record->inss,
             'estoque' => (string) $record->estoque,
             'estoque_id' => $record->estoque_id ? (string) $record->estoque_id : '',
-            'usar_agendamento' => (bool) $record->usar_agendamento,
             'usuario_id' => optional($record->usuario)->id ? (string) $record->usuario->id : '',
             'setor_vendas' => (bool) $record->setor_vendas,
             'tabela_venda_id' => $record->tabela_venda_id ? (string) $record->tabela_venda_id : '',
@@ -802,7 +800,7 @@ JS);
         }
 
         foreach ([
-            'usar_agendamento', 'setor_vendas', 'ganha_comissao_todas_vendas',
+            'setor_vendas', 'ganha_comissao_todas_vendas',
             'setor_servicos', 'ganha_comissao_todos_servicos', 'efetua_venda',
             'motorista', 'ajudante',
         ] as $flag) {

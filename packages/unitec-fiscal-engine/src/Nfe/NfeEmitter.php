@@ -8,6 +8,7 @@ use Unitec\FiscalEngine\Dto\EmitirNfeResponse;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 use Unitec\FiscalEngine\Nfce\ScNfceSoapClient;
 use Unitec\FiscalEngine\Xml\NfeXmlBuilder;
+use Unitec\FiscalEngine\Xml\NfeXmlSchemaGuard;
 use Unitec\FiscalEngine\Xml\XmlSigner;
 
 final class NfeEmitter
@@ -45,6 +46,8 @@ final class NfeEmitter
 
         $this->signer->signInfNFe($dom, $request->certificate);
         $nfeXml = $this->xmlBuilder->finalizeNfeXml($dom);
+        // Somente leitura: valida uma cópia parseada, sem alterar o XML assinado.
+        NfeXmlSchemaGuard::assertDetLayoutXml($nfeXml);
 
         return [
             'nfeXml' => $nfeXml,

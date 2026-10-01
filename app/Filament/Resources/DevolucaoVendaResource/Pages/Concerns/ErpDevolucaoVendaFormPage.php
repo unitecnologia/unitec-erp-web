@@ -7,6 +7,7 @@ use App\Models\DevolucaoVenda;
 use App\Models\DevolucaoVendaItem;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\ClienteCreditoService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
@@ -37,6 +38,34 @@ trait ErpDevolucaoVendaFormPage
     public string $observacoes = '';
 
     public string $totalDisplay = '0,00';
+
+    public bool $valePreviaPronta = false;
+
+    public string $valeEmpresaNome = '';
+
+    public string $valeEmpresaCnpj = '';
+
+    public string $valeEmpresaEndereco = '';
+
+    public string $valeEmpresaFone = '';
+
+    public string $valeOperador = '';
+
+    public bool $valeImpressaoLiberada = false;
+
+    public bool $devolucaoTravada = false;
+
+    public bool $creditoDevolucaoModal = false;
+
+    public string $creditoDevolucaoValor = '0,00';
+
+    public string $creditoDevolucaoTotal = '0,00';
+
+    public string $creditoDevolucaoAbatimentos = '0,00';
+
+    public string $creditoDevolucaoCliente = '';
+
+    public string $destinoRestoFinalizar = FinalizarDevolucaoVendaService::DESTINO_DINHEIRO;
 
     public ?int $vendaId = null;
 
@@ -136,7 +165,10 @@ trait ErpDevolucaoVendaFormPage
         $this->vendedorNome = '';
         $this->itens = [];
         $this->selectedItemIndex = null;
+        $this->valeImpressaoLiberada = false;
+        $this->devolucaoTravada = false;
         $this->closeVendaLookup();
+        $this->carregarPreviaVale();
     }
 
     public function loadDevolucaoFormFromRecord(DevolucaoVenda $record): void
@@ -176,13 +208,13 @@ trait ErpDevolucaoVendaFormPage
             ])
             ->all();
 
+        $this->valeImpressaoLiberada = $record->situacao === DevolucaoVenda::SITUACAO_FINALIZADA;
+        $this->devolucaoTravada = $this->valeImpressaoLiberada;
         $this->recalcTotais();
         $this->closeVendaLookup();
+        $this->carregarPreviaVale();
     }
 
-    /**
-     * @return array<int, array{id: int, nome: string}>
-     */
     /**
      * Vendedor da devolução é herdado da venda — não há seleção livre.
      * Mantém só o rótulo do vendedor atual (inclui legado) para exibição.
@@ -217,13 +249,82 @@ trait ErpDevolucaoVendaFormPage
         $this->vendaLookupOpen = false;
         $this->vendaResults = [];
         $this->selectedVendaIndex = null;
+
+        if ($this->vendaId && trim($this->vendaSearch) === '' && $this->vendaNumero !== '') {
+            $this->vendaSearch = trim($this->vendaNumero).' — '.trim($this->clienteNome);
+        }
+    }
+
+    public function buscarVendaPelaData(): void
+    {
+        if ($this->devolucaoTravada) {
+            return;
+        }
+
+        $this->vendaLookupOpen = true;
+        $this->selectedVendaIndex = null;
+        $this->searchVendas();
+    }
+
+    public function atualizarDataDevolucao(): void
+    {
+        if ($this->devolucaoTravada || $this->vendaId) {
+            return;
+        }
+
+        $this->buscarVendaPelaData();
+    }
+
+    /**
+     * Data da venda quando o número não é conhecido.
+     * Aceita a data digitada na busca ou, se a busca estiver vazia, a data ao lado.
+     */
+    private function dataDaBusca(string $term): ?string
+    {
+        $informada = $this->normalizarDataBusca($term);
+
+        if ($informada !== null) {
+            return $informada;
+        }
+
+        if ($term !== '') {
+            return null;
+        }
+
+        return $this->normalizarDataBusca($this->dataDevolucao);
+    }
+
+    private function normalizarDataBusca(string $valor): ?string
+    {
+        $valor = trim($valor);
+
+        if ($valor === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) === 1) {
+            return $valor;
+        }
+
+        if (preg_match('/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/', $valor, $partes) === 1) {
+            $ano = strlen($partes[3]) === 2 ? '20'.$partes[3] : $partes[3];
+
+            return sprintf('%04d-%02d-%02d', (int) $ano, (int) $partes[2], (int) $partes[1]);
+        }
+
+        if (preg_match('/^(\d{1,2})[\/\-.](\d{1,2})$/', $valor, $partes) === 1) {
+            return sprintf('%04d-%02d-%02d', (int) date('Y'), (int) $partes[2], (int) $partes[1]);
+        }
+
+        return null;
     }
 
     public function searchVendas(): void
     {
         $term = trim($this->vendaSearch);
+        $data = $this->dataDaBusca($term);
 
-        if (mb_strlen($term) < 1) {
+        if ($term === '' && $data === null) {
             $this->vendaResults = [];
 
             return;
@@ -233,17 +334,20 @@ trait ErpDevolucaoVendaFormPage
 
         $this->vendaResults = Venda::query()
             ->with('cliente')
-            ->where(function ($q) use ($like, $term): void {
-                $q->where('numero', 'like', $like);
-                if (is_numeric($term)) {
-                    $q->orWhere('numero', 'like', '%'.ltrim($term, '0').'%');
-                }
-                $q->orWhereHas('cliente', fn ($c) => $c->where('nome_razao', 'like', $like));
+            ->when($data !== null, fn ($query) => $query->whereDate('data', $data))
+            ->when($data === null, function ($query) use ($like, $term): void {
+                $query->where(function ($q) use ($like, $term): void {
+                    $q->where('numero', 'like', $like);
+                    if (is_numeric($term)) {
+                        $q->orWhere('numero', 'like', '%'.ltrim($term, '0').'%');
+                    }
+                    $q->orWhereHas('cliente', fn ($c) => $c->where('nome_razao', 'like', $like));
+                });
             })
             ->whereIn('status', [Venda::STATUS_FECHADO, Venda::STATUS_GRAVADO])
             ->orderByDesc('data')
             ->orderByDesc('id')
-            ->limit(20)
+            ->limit(30)
             ->get()
             ->map(fn (Venda $venda): array => [
                 'id' => (int) $venda->id,
@@ -435,8 +539,22 @@ trait ErpDevolucaoVendaFormPage
         $this->selectedItemIndex = $index;
     }
 
+    public function removeItemAt(int $index): void
+    {
+        if ($this->devolucaoTravada || ! isset($this->itens[$index])) {
+            return;
+        }
+
+        $this->selectedItemIndex = $index;
+        $this->removeSelectedItem();
+    }
+
     public function removeSelectedItem(): void
     {
+        if ($this->devolucaoTravada) {
+            return;
+        }
+
         if ($this->selectedItemIndex === null || ! isset($this->itens[$this->selectedItemIndex])) {
             return;
         }
@@ -486,6 +604,12 @@ trait ErpDevolucaoVendaFormPage
 
     public function gravarDevolucao(): void
     {
+        if ($this->devolucaoTravada) {
+            Notification::make()->title('Esta troca já foi finalizada.')->warning()->send();
+
+            return;
+        }
+
         if (! $this->validateBeforeSave()) {
             return;
         }
@@ -502,6 +626,64 @@ trait ErpDevolucaoVendaFormPage
 
     public function finalizarDevolucao(): void
     {
+        if ($this->creditoDevolucaoModal) {
+            $this->confirmarCreditoDevolucao();
+
+            return;
+        }
+
+        if ($this->devolucaoTravada) {
+            Notification::make()->title('Esta troca já foi finalizada.')->warning()->send();
+
+            return;
+        }
+
+        if (! $this->validateBeforeSave()) {
+            return;
+        }
+
+        $this->recalcTotais();
+        $resumo = (new FinalizarDevolucaoVendaService())->preverRestituicao(
+            $this->vendaId ? (int) $this->vendaId : null,
+            ErpMoney::parseBr($this->totalDisplay),
+        );
+        $clienteId = $this->clienteId ? (int) $this->clienteId : null;
+
+        if ($resumo['a_devolver'] > 0.009 && (new ClienteCreditoService())->podeReceberCredito($clienteId)) {
+            $this->creditoDevolucaoTotal = ErpMoney::formatBr($resumo['total']);
+            $this->creditoDevolucaoAbatimentos = ErpMoney::formatBr($resumo['abatimentos']);
+            $this->creditoDevolucaoValor = ErpMoney::formatBr($resumo['a_devolver']);
+            $this->creditoDevolucaoCliente = trim($this->clienteNome) !== '' ? trim($this->clienteNome) : 'o cliente';
+            $this->creditoDevolucaoModal = true;
+
+            return;
+        }
+
+        $this->destinoRestoFinalizar = FinalizarDevolucaoVendaService::DESTINO_DINHEIRO;
+        $this->executarFinalizarDevolucao();
+    }
+
+    public function confirmarCreditoDevolucao(): void
+    {
+        $this->creditoDevolucaoModal = false;
+        $this->destinoRestoFinalizar = FinalizarDevolucaoVendaService::DESTINO_CREDITO;
+        $this->executarFinalizarDevolucao();
+    }
+
+    public function confirmarDinheiroDevolucao(): void
+    {
+        $this->creditoDevolucaoModal = false;
+        $this->destinoRestoFinalizar = FinalizarDevolucaoVendaService::DESTINO_DINHEIRO;
+        $this->executarFinalizarDevolucao();
+    }
+
+    public function cancelarCreditoDevolucao(): void
+    {
+        $this->creditoDevolucaoModal = false;
+    }
+
+    protected function executarFinalizarDevolucao(): void
+    {
         if (! $this->validateBeforeSave()) {
             return;
         }
@@ -510,14 +692,13 @@ trait ErpDevolucaoVendaFormPage
             return;
         }
 
+        $this->valeImpressaoLiberada = true;
+        $this->devolucaoTravada = true;
+
         Notification::make()
-            ->title('Devolução finalizada.')
-            ->body('Estoque devolvido e financeiro aplicado (estorno de títulos em aberto e/ou saída no Livro Caixa).')
+            ->title('Troca incluída com sucesso!')
             ->success()
             ->send();
-
-        ErpScreen::set('Devolução de Venda');
-        $this->redirect(DevolucaoVendaResource::getUrl('index'), navigate: false);
     }
 
     protected function validateBeforeSave(): bool
@@ -654,7 +835,7 @@ trait ErpDevolucaoVendaFormPage
         if ($finalizar && $recordId) {
             try {
                 $record = DevolucaoVenda::query()->findOrFail($recordId);
-                (new FinalizarDevolucaoVendaService())->finalizar($record);
+                (new FinalizarDevolucaoVendaService())->finalizar($record, $this->destinoRestoFinalizar);
             } catch (DomainException $exception) {
                 Notification::make()
                     ->title('Não foi possível finalizar a devolução.')
@@ -723,8 +904,68 @@ trait ErpDevolucaoVendaFormPage
 
     public function handleDevolucaoFormEscape(): void
     {
+        if ($this->creditoDevolucaoModal) {
+            $this->cancelarCreditoDevolucao();
+
+            return;
+        }
+
         ErpScreen::set('Devolução de Venda');
         $this->redirect(DevolucaoVendaResource::getUrl('index'), navigate: false);
+    }
+
+    protected function carregarPreviaVale(): void
+    {
+        if ($this->valePreviaPronta) {
+            return;
+        }
+
+        $this->valeOperador = trim((string) (Auth::user()?->name ?? ''));
+
+        $empresa = ErpContext::currentEmpresa();
+
+        if ($empresa) {
+            $nome = trim((string) ($empresa->fantasia ?: $empresa->nome ?: $empresa->razao_social));
+            $this->valeEmpresaNome = $nome;
+            $this->valeEmpresaCnpj = $this->formatarDocumentoPrevia((string) $empresa->cnpj);
+            $this->valeEmpresaEndereco = $this->montarEnderecoPrevia($empresa);
+            $this->valeEmpresaFone = trim((string) $empresa->telefone);
+        }
+
+        $this->valePreviaPronta = true;
+    }
+
+    protected function formatarDocumentoPrevia(string $documento): string
+    {
+        $digitos = preg_replace('/\D/', '', $documento) ?? '';
+
+        if (strlen($digitos) === 14) {
+            return substr($digitos, 0, 2).'.'.substr($digitos, 2, 3).'.'.substr($digitos, 5, 3)
+                .'/'.substr($digitos, 8, 4).'-'.substr($digitos, 12, 2);
+        }
+
+        return trim($documento);
+    }
+
+    protected function montarEnderecoPrevia(\App\Models\Empresa $empresa): string
+    {
+        $linha = trim(implode(', ', array_filter([
+            trim((string) $empresa->endereco),
+            trim((string) $empresa->numero),
+            trim((string) $empresa->bairro),
+        ])));
+
+        $cidade = trim(implode(' - ', array_filter([
+            trim((string) $empresa->cidade),
+            trim((string) $empresa->uf),
+        ])));
+
+        $cep = preg_replace('/\D/', '', (string) $empresa->cep) ?? '';
+        $cepLinha = strlen($cep) === 8
+            ? 'CEP '.substr($cep, 0, 5).'-'.substr($cep, 5)
+            : ($cep !== '' ? 'CEP '.$cep : '');
+
+        return trim(implode("\n", array_filter([$linha, $cidade, $cepLinha])));
     }
 
     public function dataDevolucaoDisplay(): string

@@ -2,20 +2,31 @@
 
 namespace App\Support\Erp\Backup;
 
+use App\Models\Empresa;
 use App\Support\Erp\ErpSystemConfig;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
 final class DatabaseBackupService
 {
+    /** Quantidade de dumps automáticos `unitec_erp_*.sql` mantidos na pasta do usuário. */
+    public const KEEP_AUTOMATIC_BACKUPS = 4;
+
+    /**
+     * @deprecated Mantido por compatibilidade de telas antigas; a retenção real é por quantidade.
+     */
     public const RETENTION_DAYS = 14;
 
     public const FILE_PREFIX = 'unitec_erp_';
 
     public const PRE_UPDATE_PREFIX = 'unitec_erp_preupdate_';
+
+    /** Regex do dump automático (exclui preupdate e .sql manuais). */
+    private const AUTOMATIC_SQL_PATTERN = '/^unitec_erp_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql$/i';
 
     /**
      * Backup forçado antes de atualizar o sistema (ignora intervalo / flag automática).
@@ -32,7 +43,8 @@ final class DatabaseBackupService
      */
     public function run(?int $empresaId = null, bool $scheduled = false, bool $preUpdate = false): array
     {
-        $empresa = ErpSystemConfig::empresa($empresaId);
+        // Configuração única do sistema (não depende da empresa da sessão).
+        $empresaId = ErpSystemConfig::empresaForBackup($empresaId)?->id;
 
         if ($scheduled && ! ErpSystemConfig::backupEnabled($empresaId)) {
             return [
@@ -131,8 +143,32 @@ final class DatabaseBackupService
                 }
             }
 
-            $removed = $this->purgeOldBackups($destination);
-            $size = (int) filesize($targetPath);
+            $size = is_file($targetPath) ? (int) filesize($targetPath) : 0;
+
+            if ($size <= 0) {
+                @unlink($targetPath);
+                $this->markStatus($empresaId, 'failed', 'Arquivo de backup vazio');
+
+                return [
+                    'ok' => false,
+                    'message' => 'Backup gerado está vazio; rotação não executada.',
+                ];
+            }
+
+            Log::info('erp.backup.created', [
+                'path' => $targetPath,
+                'filename' => $filename,
+                'size' => $size,
+                'size_label' => $this->formatBytes($size),
+                'destination' => $destination,
+                'pre_update' => $preUpdate,
+            ]);
+
+            // Rotação somente após dump confirmado (tamanho > 0). Falha na exclusão não invalida o backup.
+            $removed = $preUpdate
+                ? 0
+                : $this->rotateAutomaticBackups($destination, self::KEEP_AUTOMATIC_BACKUPS);
+
             $this->markStatus($empresaId, 'ok', 'Backup concluído - '.$this->formatBytes($size));
 
             $label = $preUpdate ? 'Backup pré-update' : 'Backup';
@@ -141,6 +177,10 @@ final class DatabaseBackupService
                 $message .= ' Inclui cópia do .env.';
             } else {
                 $message .= ' Aviso: .env não encontrado para copiar.';
+            }
+
+            if ($removed > 0) {
+                $message .= ' Rotação: '.$removed.' arquivo(s) antigo(s) removido(s).';
             }
 
             return [
@@ -684,11 +724,21 @@ final class DatabaseBackupService
      */
     public function listBackups(?int $empresaId = null, int $limit = 40): array
     {
-        $destination = $this->resolveDestination($empresaId);
+        return $this->listBackupsInPath($this->resolveDestination($empresaId), $limit);
+    }
 
-        if (! is_dir($destination)) {
+    /**
+     * @return list<array{name: string, path: string, kind: string, size: int, size_label: string, modified_at: string, modified_ts: int}>
+     */
+    public function listBackupsInPath(string $directory, int $limit = 40): array
+    {
+        $destination = $this->normalizePath(trim($directory));
+
+        if ($destination === '' || str_contains($destination, '..') || ! is_dir($destination)) {
             return [];
         }
+
+        clearstatcache(true, $destination);
 
         $files = collect(File::files($destination))
             ->filter(function ($file): bool {
@@ -722,34 +772,130 @@ final class DatabaseBackupService
         })->all();
     }
 
-    public function purgeOldBackups(string $destination, int $retentionDays = self::RETENTION_DAYS): int
+    /**
+     * Mantém apenas os N dumps automáticos mais recentes (`unitec_erp_YYYY-MM-DD_HH-MM-SS.sql`).
+     * Não remove preupdate nem .sql manuais. Só roda após o novo backup estar confirmado.
+     *
+     * @return int Quantidade de arquivos .sql removidos (pares .env não entram na contagem principal).
+     */
+    public function rotateAutomaticBackups(string $destination, int $keep = self::KEEP_AUTOMATIC_BACKUPS): int
     {
-        if (! is_dir($destination)) {
+        if (! is_dir($destination) || $keep < 1) {
             return 0;
         }
 
-        $cutoff = time() - ($retentionDays * 86400);
-        $removed = 0;
+        $automatic = [];
 
         foreach (File::files($destination) as $file) {
             $name = $file->getFilename();
-            $lower = mb_strtolower($name);
 
-            if (! str_starts_with($name, self::FILE_PREFIX) && ! str_starts_with($name, self::PRE_UPDATE_PREFIX)) {
+            if (! preg_match(self::AUTOMATIC_SQL_PATTERN, $name)) {
                 continue;
             }
 
-            if (! str_ends_with($lower, '.sql') && ! str_ends_with($lower, '.env')) {
-                continue;
+            $automatic[] = [
+                'name' => $name,
+                'path' => $file->getPathname(),
+                'stamp' => $this->automaticBackupStamp($name),
+                'mtime' => $file->getMTime(),
+                'size' => (int) $file->getSize(),
+            ];
+        }
+
+        // Mais recente primeiro: carimbo no nome (Y-m-d_H-i-s), fallback mtime.
+        usort($automatic, function (array $a, array $b): int {
+            $cmp = strcmp((string) $b['stamp'], (string) $a['stamp']);
+
+            return $cmp !== 0 ? $cmp : ($b['mtime'] <=> $a['mtime']);
+        });
+
+        $found = count($automatic);
+
+        Log::info('erp.backup.rotation.scan', [
+            'destination' => $destination,
+            'found' => $found,
+            'keep' => $keep,
+        ]);
+
+        if ($found <= $keep) {
+            return 0;
+        }
+
+        $toRemove = array_slice($automatic, $keep);
+        $removed = 0;
+
+        foreach ($toRemove as $item) {
+            $path = (string) $item['path'];
+            $name = (string) $item['name'];
+
+            try {
+                if (is_file($path)) {
+                    File::delete($path);
+                }
+
+                if (! is_file($path)) {
+                    $removed++;
+                    Log::info('erp.backup.rotation.removed', [
+                        'file' => $name,
+                        'path' => $path,
+                        'size' => $item['size'],
+                    ]);
+                } else {
+                    Log::warning('erp.backup.rotation.delete_failed', [
+                        'file' => $name,
+                        'path' => $path,
+                        'message' => 'Arquivo ainda existe após File::delete.',
+                    ]);
+                }
+            } catch (Throwable $e) {
+                Log::warning('erp.backup.rotation.delete_failed', [
+                    'file' => $name,
+                    'path' => $path,
+                    'message' => $e->getMessage(),
+                ]);
             }
 
-            if ($file->getMTime() < $cutoff) {
-                File::delete($file->getPathname());
-                $removed++;
+            // Remove .env companheiro do mesmo carimbo, se existir (não falha o backup).
+            $envPath = preg_replace('/\.sql$/i', '.env', $path) ?? '';
+
+            if ($envPath !== '' && is_file($envPath)) {
+                try {
+                    File::delete($envPath);
+                    Log::info('erp.backup.rotation.removed_env', [
+                        'file' => basename($envPath),
+                        'path' => $envPath,
+                    ]);
+                } catch (Throwable $e) {
+                    Log::warning('erp.backup.rotation.delete_env_failed', [
+                        'file' => basename($envPath),
+                        'path' => $envPath,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
             }
         }
 
         return $removed;
+    }
+
+    /**
+     * Extrai o carimbo `Y-m-d_H-i-s` do nome automático, ou string vazia.
+     */
+    protected function automaticBackupStamp(string $filename): string
+    {
+        if (preg_match('/^unitec_erp_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.sql$/i', $filename, $m)) {
+            return $m[1];
+        }
+
+        return '';
+    }
+
+    /**
+     * @deprecated Use rotateAutomaticBackups(). Mantido para chamadas antigas.
+     */
+    public function purgeOldBackups(string $destination, int $retentionDays = self::RETENTION_DAYS): int
+    {
+        return $this->rotateAutomaticBackups($destination, self::KEEP_AUTOMATIC_BACKUPS);
     }
 
     public function intervalElapsed(?int $empresaId = null): bool
@@ -761,14 +907,15 @@ final class DatabaseBackupService
         }
 
         try {
-            $lastTs = ErpTimezone::toLocal(\Illuminate\Support\Carbon::parse($last))->getTimestamp();
+            $lastMinute = ErpTimezone::toLocal(\Illuminate\Support\Carbon::parse($last))->startOfMinute();
         } catch (Throwable) {
             return true;
         }
 
         $hours = ErpSystemConfig::backupIntervalHours($empresaId);
+        $due = $lastMinute->copy()->addHours($hours);
 
-        return (time() - $lastTs) >= ($hours * 3600);
+        return ErpTimezone::nowLocal()->startOfMinute()->greaterThanOrEqualTo($due);
     }
 
     public function formatBytes(int $bytes): string
@@ -805,12 +952,6 @@ final class DatabaseBackupService
 
     protected function markStatus(?int $empresaId, string $status, ?string $detail = null): void
     {
-        $empresa = ErpSystemConfig::empresa($empresaId);
-
-        if (! $empresa) {
-            return;
-        }
-
         $payload = [
             'param_backup_ultimo_status' => $status,
         ];
@@ -819,18 +960,17 @@ final class DatabaseBackupService
             $payload['param_backup_ultimo_em'] = ErpTimezone::toLocal()->format('Y-m-d H:i:s');
         }
 
-        if ($status === 'failed' && filled($detail)) {
-            $payload['param_backup_ultimo_status'] = 'failed';
+        ErpSystemConfig::syncBackupConfigToAll($payload);
+
+        if (! in_array($status, ['ok', 'failed'], true)) {
+            return;
         }
 
-        $empresa->forceFill($payload)->save();
+        $reporter = app(PortalBkpReporter::class);
+        $message = $detail ?? ($status === 'ok' ? 'Backup concluído.' : 'Falha ao executar backup.');
 
-        if (in_array($status, ['ok', 'failed'], true)) {
-            app(PortalBkpReporter::class)->report(
-                $empresa,
-                $status,
-                $detail ?? ($status === 'ok' ? 'Backup concluído.' : 'Falha ao executar backup.'),
-            );
+        foreach (Empresa::query()->orderBy('id')->cursor() as $empresa) {
+            $reporter->report($empresa, $status, $message);
         }
     }
 

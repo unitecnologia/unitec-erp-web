@@ -322,35 +322,41 @@
 .erp-pagar-page .erp-pagar__view-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.15rem;
     margin: 0 var(--erp-pagar-gutter) 0.25rem;
+    align-items: flex-end;
 }
 
 .erp-pagar-page .erp-pagar__view-tab {
-    padding: calc(0.35rem - 0.6mm) 0.85rem;
+    padding: 0.2rem 0.65rem;
     font-size: var(--erp-font-size-xs);
     font-weight: 600;
-    border: 1px solid var(--erp-border-light);
-    border-radius: var(--erp-radius-sm) var(--erp-radius-sm) 0 0;
-    background: var(--erp-bg-muted);
-    color: var(--erp-text-muted);
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--erp-transition), color var(--erp-transition), border-color var(--erp-transition);
+    transition: none;
+    box-shadow: none;
 }
 
-.erp-pagar-page .erp-pagar__view-tab:hover {
-    background: var(--erp-bg-panel);
-    color: var(--erp-brand-primary);
-    border-color: var(--erp-brand-primary);
+.erp-pagar-page .erp-pagar__view-tab:hover:not(.erp-pagar__view-tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
 .erp-pagar-page .erp-pagar__view-tab--active {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
-    border-color: var(--erp-brand-accent);
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
     font-weight: 700;
-    color: var(--erp-text-inverse);
-    box-shadow: var(--erp-shadow-sm);
+    color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: none;
 }
 
 .erp-pagar-page .erp-pagar__hint {
@@ -717,35 +723,42 @@
 .erp-pagar-page .erp-pagar__filter-chip {
     appearance: none;
     font-family: inherit;
-    font-size: 0.7rem;
-    font-weight: 650;
-    line-height: 1.15;
-    padding: 0.2rem 0.55rem;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: #475569;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    line-height: 1.1;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
     cursor: pointer;
     text-decoration: none;
     white-space: nowrap;
-    transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+    transition: none;
+    box-shadow: none;
 }
 
-.erp-pagar-page .erp-pagar__filter-chip:hover {
-    background: #e2e8f0;
-    color: #0f172a;
+.erp-pagar-page .erp-pagar__filter-chip:hover:not(.erp-pagar__filter-chip--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
 .erp-pagar-page .erp-pagar__filter-chip--active {
-    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
-    color: #fff;
-    font-weight: 750;
-    box-shadow: 0 4px 10px -6px rgba(30, 90, 158, 0.75);
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    font-weight: 700;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
 }
 
 .erp-pagar-page .erp-pagar__filter-chip--active:hover {
-    background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
-    color: #fff;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
 }
 
 .erp-pagar-page .erp-pagar__filter-chip:focus-visible {

@@ -40,7 +40,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'inss',
     'estoque',
     'estoque_id',
-    'usar_agendamento',
     'setor_vendas',
     'tabela_venda_id',
     'ganha_comissao_todas_vendas',
@@ -51,6 +50,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'efetua_venda',
     'motorista',
     'ajudante',
+    'entregador',
     'observacoes',
 ])]
 class Vendedor extends Model
@@ -79,7 +79,6 @@ class Vendedor extends Model
             'data_nascimento' => 'date',
             'admissao' => 'date',
             'demissao' => 'date',
-            'usar_agendamento' => 'boolean',
             'setor_vendas' => 'boolean',
             'setor_servicos' => 'boolean',
             'ganha_comissao_todas_vendas' => 'boolean',
@@ -87,6 +86,7 @@ class Vendedor extends Model
             'efetua_venda' => 'boolean',
             'motorista' => 'boolean',
             'ajudante' => 'boolean',
+            'entregador' => 'boolean',
         ];
     }
 
@@ -134,7 +134,8 @@ class Vendedor extends Model
 
     /**
      * Caixa amarrado ao colaborador na empresa informada (ou na principal).
-     * Preferência: pivot do operador; fallback: caixa padrão do usuário em Permissões.
+     * Fonte de verdade: Permissões → Caixas (caixa_conta_user do usuário vinculado).
+     * empresa_vendedor.caixa_conta_id só como fallback legado.
      */
     public function caixaContaDaEmpresa(?int $empresaId = null): ?CaixaConta
     {
@@ -144,18 +145,20 @@ class Vendedor extends Model
             return null;
         }
 
-        $empresa = $this->relationLoaded('empresas')
-            ? $this->empresas->firstWhere('id', $empresaId)
-            : $this->empresas()->where('empresas.id', $empresaId)->first();
+        $usuario = $this->relationLoaded('usuario')
+            ? $this->usuario
+            : $this->usuario()->first();
 
-        $caixaId = $empresa?->pivot?->caixa_conta_id;
+        // 1) is_padrao / primeiro liberado do usuário (Permissões → Caixas)
+        $caixaId = $usuario?->defaultCaixaContaId($empresaId);
 
+        // 2) Fallback legado: pivot empresa_vendedor (pode estar desatualizado)
         if (! $caixaId) {
-            $usuario = $this->relationLoaded('usuario')
-                ? $this->usuario
-                : $this->usuario()->first();
+            $empresa = $this->relationLoaded('empresas')
+                ? $this->empresas->firstWhere('id', $empresaId)
+                : $this->empresas()->where('empresas.id', $empresaId)->first();
 
-            $caixaId = $usuario?->defaultCaixaContaId($empresaId);
+            $caixaId = $empresa?->pivot?->caixa_conta_id;
         }
 
         if (! $caixaId) {

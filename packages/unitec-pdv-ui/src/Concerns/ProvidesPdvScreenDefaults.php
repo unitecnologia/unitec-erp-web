@@ -101,9 +101,13 @@ trait ProvidesPdvScreenDefaults
     // --- Métodos referenciados pela tela (no-op por padrão) ----------------
     public function selectSearchResult(int $index): void {}
 
+    public function setSearchSelectionIndex(int $index): void {}
+
     public function addSearchResultToCupom(int $index): void {}
 
     public function selectCupomItem(int $index): void {}
+
+    public function requestExcluirCupomItem(int $index): void {}
 
     public function handlePdvLaunchQtdEnter(): void {}
 

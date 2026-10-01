@@ -13,6 +13,9 @@
         'cartao' => 'Cartão',
         'boleto' => 'Boleto',
     ];
+
+    $situacaoAtual = filled($this->situacaoFilter) ? (string) $this->situacaoFilter : 'todos';
+    $formaAtual = filled($this->formaFilter) ? (string) $this->formaFilter : 'todos';
 @endphp
 
 <div class="erp-receber__footer">
@@ -43,29 +46,43 @@
     </div>
 
     <div class="erp-receber__footer-filters">
-        <div class="erp-receber__filter-group" role="group" aria-label="Situação">
+        <div
+            class="erp-receber__filter-group"
+            role="group"
+            aria-label="Situação"
+            wire:ignore
+            x-data="{ statusAtivo: @js($situacaoAtual) }"
+        >
             <span class="erp-receber__filter-group-label">Situação</span>
             <div class="erp-receber__filter-segment">
                 @foreach ($situacaoFilters as $value => $label)
                     <button
                         type="button"
-                        wire:click="setSituacaoFilter('{{ $value }}')"
-                        @class(['erp-receber__filter-chip', 'erp-receber__filter-chip--active' => $this->situacaoFilter === $value])
-                        @if ($this->situacaoFilter === $value) aria-pressed="true" @else aria-pressed="false" @endif
+                        class="erp-receber__filter-chip"
+                        :class="{ 'erp-receber__filter-chip--active': statusAtivo === @js($value) }"
+                        :aria-pressed="statusAtivo === @js($value) ? 'true' : 'false'"
+                        @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.conta-receber-list-table') || [])[0]; if (t) t.call('setSituacaoFilter', @js($value))"
                     >{{ $label }}</button>
                 @endforeach
             </div>
         </div>
 
-        <div class="erp-receber__filter-group" role="group" aria-label="Forma">
+        <div
+            class="erp-receber__filter-group"
+            role="group"
+            aria-label="Forma"
+            wire:ignore
+            x-data="{ statusAtivo: @js($formaAtual) }"
+        >
             <span class="erp-receber__filter-group-label">Forma</span>
             <div class="erp-receber__filter-segment">
                 @foreach ($formaFilters as $value => $label)
                     <button
                         type="button"
-                        wire:click="setFormaFilter('{{ $value }}')"
-                        @class(['erp-receber__filter-chip', 'erp-receber__filter-chip--active' => $this->formaFilter === $value])
-                        @if ($this->formaFilter === $value) aria-pressed="true" @else aria-pressed="false" @endif
+                        class="erp-receber__filter-chip"
+                        :class="{ 'erp-receber__filter-chip--active': statusAtivo === @js($value) }"
+                        :aria-pressed="statusAtivo === @js($value) ? 'true' : 'false'"
+                        @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.conta-receber-list-table') || [])[0]; if (t) t.call('setFormaFilter', @js($value))"
                     >{{ $label }}</button>
                 @endforeach
             </div>

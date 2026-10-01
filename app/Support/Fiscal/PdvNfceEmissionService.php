@@ -130,7 +130,7 @@ final class PdvNfceEmissionService
         $response = $this->engine->prepararNfceContingencia($request);
         $ambiente = NfceFiscalCertificateResolver::ambienteNfce($parametros);
 
-        return PdvVendaNfce::query()->create([
+        $nfce = PdvVendaNfce::query()->create([
             'pdv_venda_id' => $venda->id,
             'empresa_id' => $empresa->id,
             'operacao' => $operacao,
@@ -149,6 +149,10 @@ final class PdvNfceEmissionService
             'motivo_contingencia' => $motivoContingencia ?? $justificativa,
             'autorizada_em' => $venda->fechado_em ?? now(),
         ]);
+
+        (new ContadorCloudPortalHookService())->onNfceContingencia($nfce, $empresa);
+
+        return $nfce;
     }
 
     public function emitirComNumero(

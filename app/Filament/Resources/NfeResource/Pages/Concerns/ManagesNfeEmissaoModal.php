@@ -5,6 +5,7 @@ namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 use App\Models\Cfop;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
+use App\Models\FormaPagamento;
 use App\Models\Nfe;
 use App\Models\NfeEvento;
 use App\Models\NfeFatura;
@@ -27,6 +28,7 @@ use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
 use App\Support\Erp\WhatsApp\WhatsAppPhone;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
+use App\Support\Fiscal\FormaPagamentoTPagMap;
 use App\Support\Fiscal\NfeEmissionService;
 use Filament\Notifications\Notification;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
@@ -46,6 +48,12 @@ trait ManagesNfeEmissaoModal
     public string $nfeModalStatus = 'ABERTA';
 
     public bool $nfeModalHomologacao = false;
+
+    /**
+     * Empresa emitente fixada no modal (Monitor multi-empresa).
+     * Null = fluxo antigo (empresa da sessão).
+     */
+    public ?int $nfeModalEmpresaEmitenteId = null;
 
     public string $nfeModalMainTab = 'itens';
 
@@ -153,11 +161,15 @@ trait ManagesNfeEmissaoModal
 
     public int $nfeSelectedNaturezaIndex = 0;
 
-    public function createNfe(): void
+    public function createNfe(?int $empresaEmitenteId = null): void
     {
         if ($this->nfeModalOpen) {
             return;
         }
+
+        $this->nfeModalEmpresaEmitenteId = $empresaEmitenteId && $empresaEmitenteId > 0
+            ? (int) $empresaEmitenteId
+            : null;
 
         $empresaId = $this->resolveEmpresaId();
         $params = $empresaId ? VendasParametro::forEmpresa($empresaId) : null;
@@ -226,6 +238,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalVendaId = null;
         $this->nfeModalPdvVendaId = null;
         $this->nfeModalDevolucaoCompraId = null;
+        $this->nfeModalEmpresaEmitenteId = null;
         $this->nfeModalHomologacao = false;
         $this->nfeModalMainTab = 'itens';
         $this->nfeModalDetailTab = 'totais';
@@ -317,6 +330,98 @@ trait ManagesNfeEmissaoModal
                 'data_vencimento' => $vencimento,
                 'valor' => ErpMoney::formatBr($valor),
             ];
+        }
+
+        // Condição da venda: gerar duplicatas implica A PRAZO (meio de pgto permanece).
+        $this->nfeForm['forma_pgto'] = 'a_prazo';
+        $this->persistNfeFormaPgtoIfSaved('a_prazo');
+        $this->persistNfeFaturasIfSaved();
+    }
+
+    /**
+     * Remove todas as duplicatas e volta a condição para À VISTA.
+     */
+    public function limparNfeParcelas(): void
+    {
+        $this->nfeModalFaturas = [];
+        $this->nfeForm['forma_pgto'] = 'a_vista';
+        $this->persistNfeFormaPgtoIfSaved('a_vista');
+        $this->persistNfeFaturasIfSaved();
+    }
+
+    /**
+     * Se já existem parcelas (A PRAZO) e o total da nota mudou (desconto/frete/itens),
+     * redistribui os valores mantendo quantidade e vencimentos — evita cStat 851.
+     */
+    protected function syncNfeParcelasComTotalAtual(): void
+    {
+        if ($this->nfeModalFaturas === []) {
+            return;
+        }
+
+        if (($this->nfeForm['forma_pgto'] ?? '') === 'a_vista') {
+            return;
+        }
+
+        $total = round(ErpMoney::parseBr($this->nfeModalTotais['total'] ?? '0'), 2);
+        $n = count($this->nfeModalFaturas);
+
+        if ($total <= 0 || $n <= 0) {
+            return;
+        }
+
+        $somaAtual = round(array_sum(array_map(
+            static fn (array $fatura): float => ErpMoney::parseBr($fatura['valor'] ?? '0'),
+            $this->nfeModalFaturas,
+        )), 2);
+
+        if (abs($somaAtual - $total) < 0.005) {
+            return;
+        }
+
+        $valorParcela = round($total / $n, 2);
+
+        foreach ($this->nfeModalFaturas as $i => $fatura) {
+            $valor = $i === ($n - 1)
+                ? round($total - ($valorParcela * ($n - 1)), 2)
+                : $valorParcela;
+
+            $this->nfeModalFaturas[$i]['valor'] = ErpMoney::formatBr($valor);
+        }
+
+        $this->persistNfeFaturasIfSaved();
+    }
+
+    protected function persistNfeFormaPgtoIfSaved(string $formaPgto): void
+    {
+        if (! $this->nfeModalRecordId) {
+            return;
+        }
+
+        Nfe::query()->whereKey($this->nfeModalRecordId)->update([
+            'forma_pgto' => $formaPgto,
+        ]);
+    }
+
+    protected function persistNfeFaturasIfSaved(): void
+    {
+        if (! $this->nfeModalRecordId) {
+            return;
+        }
+
+        $nfeId = (int) $this->nfeModalRecordId;
+        $empresaId = $this->resolveEmpresaId();
+
+        NfeFatura::query()->where('nfe_id', $nfeId)->delete();
+
+        foreach ($this->nfeModalFaturas as $fatura) {
+            NfeFatura::query()->create([
+                'nfe_id' => $nfeId,
+                'empresa_id' => $empresaId,
+                'numero' => $fatura['numero'],
+                'data_vencimento' => $fatura['data_vencimento'],
+                'valor' => ErpMoney::parseBr($fatura['valor'] ?? '0'),
+            ]);
         }
     }
 
@@ -429,7 +534,7 @@ trait ManagesNfeEmissaoModal
                 'movimento' => ($this->nfeForm['movimento'] ?? 'saida') === 'entrada' ? '0' : '1',
                 'consumidor_final' => ! empty($this->nfeForm['consumidor_final']) ? '1' : '0',
                 'forma_pgto' => $this->nfeForm['forma_pgto'] ?? null,
-                'meio_pgto' => $this->nfeForm['meio_pgto'] ?? null,
+                'meio_pgto' => $this->normalizeNfeMeioPgto($this->nfeForm['meio_pgto'] ?? null),
                 'obs_fisco' => $this->nfeForm['obs_fisco'] ?? null,
                 'obs_contribuinte' => $this->mergeObsContribuinteWithIbpt(
                     (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
@@ -516,6 +621,7 @@ trait ManagesNfeEmissaoModal
                     'cfop' => $row['cfop'] ?? null,
                     'cst' => $row['cst'] ?? null,
                     'csosn' => $row['csosn'] ?? null,
+                    'origem' => array_key_exists('origem', $row) ? (int) $row['origem'] : null,
                     'cest' => $row['cest'] ?? null,
                     'unidade' => $row['unidade'] ?? 'UN',
                     'descricao' => $row['descricao'] ?? '',
@@ -530,6 +636,8 @@ trait ManagesNfeEmissaoModal
                     'situacao' => Nfe::SITUACAO_ABERTA,
                     'base_icms' => $row['base_icms'] ?? 0,
                     'aliq_icms' => $row['aliq_icms'] ?? 0,
+                    'p_red_bc_icms' => $row['p_red_bc_icms'] ?? 0,
+                    'mod_bc_icms' => filled($row['mod_bc_icms'] ?? null) ? $row['mod_bc_icms'] : null,
                     'valor_icms' => $row['valor_icms'] ?? 0,
                     'motivo_desoneracao' => filled($row['motivo_desoneracao'] ?? null) ? $row['motivo_desoneracao'] : null,
                     'base_desoneracao' => $row['base_desoneracao'] ?? 0,
@@ -556,6 +664,8 @@ trait ManagesNfeEmissaoModal
                     'alq_cbs' => $row['alq_cbs'] ?? 0,
                     'alq_ibs_mun' => $row['alq_ibs_mun'] ?? 0,
                     'alq_ibs_uf' => $row['alq_ibs_uf'] ?? 0,
+                    'p_red_ibs' => $row['p_red_ibs'] ?? 0,
+                    'p_red_cbs' => $row['p_red_cbs'] ?? 0,
                     'trib_fed' => $row['trib_fed'] ?? 0,
                     'trib_est' => $row['trib_est'] ?? 0,
                     'trib_mun' => $row['trib_mun'] ?? 0,
@@ -739,8 +849,10 @@ trait ManagesNfeEmissaoModal
         }
 
         $nfe = Nfe::query()->with(['itens.product', 'faturas', 'cliente', 'referencias', 'devolucaoCompra.compra'])->find($this->nfeModalRecordId);
-        $empresaId = $this->resolveEmpresaId();
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
+        // Fonte de verdade: empresa persistida na NF-e (emitente), não a sessão.
+        $empresa = $nfe?->empresa_id
+            ? Empresa::query()->find((int) $nfe->empresa_id)
+            : null;
 
         if (! $nfe || ! $empresa) {
             Notification::make()
@@ -763,18 +875,63 @@ trait ManagesNfeEmissaoModal
         }
 
         try {
-            $nfe = (new NfeEmissionService())->transmitir($nfe, $empresa);
+            $nfe = app(NfeEmissionService::class)->transmitir($nfe, $empresa);
             $this->loadNfeIntoModal($nfe);
             $this->resetTable();
             $this->showNfeFiscalOverlaySucesso($nfe);
         } catch (FiscalEngineException $exception) {
             $this->registrarFalhaTransmissaoNfe((int) $nfe->id, $exception->getMessage(), $exception->sefazCodigo);
+            $this->avancarNumeracaoNfeAposDuplicidade($nfe, $empresa, $exception);
             $this->showNfeFiscalOverlayErro($exception);
         } catch (\Throwable $exception) {
             $this->registrarFalhaTransmissaoNfe((int) $nfe->id, $exception->getMessage());
             $this->showNfeFiscalOverlayErroGenerico($exception->getMessage());
         } finally {
             $this->dispatch('erp-nfe-hide-fiscal-progress');
+        }
+    }
+
+    /**
+     * Após rejeição 539 (duplicidade), o nº já existe na SEFAZ — avança o sequencial local da NF-e.
+     */
+    protected function avancarNumeracaoNfeAposDuplicidade(Nfe $nfe, Empresa $empresa, FiscalEngineException $exception): void
+    {
+        $codigo = (string) ($exception->sefazCodigo ?? '');
+        $mensagem = mb_strtoupper($exception->getMessage(), 'UTF-8');
+
+        if ($codigo !== '539' && ! str_contains($mensagem, 'DUPLICIDADE')) {
+            return;
+        }
+
+        $proximo = ((int) preg_replace('/\D/', '', (string) $nfe->numero)) + 1;
+
+        if (preg_match('/CHNFE:(\d{44})/i', $exception->getMessage(), $matches) === 1) {
+            $proximo = max($proximo, ((int) substr($matches[1], 25, 9)) + 1);
+        }
+
+        $proximo = max(1, $proximo);
+        $serie = (string) ($nfe->serie ?: '1');
+        $empresaId = (int) $empresa->id;
+
+        while (
+            Nfe::query()
+                ->where('empresa_id', $empresaId)
+                ->where('serie', $serie)
+                ->where('numero', (string) $proximo)
+                ->whereKeyNot($nfe->getKey())
+                ->exists()
+        ) {
+            $proximo++;
+        }
+
+        $nfe->update(['numero' => (string) $proximo]);
+
+        VendasParametro::forEmpresa($empresaId)->ensureNumeroNfePeloMenos($proximo + 1);
+
+        $atualizada = Nfe::query()->with(['itens.product', 'faturas', 'cliente', 'referencias'])->find($nfe->id);
+
+        if ($atualizada) {
+            $this->loadNfeIntoModal($atualizada);
         }
     }
 
@@ -822,6 +979,104 @@ trait ManagesNfeEmissaoModal
             '3' => '3 - PRÓPRIO REMETENTE',
             '4' => '4 - PRÓPRIO DESTINATÁRIO',
         ];
+    }
+
+    /**
+     * Meios de pagamento da NF-e: cadastro compartilhado com o PDV,
+     * filtrando tipos válidos para NF-e (ex.: TEF fica só no PDV/NFC-e).
+     *
+     * @return list<array{value: string, label: string, tipo: string}>
+     */
+    #[Computed]
+    public function nfeMeiosPagamentoOptions(): array
+    {
+        $options = [];
+
+        foreach ($this->formasPagamentoAtivasParaNfe() as $forma) {
+            $label = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
+
+            if ($label === '') {
+                continue;
+            }
+
+            $options[] = [
+                'value' => (string) $forma->id,
+                'label' => $label,
+                'tipo' => (string) ($forma->tipo ?? ''),
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Formas ativas para venda, excluindo tipos não permitidos na NF-e (ex.: TEF).
+     *
+     * @return list<\App\Models\FormaPagamento>
+     */
+    protected function formasPagamentoAtivasParaNfe(): array
+    {
+        return FormaPagamento::query()
+            ->where('ativo', true)
+            ->where('aparece_venda', true)
+            ->orderBy('codigo')
+            ->get(['id', 'descricao', 'tipo'])
+            ->filter(fn (FormaPagamento $forma): bool => FormaPagamentoTPagMap::isTipoPermitidoNaNfe($forma->tipo))
+            ->values()
+            ->all();
+    }
+
+    protected function defaultNfeMeioPgto(): string
+    {
+        $formas = $this->formasPagamentoAtivasParaNfe();
+
+        if ($formas === []) {
+            return 'dinheiro';
+        }
+
+        return (string) $formas[0]->id;
+    }
+
+    /**
+     * Normaliza meio_pgto legado (dinheiro/cartao/…) ou id do cadastro FormaPagamento.
+     */
+    protected function normalizeNfeMeioPgto(?string $stored): string
+    {
+        $stored = trim((string) $stored);
+        $formas = $this->formasPagamentoAtivasParaNfe();
+
+        if ($formas === []) {
+            return $stored !== '' ? $stored : 'dinheiro';
+        }
+
+        foreach ($formas as $forma) {
+            if ($stored !== '' && (string) $forma->id === $stored) {
+                return (string) $forma->id;
+            }
+        }
+
+        $tipoBusca = mb_strtolower($stored, 'UTF-8');
+        $aliases = match ($tipoBusca) {
+            'cartao' => ['cartao_credito', 'cartao_debito'],
+            'credito_loja' => ['crediario'],
+            default => $tipoBusca !== '' ? [$tipoBusca] : [],
+        };
+
+        foreach ($formas as $forma) {
+            $tipo = mb_strtolower(trim((string) $forma->tipo), 'UTF-8');
+            if ($tipo !== '' && in_array($tipo, $aliases, true)) {
+                return (string) $forma->id;
+            }
+        }
+
+        $labelBusca = mb_strtoupper($stored, 'UTF-8');
+        foreach ($formas as $forma) {
+            if ($labelBusca !== '' && mb_strtoupper(trim((string) $forma->descricao), 'UTF-8') === $labelBusca) {
+                return (string) $forma->id;
+            }
+        }
+
+        return (string) $formas[0]->id;
     }
 
     /**
@@ -1649,7 +1904,26 @@ trait ManagesNfeEmissaoModal
     {
         if (($this->nfeForm['forma_pgto'] ?? '') === 'a_vista') {
             $this->syncNfeModalFaturasAVista();
+            $this->persistNfeFormaPgtoIfSaved('a_vista');
+
+            return;
         }
+
+        $this->persistNfeFormaPgtoIfSaved((string) ($this->nfeForm['forma_pgto'] ?? 'a_prazo'));
+    }
+
+    public function updatedNfeFormMeioPgto(): void
+    {
+        $normalized = $this->normalizeNfeMeioPgto($this->nfeForm['meio_pgto'] ?? null);
+        $this->nfeForm['meio_pgto'] = $normalized;
+
+        if (! $this->nfeModalRecordId) {
+            return;
+        }
+
+        Nfe::query()->whereKey($this->nfeModalRecordId)->update([
+            'meio_pgto' => $normalized,
+        ]);
     }
 
     public function updatedNfeFormDataEmissao(): void
@@ -1676,6 +1950,8 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalVendaId = $nfe->venda_id ? (int) $nfe->venda_id : null;
         $this->nfeModalPdvVendaId = $nfe->pdv_venda_id ? (int) $nfe->pdv_venda_id : null;
         $this->nfeModalDevolucaoCompraId = $nfe->devolucao_compra_id ? (int) $nfe->devolucao_compra_id : null;
+        // Mantém o pin alinhado à empresa persistida (re-save não volta para a sessão/Matriz).
+        $this->nfeModalEmpresaEmitenteId = $nfe->empresa_id ? (int) $nfe->empresa_id : null;
         $this->syncNfeModalAmbiente(
             VendasParametro::forEmpresa((int) ($nfe->empresa_id ?: $this->resolveEmpresaId())),
         );
@@ -1702,7 +1978,7 @@ trait ManagesNfeEmissaoModal
             'finalidade' => $this->unmapFinalidade((string) $nfe->finalidade),
             'movimento' => ($nfe->movimento ?? '1') === '0' ? 'entrada' : 'saida',
             'forma_pgto' => $nfe->forma_pgto ?? 'a_vista',
-            'meio_pgto' => $nfe->meio_pgto ?? 'dinheiro',
+            'meio_pgto' => $this->normalizeNfeMeioPgto($nfe->meio_pgto ?? null),
             'obs_fisco' => $nfe->obs_fisco ?? '',
             'obs_contribuinte' => $nfe->obs_contribuinte ?? '',
             'tipo_frete' => (string) ($nfe->tipo_frete ?: '9'),
@@ -1741,6 +2017,7 @@ trait ManagesNfeEmissaoModal
             'cfop' => $item->cfop,
             'cst' => $item->cst,
             'csosn' => $item->csosn,
+            'origem' => $item->origem,
             'pedido' => (string) ($nfe->npedido ?? ''),
             'quantidade' => ErpMoney::formatBr((float) $item->quantidade, 3),
             'valor_unitario' => ErpMoney::formatBr((float) $item->valor_unitario, 3),
@@ -1751,6 +2028,8 @@ trait ManagesNfeEmissaoModal
             'outros' => ErpMoney::formatBr((float) $item->outros, 2),
             'base_icms' => ErpMoney::formatBr((float) $item->base_icms, 2),
             'aliq_icms' => ErpMoney::formatBr((float) $item->aliq_icms, 2),
+            'p_red_bc_icms' => (float) ($item->p_red_bc_icms ?? 0),
+            'mod_bc_icms' => $item->mod_bc_icms ?? null,
             'valor_icms' => ErpMoney::formatBr((float) $item->valor_icms, 2),
             'motivo_desoneracao' => $item->motivo_desoneracao ?? '',
             'base_desoneracao' => ErpMoney::formatBr((float) ($item->base_desoneracao ?? 0), 2),
@@ -1771,6 +2050,8 @@ trait ManagesNfeEmissaoModal
             'alq_cbs' => ErpMoney::formatBr((float) ($item->alq_cbs ?? 0), 4),
             'alq_ibs_mun' => ErpMoney::formatBr((float) ($item->alq_ibs_mun ?? 0), 4),
             'alq_ibs_uf' => ErpMoney::formatBr((float) ($item->alq_ibs_uf ?? 0), 4),
+            'p_red_ibs' => (float) ($item->p_red_ibs ?? 0),
+            'p_red_cbs' => (float) ($item->p_red_cbs ?? 0),
         ])->all();
 
         $this->nfeModalFaturas = $nfe->faturas->map(fn (NfeFatura $fatura): array => [
@@ -1946,8 +2227,25 @@ trait ManagesNfeEmissaoModal
     protected function recalculateNfeTotais(): void
     {
         $empresaId = $this->resolveEmpresaId();
+        $rows = $this->nfeModalRows;
+
+        // Devolução de compra: preserva overrides do snapshot e aplica CSOSN/PIS do CRT.
+        if (
+            (int) ($this->nfeModalDevolucaoCompraId ?? 0) > 0
+            || ($this->nfeForm['finalidade'] ?? '') === 'devolucao'
+        ) {
+            $rows = array_map(
+                static function (array $row): array {
+                    $row['devolucao_compra_fiscal'] = true;
+
+                    return $row;
+                },
+                $rows,
+            );
+        }
+
         $calculated = app(NfeCalculoService::class)->calcular(
-            $this->nfeModalRows,
+            $rows,
             $empresaId ? Empresa::query()->find($empresaId) : null,
             $this->nfeForm['uf'] ?? null,
             $this->nfeImpostoCalcHint,
@@ -1990,6 +2288,7 @@ trait ManagesNfeEmissaoModal
         );
         $this->syncNfePesosFromProdutos();
         $this->syncNfeModalFaturasAVista();
+        $this->syncNfeParcelasComTotalAtual();
     }
 
     /**
@@ -2119,7 +2418,9 @@ trait ManagesNfeEmissaoModal
         return [
             'numero' => Nfe::nextNumero($empresaId),
             'serie' => (string) ($params?->serie_nfe ?? 1),
-            'empresa' => $this->empresaNome,
+            'empresa' => $empresa
+                ? (string) ($empresa->fantasia ?: $empresa->nome ?: $empresa->razao_social ?: '')
+                : $this->empresaNome,
             'cliente_id' => '',
             'uf' => '',
             'cnpj' => '',
@@ -2131,7 +2432,7 @@ trait ManagesNfeEmissaoModal
             'finalidade' => 'normal',
             'movimento' => 'saida',
             'forma_pgto' => 'a_vista',
-            'meio_pgto' => 'dinheiro',
+            'meio_pgto' => $this->defaultNfeMeioPgto(),
             'obs_fisco' => trim((string) ($empresa?->obs_fisco ?? '')),
             'obs_contribuinte' => trim((string) ($empresa?->obs_contribuinte ?? '')),
             'tipo_frete' => '9',
@@ -2146,6 +2447,44 @@ trait ManagesNfeEmissaoModal
             'peso_l' => '0,000',
             'peso_b' => '0,000',
         ];
+    }
+
+    /**
+     * Aplica transportadora/volumes gravados no pedido FV (Tela de Venda).
+     *
+     * @param  array<string, mixed>|null  $transporte
+     */
+    protected function aplicarTransporteDePedidoFv(?array $transporte): void
+    {
+        if (! is_array($transporte) || $transporte === []) {
+            return;
+        }
+
+        $this->nfeForm['tipo_frete'] = (string) ($transporte['tipo_frete'] ?? '9');
+        $this->nfeForm['placa'] = (string) ($transporte['placa'] ?? '');
+        $this->nfeForm['uf_placa'] = (string) ($transporte['uf_placa'] ?? '');
+        $this->nfeForm['especie'] = (string) ($transporte['especie'] ?? 'CAIXA');
+        $this->nfeForm['marca'] = (string) ($transporte['marca'] ?? '');
+        $this->nfeForm['nvol'] = (string) ($transporte['nvol'] ?? '');
+        $this->nfeForm['qvol'] = (string) max(1, (int) ($transporte['qvol'] ?? 1));
+        $this->nfeForm['peso_b'] = number_format((float) ($transporte['peso_b'] ?? 0), 3, ',', '.');
+        $this->nfeForm['peso_l'] = number_format((float) ($transporte['peso_l'] ?? 0), 3, ',', '.');
+
+        $transportadoraId = (int) ($transporte['transportadora_id'] ?? 0);
+        if ($transportadoraId > 0) {
+            $t = Transportadora::query()->find($transportadoraId);
+            if ($t) {
+                $this->aplicarNfeTransportadora($t, syncBusca: true);
+
+                return;
+            }
+        }
+
+        $codigo = trim((string) ($transporte['transportadora_codigo'] ?? ''));
+        if ($codigo !== '' && $codigo !== '0') {
+            $this->nfeForm['transportadora_codigo'] = $codigo;
+            $this->resolverNfeTransportadoraPorCodigo();
+        }
     }
 
     /**
@@ -2232,8 +2571,17 @@ trait ManagesNfeEmissaoModal
         };
     }
 
+    /**
+     * Empresa usada na criação/gravação do rascunho no modal.
+     * Preferência: pin do Monitor (emitente) → sessão (fluxo antigo).
+     * Após loadNfeIntoModal o pin espelha nfe.empresa_id, evitando 2º save voltar à Matriz.
+     */
     protected function resolveEmpresaId(): ?int
     {
+        if ($this->nfeModalEmpresaEmitenteId && $this->nfeModalEmpresaEmitenteId > 0) {
+            return (int) $this->nfeModalEmpresaEmitenteId;
+        }
+
         return \App\Support\Erp\ErpContext::currentEmpresaId();
     }
 
@@ -2768,7 +3116,7 @@ trait ManagesNfeEmissaoModal
         $this->closeNfeFiscalSucessoOverlay();
         $this->closeNfeFiscalInfoOverlay();
 
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe');
         $mensagemExcecao = trim($exception->getMessage());
 
         // Pré-SEFAZ (ex.: NCM): título padrão + texto no corpo — overlay vermelho do meio da tela.

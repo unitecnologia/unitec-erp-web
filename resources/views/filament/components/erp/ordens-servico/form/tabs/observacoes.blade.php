@@ -6,7 +6,7 @@
             <textarea id="os-obs" wire:model="observacoes" @disabled($readOnly) class="erp-os-form-textarea"></textarea>
         </div>
         <div class="erp-os-form-group erp-os-form-group--grow">
-            <label class="erp-os-form-label" for="os-laudo">Laudo</label>
+            <label class="erp-os-form-label" for="os-laudo">Serviços prestados</label>
             <textarea id="os-laudo" wire:model="laudo" @disabled($readOnly) class="erp-os-form-textarea"></textarea>
         </div>
     </div>

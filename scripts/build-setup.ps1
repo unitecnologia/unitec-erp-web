@@ -206,6 +206,9 @@ if (-not (Test-Path 'public\build') -or ((Get-ChildItem 'public\build' -ErrorAct
     throw 'public/build/ ausente. Rode npm run build antes de gerar o setup.'
 }
 
+# Balança/impressão: EXE self-contained (cliente nao precisa instalar .NET).
+Publish-UnitecDeviceServiceDist -SourceRoot $ProjectRoot | Out-Null
+
 Write-Host '>> Copiando arquivos para staging' -ForegroundColor White
 
 if (Test-Path $StagingDir) {
@@ -213,6 +216,21 @@ if (Test-Path $StagingDir) {
 }
 
 Copy-UnitecProjectTree -SourceRoot $ProjectRoot -TargetRoot $StagingDir -ExcludeTools
+Publish-UnitecFrankenPhpToStaging -SourceRoot $ProjectRoot -StagingDir $StagingDir
+
+$stagingDeviceExe = Join-Path $StagingDir 'services\unitec-device-service\dist\Unitec.DeviceService.exe'
+if (-not (Test-Path -LiteralPath $stagingDeviceExe)) {
+    throw "Staging sem Device Service: $stagingDeviceExe"
+}
+Write-Host '>> Device Service self-contained no staging (porta 9330).' -ForegroundColor Green
+
+foreach ($forbidden in @('apps', 'atualizacao', 'tests', 'docs', 'suporte', 'importar', 'services\unitec-erp-desktop')) {
+    $hit = Join-Path $StagingDir $forbidden
+    if (Test-Path -LiteralPath $hit) {
+        throw "Staging contaminado com pasta de DEV/apps: $forbidden"
+    }
+}
+Write-Host '>> Staging sem apps mobile nem pastas de DEV (atualizacao/tests/docs).' -ForegroundColor Green
 
 Ensure-StorageStructure $StagingDir
 Clear-LaravelRuntimeCaches $StagingDir
@@ -249,6 +267,17 @@ if (-not $IncludeDevData) {
     if (Test-Path $seedDirCleanup) {
         Remove-Item $seedDirCleanup -Recurse -Force -ErrorAction SilentlyContinue
     }
+
+    $padraoSql = Join-Path $ProjectRoot 'database\data\instalador\unitec-erp-padrao.sql'
+    if (-not (Test-Path -LiteralPath $padraoSql) -or ((Get-Item -LiteralPath $padraoSql).Length -lt 1024)) {
+        throw 'Dump padrao do instalador ausente: database\data\instalador\unitec-erp-padrao.sql'
+    }
+
+    $seedDir = Join-Path $StagingDir 'installer\seed'
+    Ensure-Directory $seedDir
+    Copy-Item -LiteralPath $padraoSql -Destination (Join-Path $seedDir 'unitec_erp.sql') -Force
+    $sqlMbPadrao = [math]::Round((Get-Item -LiteralPath $padraoSql).Length / 1MB, 1)
+    Write-Host (">> Base padrao do instalador embutida ({0} MB), sem .env de desenvolvimento." -f $sqlMbPadrao) -ForegroundColor Green
 } else {
     Write-Host '>> IncludeDevData: mantendo/preparando .env e dump do banco no staging' -ForegroundColor Cyan
 
@@ -303,9 +332,15 @@ if (-not $IncludeDevData) {
     [System.IO.File]::WriteAllLines($flagPath, $flagText, $utf8NoBom)
 }
 
-if (Test-Path (Join-Path $StagingDir 'tools')) {
-    Remove-Item (Join-Path $StagingDir 'tools') -Recurse -Force
+# tools\mysql e tools\php nao entram no staging (extraidos de zip na instalacao).
+# tools\frankenphp DEVE ir no EXE — sem ele o servidor do cliente nao sobe.
+$stagingTools = Join-Path $StagingDir 'tools'
+if (Test-Path $stagingTools) {
+    Get-ChildItem -LiteralPath $stagingTools -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne 'frankenphp' } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 }
+Publish-UnitecFrankenPhpToStaging -SourceRoot $ProjectRoot -StagingDir $StagingDir
 
 $nodeRuntime = Ensure-UnitecNodeRuntime -AppPath $ProjectRoot -SourceRoot $ProjectRoot
 if (-not $nodeRuntime) {
@@ -410,15 +445,50 @@ Write-Host ">> Icone: $IconAsset" -ForegroundColor Green
 Sync-InstallerAssetsToStaging -ProjectRoot $ProjectRoot -StagingDir $StagingDir
 Remove-PublicStorageLink -Root $StagingDir
 
-# Binarios desktop (servico + launcher + atualizador), se ja compilados.
+# Binarios desktop obrigatorios no instalador (sem aviso — falha o build).
 $desktopBin = Join-Path $ProjectRoot 'bin'
+$distDesktop = Join-Path $ProjectRoot 'dist\erp-desktop'
 $stagingBin = Join-Path $StagingDir 'bin'
-if ((Test-Path (Join-Path $desktopBin 'Unitec ERP.exe')) -and (Test-Path (Join-Path $desktopBin 'UnitecErpServer.exe'))) {
-    Ensure-Directory $stagingBin
+Ensure-Directory $stagingBin
+
+$serverFromDist = Join-Path $distDesktop 'server\UnitecErpServer.exe'
+$commonFromDist = Join-Path $distDesktop 'server\Unitec.ErpCommon.dll'
+$serverFromBin = Join-Path $desktopBin 'UnitecErpServer.exe'
+$commonFromBin = Join-Path $desktopBin 'Unitec.ErpCommon.dll'
+
+if ((Test-Path -LiteralPath $serverFromDist) -and (Test-Path -LiteralPath $commonFromDist)) {
+    Copy-Item (Join-Path $distDesktop 'server\*') $stagingBin -Force -Recurse -ErrorAction SilentlyContinue
+    if (Test-Path (Join-Path $distDesktop 'launcher')) {
+        Get-ChildItem (Join-Path $distDesktop 'launcher') -File |
+            Where-Object { $_.Extension -notin @('.pdb') } |
+            ForEach-Object { Copy-Item $_.FullName $stagingBin -Force }
+    }
+    if (Test-Path (Join-Path $distDesktop 'updater')) {
+        Get-ChildItem (Join-Path $distDesktop 'updater') -File |
+            Where-Object { $_.Extension -notin @('.pdb') } |
+            ForEach-Object { Copy-Item $_.FullName $stagingBin -Force }
+    }
+    Write-Host '>> Binarios Unitec ERP Desktop copiados de dist\erp-desktop para staging\bin.' -ForegroundColor Green
+} elseif ((Test-Path -LiteralPath $serverFromBin) -and (Test-Path -LiteralPath $commonFromBin)) {
     Copy-Item (Join-Path $desktopBin '*') $stagingBin -Force -Recurse
-    Write-Host '>> Binarios Unitec ERP Desktop copiados para staging\bin.' -ForegroundColor Green
+    Write-Host '>> Binarios Unitec ERP Desktop copiados de bin\ para staging\bin.' -ForegroundColor Green
 } else {
-    Write-Host '>> AVISO: bin\Unitec ERP.exe / UnitecErpServer.exe ausentes. Rode scripts\build-erp-desktop.ps1 antes do instalador definitivo.' -ForegroundColor Yellow
+    throw @"
+Binarios desktop obrigatorios ausentes para o instalador.
+Rode: .\scripts\build-erp-desktop.ps1
+Exigidos no staging:
+  bin\UnitecErpServer.exe
+  bin\Unitec.ErpCommon.dll
+"@
+}
+
+$requiredStagingBins = @(
+    (Join-Path $stagingBin 'UnitecErpServer.exe'),
+    (Join-Path $stagingBin 'Unitec.ErpCommon.dll')
+)
+$missingBins = @($requiredStagingBins | Where-Object { -not (Test-Path -LiteralPath $_) })
+if ($missingBins.Count -gt 0) {
+    throw ('Staging incompleto (binarios desktop): {0}' -f ($missingBins -join ', '))
 }
 
 # Cliente: um unico atalho (Unitec ERP.exe). Sem .bat na raiz do pacote.
@@ -467,7 +537,10 @@ Requisitos em installer\assets\:
   mariadb-win.zip, php-8.4-win.zip, vc_redist.x64.exe, cacert.pem
 Opcionais: HeidiSQL_*_Setup.exe, unitec-erp.ico (icone da marca)
 
-O staging NAO inclui tools\ - MariaDB e PHP sao extraidos na instalacao do cliente.
+O staging inclui tools\frankenphp (obrigatorio),
+bin\UnitecErpServer.exe + Unitec.ErpCommon.dll (obrigatorio) e
+services\unitec-device-service\dist (Device Service self-contained, balanca/impressao).
+MariaDB e PHP sao extraidos na instalacao do cliente.
 "@
     Set-Content -Path $innoReadme -Value $readme -Encoding UTF8
     Write-Host ">> Instrucoes Inno: $innoReadme" -ForegroundColor Green
@@ -487,6 +560,30 @@ Ou: winget install --id JRSoftware.InnoSetup
 Depois rode novamente: .\scripts\build-setup.ps1
 "@
 }
+
+# Alinha AppVersion do Inno com config/unitec.php (fonte da verdade).
+$erpVersion = 'desconhecida'
+$unitecCfg = Join-Path $ProjectRoot 'config\unitec.php'
+if (Test-Path -LiteralPath $unitecCfg) {
+    $cfgRaw = Get-Content -LiteralPath $unitecCfg -Raw
+    if ($cfgRaw -match "'versao'\s*=>\s*'([^']+)'") {
+        $erpVersion = $Matches[1]
+    }
+}
+if ($erpVersion -eq 'desconhecida') {
+    throw 'Nao foi possivel ler unitec.versao para gravar no instalador.'
+}
+$issRaw = Get-Content -LiteralPath $IssFile -Raw
+$issUpdated = [regex]::Replace(
+    $issRaw,
+    '(?m)^#define MyAppVersion\s+".*"\s*$',
+    ('#define MyAppVersion "{0}"' -f $erpVersion)
+)
+if ($issUpdated -notmatch [regex]::Escape(('#define MyAppVersion "{0}"' -f $erpVersion))) {
+    throw ("Falha ao sincronizar MyAppVersion={0} em {1}" -f $erpVersion, $IssFile)
+}
+[System.IO.File]::WriteAllText($IssFile, $issUpdated, (New-Object System.Text.UTF8Encoding $false))
+Write-Host (">> Inno MyAppVersion sincronizado: {0}" -f $erpVersion) -ForegroundColor Green
 
 Write-Host ">> Compilando com: $iscc" -ForegroundColor White
 & $iscc $IssFile

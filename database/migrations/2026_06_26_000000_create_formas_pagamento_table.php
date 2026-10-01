@@ -20,14 +20,13 @@ return new class extends Migration
 
         $now = now();
 
+        // Padrão de instalação nova = espelho do DEV (sem DEPOSITO/TEF/TROCA).
         $padrao = [
             ['codigo' => 1, 'descricao' => 'DINHEIRO', 'tipo' => 'dinheiro'],
             ['codigo' => 2, 'descricao' => 'PIX', 'tipo' => 'pix'],
             ['codigo' => 3, 'descricao' => 'POS DEBITO', 'tipo' => 'cartao_debito'],
             ['codigo' => 4, 'descricao' => 'POS CREDITO', 'tipo' => 'cartao_credito'],
-            ['codigo' => 5, 'descricao' => 'DEPOSITO', 'tipo' => 'deposito'],
-            ['codigo' => 6, 'descricao' => 'TEF', 'tipo' => 'tef'],
-            ['codigo' => 8, 'descricao' => 'TROCA', 'tipo' => 'troca'],
+            ['codigo' => 5, 'descricao' => 'BOLETO', 'tipo' => 'boleto'],
         ];
 
         DB::table('formas_pagamento')->insert(array_map(static function (array $row) use ($now): array {

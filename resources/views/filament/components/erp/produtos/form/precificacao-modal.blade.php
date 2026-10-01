@@ -38,17 +38,7 @@
     <div
         class="erp-lookup-modal erp-prod-precificacao-modal"
         wire:keydown.escape.window="closeProductPrecificacao"
-        x-on:keydown.f5.window.prevent="
-            const el = document.activeElement;
-            const id = el && el.id ? String(el.id) : '';
-            const val = el && 'value' in el ? String(el.value) : null;
-            const aplicar = () => $wire.aplicarProductPrecificacao();
-            if (id.indexOf('precif-') === 0 && val !== null) {
-                $wire.precificacaoCommitField(id, val).then(aplicar);
-            } else {
-                aplicar();
-            }
-        "
+        x-on:keydown.f5.window.prevent="window.aplicarErpProdutosPrecificacao($wire)"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeProductPrecificacao"></div>
 
@@ -431,17 +421,7 @@
             <div class="erp-lookup-modal__actions erp-pcad-actions erp-prod-precificacao__actions">
                 <button
                     type="button"
-                    x-on:click.prevent="
-                        const el = document.activeElement;
-                        const id = el && el.id ? String(el.id) : '';
-                        const val = el && 'value' in el ? String(el.value) : null;
-                        const aplicar = () => $wire.aplicarProductPrecificacao();
-                        if (id.indexOf('precif-') === 0 && val !== null) {
-                            $wire.precificacaoCommitField(id, val).then(aplicar);
-                        } else {
-                            aplicar();
-                        }
-                    "
+                    x-on:click.prevent="window.aplicarErpProdutosPrecificacao($wire)"
                     class="erp-pcad-actions__btn erp-prod-precificacao__btn erp-prod-precificacao__btn--aplicar"
                     data-erp-key="F5"
                     title="Aplicar preços (F5)"

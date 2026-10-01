@@ -1,8 +1,7 @@
 @php
     $columns = [
-        ['key' => 'codigo', 'label' => '>>Código', 'sortable' => true, 'align' => 'center'],
+        ['key' => 'documento', 'label' => 'Pedido', 'sortable' => false, 'align' => 'center'],
         ['key' => 'emissao', 'label' => 'Emissão', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'documento', 'label' => 'Documento', 'sortable' => false, 'align' => 'start'],
         ['key' => 'historico', 'label' => 'Histórico', 'sortable' => false, 'align' => 'start'],
         ['key' => 'plano_contas', 'label' => 'Plano de Contas', 'sortable' => false, 'align' => 'start'],
         ['key' => 'conta', 'label' => 'Contas', 'sortable' => false, 'align' => 'start'],

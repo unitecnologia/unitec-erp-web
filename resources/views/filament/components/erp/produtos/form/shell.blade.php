@@ -38,9 +38,6 @@
     ];
 @endphp
 
-@if ($this->embedsInPdv)
-    @include('filament.components.erp.produtos.form.shell-pdv')
-@else
 <div class="erp-pcad erp-produtos-pcad">
     <div class="erp-produtos-pcad__top">
         <fieldset class="erp-produtos-pcad__empresa-box">
@@ -156,6 +153,7 @@
     </div>
 
     @include('filament.components.erp.produtos.form.lookup-modal')
+    @include('filament.components.erp.produtos.form.image-search-modal')
     @include('filament.components.erp.produtos.form.ncm-confirm-modal')
     @include('filament.components.erp.produtos.form.duplicate-confirm-modal')
     @include('filament.components.erp.produtos.form.exit-confirm-modal')
@@ -163,7 +161,6 @@
     @include('filament.components.erp.produtos.form.replica-precos-modal')
     @include('filament.components.erp.fiscal.cclass-trib-modal')
 </div>
-@endif
 
 @include('filament.components.erp.form-scripts')
 @php

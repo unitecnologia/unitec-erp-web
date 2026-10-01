@@ -1,0 +1,1031 @@
+/* ERP — Carga / Romaneio */
+
+.erp-cargas-page .fi-header,
+.erp-cargas-page .fi-page-header {
+    display: none !important;
+}
+
+.erp-cargas-page,
+.erp-cargas-page .fi-page-content,
+.erp-cargas-page .fi-page__content,
+.erp-cargas-page .fi-sc,
+.erp-cargas-page .fi-sc > div:first-child {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    row-gap: 0 !important;
+}
+
+.erp-cargas-page .fi-sc > div:not(.fi-hidden) {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.erp-cargas-root {
+    margin-top: 0;
+}
+
+.erp-cargas-page .erp-cargas {
+    width: calc(100% - 4mm);
+    margin-left: 2mm;
+    margin-bottom: 2mm;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md, 8px);
+    box-shadow: var(--erp-shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-cargas__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: calc(0.35rem - 1mm) 0.75rem;
+    border-top-left-radius: var(--erp-radius-md, 8px);
+    border-top-right-radius: var(--erp-radius-md, 8px);
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: var(--erp-text-on-brand, #fff);
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.erp-cargas__consulta {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    border-bottom: 1px solid var(--erp-border, #94a3b8);
+    padding: 0.4rem 0.85rem 0.5rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
+}
+
+.erp-cargas-page .erp-cargas__consulta > legend {
+    display: block;
+    width: 100%;
+    padding: 0 0 0.2rem;
+    margin-bottom: 0.1rem;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.erp-cargas__consulta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.erp-cargas__inputs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.85rem;
+    width: 100%;
+}
+
+.erp-cargas__field {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+.erp-cargas__label,
+.erp-cargas__field > span {
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.erp-cargas__periodo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+}
+
+.erp-cargas__periodo-sep {
+    flex-shrink: 0;
+    min-width: 1.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.erp-cargas__field--status {
+    min-width: 0;
+}
+
+.erp-cargas__field--numero {
+    flex: 0 1 11rem;
+}
+
+.erp-cargas__select {
+    min-width: 8.5rem;
+}
+
+.erp-cargas__numero-input {
+    width: 7.5rem;
+    min-width: 6.5rem;
+}
+
+.erp-cargas-page .erp-cargas__field .erp-nfe__select,
+.erp-cargas-page .erp-cargas__field .erp-nfe__input,
+.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input {
+    height: 2.125rem;
+    min-height: 2.125rem;
+    box-sizing: border-box;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--erp-text, #0f172a);
+    background: #fff;
+    border: 1px solid var(--erp-border, #94a3b8);
+    border-radius: var(--erp-radius-sm, 6px);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.erp-cargas-page .erp-cargas__field .erp-nfe__select:focus,
+.erp-cargas-page .erp-cargas__field .erp-nfe__input:focus,
+.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input:focus {
+    outline: none;
+    border-color: #1e5a9e;
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+}
+
+.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input {
+    width: 8.25rem;
+}
+
+.erp-cargas__btn-consultar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.125rem;
+    min-height: 2.125rem;
+    padding: 0 0.95rem;
+    border: 1px solid #94a3b8;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: linear-gradient(180deg, #ffffff 0%, #e8eef7 100%);
+    color: #0f3460;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.erp-cargas__btn-consultar:hover {
+    border-color: #1e5a9e;
+    background: #fff;
+}
+
+.erp-cargas-page .erp-cargas__check {
+    width: 0.95rem;
+    height: 0.95rem;
+    cursor: pointer;
+    accent-color: #1e5a9e;
+}
+
+/* Seleção: classe no render (recordClasses) + :has(:checked) se o morph remover a classe e preservar o checkbox (ex.: voltar do F4/F6). */
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked .fi-ta-cell,
+.erp-cargas-page .fi-ta-row.erp-row-selected.erp-cargas-row--checked .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) .fi-ta-cell {
+    background: #60a5fa !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+}
+
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked:nth-child(even) .fi-ta-cell,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked.fi-striped .fi-ta-cell,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked:nth-child(odd) .fi-ta-cell,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked:hover .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked):nth-child(even) .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked).fi-striped .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked):nth-child(odd) .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked):hover .fi-ta-cell {
+    background: #60a5fa !important;
+}
+
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked:hover .fi-ta-cell,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked):hover .fi-ta-cell {
+    background: #3b82f6 !important;
+}
+
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked .fi-ta-text-item,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked .fi-ta-col .fi-ta-text,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked .fi-badge,
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked .fi-ta-text-item span,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) .fi-ta-text-item,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) .fi-ta-col .fi-ta-text,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) .fi-badge,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) .fi-ta-text-item span {
+    color: #0f172a !important;
+    font-weight: 800 !important;
+}
+
+.erp-cargas-page .fi-ta-row.erp-cargas-row--checked,
+.erp-cargas-page .fi-ta-row:has(.erp-cargas__check:checked) {
+    box-shadow: inset 5px 0 0 #1e3a8a;
+    outline: none;
+}
+
+/* Toasts Filament acima do modal de carga (modal z-index: 250; .fi-no default ~50) */
+.fi-body:has(.erp-carga-form-modal) .fi-no,
+body:has(.erp-carga-form-modal) .fi-no,
+body:has(.erp-carga-form-modal) .fi-no-notification,
+body:has(.erp-carga-form-modal) .fi-no-notifications,
+body:has(.erp-carga-form-modal) [data-filament-notifications] {
+    z-index: 300 !important;
+}
+
+/* ── Modal overlay ─────────────────────────────────────────────── */
+.erp-cargas-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
+}
+
+.erp-cargas-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 55%);
+    backdrop-filter: blur(3px);
+}
+
+.erp-cargas-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: 10px;
+    background: #e8eef7;
+    box-shadow: 0 20px 48px rgba(15, 52, 96, 0.4);
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.erp-cargas-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 0.45rem 0.65rem 0.45rem 0.85rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.erp-cargas-page .erp-lookup-modal__titlebar small {
+    margin-left: 0.4rem;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.erp-cargas-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.erp-cargas-page .erp-lookup-modal__close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.erp-cargas-page .erp-carga-form-modal__window {
+    width: min(1180px, calc(100vw - 0.7rem));
+    max-height: calc(100vh - 0.7rem);
+    /* ~5cm a mais de altura na janela (preenche a tela útil) */
+    height: calc(100vh - 0.7rem);
+}
+
+.erp-cargas-page .erp-carga-form-modal__body {
+    flex: 1 1 auto;
+    padding: 0.3rem 0.75rem 0.45rem;
+    max-height: none;
+    overflow: auto;
+    overflow-x: hidden;
+    background: #fff;
+}
+
+.erp-cargas-page .erp-carga-form-modal__body > .erp-carga-form-modal__form {
+    gap: 0.35rem;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions {
+    flex-shrink: 0;
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.55rem !important;
+    padding: 0.55rem 0.85rem 0.65rem !important;
+    border-top: 1px solid #c7d5e8;
+    background: linear-gradient(180deg, #f1f5f9 0%, #e2eaf4 100%) !important;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__btn {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.4rem;
+    min-width: 8.5rem !important;
+    height: 2.55rem !important;
+    padding: 0 0.95rem !important;
+    border-radius: 8px !important;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(15, 52, 96, 0.16) !important;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__icon {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin: 0 !important;
+    border-radius: 50%;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__label {
+    font-size: 0.8rem !important;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
+    border: 1px solid #86efac !important;
+    color: #fff !important;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__btn[data-erp-key="F5"]:hover {
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%) !important;
+    transform: translateY(-1px);
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #f87171 0%, #b91c1c 100%) !important;
+    border: 1px solid #fca5a5 !important;
+    color: #fff !important;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #fca5a5 0%, #dc2626 100%) !important;
+    transform: translateY(-1px);
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__icon--save,
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__icon--exit {
+    background: rgba(255, 255, 255, 0.28) !important;
+}
+
+.erp-cargas-page .erp-carga-form-modal__actions .erp-pcad-actions__label kbd {
+    padding: 0.08rem 0.28rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+/* ── Form sections ─────────────────────────────────────────────── */
+.erp-cargas-page .erp-carga-form__section {
+    margin: 0 0 0.75rem;
+    padding: 0.55rem 0.7rem 0.6rem;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
+    min-inline-size: 0;
+}
+
+.erp-cargas-page .erp-carga-form__section-title {
+    float: none;
+    width: auto;
+    margin: 0 0 0 0.35rem;
+    padding: 0 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #0f3460;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #fff;
+}
+
+.erp-cargas-page .erp-carga-form__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    margin-bottom: 0.4rem;
+}
+
+.erp-cargas-page .erp-carga-form__section-head--actions {
+    margin-top: -0.15rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+}
+
+.erp-cargas-page .erp-carga-form__disp-tools {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.85rem;
+}
+
+.erp-cargas-page .erp-carga-form__add-by-numero {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.erp-cargas-page .erp-carga-form__add-by-numero-input {
+    width: 7.25rem;
+    min-height: 2.15rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.erp-cargas-page .erp-carga-form__field--periodo {
+    width: auto;
+}
+
+.erp-cargas-page .erp-carga-form__periodo {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.3rem 0.4rem;
+}
+
+.erp-cargas-page .erp-carga-form__periodo-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    width: 8.5rem;
+    min-width: 8.5rem;
+}
+
+.erp-cargas-page .erp-carga-form__periodo-sep {
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-cargas-page .erp-carga-form__periodo-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.2rem 1.85rem 0.2rem 0.4rem !important;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    color-scheme: light;
+    background-image: none !important;
+}
+
+.erp-cargas-page .erp-carga-form__periodo-input[data-erp-native-date]::-webkit-calendar-picker-indicator {
+    opacity: 0 !important;
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.erp-cargas-page .erp-carga-form__periodo-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1.85rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231e5a9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")
+        center / 1rem 1rem no-repeat;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.erp-cargas-page .erp-carga-form__limit {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.45rem;
+    margin: 0;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-cargas-page .erp-carga-form__limit-select {
+    width: auto;
+    min-width: 4.5rem;
+    min-height: 2rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-cargas-page .erp-carga-form__limit-note {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.erp-cargas-page .erp-carga-form__section-head .erp-carga-form__section-title {
+    margin: 0;
+}
+
+.erp-cargas-page .erp-carga-form__header-grid {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 0.45rem;
+    row-gap: 0.12rem;
+    align-items: flex-start;
+}
+
+.erp-cargas-page .erp-carga-form__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.erp-cargas-page .erp-carga-form__field:not(.erp-carga-form__field--grow):not(.erp-carga-form__field--full) {
+    flex: 0 0 auto;
+}
+
+.erp-cargas-page .erp-carga-form__field--num {
+    width: 4.5rem;
+}
+
+.erp-cargas-page .erp-carga-form__field--date {
+    width: 9.5rem;
+}
+
+.erp-cargas-page .erp-carga-form__field > span:first-child {
+    white-space: nowrap;
+    overflow: visible;
+    line-height: 1.2;
+}
+
+.erp-cargas-page .erp-carga-form__field:has(> .erp-carga-form__hint) {
+    position: relative;
+    /* hint fora do fluxo para não empurrar a linha Observação */
+    margin-bottom: 0;
+}
+
+.erp-cargas-page .erp-carga-form__hint {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.02rem);
+    margin: 0;
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: #64748b;
+    line-height: 1.15;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.erp-cargas-page .erp-carga-form__field--grow {
+    flex: 0 0 auto;
+    width: 14rem;
+    max-width: 14rem;
+}
+
+.erp-cargas-page .erp-carga-form__field--full {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+    margin-top: 0;
+}
+
+.erp-cargas-page .erp-carga-form-modal__body > .erp-carga-form-modal__form > .erp-carga-form__section:first-child {
+    margin-top: 0;
+    margin-bottom: 0.55rem;
+    padding: 0.35rem 0.55rem 0.85rem;
+}
+
+.erp-cargas-page .erp-carga-form__field .erp-pcad-form__input,
+.erp-cargas-page .erp-carga-form__field select.erp-pcad-form__input {
+    width: 100%;
+    min-width: 0;
+    min-height: 1.85rem;
+    height: 1.85rem;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid #94a3b8;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #0f172a;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    box-shadow: none;
+}
+
+.erp-cargas-page .erp-carga-form__field .erp-pcad-form__input.erp-date-input {
+    padding-right: 2.1rem;
+    cursor: pointer;
+}
+
+.erp-cargas-page .erp-carga-form__field .erp-carga-form__input--locked,
+.erp-cargas-page .erp-carga-form__field .erp-carga-form__input--locked:focus {
+    background-color: #eef2f7;
+    color: #334155;
+    cursor: default;
+    outline: none;
+    box-shadow: none;
+    border-color: #94a3b8;
+}
+
+.erp-cargas-page .erp-carga-form__field .erp-pcad-form__input:focus,
+.erp-cargas-page .erp-carga-form__field select.erp-pcad-form__input:focus {
+    outline: none;
+    border-color: #1e5a9e;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.15);
+}
+
+.erp-cargas-page .erp-carga-form__field .erp-pcad-form__input[readonly],
+.erp-cargas-page .erp-carga-form__field .erp-pcad-form__input:disabled,
+.erp-cargas-page .erp-carga-form__field select.erp-pcad-form__input:disabled {
+    background-color: #eef2f7;
+    color: #334155;
+    cursor: default;
+}
+
+/* ── Mini action buttons ───────────────────────────────────────── */
+.erp-cargas-page .erp-carga-form__mini-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.95rem;
+    border: 1px solid #1e5a9e;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #1e5a9e 0%, #164a85 100%);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(15, 52, 96, 0.2);
+}
+
+.erp-cargas-page .erp-carga-form__mini-btn:hover {
+    background: linear-gradient(180deg, #2563a8 0%, #1e5a9e 100%);
+    transform: translateY(-1px);
+}
+
+.erp-cargas-page .erp-carga-form__mini-btn--danger {
+    border-color: #b91c1c;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(185, 28, 28, 0.22);
+}
+
+.erp-cargas-page .erp-carga-form__mini-btn--danger:hover {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+}
+
+/* ── Pedidos grids ─────────────────────────────────────────────── */
+.erp-cargas-page .erp-carga-form__table-wrap {
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    max-height: 11.5rem;
+    overflow: auto;
+    background: #fff;
+}
+
+/* Pedidos disponíveis: altura fixa para 8 linhas */
+.erp-cargas-page .erp-carga-form__table-wrap--disponiveis {
+    --erp-carga-row-h: 1.45rem;
+    --erp-carga-head-h: 1.2rem;
+    height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+    min-height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+    max-height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+}
+
+.erp-cargas-page .erp-carga-form__qtd-pedido {
+    margin-top: 0.25rem;
+    padding-left: 2.1rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #0f3460;
+}
+
+/* Pedidos da carga: altura fixa para 8 linhas */
+.erp-cargas-page .erp-carga-form__table-wrap--carga {
+    --erp-carga-row-h: 1.45rem;
+    --erp-carga-head-h: 1.2rem;
+    height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+    min-height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+    max-height: calc(var(--erp-carga-head-h) + (8 * var(--erp-carga-row-h)));
+}
+
+.erp-cargas-page .erp-carga-form__table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-size: 0.75rem;
+}
+
+.erp-cargas-page .erp-carga-form__table th,
+.erp-cargas-page .erp-carga-form__table td {
+    padding: 0.18rem 0.4rem;
+    border-bottom: 1px solid #dbe3ef;
+    border-right: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.erp-cargas-page .erp-carga-form__table th:last-child,
+.erp-cargas-page .erp-carga-form__table td:last-child {
+    border-right: 0;
+}
+
+.erp-cargas-page .erp-carga-form__table th {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, #e8eef7 0%, #d7e3f2 100%);
+    color: #0f3460;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    z-index: 1;
+    box-shadow: inset 0 -1px 0 #94a3b8;
+    padding-top: 0.22rem;
+    padding-bottom: 0.22rem;
+}
+
+.erp-cargas-page .erp-carga-form__table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.erp-cargas-page .erp-carga-form__table tbody tr:hover td {
+    background: #eef6ff;
+}
+
+.erp-cargas-page .erp-carga-form__table tbody tr.is-selected td,
+.erp-cargas-page .erp-carga-form__table tbody tr.is-selected:nth-child(even) td,
+.erp-cargas-page .erp-carga-form__table tbody tr.is-selected:hover td {
+    background: #bfdbfe;
+    color: #0f3460;
+}
+
+.erp-cargas-page .erp-carga-form__table col.col-chk { width: 2rem; }
+.erp-cargas-page .erp-carga-form__table col.col-pedido { width: 4.75rem; }
+.erp-cargas-page .erp-carga-form__table col.col-cliente { width: auto; }
+.erp-cargas-page .erp-carga-form__table col.col-data { width: 6.25rem; }
+.erp-cargas-page .erp-carga-form__table col.col-valor { width: 6rem; }
+
+.erp-cargas-page .erp-carga-form__table td.nome {
+    max-width: none;
+    white-space: nowrap;
+}
+
+.erp-cargas-page .erp-carga-form__table .chk {
+    text-align: center;
+    width: 2.1rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    vertical-align: middle;
+}
+
+.erp-cargas-page .erp-carga-form__table .chk input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    vertical-align: middle;
+    cursor: pointer;
+    accent-color: #1e5a9e;
+}
+
+.erp-cargas-page .erp-carga-form__table .col-pedido,
+.erp-cargas-page .erp-carga-form__table th.col-pedido,
+.erp-cargas-page .erp-carga-form__table td.col-pedido {
+    text-align: center;
+    font-weight: 700;
+}
+
+.erp-cargas-page .erp-carga-form__table .col-data,
+.erp-cargas-page .erp-carga-form__table th.col-data,
+.erp-cargas-page .erp-carga-form__table td.col-data {
+    text-align: center;
+}
+
+.erp-cargas-page .erp-carga-form__table .num,
+.erp-cargas-page .erp-carga-form__table th.num,
+.erp-cargas-page .erp-carga-form__table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.erp-cargas-page .erp-carga-form__table .empty {
+    text-align: center;
+    color: #64748b;
+    padding: 0.55rem;
+    font-weight: 600;
+    border-right: 0;
+}
+
+.erp-cargas-page .erp-carga-form__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fff 0%, #eef4fb 100%);
+    font-size: 0.78rem;
+    color: #0f172a;
+}
+
+.erp-cargas-page .erp-carga-form__footer-right {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 1.25rem;
+}
+
+.erp-cargas-page .erp-carga-form__footer strong {
+    color: #0f3460;
+}
+
+.erp-carga-entrega-status {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-carga-entrega-status--ok {
+    color: #2e7d32;
+}
+
+.erp-carga-entrega-status--parcial {
+    color: #1565c0;
+}
+
+.erp-carga-entrega-status--nao {
+    color: #ef6c00;
+}
+
+.erp-carga-entrega-status--pendente {
+    color: #ca8a04;
+}
+
+/* Barra de ações — ícones no padrão do monitor FV */
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon svg {
+    width: 1.02rem;
+    height: 1.02rem;
+    display: block;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55));
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--cancel svg,
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--new svg,
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--ok svg {
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.12rem;
+    border-radius: 7px;
+    border: 1px solid rgba(15, 52, 96, 0.28);
+    background: linear-gradient(180deg, #ffffff 0%, #eaf2fc 52%, #d3e2f6 100%);
+    color: var(--erp-brand-primary-dark, #0f3460);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -2px 3px rgba(15, 52, 96, 0.18),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__btn:hover .erp-nfe-actions__icon {
+    background: linear-gradient(180deg, #ffffff 0%, #f3f8ff 52%, #e1ecfb 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 1),
+        inset 0 -2px 3px rgba(15, 52, 96, 0.16),
+        0 3px 5px rgba(15, 40, 71, 0.32);
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--new {
+    border-color: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(15, 52, 96, 0.45);
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--ok {
+    border-color: rgba(6, 78, 59, 0.45);
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 52%, #15803d 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(6, 78, 59, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(6, 78, 59, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--cancel {
+    font-size: 0.8rem;
+    border-radius: 50%;
+    border-color: rgba(127, 29, 29, 0.5);
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 52%, #b91c1c 100%);
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(127, 29, 29, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 3px rgba(127, 29, 29, 0.45),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+.erp-cargas-page .erp-cargas-actions .erp-nfe-actions__icon--close {
+    border-color: rgba(15, 23, 42, 0.45);
+    background: linear-gradient(180deg, #f1f5f9 0%, #cbd5e1 52%, #94a3b8 100%);
+    color: #0f172a;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 -2px 3px rgba(15, 23, 42, 0.22),
+        0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+@media (max-width: 1100px) {
+    .erp-cargas-page .erp-carga-form__field--grow {
+        width: 12.5rem;
+        max-width: 12.5rem;
+    }
+}
+
+@media (max-width: 900px) {
+    .erp-cargas-page .erp-carga-form__field--num,
+    .erp-cargas-page .erp-carga-form__field--date,
+    .erp-cargas-page .erp-carga-form__field--periodo,
+    .erp-cargas-page .erp-carga-form__field--grow {
+        flex: 1 1 calc(50% - 0.3rem);
+        width: auto;
+        max-width: none;
+    }
+}

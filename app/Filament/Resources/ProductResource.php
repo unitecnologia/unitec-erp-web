@@ -56,6 +56,7 @@ class ProductResource extends Resource
             'cst_entrada', 'cst_saida', 'cst_cofins', 'cst_ipi', 'cod_enq_ipi', 'cod_beneficio', 'anp_code', 'prefixo_balanca',
             'tipo_restaurante', 'complemento', 'aplicacao', 'tipo_tributacao', 'tipo_alimento',
             'foto_path', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao',
+            'c_trib_nac', 'c_nbs', 'c_trib_mun', 'c_ind_op',
             'nutri_porcao_unidade', 'nutri_medida_fracao', 'nutri_medida_tipo',
         ];
 

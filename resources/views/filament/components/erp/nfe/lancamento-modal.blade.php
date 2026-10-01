@@ -111,20 +111,24 @@
 
                         <div class="erp-nfe-lancamento-modal__form-group">
                             <label class="erp-nfe-lancamento-modal__form-label">Forma de Pgto</label>
-                            <select wire:model="nfeForm.forma_pgto" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
+                            <select wire:model.live="nfeForm.forma_pgto" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
                                 <option value="a_vista">À VISTA</option>
                                 <option value="a_prazo">À PRAZO</option>
                                 <option value="outros">OUTROS</option>
                             </select>
                         </div>
 
-                        <div class="erp-nfe-lancamento-modal__form-group">
+                        <div class="erp-nfe-lancamento-modal__form-group erp-nfe-lancamento-modal__form-group--meio-pgto">
                             <label class="erp-nfe-lancamento-modal__form-label">Meio de Pgto</label>
-                            <select wire:model="nfeForm.meio_pgto" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
-                                <option value="dinheiro">DINHEIRO</option>
-                                <option value="cartao">CARTÃO</option>
-                                <option value="boleto">BOLETO</option>
-                                <option value="pix">PIX</option>
+                            <select wire:model.live="nfeForm.meio_pgto" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo erp-nfe-lancamento-modal__form-input--meio-pgto">
+                                @forelse ($this->nfeMeiosPagamentoOptions as $meio)
+                                    <option value="{{ $meio['value'] }}">{{ $meio['label'] }}</option>
+                                @empty
+                                    <option value="dinheiro">DINHEIRO</option>
+                                    <option value="cartao">CARTÃO</option>
+                                    <option value="boleto">BOLETO</option>
+                                    <option value="pix">PIX</option>
+                                @endforelse
                             </select>
                         </div>
 
@@ -197,12 +201,19 @@
                     </div>
                 </div>
 
-                <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--main">
+                <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--main" role="tablist" aria-label="Abas da grade">
                     @foreach ($mainTabs as $value => $label)
                         <button
                             type="button"
+                            role="tab"
                             wire:click="setNfeModalMainTab('{{ $value }}')"
-                            @class(['erp-nfe-lancamento-modal__section-tab', 'erp-nfe-lancamento-modal__section-tab--active' => $this->nfeModalMainTab === $value])
+                            aria-selected="{{ $this->nfeModalMainTab === $value ? 'true' : 'false' }}"
+                            @class([
+                                'erp-nfe-tab-btn',
+                                'erp-nfe-lancamento-modal__section-tab',
+                                'erp-nfe-tab-btn--active' => $this->nfeModalMainTab === $value,
+                                'erp-nfe-lancamento-modal__section-tab--active' => $this->nfeModalMainTab === $value,
+                            ])
                         >{{ $label }}</button>
                     @endforeach
 
@@ -253,6 +264,7 @@
                             <button type="button" wire:click="gerarNfeParcelas(3)" class="erp-nfe-lancamento-modal__tool-btn">3x</button>
                             <button type="button" wire:click="gerarNfeParcelas(6)" class="erp-nfe-lancamento-modal__tool-btn">6x</button>
                             <button type="button" wire:click="gerarNfeParcelas(10)" class="erp-nfe-lancamento-modal__tool-btn">10x</button>
+                            <button type="button" wire:click="limparNfeParcelas" class="erp-nfe-lancamento-modal__tool-btn" title="Remover parcelas e voltar para À VISTA">Limpar</button>
                         </div>
                         <div class="erp-lookup-modal__grid-wrap erp-nfe-lancamento-modal__grid-wrap">
                             <table class="erp-lookup-modal__grid erp-nfe-lancamento-modal__grid">
@@ -281,12 +293,19 @@
                     </div>
                 @endif
 
-                <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--detail">
+                <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--detail" role="tablist" aria-label="Abas de detalhes">
                     @foreach ($detailTabs as $value => $label)
                         <button
                             type="button"
+                            role="tab"
                             wire:click="setNfeModalDetailTab('{{ $value }}')"
-                            @class(['erp-nfe-lancamento-modal__section-tab', 'erp-nfe-lancamento-modal__section-tab--active' => $this->nfeModalDetailTab === $value])
+                            aria-selected="{{ $this->nfeModalDetailTab === $value ? 'true' : 'false' }}"
+                            @class([
+                                'erp-nfe-tab-btn',
+                                'erp-nfe-lancamento-modal__section-tab',
+                                'erp-nfe-tab-btn--active' => $this->nfeModalDetailTab === $value,
+                                'erp-nfe-lancamento-modal__section-tab--active' => $this->nfeModalDetailTab === $value,
+                            ])
                         >{{ $label }}</button>
                     @endforeach
                 </div>

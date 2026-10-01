@@ -42,6 +42,10 @@ trait ManagesProductCardex
             $query['return'] = 'edit';
         }
 
+        if (($this->embedsInPdv ?? false) === true) {
+            $query['pdv'] = '1';
+        }
+
         $url = ProductResource::getUrl('cardex', $params);
 
         if ($query !== []) {

@@ -189,8 +189,10 @@ trait ManagesPdvCaixa
                 'movimentos' => [],
                 'vendas_canceladas' => [],
                 'produtos_cancelados' => [],
+                'espera_descartadas' => [],
                 'total_vendas_canceladas' => '0,00',
                 'total_produtos_cancelados' => '0,00',
+                'total_espera_descartadas' => '0,00',
             ];
         }
 
@@ -256,6 +258,26 @@ trait ManagesPdvCaixa
             ->where('situacao', 'C')
             ->sum('total');
 
+        $esperaDescartadas = [];
+        $totalEspera = 0.0;
+
+        foreach (is_array($sessao->vendas_espera_descartadas) ? $sessao->vendas_espera_descartadas : [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $total = (float) ($row['total'] ?? 0);
+            $totalEspera += $total;
+            $esperaDescartadas[] = [
+                'numero' => (string) ($row['numero'] ?? ''),
+                'cliente' => (string) ($row['cliente'] ?? '—'),
+                'itens' => (int) ($row['itens'] ?? 0),
+                'total' => ErpMoney::formatBr($total),
+                'motivo' => (string) ($row['motivo'] ?? '—'),
+                'em' => $this->formatCancelamentoEm($row['em'] ?? null),
+            ];
+        }
+
         return [
             'total_entrada' => ErpMoney::formatBr($entradaResumo),
             'total_saida' => ErpMoney::formatBr($saidaResumo),
@@ -264,8 +286,10 @@ trait ManagesPdvCaixa
             'movimentos' => $movimentos,
             'vendas_canceladas' => $vendasCanceladas,
             'produtos_cancelados' => $produtosCancelados,
+            'espera_descartadas' => $esperaDescartadas,
             'total_vendas_canceladas' => ErpMoney::formatBr($totalVendas),
             'total_produtos_cancelados' => ErpMoney::formatBr($totalProdutos),
+            'total_espera_descartadas' => ErpMoney::formatBr($totalEspera),
         ];
     }
 

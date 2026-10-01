@@ -4,6 +4,7 @@ namespace App\Support\Erp;
 
 use App\Models\Empresa;
 use App\Support\Erp\Dashboard\ErpDashboardCertificadoAlert;
+use Illuminate\Support\Facades\Schema;
 
 final class ErpSystemConfig
 {
@@ -86,9 +87,77 @@ final class ErpSystemConfig
         ], true);
     }
 
+    /**
+     * Backup é configuração única do sistema (banco compartilhado).
+     * Prefere empresa com automático ligado; senão a de menor id.
+     *
+     * @param  int|null  $empresaId  Ignorado (mantido por compatibilidade de assinatura).
+     */
+    public static function empresaForBackup(?int $empresaId = null): ?Empresa
+    {
+        return Empresa::query()
+            ->where('param_backup_habilitar', 1)
+            ->orderBy('id')
+            ->first()
+            ?? Empresa::query()->orderBy('id')->first();
+    }
+
+    /**
+     * Replica pasta/intervalo/flag/token (e opcionalmente status) em todas as empresas.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function syncBackupConfigToAll(array $payload): void
+    {
+        $allowed = [
+            'param_backup_pasta_destino',
+            'param_backup_intervalo_horas',
+            'param_backup_habilitar',
+            'param_backup_ultimo_em',
+            'param_backup_ultimo_status',
+            'param_portal_bkp_token',
+        ];
+
+        $data = array_intersect_key($payload, array_flip($allowed));
+
+        if ($data === []) {
+            return;
+        }
+
+        Empresa::query()->update($data);
+    }
+
+    /**
+     * Token único do Log de BKP. Não varia por empresa.
+     */
+    public static function portalBkpToken(): string
+    {
+        return trim((string) config('unitec.portal_bkp.token', ''));
+    }
+
+    /**
+     * Grava o token padrão nas empresas que ainda estão sem ele.
+     */
+    public static function ensurePortalBkpToken(): void
+    {
+        $token = static::portalBkpToken();
+
+        if ($token === '' || ! Schema::hasColumn('empresas', 'param_portal_bkp_token')) {
+            return;
+        }
+
+        Empresa::query()
+            ->where(function ($query) use ($token): void {
+                $query->whereNull('param_portal_bkp_token')
+                    ->orWhere('param_portal_bkp_token', '')
+                    ->orWhere('param_portal_bkp_token', '!=', $token);
+            })
+            ->update(['param_portal_bkp_token' => $token]);
+    }
+
     public static function backupEnabled(?int $empresaId = null): bool
     {
-        $empresa = static::empresa($empresaId);
+        $empresa = static::empresaForBackup($empresaId);
 
         if ($empresa !== null) {
             return (bool) $empresa->param_backup_habilitar;
@@ -99,19 +168,19 @@ final class ErpSystemConfig
 
     public static function backupDestinationPath(?int $empresaId = null): string
     {
-        return trim((string) static::empresa($empresaId)?->param_backup_pasta_destino);
+        return trim((string) static::empresaForBackup($empresaId)?->param_backup_pasta_destino);
     }
 
     public static function backupIntervalHours(?int $empresaId = null): int
     {
-        $hours = (int) (static::empresa($empresaId)?->param_backup_intervalo_horas ?? 24);
+        $hours = (int) (static::empresaForBackup($empresaId)?->param_backup_intervalo_horas ?? 24);
 
         return max(1, $hours);
     }
 
     public static function backupLastStatus(?int $empresaId = null): string
     {
-        $fromDb = trim((string) static::empresa($empresaId)?->param_backup_ultimo_status);
+        $fromDb = trim((string) static::empresaForBackup($empresaId)?->param_backup_ultimo_status);
 
         if ($fromDb !== '') {
             return $fromDb;
@@ -122,7 +191,7 @@ final class ErpSystemConfig
 
     public static function backupLastAt(?int $empresaId = null): ?string
     {
-        $fromDb = trim((string) static::empresa($empresaId)?->param_backup_ultimo_em);
+        $fromDb = trim((string) static::empresaForBackup($empresaId)?->param_backup_ultimo_em);
 
         if ($fromDb !== '') {
             return $fromDb;

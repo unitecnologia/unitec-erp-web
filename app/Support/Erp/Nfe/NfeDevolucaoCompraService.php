@@ -3,18 +3,25 @@
 namespace App\Support\Erp\Nfe;
 
 use App\Models\Cfop;
+use App\Models\CompraItem;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\OperacaoFiscal;
 use App\Models\Person;
+use App\Support\Erp\NotaFornecedor\NotaFornecedorDevolucaoFiscalService;
+use DomainException;
 use RuntimeException;
 
 class NfeDevolucaoCompraService
 {
+    public function __construct(
+        private readonly NotaFornecedorDevolucaoFiscalService $fiscalDevolucao = new NotaFornecedorDevolucaoFiscalService(),
+    ) {}
+
     public function validar(DevolucaoCompra $devolucao): void
     {
-        $devolucao->loadMissing(['itens', 'compra', 'fornecedor', 'empresa']);
+        $devolucao->loadMissing(['itens.compraItem.notaFornecedorItem', 'compra', 'fornecedor', 'empresa']);
 
         if ($devolucao->situacao !== DevolucaoCompra::SITUACAO_FINALIZADA) {
             throw new RuntimeException('Somente devolução de compra finalizada pode gerar NF-e.');
@@ -45,6 +52,24 @@ class NfeDevolucaoCompraService
         if ($this->temNfeAtiva($devolucao)) {
             throw new RuntimeException('Esta devolução de compra já possui NF-e vinculada.');
         }
+
+        foreach ($devolucao->itens as $item) {
+            $compraItem = $item->compraItem;
+
+            if (! $compraItem instanceof CompraItem) {
+                continue;
+            }
+
+            try {
+                $this->fiscalDevolucao->assertQuantidadePermitida(
+                    $compraItem,
+                    (float) $item->qtd,
+                    (int) $devolucao->id,
+                );
+            } catch (DomainException $e) {
+                throw new RuntimeException($e->getMessage(), 0, $e);
+            }
+        }
     }
 
     /**
@@ -59,14 +84,14 @@ class NfeDevolucaoCompraService
      *     natureza_operacao: string,
      *     obs_contribuinte: string,
      *     referencias: list<array{referencia: string}>,
-     *     rows: list<array{product_id: int, quantidade: float, valor_unitario: float, descricao: string, cfop: string}>
+     *     rows: list<array<string, mixed>>
      * }
      */
     public function montarPayload(DevolucaoCompra $devolucao): array
     {
         $this->validar($devolucao);
 
-        $devolucao->loadMissing(['itens.product', 'compra', 'fornecedor', 'empresa']);
+        $devolucao->loadMissing(['itens.product', 'itens.compraItem.notaFornecedorItem', 'compra', 'fornecedor', 'empresa']);
 
         $empresa = $this->resolveEmpresa($devolucao);
         $fornecedor = $devolucao->fornecedor;
@@ -86,13 +111,28 @@ class NfeDevolucaoCompraService
                 continue;
             }
 
-            $rows[] = [
+            $qtd = (float) $item->qtd;
+            $row = [
                 'product_id' => $productId,
-                'quantidade' => (float) $item->qtd,
+                'quantidade' => $qtd,
                 'valor_unitario' => (float) $item->preco,
                 'descricao' => (string) ($item->produto_descricao ?: ($item->product?->descricao ?? '')),
                 'cfop' => (string) $cfop,
             ];
+
+            $notaItem = $item->compraItem
+                ? $this->fiscalDevolucao->resolveNotaItem($item->compraItem)
+                : null;
+
+            if ($notaItem) {
+                $row = [
+                    ...$row,
+                    ...$this->fiscalDevolucao->montarOverridesNfe($notaItem, $qtd, $empresa),
+                    'cfop' => (string) $cfop,
+                ];
+            }
+
+            $rows[] = $row;
         }
 
         if ($rows === []) {
@@ -100,11 +140,12 @@ class NfeDevolucaoCompraService
         }
 
         $obsDevolucao = trim((string) ($devolucao->observacoes ?? ''));
-        $origem = 'NF-e de devolução de compra nº '.$numeroDevolucao.'.';
-
-        if ($numeroCompra !== '') {
-            $origem .= ' Compra nº '.$numeroCompra.'.';
-        }
+        $origem = $this->montarObsOrigem(
+            numeroDevolucao: $numeroDevolucao,
+            numeroCompra: $numeroCompra,
+            numeroNotaOrigem: $this->resolveNumeroNotaOrigem($devolucao),
+            chaveReferenciada: $chave,
+        );
 
         return [
             'devolucao_compra_id' => (int) $devolucao->id,
@@ -119,6 +160,44 @@ class NfeDevolucaoCompraService
             'referencias' => $chave !== null ? [['referencia' => $chave]] : [],
             'rows' => $rows,
         ];
+    }
+
+    private function montarObsOrigem(
+        string $numeroDevolucao,
+        string $numeroCompra,
+        ?string $numeroNotaOrigem,
+        ?string $chaveReferenciada,
+    ): string {
+        $partes = ['NF-e de devolução de compra nº '.$numeroDevolucao.'.'];
+
+        if ($numeroCompra !== '') {
+            $partes[] = 'Compra nº '.$numeroCompra.'.';
+        }
+
+        if ($numeroNotaOrigem !== null && $numeroNotaOrigem !== '') {
+            $partes[] = 'NF-e de origem: '.$numeroNotaOrigem.'.';
+        }
+
+        if ($chaveReferenciada !== null && $chaveReferenciada !== '') {
+            $partes[] = 'Chave NF-e referenciada: '.$chaveReferenciada.'.';
+        }
+
+        return implode(' ', $partes);
+    }
+
+    private function resolveNumeroNotaOrigem(DevolucaoCompra $devolucao): ?string
+    {
+        $compra = $devolucao->compra;
+        if ($compra === null) {
+            return null;
+        }
+
+        $numeroNota = trim((string) ($compra->numero_nota ?? ''));
+        if ($numeroNota === '') {
+            return null;
+        }
+
+        return ltrim($numeroNota, '0') ?: $numeroNota;
     }
 
     public function temNfeAtiva(DevolucaoCompra $devolucao): bool

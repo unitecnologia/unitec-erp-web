@@ -2,14 +2,18 @@
 
 namespace App\Support\Erp\Vendas;
 
+use App\Models\ClienteCreditoMovimentacao;
 use App\Models\DevolucaoVenda;
+use App\Support\Erp\ClienteCreditoService;
 use App\Models\Empresa;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Nfe;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\Product;
 use App\Models\Venda;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\Pdv\PdvCaixaMovimentoService;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvStockService;
@@ -19,6 +23,7 @@ use App\Support\Fiscal\PdvNfceCancelamentoService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\Logistica\LogisticaVendaHookService;
 use DomainException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 
@@ -64,9 +69,13 @@ final class EstornarVendaService
         ?Empresa $empresa = null,
         ?int $pdvCaixaSessaoId = null,
         bool $bloquearCancelamentoDocFiscal = false,
+        ?callable $aoAvancar = null,
     ): EstornarVendaResult {
         $motivo = PdvEstornoMotivo::normalize($motivo);
-        $erroMotivo = PdvEstornoMotivo::validate($motivo);
+        $minMotivo = $origem === self::ORIGEM_MONITOR_FV
+            ? PdvEstornoMotivo::MIN_LENGTH_MONITOR_FV
+            : PdvEstornoMotivo::MIN_LENGTH;
+        $erroMotivo = PdvEstornoMotivo::validate($motivo, $minMotivo);
 
         if ($erroMotivo !== null) {
             throw new DomainException($erroMotivo);
@@ -90,10 +99,10 @@ final class EstornarVendaService
         }
 
         $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
-        $this->assertSemNfeTransmitidaAtiva($venda, $origem);
+        $this->assertSemDocumentoFiscalAtivo($venda, $origem);
 
         if ($venda->forcaVendasOrder !== null && $venda->forcaVendasOrder->venda_id) {
-            return $this->estornarForcaVendas($venda, $motivo, $origem);
+            return $this->estornarForcaVendas($venda, $motivo, $origem, $aoAvancar);
         }
 
         if ($venda->pdvVenda !== null) {
@@ -158,7 +167,7 @@ final class EstornarVendaService
         }
 
         $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
-        $this->assertSemNfeTransmitidaAtiva($venda, $origem);
+        $this->assertSemDocumentoFiscalAtivo($venda, $origem);
 
         if ($venda->forcaVendasOrder !== null && $venda->forcaVendasOrder->venda_id) {
             return $this->estornarForcaVendas($venda, $motivo, $origem);
@@ -176,10 +185,22 @@ final class EstornarVendaService
     }
 
     /**
+     * Mesmas travas de devolução e documento fiscal usadas no cancelamento do Monitor.
+     *
      * @throws DomainException
      */
-    private function estornarForcaVendas(Venda $venda, string $motivo, string $origem): EstornarVendaResult
+    public function assertSemImpedimentoFiscalOuDevolucao(Venda $venda): void
     {
+        $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
+        $this->assertSemDocumentoFiscalAtivo($venda, self::ORIGEM_MONITOR_FV);
+    }
+
+    private function estornarForcaVendas(
+        Venda $venda,
+        string $motivo,
+        string $origem,
+        ?callable $aoAvancar = null,
+    ): EstornarVendaResult {
         $order = $venda->forcaVendasOrder;
 
         if ($order === null) {
@@ -187,7 +208,7 @@ final class EstornarVendaService
         }
 
         try {
-            $this->forcaVendasFaturamento->estornar($order);
+            $this->forcaVendasFaturamento->estornar($order, $motivo, $aoAvancar);
         } catch (\RuntimeException $exception) {
             throw new DomainException($exception->getMessage(), 0, $exception);
         }
@@ -199,7 +220,7 @@ final class EstornarVendaService
             $origem,
             null,
             'ok',
-            'Estorno Força de Vendas (estoque, CR, caixa FV, logística).',
+            'Cancelamento Força de Vendas (estoque, CR, caixa FV, logística).',
         );
 
         return new EstornarVendaResult(
@@ -298,6 +319,13 @@ final class EstornarVendaService
                     throw new DomainException($erroFinanceiro);
                 }
 
+                (new ClienteCreditoService())->estornarUsosDaOrigem(
+                    ClienteCreditoMovimentacao::ORIGEM_PDV,
+                    (int) $pdvLocked->id,
+                    Auth::id() ? (int) Auth::id() : null,
+                    'Estorno da venda PDV #'.$pdvLocked->numero,
+                );
+
                 foreach ($pdvLocked->itens as $item) {
                     if (! $item->product_id) {
                         continue;
@@ -311,6 +339,14 @@ final class EstornarVendaService
                             (float) $item->quantidade,
                             $item->product_grade_id ? (int) $item->product_grade_id : null,
                             $item->product_serial_id ? (int) $item->product_serial_id : null,
+                            null,
+                            EstoqueMovimentacaoContext::make(
+                                EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                                empresaId: \App\Support\Erp\ErpContext::currentEmpresaId(),
+                                origemTipo: 'venda',
+                                origemId: (int) $vendaLocked->id,
+                                origemNumero: $this->numeroVendaAmigavel($vendaLocked, $pdvLocked),
+                            ),
                         );
                     }
                 }
@@ -376,30 +412,69 @@ final class EstornarVendaService
     }
 
     /**
-     * Pedido com NF-e ainda transmitida: cancelar a nota primeiro (tela NF-e),
-     * que em seguida pode estornar o pedido. Exceto quando a origem já é o cancelamento da NF-e.
+     * Pedido com documento fiscal ainda ativo (NF-e aberta/transmitida/contingência
+     * ou NFC-e pendente/autorizada/contingência/simulada): tratar o fiscal antes.
+     * Exceto quando a origem já é o cancelamento da NF-e/NFC-e.
+     * No PDV a NFC-e é cancelada no próprio fluxo — não bloqueia NFC-e.
      *
      * @throws DomainException
      */
-    private function assertSemNfeTransmitidaAtiva(Venda $venda, string $origem): void
+    private function assertSemDocumentoFiscalAtivo(Venda $venda, string $origem): void
     {
-        if ($origem === self::ORIGEM_NFE_LISTA) {
+        if ($origem === self::ORIGEM_NFE_LISTA || $origem === self::ORIGEM_NFCE_LISTA) {
             return;
         }
 
         $nfe = Nfe::query()
             ->where('venda_id', (int) $venda->id)
-            ->where('status', Nfe::STATUS_TRANSMITIDA)
+            ->whereIn('status', [
+                Nfe::STATUS_ABERTA,
+                Nfe::STATUS_TRANSMITIDA,
+                Nfe::STATUS_CONTINGENCIA,
+            ])
             ->orderByDesc('id')
             ->first();
 
-        if ($nfe === null) {
+        if ($nfe !== null) {
+            $rotulo = match ((string) $nfe->status) {
+                Nfe::STATUS_ABERTA => 'aberta',
+                Nfe::STATUS_CONTINGENCIA => 'em contingência',
+                default => 'transmitida',
+            };
+
+            throw new DomainException(
+                'Existe NF-e '.$rotulo.' (#'.($nfe->numero ?: $nfe->id).') vinculada a este pedido. '
+                .'Cancele ou exclua o documento fiscal antes de cancelar o pedido.'
+            );
+        }
+
+        // PDV cancela NFC-e dentro do estorno — não bloquear aqui.
+        if ($origem === self::ORIGEM_PDV) {
+            return;
+        }
+
+        $venda->loadMissing('pdvVenda.nfce');
+        $nfce = $venda->pdvVenda?->nfce;
+
+        if ($nfce === null) {
+            return;
+        }
+
+        $statusNfce = (string) ($nfce->status ?? '');
+        $bloqueantes = [
+            PdvVendaNfce::STATUS_PENDENTE,
+            PdvVendaNfce::STATUS_AUTORIZADA,
+            PdvVendaNfce::STATUS_CONTINGENCIA,
+            PdvVendaNfce::STATUS_SIMULADA,
+        ];
+
+        if (! in_array($statusNfce, $bloqueantes, true)) {
             return;
         }
 
         throw new DomainException(
-            'Existe NF-e transmitida (#'.$nfe->numero.') vinculada a este pedido. '
-            .'Cancele a NF-e primeiro na tela de NF-e; o cancelamento da nota também estorna o pedido.'
+            'Existe NFC-e ('.$statusNfce.') vinculada a este pedido. '
+            .'Cancele ou exclua o documento fiscal antes de cancelar o pedido.'
         );
     }
 
@@ -430,8 +505,8 @@ final class EstornarVendaService
         }
 
         throw new DomainException(
-            'Não é possível estornar/cancelar esta venda: existe devolução #'.$dev->numero
-            .' finalizada. Use a devolução para o ajuste de estoque/financeiro; estornar a venda novamente duplicaria o estoque.'
+            'Não é possível cancelar esta venda: existe devolução #'.$dev->numero
+            .' finalizada. Use a devolução para o ajuste de estoque/financeiro; cancelar a venda novamente duplicaria o estoque.'
         );
     }
 
@@ -451,6 +526,18 @@ final class EstornarVendaService
                     $this->stockService->estornoItemVenda(
                         $product,
                         (float) $item->quantidade,
+                        null,
+                        null,
+                        null,
+                        EstoqueMovimentacaoContext::make(
+                            EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                            empresaId: $venda->empresa_id
+                                ? (int) $venda->empresa_id
+                                : \App\Support\Erp\ErpContext::currentEmpresaId(),
+                            origemTipo: 'venda',
+                            origemId: (int) $venda->id,
+                            origemNumero: $venda->numero !== null ? (string) $venda->numero : null,
+                        ),
                     );
                 }
             }
@@ -524,6 +611,20 @@ final class EstornarVendaService
         }
 
         return null;
+    }
+
+    private function numeroVendaAmigavel(Venda $venda, ?PdvVenda $pdvVenda = null): string
+    {
+        $numero = ltrim((string) ($venda->numero ?? ''), '0');
+        if ($numero !== '') {
+            return $numero;
+        }
+
+        if ($pdvVenda?->numero !== null && (string) $pdvVenda->numero !== '') {
+            return (string) $pdvVenda->numero;
+        }
+
+        return (string) $venda->id;
     }
 
     private function resolveEmpresa(?PdvVendaNfce $nfce): ?Empresa

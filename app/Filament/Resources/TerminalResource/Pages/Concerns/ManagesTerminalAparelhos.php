@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
+use App\Models\EntregasDevice;
 use App\Models\ForcaVendasDevice;
-use App\Models\Terminal;
 use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
 use App\Support\Erp\ErpAccess;
@@ -86,13 +86,13 @@ trait ManagesTerminalAparelhos
             ->send();
     }
 
-    public function revogarAparelhoSelecionado(): void
+    public function excluirAparelhoSelecionado(): void
     {
         $item = $this->selectedAparelhoItem();
 
         if ($item === null) {
             Notification::make()
-                ->title('Selecione um aparelho para revogar.')
+                ->title('Selecione um aparelho para excluir.')
                 ->warning()
                 ->send();
 
@@ -104,11 +104,10 @@ trait ManagesTerminalAparelhos
         }
 
         try {
-            app(GestorAprovacaoService::class)->rejeitarAparelho($item['origem'], (int) $item['id']);
-            $this->desativarTerminalDoAparelho($item);
+            app(GestorAprovacaoService::class)->excluirAparelho($item['origem'], (int) $item['id']);
         } catch (\Throwable $e) {
             Notification::make()
-                ->title('Não foi possível revogar.')
+                ->title('Não foi possível excluir.')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -119,7 +118,8 @@ trait ManagesTerminalAparelhos
         $this->selectedAparelhoKey = null;
 
         Notification::make()
-            ->title('Aparelho revogado.')
+            ->title('Aparelho excluído.')
+            ->body('A vaga de telefone foi liberada. O app pode solicitar autorização de novo.')
             ->success()
             ->send();
     }
@@ -142,6 +142,10 @@ trait ManagesTerminalAparelhos
 
         if (Schema::hasTable((new UnitecOsDevice)->getTable())) {
             $items = $items->merge($this->mapDevices('os', 'Unitec OS', UnitecOsDevice::query(), $empresaId));
+        }
+
+        if (Schema::hasTable((new EntregasDevice)->getTable())) {
+            $items = $items->merge($this->mapDevices('ent', 'Unitec Entregas', EntregasDevice::query(), $empresaId));
         }
 
         return $items
@@ -205,33 +209,5 @@ trait ManagesTerminalAparelhos
         }
 
         return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $item
-     */
-    private function desativarTerminalDoAparelho(array $item): void
-    {
-        if (! Schema::hasColumn('terminais', 'device_uuid')) {
-            return;
-        }
-
-        $device = match ($item['origem'] ?? '') {
-            'vi' => VendasInternasDevice::query()->find($item['id']),
-            'os' => UnitecOsDevice::query()->find($item['id']),
-            default => ForcaVendasDevice::query()->find($item['id']),
-        };
-
-        $uuid = trim((string) ($device?->device_uuid ?? ''));
-        $empresaId = (int) ($device?->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
-
-        if ($uuid === '' || $empresaId < 1) {
-            return;
-        }
-
-        Terminal::query()
-            ->where('empresa_id', $empresaId)
-            ->where('device_uuid', $uuid)
-            ->update(['ativo' => false]);
     }
 }

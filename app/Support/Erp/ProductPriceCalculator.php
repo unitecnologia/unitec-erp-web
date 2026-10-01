@@ -73,4 +73,37 @@ class ProductPriceCalculator
 
         return $data;
     }
+
+    /**
+     * Normaliza custo/margem no save sem sobrescrever preço de venda informado.
+     *
+     * - Compra > 0: atualiza custo (compra + % custos).
+     * - Venda > 0: preserva venda e deriva margem.
+     * - Venda vazia/zero: deriva venda de custo + margem.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function recalculateBeforeSave(array $data): array
+    {
+        $vendaInformada = BrDecimal::parse($data['preco_venda'] ?? 0, 2);
+        $compra = BrDecimal::parse($data['preco_compra'] ?? 0, 2);
+
+        if ($compra > 0) {
+            $pctCustos = BrDecimal::parse($data['pct_custos'] ?? 0, 2);
+            $data['preco_custo'] = round($compra + ($compra * $pctCustos / 100), 2);
+        }
+
+        $custo = BrDecimal::parse($data['preco_custo'] ?? 0, 2);
+
+        if ($compra <= 0 && $custo <= 0) {
+            return $data;
+        }
+
+        if ($vendaInformada > 0) {
+            return self::recalculateFromVenda($data);
+        }
+
+        return self::recalculateFromMargem($data);
+    }
 }

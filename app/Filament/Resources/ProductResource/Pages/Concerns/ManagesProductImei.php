@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
+use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductImei;
 use Filament\Notifications\Notification;
@@ -82,6 +83,8 @@ trait ManagesProductImei
         }
 
         $ids = [];
+        $fornecedoresValidos = $this->fornecedoresExistentesDosImeis();
+        $fornecedoresIgnorados = [];
 
         foreach ($this->imeiRows as $row) {
             $imei = trim((string) ($row['imei'] ?? ''));
@@ -90,9 +93,18 @@ trait ManagesProductImei
                 continue;
             }
 
+            $fornecedorId = filled($row['fornecedor_id'] ?? null) ? (int) $row['fornecedor_id'] : null;
+            if ($fornecedorId !== null && $fornecedorId > 0 && ! isset($fornecedoresValidos[$fornecedorId])) {
+                $fornecedoresIgnorados[] = $fornecedorId;
+                $fornecedorId = null;
+            }
+            if ($fornecedorId !== null && $fornecedorId <= 0) {
+                $fornecedorId = null;
+            }
+
             $attributes = [
                 'imei' => $imei,
-                'fornecedor_id' => filled($row['fornecedor_id'] ?? null) ? (int) $row['fornecedor_id'] : null,
+                'fornecedor_id' => $fornecedorId,
                 'ativo' => (bool) ($row['ativo'] ?? true),
             ];
 
@@ -106,5 +118,39 @@ trait ManagesProductImei
         }
 
         $product->imeis()->whereNotIn('id', $ids)->delete();
+
+        $ignorados = array_values(array_unique($fornecedoresIgnorados));
+        if ($ignorados !== []) {
+            Notification::make()
+                ->title('IMEI gravado sem fornecedor.')
+                ->body('Estes IDs de fornecedor não existem no cadastro e foram ignorados: '.implode(', ', $ignorados).'.')
+                ->warning()
+                ->send();
+        }
+    }
+
+    /** @return array<int, true> */
+    protected function fornecedoresExistentesDosImeis(): array
+    {
+        $ids = [];
+        foreach ($this->imeiRows as $row) {
+            if (! filled($row['fornecedor_id'] ?? null)) {
+                continue;
+            }
+            $id = (int) $row['fornecedor_id'];
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return Person::query()
+            ->whereIn('id', array_values(array_unique($ids)))
+            ->pluck('id')
+            ->mapWithKeys(fn ($id): array => [(int) $id => true])
+            ->all();
     }
 }

@@ -85,3 +85,16 @@ Thumbs.db
 # Caches/binários PHP locais
 /tools/php/opcache/
 /tools/php/ossl-modules/
+
+**/caddy
+frankenphp
+frankenphp-worker.php
+
+# Locais / acidentais — não versionar
+/tools/composer.phar
+/tools/composer.cmd
+/database/data/instalador/certificados/certificado.pfx
+/database/data/instalador/empresa_unitec.json
+/backup-antes-restauracao-fiscal.patch
+/app/Support/Erp/Nfse/referencia-teste-real.txt
+/scripts/sql/consolidar-boleto-formas-heidisql.sql

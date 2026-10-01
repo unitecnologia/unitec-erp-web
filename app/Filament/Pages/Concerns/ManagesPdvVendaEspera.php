@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Livewire\Erp\PdvHotPath;
 use App\Models\PdvVendaEspera;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Pdv\PdvCaixaEsperaDescarteLog;
 use App\Support\Erp\Pdv\PdvVendaEsperaService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +20,7 @@ trait ManagesPdvVendaEspera
 
     public ?int $selectedVendaEsperaIndex = null;
 
-    public ?int $vendaEsperaExcluirId = null;
+    public string $vendaEsperaMotivoDescarte = '';
 
     public function suspenderVendaEmEspera(): void
     {
@@ -27,6 +29,9 @@ trait ManagesPdvVendaEspera
 
             return;
         }
+
+        // Hot path grava o cupom na sessão; carregar antes de salvar a espera.
+        $this->loadCupomFromSession();
 
         if (! $this->cupomTemItens()) {
             Notification::make()
@@ -62,6 +67,8 @@ trait ManagesPdvVendaEspera
 
         $clienteNome = trim((string) ($contexto['import']['cliente_nome'] ?? ''));
         $total = (float) $this->cupomTotalValor();
+        $itens = array_values($this->cupomItens);
+
         $espera = PdvVendaEspera::query()->create([
             'pdv_caixa_sessao_id' => $this->caixaSessaoId,
             'user_id' => $user->id,
@@ -69,11 +76,12 @@ trait ManagesPdvVendaEspera
             'sequencia' => $service->nextSequencia($this->caixaSessaoId),
             'cliente_nome' => $clienteNome !== '' ? $clienteNome : null,
             'vendedor_nome' => $this->vendedor !== '' ? $this->vendedor : null,
-            'qtd_itens' => count($this->cupomItens),
+            'qtd_itens' => count($itens),
             'total' => $total,
-            'snapshot' => $service->encode($service->buildSnapshot($this->cupomItens, $contexto)),
+            'snapshot' => $service->encode($service->buildSnapshot($itens, $contexto)),
         ]);
 
+        // Só limpa o cupom depois que a espera foi persistida.
         $this->limparCupom();
         $this->dispatch('erp-pdv-focus-search');
 
@@ -94,7 +102,7 @@ trait ManagesPdvVendaEspera
 
         $this->vendaEsperaSearch = '';
         $this->selectedVendaEsperaIndex = null;
-        $this->vendaEsperaExcluirId = null;
+        $this->vendaEsperaMotivoDescarte = '';
         $this->refreshVendasEsperaResults();
         $this->openPdvModal('vendas_espera');
         $this->dispatch('erp-pdv-focus-vendas-espera');
@@ -108,6 +116,14 @@ trait ManagesPdvVendaEspera
         }
 
         $this->refreshVendasEsperaResults();
+    }
+
+    public function updatedVendaEsperaMotivoDescarte(string $value): void
+    {
+        $upper = mb_strtoupper($value, 'UTF-8');
+        if ($this->vendaEsperaMotivoDescarte !== $upper) {
+            $this->vendaEsperaMotivoDescarte = $upper;
+        }
     }
 
     public function refreshVendasEsperaResults(): void
@@ -155,6 +171,8 @@ trait ManagesPdvVendaEspera
     {
         if (isset($this->vendaEsperaResults[$index])) {
             $this->selectedVendaEsperaIndex = $index;
+            $this->vendaEsperaMotivoDescarte = '';
+            $this->dispatch('erp-pdv-focus-vendas-espera-motivo');
         }
     }
 
@@ -176,6 +194,8 @@ trait ManagesPdvVendaEspera
 
             return;
         }
+
+        $this->loadCupomFromSession();
 
         if ($this->cupomTemItens()) {
             $this->notifyPdvError('Há uma venda em andamento. Suspenda ou cancele antes de recuperar outra.');
@@ -208,7 +228,14 @@ trait ManagesPdvVendaEspera
             return;
         }
 
-        $this->cupomItens = array_values($snapshot['cupom_itens']);
+        $itens = array_values($snapshot['cupom_itens']);
+        if ($itens === []) {
+            $this->notifyPdvError('A espera não contém itens para recuperar.');
+
+            return;
+        }
+
+        $this->cupomItens = $itens;
         $this->selectedCupomIndex = null;
         $this->pdvMostrarDetalheItem = false;
         $this->persistCupomToSession();
@@ -233,40 +260,92 @@ trait ManagesPdvVendaEspera
             $this->persistVendedorToSession();
         }
 
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
+
         $espera->delete();
         $this->closePdvModal();
         $this->dispatch('erp-pdv-focus-search');
 
         Notification::make()
             ->title('Venda em espera recuperada.')
+            ->body(sprintf('%d item(ns) — R$ %s', count($itens), ErpMoney::formatBr($this->cupomTotalValor())))
             ->success()
             ->send();
     }
 
     public function requestExcluirVendaEmEspera(): void
     {
-        $row = $this->vendaEsperaResults[$this->selectedVendaEsperaIndex ?? -1] ?? null;
-        $this->vendaEsperaExcluirId = $row ? (int) $row['id'] : null;
+        if ($this->selectedVendaEsperaIndex === null) {
+            return;
+        }
+
+        $this->dispatch('erp-pdv-focus-vendas-espera-motivo');
     }
 
     public function confirmarExcluirVendaEmEspera(): void
     {
-        $user = Auth::user();
-        if ($this->vendaEsperaExcluirId && $user && $this->caixaSessaoId) {
-            PdvVendaEspera::query()
-                ->whereKey($this->vendaEsperaExcluirId)
-                ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
-                ->where('user_id', $user->id)
-                ->delete();
+        $motivo = trim($this->vendaEsperaMotivoDescarte);
+
+        if ($motivo === '' || mb_strlen($motivo, 'UTF-8') < 10) {
+            Notification::make()
+                ->title('Informe o motivo do descarte.')
+                ->body('Mínimo de 10 caracteres.')
+                ->warning()
+                ->send();
+            $this->dispatch('erp-pdv-focus-vendas-espera-motivo');
+
+            return;
         }
 
-        $this->vendaEsperaExcluirId = null;
+        $user = Auth::user();
+        $row = $this->vendaEsperaResults[$this->selectedVendaEsperaIndex ?? -1] ?? null;
+
+        if (! $row || ! $user || ! $this->caixaSessaoId) {
+            return;
+        }
+
+        $espera = PdvVendaEspera::query()
+            ->whereKey((int) $row['id'])
+            ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $espera) {
+            $this->vendaEsperaMotivoDescarte = '';
+            $this->refreshVendasEsperaResults();
+
+            return;
+        }
+
+        $sessao = $this->caixaSessaoAtual();
+        if (! $sessao || $sessao->fechado_em !== null) {
+            Notification::make()
+                ->title('Caixa fechado.')
+                ->body('Não foi possível registrar o descarte.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        (new PdvCaixaEsperaDescarteLog())->registrar($sessao, $espera, $motivo);
+        $espera->delete();
+
+        $this->vendaEsperaMotivoDescarte = '';
+        $this->selectedVendaEsperaIndex = null;
         $this->refreshVendasEsperaResults();
+
+        Notification::make()
+            ->title('Venda em espera descartada.')
+            ->success()
+            ->send();
     }
 
     public function cancelVendaEmEspera(): void
     {
-        $this->vendaEsperaExcluirId = null;
+        $this->vendaEsperaMotivoDescarte = '';
         $this->closePdvModal();
         $this->dispatch('erp-pdv-focus-search');
     }

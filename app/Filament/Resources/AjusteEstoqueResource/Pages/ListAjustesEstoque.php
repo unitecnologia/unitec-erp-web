@@ -33,8 +33,6 @@ class ListAjustesEstoque extends ListRecords
     #[Url(as: 'campo')]
     public string $searchColumn = 'produto';
 
-    public bool $informarPeriodo = true;
-
     public string $periodoDe = '';
 
     public string $periodoAte = '';
@@ -83,7 +81,7 @@ class ListAjustesEstoque extends ListRecords
             'searchFocusKey' => 'F5',
             'create' => 'createAjuste',
             'edit' => 'editAjuste',
-            'delete' => 'deleteAjuste',
+            'delete' => null,
             'extraKeys' => [
                 'F4' => ['method' => 'printAjustes'],
             ],
@@ -99,14 +97,12 @@ class ListAjustesEstoque extends ListRecords
     {
         $query = parent::getTableQuery()->with(['product']);
 
-        if ($this->informarPeriodo) {
-            if (filled($this->periodoDeApplied)) {
-                $query->whereDate('data', '>=', $this->periodoDeApplied);
-            }
+        if (filled($this->periodoDeApplied)) {
+            $query->whereDate('data', '>=', $this->periodoDeApplied);
+        }
 
-            if (filled($this->periodoAteApplied)) {
-                $query->whereDate('data', '<=', $this->periodoAteApplied);
-            }
+        if (filled($this->periodoAteApplied)) {
+            $query->whereDate('data', '<=', $this->periodoAteApplied);
         }
 
         if (filled($this->localSearch)) {
@@ -159,12 +155,6 @@ class ListAjustesEstoque extends ListRecords
         $this->resetTable();
     }
 
-    public function updatedInformarPeriodo(): void
-    {
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
     public function updatedSearchColumn(): void
     {
         $this->localSearch = '';
@@ -206,7 +196,7 @@ class ListAjustesEstoque extends ListRecords
         }
 
         $builder = new AjusteEstoqueListQueryBuilder(
-            informarPeriodo: $this->informarPeriodo,
+            informarPeriodo: true,
             periodoDe: $this->periodoDeApplied,
             periodoAte: $this->periodoAteApplied,
             searchColumn: $this->searchColumn,

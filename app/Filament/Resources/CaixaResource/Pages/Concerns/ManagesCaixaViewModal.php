@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CaixaResource\Pages\Concerns;
 
 use App\Models\CaixaLancamento;
+use App\Support\Erp\ContaReceberPedidoExibicao;
 use Filament\Notifications\Notification;
 
 trait ManagesCaixaViewModal
@@ -30,7 +31,10 @@ trait ManagesCaixaViewModal
         $this->viewModalData = [
             'codigo' => (string) $lancamento->codigo,
             'emissao' => $lancamento->emissao?->format('d/m/Y') ?? '—',
-            'documento' => $lancamento->documento ?: '—',
+            'documento' => ContaReceberPedidoExibicao::texto(
+                $lancamento->documento,
+                ContaReceberPedidoExibicao::mapa([$lancamento]),
+            ),
             'historico' => mb_strtoupper($lancamento->historico, 'UTF-8'),
             'plano_contas' => mb_strtoupper((string) ($lancamento->plano_contas ?? ''), 'UTF-8') ?: '—',
             'conta' => mb_strtoupper($lancamento->conta?->nome ?? '—', 'UTF-8'),

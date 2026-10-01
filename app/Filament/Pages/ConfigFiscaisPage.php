@@ -11,6 +11,8 @@ use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
+use App\Support\Erp\Nfse\NfseRegimeTributario;
+use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -20,6 +22,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -74,6 +77,7 @@ class ConfigFiscaisPage extends Page
         $params = VendasParametro::forEmpresa($empresaId);
         NfeFiscalConfig::ensureDefaults($params, $empresa);
         $this->form = NfeFiscalConfig::toFormArray($params->fresh());
+        $this->loadNfseRegime($empresa);
         $this->syncNfeStoragePathsToForm();
         $this->refreshCertificadoInfo();
         $this->loadTerminais();
@@ -101,7 +105,7 @@ class ConfigFiscaisPage extends Page
 
     public function setActiveTab(string $tab): void
     {
-        $allowed = ['webservice', 'certificado', 'nfce', 'nfe', 'pdv_offline', 'resp_tecnico'];
+        $allowed = ['webservice', 'certificado', 'nfce', 'nfe', 'nfse', 'pdv_offline', 'resp_tecnico'];
 
         $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'webservice';
 
@@ -135,17 +139,17 @@ class ConfigFiscaisPage extends Page
             ->orderBy('id')
             ->get()
             ->map(function (Terminal $t) use ($params): array {
-                $serieEfetiva = NfceTerminalSequencia::serieEfetiva($t, $params);
-                $ultimo = NfceTerminalSequencia::ultimoNumero((int) $t->empresa_id, $serieEfetiva);
-
                 $serieGravada = trim((string) ($t->serie ?: ''));
+                $serieConsulta = $serieGravada !== ''
+                    ? $serieGravada
+                    : NfceTerminalSequencia::serieEfetiva($t, $params);
+                $ultimo = NfceTerminalSequencia::ultimoNumero((int) $t->empresa_id, $serieConsulta);
 
                 return [
                     'id' => (int) $t->id,
                     'nome' => (string) ($t->nome ?: 'Caixa'),
                     'terminal' => (string) ($t->numero_logico_terminal ?: $t->id),
-                    // Pré-preenche com a série efetiva para não parecer "—" sem valor.
-                    'serie' => $serieGravada !== '' ? $serieGravada : $serieEfetiva,
+                    'serie' => $serieGravada,
                     'proximo_numero' => NfceTerminalSequencia::proximoPiso($t, $params),
                     'ultimo_nfce' => $ultimo ?? 0,
                 ];
@@ -270,25 +274,63 @@ class ConfigFiscaisPage extends Page
             return;
         }
 
-        $this->validate([
-            'form.uf' => ['required', 'string', 'size:2'],
-            'form.ambiente' => ['required', 'integer', 'in:0,1'],
-            'form.aguardar' => ['required', 'integer', 'min:0'],
-            'form.intervalo' => ['required', 'integer', 'min:0'],
-            'form.tentativas' => ['required', 'integer', 'min:1'],
-            'form.numero_nfe' => ['required', 'integer', 'min:1'],
-            'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
-            'form.id_token' => ['nullable', 'string', 'max:40'],
-            'form.token' => ['nullable', 'string', 'max:120'],
-            'form.versao_qrcode' => ['nullable', 'integer', 'in:2,3'],
-            'form.resp_tecnico_cnpj' => ['nullable', 'string', 'max:18'],
-            'form.resp_tecnico_contato' => ['nullable', 'string', 'max:60'],
-            'form.resp_tecnico_email' => ['nullable', 'string', 'max:60'],
-            'form.resp_tecnico_fone' => ['nullable', 'string', 'max:20'],
-            'form.resp_tecnico_id_csrt' => ['nullable', 'string', 'max:6'],
-            'form.resp_tecnico_csrt' => ['nullable', 'string', 'max:100'],
-        ]);
+        $this->form['nfse_ambiente'] = $this->normalizarNfseAmbiente($this->form['nfse_ambiente'] ?? null);
+        $this->form['nfse_reg_esp_trib'] = $this->codigoNfseOuNulo($this->form['nfse_reg_esp_trib'] ?? null);
+        $this->form['nfse_reg_ap_trib_sn'] = $this->codigoNfseOuNulo($this->form['nfse_reg_ap_trib_sn'] ?? null);
 
+        try {
+            $this->validate([
+                'form.uf' => ['required', 'string', 'size:2'],
+                'form.ambiente' => ['required', 'integer', 'in:0,1'],
+                'form.aguardar' => ['required', 'integer', 'min:0'],
+                'form.intervalo' => ['required', 'integer', 'min:0'],
+                'form.tentativas' => ['required', 'integer', 'min:1'],
+                'form.numero_nfe' => ['required', 'integer', 'min:1'],
+                'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
+                'form.id_token' => ['nullable', 'string', 'max:40'],
+                'form.token' => ['nullable', 'string', 'max:120'],
+                'form.versao_qrcode' => ['nullable', 'integer', 'in:2,3'],
+                'form.resp_tecnico_cnpj' => ['nullable', 'string', 'max:18'],
+                'form.resp_tecnico_contato' => ['nullable', 'string', 'max:60'],
+                'form.resp_tecnico_email' => ['nullable', 'string', 'max:60'],
+                'form.resp_tecnico_fone' => ['nullable', 'string', 'max:20'],
+                'form.resp_tecnico_id_csrt' => ['nullable', 'string', 'max:6'],
+                'form.resp_tecnico_csrt' => ['nullable', 'string', 'max:100'],
+                'form.nfse_ambiente' => ['nullable', 'in:'.implode(',', array_keys(NfseSefinAmbiente::opcoes()))],
+                'form.nfse_reg_esp_trib' => ['nullable', 'in:'.implode(',', array_keys(NfseRegimeTributario::regimesEspeciais()))],
+                'form.nfse_reg_ap_trib_sn' => ['nullable', 'in:'.implode(',', array_keys(NfseRegimeTributario::regimesApuracaoSimples()))],
+            ], [
+                'form.nfse_ambiente.in' => 'Ambiente da NFS-e inválido.',
+                'form.nfse_reg_esp_trib.in' => 'Regime especial de tributação da NFS-e inválido.',
+                'form.nfse_reg_ap_trib_sn.in' => 'Regime de apuração do Simples da NFS-e inválido.',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $primeiro = collect($e->validator->errors()->all())->first();
+
+            Notification::make()
+                ->title('Não foi possível gravar')
+                ->body($primeiro ?: 'Verifique os campos das abas e tente novamente.')
+                ->danger()
+                ->send();
+
+            throw $e;
+        }
+
+        try {
+            $this->persistConfigFiscais($empresaId);
+        } catch (\Throwable $e) {
+            report($e);
+
+            Notification::make()
+                ->title('Não foi possível gravar')
+                ->body('Ocorreu um erro ao salvar as configurações fiscais. Tente novamente.')
+                ->danger()
+                ->send();
+        }
+    }
+
+    protected function persistConfigFiscais(int $empresaId): void
+    {
         $params = VendasParametro::forEmpresa($empresaId);
 
         $payload = [
@@ -353,8 +395,11 @@ class ConfigFiscaisPage extends Page
         $params = NfeFiscalConfig::syncStoragePaths($params->fresh());
         $params = NfeFiscalConfig::syncWebStack($params);
 
+        $this->persistNfseRegime($empresaId);
+
         $this->form = NfeFiscalConfig::toFormArray($params);
         $this->form['proxy_senha'] = '';
+        $this->loadNfseRegime(Empresa::query()->find($empresaId));
 
         if (! $this->persistTerminaisSeries($empresaId)) {
             Notification::make()
@@ -430,15 +475,24 @@ class ConfigFiscaisPage extends Page
             );
 
             $params = VendasParametro::forEmpresa($empresaId);
+            // Evita DecryptException de PFX antigo corrompido ao sobrescrever.
+            $params->setAttribute('certificado_pfx', null);
+            $params->syncOriginalAttribute('certificado_pfx');
+
             $params->forceFill([
                 'caminho_certificado' => $relative,
+                'certificado_pfx' => $content,
                 'senha_certificado' => $senha,
                 'numero_serie_certificado' => $result['numero_serie'] ?? null,
                 ...NfeFiscalConfig::defaultWebStack(),
             ])->save();
 
-            NfeFiscalConfig::ensureDirectories($params->fresh());
-            NfeFiscalConfig::syncWebStack($params->fresh());
+            try {
+                NfeFiscalConfig::ensureDirectories($params->fresh());
+                NfeFiscalConfig::syncWebStack($params->fresh());
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $decryptException) {
+                report($decryptException);
+            }
 
             $this->certificadoUpload = null;
             $this->form['caminho_certificado'] = $relative;
@@ -454,15 +508,79 @@ class ConfigFiscaisPage extends Page
                 ->body($validade !== '' ? "Válido até {$validade}." : null)
                 ->success()
                 ->send();
-        } catch (\Throwable $exception) {
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $exception) {
             report($exception);
 
             Notification::make()
                 ->title('Não foi possível importar o certificado.')
-                ->body($exception->getMessage())
+                ->body('Falha ao gravar o certificado no banco (chave de criptografia). Tente novamente; se persistir, avise o suporte.')
+                ->danger()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $msg = $exception->getMessage();
+            $lower = mb_strtolower($msg);
+            if (str_contains($lower, 'mac is invalid') || str_contains($lower, 'mac verify')) {
+                $msg = 'Senha do .pfx incorreta ou arquivo inválido. Digite a senha novamente (diferencia maiúsculas/minúsculas) e selecione o arquivo de novo.';
+            }
+
+            Notification::make()
+                ->title('Não foi possível importar o certificado.')
+                ->body($msg)
                 ->danger()
                 ->send();
         }
+    }
+
+    public function excluirCertificado(): void
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            Notification::make()->title('Empresa não identificada.')->warning()->send();
+
+            return;
+        }
+
+        $params = VendasParametro::forEmpresa($empresaId);
+        $relative = trim((string) ($params->caminho_certificado ?? ''));
+        $defaultRelative = 'certificados/'.$empresaId.'/certificado.pfx';
+
+        $candidates = array_values(array_unique(array_filter([
+            $relative,
+            $relative !== '' ? Storage::disk('local')->path($relative) : null,
+            $defaultRelative,
+            Storage::disk('local')->path($defaultRelative),
+        ])));
+
+        foreach ($candidates as $path) {
+            if (is_string($path) && $path !== '' && is_file($path)) {
+                @unlink($path);
+            }
+
+            if (is_string($path) && $path !== '' && Storage::disk('local')->exists($path)) {
+                Storage::disk('local')->delete($path);
+            }
+        }
+
+        $params->setAttribute('certificado_pfx', null);
+        $params->syncOriginalAttribute('certificado_pfx');
+
+        $params->forceFill([
+            'caminho_certificado' => null,
+            'certificado_pfx' => null,
+            'senha_certificado' => null,
+            'numero_serie_certificado' => null,
+        ])->save();
+
+        $this->certificadoUpload = null;
+        $this->certificadoInfo = null;
+        $this->form['caminho_certificado'] = '';
+        $this->form['numero_serie_certificado'] = '';
+        $this->form['senha_certificado'] = '';
+
+        Notification::make()->title('Certificado digital removido.')->success()->send();
     }
 
     public function testEmailSmtp(): void
@@ -679,6 +797,41 @@ class ConfigFiscaisPage extends Page
         }
 
         return $empresa->fantasia ?: ($empresa->nome ?: $empresa->razao_social);
+    }
+
+    protected function loadNfseRegime(?Empresa $empresa): void
+    {
+        $this->form['nfse_ambiente'] = $this->codigoNfse($empresa?->nfse_ambiente);
+        $this->form['nfse_reg_esp_trib'] = $this->codigoNfse($empresa?->nfse_reg_esp_trib);
+        $this->form['nfse_reg_ap_trib_sn'] = $this->codigoNfse($empresa?->nfse_reg_ap_trib_sn);
+    }
+
+    protected function persistNfseRegime(int $empresaId): void
+    {
+        Empresa::query()->whereKey($empresaId)->update([
+            'nfse_ambiente' => $this->normalizarNfseAmbiente($this->form['nfse_ambiente'] ?? null),
+            'nfse_reg_esp_trib' => $this->codigoNfseOuNulo($this->form['nfse_reg_esp_trib'] ?? null),
+            'nfse_reg_ap_trib_sn' => $this->codigoNfseOuNulo($this->form['nfse_reg_ap_trib_sn'] ?? null),
+        ]);
+    }
+
+    protected function normalizarNfseAmbiente(mixed $valor): ?string
+    {
+        $texto = strtolower(trim((string) $valor));
+
+        return array_key_exists($texto, NfseSefinAmbiente::opcoes()) ? $texto : null;
+    }
+
+    protected function codigoNfse(mixed $valor): string
+    {
+        return trim((string) $valor);
+    }
+
+    protected function codigoNfseOuNulo(mixed $valor): ?string
+    {
+        $texto = $this->codigoNfse($valor);
+
+        return $texto === '' ? null : $texto;
     }
 
     protected function resolveEmpresaId(): ?int

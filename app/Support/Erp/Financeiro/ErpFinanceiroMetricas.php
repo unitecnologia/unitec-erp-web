@@ -379,6 +379,68 @@ final class ErpFinanceiroMetricas
     }
 
     /**
+     * Entradas e saídas de dois períodos em uma única query (mês atual + mês anterior).
+     *
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{
+     *     mes: array{entradas: float, saidas: float},
+     *     mes_anterior: array{entradas: float, saidas: float}
+     * }
+     */
+    public static function sumCaixaMesEAnterior(
+        Carbon $inicioMes,
+        Carbon $fimMes,
+        Carbon $inicioMesAnt,
+        Carbon $fimMesAnt,
+        int|array|null $empresaScope = null,
+    ): array {
+        $vazio = [
+            'mes' => ['entradas' => 0.0, 'saidas' => 0.0],
+            'mes_anterior' => ['entradas' => 0.0, 'saidas' => 0.0],
+        ];
+
+        try {
+            if (! ErpSchema::hasTable((new CaixaLancamento)->getTable())) {
+                return $vazio;
+            }
+
+            $mesDe = $inicioMes->toDateString();
+            $mesAte = $fimMes->toDateString();
+            $antDe = $inicioMesAnt->toDateString();
+            $antAte = $fimMesAnt->toDateString();
+
+            $q = CaixaLancamento::query()
+                ->whereDate('emissao', '>=', $antDe)
+                ->whereDate('emissao', '<=', $mesAte);
+
+            self::applyCaixaEscopo($q, null, $empresaScope);
+
+            $row = $q
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN entrada ELSE 0 END), 0) as mes_entradas,'.
+                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN saida ELSE 0 END), 0) as mes_saidas,'.
+                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN entrada ELSE 0 END), 0) as ant_entradas,'.
+                    'COALESCE(SUM(CASE WHEN DATE(emissao) >= ? AND DATE(emissao) <= ? THEN saida ELSE 0 END), 0) as ant_saidas',
+                    [$mesDe, $mesAte, $mesDe, $mesAte, $antDe, $antAte, $antDe, $antAte]
+                )
+                ->first();
+
+            return [
+                'mes' => [
+                    'entradas' => round((float) ($row->mes_entradas ?? 0), 2),
+                    'saidas' => round((float) ($row->mes_saidas ?? 0), 2),
+                ],
+                'mes_anterior' => [
+                    'entradas' => round((float) ($row->ant_entradas ?? 0), 2),
+                    'saidas' => round((float) ($row->ant_saidas ?? 0), 2),
+                ],
+            ];
+        } catch (Throwable) {
+            return $vazio;
+        }
+    }
+
+    /**
      * @param  int|list<int>|null  $empresaScope
      * @return array<string, float|int>
      */

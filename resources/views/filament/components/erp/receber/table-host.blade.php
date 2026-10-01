@@ -5,6 +5,7 @@
         :cliente-filter="$this->clienteFilter"
         :search-column="$this->searchColumn"
         :local-search="$this->localSearch"
+        :search-fields-active="$this->searchFieldsActive"
         :periodo-de-applied="$this->periodoDeApplied"
         :periodo-ate-applied="$this->periodoAteApplied"
         :skip-local-search="$this->shouldSkipContaReceberLocalSearch()"

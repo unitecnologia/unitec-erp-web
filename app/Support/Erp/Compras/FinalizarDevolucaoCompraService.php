@@ -3,12 +3,15 @@
 namespace App\Support\Erp\Compras;
 
 use App\Models\Compra;
+use App\Models\CompraItem;
 use App\Models\DevolucaoCompra;
-use App\Models\DevolucaoCompraItem;
 use App\Models\Estoque;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -100,7 +103,7 @@ final class FinalizarDevolucaoCompraService
 
     private function validarQuantidades(DevolucaoCompra $devolucao, Compra $compra): void
     {
-        $jaDevolvido = $this->quantidadesJaDevolvidas((int) $compra->id, (int) $devolucao->id);
+        $fiscal = app(\App\Support\Erp\NotaFornecedor\NotaFornecedorDevolucaoFiscalService::class);
 
         foreach ($devolucao->itens as $item) {
             $qtd = round((float) $item->qtd, 3);
@@ -110,44 +113,30 @@ final class FinalizarDevolucaoCompraService
             }
 
             $compraItemId = $item->compra_item_id ? (int) $item->compra_item_id : 0;
-            $comprada = round((float) $item->qtd_comprada, 3);
 
-            if ($compraItemId > 0) {
-                $prev = $jaDevolvido[$compraItemId] ?? 0.0;
-                $disponivel = round(max(0, $comprada - $prev), 3);
+            if ($compraItemId <= 0) {
+                continue;
+            }
 
-                if ($qtd > $disponivel + 0.0005) {
-                    $desc = $item->produto_descricao ?: ('item #'.$item->item);
-                    throw new DomainException(
-                        "Quantidade devolvida de \"{$desc}\" excede o disponível ({$disponivel})."
-                    );
-                }
+            $compraItem = CompraItem::query()->with('notaFornecedorItem')->find($compraItemId);
+
+            if (! $compraItem) {
+                continue;
+            }
+
+            try {
+                $fiscal->assertQuantidadePermitida(
+                    $compraItem,
+                    $qtd,
+                    (int) $devolucao->id,
+                );
+            } catch (DomainException $e) {
+                $desc = $item->produto_descricao ?: ('item #'.$item->item);
+                throw new DomainException(
+                    "Quantidade devolvida de \"{$desc}\" excede o disponível. ".$e->getMessage()
+                );
             }
         }
-    }
-
-    /**
-     * @return array<int, float> compra_item_id => qtd já devolvida em devoluções finalizadas
-     */
-    private function quantidadesJaDevolvidas(int $compraId, int $excetoDevolucaoId): array
-    {
-        $rows = DevolucaoCompraItem::query()
-            ->whereNotNull('compra_item_id')
-            ->whereHas('devolucao', function ($q) use ($compraId, $excetoDevolucaoId): void {
-                $q->where('compra_id', $compraId)
-                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
-                    ->where('id', '!=', $excetoDevolucaoId);
-            })
-            ->get(['compra_item_id', 'qtd']);
-
-        $map = [];
-
-        foreach ($rows as $row) {
-            $id = (int) $row->compra_item_id;
-            $map[$id] = round(($map[$id] ?? 0) + (float) $row->qtd, 3);
-        }
-
-        return $map;
     }
 
     private function baixarEstoque(DevolucaoCompra $devolucao, ?int $estoqueId, ?int $empresaId = null): void
@@ -165,11 +154,21 @@ final class FinalizarDevolucaoCompraService
                 continue;
             }
 
+            $doc = EstoqueMovimentacaoDocumento::fromDevolucaoCompra($devolucao);
             $this->saldos->decrementar(
                 (int) $product->id,
                 (float) $item->qtd,
                 $estoqueId,
                 $empresa,
+                EstoqueMovimentacaoContext::make(
+                    EstoqueMovimentacao::TIPO_DEVOLUCAO_COMPRA,
+                    empresaId: $empresaId,
+                    origemTipo: $doc['origemTipo'],
+                    origemId: $doc['origemId'],
+                    origemNumero: $doc['origemNumero'],
+                    docFiscalTipo: $doc['docFiscalTipo'],
+                    docFiscalNumero: $doc['docFiscalNumero'],
+                ),
             );
 
             if ($product->controla_lote_validade) {

@@ -41,6 +41,8 @@ class ProductFormValidator
 
         self::validateCstIcms((string) ($data['cst_icms'] ?? ''));
 
+        self::validateServicoFiscal($data);
+
         self::validateCestIfRequired($data);
 
         self::validateCombustivel($data);
@@ -52,6 +54,74 @@ class ProductFormValidator
         self::validateDuplicateReferencia($data, $excludeProductId);
 
         self::validateBalanca($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizeServicoFiscal(array $data): array
+    {
+        $data['c_trib_nac'] = self::digitsOrNull($data['c_trib_nac'] ?? null);
+        $data['c_nbs'] = self::digitsOrNull($data['c_nbs'] ?? null);
+        $data['c_trib_mun'] = self::codeOrNull($data['c_trib_mun'] ?? null);
+        $data['c_ind_op'] = self::digitsOrNull($data['c_ind_op'] ?? null);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected static function validateServicoFiscal(array $data): void
+    {
+        if (! ($data['is_servico'] ?? false)) {
+            return;
+        }
+
+        $tribNac = (string) ($data['c_trib_nac'] ?? '');
+        $nbs = (string) ($data['c_nbs'] ?? '');
+        $tribMun = (string) ($data['c_trib_mun'] ?? '');
+        $indOp = (string) ($data['c_ind_op'] ?? '');
+
+        if (strlen($tribNac) !== 6) {
+            throw ValidationException::withMessages([
+                'c_trib_nac' => 'Informe o código de tributação nacional com 6 dígitos.',
+            ]);
+        }
+
+        if (strlen($nbs) !== 9) {
+            throw ValidationException::withMessages([
+                'c_nbs' => 'Informe a NBS com 9 dígitos.',
+            ]);
+        }
+
+        if ($tribMun !== '' && strlen($tribMun) > 20) {
+            throw ValidationException::withMessages([
+                'c_trib_mun' => 'O código municipal deve ter no máximo 20 caracteres.',
+            ]);
+        }
+
+        if ($indOp !== '' && strlen($indOp) !== 6) {
+            throw ValidationException::withMessages([
+                'c_ind_op' => 'O indicador da operação deve ter 6 dígitos.',
+            ]);
+        }
+    }
+
+    protected static function digitsOrNull(mixed $value): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $value) ?? '';
+
+        return $digits === '' ? null : $digits;
+    }
+
+    protected static function codeOrNull(mixed $value): ?string
+    {
+        $code = strtoupper(trim((string) $value));
+        $code = preg_replace('/[^A-Z0-9]/', '', $code) ?? '';
+
+        return $code === '' ? null : $code;
     }
 
     /**

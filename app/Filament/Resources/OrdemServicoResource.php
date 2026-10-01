@@ -62,6 +62,13 @@ class OrdemServicoResource extends Resource
                         return $record->codigo_legado ? (string) $record->codigo_legado : '—';
                     })
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('nfse.numero_nfse')
+                    ->label('NFS-e')
+                    ->state(fn (OrdemServico $record): string => $record->nfseNumeroLista())
+                    ->alignCenter()
+                    ->width('5.25rem')
+                    ->placeholder('—')
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('data_inicio')
                     ->label('Data')
                     ->date('d/m/Y')
@@ -69,8 +76,13 @@ class OrdemServicoResource extends Resource
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('hora_inicio')
-                    ->label('Hora')
+                    ->label('H.Aber.')
                     ->state(fn (OrdemServico $record): string => $record->horaInicioExibicao() ?? '—')
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('hora_termino')
+                    ->label('H.Fech.')
+                    ->state(fn (OrdemServico $record): string => $record->horaTerminoExibicao() ?? '—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente_nome')
@@ -94,12 +106,18 @@ class OrdemServicoResource extends Resource
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('previsao_entrega')
-                    ->label('Previsão')
-                    ->dateTime('d/m/Y')
+                TextColumn::make('meio_pagamento')
+                    ->label('Meio de Pag.')
+                    ->state(fn (OrdemServico $record): string => $record->meioPagamentoLista())
                     ->placeholder('—')
-                    ->alignCenter()
+                    ->wrap(false)
+                    ->tooltip(fn (OrdemServico $record): ?string => ($t = $record->meioPagamentoLista()) !== '—' ? $t : null)
                     ->weight(FontWeight::SemiBold),
+                ViewColumn::make('envio')
+                    ->label('Env.')
+                    ->view('filament.components.erp.ordens-servico.columns.envio')
+                    ->alignCenter()
+                    ->disabledClick(),
                 ViewColumn::make('situacao')
                     ->label('Situação')
                     ->view('filament.components.erp.ordens-servico.columns.status')
@@ -108,6 +126,13 @@ class OrdemServicoResource extends Resource
                 ViewColumn::make('total_geral')
                     ->label('Total')
                     ->view('filament.components.erp.ordens-servico.columns.total')
+                    ->disabledClick(),
+                ViewColumn::make('ver_espelho')
+                    ->label('')
+                    ->state(fn (): bool => true)
+                    ->width('1.35rem')
+                    ->view('filament.components.erp.ordens-servico.columns.ver-espelho')
+                    ->alignCenter()
                     ->disabledClick(),
             ])
             ->defaultSort('data_inicio', 'desc')

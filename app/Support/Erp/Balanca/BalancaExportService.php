@@ -638,7 +638,6 @@ final class BalancaExportService
             }
 
             $modeloEtq = $empresa?->param_balanca_etiqueta_modelo
-                ?? $empresa?->param_pdv_modelo_balanca
                 ?? BalancaEtiquetaLayout::DEFAULT_MODELO;
 
             return BalancaEtiquetaLayout::digitosForModelo((int) $modeloEtq);

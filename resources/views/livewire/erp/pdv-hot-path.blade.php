@@ -6,6 +6,7 @@
     <div class="erp-pdv__grid-wrap" id="erp-pdv-grid-wrap">
         <table class="erp-pdv__grid erp-pdv__grid--cupom">
             <colgroup>
+                <col class="erp-pdv__col-excluir">
                 <col class="erp-pdv__col-item">
                 <col class="erp-pdv__col-codigo">
                 <col class="erp-pdv__col-barras">
@@ -17,6 +18,7 @@
             </colgroup>
             <thead>
                 <tr>
+                    <th class="erp-pdv__grid-col-center erp-pdv__th-excluir" aria-label="Excluir"></th>
                     <th class="erp-pdv__grid-col-center">Item</th>
                     <th>Código</th>
                     <th>Cód. Barras</th>
@@ -33,8 +35,27 @@
                         wire:click="selectCupomItem({{ $index }})"
                         wire:key="pdv-hot-item-{{ $index }}-{{ $item['product_id'] ?? $index }}"
                         id="erp-pdv-cupom-row-{{ $index }}"
-                        class="erp-pdv__grid-row"
+                        @class([
+                            'erp-pdv__grid-row',
+                            'erp-pdv__grid-row--selected' => $selectedCupomIndex === $index,
+                        ])
                     >
+                        <td class="erp-pdv__grid-col-center erp-pdv__td-excluir">
+                            <button
+                                type="button"
+                                class="erp-pdv__item-del"
+                                wire:click.stop="requestExcluirCupomItem({{ $index }})"
+                                title="Excluir item"
+                                aria-label="Excluir item {{ $index + 1 }}"
+                            >
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                    <path d="M10 11v6M14 11v6"/>
+                                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                </svg>
+                            </button>
+                        </td>
                         <td class="erp-pdv__grid-col-center">{{ $index + 1 }}</td>
                         <td class="erp-pdv__grid-col-codigo">{{ $item['codigo'] ?? '—' }}</td>
                         <td class="erp-pdv__grid-col-codigo">{{ ($item['codigo_barras'] ?? '') !== '' ? $item['codigo_barras'] : '—' }}</td>
@@ -53,14 +74,12 @@
                     </tr>
                 @empty
                     <tr class="erp-pdv__grid-empty">
-                        <td colspan="8">&nbsp;</td>
+                        <td colspan="9">&nbsp;</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-
-    <div class="erp-pdv__product-line" id="erp-pdv-product-name" aria-live="polite">{{ $pdvPreviewProductName }}</div>
 
     {{-- Flash espelhado no DOM lateral do pai via evento; totais aqui alimentam o data-* --}}
     <div

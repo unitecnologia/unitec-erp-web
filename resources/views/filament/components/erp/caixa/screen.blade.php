@@ -1,8 +1,7 @@
 @php
     $searchFields = [
-        'codigo' => 'CÓDIGO',
         'emissao' => 'EMISSÃO',
-        'documento' => 'DOCUMENTO',
+        'documento' => 'PEDIDO',
         'historico' => 'HISTÓRICO',
         'plano_contas' => 'PLANO DE CONTAS',
         'conta' => 'CONTAS',

@@ -30,17 +30,24 @@
             <div class="unitec-login__right">
                 <div class="unitec-login__right-header">
                     <div>
-                        <p class="unitec-login__instruction">Entrar</p>
-                        <p class="unitec-login__instruction-hint">Informe empresa, usuário e senha</p>
+                        @if ($configuracaoInicial)
+                            <p class="unitec-login__instruction">Configuração inicial</p>
+                            <p class="unitec-login__instruction-hint">Informe os dados da empresa</p>
+                        @else
+                            <p class="unitec-login__instruction">Entrar</p>
+                            <p class="unitec-login__instruction-hint">Informe empresa, usuário e senha</p>
+                        @endif
                     </div>
-                    <button
-                        type="button"
-                        class="unitec-login__close"
-                        wire:click="cancel"
-                        aria-label="Fechar"
-                    >
-                        &times;
-                    </button>
+                    @unless ($configuracaoInicial)
+                        <button
+                            type="button"
+                            class="unitec-login__close"
+                            wire:click="cancel"
+                            aria-label="Fechar"
+                        >
+                            &times;
+                        </button>
+                    @endunless
                 </div>
 
                 <div class="unitec-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
@@ -53,7 +60,93 @@
                             {{ $schemaMigrateOk }}
                         </div>
                     @endif
-                    {{ $this->content }}
+                    @if ($configuracaoInicial)
+                        <div class="unitec-login__setup">
+                            <div class="unitec-login__setup-span">
+                                <label for="inicial-razao">Razão social <span>*</span></label>
+                                <input id="inicial-razao" type="text" maxlength="255" autocomplete="off" wire:model="inicialRazao">
+                                @error('inicialRazao') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="unitec-login__setup-span">
+                                <label for="inicial-fantasia">Nome fantasia <span>*</span></label>
+                                <input id="inicial-fantasia" type="text" maxlength="255" autocomplete="off" wire:model="inicialFantasia">
+                                @error('inicialFantasia') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-cnpj">CNPJ <span>*</span></label>
+                                <input id="inicial-cnpj" type="text" maxlength="20" inputmode="numeric" autocomplete="off" wire:model.live.debounce.500ms="inicialCnpj">
+                                @error('inicialCnpj') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                                <p class="unitec-login__setup-hint" wire:loading wire:target="inicialCnpj">Consultando CNPJ…</p>
+                                @if (filled($inicialCnpjAviso))
+                                    <p class="unitec-login__setup-hint">{{ $inicialCnpjAviso }}</p>
+                                @endif
+                            </div>
+                            <div>
+                                <label for="inicial-ie">Inscrição estadual (opcional)</label>
+                                <input id="inicial-ie" type="text" maxlength="20" autocomplete="off" wire:model="inicialIe">
+                                @error('inicialIe') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-cep">CEP <span>*</span></label>
+                                <input id="inicial-cep" type="text" maxlength="10" inputmode="numeric" autocomplete="off" wire:model.live.debounce.500ms="inicialCep">
+                                @error('inicialCep') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                                @if (filled($inicialCepAviso))
+                                    <p class="unitec-login__setup-hint">{{ $inicialCepAviso }}</p>
+                                @endif
+                            </div>
+                            <div>
+                                <label for="inicial-telefone">Telefone <span>*</span></label>
+                                <input id="inicial-telefone" type="text" maxlength="20" inputmode="tel" autocomplete="off" wire:model="inicialTelefone">
+                                @error('inicialTelefone') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="unitec-login__setup-span">
+                                <label for="inicial-endereco">Endereço <span>*</span></label>
+                                <input id="inicial-endereco" type="text" maxlength="255" autocomplete="off" wire:model="inicialEndereco">
+                                @error('inicialEndereco') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-numero">Número <span>*</span></label>
+                                <input id="inicial-numero" type="text" maxlength="20" autocomplete="off" wire:model="inicialNumero">
+                                @error('inicialNumero') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-complemento">Complemento (opcional)</label>
+                                <input id="inicial-complemento" type="text" maxlength="255" autocomplete="off" wire:model="inicialComplemento">
+                                @error('inicialComplemento') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-bairro">Bairro <span>*</span></label>
+                                <input id="inicial-bairro" type="text" maxlength="255" autocomplete="off" wire:model="inicialBairro">
+                                @error('inicialBairro') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-cidade">Cidade <span>*</span></label>
+                                <input id="inicial-cidade" type="text" maxlength="255" autocomplete="off" wire:model="inicialCidade">
+                                @error('inicialCidade') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-uf">UF <span>*</span></label>
+                                <select id="inicial-uf" wire:model="inicialUf">
+                                    <option value="">UF</option>
+                                    @foreach (\App\Models\Empresa::ufs() as $sigla => $rotulo)
+                                        <option value="{{ $sigla }}">{{ $rotulo }}</option>
+                                    @endforeach
+                                </select>
+                                @error('inicialUf') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="inicial-email">E-mail <span>*</span></label>
+                                <input id="inicial-email" type="email" maxlength="255" autocomplete="off" wire:model="inicialEmail">
+                                @error('inicialEmail') <p class="unitec-login__setup-error">{{ $message }}</p> @enderror
+                            </div>
+                            <button type="button" class="unitec-login__setup-submit" wire:click="salvarConfiguracaoInicial" wire:loading.attr="disabled" wire:target="salvarConfiguracaoInicial">
+                                <span wire:loading.remove wire:target="salvarConfiguracaoInicial">Salvar e continuar</span>
+                                <span wire:loading wire:target="salvarConfiguracaoInicial">Salvando…</span>
+                            </button>
+                        </div>
+                    @else
+                        {{ $this->content }}
+                    @endif
                 </div>
             </div>
         </div>
@@ -616,7 +709,20 @@
                 window.clearTimeout(stuckTimer);
                 setMessage('Quase lá...');
 
-                const target = typeof url === 'string' && url !== '' ? url : '/admin';
+                const target = (function (raw) {
+                    const fallback = '/admin';
+                    const value = typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : fallback;
+                    try {
+                        const parsed = new URL(value, window.location.origin);
+                        const host = (parsed.hostname || '').toLowerCase();
+                        if (host === '127.0.0.1' || host === 'localhost' || host === '[::1]') {
+                            return parsed.pathname + parsed.search + parsed.hash;
+                        }
+                        return parsed.href;
+                    } catch (e) {
+                        return value.charAt(0) === '/' ? value : fallback;
+                    }
+                })(url);
                 const start = performance.now();
                 const from = Math.max(progress, 40);
                 progress = from;

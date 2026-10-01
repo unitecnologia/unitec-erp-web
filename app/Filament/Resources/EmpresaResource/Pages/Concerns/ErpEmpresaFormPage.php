@@ -6,6 +6,7 @@ use App\Filament\Concerns\ManagesCclassTribLookup;
 use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\EmpresaResource;
 use App\Models\Empresa;
+use App\Models\PlanoConta;
 use App\Rules\DocumentoBrasileiroValido;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpScreen;
@@ -23,6 +24,7 @@ trait ErpEmpresaFormPage
 {
     use ManagesCclassTribLookup;
     use ManagesEmpresaBloquearEstoqueNegativo;
+    use ManagesEmpresaBoletoContas;
     use ManagesEmpresaEstoques;
     use ManagesEmpresaEmailConfig;
     use ManagesEmpresaFormUi;
@@ -30,6 +32,8 @@ trait ErpEmpresaFormPage
     use ManagesEmpresaImpostoTabelasImport;
     use ManagesEmpresaIpbtaxModal;
     use ManagesEmpresaLogo;
+    use ManagesEmpresaNfeEmitentes;
+    use ManagesEmpresaPixCert;
     use ManagesEmpresaLookup;
     use ManagesEmpresaPortalContadorLog;
     use ManagesEmpresaPortalContadorVinculo;
@@ -95,6 +99,8 @@ trait ErpEmpresaFormPage
         $this->data['cnpj_representante'] = static::normalizeOptionalCnpjRepresentante($this->data['cnpj_representante'] ?? null);
         // Só ajusta $this->data — não remonta o form Filament no hot path (evita ActionNotResolvable / travamento).
         $this->ensureEmpresaRequiredDefaults(syncForm: false);
+        $this->data['nfse_reg_esp_trib'] = $this->codigoNfseOuNulo($this->data['nfse_reg_esp_trib'] ?? null);
+        $this->data['nfse_reg_ap_trib_sn'] = $this->codigoNfseOuNulo($this->data['nfse_reg_ap_trib_sn'] ?? null);
 
         try {
             $this->validate(
@@ -265,6 +271,7 @@ trait ErpEmpresaFormPage
         }
 
         $merged = $this->normalizeEmpresaParametrosFormData($merged);
+        $merged = $this->normalizeEmpresaPixSecretsFormData($merged);
         $merged = $this->normalizeEmpresaDocumentFormData($merged);
         $merged = $this->normalizeEmpresaMercadoLivreFormData($merged);
 
@@ -392,8 +399,62 @@ trait ErpEmpresaFormPage
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    /**
+     * Não apaga segredos Pix se o formulário mandou campo em branco (password inputs).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function normalizeEmpresaPixSecretsFormData(array $data): array
+    {
+        $record = property_exists($this, 'record') && $this->record instanceof Empresa
+            ? $this->record
+            : null;
+
+        if ($record === null) {
+            return $data;
+        }
+
+        foreach ([
+            'param_pix_mp_access_token',
+            'param_pix_client_secret',
+            'param_pix_certificado_senha',
+            'param_pix_chave',
+            'param_pix_certificado',
+        ] as $secretField) {
+            if (! array_key_exists($secretField, $data)) {
+                continue;
+            }
+
+            if (filled($data[$secretField])) {
+                continue;
+            }
+
+            $atual = $record->{$secretField} ?? null;
+            if (filled($atual)) {
+                $data[$secretField] = $atual;
+            }
+        }
+
+        if (mb_strtolower(trim((string) ($data['param_pix_provedor'] ?? '')), 'UTF-8') === 'ailos') {
+            if (blank($data['param_pix_ambiente'] ?? null)) {
+                $data['param_pix_ambiente'] = 'producao';
+            }
+            if (blank($data['param_pix_webhook_url'] ?? null)) {
+                $data['param_pix_webhook_url'] = EmpresaParametros::pixAilosWebhookUrl();
+            }
+        }
+
+        return $data;
+    }
+
     protected function normalizeEmpresaParametrosFormData(array $data): array
     {
+        $modoDescontoReais = 'param_monitor_vendas_desconto_reais_item_modo';
+        if (array_key_exists($modoDescontoReais, $data)) {
+            $data[$modoDescontoReais] = EmpresaParametros::normalizarDescontoReaisItemModo($data[$modoDescontoReais]);
+        }
+
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true || ! array_key_exists($field, $data)) {
                 continue;
@@ -426,19 +487,32 @@ trait ErpEmpresaFormPage
             }
         }
 
+        foreach (EmpresaParametros::planoContaFields() as $field => $meta) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $id = (int) $data[$field];
+
+            if ($id <= 0) {
+                $data[$field] = null;
+
+                continue;
+            }
+
+            $valido = PlanoConta::query()
+                ->whereKey($id)
+                ->where('dc', $meta['dc'])
+                ->exists();
+
+            $data[$field] = $valido ? $id : null;
+        }
+
         if (array_key_exists('param_api_servicos_timeout', $data) && $data['param_api_servicos_timeout'] !== '') {
             $data['param_api_servicos_timeout'] = (int) $data['param_api_servicos_timeout'];
         }
 
-        if (array_key_exists('param_licenca_api_timeout', $data)) {
-            if ($data['param_licenca_api_timeout'] === '' || $data['param_licenca_api_timeout'] === null) {
-                $data['param_licenca_api_timeout'] = 8;
-            } else {
-                $data['param_licenca_api_timeout'] = max(2, min(30, (int) $data['param_licenca_api_timeout']));
-            }
-        }
-
-        unset($data['param_licenca_api_url']);
+        unset($data['param_licenca_api_url'], $data['param_licenca_api_timeout']);
 
         if (array_key_exists('param_whatsapp_timeout', $data)) {
             if ($data['param_whatsapp_timeout'] === '' || $data['param_whatsapp_timeout'] === null) {
@@ -474,18 +548,6 @@ trait ErpEmpresaFormPage
             }
         }
 
-        foreach (EmpresaParametros::expedicaoFields() as $field => $meta) {
-            if (! array_key_exists($field, $data)) {
-                continue;
-            }
-
-            if ($data[$field] === '' || $data[$field] === null) {
-                $data[$field] = (int) ($meta['default'] ?? 1);
-            } else {
-                $data[$field] = max(1, (int) $data[$field]);
-            }
-        }
-
         foreach (EmpresaParametros::whatsAppBooleanFields() as $field => $meta) {
             if (! array_key_exists($field, $data)) {
                 continue;
@@ -501,6 +563,14 @@ trait ErpEmpresaFormPage
         if (array_key_exists('param_whatsapp_numero', $data) && is_string($data['param_whatsapp_numero'])) {
             $data['param_whatsapp_numero'] = \App\Support\Erp\WhatsApp\WhatsAppPhone::normalize($data['param_whatsapp_numero'])
                 ?? preg_replace('/\D/', '', $data['param_whatsapp_numero']);
+        }
+
+        if (blank($data['param_portal_contador_url'] ?? null)) {
+            $data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
+        }
+
+        if (blank($data['param_portal_contador_ambiente'] ?? null)) {
+            $data['param_portal_contador_ambiente'] = 'producao';
         }
 
         if (array_key_exists('param_portal_contador_timeout', $data)) {
@@ -557,6 +627,7 @@ trait ErpEmpresaFormPage
     protected function prepareEmpresaParametrosForForm(): void
     {
         $this->loadEmpresaEmailConfig();
+        $this->hydrateEmpresaNfeEmitentes();
 
         foreach (EmpresaParametros::permissionFields() as $field => $meta) {
             if (($meta['tri'] ?? false) !== true) {
@@ -593,6 +664,12 @@ trait ErpEmpresaFormPage
         }
 
         foreach (EmpresaParametros::numericFields() as $field => $meta) {
+            if (($meta['type'] ?? '') === 'integer') {
+                $this->data[$field] = (string) max(0, (int) round((float) str_replace(',', '.', (string) ($this->data[$field] ?? ($meta['default'] ?? 0)))));
+
+                continue;
+            }
+
             if (($meta['type'] ?? '') !== 'decimal') {
                 continue;
             }
@@ -606,9 +683,49 @@ trait ErpEmpresaFormPage
             );
         }
 
+        foreach (array_keys(EmpresaParametros::planoContaFields()) as $field) {
+            $value = $this->data[$field] ?? null;
+            $this->data[$field] = filled($value) ? (string) (int) $value : '';
+        }
+
+        foreach (array_keys(EmpresaParametros::nfseFields()) as $field) {
+            if (! array_key_exists($field, $this->data) || $this->data[$field] === null) {
+                $this->data[$field] = '';
+            } else {
+                $this->data[$field] = (string) $this->data[$field];
+            }
+        }
+
+        $this->hydratePortalContadorFormDefaults();
         $this->safeFillEmpresaForm();
         $this->hydrateCloudflareCredentialsFromDefaults();
         $this->hydrateUpdateDownloadUrlFromDefault();
+    }
+
+    protected function hydratePortalContadorFormDefaults(): void
+    {
+        if (blank($this->data['param_portal_contador_url'] ?? null)) {
+            $this->data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
+        }
+
+        if (blank($this->data['param_portal_contador_ambiente'] ?? null)) {
+            $this->data['param_portal_contador_ambiente'] = 'producao';
+        }
+
+        if (
+            ! array_key_exists('param_portal_contador_timeout', $this->data)
+            || $this->data['param_portal_contador_timeout'] === ''
+            || $this->data['param_portal_contador_timeout'] === null
+        ) {
+            $this->data['param_portal_contador_timeout'] = 30;
+        }
+
+        // Empresa ainda sem vínculo: aplicar o pacote padrão (tudo marcado) na tela.
+        if (blank($this->data['param_portal_contador_token'] ?? null)) {
+            foreach (EmpresaParametros::portalContadorBooleanFields() as $field => $meta) {
+                $this->data[$field] = (bool) ($meta['default'] ?? true);
+            }
+        }
     }
 
     protected function getEmpresaListRedirectUrl(): string
@@ -684,6 +801,15 @@ trait ErpEmpresaFormPage
             'logo_path' => '',
             'ativo' => true,
             ...EmpresaParametros::defaultFormValues(),
+            // Contas Ailos/Sicredi já nascem prontas; a API só liga quando marcar a flag.
+            'param_boleto_habilitar' => false,
         ];
+    }
+
+    private function codigoNfseOuNulo(mixed $valor): ?string
+    {
+        $texto = trim((string) $valor);
+
+        return $texto === '' ? null : $texto;
     }
 }

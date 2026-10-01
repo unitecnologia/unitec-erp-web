@@ -35,6 +35,8 @@ class PdvHotPath extends Component
 
     public int $produtoNaoEncontradoCount = 0;
 
+    public ?int $selectedCupomIndex = null;
+
     public function mount(bool $caixaAberto = false): void
     {
         $this->caixaAberto = $caixaAberto;
@@ -55,6 +57,20 @@ class PdvHotPath extends Component
         $this->pdvFlashQtd = null;
         $this->pdvFlashPreco = null;
         $this->pdvFlashTotal = null;
+
+        if ($this->selectedCupomIndex !== null && ! isset($this->cupomItens[$this->selectedCupomIndex])) {
+            $this->selectedCupomIndex = $this->cupomItens === []
+                ? null
+                : min($this->selectedCupomIndex, count($this->cupomItens) - 1);
+        }
+    }
+
+    #[On('erp-pdv-hot-set-selection')]
+    public function setCupomSelection(?int $index): void
+    {
+        $this->selectedCupomIndex = ($index !== null && isset($this->cupomItens[$index]))
+            ? $index
+            : null;
     }
 
     public function handlePdvSearchEnter(?string $codigo = null): void
@@ -135,8 +151,23 @@ class PdvHotPath extends Component
 
     public function selectCupomItem(int $index): void
     {
+        if (! isset($this->cupomItens[$index])) {
+            return;
+        }
+
+        $this->selectedCupomIndex = $index;
         // Seleção/desconto ficam no page; só avisa o pai.
         $this->dispatch('erp-pdv-hot-select-cupom', index: $index);
+    }
+
+    public function requestExcluirCupomItem(int $index): void
+    {
+        if (! isset($this->cupomItens[$index])) {
+            return;
+        }
+
+        $this->selectedCupomIndex = $index;
+        $this->dispatch('erp-pdv-hot-excluir-cupom', index: $index);
     }
 
     public function getCupomTotalProperty(): string

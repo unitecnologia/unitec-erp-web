@@ -279,6 +279,41 @@ window.commitErpProdutosFormBeforeSave = function commitErpProdutosFormBeforeSav
     }
 };
 
+/**
+ * Garante que o valor visível de Pr. Varejo entre no próximo request Livewire
+ * (ex.: F5 sem blur). false = sem request extra / sem .live a cada tecla.
+ */
+function syncErpProdutosPrecoVendaBeforeSave(component, page) {
+    const input = page.querySelector('#pprod-preco-venda');
+
+    if (! input || ! component) {
+        return;
+    }
+
+    component.set('data.preco_venda', String(input.value ?? ''), false);
+}
+
+/**
+ * Mesmo fluxo do botão "Aplicar preços": commit do campo focado + aplicar.
+ */
+window.aplicarErpProdutosPrecificacao = async function aplicarErpProdutosPrecificacao(component) {
+    component = component || getErpProdutosComponent();
+
+    if (! component) {
+        return;
+    }
+
+    const el = document.activeElement;
+    const id = el && el.id ? String(el.id) : '';
+    const val = el && 'value' in el ? String(el.value) : null;
+
+    if (id.indexOf('precif-') === 0 && val !== null) {
+        await component.call('precificacaoCommitField', id, val);
+    }
+
+    await component.call('aplicarProductPrecificacao');
+};
+
 window.saveErpProdutosForm = async function saveErpProdutosForm() {
     const page = document.querySelector('.erp-produtos-form-page');
 
@@ -293,6 +328,8 @@ window.saveErpProdutosForm = async function saveErpProdutosForm() {
     if (! component) {
         return;
     }
+
+    syncErpProdutosPrecoVendaBeforeSave(component, page);
 
     // Sem o bloco Localizações no DOM (outra subaba), não envia '' — isso apagava
     // a localização gravada. O Livewire já mantém o valor em $data.
@@ -534,11 +571,11 @@ function bindErpProdutosSaveButtons(page) {
 }
 
 function bindErpProdutosFormKeys() {
-    if (window.__erpProdutosFormKeysBoundV9) {
+    if (window.__erpProdutosFormKeysBoundV10) {
         return;
     }
 
-    window.__erpProdutosFormKeysBoundV9 = true;
+    window.__erpProdutosFormKeysBoundV10 = true;
 
     document.addEventListener('keydown', (event) => {
         const page = document.querySelector('.erp-produtos-form-page');
@@ -559,7 +596,8 @@ function bindErpProdutosFormKeys() {
             if (event.key === 'F5' && component) {
                 event.preventDefault();
                 event.stopPropagation();
-                component.call('aplicarProductPrecificacao');
+                // Igual ao botão Aplicar: commit do foco + aplicarProductPrecificacao.
+                window.aplicarErpProdutosPrecificacao(component);
             }
 
             return;

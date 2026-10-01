@@ -2,6 +2,8 @@
 
 namespace App\Support\Erp;
 
+use App\Support\Erp\License\LicencaHttpClient;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -10,6 +12,11 @@ use RuntimeException;
 class CnpjLookupService
 {
     private const CACHE_TTL_DAYS = 30;
+
+    /** @var list<string> */
+    private array $providerErrors = [];
+
+    private bool $sawNotFound = false;
 
     /**
      * @return array<string, string|null>
@@ -34,10 +41,24 @@ class CnpjLookupService
     }
 
     /**
+     * HTTP de saída com CA bundle explícito (FrankenPHP/Windows não herda curl.cainfo).
+     */
+    protected function http(): PendingRequest
+    {
+        return Http::withOptions(LicencaHttpClient::options())
+            ->timeout(8)
+            ->connectTimeout(5)
+            ->acceptJson();
+    }
+
+    /**
      * @return array<string, string|null>
      */
     protected function fetchFromProviders(string $cnpj): array
     {
+        $this->providerErrors = [];
+        $this->sawNotFound = false;
+
         $merged = [];
 
         $merged = $this->mergeFields($merged, $this->fetchOpenCnpj($cnpj));
@@ -48,6 +69,12 @@ class CnpjLookupService
         }
 
         if (blank($merged['nome_razao'] ?? null)) {
+            if ($this->providerErrors !== [] && ! $this->sawNotFound) {
+                throw new RuntimeException(
+                    'Não foi possível consultar o CNPJ agora. Verifique a conexão com a internet e tente novamente.'
+                );
+            }
+
             throw new RuntimeException('CNPJ não encontrado.');
         }
 
@@ -60,21 +87,29 @@ class CnpjLookupService
     protected function fetchOpenCnpj(string $cnpj): array
     {
         try {
-            $response = Http::timeout(8)->connectTimeout(5)
-                ->acceptJson()
-                ->get("https://api.opencnpj.org/{$cnpj}");
-        } catch (\Throwable) {
+            $response = $this->http()->get("https://api.opencnpj.org/{$cnpj}");
+        } catch (\Throwable $exception) {
+            $this->providerErrors[] = 'opencnpj: '.$exception->getMessage();
+
             return [];
         }
 
-        if ($response->status() === 404 || ! $response->successful()) {
+        if ($response->status() === 404) {
+            $this->sawNotFound = true;
+
+            return [];
+        }
+
+        if (! $response->successful()) {
+            $this->providerErrors[] = 'opencnpj: HTTP '.$response->status();
+
             return [];
         }
 
         /** @var array<string, mixed> $payload */
         $payload = $response->json();
 
-        return $this->mapOpenCnpj($payload);
+        return $this->mapOpenCnpj(is_array($payload) ? $payload : []);
     }
 
     /**
@@ -83,21 +118,29 @@ class CnpjLookupService
     protected function fetchBrasilApi(string $cnpj): array
     {
         try {
-            $response = Http::timeout(8)->connectTimeout(5)
-                ->acceptJson()
-                ->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
-        } catch (\Throwable) {
+            $response = $this->http()->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
+        } catch (\Throwable $exception) {
+            $this->providerErrors[] = 'brasilapi: '.$exception->getMessage();
+
             return [];
         }
 
-        if ($response->status() === 404 || ! $response->successful()) {
+        if ($response->status() === 404) {
+            $this->sawNotFound = true;
+
+            return [];
+        }
+
+        if (! $response->successful()) {
+            $this->providerErrors[] = 'brasilapi: HTTP '.$response->status();
+
             return [];
         }
 
         /** @var array<string, mixed> $payload */
         $payload = $response->json();
 
-        return $this->mapBrasilApi($payload);
+        return $this->mapBrasilApi(is_array($payload) ? $payload : []);
     }
 
     /**
@@ -106,21 +149,29 @@ class CnpjLookupService
     protected function fetchCnpjWs(string $cnpj): array
     {
         try {
-            $response = Http::timeout(8)->connectTimeout(5)
-                ->acceptJson()
-                ->get("https://publica.cnpj.ws/cnpj/{$cnpj}");
-        } catch (\Throwable) {
+            $response = $this->http()->get("https://publica.cnpj.ws/cnpj/{$cnpj}");
+        } catch (\Throwable $exception) {
+            $this->providerErrors[] = 'cnpj.ws: '.$exception->getMessage();
+
             return [];
         }
 
-        if ($response->status() === 404 || ! $response->successful()) {
+        if ($response->status() === 404) {
+            $this->sawNotFound = true;
+
+            return [];
+        }
+
+        if (! $response->successful()) {
+            $this->providerErrors[] = 'cnpj.ws: HTTP '.$response->status();
+
             return [];
         }
 
         /** @var array<string, mixed> $payload */
         $payload = $response->json();
 
-        return $this->mapCnpjWs($payload);
+        return $this->mapCnpjWs(is_array($payload) ? $payload : []);
     }
 
     /**

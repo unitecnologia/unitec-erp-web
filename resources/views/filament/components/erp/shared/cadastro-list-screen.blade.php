@@ -10,6 +10,7 @@
     @var string|null $uppercaseColumns  CSV de colunas que forçam uppercase no input
     @var string|null $extraClass        classes extras no wrapper
     @var string|null $beforeFiltersView view parcial acima da toolbar
+    @var bool $beforeFiltersInline      se true, inclui beforeFiltersView na mesma linha dos filtros
 --}}
 @php
     $pageClass = $pageClass ?? 'erp-unidades';
@@ -26,16 +27,21 @@
     $extraClass = trim((string) ($extraClass ?? ''));
     $hint = $hint ?? null;
     $beforeFiltersView = $beforeFiltersView ?? null;
+    $beforeFiltersInline = (bool) ($beforeFiltersInline ?? false);
     $searchColumn = $this->searchColumn ?? array_key_first($searchFields) ?? 'q';
 @endphp
 
 <div class="{{ $pageClass }} {{ $extraClass }}" wire:ignore.self>
-    @if (filled($beforeFiltersView))
+    @if (filled($beforeFiltersView) && ! $beforeFiltersInline)
         @include($beforeFiltersView)
     @endif
 
     <div class="{{ $pageClass }}__filters">
         <div class="{{ $pageClass }}__filters-row">
+            @if (filled($beforeFiltersView) && $beforeFiltersInline)
+                @include($beforeFiltersView)
+            @endif
+
             <div class="{{ $pageClass }}__search-group">
                 <span class="{{ $pageClass }}__locate-label">F6 | Localizar</span>
                 @if ($showFieldDropdown)

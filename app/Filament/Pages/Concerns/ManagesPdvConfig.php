@@ -53,7 +53,7 @@ trait ManagesPdvConfig
 
     public function getPdvMarqueeTextoProperty(): string
     {
-        return $this->pdvConfig()->marqueeTexto();
+        return '';
     }
 
     /**

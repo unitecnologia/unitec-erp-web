@@ -3,7 +3,6 @@
 
     $booleans = EmpresaParametros::apiServicosBooleanFields();
     $acessoRemotoFields = EmpresaParametros::acessoRemotoFields();
-    $licencaFields = EmpresaParametros::licencaApiFields();
     $licencaBooleans = EmpresaParametros::licencaApiBooleanFields();
 
     $cfStatus = is_array($this->cloudflaredStatus ?? null) ? $this->cloudflaredStatus : [];
@@ -258,20 +257,6 @@
                     </label>
                 @endforeach
             </div>
-
-            @foreach ($licencaFields as $field => $meta)
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field erp-empresas-api-servicos__field--timeout">
-                    <label class="erp-pcad-form__label" for="param-{{ $field }}">{{ $meta['label'] }}</label>
-                    <input
-                        id="param-{{ $field }}"
-                        type="number"
-                        min="2"
-                        max="30"
-                        wire:model="data.{{ $field }}"
-                        class="erp-pcad-form__input erp-pcad-form__input--xs"
-                    >
-                </div>
-            @endforeach
         </div>
     </section>
 </div>

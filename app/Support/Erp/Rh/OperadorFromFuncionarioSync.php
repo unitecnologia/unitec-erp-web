@@ -22,7 +22,7 @@ final class OperadorFromFuncionarioSync
      *   usuario_id: int|null,
      *   terminais: list<int>,
      *   estoque_id: int|null,
-     *   usar_agendamento: bool,
+     *   entregador: bool,
      *   setor_vendas: bool,
      *   tabela_venda_id: int|null,
      *   comissao_av: float,
@@ -43,7 +43,8 @@ final class OperadorFromFuncionarioSync
         $vendedorId = (int) ($funcionario->vendedor_id ?? 0);
         $vendedor = $vendedorId > 0 ? Vendedor::query()->find($vendedorId) : null;
 
-        if (! $ehOperador) {
+        // Funcionário inativo (ou sem flag de operador) não pode continuar vendendo.
+        if (! $ehOperador || ! (bool) $funcionario->ativo) {
             $this->desativarOperador($funcionario, $vendedor);
 
             return;
@@ -109,7 +110,7 @@ final class OperadorFromFuncionarioSync
             'ativo' => (bool) $funcionario->ativo,
             'empresa_id' => array_key_first($empresasSync),
             'estoque_id' => $estoqueId,
-            'usar_agendamento' => (bool) ($operador['usar_agendamento'] ?? false),
+            'entregador' => (bool) ($operador['entregador'] ?? true),
             'setor_vendas' => (bool) ($operador['setor_vendas'] ?? true),
             'tabela_venda_id' => $operador['tabela_venda_id'] ?? null,
             'comissao_av' => (float) ($operador['comissao_av'] ?? 0),
@@ -172,8 +173,29 @@ final class OperadorFromFuncionarioSync
         $funcionario->save();
     }
 
-    private function desativarOperador(RhFuncionario $funcionario, ?Vendedor $vendedor): void
+    /**
+     * Desativa o operador sem apagar o registro em `vendedores` (preserva histórico de vendas).
+     * Mantém vendedor_id no funcionário para histórico/FKs.
+     */
+    public function desativarOperador(RhFuncionario $funcionario, ?Vendedor $vendedor): void
     {
+        $this->desativarVendedor($vendedor ?? ((int) ($funcionario->vendedor_id ?? 0) ?: null));
+    }
+
+    /**
+     * Desativa vendedor por id/model — usado na exclusão/desativação de usuário ou funcionário.
+     * Nunca dá DELETE em `vendedores`.
+     */
+    public function desativarVendedor(Vendedor|int|null $vendedor): void
+    {
+        if ($vendedor === null || $vendedor === 0) {
+            return;
+        }
+
+        if (! $vendedor instanceof Vendedor) {
+            $vendedor = Vendedor::query()->find((int) $vendedor);
+        }
+
         if (! $vendedor) {
             return;
         }
@@ -186,8 +208,6 @@ final class OperadorFromFuncionarioSync
         User::query()
             ->where('vendedor_id', $vendedor->getKey())
             ->update(['vendedor_id' => null]);
-
-        // Mantém vendedor_id no funcionário para histórico/FKs; só desativa o operador.
     }
 
     /**

@@ -513,16 +513,17 @@ a.erp-produtos__tab {
 .erp-aniversariantes__tab,
 .erp-produtos__tab,
 .erp-nfe__tab {
-    padding: 0.4rem 1rem;
+    padding: 0.2rem 0.65rem;
     font-size: var(--erp-font-size-xs);
     font-weight: 600;
-    border: 1px solid var(--erp-border-light);
-    border-radius: var(--erp-radius-sm) var(--erp-radius-sm) 0 0;
-    background: var(--erp-bg-muted);
-    color: var(--erp-text-muted);
+    border: 1px solid #c5d0dc;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--erp-transition), color var(--erp-transition), border-color var(--erp-transition), box-shadow var(--erp-transition);
+    transition: none;
+    box-shadow: none;
 }
 
 .erp-orcamentos__tab:hover,
@@ -542,9 +543,9 @@ a.erp-produtos__tab {
 .erp-aniversariantes__tab:hover,
 .erp-produtos__tab:hover,
 .erp-nfe__tab:hover {
-    background: var(--erp-bg-panel);
-    color: var(--erp-brand-primary);
-    border-color: var(--erp-brand-primary);
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
 .erp-orcamentos__tab--active,
@@ -564,11 +565,14 @@ a.erp-produtos__tab {
 .erp-aniversariantes__tab--active,
 .erp-produtos__tab--active,
 .erp-nfe__tab--active {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
-    border-color: var(--erp-brand-accent);
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
     font-weight: 700;
-    color: var(--erp-text-inverse);
-    box-shadow: var(--erp-shadow-sm);
+    color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: none;
 }
 
 /* ── Abas coladas na grade (todas as listagens ERP) ────────────── */
@@ -1346,7 +1350,7 @@ a.erp-produtos__tab {
     }
 }
 
-/* ── Logística — abas de status e action bar ───────────────────── */
+/* ── Logística / RH / cadastros — abas estilo fichário ───────────── */
 
 .erp-transportadoras__tab,
 .erp-veiculos__tab,
@@ -1356,29 +1360,34 @@ a.erp-produtos__tab {
 .erp-rh-funcionarios__tab,
 .erp-rh-cargos__tab,
 .erp-rh-departamentos__tab {
-    padding: 0.4rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.65rem;
     font-size: var(--erp-font-size-xs);
     font-weight: 600;
-    border: 1px solid var(--erp-border-light);
-    border-radius: var(--erp-radius-sm) var(--erp-radius-sm) 0 0;
-    background: var(--erp-bg-muted);
-    color: var(--erp-text-muted);
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #e8edf3;
+    color: #64748b;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--erp-transition), color var(--erp-transition), border-color var(--erp-transition), box-shadow var(--erp-transition);
+    transition: none;
+    box-shadow: none;
 }
 
-.erp-transportadoras__tab:hover,
-.erp-veiculos__tab:hover,
-.erp-tomadores-servico__tab:hover,
-.erp-logistica-destinatarios__tab:hover,
-.erp-logistica-remetentes__tab:hover,
-.erp-rh-funcionarios__tab:hover,
-.erp-rh-cargos__tab:hover,
-.erp-rh-departamentos__tab:hover {
-    background: var(--erp-bg-panel);
-    color: var(--erp-brand-primary);
-    border-color: var(--erp-brand-primary);
+.erp-transportadoras__tab:hover:not(.erp-transportadoras__tab--active),
+.erp-veiculos__tab:hover:not(.erp-veiculos__tab--active),
+.erp-tomadores-servico__tab:hover:not(.erp-tomadores-servico__tab--active),
+.erp-logistica-destinatarios__tab:hover:not(.erp-logistica-destinatarios__tab--active),
+.erp-logistica-remetentes__tab:hover:not(.erp-logistica-remetentes__tab--active),
+.erp-rh-funcionarios__tab:hover:not(.erp-rh-funcionarios__tab--active),
+.erp-rh-cargos__tab:hover:not(.erp-rh-cargos__tab--active),
+.erp-rh-departamentos__tab:hover:not(.erp-rh-departamentos__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
 .erp-transportadoras__tab--active,
@@ -1389,11 +1398,14 @@ a.erp-produtos__tab {
 .erp-rh-funcionarios__tab--active,
 .erp-rh-cargos__tab--active,
 .erp-rh-departamentos__tab--active {
-    background: linear-gradient(180deg, var(--erp-brand-accent-soft) 0%, var(--erp-brand-accent) 100%);
-    border-color: var(--erp-brand-accent);
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
     font-weight: 700;
-    color: var(--erp-text-inverse);
-    box-shadow: var(--erp-shadow-sm);
+    color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: none;
 }
 
 .erp-transportadoras-actions,
@@ -1666,6 +1678,90 @@ a.erp-produtos__tab {
 }
 
 /* ── Toolbar padrão Produtos (filters-row) para cadastros ─────────── */
+
+.erp-list-page .erp-ajustes-estoque__filters-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    width: 100%;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+    min-width: 0;
+    padding-right: 0.65rem;
+    margin-right: 0.15rem;
+    border-right: 1px solid var(--erp-border-light);
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline .erp-ajustes-estoque__filter-title {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline .erp-ajustes-estoque__period {
+    display: inline-flex;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    min-width: 0;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline .erp-ajustes-estoque__period-label {
+    white-space: nowrap;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline .erp-ajustes-estoque__period-input {
+    width: 7.6rem;
+    min-width: 7.6rem;
+}
+
+.erp-list-page .erp-ajustes-estoque__period-inline + .erp-ajustes-estoque__search-group {
+    padding-left: 0.15rem;
+}
+
+.erp-list-page .erp-ajustes-estoque__search-text {
+    width: 7.5cm;
+    max-width: 7.5cm;
+    min-width: 5rem;
+}
+
+@media (max-width: 1200px) {
+    .erp-list-page .erp-ajustes-estoque__filters-row {
+        flex-wrap: wrap;
+    }
+
+    .erp-list-page .erp-ajustes-estoque__period-inline {
+        width: 100%;
+        padding-right: 0;
+        margin-right: 0;
+        padding-bottom: 0.35rem;
+        margin-bottom: 0.15rem;
+        border-right: none;
+        border-bottom: 1px solid var(--erp-border-light);
+    }
+
+    .erp-list-page .erp-ajustes-estoque__search-text {
+        width: 11cm;
+        max-width: 11cm;
+    }
+}
 
 .erp-list-page .erp-empresas__filters,
 .erp-list-page .erp-unidades__filters,

@@ -409,10 +409,22 @@
     display: none !important;
 }
 
+/* ── Abas estilo fichário (padrão Orçamentos) ── */
+
 .erp-nfe-page .erp-nfe__tabs-wrap {
     flex-shrink: 0;
-    margin: 0;
+    margin: 0 0 -1px;
     padding: 0;
+    background: transparent;
+    border: none;
+    position: relative;
+    z-index: 1;
+}
+
+.erp-nfe-page .erp-nfe__tabs {
+    margin: 0;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
 .erp-nfe-page .erp-nfe__tab {
@@ -423,26 +435,34 @@
     line-height: 1.1;
     min-height: 0;
     font-family: inherit;
-    font-weight: 700;
-    border: 1px solid #94a3b8;
-    background: #e2e8f0;
-    color: #334155;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: #64748b;
+    background: #e8edf3;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
     cursor: pointer;
     appearance: none;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    transition: none;
 }
 
 .erp-nfe-page .erp-nfe__tab:not(.erp-nfe__tab--active):hover {
-    background: #cbd5e1;
-    border-color: #64748b;
-    color: #0f172a;
+    background: #dde4ec;
+    border-color: #b0bcc9;
+    color: #475569;
 }
 
 .erp-nfe-page .erp-nfe__tab--active {
-    background: #1e3a5f;
-    color: #ffffff;
-    border-color: #0f2744;
-    box-shadow: inset 0 -2px 0 #0f2744;
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 .erp-nfe-page .fi-sc > div:not(.fi-hidden) {
@@ -742,7 +762,7 @@
     overflow: hidden;
 }
 
-/* ── Larguras de colunas NF-e (flag + número + datas + … + histórico — não aplicar na NFC-e) ─ */
+/* ── Larguras de colunas NF-e (flag + número + OS/DAV + datas + … + histórico — não aplicar na NFC-e) ─ */
 
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(1),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -762,14 +782,23 @@
 
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(3),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(3),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-npedido,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-npedido {
+    width: 5rem;
+    max-width: 5.75rem;
+    white-space: nowrap;
+}
+
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(4),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(4) {
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(5),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(5) {
     width: 5.75rem;
     max-width: 6.25rem;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(5),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(6),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-cliente\.nome-razao,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao {
     width: auto !important;
@@ -777,8 +806,8 @@
     max-width: none !important;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(6),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(7),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-chave,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-chave {
     width: calc(46ch + 1cm) !important;
@@ -800,8 +829,8 @@
     letter-spacing: 0.01em;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(7),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(7),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(8),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(8),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-protocolo,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-protocolo {
     width: 17ch !important;
@@ -823,24 +852,24 @@
     font-variant-numeric: tabular-nums;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(8),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(9),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-finalidade,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-finalidade {
     width: 7.5rem;
     max-width: 8.5rem;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(9),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(10),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(10),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-status,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-status {
     width: 5.75rem;
     max-width: 6.5rem;
 }
 
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(10),
-.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(10),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(11),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(11),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-total,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-total {
     width: 6.5rem;
@@ -1733,6 +1762,7 @@
 }
 
 .erp-nfe-page .erp-nfe-cliente__input[readonly],
+.erp-nfe-page .erp-nfe-cliente__input[data-erp-locked],
 .erp-nfe-page .erp-nfe-cliente__input--info {
     background: #dce6f2 !important;
     border-color: #9eb6d4;
@@ -1741,6 +1771,14 @@
     pointer-events: none;
     box-shadow: none;
     user-select: text;
+}
+
+.erp-nfe-page .erp-nfe-cliente__field:has(> .erp-nfe-cliente__input--info) {
+    pointer-events: none;
+}
+
+.erp-nfe-page .erp-nfe-cliente__field--suggest {
+    pointer-events: auto;
 }
 
 .erp-nfe-page .erp-nfe-cliente__input[readonly]:focus,
@@ -2014,6 +2052,17 @@
     width: 6.8rem;
 }
 
+.erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-group--meio-pgto {
+    flex: 0 0 auto;
+    min-width: 14rem;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-input--meio-pgto {
+    width: 14.5rem;
+    min-width: 14.5rem;
+    max-width: 18rem;
+}
+
 .erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-input--sm {
     width: 4.2rem;
     min-width: 4.2rem;
@@ -2042,22 +2091,23 @@
     flex: 0 0 auto;
 }
 
+/* Faixa de abas (grade + detalhes) — compacta */
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.15rem;
+    gap: 0.2rem;
     flex-shrink: 0;
-    padding: 0.18rem;
-    border: 1px solid #b8c9de;
-    border-radius: 8px;
-    background: linear-gradient(180deg, #f4f8fc 0%, #e8f0fa 100%);
-    box-shadow: 0 1px 2px rgb(15 52 96 / 5%);
+    padding: 0.16rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #eef3f9;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main {
     align-items: center;
     flex-wrap: nowrap;
-    gap: 0.35rem;
+    gap: 0.28rem;
     margin-top: -0.1cm;
 }
 
@@ -2067,10 +2117,10 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-left: 0.35rem;
-    padding: 0.22rem 0.65rem;
-    border: 1px solid #b8c9de;
-    border-radius: 6px;
+    margin-left: 0.2rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 5px;
     background: #fff;
     color: #0f172a;
     font-size: 0.72rem;
@@ -2083,7 +2133,7 @@
 
 .erp-nfe-page .erp-nfe-lancamento-modal__imposto-produto-cod {
     flex: 0 0 auto;
-    color: #1e5a9e;
+    color: var(--erp-brand-primary, #1e5a9e);
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__imposto-produto-nome {
@@ -2092,40 +2142,66 @@
     text-overflow: ellipsis;
 }
 
-.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-lancamento-modal__section-tab {
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-lancamento-modal__section-tab,
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-tab-btn {
     flex: 0 0 auto;
 }
 
+/*
+ * Botão de aba compacto (reutilizável).
+ * Use: erp-nfe-tab-btn + erp-nfe-tab-btn--active
+ */
+.erp-nfe-page .erp-nfe-tab-btn,
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tab {
-    padding: 0.28rem 0.7rem;
-    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.55rem;
+    padding: 0.22rem 0.62rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: #64748b;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    border: 1px solid #b6c6da;
+    border-radius: 5px;
+    background: #fff;
+    color: #334155;
     cursor: pointer;
     font-family: inherit;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    white-space: nowrap;
+    box-shadow: none;
+    transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
 }
 
+.erp-nfe-page .erp-nfe-tab-btn:hover,
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tab:hover {
-    background: #f1f5f9;
-    color: #0f3460;
+    background: #f5f9ff;
+    border-color: #8eabcd;
+    color: var(--erp-brand-primary-dark, #0f3460);
 }
 
-.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-lancamento-modal__section-tab--active {
-    background: #1e5a9e;
-    border-color: #1e5a9e;
-    color: #fff;
-    box-shadow: none;
+.erp-nfe-page .erp-nfe-tab-btn:focus-visible,
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tab:focus-visible {
+    outline: 2px solid var(--erp-brand-primary, #1e5a9e);
+    outline-offset: 1px;
 }
 
+.erp-nfe-page .erp-nfe-tab-btn--active,
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tab--active,
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--main .erp-nfe-lancamento-modal__section-tab--active,
 .erp-nfe-page .erp-nfe-lancamento-modal__section-tabs--detail .erp-nfe-lancamento-modal__section-tab--active {
-    background: #0f766e;
-    border-color: #0f766e;
+    background: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary-dark, #0f3460);
     color: #fff;
-    box-shadow: none;
+    font-weight: 700;
+    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 12%);
+}
+
+.erp-nfe-page .erp-nfe-tab-btn--active:hover,
+.erp-nfe-page .erp-nfe-lancamento-modal__section-tab--active:hover {
+    background: var(--erp-brand-primary-dark, #0f3460);
+    border-color: var(--erp-brand-primary-dark, #0f3460);
+    color: #fff;
 }
 
 .erp-nfe-page .erp-nfe-lancamento-modal__header,
@@ -4655,6 +4731,14 @@
     background: #0d5f59;
 }
 
+.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe {
+    background: #7c3aed;
+}
+
+.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe:hover {
+    background: #6d28d9;
+}
+
 .erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__actions--cce .erp-nfe-fiscal-overlay__btn {
     min-width: 6.75rem;
 }
@@ -6124,14 +6208,19 @@
 }
 /* ── Modal espelho NF-e (aba aberta) ───────────────────────────── */
 
+/* Acima do lançamento (250), progresso (280) e toasts (300); abaixo do WhatsApp (320). */
 .erp-nfe-page .erp-nfe-espelho-modal {
     position: fixed;
     inset: 0;
-    z-index: 265;
-    display: flex;
+    z-index: 310;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 0.5rem;
+}
+
+.erp-nfe-page .erp-nfe-espelho-modal.is-visible {
+    display: flex;
 }
 
 .erp-nfe-page .erp-nfe-espelho-modal .erp-lookup-modal__backdrop {
@@ -6208,7 +6297,7 @@
 }
 
 .erp-nfe-page .erp-nfe-espelho-email-modal {
-    z-index: 275;
+    z-index: 320;
 }
 
 /* Modal e-mail — mesmo padrão do orçamento (F8 / F11) */
@@ -6647,4 +6736,26 @@
     font-size: 0.82rem;
     line-height: 1.35;
     word-break: break-word;
+}
+/* Prefixo de documento (D-/O-/NF-/NC-) alinhado à esquerda */
+.erp-doc-pref {
+    display: inline-flex;
+    width: 100%;
+    justify-content: flex-start;
+    align-items: baseline;
+    gap: 0.05rem;
+    text-align: left;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+}
+
+.erp-doc-pref__letra {
+    flex-shrink: 0;
+    color: #0f3460;
+    font-weight: 400;
+}
+
+.erp-doc-pref__num {
+    min-width: 0;
+    font-weight: 400;
 }

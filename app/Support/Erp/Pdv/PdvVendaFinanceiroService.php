@@ -6,6 +6,7 @@ use App\Models\ContaReceber;
 use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
 use Carbon\Carbon;
 
@@ -19,6 +20,7 @@ final class PdvVendaFinanceiroService
      * @param  list<int>|null  $tabelaPrazoDias  Dias de vencimento do crediário (ex.: [30, 60, 90]).
      * @param  array{nsu?: string, autorizacao?: string, maquininha?: string, bandeira?: string, dias?: list<int>}|null  $cartaoCanhoto
      * @param  list<string>|null  $chequeNumeros  Número do cheque por parcela (mesmo índice dos dias).
+     * @return list<ContaReceber>
      */
     public function gerarContasReceber(
         PdvVenda $venda,
@@ -27,7 +29,7 @@ final class PdvVendaFinanceiroService
         ?array $tabelaPrazoDias = null,
         ?array $cartaoCanhoto = null,
         ?array $chequeNumeros = null,
-    ): void {
+    ): array {
         $venda->loadMissing('sessao');
         $personId = $personId ?: $this->resolveConsumidorFinalClienteId();
         $empresaId = $venda->sessao?->empresa_id !== null
@@ -37,6 +39,7 @@ final class PdvVendaFinanceiroService
         $numeroVenda = str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
         $documentoBase = 'PDV-'.$numeroVenda;
         $hoje = Carbon::today();
+        $criadas = [];
 
         foreach ($pagamentos as $pagamento) {
             $forma = mb_strtoupper(trim($pagamento['forma'] ?? ''), 'UTF-8');
@@ -79,7 +82,7 @@ final class PdvVendaFinanceiroService
                 'bandeira' => trim((string) ($cartaoCanhoto['bandeira'] ?? '')),
             ] : null;
 
-            $this->criarParcelas(
+            $criadas = array_merge($criadas, $this->criarParcelas(
                 personId: $personId,
                 contaForma: $contaForma,
                 formaLabel: $forma,
@@ -91,8 +94,10 @@ final class PdvVendaFinanceiroService
                 empresaId: $empresaId,
                 canhoto: $canhoto,
                 chequeNumeros: $isCheque ? ($chequeNumeros ?? []) : null,
-            );
+            ));
         }
+
+        return $criadas;
     }
 
     /**
@@ -114,6 +119,7 @@ final class PdvVendaFinanceiroService
      * @param  list<int>  $dias
      * @param  array{nsu: string, autorizacao: string, maquininha?: string, bandeira: string}|null  $canhoto
      * @param  list<string>|null  $chequeNumeros
+     * @return list<ContaReceber>
      */
     private function criarParcelas(
         int $personId,
@@ -127,9 +133,10 @@ final class PdvVendaFinanceiroService
         ?int $empresaId = null,
         ?array $canhoto = null,
         ?array $chequeNumeros = null,
-    ): void {
+    ): array {
         $n = count($dias);
         $parcelaBase = floor($total / $n * 100) / 100;
+        $criadas = [];
 
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
@@ -161,7 +168,7 @@ final class PdvVendaFinanceiroService
                 $historico .= ' | CHQ '.$numeroCheque;
             }
 
-            ContaReceber::query()->create([
+            $criadas[] = ContaReceber::query()->create([
                 'empresa_id' => $empresaId,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
@@ -177,8 +184,11 @@ final class PdvVendaFinanceiroService
                 'cartao_bandeira' => $canhoto['bandeira'] ?? null,
                 'cartao_parcela' => $canhoto !== null ? $parcelaLabel : null,
                 'numero_cheque' => $numeroCheque !== '' ? mb_substr($numeroCheque, 0, 40) : null,
+                ...ContaReceberJurosCarteira::atributosParaCreate($contaForma, $empresaId),
             ]);
         }
+
+        return $criadas;
     }
 
     private function resolveConsumidorFinalClienteId(): int

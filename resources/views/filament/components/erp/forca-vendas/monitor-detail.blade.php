@@ -2,6 +2,9 @@
     $order = $this->selecionado;
     $itens = $this->itensSelecionado;
     $pagamentos = $this->pagamentosSelecionado;
+    $exibirCustoGrade = $this->exibirCustoProdutoGrade;
+    $custosGrade = $exibirCustoGrade ? $this->custosUnitariosGrade : [];
+    $colspanItens = $exibirCustoGrade ? 10 : 9;
 
     $fmtNum = fn (float $v): string => number_format($v, 2, ',', '.');
     $fmtQtd = fn (float $v): string => rtrim(rtrim(number_format($v, 3, ',', '.'), '0'), ',');
@@ -23,10 +26,13 @@
                             <th class="erp-fv-mon__th--code">Cód. Barras</th>
                             <th>Produto</th>
                             <th class="erp-fv-mon__th--num">Qtde</th>
-                            <th class="erp-fv-mon__th--money">Vlr Unit.</th>
-                            <th class="erp-fv-mon__th--money">Desc.</th>
-                            <th class="erp-fv-mon__th--money">Acmo.</th>
-                            <th class="erp-fv-mon__th--money">TT Líquido</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--vlr">Vlr Unit.</th>
+                            @if ($exibirCustoGrade)
+                                <th class="erp-fv-mon__th--money erp-fv-mon__th--custo">Custo</th>
+                            @endif
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--desc">Desc.</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--acre">Acre.</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--liq">TT Líquido</th>
                             <th>Vendedor</th>
                         </tr>
                     </thead>
@@ -37,25 +43,33 @@
                                 <td class="erp-fv-mon__td--code">{{ $item['codigo_barras'] ?: '—' }}</td>
                                 <td>{{ $item['descricao'] }}</td>
                                 <td class="erp-fv-mon__td--num">{{ $fmtQtd($item['quantidade']) }}</td>
-                                <td class="erp-fv-mon__td--money">
+                                <td class="erp-fv-mon__td--money erp-fv-mon__td--vlr">
                                     <span class="erp-fv-mon-money">
                                         <span class="erp-fv-mon-money__currency">R$</span>
                                         <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['preco_unitario']) }}</span>
                                     </span>
                                 </td>
-                                <td class="erp-fv-mon__td--money">
+                                @if ($exibirCustoGrade)
+                                    <td class="erp-fv-mon__td--money erp-fv-mon__td--custo">
+                                        <span class="erp-fv-mon-money">
+                                            <span class="erp-fv-mon-money__currency">R$</span>
+                                            <span class="erp-fv-mon-money__amount">{{ $fmtNum((float) ($custosGrade[(int) ($item['product_id'] ?? 0)] ?? 0)) }}</span>
+                                        </span>
+                                    </td>
+                                @endif
+                                <td class="erp-fv-mon__td--money erp-fv-mon__td--desc">
                                     <span class="erp-fv-mon-money">
                                         <span class="erp-fv-mon-money__currency">R$</span>
                                         <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['desconto']) }}</span>
                                     </span>
                                 </td>
-                                <td class="erp-fv-mon__td--money">
+                                <td class="erp-fv-mon__td--money erp-fv-mon__td--acre">
                                     <span class="erp-fv-mon-money">
                                         <span class="erp-fv-mon-money__currency">R$</span>
                                         <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['acrescimo']) }}</span>
                                     </span>
                                 </td>
-                                <td class="erp-fv-mon__td--money">
+                                <td class="erp-fv-mon__td--money erp-fv-mon__td--liq">
                                     <span class="erp-fv-mon-money">
                                         <span class="erp-fv-mon-money__currency">R$</span>
                                         <span class="erp-fv-mon-money__amount">{{ $fmtNum($item['total']) }}</span>
@@ -65,7 +79,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="erp-fv-mon__empty">
+                                <td colspan="{{ $colspanItens }}" class="erp-fv-mon__empty">
                                     {{ $order ? 'Pedido sem itens detalhados.' : 'Não há dados para mostrar' }}
                                 </td>
                             </tr>
@@ -75,10 +89,34 @@
             </div>
             <footer class="erp-fv-mon__foot">
                 <span class="erp-fv-mon__foot-count">{{ count($itens) }}</span>
-                <span class="erp-fv-mon__foot-total">
-                    <span class="erp-fv-mon-money">
-                        <span class="erp-fv-mon-money__currency">R$</span>
-                        <span class="erp-fv-mon-money__amount">{{ $fmtNum($totItens) }}</span>
+                <span class="erp-fv-mon__foot-end">
+                    @if ((bool) (\App\Support\Erp\ErpContext::currentEmpresa()?->param_monitor_vendas_exibir_mais_opcoes ?? false))
+                        <span class="erp-fv-mon__foot-mais">
+                            @include('filament.components.erp.forca-vendas.mais-opcoes-menu', [
+                                'enabled' => count($this->selecionados) === 1,
+                                'onMargem' => 'abrirMargemVenda',
+                            ])
+                        </span>
+                    @endif
+                    @if ($order)
+                        <span class="erp-fv-mon__foot-pedido">
+                            PEDIDO:
+                            {{ $order->venda?->numero
+                                ? (string) (int) preg_replace('/\D/', '', (string) $order->venda->numero)
+                                : '—' }}
+                        </span>
+                        <span class="erp-fv-mon__foot-pedido">
+                            DAV:
+                            {{ $order->pedido?->numero
+                                ? (string) (int) preg_replace('/\D/', '', (string) $order->pedido->numero)
+                                : (string) $order->id }}
+                        </span>
+                    @endif
+                    <span class="erp-fv-mon__foot-total">
+                        <span class="erp-fv-mon-money">
+                            <span class="erp-fv-mon-money__currency">R$</span>
+                            <span class="erp-fv-mon-money__amount">{{ $fmtNum($totItens) }}</span>
+                        </span>
                     </span>
                 </span>
             </footer>

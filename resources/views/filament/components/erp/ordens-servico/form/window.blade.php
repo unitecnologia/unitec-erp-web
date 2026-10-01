@@ -1,4 +1,8 @@
-<div class="erp-os-window">
+<div
+    class="erp-os-window"
+    x-data
+    x-on:erp-os-focus-cliente.window="$nextTick(() => { const el = document.getElementById('os-cliente'); if (!el || el.disabled) return; el.removeAttribute('readonly'); el.focus(); })"
+>
     <header class="erp-os-window__titlebar">
         <span>Lançamento OS</span>
         <button
@@ -16,21 +20,21 @@
         @include('filament.components.erp.ordens-servico.form.action-bar')
     </div>
 
-    @if ($this->overlayProductOpen)
-        @include('filament.components.erp.form-overlay', [
-            'title' => 'Cadastro de Produtos',
-            'iframeUrl' => $this->productOverlayUrl,
-            'closeAction' => 'closeProductOverlay',
-        ])
-    @endif
-
-    @if ($this->overlayPersonOpen)
-        @include('filament.components.erp.form-overlay', [
-            'title' => 'Cadastro de Clientes',
-            'iframeUrl' => $this->personOverlayUrl,
-            'closeAction' => 'closePersonOverlay',
-        ])
-    @endif
-
     @include('filament.components.erp.ordens-servico.form.item-delete-confirm')
+    @include('filament.components.erp.ordens-servico.form.post-save-prompt')
 </div>
+
+@include('filament.components.erp.ordens-servico.form.desconto-item')
+@include('filament.components.erp.ordens-servico.form.servico-prestado-modal')
+
+<div
+    wire:ignore
+    id="erp-os-cadastro-overlays"
+    data-product-url="{{ $this->productOverlayUrl }}"
+    data-person-url="{{ $this->personOverlayUrl }}"
+></div>
+
+@include('filament.components.erp.ordens-servico.preview-overlay')
+@include('filament.components.erp.ordens-servico.print-modal')
+@include('filament.components.erp.ordens-servico.form.faturamento-modal')
+@include('filament.components.erp.boleto-pos-documento')

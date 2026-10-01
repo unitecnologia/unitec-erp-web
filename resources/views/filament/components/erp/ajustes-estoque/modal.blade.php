@@ -4,11 +4,33 @@
         x-data
         x-on:keydown.escape.window="$wire.handleAjusteEscape()"
         x-on:keydown.window="if ($event.key === 'F5') { $event.preventDefault(); $wire.saveAjusteForm(); }"
-        x-on:erp-ajuste-scroll-produto-sugestao.window="
+        x-on:erp-ajuste-focus-qtd.window="
             $nextTick(() => {
-                const i = $event.detail.index ?? 0;
-                document.getElementById('erp-ajuste-produto-sug-' + i)?.scrollIntoView({ block: 'nearest' });
+                const el = document.getElementById('erp-ajuste-qtd');
+                if (!el || el.disabled) return;
+                el.focus();
+                el.select?.();
             })
+        "
+        x-on:erp-ajuste-focus-codigo-interno.window="
+            $nextTick(() => {
+                const el = document.getElementById('erp-ajuste-codigo-interno');
+                if (!el || el.disabled) return;
+                el.removeAttribute('readonly');
+                el.focus();
+                el.select?.();
+            })
+        "
+        x-init="
+            @if (! $this->ajusteFormId)
+                $nextTick(() => {
+                    const el = document.getElementById('erp-ajuste-codigo-interno');
+                    if (!el || el.disabled) return;
+                    el.removeAttribute('readonly');
+                    el.focus();
+                    el.select?.();
+                })
+            @endif
         "
     >
         <div class="erp-fpgto-modal__backdrop erp-ajuste-modal__backdrop" wire:click="closeAjusteForm"></div>
@@ -51,6 +73,7 @@
                         <label class="erp-ajuste-modal__field">
                             <span class="erp-ajuste-modal__label">Cód. int.</span>
                             <input
+                                id="erp-ajuste-codigo-interno"
                                 type="text"
                                 wire:model="ajusteForm.codigo_interno"
                                 wire:keydown.enter="resolveProdutoCodigoInterno"
@@ -58,6 +81,8 @@
                                 @disabled($this->ajusteFormId)
                                 class="erp-ajuste-modal__input"
                                 placeholder="Código"
+                                data-erp-uppercase
+                                autocomplete="off"
                             >
                         </label>
                         <label class="erp-ajuste-modal__field">
@@ -70,6 +95,8 @@
                                 @disabled($this->ajusteFormId)
                                 class="erp-ajuste-modal__input"
                                 placeholder="EAN / barras"
+                                data-erp-uppercase
+                                autocomplete="off"
                             >
                         </label>
                         <label class="erp-ajuste-modal__field">
@@ -82,54 +109,120 @@
                                 @disabled($this->ajusteFormId)
                                 class="erp-ajuste-modal__input"
                                 placeholder="Referência"
+                                data-erp-uppercase
+                                autocomplete="off"
                             >
                         </label>
                     </div>
 
-                    <label class="erp-ajuste-modal__field erp-ajuste-modal__field--full">
-                        <span class="erp-ajuste-modal__label">Descrição</span>
-                        <input
-                            id="erp-ajuste-descricao-busca"
-                            type="text"
-                            wire:model.live.debounce.300ms="ajusteForm.descricao_busca"
-                            wire:keydown.enter.prevent="confirmarProdutoSugestao"
-                            wire:keydown.escape.prevent="fecharSugestoesProduto"
-                            x-on:keydown.arrow-down.prevent="$wire.moverSugestaoProduto(1)"
-                            x-on:keydown.arrow-up.prevent="$wire.moverSugestaoProduto(-1)"
-                            @disabled($this->ajusteFormId)
-                            class="erp-ajuste-modal__input"
-                            placeholder="Digite nome, código, barras ou referência (mín. 2 letras)"
-                            autocomplete="off"
-                            role="combobox"
-                            aria-autocomplete="list"
-                            aria-expanded="{{ count($this->produtoSugestoes) > 0 ? 'true' : 'false' }}"
-                            aria-controls="erp-ajuste-produto-sugestoes"
-                        >
-                    </label>
+                    <div
+                        class="erp-ajuste-modal__produto-busca"
+                        x-data="{
+                            ativo: 0,
+                            mover(d) {
+                                const lista = this.$refs.lista;
+                                if (! lista) return;
+                                const itens = lista.children;
+                                const total = itens.length;
+                                if (total === 0) return;
+                                const atual = itens[this.ativo];
+                                if (atual) {
+                                    atual.classList.remove('is-selected');
+                                    atual.setAttribute('aria-selected', 'false');
+                                }
+                                this.ativo = Math.max(0, Math.min(total - 1, this.ativo + d));
+                                const prox = itens[this.ativo];
+                                if (prox) {
+                                    prox.classList.add('is-selected');
+                                    prox.setAttribute('aria-selected', 'true');
+                                    prox.scrollIntoView({ block: 'nearest' });
+                                }
+                            },
+                            confirmar() {
+                                const lista = this.$refs.lista;
+                                const el = lista ? lista.children[this.ativo] : null;
+                                const id = el ? Number(el.dataset.id || 0) : 0;
+                                if (id > 0) {
+                                    $wire.selecionarProdutoSugestao(id);
+                                    return;
+                                }
+                                $wire.confirmarProdutoSugestao();
+                            },
+                            reset() {
+                                this.ativo = 0;
+                            }
+                        }"
+                        x-on:erp-ajuste-sugestoes-ready.window="reset()"
+                    >
+                        <label class="erp-ajuste-modal__field erp-ajuste-modal__field--full">
+                            <span class="erp-ajuste-modal__label">Descrição</span>
+                            <input
+                                id="erp-ajuste-descricao-busca"
+                                type="text"
+                                wire:model.live.debounce.450ms="ajusteForm.descricao_busca"
+                                wire:keydown.escape.prevent="fecharSugestoesProduto"
+                                x-on:keydown.enter.prevent="confirmar()"
+                                x-on:keydown.arrow-down.prevent="mover(1)"
+                                x-on:keydown.arrow-up.prevent="mover(-1)"
+                                @disabled($this->ajusteFormId)
+                                class="erp-ajuste-modal__input"
+                                placeholder="Digite nome, código, barras ou referência (mín. 2 letras)"
+                                autocomplete="off"
+                                data-erp-uppercase
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded="{{ count($this->produtoSugestoes) > 0 ? 'true' : 'false' }}"
+                                aria-controls="erp-ajuste-produto-sugestoes"
+                            >
+                        </label>
 
-                    @if (! $this->ajusteFormId && count($this->produtoSugestoes) > 0)
-                        <div id="erp-ajuste-produto-sugestoes" class="erp-ajuste-modal__sugestoes" role="listbox" aria-label="Produtos encontrados">
-                            @foreach ($this->produtoSugestoes as $index => $sugestao)
-                                <button
-                                    type="button"
-                                    id="erp-ajuste-produto-sug-{{ $index }}"
-                                    wire:key="erp-ajuste-prod-sug-{{ $sugestao['id'] }}"
-                                    wire:click="selecionarProdutoSugestao({{ $sugestao['id'] }})"
-                                    @class([
-                                        'erp-ajuste-modal__sugestao',
-                                        'is-selected' => $this->selectedProdutoSugestaoIndex === $index,
-                                    ])
-                                    role="option"
-                                    aria-selected="{{ $this->selectedProdutoSugestaoIndex === $index ? 'true' : 'false' }}"
-                                    tabindex="-1"
-                                >
-                                    <span class="erp-ajuste-modal__sugestao-cod">{{ $sugestao['codigo'] }}</span>
-                                    <span class="erp-ajuste-modal__sugestao-desc">{{ $sugestao['descricao'] }}</span>
-                                    <span class="erp-ajuste-modal__sugestao-est">Est. {{ $sugestao['estoque'] }}</span>
-                                </button>
-                            @endforeach
-                        </div>
-                    @endif
+                        @if (! $this->ajusteFormId && count($this->produtoSugestoes) > 0)
+                            <div
+                                id="erp-ajuste-produto-sugestoes"
+                                class="erp-ajuste-modal__sugestoes"
+                                role="listbox"
+                                aria-label="Produtos encontrados"
+                                x-ref="lista"
+                            >
+                                @foreach ($this->produtoSugestoes as $index => $sugestao)
+                                    <button
+                                        type="button"
+                                        id="erp-ajuste-produto-sug-{{ $index }}"
+                                        wire:key="erp-ajuste-prod-sug-{{ $sugestao['id'] }}"
+                                        data-id="{{ $sugestao['id'] }}"
+                                        wire:click="selecionarProdutoSugestao({{ $sugestao['id'] }})"
+                                        x-on:mouseenter="
+                                            const lista = $refs.lista;
+                                            if (! lista) return;
+                                            const prev = lista.children[ativo];
+                                            if (prev) {
+                                                prev.classList.remove('is-selected');
+                                                prev.setAttribute('aria-selected', 'false');
+                                            }
+                                            ativo = {{ $index }};
+                                            const cur = lista.children[ativo];
+                                            if (cur) {
+                                                cur.classList.add('is-selected');
+                                                cur.setAttribute('aria-selected', 'true');
+                                            }
+                                        "
+                                        @class([
+                                            'erp-ajuste-modal__sugestao',
+                                            'is-selected' => $index === 0,
+                                        ])
+                                        role="option"
+                                        aria-selected="{{ $index === 0 ? 'true' : 'false' }}"
+                                        tabindex="-1"
+                                    >
+                                        <span class="erp-ajuste-modal__sugestao-cod">{{ $sugestao['codigo'] }}</span>
+                                        <span class="erp-ajuste-modal__sugestao-barras" title="{{ $sugestao['codigo_barras'] ?: '—' }}">{{ $sugestao['codigo_barras'] ?: '—' }}</span>
+                                        <span class="erp-ajuste-modal__sugestao-desc">{{ $sugestao['descricao'] }}</span>
+                                        <span class="erp-ajuste-modal__sugestao-est">Est. {{ $sugestao['estoque'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
 
                     @if (filled($this->ajusteForm['product_id'] ?? null))
                         <p class="erp-ajuste-modal__produto-ok">
@@ -141,8 +234,34 @@
                 <section class="erp-ajuste-modal__section erp-ajuste-modal__section--qty">
                     <div class="erp-ajuste-modal__section-head">
                         <span>Quantidade</span>
-                        <small>+ entrada · − saída</small>
+                        <small>
+                            @if (($this->ajusteForm['modo'] ?? 'somar') === 'substituir')
+                                valor informado vira o estoque final
+                            @else
+                                + entrada · − saída
+                            @endif
+                        </small>
                     </div>
+
+                    <div class="erp-ajuste-modal__modo" role="radiogroup" aria-label="Modo do ajuste">
+                        <label class="erp-ajuste-modal__modo-opt">
+                            <input
+                                type="radio"
+                                wire:model.live="ajusteForm.modo"
+                                value="somar"
+                            >
+                            <span>Somar</span>
+                        </label>
+                        <label class="erp-ajuste-modal__modo-opt">
+                            <input
+                                type="radio"
+                                wire:model.live="ajusteForm.modo"
+                                value="substituir"
+                            >
+                            <span>Substituir</span>
+                        </label>
+                    </div>
+
                     <div class="erp-ajuste-modal__row2">
                         <label class="erp-ajuste-modal__field">
                             <span class="erp-ajuste-modal__label">Estoque atual</span>
@@ -157,8 +276,11 @@
                             >
                         </label>
                         <label class="erp-ajuste-modal__field">
-                            <span class="erp-ajuste-modal__label">Qtd. ajuste</span>
+                            <span class="erp-ajuste-modal__label">
+                                {{ ($this->ajusteForm['modo'] ?? 'somar') === 'substituir' ? 'Novo estoque' : 'Qtd. ajuste' }}
+                            </span>
                             <input
+                                id="erp-ajuste-qtd"
                                 type="text"
                                 wire:model="ajusteForm.quantidade"
                                 inputmode="decimal"
@@ -168,7 +290,12 @@
                         </label>
                     </div>
                     <p class="erp-ajuste-modal__hint">
-                        Quantidade positiva entra estoque; negativa sai. Pressione <kbd>Enter</kbd> nos campos de código para localizar.
+                        @if (($this->ajusteForm['modo'] ?? 'somar') === 'substituir')
+                            Substituir: o valor informado vira o estoque final (ex.: atual −7 e informar 10 → entrada de 17 para ficar 10).
+                        @else
+                            Somar: quantidade positiva entra estoque; negativa sai.
+                        @endif
+                        Pressione <kbd>Enter</kbd> nos campos de código para localizar.
                     </p>
                 </section>
             </div>

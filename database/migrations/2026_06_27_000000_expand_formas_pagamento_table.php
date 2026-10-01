@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -23,6 +24,25 @@ return new class extends Migration
 
             $table->index('conta_destino_id');
         });
+
+        // Valores do seed inicial (instalação nova). Não reexecuta em clientes já migrados.
+        $now = now();
+        $configs = [
+            1 => ['tipo_movimento' => 'caixa', 'atalho' => 'A', 'aparece_contas_receber' => false],
+            2 => ['tipo_movimento' => 'caixa', 'atalho' => 'P', 'aparece_contas_receber' => true],
+            3 => ['tipo_movimento' => 'caixa', 'atalho' => null, 'aparece_contas_receber' => false],
+            4 => ['tipo_movimento' => 'caixa', 'atalho' => null, 'aparece_contas_receber' => true],
+            5 => ['tipo_movimento' => 'contas_receber', 'atalho' => 'K', 'aparece_contas_receber' => true],
+        ];
+
+        foreach ($configs as $codigo => $cfg) {
+            DB::table('formas_pagamento')
+                ->where('codigo', $codigo)
+                ->update([
+                    ...$cfg,
+                    'updated_at' => $now,
+                ]);
+        }
     }
 
     public function down(): void

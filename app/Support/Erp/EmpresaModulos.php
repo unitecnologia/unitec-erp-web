@@ -6,6 +6,12 @@ use App\Models\Empresa;
 
 final class EmpresaModulos
 {
+    /** Módulos liberados só com tipo de atividade «Prestador de Serviços». */
+    private const MODULOS_PRESTADOR_SERVICOS = [
+        'ordens_servico',
+        'nfse',
+    ];
+
     /**
      * @return array<string, string>
      */
@@ -15,6 +21,7 @@ final class EmpresaModulos
             'pdv' => 'param_modulo_pdv',
             'ordens_servico' => 'param_modulo_ordens_servico',
             'logistica' => 'param_modulo_logistica',
+            'cargas' => 'param_modulo_logistica',
             'transportadoras' => 'param_modulo_logistica',
             'veiculos' => 'param_modulo_logistica',
             'tomadores_servico' => 'param_modulo_logistica',
@@ -30,6 +37,11 @@ final class EmpresaModulos
 
     public static function enabled(?Empresa $empresa, string $catalogModule): bool
     {
+        if (in_array($catalogModule, self::MODULOS_PRESTADOR_SERVICOS, true)
+            && ! static::empresaPrestadorServicos($empresa)) {
+            return false;
+        }
+
         $field = static::permissionModuleMap()[$catalogModule] ?? null;
 
         if ($field === null) {
@@ -41,6 +53,21 @@ final class EmpresaModulos
         }
 
         return (bool) $empresa->getAttribute($field);
+    }
+
+    public static function empresaPrestadorServicos(?Empresa $empresa): bool
+    {
+        return $empresa instanceof Empresa && $empresa->isPrestadorServicos();
+    }
+
+    public static function requerPrestadorServicos(string $catalogModule): bool
+    {
+        return in_array($catalogModule, self::MODULOS_PRESTADOR_SERVICOS, true);
+    }
+
+    public static function requerPrestadorServicosPorPermissao(string $permission): bool
+    {
+        return static::requerPrestadorServicos(static::catalogModuleForPermission($permission));
     }
 
     public static function enabledForPermission(?Empresa $empresa, string $permission): bool

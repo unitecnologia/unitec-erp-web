@@ -12,6 +12,7 @@ class CompraItem extends Model
     protected $fillable = [
         'compra_id',
         'product_id',
+        'nota_fornecedor_item_id',
         'quantidade',
         'valor_unitario',
         'total',
@@ -34,5 +35,10 @@ class CompraItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function notaFornecedorItem(): BelongsTo
+    {
+        return $this->belongsTo(NotaFornecedorItem::class);
     }
 }

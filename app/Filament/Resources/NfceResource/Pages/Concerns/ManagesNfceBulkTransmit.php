@@ -93,8 +93,12 @@ trait ManagesNfceBulkTransmit
         return $this->highlightedRecordId ? [(int) $this->highlightedRecordId] : [];
     }
 
-    protected function notifyNfceTransmitirResumo(int $transmitidas, int $erros, ?string $ultimoProtocolo = null): void
-    {
+    protected function notifyNfceTransmitirResumo(
+        int $transmitidas,
+        int $erros,
+        ?string $ultimoProtocolo = null,
+        ?string $primeiraMensagemErro = null,
+    ): void {
         if ($transmitidas > 0 && $erros === 0) {
             $notification = Notification::make()
                 ->title($transmitidas === 1
@@ -102,7 +106,7 @@ trait ManagesNfceBulkTransmit
                     : "{$transmitidas} NFC-e transmitidas com sucesso.");
 
             if ($transmitidas === 1 && filled($ultimoProtocolo)) {
-                $notification->body('Protocolo: ' . $ultimoProtocolo);
+                $notification->body('Protocolo: '.$ultimoProtocolo);
             }
 
             $notification->success()->send();
@@ -111,9 +115,23 @@ trait ManagesNfceBulkTransmit
         }
 
         if ($transmitidas > 0 && $erros > 0) {
-            Notification::make()
+            $notification = Notification::make()
                 ->title("{$transmitidas} transmitida(s), {$erros} com erro.")
-                ->warning()
+                ->warning();
+
+            if (filled($primeiraMensagemErro)) {
+                $notification->body($primeiraMensagemErro);
+            }
+
+            $notification->send();
+
+            return;
+        }
+
+        if (filled($primeiraMensagemErro)) {
+            Notification::make()
+                ->title($primeiraMensagemErro)
+                ->danger()
                 ->send();
 
             return;

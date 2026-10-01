@@ -1,0 +1,397 @@
+/* Modal Enviar (F9) no Monitor — mesmo padrão OS / Orçamentos */
+
+.erp-fv-monitor-page .erp-lookup-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 340;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 52%);
+    backdrop-filter: blur(3px);
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__window {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    background: #e3ecf7;
+    box-shadow: 0 8px 32px rgba(15, 52, 96, 0.35);
+    overflow: hidden;
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border: none;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 12%);
+    color: #fff;
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__close:hover {
+    background: rgb(255 255 255 / 22%);
+}
+
+.erp-fv-monitor-page .erp-lookup-modal__body {
+    background: #fff;
+    min-height: 0;
+    overflow: auto;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-lookup-modal__window,
+.erp-fv-monitor-page .erp-nfe-whatsapp-modal .erp-lookup-modal__window {
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__body,
+.erp-fv-monitor-page .erp-orc-email-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__field--message {
+    align-items: start;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: #0f172a;
+    background: #fff;
+    font-family: inherit;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea {
+    min-height: 8.5rem;
+    resize: vertical;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__input:focus,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__error {
+    grid-column: 2;
+    font-size: 0.72rem;
+    color: #b91c1c;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-height: 2.5rem;
+    padding: 0.35rem;
+    border: 1px solid #c7d5e8;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 0.75rem;
+    color: #0f172a;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachment.is-selected {
+    border-color: #16a34a;
+    background: #ecfdf5;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments-empty {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__attachment-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__mini-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid #c7d5e8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: #0f172a;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__mini-btn:hover {
+    border-color: #1e5a9e;
+    background: #fff;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__mini-btn--danger:hover {
+    border-color: #dc2626;
+    background: #fff5f5;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__hint,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__hint {
+    grid-column: 2;
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-lookup-modal__actions,
+.erp-fv-monitor-page .erp-orc-email-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.75rem 0.65rem;
+    background: linear-gradient(180deg, #eef4fb 0%, #e3ecf7 100%);
+    border-top: 1px solid #c7d5e8;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    background: transparent;
+    padding: 0;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.85rem;
+    height: 3rem;
+    border: 1px solid #c7d5e8;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: #0f172a;
+    box-shadow: 0 4px 14px rgba(30, 90, 158, 0.14);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn:hover:not(:disabled) {
+    border-color: #1e5a9e;
+    background: #fff;
+    transform: translateY(-1px);
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="F5"] {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    border-color: #86efac;
+    color: #fff;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"],
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp {
+    background: linear-gradient(180deg, #25d366 0%, #128c7e 100%) !important;
+    border-color: #86efac !important;
+    color: #fff !important;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+    border-color: #fca5a5;
+    color: #fff;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="F5"] .erp-pcad-actions__label kbd,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="WhatsApp"] .erp-pcad-actions__label,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn--whatsapp .erp-pcad-actions__label,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label,
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-pcad-actions__label kbd {
+    color: #fff !important;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy[wire\:loading],
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy[style*="display: flex"] {
+    display: flex !important;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-panel {
+    position: relative;
+    z-index: 1;
+    width: min(22rem, 100%);
+    padding: 1rem 1.1rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #86efac;
+    background: linear-gradient(180deg, #f8fffb 0%, #eefcf3 100%);
+    box-shadow: 0 18px 40px rgba(15, 40, 71, 0.28);
+    text-align: center;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-spinner {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0 auto 0.55rem;
+    border: 2.5px solid #bbf7d0;
+    border-top-color: #16a34a;
+    border-radius: 999px;
+    animation: erp-fv-mon-email-busy-spin 0.7s linear infinite;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-status {
+    margin: 0 0 0.55rem;
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #14532d;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #86efac;
+    background: #ecfdf5;
+    overflow: hidden;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-bar {
+    height: 100%;
+    width: 38%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #15803d 0%, #16a34a 45%, #4ade80 100%);
+    background-size: 200% 100%;
+    animation: erp-fv-mon-email-busy-slide 1.05s ease-in-out infinite;
+}
+
+.erp-fv-monitor-page .erp-orc-envio-modal .erp-orc-email-modal__busy-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+@keyframes erp-fv-mon-email-busy-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes erp-fv-mon-email-busy-slide {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(280%); }
+}

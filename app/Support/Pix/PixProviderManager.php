@@ -5,6 +5,7 @@ namespace App\Support\Pix;
 use App\Models\Empresa;
 use App\Models\PixCobranca;
 use App\Support\Pix\Contracts\PixProvider;
+use App\Support\Pix\Providers\AilosPixProvider;
 use App\Support\Pix\Providers\MercadoPagoPixProvider;
 use RuntimeException;
 
@@ -33,7 +34,7 @@ class PixProviderManager
     {
         $empresa = $this->empresa($empresaId);
 
-        return (string) ($empresa?->param_pix_provedor ?: 'mercadopago');
+        return mb_strtolower(trim((string) ($empresa?->param_pix_provedor ?: 'mercadopago')), 'UTF-8');
     }
 
     private function empresa(?int $empresaId): ?Empresa
@@ -53,12 +54,26 @@ class PixProviderManager
             );
         }
 
-        $provedor = $forcarProvedor ?: (string) ($empresa?->param_pix_provedor ?: 'mercadopago');
+        $provedor = mb_strtolower(trim((string) (
+            $forcarProvedor ?: ($empresa?->param_pix_provedor ?: 'mercadopago')
+        )), 'UTF-8');
 
         return match ($provedor) {
             'mercadopago' => $this->mercadopago($empresa),
+            'ailos' => $this->ailos($empresa),
             default => throw new RuntimeException('Provedor Pix não suportado: '.$provedor),
         };
+    }
+
+    private function ailos(?Empresa $empresa): PixProvider
+    {
+        if ($empresa === null) {
+            throw new RuntimeException(
+                'Empresa não encontrada para o provedor Ailos Pix.'
+            );
+        }
+
+        return new AilosPixProvider($empresa);
     }
 
     public function apiHabilitada(?Empresa $empresa): bool

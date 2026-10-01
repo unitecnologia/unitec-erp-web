@@ -10,9 +10,12 @@ use App\Models\ErpOperacaoLog;
 use App\Models\Product;
 use App\Models\ProductPriceHistory;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Financeiro\ContaPagarEstornoService;
 use App\Support\Erp\Product\ProductPriceHistoryRecorder;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Models\EstoqueMovimentacao;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -127,11 +130,21 @@ final class ReabrirCompraLancamentoService
             $product = Product::query()->find($item->product_id);
 
             if ($product && ! $product->is_servico) {
+                $doc = EstoqueMovimentacaoDocumento::fromCompra($compra);
                 $this->saldos->decrementar(
                     (int) $product->id,
                     (float) $item->quantidade,
                     $estoqueId,
                     $empresa,
+                    EstoqueMovimentacaoContext::make(
+                        EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                        empresaId: $empresa?->id !== null ? (int) $empresa->id : ($compra->empresa_id ? (int) $compra->empresa_id : null),
+                        origemTipo: $doc['origemTipo'],
+                        origemId: $doc['origemId'],
+                        origemNumero: $doc['origemNumero'],
+                        docFiscalTipo: $doc['docFiscalTipo'],
+                        docFiscalNumero: $doc['docFiscalNumero'],
+                    ),
                 );
 
                 if ($product->controla_lote_validade) {

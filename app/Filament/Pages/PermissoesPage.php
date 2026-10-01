@@ -328,7 +328,13 @@ class PermissoesPage extends Page
         $this->userForm = [
             'name' => '',
             'password' => '',
-            'password_confirmation' => '',
+            'senha_atual' => '',
+            'senha_app_forca_vendas' => '',
+            'acesso_app_forca_vendas' => false,
+            'acesso_app_vendas_internas' => false,
+            'acesso_app_unitec_os' => false,
+            'acesso_app_entregas' => false,
+            'acesso_app_gestao' => false,
             'empresa_id' => $empresaId,
             'erp_profile_id' => '',
             'is_admin' => 'N',
@@ -352,7 +358,13 @@ class PermissoesPage extends Page
         $this->userForm = [
             'name' => $user->name,
             'password' => '',
-            'password_confirmation' => '',
+            'senha_atual' => (string) ($user->senha ?? ''),
+            'senha_app_forca_vendas' => (string) ($user->senha_app_forca_vendas ?? ''),
+            'acesso_app_forca_vendas' => (bool) $user->acesso_app_forca_vendas,
+            'acesso_app_vendas_internas' => (bool) $user->acesso_app_vendas_internas,
+            'acesso_app_unitec_os' => (bool) $user->acesso_app_unitec_os,
+            'acesso_app_entregas' => (bool) $user->acesso_app_entregas,
+            'acesso_app_gestao' => (bool) $user->acesso_app_gestao,
             'empresa_id' => (string) ($user->empresa_id ?? ''),
             'erp_profile_id' => $user->erp_profile_id ? (string) $user->erp_profile_id : '',
             'is_admin' => $user->is_admin ? 'S' : 'N',
@@ -441,14 +453,13 @@ class PermissoesPage extends Page
             'userForm.erp_profile_id' => ['nullable', 'integer', 'exists:erp_profiles,id'],
             'userForm.is_admin' => ['required', 'in:S,N'],
             'userForm.ativo' => ['required', 'in:S,N'],
+            'userForm.senha_app_forca_vendas' => ['nullable', 'string', 'max:60'],
         ];
 
         if ($isCreate) {
             $rules['userForm.password'] = ['required', 'string', 'min:2', 'max:60'];
-            $rules['userForm.password_confirmation'] = ['required', 'same:userForm.password'];
         } elseif (filled($this->userForm['password'] ?? null)) {
             $rules['userForm.password'] = ['string', 'min:2', 'max:60'];
-            $rules['userForm.password_confirmation'] = ['required', 'same:userForm.password'];
         }
 
         $this->validate($rules);
@@ -460,6 +471,14 @@ class PermissoesPage extends Page
             'erp_profile_id' => filled($this->userForm['erp_profile_id'] ?? null) ? (int) $this->userForm['erp_profile_id'] : null,
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
+            'senha_app_forca_vendas' => filled($this->userForm['senha_app_forca_vendas'] ?? null)
+                ? (string) $this->userForm['senha_app_forca_vendas']
+                : null,
+            'acesso_app_forca_vendas' => filter_var($this->userForm['acesso_app_forca_vendas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_vendas_internas' => filter_var($this->userForm['acesso_app_vendas_internas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_unitec_os' => filter_var($this->userForm['acesso_app_unitec_os'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_entregas' => filter_var($this->userForm['acesso_app_entregas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_gestao' => filter_var($this->userForm['acesso_app_gestao'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ];
 
         if (filled($this->userForm['password'] ?? null)) {

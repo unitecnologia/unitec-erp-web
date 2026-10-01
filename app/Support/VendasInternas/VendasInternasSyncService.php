@@ -6,6 +6,8 @@ use App\Models\EstoqueReserva;
 use App\Models\ForcaVendasOrder;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
+use App\Models\Pedido;
+use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\PriceTable;
 use App\Models\Product;
@@ -255,9 +257,6 @@ class VendasInternasSyncService
     }
 
     /**
-     * @return array<int, array<string, mixed>>
-     */
-    /**
      * Catálogo de operadores para o app Vendas Internas (mesmo critério do FV).
      *
      * @return array<int, array<string, mixed>>
@@ -311,8 +310,8 @@ class VendasInternasSyncService
         $query = VendasInternasOrder::query()
             ->with([
                 'orcamento.itens.product:id,descricao',
+                'forcaVendasOrder.pedido.itens.product:id,descricao',
                 'venda:id,numero',
-                'forcaVendasOrder:id,situacao,venda_id',
             ])
             ->where('received_at', '>=', now()->subDays(self::HISTORICO_DIAS));
 
@@ -326,9 +325,11 @@ class VendasInternasSyncService
             ->get()
             ->map(function (VendasInternasOrder $order): array {
                 $payload = is_array($order->payload) ? $order->payload : [];
-                $orcamento = $order->orcamento;
+                $doc = $order->tipo === VendasInternasOrder::TIPO_PEDIDO
+                    ? ($order->forcaVendasOrder?->pedido ?? $order->orcamento)
+                    : ($order->orcamento ?? $order->forcaVendasOrder?->pedido);
 
-                $itens = $orcamento?->itens
+                $itens = $doc?->itens
                     ->map(fn ($item): array => [
                         'product_id' => $item->product_id,
                         'descricao' => $item->descricao ?: $item->product?->descricao,
@@ -342,15 +343,15 @@ class VendasInternasSyncService
                 return [
                     'uuid' => $order->uuid,
                     'tipo' => $order->tipo ?? VendasInternasOrder::TIPO_ORCAMENTO,
-                    'numero' => $orcamento?->numero,
+                    'numero' => $doc?->numero,
                     'numero_pedido' => $order->venda?->numero,
                     'situacao' => $this->situacaoParaApp($order),
                     'status' => $order->status,
                     'total' => (float) $order->total,
                     'cliente_id' => $order->cliente_id,
                     'cliente_nome' => $order->clienteNome(),
-                    'observacoes' => $orcamento?->observacoes,
-                    'desconto_valor' => (float) ($orcamento?->desconto_valor ?? 0),
+                    'observacoes' => $doc?->observacoes,
+                    'desconto_valor' => (float) ($doc?->desconto_valor ?? 0),
                     'itens' => $itens,
                     'data' => optional($order->dataAberturaAt())->toDateString(),
                     'created_at' => optional($order->client_created_at ?? $order->received_at)->toIso8601String(),
@@ -366,7 +367,11 @@ class VendasInternasSyncService
      */
     private function orderPushResult(VendasInternasOrder $order, bool $duplicado = false): array
     {
-        $order->loadMissing(['orcamento:id,numero', 'venda:id,numero']);
+        $order->loadMissing(['orcamento:id,numero', 'forcaVendasOrder.pedido:id,numero', 'venda:id,numero']);
+
+        $numero = $order->tipo === VendasInternasOrder::TIPO_PEDIDO
+            ? ($order->forcaVendasOrder?->pedido?->numero ?? $order->orcamento?->numero)
+            : ($order->orcamento?->numero ?? $order->forcaVendasOrder?->pedido?->numero);
 
         return [
             'uuid' => $order->uuid,
@@ -374,7 +379,8 @@ class VendasInternasSyncService
             'status' => $order->status,
             'situacao' => $this->situacaoParaApp($order),
             'orcamento_id' => $order->orcamento_id,
-            'numero' => $order->orcamento?->numero,
+            'pedido_id' => $order->forcaVendasOrder?->pedido_id,
+            'numero' => $numero,
             'numero_pedido' => $order->venda?->numero,
             'total' => (float) $order->total,
             'duplicado' => $duplicado,
@@ -408,11 +414,13 @@ class VendasInternasSyncService
 
         try {
             return DB::transaction(function () use ($uuid, $order, $user, $tipo): array {
-                [$orcamento, $total, $clientCreatedAt] = $this->buildOrcamentoFromPush($order, $user);
-
                 if ($tipo === VendasInternasOrder::TIPO_PEDIDO) {
-                    return $this->finalizePedidoPush($uuid, $order, $user, $orcamento, $total, $clientCreatedAt);
+                    [$pedido, $total, $clientCreatedAt] = $this->buildPedidoFromPush($order, $user);
+
+                    return $this->finalizePedidoPush($uuid, $order, $user, $pedido, $total, $clientCreatedAt);
                 }
+
+                [$orcamento, $total, $clientCreatedAt] = $this->buildOrcamentoFromPush($order, $user);
 
                 return $this->finalizeOrcamentoPush($uuid, $order, $user, $orcamento, $total, $clientCreatedAt);
             });
@@ -528,6 +536,89 @@ class VendasInternasSyncService
     }
 
     /**
+     * @param  array<string, mixed>  $order
+     * @return array{0: Pedido, 1: float, 2: ?Carbon}
+     */
+    private function buildPedidoFromPush(array $order, User $user): array
+    {
+        $clienteId = (int) ($order['cliente_id'] ?? 0);
+
+        if ($clienteId <= 0 || ! Person::query()->whereKey($clienteId)->exists()) {
+            throw new \RuntimeException('Cliente inválido ou não encontrado.');
+        }
+
+        $itens = is_array($order['itens'] ?? null) ? $order['itens'] : [];
+
+        if ($itens === []) {
+            throw new \RuntimeException('Documento sem itens.');
+        }
+
+        $subtotal = 0.0;
+        $descontoValor = (float) ($order['desconto_valor'] ?? 0);
+        $clientCreatedAt = isset($order['created_at']) ? Carbon::parse($order['created_at']) : null;
+        $momentoLocal = $clientCreatedAt
+            ? ErpTimezone::toLocal($clientCreatedAt)
+            : ErpTimezone::toLocal();
+        $dataPedido = $momentoLocal->toDateString();
+
+        $pedido = Pedido::query()->create([
+            'numero' => Pedido::nextNumero(),
+            'data' => $dataPedido,
+            'hora' => $momentoLocal->format('H:i:s'),
+            'cliente_id' => $clienteId,
+            'vendedor_id' => $user->vendedor_id,
+            'subtotal' => 0,
+            'percentual_desconto' => (float) ($order['percentual_desconto'] ?? 0),
+            'desconto_valor' => $descontoValor,
+            'forma_pagamento' => $order['forma_pagamento'] ?? null,
+            'validade_dias' => (int) ($order['validade_dias'] ?? 0),
+            'observacoes' => $order['observacoes'] ?? null,
+            'total' => 0,
+            'status' => Pedido::STATUS_ABERTO,
+            'plataforma' => 'vi',
+        ]);
+
+        $linha = 1;
+
+        foreach ($itens as $item) {
+            $productId = (int) ($item['product_id'] ?? 0);
+
+            if ($productId <= 0 || ! Product::query()->whereKey($productId)->exists()) {
+                throw new \RuntimeException('Produto inválido no item '.$linha.'.');
+            }
+
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $preco = (float) ($item['preco_unitario'] ?? 0);
+            $descItem = (float) ($item['desconto'] ?? 0);
+            $totalItem = round(($quantidade * $preco) - $descItem, 2);
+            $subtotal += $totalItem;
+
+            PedidoItem::query()->create([
+                'pedido_id' => $pedido->id,
+                'item' => $linha,
+                'product_id' => $productId,
+                'product_grade_id' => $item['product_grade_id'] ?? null,
+                'quantidade' => $quantidade,
+                'preco_unitario' => $preco,
+                'total' => $totalItem,
+                'desconto' => $descItem,
+                'descricao' => $item['descricao'] ?? null,
+            ]);
+
+            $linha++;
+        }
+
+        $total = round($subtotal - $descontoValor, 2);
+
+        $pedido->update([
+            'subtotal' => $subtotal,
+            'total' => $total,
+        ]);
+
+        return [$pedido, $total, $clientCreatedAt];
+    }
+
+    /**
      * Orçamento VI → lista Orçamentos / importação PDV.
      *
      * @param  array<string, mixed>  $order
@@ -576,7 +667,7 @@ class VendasInternasSyncService
         string $uuid,
         array $order,
         User $user,
-        Orcamento $orcamento,
+        Pedido $pedido,
         float $total,
         ?Carbon $clientCreatedAt,
     ): array {
@@ -586,9 +677,10 @@ class VendasInternasSyncService
             'user_id' => $user->id,
             'empresa_id' => $user->empresa_id,
             'tipo' => ForcaVendasOrder::TIPO_PEDIDO,
-            'cliente_id' => $orcamento->cliente_id,
+            'cliente_id' => $pedido->cliente_id,
             'vendedor_id' => $user->vendedor_id,
-            'orcamento_id' => $orcamento->id,
+            'orcamento_id' => null,
+            'pedido_id' => $pedido->id,
             'venda_id' => null,
             'total' => $total,
             'status' => ForcaVendasOrder::STATUS_IMPORTADO,
@@ -598,7 +690,7 @@ class VendasInternasSyncService
             'received_at' => now(),
         ]);
 
-        (new EstoqueReservaService())->reservarPedido($fvOrder, $orcamento, $user);
+        (new EstoqueReservaService())->reservarPedido($fvOrder, $pedido, $user);
 
         $viOrder = VendasInternasOrder::query()->create([
             'uuid' => $uuid,
@@ -606,9 +698,9 @@ class VendasInternasSyncService
             'user_id' => $user->id,
             'empresa_id' => $user->empresa_id,
             'tipo' => VendasInternasOrder::TIPO_PEDIDO,
-            'cliente_id' => $orcamento->cliente_id,
+            'cliente_id' => $pedido->cliente_id,
             'vendedor_id' => $user->vendedor_id,
-            'orcamento_id' => $orcamento->id,
+            'orcamento_id' => null,
             'forca_vendas_order_id' => $fvOrder->id,
             'venda_id' => null,
             'total' => $total,
@@ -622,7 +714,7 @@ class VendasInternasSyncService
         return array_merge(
             $this->orderPushResult($viOrder),
             [
-                'orcamento_id' => $orcamento->id,
+                'pedido_id' => $pedido->id,
                 'forca_vendas_order_id' => $fvOrder->id,
             ],
         );

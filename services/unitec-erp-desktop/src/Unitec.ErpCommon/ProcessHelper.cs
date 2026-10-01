@@ -135,23 +135,23 @@ public static class ProcessHelper
 
         try
         {
-            if (int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid))
+            if (!int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid))
             {
-                using var p = Process.GetProcessById(pid);
-                if (!p.HasExited)
-                {
-                    p.Kill(entireProcessTree: true);
-                    p.WaitForExit(3000);
-                }
+                return;
             }
+
+            // O DEV (porta 8000) grava o mesmo pid. Parar o serviço da 8765 não pode derrubá-lo.
+            if (!IsListeningOnPort(pid, ErpPaths.Port))
+            {
+                return;
+            }
+
+            KillProcessTree(pid);
+            try { File.Delete(pidFile); } catch { }
         }
         catch
         {
             // ignore
-        }
-        finally
-        {
-            try { File.Delete(pidFile); } catch { }
         }
     }
 
@@ -170,25 +170,88 @@ public static class ProcessHelper
     }
 
     /// <summary>
-    /// Encerra FrankenPHP + php -S legado desta instalacao.
+    /// Encerra só o HTTP da porta do ERP (8765). Não mata o FrankenPHP de desenvolvimento (8000).
     /// </summary>
     public static void KillAppHttpServers(string appPath)
     {
-        KillAppPhpServers(appPath);
-        KillProcessesUnderDir(Path.Combine(appPath, "tools", "frankenphp"), "frankenphp");
+        foreach (var pid in GetListeningPids(ErpPaths.Port))
+        {
+            KillProcessTree(pid);
+        }
+    }
+
+    private static void KillProcessTree(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (p.HasExited)
+            {
+                return;
+            }
+
+            p.Kill(entireProcessTree: true);
+            p.WaitForExit(3000);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private static bool IsListeningOnPort(int pid, int port)
+        => GetListeningPids(port).Contains(pid);
+
+    private static HashSet<int> GetListeningPids(int port)
+    {
+        var pids = new HashSet<int>();
 
         try
         {
-            var marker = Path.Combine(appPath, ".unitec-serve.runtime");
-            if (File.Exists(marker))
+            var psi = new ProcessStartInfo
             {
-                File.Delete(marker);
+                FileName = "netstat",
+                Arguments = "-ano -p tcp",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc is null)
+            {
+                return pids;
+            }
+
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(3000);
+
+            var suffix = ":" + port;
+            foreach (var raw in output.Split('\n'))
+            {
+                if (raw.IndexOf("LISTENING", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                var parts = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5 || !parts[1].EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (int.TryParse(parts[^1], out var listenPid))
+                {
+                    pids.Add(listenPid);
+                }
             }
         }
         catch
         {
             // ignore
         }
+
+        return pids;
     }
 
     private static void KillProcessesUnderDir(string dir, string processName)

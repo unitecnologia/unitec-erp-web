@@ -99,6 +99,18 @@
             <button type="button" wire:click="testCertificado" class="erp-config-fiscais-form__verify-btn">
                 Verificar data de validade
             </button>
+            @if ($this->certificadoInfo)
+                <button
+                    type="button"
+                    wire:click="excluirCertificado"
+                    wire:confirm="Excluir o certificado digital desta empresa? A transmissão de NF-e ficará indisponível até importar outro."
+                    wire:loading.attr="disabled"
+                    wire:target="excluirCertificado"
+                    class="erp-config-fiscais-form__verify-btn erp-config-fiscais-form__verify-btn--danger"
+                >
+                    Excluir certificado
+                </button>
+            @endif
         </div>
     </fieldset>
 

@@ -22,12 +22,12 @@ final class ScNfceEndpointsTest extends TestCase
         );
 
         $this->assertSame(
-            'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeConsultaProtocolo/NFeConsultaProtocolo4.asmx',
+            'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeConsulta/NfeConsulta4.asmx',
             ScNfceEndpoints::consultaProtocolo(2),
         );
 
         $this->assertSame(
-            'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeInutilizacao/NFeInutilizacao4.asmx',
+            'https://nfce-homologacao.svrs.rs.gov.br/ws/nfeinutilizacao/nfeinutilizacao4.asmx',
             ScNfceEndpoints::inutilizacao(2),
         );
     }

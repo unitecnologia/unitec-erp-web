@@ -43,6 +43,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
+    height: auto;
     min-height: 0 !important;
     padding: 0 !important;
     background: transparent !important;
@@ -94,22 +95,19 @@
 
 .erp-dash {
     width: 100%;
-    max-width: 100%;
-    height: 100%;
     max-width: none;
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0;
     margin: 0;
     padding: 0.28rem 0.35rem 0.22rem;
     box-sizing: border-box;
-    display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 0.28rem;
     overflow: hidden;
     font-family: var(--erp-font, 'Segoe UI', system-ui, sans-serif);
     color: #0f172a;
-}
-
-.erp-dash--has-visao {
-    grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
 .erp-dash__visao-bar {
@@ -168,12 +166,29 @@
     border-left: 1px solid #c5d0de;
 }
 
-/* Sem linha de gauges: sobe o resto do dashboard e fecha o vazio */
-.erp-dash:not(:has(.erp-dash__gauges-row)) {
-    grid-template-rows: auto minmax(0, 1fr);
+.erp-dash__heavy {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    gap: 0.28rem;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
 }
 
-/* â”€â”€ Gauges (velocÃ­metros) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.erp-dash__heavy > .erp-dash__layout {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.erp-dash__skel-block {
+    flex: 1 1 auto;
+    min-height: 4rem;
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+/* Gauges (velocímetros) */
 
 .erp-dash__gauges-row {
     display: flex;
@@ -914,6 +929,8 @@
     grid-template-columns: repeat(var(--erp-kpi-cols, 8), minmax(0, 1fr));
     gap: 0.35rem;
     flex-shrink: 0;
+    align-self: start;
+    width: 100%;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -924,13 +941,16 @@
     position: relative;
     display: flex;
     align-items: center;
+    align-self: start;
     gap: 0.4rem;
     padding: 0.4rem 0.45rem 0.4rem 0.55rem;
     border-radius: 6px;
     border: 1px solid #c5d0de;
     background: #ffffff;
     box-shadow: none;
-    min-height: 3.85rem;
+    height: 70px;
+    min-height: 70px;
+    max-height: 70px;
     text-decoration: none;
     color: inherit;
     overflow: hidden;
@@ -991,25 +1011,48 @@
     transform: none;
 }
 
+.erp-dash-kpi--action {
+    padding-right: 4.6rem;
+}
+
 .erp-dash-kpi__action {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    z-index: 2;
     display: inline-flex;
     align-items: center;
-    margin-top: 0.2rem;
-    padding: 0.14rem 0.4rem;
-    width: fit-content;
-    max-width: 100%;
-    font-size: 0.62rem;
+    justify-content: center;
+    margin: 0;
+    padding: 0.28rem 0.55rem;
+    width: auto;
+    max-width: calc(100% - 0.7rem);
+    min-height: 1.55rem;
+    font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #fff;
     text-decoration: none;
-    line-height: 1.15;
-    border-radius: 3px;
+    line-height: 1.1;
+    border-radius: 4px;
     background: #1e5a9e;
+    white-space: nowrap;
 }
 
-.erp-dash-kpi--link:hover .erp-dash-kpi__action {
+.erp-dash-kpi--link:hover .erp-dash-kpi__action,
+button.erp-dash-kpi__action:hover {
     background: #0f3460;
+}
+
+button.erp-dash-kpi__action {
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+button.erp-dash-kpi__action:disabled {
+    opacity: 0.7;
+    cursor: wait;
 }
 
 .erp-dash-kpi__icon-wrap {
@@ -1710,4 +1753,196 @@
     .erp-dash__kpis {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+}
+
+/* Modal Pix — renovar licença pelo KPI */
+.erp-dash-pix {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.erp-dash-pix__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background: rgba(15, 23, 42, 0.48);
+    cursor: pointer;
+}
+
+.erp-dash-pix__card {
+    position: relative;
+    z-index: 1;
+    width: min(23.5rem, calc(100vw - 1.5rem));
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
+    padding: 1rem 1.05rem 0.95rem;
+    border-radius: 14px;
+    background: #fff;
+    color: #0f172a;
+    box-shadow: 0 24px 48px rgba(2, 6, 23, 0.28);
+    box-sizing: border-box;
+}
+
+.erp-dash-pix__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.erp-dash-pix__eyebrow {
+    margin: 0;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-dash-pix__title {
+    margin: 0.15rem 0 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #0f172a;
+}
+
+.erp-dash-pix__close {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 1.45rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
+}
+
+.erp-dash-pix__loading,
+.erp-dash-pix__feedback {
+    margin: 0.75rem 0 0;
+    padding: 0.55rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.erp-dash-pix__loading {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    text-align: center;
+}
+
+.erp-dash-pix__feedback {
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+}
+
+.erp-dash-pix__body {
+    margin-top: 0.75rem;
+    padding: 0.7rem;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+.erp-dash-pix__amount-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.84rem;
+    color: #0f172a;
+}
+
+.erp-dash-pix__amount-row span {
+    font-weight: 800;
+    color: #1d4ed8;
+}
+
+.erp-dash-pix__desc,
+.erp-dash-pix__hint {
+    margin: 0.3rem 0 0;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: #64748b;
+}
+
+.erp-dash-pix__qr {
+    width: 10.5rem;
+    height: 10.5rem;
+    margin: 0.55rem auto 0.35rem;
+    display: block;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+.erp-dash-pix__copia {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    align-items: center;
+}
+
+.erp-dash-pix__copia-input {
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.64rem;
+    color: #334155;
+}
+
+.erp-dash-pix__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+.erp-dash-pix__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.erp-dash-pix__btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.erp-dash-pix__btn--accent {
+    grid-column: 1 / -1;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-color: #1e40af;
+    color: #fff;
+}
+
+.erp-dash-pix__btn--ghost {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #334155;
 }

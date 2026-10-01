@@ -43,10 +43,14 @@ class ContaReceberResource extends Resource
                     ->label('')
                     ->view('filament.components.erp.receber.select-cell')
                     ->alignCenter(),
-                TextColumn::make('numero')
-                    ->label('>>Número')
-                    ->sortable()
+                TextColumn::make('documento')
+                    ->label('Pedido')
+                    ->placeholder('—')
                     ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('cliente.nome_razao')
+                    ->label('Cliente')
+                    ->wrap(false)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('emissao')
                     ->label('Emissão')
@@ -58,11 +62,6 @@ class ContaReceberResource extends Resource
                     ->label('Histórico')
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
-                TextColumn::make('documento')
-                    ->label('Doc.')
-                    ->placeholder('—')
-                    ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('cartao_maquininha')
                     ->label('Maquininha')
                     ->placeholder('—')
@@ -72,10 +71,6 @@ class ContaReceberResource extends Resource
                     ->label('Bandeira')
                     ->placeholder('—')
                     ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('cliente.nome_razao')
-                    ->label('Cliente')
-                    ->wrap(false)
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('vencimento')
                     ->label('Vencimento')
@@ -104,7 +99,7 @@ class ContaReceberResource extends Resource
                     ->alignEnd()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('valor_recebido')
-                    ->label('Vl Recebido')
+                    ->label('V.Recebido')
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 2, ',', '.'))
                     ->alignEnd()
                     ->weight(FontWeight::SemiBold),

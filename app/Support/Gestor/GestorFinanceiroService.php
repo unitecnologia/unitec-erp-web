@@ -11,7 +11,7 @@ use App\Support\Erp\Dashboard\ErpDashboardSalesMetrics;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\Erp\ErpSchema;
 use Throwable;
 
 /**
@@ -45,12 +45,9 @@ final class GestorFinanceiroService
         $receberVencido = $this->comVariacao(ErpFinanceiroMetricas::receberVencido($hoje, $empresaArg));
         $pagarVencido = $this->comVariacao(ErpFinanceiroMetricas::pagarVencido($hoje, $empresaArg));
 
-        $receberMes = $this->comVariacao(ErpFinanceiroMetricas::titulosReceber($inicioMes, $hoje, $empresaArg));
-        $pagarMes = $this->comVariacao(ErpFinanceiroMetricas::titulosPagar($inicioMes, $hoje, $empresaArg));
-
         $serie7d = $this->serieSaldo7Dias($saldo, $hoje, $empresaArg);
         $projecao = $this->projecaoCaixa($saldo, $hoje, $empresaArg);
-        $inadimplencia = ErpFinanceiroMetricas::inadimplencia($hoje, $empresaArg);
+        $inadimplencia = $this->inadimplenciaComVencido($receberVencido, $hoje, $empresaArg);
         $acimaLimite = $this->clientesAcimaLimite();
         $proximos = $this->proximosVencimentos($hoje, 5);
         $aprovacoes = 0;
@@ -61,7 +58,16 @@ final class GestorFinanceiroService
         }
 
         try {
-            $saude = ErpDashboardGauges::saudeSnapshot($empresaId > 0 ? $empresaId : null);
+            $saude = ErpDashboardGauges::saudeSnapshot(
+                $empresaId > 0 ? $empresaId : null,
+                [
+                    'saldo' => $saldo,
+                    'receber_vencido' => (float) $receberVencido['valor'],
+                    'pagar_vencido' => (float) $pagarVencido['valor'],
+                    // Mesmo conceito de obrigações a pagar: vencidos + a pagar em até 7 dias.
+                    'obrigacoes_7d' => (float) $pagarVencido['valor'] + (float) ($projecao['pagar_7d'] ?? 0),
+                ],
+            );
         } catch (Throwable) {
             $saude = $this->saudeFinanceira(
                 saldo: $saldo,
@@ -82,6 +88,13 @@ final class GestorFinanceiroService
         );
 
         $cartoes = $this->resumoCartoes($hoje);
+        $caixaMeses = ErpFinanceiroMetricas::sumCaixaMesEAnterior(
+            $inicioMes,
+            $hoje,
+            $inicioMesAnt,
+            $fimMesAnt,
+            $empresaArg,
+        );
 
         return [
             'atualizado_em' => ErpFinanceiroMetricas::agoraLabelHora(),
@@ -91,20 +104,12 @@ final class GestorFinanceiroService
             'saldo_variacao_pct' => $varSaldoPct,
             'hoje' => $hojeMov,
             'ontem' => $ontemMov,
-            'mes' => [
-                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'entrada', $empresaArg),
-                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMes, $hoje, 'saida', $empresaArg),
-            ],
-            'mes_anterior' => [
-                'entradas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'entrada', $empresaArg),
-                'saidas' => ErpFinanceiroMetricas::sumCaixaCampo($inicioMesAnt, $fimMesAnt, 'saida', $empresaArg),
-            ],
+            'mes' => $caixaMeses['mes'],
+            'mes_anterior' => $caixaMeses['mes_anterior'],
             'receber_hoje' => $receberHoje,
             'pagar_hoje' => $pagarHoje,
             'receber_vencido' => $receberVencido,
             'pagar_vencido' => $pagarVencido,
-            'receber_mes' => $receberMes,
-            'pagar_mes' => $pagarMes,
             'serie_7d' => $serie7d,
             'projecao' => $projecao,
             'inadimplencia' => $inadimplencia,
@@ -180,72 +185,107 @@ final class GestorFinanceiroService
         ];
 
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return $vazio;
             }
 
-            $abertos = ContaReceber::query()
+            $hojeStr = $hoje->toDateString();
+            $ate7Str = $hoje->copy()->addDays(7)->toDateString();
+            $bandeiraExpr = "UPPER(TRIM(COALESCE(NULLIF(TRIM(cartao_bandeira), ''), 'SEM BANDEIRA')))";
+
+            $totais = ContaReceber::query()
                 ->where('forma', ContaReceber::FORMA_CARTAO)
                 ->where('saldo', '>', 0)
-                ->get(['saldo', 'vencimento', 'cartao_bandeira', 'emissao']);
+                ->selectRaw('COUNT(*) as qtd')
+                ->selectRaw('COALESCE(SUM(saldo), 0) as valor')
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN DATE(vencimento) = ? THEN saldo ELSE 0 END), 0) as vence_hoje',
+                    [$hojeStr],
+                )
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN DATE(vencimento) > ? AND DATE(vencimento) <= ? THEN saldo ELSE 0 END), 0) as proximos_7d',
+                    [$hojeStr, $ate7Str],
+                )
+                ->first();
 
-            if ($abertos->isEmpty()) {
-                $vendidoHoje = (float) ContaReceber::query()
+            $qtd = (int) ($totais->qtd ?? 0);
+            $valor = round((float) ($totais->valor ?? 0), 2);
+            $venceHoje = round((float) ($totais->vence_hoje ?? 0), 2);
+            $proximos7 = round((float) ($totais->proximos_7d ?? 0), 2);
+
+            $bandeiras = [];
+            if ($qtd > 0) {
+                $bandeiras = ContaReceber::query()
                     ->where('forma', ContaReceber::FORMA_CARTAO)
-                    ->whereDate('emissao', $hoje->toDateString())
-                    ->sum('valor');
-
-                return array_merge($vazio, ['vendido_hoje' => round($vendidoHoje, 2)]);
+                    ->where('saldo', '>', 0)
+                    ->selectRaw("{$bandeiraExpr} as nome")
+                    ->selectRaw('COUNT(*) as qtd')
+                    ->selectRaw('COALESCE(SUM(saldo), 0) as valor')
+                    ->groupByRaw($bandeiraExpr)
+                    ->orderByDesc('valor')
+                    ->limit(4)
+                    ->get()
+                    ->map(fn ($row): array => [
+                        'nome' => (string) ($row->nome ?? 'SEM BANDEIRA'),
+                        'qtd' => (int) ($row->qtd ?? 0),
+                        'valor' => round((float) ($row->valor ?? 0), 2),
+                    ])
+                    ->all();
             }
-
-            $valor = round((float) $abertos->sum('saldo'), 2);
-            $venceHoje = 0.0;
-            $proximos7 = 0.0;
-            $ate7 = $hoje->copy()->addDays(7);
-            $bandeirasMap = [];
-
-            foreach ($abertos as $titulo) {
-                $saldo = (float) $titulo->saldo;
-                $venc = $titulo->vencimento;
-                if ($venc && $venc->isSameDay($hoje)) {
-                    $venceHoje += $saldo;
-                } elseif ($venc && $venc->gt($hoje) && $venc->lte($ate7)) {
-                    $proximos7 += $saldo;
-                }
-
-                $bandeira = mb_strtoupper(trim((string) ($titulo->cartao_bandeira ?: 'SEM BANDEIRA')), 'UTF-8');
-                if (! isset($bandeirasMap[$bandeira])) {
-                    $bandeirasMap[$bandeira] = ['nome' => $bandeira, 'qtd' => 0, 'valor' => 0.0];
-                }
-                $bandeirasMap[$bandeira]['qtd']++;
-                $bandeirasMap[$bandeira]['valor'] += $saldo;
-            }
-
-            $bandeiras = array_values(array_map(
-                fn (array $b): array => [
-                    'nome' => $b['nome'],
-                    'qtd' => (int) $b['qtd'],
-                    'valor' => round((float) $b['valor'], 2),
-                ],
-                $bandeirasMap,
-            ));
-            usort($bandeiras, fn (array $a, array $b): int => $b['valor'] <=> $a['valor']);
 
             $vendidoHoje = round((float) ContaReceber::query()
                 ->where('forma', ContaReceber::FORMA_CARTAO)
-                ->whereDate('emissao', $hoje->toDateString())
+                ->whereDate('emissao', $hojeStr)
                 ->sum('valor'), 2);
 
             return [
-                'qtd' => $abertos->count(),
+                'qtd' => $qtd,
                 'valor' => $valor,
                 'vendido_hoje' => $vendidoHoje,
-                'vence_hoje' => round($venceHoje, 2),
-                'proximos_7d' => round($proximos7, 2),
-                'bandeiras' => array_slice($bandeiras, 0, 4),
+                'vence_hoje' => $venceHoje,
+                'proximos_7d' => $proximos7,
+                'bandeiras' => $bandeiras,
             ];
         } catch (Throwable) {
             return $vazio;
+        }
+    }
+
+    /**
+     * Inadimplência reutilizando totais de receber vencido já calculados no build().
+     *
+     * @param  array{qtd: int, valor: float, variacao_pct?: ?float}  $receberVencido
+     * @param  int|list<int>|null  $empresaScope
+     * @return array{clientes: int, valor: float, qtd: int}
+     */
+    private function inadimplenciaComVencido(array $receberVencido, Carbon $hoje, int|array|null $empresaScope = null): array
+    {
+        $valor = (float) ($receberVencido['valor'] ?? 0);
+        $qtd = (int) ($receberVencido['qtd'] ?? 0);
+
+        try {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
+                return ['clientes' => 0, 'valor' => $valor, 'qtd' => $qtd];
+            }
+
+            $q = ContaReceber::query()
+                ->where('saldo', '>', 0)
+                ->whereDate('vencimento', '<', $hoje->toDateString())
+                ->whereNotNull('cliente_id');
+
+            ErpFinanceiroMetricas::applyEmpresaColumn($q, (new ContaReceber)->getTable(), $empresaScope);
+
+            $clientes = (int) $q
+                ->selectRaw('COUNT(DISTINCT cliente_id) as agregados')
+                ->value('agregados');
+
+            return [
+                'clientes' => $clientes,
+                'valor' => $valor,
+                'qtd' => $qtd,
+            ];
+        } catch (Throwable) {
+            return ['clientes' => 0, 'valor' => $valor, 'qtd' => $qtd];
         }
     }
 
@@ -255,7 +295,7 @@ final class GestorFinanceiroService
     private function listarCartoes(Carbon $hoje, int $limit = 80): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return [];
             }
 
@@ -398,7 +438,7 @@ final class GestorFinanceiroService
     private function saldosPorVencimentoReceber(Carbon $from, Carbon $to, ?int $empresaId = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return [];
             }
 
@@ -409,7 +449,7 @@ final class GestorFinanceiroService
                 ->selectRaw('DATE(vencimento) as dia, SUM(saldo) as total')
                 ->groupByRaw('DATE(vencimento)');
 
-            if ($empresaId && $empresaId > 0 && Schema::hasColumn((new ContaReceber)->getTable(), 'empresa_id')) {
+            if ($empresaId && $empresaId > 0 && ErpSchema::hasColumn((new ContaReceber)->getTable(), 'empresa_id')) {
                 $q->where('empresa_id', $empresaId);
             }
 
@@ -435,7 +475,7 @@ final class GestorFinanceiroService
     private function saldosPorVencimentoPagar(Carbon $from, Carbon $to, ?int $empresaId = null): array
     {
         try {
-            if (! Schema::hasTable((new ContaPagar)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaPagar)->getTable())) {
                 return [];
             }
 
@@ -446,7 +486,7 @@ final class GestorFinanceiroService
                 ->selectRaw('DATE(vencimento) as dia, SUM(saldo) as total')
                 ->groupByRaw('DATE(vencimento)');
 
-            if ($empresaId && $empresaId > 0 && Schema::hasColumn((new ContaPagar)->getTable(), 'empresa_id')) {
+            if ($empresaId && $empresaId > 0 && ErpSchema::hasColumn((new ContaPagar)->getTable(), 'empresa_id')) {
                 $q->where('empresa_id', $empresaId);
             }
 
@@ -474,7 +514,7 @@ final class GestorFinanceiroService
     private function listarClientesAcimaLimite(int $limit = 80): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable()) || ! Schema::hasTable((new Person)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable()) || ! ErpSchema::hasTable((new Person)->getTable())) {
                 return [];
             }
 
@@ -539,7 +579,7 @@ final class GestorFinanceiroService
     private function clientesAcimaLimite(): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable()) || ! Schema::hasTable((new Person)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable()) || ! ErpSchema::hasTable((new Person)->getTable())) {
                 return ['qtd' => 0, 'valor' => 0.0];
             }
 
@@ -623,7 +663,7 @@ final class GestorFinanceiroService
     private function listarClientesInadimplentes(Carbon $hoje, int $limit = 80): array
     {
         try {
-            if (! Schema::hasTable((new ContaReceber)->getTable())) {
+            if (! ErpSchema::hasTable((new ContaReceber)->getTable())) {
                 return [];
             }
 

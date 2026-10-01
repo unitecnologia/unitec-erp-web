@@ -2,6 +2,7 @@
 
 namespace App\Support\Fiscal;
 
+use App\Models\ClienteCreditoMovimentacao;
 use App\Models\Empresa;
 use App\Models\PdvVenda;
 use App\Models\Product;
@@ -58,6 +59,7 @@ final class PdvNfceFiscalPayloadBuilder
 
         $venda->loadMissing(['itens.product', 'pagamentos', 'person']);
 
+        $crt = $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples'));
         $itens = [];
         $valorProdutos = 0.0;
         $valorDescontoItens = 0.0;
@@ -96,14 +98,29 @@ final class PdvNfceFiscalPayloadBuilder
                 'ibpt_chave' => $ibpt['chave'],
                 'ibpt_versao' => $ibpt['versao'],
             ];
-            $imposto = $this->buildItemImposto($product, $totalLiquido, (float) $ibpt['v_tot_trib']);
+            $imposto = $this->buildItemImposto(
+                $product,
+                $totalLiquido,
+                (float) $ibpt['v_tot_trib'],
+                $crt,
+                $emissao,
+            );
+
+            $cfop = (string) ($product?->cfop_interno ?: '5102');
+            if (MeiFiscalNormalizer::isMeiCrt($crt)) {
+                $cfop = MeiFiscalNormalizer::normalizeItem(
+                    (string) ($imposto->csosn ?: '102'),
+                    $cfop,
+                    MeiFiscalNormalizer::MODELO_NFCE,
+                )['cfop'];
+            }
 
             $itens[] = new ItemDto(
                 numero: $index + 1,
                 codigo: (string) ($item->codigo ?: $item->product_id ?: ($index + 1)),
                 descricao: (string) $item->descricao,
                 ncm: (string) ($product?->ncm ?: '00000000'),
-                cfop: (string) ($product?->cfop_interno ?: '5102'),
+                cfop: $cfop,
                 unidade: (string) ($item->unidade ?: 'UN'),
                 quantidade: $quantidade,
                 valorUnitario: $precoBruto,
@@ -118,8 +135,13 @@ final class PdvNfceFiscalPayloadBuilder
         $textoIbpt = $ibptLookup->formatarTextoLei12741($ibptTotais);
         $obsVenda = trim((string) ($venda->observacoes ?? ''));
         $textoCanhoto = $this->formatCanhotoInformacoes($venda);
-        $informacoesComplementares = $this->mergeInformacoesComIbpt(
+        $mensagensLegais = app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class);
+        $informacoesComplementares = $mensagensLegais->comporInfCpl(
             $this->mergeInformacoes($obsVenda, $textoCanhoto),
+            $mensagensLegais->mensagens([
+                'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFCE,
+                'crt' => $crt,
+            ]),
             $textoIbpt,
         );
 
@@ -158,15 +180,6 @@ final class PdvNfceFiscalPayloadBuilder
         $valorDesconto = round($valorDescontoItens + (float) $venda->desconto, 2);
         $valorAcrescimo = round($valorAcrescimoItens + (float) $venda->acrescimo, 2);
         $valorNota = round((float) $venda->total, 2);
-        $totalPagamentos = round(array_sum(array_map(
-            static fn (PagamentoDto $pagamento): float => (float) $pagamento->valor,
-            $pagamentos,
-        )), 2);
-        $valorTroco = round(max(0, (float) $venda->troco), 2);
-
-        if ($valorTroco <= 0 && $totalPagamentos > $valorNota) {
-            $valorTroco = round($totalPagamentos - $valorNota, 2);
-        }
 
         return new EmitirNfceRequest(
             certificate: $certificate,
@@ -190,7 +203,6 @@ final class PdvNfceFiscalPayloadBuilder
             valorDesconto: $valorDesconto,
             valorAcrescimo: $valorAcrescimo,
             valorTotTrib: (float) ($ibptTotais['v_tot_trib'] ?? 0),
-            valorTroco: $valorTroco,
             destinatario: $destinatario,
             idToken: trim((string) ($parametros->id_token ?? '')),
             csc: trim((string) ($parametros->token ?? '')),
@@ -341,9 +353,20 @@ final class PdvNfceFiscalPayloadBuilder
         );
     }
 
-    private function buildItemImposto(?Product $product, float $base, float $vTotTrib = 0.0): ItemImpostoDto
-    {
-        return IbscbsImpostoFactory::fromProduct($product, $base, $vTotTrib);
+    private function buildItemImposto(
+        ?Product $product,
+        float $base,
+        float $vTotTrib = 0.0,
+        int $crt = 1,
+        ?\DateTimeInterface $dataEmissao = null,
+    ): ItemImpostoDto {
+        return IbscbsImpostoFactory::fromProduct(
+            $product,
+            $base,
+            $vTotTrib,
+            $crt,
+            $dataEmissao,
+        );
     }
 
     private function mergeInformacoesComIbpt(string $obs, string $ibptTexto): string
@@ -404,6 +427,8 @@ final class PdvNfceFiscalPayloadBuilder
     {
         return match (strtolower($regime)) {
             'simples' => 1,
+            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
+            'mei', 'simei' => 4,
             'presumido', 'real', 'normal' => 3,
             default => 1,
         };
@@ -417,6 +442,13 @@ final class PdvNfceFiscalPayloadBuilder
     private function mapTipoPagamento(string $forma): string
     {
         $forma = mb_strtoupper(trim($forma), 'UTF-8');
+
+        if (
+            ClienteCreditoMovimentacao::isFormaPdv($forma)
+            || $this->formaCadastradaComoCreditoCliente($forma)
+        ) {
+            return '05';
+        }
 
         return match (true) {
             str_contains($forma, 'DINHEIRO') => '01',
@@ -438,5 +470,17 @@ final class PdvNfceFiscalPayloadBuilder
             // TROCA e demais → 99 (exige xPag no XML).
             default => '99',
         };
+    }
+
+    private function formaCadastradaComoCreditoCliente(string $forma): bool
+    {
+        if ($forma === '') {
+            return false;
+        }
+
+        return \App\Models\FormaPagamento::query()
+            ->whereRaw('UPPER(TRIM(descricao)) = ?', [$forma])
+            ->where('tipo_movimento', 'credito_cliente')
+            ->exists();
     }
 }

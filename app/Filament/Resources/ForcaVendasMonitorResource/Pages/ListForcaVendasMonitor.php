@@ -3,27 +3,32 @@
 namespace App\Filament\Resources\ForcaVendasMonitorResource\Pages;
 
 use App\Filament\Pages\ForcaVendasTelaVendaPage;
+use App\Livewire\Erp\ForcaVendasMonitorDetalhePanel;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Filament\Resources\NfeResource;
 use App\Models\ContaReceber;
+use App\Models\ErpUserPreference;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
-use App\Models\Orcamento;
+use App\Models\Pedido;
 use App\Models\Person;
+use App\Models\PixCobranca;
 use App\Models\Vendedor;
 use App\Models\Venda;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
-use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
+use App\Support\Erp\Nfe\NfeMonitorEmitenteResolver;
+use App\Support\Erp\Nfe\NfeVendaLoteEmissionService;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
-use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\ForcaVendas\ForcaVendasCancelamentoBoletoPendenteException;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
+use App\Support\ForcaVendas\ForcaVendasMonitorCancelamentoService;
 use App\Support\ForcaVendas\ForcaVendasTelaVendaService;
-use DomainException;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -33,13 +38,18 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 
 class ListForcaVendasMonitor extends ListRecords
 {
     use InteractsWithErpListPage;
+    use Concerns\ManagesForcaVendasMonitorEmailModal;
+    use Concerns\ManagesForcaVendasMonitorNfeEmitenteModal;
+    use Concerns\ProvidesForcaVendasMonitorSelecaoUi;
 
     protected static string $resource = ForcaVendasMonitorResource::class;
 
@@ -66,7 +76,7 @@ class ListForcaVendasMonitor extends ListRecords
     public string $periodoAteApplied = '';
 
     /**
-     * IDs dos pedidos marcados (check-boxes) para faturar/estornar em lote.
+     * IDs dos pedidos marcados (check-boxes) para faturar/cancelar em lote.
      *
      * @var array<int, string>
      */
@@ -76,18 +86,122 @@ class ListForcaVendasMonitor extends ListRecords
 
     public ?int $financeiroOrderId = null;
 
+    public bool $cancelarPedidosModalOpen = false;
+
+    public bool $clonarPedidoModalOpen = false;
+
+    public ?int $clonarPedidoOrderId = null;
+
+    public bool $clonarProgressOpen = false;
+
+    public bool $clonarOk = false;
+
+    public ?int $clonarNovoId = null;
+
+    public string $clonarEtapa = '';
+
+    public string $clonarErro = '';
+
+    public string $cancelarPedidosMotivo = '';
+
+    public int $cancelarPedidosQuantidade = 0;
+
+    public bool $cancelarProgressOpen = false;
+
+    public int $cancelarAtual = 0;
+
+    public int $cancelarTotal = 0;
+
+    public string $cancelarProgressStatus = '';
+
+    public string $cancelarMotivoAplicado = '';
+
+    /** @var list<array{id: int, numero: string, pendente: bool}> */
+    public array $cancelarFila = [];
+
+    public int $cancelarFilaIndex = 0;
+
+    public ?int $cancelarBoletoAutorizadoId = null;
+
+    /** @var list<array{id: string, ok: bool, numero: string, etapa: string, erro: ?string}> */
+    public array $cancelarResultados = [];
+
+    public bool $reabrirProgressOpen = false;
+
+    public ?int $reabrirOrderId = null;
+
+    public string $reabrirNumero = '';
+
+    public string $reabrirProgressStatus = '';
+
+    public ?int $reabrirBoletoAutorizadoId = null;
+
+    public bool $reabrirOk = false;
+
+    public bool $reabrirSemVenda = false;
+
+    public bool $reabrirTemBoleto = false;
+
+    public string $reabrirEtapa = '';
+
+    public string $reabrirErro = '';
+
+    /** Overlay de transmissão em lote (permanece no Monitor). */
+    public bool $nfeLoteProgressOpen = false;
+
+    public bool $nfeLoteResumoOpen = false;
+
+    public int $nfeLoteAtual = 0;
+
+    public int $nfeLoteTotal = 0;
+
+    public int $nfeLoteProgressStep = 0;
+
+    public string $nfeLoteProgressStatus = '';
+
+    public string $nfeLoteResumoTitulo = '';
+
+    public string $nfeLoteResumoTexto = '';
+
+    /** @var list<int> */
+    public array $nfeLoteFilaVendaIds = [];
+
+    public int $nfeLoteFilaIndex = 0;
+
+    /** @var list<array{ok: bool, venda_id: int, numero: ?string, erro: ?string}> */
+    public array $nfeLoteResultados = [];
+
+    /**
+     * Emitente fixada para todo o lote (Monitor multi-empresa).
+     * Null = fluxo antigo (empresa da sessão).
+     */
+    public ?int $nfeLoteEmpresaEmitenteId = null;
+
+    public bool $faturarProgressOpen = false;
+
+    public int $faturarAtual = 0;
+
+    public int $faturarTotal = 0;
+
+    public string $faturarProgressStatus = '';
+
+    /** @var list<array{id: int, numero: string}> */
+    public array $faturarFila = [];
+
+    public int $faturarFilaIndex = 0;
+
+    public int $faturarIgnorados = 0;
+
+    /** @var list<array{id: string, ok: bool, numero: string, etapa: string, erro: ?string}> */
+    public array $faturarResultados = [];
+
     public function mount(): void
     {
         parent::mount();
 
         ErpScreen::set('Monitor de Vendas');
 
-        // Tipo de Pedido: padrão Pendente (flag marcada no dropdown).
-        if ($this->situacaoFilter === ''
-            || $this->situacaoFilter === 'todos'
-            || ! array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
-            $this->situacaoFilter = ForcaVendasOrder::SITUACAO_PENDENTE;
-        }
+        $this->situacaoFilter = $this->resolveSituacaoFilterOnMount();
 
         // Padrão: do dia de hoje até o fim do mês. Usa o fuso local
         // (America/Sao_Paulo); senão as datas saem +1 dia, pois o servidor é UTC.
@@ -128,7 +242,10 @@ class ListForcaVendasMonitor extends ListRecords
             'edit' => null,
             'delete' => null,
             'refresh' => null,
-            'extraKeys' => [],
+            'rowSelection' => false,
+            'extraKeys' => [
+                'F9' => ['method' => 'openEmailModal'],
+            ],
         ];
     }
 
@@ -145,12 +262,8 @@ class ListForcaVendasMonitor extends ListRecords
 
                 $classes = [$tint];
 
-                if ($this->highlightedRecordId === $record->getKey()) {
-                    $classes[] = 'erp-row-selected';
-                }
-
                 if (in_array((string) $record->getKey(), $this->selecionados, true)) {
-                    $classes[] = 'erp-fv-mon-row--checked';
+                    $classes[] = 'erp-row-selected';
                 }
 
                 return implode(' ', $classes);
@@ -161,7 +274,14 @@ class ListForcaVendasMonitor extends ListRecords
     {
         $query = parent::getTableQuery()
             ->where('tipo', 'pedido')
-            ->with(['user', 'vendedor', 'orcamento.itens', 'cliente']);
+            ->with([
+                'user',
+                'vendedor',
+                'pedido.itens',
+                'cliente',
+                'venda.nfes',
+                'venda.pdvVenda.nfce',
+            ]);
 
         if (array_key_exists($this->situacaoFilter, ForcaVendasOrder::situacaoLabels())) {
             if ($this->situacaoFilter === ForcaVendasOrder::SITUACAO_PENDENTE) {
@@ -175,9 +295,11 @@ class ListForcaVendasMonitor extends ListRecords
             }
         }
 
-        // Período usa a data da venda no app (client_created_at), não a sincronização.
+        // Período na timezone do ERP (America/Sao_Paulo). As datas em
+        // client_created_at / received_at são gravadas no fuso do app — não converter
+        // para UTC aqui, senão pedidos entre 00:00 e 02:59 sumem do filtro "hoje".
         if (filled($this->periodoDeApplied)) {
-            $inicio = Carbon::parse($this->periodoDeApplied, ErpTimezone::DEFAULT)->startOfDay()->utc();
+            $inicio = Carbon::parse($this->periodoDeApplied, ErpTimezone::DEFAULT)->startOfDay();
             $query->where(function (Builder $q) use ($inicio): void {
                 $q->where('client_created_at', '>=', $inicio)
                     ->orWhere(fn (Builder $q2) => $q2
@@ -187,7 +309,7 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         if (filled($this->periodoAteApplied)) {
-            $fim = Carbon::parse($this->periodoAteApplied, ErpTimezone::DEFAULT)->endOfDay()->utc();
+            $fim = Carbon::parse($this->periodoAteApplied, ErpTimezone::DEFAULT)->endOfDay();
             $query->where(function (Builder $q) use ($fim): void {
                 $q->where('client_created_at', '<=', $fim)
                     ->orWhere(fn (Builder $q2) => $q2
@@ -260,13 +382,14 @@ class ListForcaVendasMonitor extends ListRecords
 
         switch ($campo) {
             case 'dav':
-                $query->whereHas('orcamento', fn (Builder $s) => $s->where('numero', 'like', '%' . $valor . '%'));
+            case 'pedido':
+                $query->whereHas('venda', fn (Builder $s) => $s->where('numero', 'like', '%' . $valor . '%'));
                 break;
 
             case 'meio_pgto':
                 $query->where(function (Builder $q) use ($valor): void {
                     $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.forma_pagamento'))) = ?", [mb_strtolower($valor, 'UTF-8')])
-                        ->orWhereHas('orcamento', fn (Builder $s) => $s
+                        ->orWhereHas('pedido', fn (Builder $s) => $s
                             ->whereRaw('LOWER(forma_pagamento) = ?', [mb_strtolower($valor, 'UTF-8')]));
                 });
                 break;
@@ -318,12 +441,12 @@ class ListForcaVendasMonitor extends ListRecords
 
             case 'tt_bruto':
                 $num = $this->parseNumeroFiltro($valor);
-                $query->whereHas('orcamento', fn (Builder $s) => $s->where('subtotal', '>=', $num));
+                $query->whereHas('pedido', fn (Builder $s) => $s->where('subtotal', '>=', $num));
                 break;
 
             case 'desconto':
                 $num = $this->parseNumeroFiltro($valor);
-                $query->whereHas('orcamento', fn (Builder $s) => $s->where('desconto_valor', '>=', $num));
+                $query->whereHas('pedido', fn (Builder $s) => $s->where('desconto_valor', '>=', $num));
                 break;
 
             case 'acrescimo':
@@ -334,15 +457,15 @@ class ListForcaVendasMonitor extends ListRecords
     }
 
     /**
-     * Limites UTC (início/fim) de um dia local informado como Y-m-d.
+     * Limites (início/fim) de um dia local informado como Y-m-d, no fuso do ERP.
      *
      * @return array{0: \Carbon\Carbon, 1: \Carbon\Carbon}
      */
     protected function intervaloDoDia(string $data): array
     {
         return [
-            Carbon::parse($data, ErpTimezone::DEFAULT)->startOfDay()->utc(),
-            Carbon::parse($data, ErpTimezone::DEFAULT)->endOfDay()->utc(),
+            Carbon::parse($data, ErpTimezone::DEFAULT)->startOfDay(),
+            Carbon::parse($data, ErpTimezone::DEFAULT)->endOfDay(),
         ];
     }
 
@@ -376,131 +499,6 @@ class ListForcaVendasMonitor extends ListRecords
     }
 
     #[Computed]
-    public function selecionado(): ?ForcaVendasOrder
-    {
-        if (! $this->highlightedRecordId) {
-            return null;
-        }
-
-        return ForcaVendasOrder::query()
-            ->with(['orcamento.itens.product', 'orcamento.itens.grade', 'cliente', 'user', 'vendedor'])
-            ->find($this->highlightedRecordId);
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    #[Computed]
-    public function itensSelecionado(): array
-    {
-        $order = $this->selecionado;
-        $orcamento = $order?->orcamento;
-
-        if (! $orcamento) {
-            return [];
-        }
-
-        $vendedor = $order?->vendedor?->nome ?? $order?->user?->name ?? '—';
-        $payloadItens = is_array($order?->payload['itens'] ?? null) ? $order->payload['itens'] : [];
-
-        return $orcamento->itens
-            ->values()
-            ->map(function ($item, int $index) use ($vendedor, $payloadItens): array {
-                $payloadItem = is_array($payloadItens[$index] ?? null) ? $payloadItens[$index] : [];
-
-                return [
-                    'codigo' => $item->product?->codigo ?? '',
-                    'codigo_barras' => $item->product?->codigo_barras ?? '',
-                    'descricao' => $item->descricao
-                        ?: ($item->product?->descricao ?? 'Item'),
-                    'quantidade' => (float) $item->quantidade,
-                    'preco_unitario' => (float) $item->preco_unitario,
-                    'desconto' => (float) $item->desconto,
-                    'acrescimo' => (float) ($payloadItem['acrescimo'] ?? 0),
-                    'total' => (float) $item->total,
-                    'vendedor' => $vendedor,
-                ];
-            })
-            ->all();
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    #[Computed]
-    public function pagamentosSelecionado(): array
-    {
-        $order = $this->selecionado;
-
-        if (! $order) {
-            return [];
-        }
-
-        $documento = $this->documentoReceber($order);
-
-        $contas = ContaReceber::query()
-            ->where(fn (Builder $q) => $q
-                ->where('documento', $documento)
-                ->orWhere('documento', 'like', $documento . '/%'))
-            ->orderBy('vencimento')
-            ->get();
-
-        if ($contas->isNotEmpty()) {
-            return $contas
-                ->map(fn (ContaReceber $c, int $i): array => [
-                    'meio' => ContaReceber::formaLabels()[$c->forma] ?? mb_strtoupper((string) $c->forma, 'UTF-8'),
-                    'parcela' => $i + 1,
-                    'vencimento' => optional($c->vencimento)->format('d/m/Y') ?? '—',
-                    'valor' => (float) $c->valor,
-                ])
-                ->all();
-        }
-
-        // Pedido pendente: prévia das parcelas conforme enviado pelo app.
-        return $this->pagamentosPrevistos($order);
-    }
-
-    /**
-     * Prévia de parcelas antes do faturamento (forma, prazos e valores do payload).
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function pagamentosPrevistos(ForcaVendasOrder $order): array
-    {
-        $total = round((float) ($order->orcamento?->total ?? $order->total), 2);
-
-        if ($total <= 0) {
-            return [];
-        }
-
-        $dias = $this->diasParcelas($order);
-        $n = count($dias);
-        $forma = trim((string) ($order->payload['forma_pagamento'] ?? ''));
-        $meio = $forma !== ''
-            ? $forma
-            : (ContaReceber::formaLabels()[$this->formaContaReceber($order)] ?? '—');
-        $hoje = ErpTimezone::toLocal()->startOfDay();
-        $parcelaBase = floor($total / $n * 100) / 100;
-
-        $linhas = [];
-
-        foreach (array_values($dias) as $i => $dia) {
-            $valor = $i === $n - 1
-                ? round($total - ($parcelaBase * ($n - 1)), 2)
-                : $parcelaBase;
-
-            $linhas[] = [
-                'meio' => $meio,
-                'parcela' => $i + 1,
-                'vencimento' => $hoje->copy()->addDays(max(0, (int) $dia))->format('d/m/Y'),
-                'valor' => $valor,
-            ];
-        }
-
-        return $linhas;
-    }
-
-    #[Computed]
     public function totalFiltrado(): float
     {
         return (float) $this->getTableQuery()->sum('total');
@@ -513,9 +511,17 @@ class ListForcaVendasMonitor extends ListRecords
             ->components([
                 View::make('filament.components.erp.forca-vendas.monitor-screen'),
                 EmbeddedTable::make()->columnSpanFull(),
-                View::make('filament.components.erp.forca-vendas.monitor-detail'),
-                View::make('filament.components.erp.forca-vendas.monitor-action-bar'),
+                View::make('filament.components.erp.forca-vendas.monitor-detalhe-host'),
+                View::make('filament.components.erp.forca-vendas.monitor-cancel-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-clonar-pedido-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-clonar-progress'),
                 View::make('filament.components.erp.forca-vendas.monitor-financeiro-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-nfe-lote-progress'),
+                View::make('filament.components.erp.forca-vendas.monitor-faturar-progress'),
+                View::make('filament.components.erp.forca-vendas.monitor-cancelar-progress'),
+                View::make('filament.components.erp.forca-vendas.monitor-reabrir-progress'),
+                View::make('filament.components.erp.forca-vendas.monitor-nfe-emitente-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-email-modal'),
             ]);
     }
 
@@ -527,7 +533,7 @@ class ListForcaVendasMonitor extends ListRecords
         }
 
         return ForcaVendasOrder::query()
-            ->with(['orcamento', 'cliente'])
+            ->with(['pedido', 'cliente'])
             ->find($this->financeiroOrderId);
     }
 
@@ -592,15 +598,13 @@ class ListForcaVendasMonitor extends ListRecords
         $this->resetTable();
     }
 
-    public function updatedPeriodoDe(): void
+    /**
+     * Aplica o período após o Flatpickr gravar periodoDe/periodoAte
+     * (um único resetTable — sem remount dos inputs, que ficam em wire:ignore).
+     */
+    public function applyPeriodFilterAuto(): void
     {
         $this->periodoDeApplied = $this->periodoDe;
-        $this->clearListSelection();
-        $this->resetTable();
-    }
-
-    public function updatedPeriodoAte(): void
-    {
         $this->periodoAteApplied = $this->periodoAte;
         $this->clearListSelection();
         $this->resetTable();
@@ -608,8 +612,85 @@ class ListForcaVendasMonitor extends ListRecords
 
     public function updatedSituacaoFilter(): void
     {
+        $normalized = $this->normalizeSituacaoFilter($this->situacaoFilter)
+            ?? ForcaVendasOrder::SITUACAO_PENDENTE;
+        $this->situacaoFilter = $normalized;
+        $this->persistSituacaoFilterPreference($normalized);
+
         $this->clearListSelection();
         $this->resetTable();
+    }
+
+    /**
+     * URL válida só nesta abertura; senão preferência user/empresa; senão pendente.
+     */
+    private function resolveSituacaoFilterOnMount(): string
+    {
+        if (request()->has('situacao')) {
+            $fromUrl = $this->normalizeSituacaoFilter(request()->query('situacao'));
+
+            if ($fromUrl !== null) {
+                return $fromUrl;
+            }
+        }
+
+        return $this->restoreSituacaoFilterPreference()
+            ?? ForcaVendasOrder::SITUACAO_PENDENTE;
+    }
+
+    private function normalizeSituacaoFilter(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '' || ! in_array($value, $this->allowedSituacaoFilters(), true)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedSituacaoFilters(): array
+    {
+        return [
+            'todos',
+            ...array_keys(ForcaVendasOrder::situacaoLabels()),
+        ];
+    }
+
+    private function restoreSituacaoFilterPreference(): ?string
+    {
+        $userId = (int) (Auth::id() ?? 0);
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? Auth::user()?->empresa_id ?? 0);
+
+        if ($userId <= 0 || $empresaId <= 0) {
+            return null;
+        }
+
+        return $this->normalizeSituacaoFilter(ErpUserPreference::getValue(
+            $userId,
+            $empresaId,
+            ErpUserPreference::KEY_MONITOR_VENDAS_SITUACAO_FILTER
+        ));
+    }
+
+    private function persistSituacaoFilterPreference(string $value): void
+    {
+        $userId = (int) (Auth::id() ?? 0);
+        $empresaId = (int) (ErpContext::currentEmpresaId() ?? Auth::user()?->empresa_id ?? 0);
+
+        if ($userId <= 0 || $empresaId <= 0) {
+            return;
+        }
+
+        ErpUserPreference::putValue(
+            $userId,
+            $empresaId,
+            ErpUserPreference::KEY_MONITOR_VENDAS_SITUACAO_FILTER,
+            $value
+        );
     }
 
     public function updatedFiltroCampo(): void
@@ -626,6 +707,13 @@ class ListForcaVendasMonitor extends ListRecords
         $this->resetTable();
     }
 
+    protected function clearListSelection(): void
+    {
+        // Trait InteractsWithErpListPage (não usar parent:: — ListRecords não tem o método).
+        $this->highlightedRecordId = null;
+        $this->pushSelecaoToDetalhePanel();
+    }
+
     public function updatedPlataformaFilter(): void
     {
         $this->clearListSelection();
@@ -640,7 +728,7 @@ class ListForcaVendasMonitor extends ListRecords
     public function filtroCamposOptions(): array
     {
         return [
-            'dav' => 'Nº DAV',
+            'pedido' => 'Nº Pedido',
             'status' => 'Status',
             'cliente' => 'Cliente',
             'vendedor' => 'Vendedor',
@@ -859,8 +947,8 @@ class ListForcaVendasMonitor extends ListRecords
     // ---- Seleção em lote ---------------------------------------------------
 
     /**
-     * Marca/desmarca a flag da linha e acompanha o destaque do pedido:
-     * marcar seleciona a linha, desmarcar tira o destaque dela.
+     * Marca/desmarca a flag da linha e acompanha o destaque do pedido.
+     * skipRender: não remonta a EmbeddedTable; o painel filho atualiza detalhe/barra.
      */
     public function alternarSelecionado(int|string $recordId): void
     {
@@ -875,55 +963,101 @@ class ListForcaVendasMonitor extends ListRecords
                 $this->highlightedRecordId = null;
             }
 
+            $this->pushSelecaoToDetalhePanel();
+            $this->skipRender();
+
             return;
         }
 
         $this->selecionados[] = $key;
         $this->highlightedRecordId = (int) $recordId;
+        $this->pushSelecaoToDetalhePanel();
+        $this->skipRender();
     }
 
     /**
-     * Marca todos os pedidos pendentes do filtro atual.
+     * Compat: antes fazia full render (~1 MB). Agora só sincroniza o painel filho.
+     * Mantido para rollback / chamadas legadas; o checkbox não usa mais debounce.
      */
-    public function selecionarPendentes(): void
+    public function syncSelecaoUi(): void
     {
-        $this->selecionados = $this->getTableQuery()
-            ->where('situacao', ForcaVendasOrder::SITUACAO_PENDENTE)
-            ->pluck('id')
-            ->map(fn ($id): string => (string) $id)
-            ->all();
+        $this->pushSelecaoToDetalhePanel();
+        $this->skipRender();
+    }
 
-        if ($this->selecionados === []) {
-            $this->avisa('Nenhum pedido pendente no filtro atual.', 'info');
+    /**
+     * Notifica o Livewire filho (detalhe + barra) sem remontar a tabela do pai.
+     */
+    protected function pushSelecaoToDetalhePanel(): void
+    {
+        $this->dispatch(
+            'fv-monitor-selecao',
+            selecionados: $this->selecionados,
+            highlightedRecordId: $this->highlightedRecordId,
+            nfeLoteProgressOpen: $this->nfeLoteProgressOpen,
+            faturarProgressOpen: $this->faturarProgressOpen,
+            cancelarProgressOpen: $this->cancelarProgressOpen,
+            reabrirProgressOpen: $this->reabrirProgressOpen,
+            clonarProgressOpen: $this->clonarProgressOpen,
+        )->to(ForcaVendasMonitorDetalhePanel::class);
+    }
+
+    /**
+     * Imprime os pedidos marcados em um único relatório A4 (vários blocos por folha).
+     * Prefere DAV/orçamento; se faturado sem DAV, usa a venda.
+     */
+    public function imprimirSelecionados(): void
+    {
+        $orders = $this->pedidosSelecionados();
+
+        if ($orders->isEmpty()) {
+            $this->avisa('Selecione ao menos um pedido para imprimir.', 'warning');
+
+            return;
         }
-    }
 
-    public function limparSelecao(): void
-    {
-        $this->selecionados = [];
-        $this->highlightedRecordId = null;
-    }
+        $ids = [];
+        $semDocumento = 0;
 
-    /**
-     * @return \Illuminate\Support\Collection<int, ForcaVendasOrder>
-     */
-    protected function pedidosSelecionados(): \Illuminate\Support\Collection
-    {
-        $ids = collect($this->selecionados)
-            ->map(fn ($id): int => (int) $id)
-            ->filter()
-            ->all();
+        foreach ($orders as $order) {
+            $pedidoId = (int) ($order->pedido_id ?? 0);
+            $vendaId = (int) ($order->venda_id ?? 0);
+
+            if ($pedidoId <= 0 && $vendaId <= 0) {
+                $semDocumento++;
+
+                continue;
+            }
+
+            $ids[] = (int) $order->id;
+        }
 
         if ($ids === []) {
-            return collect();
+            $this->avisa('Nenhum dos pedidos selecionados possui DAV/orçamento ou venda para imprimir.', 'warning');
+
+            return;
         }
 
-        return ForcaVendasOrder::query()
-            ->whereIn('id', $ids)
-            ->with('orcamento')
-            ->get();
+        $url = route('erp.reports.monitor-pedidos', [
+            'ids' => implode(',', $ids),
+            'auto' => 1,
+        ]);
+
+        $this->js('window.location.assign('.Js::from($url).');');
+
+        if ($semDocumento > 0) {
+            $this->avisa(
+                'Abrindo impressão de '.count($ids).' pedido(s). Sem documento: '.$semDocumento.'.',
+                'warning',
+            );
+        }
     }
 
+    /**
+     * Estado do botão Emitir NF-e / Lote conforme a seleção.
+     *
+     * @return array{enabled: bool, label: string, title: string, mode: string, venda_ids: list<int>}
+     */
     // ---- Ações -------------------------------------------------------------
 
     /**
@@ -940,187 +1074,774 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        $faturados = 0;
-        $ignorados = 0;
-        $erros = 0;
-        $serv = new ForcaVendasFaturamentoService();
+        $candidatos = [];
 
         foreach ($orders as $order) {
             if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO || $order->venda_id) {
-                $ignorados++;
-
                 continue;
             }
 
             if ($order->situacao === ForcaVendasOrder::SITUACAO_FINANCEIRO) {
-                $ignorados++;
-
                 continue;
             }
 
-            if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO || ! $order->orcamento) {
-                $ignorados++;
-
+            if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO || ! $order->pedido) {
                 continue;
             }
 
-            try {
-                DB::transaction(fn () => $serv->faturar($order, $order->orcamento));
-                $faturados++;
-            } catch (\Throwable $e) {
-                $erros++;
+            $candidatos[] = $order;
+        }
+
+        if ($candidatos === []) {
+            $this->avisa('Nenhum pedido pendente selecionado para faturar.', 'warning');
+
+            return;
+        }
+
+        foreach ($candidatos as $order) {
+            if (! $this->pedidoTemFormaPagamento($order)) {
+                $this->avisa(
+                    'DAV '.($order->pedido?->numero ?? $order->id).': sem forma de pagamento. Não é possível faturar.',
+                    'warning',
+                );
+
+                return;
             }
         }
 
-        $this->selecionados = [];
+        if ($this->faturarProgressOpen) {
+            return;
+        }
+
+        $this->faturarFila = [];
+
+        foreach ($candidatos as $order) {
+            $this->faturarFila[] = [
+                'id' => (int) $order->getKey(),
+                'numero' => $this->numeroPedidoFaturamento($order),
+            ];
+        }
+
+        $this->faturarIgnorados = $orders->count() - count($candidatos);
+        $this->faturarFilaIndex = 0;
+        $this->faturarResultados = [];
+        $this->faturarAtual = 0;
+        $this->faturarTotal = count($this->faturarFila);
+        $this->faturarProgressStatus = 'Preparando faturamento...';
+        $this->faturarProgressOpen = true;
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                if (window.__erpFvMonFaturarRun) {
+                    window.__erpFvMonFaturarRun($wire);
+                }
+            });
+        JS);
+    }
+
+    /**
+     * @return array{done: bool, atual: int, total: int, numero: string}
+     */
+    public function prepararProximoFaturamento(): array
+    {
+        if (! $this->faturarProgressOpen || $this->faturarFila === []) {
+            return ['done' => true, 'atual' => 0, 'total' => 0, 'numero' => ''];
+        }
+
+        if ($this->faturarFilaIndex >= count($this->faturarFila)) {
+            return [
+                'done' => true,
+                'atual' => $this->faturarTotal,
+                'total' => $this->faturarTotal,
+                'numero' => '',
+            ];
+        }
+
+        $item = $this->faturarFila[$this->faturarFilaIndex];
+        $this->faturarAtual = $this->faturarFilaIndex + 1;
+        $this->faturarProgressStatus = 'Faturando pedido '.$item['numero'].' ('.$this->faturarAtual.' de '.$this->faturarTotal.')';
+
+        return [
+            'done' => false,
+            'atual' => $this->faturarAtual,
+            'total' => $this->faturarTotal,
+            'numero' => $item['numero'],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, done: bool, atual: int, total: int, numero: string, etapa: string, erro: ?string}
+     */
+    public function processarProximoFaturamento(): array
+    {
+        $vazio = [
+            'ok' => false,
+            'done' => true,
+            'atual' => $this->faturarTotal,
+            'total' => $this->faturarTotal,
+            'numero' => '',
+            'etapa' => '',
+            'erro' => null,
+        ];
+
+        if (! $this->faturarProgressOpen || $this->faturarFilaIndex >= count($this->faturarFila)) {
+            return $vazio;
+        }
+
+        $item = $this->faturarFila[$this->faturarFilaIndex];
+        $numero = (string) $item['numero'];
+        $etapa = 'Validando pedido';
+        $ok = false;
+        $erro = null;
+
+        $order = ForcaVendasOrder::query()->with('pedido')->find((int) $item['id']);
+
+        if (! $order instanceof ForcaVendasOrder || $order->pedido === null) {
+            $erro = 'Pedido não encontrado.';
+        } else {
+            try {
+                $serv = new ForcaVendasFaturamentoService();
+                DB::transaction(function () use ($serv, $order, &$etapa): void {
+                    $serv->faturar($order, $order->pedido, function (string $nome) use (&$etapa): void {
+                        $etapa = $nome;
+                    });
+                });
+                $ok = true;
+                $etapa = 'Pedido '.$numero.' faturado';
+            } catch (\Throwable $e) {
+                $erro = $e->getMessage();
+            }
+        }
+
+        $this->faturarResultados[] = [
+            'id' => (string) $item['id'],
+            'ok' => $ok,
+            'numero' => $numero,
+            'etapa' => $etapa,
+            'erro' => $erro,
+        ];
+        $this->faturarFilaIndex++;
+        $this->faturarAtual = min($this->faturarFilaIndex, $this->faturarTotal);
+
+        if (! $ok) {
+            $this->faturarProgressStatus = 'Pedido '.$numero.' — falha em '.$etapa.($erro ? ': '.$erro : '');
+        }
+
+        return [
+            'ok' => $ok,
+            'done' => $this->faturarFilaIndex >= count($this->faturarFila),
+            'atual' => $this->faturarAtual,
+            'total' => $this->faturarTotal,
+            'numero' => $numero,
+            'etapa' => $etapa,
+            'erro' => $erro,
+        ];
+    }
+
+    public function concluirFaturamentoMonitor(): void
+    {
+        $faturadosIds = [];
+        $erros = 0;
+        $ultimoErro = '';
+
+        foreach ($this->faturarResultados as $resultado) {
+            if ($resultado['ok']) {
+                $faturadosIds[] = (string) $resultado['id'];
+
+                continue;
+            }
+
+            $erros++;
+            $ultimoErro = trim(($resultado['etapa'] ?? '').($resultado['erro'] ? ': '.$resultado['erro'] : ''));
+        }
+
+        $faturados = count($faturadosIds);
+        $ignorados = $this->faturarIgnorados;
+
+        if ($faturados > 0) {
+            $this->selecionados = $erros === 0
+                ? []
+                : array_values(array_filter(
+                    $this->selecionados,
+                    fn (mixed $id): bool => ! in_array((string) $id, $faturadosIds, true),
+                ));
+
+            if ($this->highlightedRecordId !== null
+                && ($erros === 0 || in_array((string) $this->highlightedRecordId, $faturadosIds, true))) {
+                $this->highlightedRecordId = null;
+            }
+
+            $this->js(
+                'requestAnimationFrame(() => {'
+                .'const todos = '.Js::from($erros === 0).';'
+                .'const ids = '.Js::from($faturadosIds).';'
+                .'document.querySelectorAll(".erp-fv-monitor-page .erp-fv-mon__check").forEach((el) => {'
+                .'if (!todos && !ids.includes(String(el.value))) return;'
+                .'el.checked = false;'
+                .'el.removeAttribute("checked");'
+                .'el.closest(".fi-ta-row")?.classList.remove("erp-row-selected");'
+                .'});'
+                .'});'
+            );
+        }
+
+        $this->faturarProgressOpen = false;
+        $this->faturarFila = [];
+        $this->faturarFilaIndex = 0;
+        $this->faturarResultados = [];
+        $this->faturarAtual = 0;
+        $this->faturarTotal = 0;
+        $this->faturarProgressStatus = '';
 
         $msg = "Faturados: {$faturados}."
             . ($ignorados > 0 ? " Ignorados: {$ignorados}." : '')
-            . ($erros > 0 ? " Com erro: {$erros}." : '');
+            . ($erros > 0 ? " Com erro: {$erros}." : '')
+            . ($erros > 0 && $ultimoErro !== '' ? ' '.$ultimoErro : '');
 
         $this->avisa($msg, $erros > 0 ? 'warning' : 'success');
+        $this->pushSelecaoToDetalhePanel();
+    }
+
+    private function numeroPedidoFaturamento(ForcaVendasOrder $order): string
+    {
+        $dav = preg_replace('/\D/', '', (string) ($order->pedido?->numero ?? ''));
+        $dav = ltrim((string) $dav, '0');
+
+        if ($dav !== '') {
+            return $dav;
+        }
+
+        return (string) $order->getKey();
     }
 
     /**
-     * Estorna em lote os pedidos faturados selecionados: devolve o estoque,
-     * cancela a venda e apaga as contas a receber em aberto.
-     *
-     * Pedidos com título já recebido (baixado) são bloqueados pelo serviço e
-     * contados à parte; demais falhas entram em "com erro".
+     * Abre o modal de motivo para cancelar os pedidos faturados selecionados.
      */
-    public function estornarSelecionados(): void
+    public function pedirCancelarSelecionados(): void
     {
+        if ($this->cancelarProgressOpen) {
+            return;
+        }
+
         $orders = $this->pedidosSelecionados();
 
         if ($orders->isEmpty()) {
-            $this->avisa('Selecione ao menos um pedido para estornar.', 'warning');
+            $this->avisa('Selecione ao menos um pedido para cancelar.', 'warning');
 
             return;
         }
 
-        $estornados = 0;
-        $ignorados = 0;
-        $bloqueados = 0;
-        $erros = 0;
-        $serv = new EstornarVendaService();
+        $empresa = ErpContext::currentEmpresa();
+        $this->cancelarPedidosQuantidade = $orders->count();
+        $this->cancelarPedidosMotivo = ($empresa && (bool) $empresa->param_fiscal_motivo_estorno_automatico)
+            ? PdvEstornoMotivo::MOTIVO_AUTOMATICO
+            : '';
+        $this->cancelarPedidosModalOpen = true;
+    }
 
-        foreach ($orders as $order) {
-            if (! $order->venda_id || $order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
-                $ignorados++;
-
-                continue;
-            }
-
-            $venda = Venda::query()->find($order->venda_id);
-
-            if (! $venda) {
-                $ignorados++;
-
-                continue;
-            }
-
-            try {
-                $serv->fromVenda(
-                    $venda,
-                    PdvEstornoMotivo::MOTIVO_AUTOMATICO,
-                    EstornarVendaService::ORIGEM_MONITOR_FV,
-                );
-
-                $order->refresh();
-
-                if ($order->orcamento && $order->orcamento->status !== Orcamento::STATUS_CANCELADO) {
-                    $order->orcamento->update(['status' => Orcamento::STATUS_CANCELADO]);
-                }
-
-                $estornados++;
-            } catch (DomainException|\RuntimeException $e) {
-                if (str_contains(mb_strtolower($e->getMessage(), 'UTF-8'), 'recebid')) {
-                    $bloqueados++;
-                } else {
-                    $erros++;
-                }
-            }
-        }
-
-        $this->selecionados = [];
-
-        $msg = "Estornados: {$estornados}."
-            . ($ignorados > 0 ? " Ignorados: {$ignorados}." : '')
-            . ($bloqueados > 0 ? " Bloqueados (título já recebido): {$bloqueados}." : '')
-            . ($erros > 0 ? " Com erro: {$erros}." : '');
-
-        $this->avisa($msg, ($bloqueados > 0 || $erros > 0) ? 'warning' : 'success');
+    public function closeCancelarPedidosModal(): void
+    {
+        $this->cancelarPedidosModalOpen = false;
+        $this->cancelarPedidosMotivo = '';
+        $this->cancelarPedidosQuantidade = 0;
     }
 
     /**
-     * Reabre um pedido estornado (volta para "Pendente"), permitindo faturar de novo.
+     * Monta a fila e abre o progresso. Cada pedido é cancelado numa chamada seguinte.
+     */
+    public function confirmCancelarSelecionados(): void
+    {
+        if ($this->cancelarProgressOpen || ! $this->cancelarPedidosModalOpen) {
+            return;
+        }
+
+        $motivo = PdvEstornoMotivo::normalize($this->cancelarPedidosMotivo);
+        $erroMotivo = PdvEstornoMotivo::validate($motivo, PdvEstornoMotivo::MIN_LENGTH_MONITOR_FV);
+
+        if ($erroMotivo !== null) {
+            $this->avisa($erroMotivo, 'warning');
+
+            return;
+        }
+
+        $orders = $this->pedidosSelecionados();
+
+        if ($orders->isEmpty()) {
+            $this->closeCancelarPedidosModal();
+            $this->avisa('Selecione ao menos um pedido para cancelar.', 'warning');
+
+            return;
+        }
+
+        $this->cancelarMotivoAplicado = $motivo;
+        $this->cancelarFila = [];
+
+        foreach ($orders as $order) {
+            $this->cancelarFila[] = [
+                'id' => (int) $order->getKey(),
+                'numero' => $this->numeroPedidoFaturamento($order),
+                'pendente' => ! $order->venda_id,
+            ];
+        }
+
+        $this->cancelarFilaIndex = 0;
+        $this->cancelarResultados = [];
+        $this->cancelarBoletoAutorizadoId = null;
+        $this->cancelarAtual = 0;
+        $this->cancelarTotal = count($this->cancelarFila);
+        $this->cancelarProgressStatus = 'Preparando cancelamento...';
+        $this->cancelarProgressOpen = true;
+        $this->closeCancelarPedidosModal();
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                if (window.__erpFvMonCancelarRun) {
+                    window.__erpFvMonCancelarRun($wire);
+                }
+            });
+        JS);
+    }
+
+    /**
+     * @return array{done: bool, atual: int, total: int, numero: string, pendente: bool}
+     */
+    public function prepararProximoCancelamento(): array
+    {
+        if (! $this->cancelarProgressOpen || $this->cancelarFilaIndex >= count($this->cancelarFila)) {
+            return [
+                'done' => true,
+                'atual' => $this->cancelarTotal,
+                'total' => $this->cancelarTotal,
+                'numero' => '',
+                'pendente' => false,
+            ];
+        }
+
+        $item = $this->cancelarFila[$this->cancelarFilaIndex];
+        $this->cancelarAtual = $this->cancelarFilaIndex + 1;
+        $this->cancelarProgressStatus = 'Cancelando pedido '.$item['numero'].' ('.$this->cancelarAtual.' de '.$this->cancelarTotal.')';
+
+        return [
+            'done' => false,
+            'atual' => $this->cancelarAtual,
+            'total' => $this->cancelarTotal,
+            'numero' => $item['numero'],
+            'pendente' => (bool) $item['pendente'],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, done: bool, aguardandoBoleto: bool, atual: int, total: int, numero: string, etapa: string, erro: ?string, mensagem: string}
+     */
+    public function processarProximoCancelamento(): array
+    {
+        $vazio = $this->respostaCancelamento(false, true, false, '', '', null, '');
+
+        if (! $this->cancelarProgressOpen || $this->cancelarFilaIndex >= count($this->cancelarFila)) {
+            return $vazio;
+        }
+
+        $item = $this->cancelarFila[$this->cancelarFilaIndex];
+        $numero = (string) $item['numero'];
+        $etapa = 'Validando pedido';
+        $order = ForcaVendasOrder::query()->with('pedido')->find((int) $item['id']);
+
+        if (! $order instanceof ForcaVendasOrder) {
+            return $this->registrarResultadoCancelamento($item, false, $etapa, 'Pedido não encontrado.');
+        }
+
+        try {
+            (new ForcaVendasMonitorCancelamentoService())->cancelar(
+                $order,
+                $this->cancelarMotivoAplicado,
+                $numero,
+                (int) $this->cancelarBoletoAutorizadoId === (int) $order->getKey(),
+                function (string $nome) use (&$etapa): void {
+                    $etapa = $nome;
+                },
+            );
+        } catch (ForcaVendasCancelamentoBoletoPendenteException $e) {
+            $this->cancelarProgressStatus = $e->getMessage();
+
+            return $this->respostaCancelamento(
+                false,
+                false,
+                true,
+                $numero,
+                'Verificando boleto bancário',
+                null,
+                $e->getMessage(),
+            );
+        } catch (\Throwable $e) {
+            return $this->registrarResultadoCancelamento($item, false, $etapa, $e->getMessage());
+        }
+
+        $this->cancelarBoletoAutorizadoId = null;
+
+        return $this->registrarResultadoCancelamento($item, true, 'Finalizando pedido', null);
+    }
+
+    public function autorizarBaixaBoletoCancelamento(): void
+    {
+        if (! $this->cancelarProgressOpen || $this->cancelarFilaIndex >= count($this->cancelarFila)) {
+            return;
+        }
+
+        $this->cancelarBoletoAutorizadoId = (int) $this->cancelarFila[$this->cancelarFilaIndex]['id'];
+    }
+
+    /**
+     * @return array{ok: bool, done: bool, aguardandoBoleto: bool, atual: int, total: int, numero: string, etapa: string, erro: ?string, mensagem: string}
+     */
+    public function recusarBaixaBoletoCancelamento(): array
+    {
+        if (! $this->cancelarProgressOpen || $this->cancelarFilaIndex >= count($this->cancelarFila)) {
+            return $this->respostaCancelamento(false, true, false, '', '', null, '');
+        }
+
+        $item = $this->cancelarFila[$this->cancelarFilaIndex];
+
+        return $this->registrarResultadoCancelamento(
+            $item,
+            false,
+            'Verificando boleto bancário',
+            'Baixa do boleto não confirmada.',
+        );
+    }
+
+    public function concluirCancelamentoMonitor(): void
+    {
+        $canceladosIds = [];
+        $falhas = [];
+
+        foreach ($this->cancelarResultados as $resultado) {
+            if ($resultado['ok']) {
+                $canceladosIds[] = (string) $resultado['id'];
+
+                continue;
+            }
+
+            $falhas[] = 'Pedido '.$resultado['numero'].' — '
+                .trim((string) ($resultado['etapa'] ?? ''))
+                .($resultado['erro'] ? ': '.$resultado['erro'] : '');
+        }
+
+        $cancelados = count($canceladosIds);
+
+        if ($cancelados > 0) {
+            $this->selecionados = $falhas === []
+                ? []
+                : array_values(array_filter(
+                    $this->selecionados,
+                    fn (mixed $id): bool => ! in_array((string) $id, $canceladosIds, true),
+                ));
+
+            if ($this->highlightedRecordId !== null
+                && ($falhas === [] || in_array((string) $this->highlightedRecordId, $canceladosIds, true))) {
+                $this->highlightedRecordId = null;
+            }
+
+            $this->js(
+                'requestAnimationFrame(() => {'
+                .'const todos = '.Js::from($falhas === []).';'
+                .'const ids = '.Js::from($canceladosIds).';'
+                .'document.querySelectorAll(".erp-fv-monitor-page .erp-fv-mon__check").forEach((el) => {'
+                .'if (!todos && !ids.includes(String(el.value))) return;'
+                .'el.checked = false;'
+                .'el.removeAttribute("checked");'
+                .'el.closest(".fi-ta-row")?.classList.remove("erp-row-selected");'
+                .'});'
+                .'});'
+            );
+        }
+
+        $this->cancelarProgressOpen = false;
+        $this->cancelarFila = [];
+        $this->cancelarFilaIndex = 0;
+        $this->cancelarResultados = [];
+        $this->cancelarBoletoAutorizadoId = null;
+        $this->cancelarAtual = 0;
+        $this->cancelarTotal = 0;
+        $this->cancelarProgressStatus = '';
+        $this->cancelarMotivoAplicado = '';
+
+        $msg = "Cancelados: {$cancelados}.";
+
+        if ($falhas !== []) {
+            $msg .= ' '.implode(' ', $falhas);
+        }
+
+        $this->avisa($msg, $falhas === [] ? 'success' : 'warning');
+        $this->pushSelecaoToDetalhePanel();
+    }
+
+    /**
+     * @param  array{id: int, numero: string, pendente: bool}  $item
+     * @return array{ok: bool, done: bool, aguardandoBoleto: bool, atual: int, total: int, numero: string, etapa: string, erro: ?string, mensagem: string}
+     */
+    private function registrarResultadoCancelamento(array $item, bool $ok, string $etapa, ?string $erro): array
+    {
+        $numero = (string) $item['numero'];
+        $this->cancelarResultados[] = [
+            'id' => (string) $item['id'],
+            'ok' => $ok,
+            'numero' => $numero,
+            'etapa' => $etapa,
+            'erro' => $erro,
+        ];
+        $this->cancelarBoletoAutorizadoId = null;
+        $this->cancelarFilaIndex++;
+        $this->cancelarAtual = min($this->cancelarFilaIndex, $this->cancelarTotal);
+
+        if (! $ok) {
+            $this->cancelarProgressStatus = 'Pedido '.$numero.' — falha em '.$etapa.($erro ? ': '.$erro : '');
+        }
+
+        return $this->respostaCancelamento(
+            $ok,
+            $this->cancelarFilaIndex >= count($this->cancelarFila),
+            false,
+            $numero,
+            $etapa,
+            $erro,
+            '',
+        );
+    }
+
+    /**
+     * @return array{ok: bool, done: bool, aguardandoBoleto: bool, atual: int, total: int, numero: string, etapa: string, erro: ?string, mensagem: string}
+     */
+    private function respostaCancelamento(
+        bool $ok,
+        bool $done,
+        bool $aguardandoBoleto,
+        string $numero,
+        string $etapa,
+        ?string $erro,
+        string $mensagem,
+    ): array {
+        return [
+            'ok' => $ok,
+            'done' => $done,
+            'aguardandoBoleto' => $aguardandoBoleto,
+            'atual' => $this->cancelarAtual,
+            'total' => $this->cancelarTotal,
+            'numero' => $numero,
+            'etapa' => $etapa,
+            'erro' => $erro,
+            'mensagem' => $mensagem,
+        ];
+    }
+
+    /**
+     * @deprecated Use pedirCancelarSelecionados / confirmCancelarSelecionados.
+     */
+    public function estornarSelecionados(): void
+    {
+        $this->pedirCancelarSelecionados();
+    }
+
+    /**
+     * Reabre um pedido por vez. Faturado estorna como o Cancelar e volta a pendente.
      */
     public function reabrirPedido(): void
     {
-        $order = $this->pedidoSelecionadoOuAvisa();
-
-        if (! $order) {
+        if ($this->reabrirProgressOpen) {
             return;
         }
 
-        $venda = $order->venda_id ? Venda::query()->find($order->venda_id) : null;
-
-        if ($venda && $venda->status !== Venda::STATUS_CANCELADO) {
-            $this->avisa('Pedido faturado. Estorne antes de reabrir.', 'warning');
+        if (count($this->selecionados) > 1) {
+            $this->avisa('Reabrir apenas um pedido por vez. Desmarque a seleção em lote.', 'warning');
 
             return;
         }
 
-        try {
-            DB::transaction(function () use ($order): void {
-                $order->update([
-                    'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
-                    'venda_id' => null,
-                    'confirmed_at' => null,
-                    'faturado_at' => null,
-                    'canceled_at' => null,
-                ]);
+        $orderId = count($this->selecionados) === 1
+            ? (int) $this->selecionados[0]
+            : (int) ($this->highlightedRecordId ?? 0);
 
-                if ($order->orcamento && $order->orcamento->status === Orcamento::STATUS_CANCELADO) {
-                    $order->orcamento->update(['status' => Orcamento::STATUS_ABERTO]);
-                }
+        if ($orderId <= 0) {
+            $this->avisa('Selecione um pedido para reabrir.', 'warning');
 
-                $order->loadMissing('orcamento.itens.product', 'user');
+            return;
+        }
 
-                if ($order->tipo === ForcaVendasOrder::TIPO_PEDIDO
-                    && $order->orcamento
-                    && $order->user) {
-                    (new EstoqueReservaService())->reservarPedido(
-                        $order,
-                        $order->orcamento,
-                        $order->user,
-                    );
+        $order = ForcaVendasOrder::query()->with('pedido')->find($orderId);
+
+        if (! $order instanceof ForcaVendasOrder) {
+            $this->avisa('Pedido não encontrado.', 'warning');
+
+            return;
+        }
+
+        $this->reabrirOrderId = (int) $order->getKey();
+        $this->reabrirNumero = $this->numeroPedidoFaturamento($order);
+        $this->reabrirBoletoAutorizadoId = null;
+        $this->reabrirOk = false;
+        $this->reabrirSemVenda = false;
+        $this->reabrirTemBoleto = false;
+        $this->reabrirEtapa = '';
+        $this->reabrirErro = '';
+        $this->reabrirProgressStatus = 'Preparando reabertura...';
+        $this->reabrirProgressOpen = true;
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                if (window.__erpFvMonReabrirRun) {
+                    window.__erpFvMonReabrirRun($wire);
                 }
             });
-
-            $this->avisa('Pedido reaberto (pendente).', 'success');
-        } catch (\Throwable $e) {
-            $this->avisa($e->getMessage(), 'warning');
-        }
+        JS);
     }
 
     /**
-     * Cancela pedido pendente e libera reservas de estoque.
+     * @return array{ok: bool, aguardandoBoleto: bool, numero: string, etapa: string, erro: ?string, mensagem: string, semVenda: bool, temBoleto: bool}
      */
-    public function cancelarPedidoPendente(): void
+    public function processarReabertura(): array
     {
-        $order = $this->pedidoSelecionadoOuAvisa();
+        $vazio = $this->respostaReabertura(false, false, '', '', null, '', false, false);
 
-        if (! $order) {
-            return;
+        if (! $this->reabrirProgressOpen || ! $this->reabrirOrderId) {
+            return $vazio;
+        }
+
+        $numero = $this->reabrirNumero;
+        $etapa = 'Validando pedido';
+        $order = ForcaVendasOrder::query()->with('pedido')->find($this->reabrirOrderId);
+
+        if (! $order instanceof ForcaVendasOrder) {
+            return $this->guardarReabertura(false, $numero, $etapa, 'Pedido não encontrado.', false, false);
         }
 
         try {
-            (new ForcaVendasFaturamentoService())->cancelarPendente($order);
-            $this->avisa('Pedido cancelado. Reserva de estoque liberada.', 'success');
+            $info = (new ForcaVendasMonitorCancelamentoService())->reabrir(
+                $order,
+                $numero,
+                (int) $this->reabrirBoletoAutorizadoId === (int) $order->getKey(),
+                function (string $nome) use (&$etapa): void {
+                    $etapa = $nome;
+                },
+            );
+        } catch (ForcaVendasCancelamentoBoletoPendenteException $e) {
+            $this->reabrirTemBoleto = true;
+            $this->reabrirProgressStatus = $e->getMessage();
+
+            return $this->respostaReabertura(
+                false,
+                true,
+                $numero,
+                'Verificando boleto bancário',
+                null,
+                $e->getMessage(),
+                false,
+                true,
+            );
         } catch (\Throwable $e) {
-            $this->avisa($e->getMessage(), 'warning');
+            return $this->guardarReabertura(false, $numero, $etapa, $e->getMessage(), false, $this->reabrirTemBoleto);
         }
+
+        $this->reabrirBoletoAutorizadoId = null;
+
+        return $this->guardarReabertura(true, $numero, 'Reabrindo pedido', null, $info['sem_venda'], $info['tem_boleto']);
+    }
+
+    public function autorizarBaixaBoletoReabertura(): void
+    {
+        if (! $this->reabrirProgressOpen || ! $this->reabrirOrderId) {
+            return;
+        }
+
+        $this->reabrirBoletoAutorizadoId = $this->reabrirOrderId;
+    }
+
+    /**
+     * @return array{ok: bool, aguardandoBoleto: bool, numero: string, etapa: string, erro: ?string, mensagem: string, semVenda: bool, temBoleto: bool}
+     */
+    public function recusarBaixaBoletoReabertura(): array
+    {
+        return $this->guardarReabertura(
+            false,
+            $this->reabrirNumero,
+            'Verificando boleto bancário',
+            'Baixa do boleto não confirmada.',
+            false,
+            true,
+        );
+    }
+
+    public function concluirReabertura(): void
+    {
+        $ok = $this->reabrirOk;
+        $erro = trim($this->reabrirEtapa.($this->reabrirErro !== '' ? ': '.$this->reabrirErro : ''));
+        $numero = $this->reabrirNumero;
+
+        $this->reabrirProgressOpen = false;
+        $this->reabrirOrderId = null;
+        $this->reabrirNumero = '';
+        $this->reabrirProgressStatus = '';
+        $this->reabrirBoletoAutorizadoId = null;
+        $this->reabrirOk = false;
+        $this->reabrirSemVenda = false;
+        $this->reabrirTemBoleto = false;
+        $this->reabrirEtapa = '';
+        $this->reabrirErro = '';
+
+        if ($ok) {
+            $this->avisa('Pedido '.$numero.' reaberto.', 'success');
+        } else {
+            $this->avisa($erro !== '' ? 'Pedido '.$numero.' — '.$erro : 'Não foi possível reabrir o pedido.', 'warning');
+        }
+
+        $this->pushSelecaoToDetalhePanel();
+    }
+
+    /**
+     * @return array{ok: bool, aguardandoBoleto: bool, numero: string, etapa: string, erro: ?string, mensagem: string, semVenda: bool, temBoleto: bool}
+     */
+    private function guardarReabertura(
+        bool $ok,
+        string $numero,
+        string $etapa,
+        ?string $erro,
+        bool $semVenda,
+        bool $temBoleto,
+    ): array {
+        $this->reabrirOk = $ok;
+        $this->reabrirSemVenda = $semVenda;
+        $this->reabrirTemBoleto = $temBoleto;
+        $this->reabrirEtapa = $etapa;
+        $this->reabrirErro = (string) ($erro ?? '');
+
+        if (! $ok) {
+            $this->reabrirProgressStatus = 'Pedido '.$numero.' — falha em '.$etapa.($erro ? ': '.$erro : '');
+        }
+
+        return $this->respostaReabertura(ok: $ok, aguardandoBoleto: false, numero: $numero, etapa: $etapa, erro: $erro, mensagem: '', semVenda: $semVenda, temBoleto: $temBoleto);
+    }
+
+    /**
+     * @return array{ok: bool, aguardandoBoleto: bool, numero: string, etapa: string, erro: ?string, mensagem: string, semVenda: bool, temBoleto: bool}
+     */
+    private function respostaReabertura(
+        bool $ok,
+        bool $aguardandoBoleto,
+        string $numero,
+        string $etapa,
+        ?string $erro,
+        string $mensagem,
+        bool $semVenda,
+        bool $temBoleto,
+    ): array {
+        return [
+            'ok' => $ok,
+            'aguardandoBoleto' => $aguardandoBoleto,
+            'numero' => $numero,
+            'etapa' => $etapa,
+            'erro' => $erro,
+            'mensagem' => $mensagem,
+            'semVenda' => $semVenda,
+            'temBoleto' => $temBoleto,
+        ];
     }
 
     public function recebimento(): void
@@ -1157,9 +1878,16 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        $numeroPedido = $order->orcamento?->numero ?? ('#' . $order->id);
         $forma = $this->formaContaReceber($order);
-        $dias = $this->diasParcelas($order);
+
+        try {
+            $dias = $this->diasParcelas($order);
+        } catch (\RuntimeException $e) {
+            $this->avisa($e->getMessage(), 'warning');
+
+            return;
+        }
+
         $parcelas = count($dias);
         $total = round((float) $order->total, 2);
 
@@ -1175,13 +1903,17 @@ class ListForcaVendasMonitor extends ListRecords
                 'empresa_id' => $order->empresa_id ? (int) $order->empresa_id : null,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => Carbon::today(),
-                'historico' => 'PEDIDO APP ' . $numeroPedido
+                'historico' => 'PEDIDO APP FV'
                     . ($parcelas > 1 ? ' (' . ($i + 1) . '/' . $parcelas . ')' : ''),
                 'documento' => $parcelas > 1 ? $documento . '/' . ($i + 1) : $documento,
                 'cliente_id' => $order->cliente_id,
                 'vencimento' => Carbon::today()->addDays(max(0, $dia)),
                 'valor' => $valorParcela,
                 'forma' => $forma,
+                ...ContaReceberJurosCarteira::atributosParaCreate(
+                    $forma,
+                    $order->empresa_id ? (int) $order->empresa_id : null
+                ),
             ]);
         }
 
@@ -1198,154 +1930,324 @@ class ListForcaVendasMonitor extends ListRecords
         );
     }
 
-    /**
-     * Dias de vencimento de cada parcela, a partir da tabela de prazo do pedido
-     * (ex.: "30,60,90"). Sem tabela definida, gera uma única parcela à vista (hoje).
-     *
-     * @return array<int, int>
-     */
-    protected function diasParcelas(ForcaVendasOrder $order): array
+    public function emitirNfeDoBotao(): void
     {
-        $payload = is_array($order->payload) ? $order->payload : [];
+        $estado = $this->nfeEmitirEstado;
 
-        // 1º Canhoto POS (crédito/débito) gerado na Tela de Venda.
-        $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
+        if (! ($estado['enabled'] ?? false)) {
+            Notification::make()
+                ->title('Não é possível emitir NF-e.')
+                ->body((string) ($estado['title'] ?? 'Selecione pedidos faturados com cliente apto.'))
+                ->warning()
+                ->send();
 
-        if (is_array($canhotoDias) && $canhotoDias !== []) {
-            $dias = collect($canhotoDias)
-                ->map(fn ($d): int => (int) $d)
-                ->filter(fn (int $d): bool => $d >= 0)
-                ->values()
-                ->all();
+            return;
+        }
 
-            if ($dias !== []) {
-                return $dias;
+        $vendaIds = array_values(array_map('intval', $estado['venda_ids'] ?? []));
+
+        if ($vendaIds === []) {
+            return;
+        }
+
+        $mode = (($estado['mode'] ?? '') === 'lote') ? 'lote' : 'single';
+        $resolver = app(NfeMonitorEmitenteResolver::class);
+
+        if ($resolver->flagAtivo(ErpContext::currentEmpresa())) {
+            $this->abrirModalEmpresaEmitenteNfe($vendaIds, $mode);
+
+            return;
+        }
+
+        if ($mode === 'lote') {
+            $this->iniciarNfeLote($vendaIds);
+
+            return;
+        }
+
+        $this->redirect(NfeResource::getUrl('index').'?venda_id='.$vendaIds[0]);
+    }
+
+    /**
+     * Fatia 4B1: abre NF-e aberta existente (não cria outra).
+     */
+    public function abrirNfeAbertaDoBotao(): void
+    {
+        $estado = $this->nfeAbrirEstado;
+
+        if (! ($estado['enabled'] ?? false) || ! ($estado['nfe_id'] ?? null)) {
+            Notification::make()
+                ->title('Não é possível abrir a NF-e.')
+                ->body((string) ($estado['title'] ?? 'Selecione um pedido com NF-e aberta.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirect(NfeResource::getUrl('index').'?nfe_id='.(int) $estado['nfe_id']);
+    }
+
+    /**
+     * @param  list<int>  $vendaIds
+     */
+    public function iniciarNfeLote(array $vendaIds, ?int $empresaEmitenteId = null): void
+    {
+        $vendaIds = array_values(array_filter(array_map('intval', $vendaIds)));
+
+        if (count($vendaIds) < 2) {
+            Notification::make()->title('Selecione ao menos duas vendas para o lote.')->warning()->send();
+
+            return;
+        }
+
+        $emitenteId = $empresaEmitenteId && $empresaEmitenteId > 0 ? (int) $empresaEmitenteId : null;
+
+        if ($emitenteId !== null) {
+            $resolver = app(NfeMonitorEmitenteResolver::class);
+            if (! $resolver->emitentePermitida($emitenteId, ErpContext::currentEmpresa(), Auth::user())) {
+                Notification::make()
+                    ->title('Empresa emitente inválida.')
+                    ->body('A emitente escolhida não está mais autorizada ou acessível. O lote não foi iniciado.')
+                    ->warning()
+                    ->send();
+                $this->nfeLoteEmpresaEmitenteId = null;
+
+                return;
             }
         }
 
-        // 2º Tabela de prazo (string "30,60" ou lista).
-        $prazoRaw = $payload['tabela_prazo_dias'] ?? '';
-
-        if (is_array($prazoRaw)) {
-            $dias = collect($prazoRaw)
-                ->map(fn ($d): int => (int) $d)
-                ->filter(fn (int $d): bool => $d >= 0)
-                ->values()
-                ->all();
-
-            return $dias === [] ? [0] : $dias;
-        }
-
-        $dias = collect(explode(',', (string) $prazoRaw))
-            ->map(fn ($d): int => (int) trim((string) $d))
-            ->filter(fn ($d): bool => $d >= 0)
-            ->values()
-            ->all();
-
-        return $dias === [] ? [0] : $dias;
+        $this->nfeLoteEmpresaEmitenteId = $emitenteId;
+        $this->nfeLoteFilaVendaIds = $vendaIds;
+        $this->nfeLoteFilaIndex = 0;
+        $this->nfeLoteTotal = count($vendaIds);
+        $this->nfeLoteAtual = 0;
+        $this->nfeLoteResultados = [];
+        $this->nfeLoteResumoOpen = false;
+        $this->nfeLoteProgressOpen = true;
+        $this->nfeLoteProgressStep = 0;
+        $this->nfeLoteProgressStatus = 'Preparando lote…';
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                if (window.__erpFvMonNfeLoteRun) {
+                    window.__erpFvMonNfeLoteRun($wire);
+                }
+            });
+        JS);
     }
 
     /**
-     * Mapeia a forma de pagamento textual do app para a forma da conta a receber.
+     * Atualiza UI para a próxima nota (sem transmitir ainda).
+     *
+     * @return array{done: bool, atual: int, total: int}
      */
-    protected function formaContaReceber(ForcaVendasOrder $order): string
+    public function prepararProximoItemNfeLote(): array
     {
-        $forma = mb_strtolower((string) ($order->payload['forma_pagamento'] ?? ''), 'UTF-8');
+        if (! $this->nfeLoteProgressOpen || $this->nfeLoteFilaVendaIds === []) {
+            return ['done' => true, 'atual' => 0, 'total' => 0];
+        }
 
-        return match (true) {
-            str_contains($forma, 'boleto') => ContaReceber::FORMA_BOLETO,
-            str_contains($forma, 'cheque') => ContaReceber::FORMA_CHEQUE,
-            str_contains($forma, 'cart') || str_contains($forma, 'pos') || str_contains($forma, 'tef') => ContaReceber::FORMA_CARTAO,
-            default => ContaReceber::FORMA_CARTEIRA,
-        };
+        if ($this->nfeLoteFilaIndex >= count($this->nfeLoteFilaVendaIds)) {
+            $this->finalizarNfeLote();
+
+            return [
+                'done' => true,
+                'atual' => $this->nfeLoteTotal,
+                'total' => $this->nfeLoteTotal,
+            ];
+        }
+
+        $this->nfeLoteAtual = $this->nfeLoteFilaIndex + 1;
+        $this->nfeLoteProgressStep = 0;
+        $this->nfeLoteProgressStatus = 'Nota '.$this->nfeLoteAtual.' de '.$this->nfeLoteTotal.' — Validando dados da NF-e…';
+
+        return [
+            'done' => false,
+            'atual' => $this->nfeLoteAtual,
+            'total' => $this->nfeLoteTotal,
+        ];
     }
 
-    public function emitirNfeSelecionado(): void
+    /**
+     * Transmite a nota já preparada na fila (index atual).
+     *
+     * @return array{done: bool, atual: int, total: int, ok: ?bool, erro: ?string}
+     */
+    public function processarProximoItemNfeLote(): array
     {
-        $recordId = $this->highlightedRecordId
-            ?: (int) ($this->selecionados[count($this->selecionados) - 1] ?? 0);
-
-        if ($recordId <= 0) {
-            Notification::make()
-                ->title('Selecione um pedido faturado para emitir NF-e.')
-                ->warning()
-                ->send();
-
-            return;
+        if (! $this->nfeLoteProgressOpen || $this->nfeLoteFilaVendaIds === []) {
+            return ['done' => true, 'atual' => 0, 'total' => 0, 'ok' => null, 'erro' => null];
         }
 
-        if (! ErpAccess::currentCan('nfe.access')) {
-            Notification::make()
-                ->title('Sem permissão para acessar NF-e.')
-                ->warning()
-                ->send();
+        if ($this->nfeLoteFilaIndex >= count($this->nfeLoteFilaVendaIds)) {
+            $this->finalizarNfeLote();
 
-            return;
+            return [
+                'done' => true,
+                'atual' => $this->nfeLoteTotal,
+                'total' => $this->nfeLoteTotal,
+                'ok' => null,
+                'erro' => null,
+            ];
         }
 
-        if (! ErpAccess::currentCan('nfe.emit')) {
-            Notification::make()
-                ->title('Sem permissão para emitir NF-e.')
-                ->warning()
-                ->send();
+        $vendaId = (int) $this->nfeLoteFilaVendaIds[$this->nfeLoteFilaIndex];
+        $this->nfeLoteAtual = $this->nfeLoteFilaIndex + 1;
 
-            return;
-        }
+        $venda = Venda::query()
+            ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido'])
+            ->find($vendaId);
 
-        $empresaId = ErpContext::currentEmpresaId();
-
-        $order = ForcaVendasOrder::query()
-            ->with(['venda.itens', 'venda.cliente', 'orcamento'])
-            ->when($empresaId, fn (Builder $query, int $eid) => $query->where('empresa_id', $eid))
-            ->find($recordId);
-
-        if (! $order) {
-            Notification::make()
-                ->title('Pedido não encontrado.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        if ($order->situacao !== ForcaVendasOrder::SITUACAO_FATURADO || ! $order->venda_id) {
-            Notification::make()
-                ->title('Somente pedido já faturado pode emitir NF-e.')
-                ->body('Fature o pedido no Monitor antes de emitir a nota.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $venda = $order->venda;
+        $davLabel = null;
 
         if (! $venda) {
-            Notification::make()
-                ->title('Venda da retaguarda não encontrada para este pedido.')
-                ->warning()
-                ->send();
+            $resultado = [
+                'ok' => false,
+                'venda_id' => $vendaId,
+                'nfe_id' => null,
+                'numero' => null,
+                'erro' => 'Venda #'.$vendaId.' não encontrada.',
+            ];
+        } else {
+            $davLabel = (string) ($venda->forcaVendasOrder?->pedido?->numero
+                ?? $venda->numero
+                ?? $vendaId);
 
-            return;
+            $emitenteId = $this->nfeLoteEmpresaEmitenteId && $this->nfeLoteEmpresaEmitenteId > 0
+                ? (int) $this->nfeLoteEmpresaEmitenteId
+                : null;
+
+            if ($emitenteId !== null) {
+                $resolver = app(NfeMonitorEmitenteResolver::class);
+                if (! $resolver->emitentePermitida($emitenteId, ErpContext::currentEmpresa(), Auth::user())) {
+                    $resultado = [
+                        'ok' => false,
+                        'venda_id' => $vendaId,
+                        'nfe_id' => null,
+                        'numero' => null,
+                        'protocolo' => null,
+                        'erro' => 'Empresa emitente inválida ou sem acesso. A emissão deste pedido foi interrompida sem alterar a empresa da sessão.',
+                    ];
+                } else {
+                    $resultado = app(NfeVendaLoteEmissionService::class)
+                        ->criarETransmitir($venda, function (int $step, string $label): void {
+                            $this->nfeLoteProgressStep = $step;
+                            $this->nfeLoteProgressStatus = 'Nota '.$this->nfeLoteAtual.' de '.$this->nfeLoteTotal.' — '.$label.'…';
+                        }, $emitenteId);
+                }
+            } else {
+                $resultado = app(NfeVendaLoteEmissionService::class)
+                    ->criarETransmitir($venda, function (int $step, string $label): void {
+                        $this->nfeLoteProgressStep = $step;
+                        $this->nfeLoteProgressStatus = 'Nota '.$this->nfeLoteAtual.' de '.$this->nfeLoteTotal.' — '.$label.'…';
+                    });
+            }
         }
 
-        try {
-            app(NfeVendaMercadoriaService::class)->validar($venda);
-        } catch (\Throwable $exception) {
-            Notification::make()
-                ->title('Não foi possível emitir a NF-e.')
-                ->body($exception->getMessage())
-                ->warning()
-                ->send();
+        $nfeIdResultado = isset($resultado['nfe_id']) && (int) $resultado['nfe_id'] > 0
+            ? (int) $resultado['nfe_id']
+            : null;
 
-            return;
+        $this->nfeLoteResultados[] = [
+            'ok' => (bool) ($resultado['ok'] ?? false),
+            'venda_id' => (int) ($resultado['venda_id'] ?? $vendaId),
+            'nfe_id' => $nfeIdResultado,
+            'dav' => $davLabel,
+            'numero' => $resultado['numero'] ?? null,
+            'erro' => $resultado['erro'] ?? null,
+        ];
+
+        $this->nfeLoteFilaIndex++;
+
+        $ok = (bool) ($resultado['ok'] ?? false);
+
+        if ($this->nfeLoteFilaIndex >= count($this->nfeLoteFilaVendaIds)) {
+            $this->finalizarNfeLote();
+
+            return [
+                'done' => true,
+                'atual' => $this->nfeLoteTotal,
+                'total' => $this->nfeLoteTotal,
+                'ok' => $ok,
+                'erro' => $resultado['erro'] ?? null,
+            ];
         }
 
-        $this->redirect(NfeResource::getUrl('index').'?venda_id='.$venda->id);
+        return [
+            'done' => false,
+            'atual' => $this->nfeLoteAtual,
+            'total' => $this->nfeLoteTotal,
+            'ok' => $ok,
+            'erro' => $resultado['erro'] ?? null,
+        ];
+    }
+
+    protected function finalizarNfeLote(): void
+    {
+        $ok = collect($this->nfeLoteResultados)->where('ok', true)->count();
+        $erro = collect($this->nfeLoteResultados)->where('ok', false)->count();
+
+        $this->nfeLoteProgressOpen = false;
+        $this->nfeLoteResumoOpen = true;
+        $this->nfeLoteResumoTitulo = 'Lote de NF-e concluído';
+        $this->nfeLoteResumoTexto = $ok.' autorizada(s), '.$erro.' com erro.';
+        // Detalhes de erro + Abrir NF-e (Fatia 4B2) vêm de nfeLoteResultados no Blade.
+
+        $this->selecionados = [];
+        $this->pushSelecaoToDetalhePanel();
+        $this->resetTable();
+        unset($this->nfeEmitirEstado, $this->nfeAbrirEstado);
+        $this->nfeLoteEmpresaEmitenteId = null;
+    }
+
+    /**
+     * Fatia 4B2: link do resumo só se a NF-e ainda existir e estiver aberta.
+     * Autorização real fica no deep link ?nfe_id= (Fatia 4B1).
+     */
+    public function nfeIdAbertaDoResumoLote(?int $nfeId): ?int
+    {
+        if (! $nfeId || $nfeId <= 0) {
+            return null;
+        }
+
+        $exists = \App\Models\Nfe::query()
+            ->whereKey($nfeId)
+            ->where('status', \App\Models\Nfe::STATUS_ABERTA)
+            ->exists();
+
+        return $exists ? $nfeId : null;
+    }
+
+    public function fecharNfeLoteResumo(): void
+    {
+        $this->nfeLoteResumoOpen = false;
+        $this->nfeLoteFilaVendaIds = [];
+        $this->nfeLoteResultados = [];
+        $this->nfeLoteFilaIndex = 0;
+        $this->nfeLoteAtual = 0;
+        $this->nfeLoteTotal = 0;
+        $this->nfeLoteEmpresaEmitenteId = null;
+    }
+
+    /** @deprecated Use emitirNfeDoBotao */
+    public function emitirNfeSelecionado(): void
+    {
+        $this->emitirNfeDoBotao();
     }
 
     public function telaVenda(): void
     {
+        if ($this->clonarProgressOpen) {
+            return;
+        }
+
+        if (count($this->selecionados) > 1) {
+            $this->avisa('Abra apenas um pedido por vez na Tela de Venda. Desmarque a seleção em lote.', 'warning');
+
+            return;
+        }
+
         // Sem seleção: abre tela em branco (nova venda).
         if (! $this->highlightedRecordId && $this->selecionados === []) {
             $this->redirect(ForcaVendasTelaVendaPage::getUrl());
@@ -1365,10 +2267,23 @@ class ListForcaVendasMonitor extends ListRecords
             return;
         }
 
-        $order = ForcaVendasOrder::query()->with('orcamento')->find($recordId);
+        $order = ForcaVendasOrder::query()->with('pedido')->find($recordId);
 
         if (! $order) {
             $this->avisa('Pedido não encontrado.', 'warning');
+
+            return;
+        }
+
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO) {
+            if ($order->tipo !== ForcaVendasOrder::TIPO_PEDIDO) {
+                $this->avisa('Somente pedidos podem ser abertos nesta tela.', 'warning');
+
+                return;
+            }
+
+            $this->clonarPedidoOrderId = (int) $order->getKey();
+            $this->clonarPedidoModalOpen = true;
 
             return;
         }
@@ -1388,10 +2303,120 @@ class ListForcaVendasMonitor extends ListRecords
         $this->redirect(ForcaVendasTelaVendaPage::getUrl(['pedido' => $order->id]));
     }
 
-    protected function documentoReceber(ForcaVendasOrder $order): string
+    public function confirmarClonarPedidoCancelado(): void
     {
-        return 'FV-' . $order->id;
+        if ($this->clonarProgressOpen || ! $this->clonarPedidoModalOpen || ! $this->clonarPedidoOrderId) {
+            return;
+        }
+
+        $this->clonarOk = false;
+        $this->clonarNovoId = null;
+        $this->clonarEtapa = '';
+        $this->clonarErro = '';
+        $this->clonarPedidoModalOpen = false;
+        $this->clonarProgressOpen = true;
+        $this->pushSelecaoToDetalhePanel();
+        $this->js(<<<'JS'
+            queueMicrotask(() => {
+                if (window.__erpFvMonClonarRun) {
+                    window.__erpFvMonClonarRun($wire);
+                }
+            });
+        JS);
     }
+
+    /**
+     * @return array{ok: bool, etapa: string, erro: ?string, pedidoId: ?int}
+     */
+    public function processarClonagemPedido(): array
+    {
+        $vazio = ['ok' => false, 'etapa' => 'Validando pedido cancelado', 'erro' => 'Clonagem não iniciada.', 'pedidoId' => null];
+
+        if (! $this->clonarProgressOpen || ! $this->clonarPedidoOrderId) {
+            return $vazio;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof \App\Models\User) {
+            return $this->guardarClonagem(false, 'Validando pedido cancelado', 'Usuário não autenticado.', null);
+        }
+
+        $order = ForcaVendasOrder::query()->with('pedido.itens')->find($this->clonarPedidoOrderId);
+
+        if (! $order instanceof ForcaVendasOrder) {
+            return $this->guardarClonagem(false, 'Validando pedido cancelado', 'Pedido não encontrado.', null);
+        }
+
+        $etapa = 'Validando pedido cancelado';
+
+        try {
+            $novo = app(ForcaVendasTelaVendaService::class)->clonarPedidoCancelado(
+                $order,
+                $user,
+                function (string $nome) use (&$etapa): void {
+                    $etapa = $nome;
+                },
+            );
+        } catch (\Throwable $e) {
+            return $this->guardarClonagem(false, $etapa, $e->getMessage(), null);
+        }
+
+        if (! $novo->id) {
+            return $this->guardarClonagem(false, $etapa, 'Não foi possível criar o pedido clonado.', null);
+        }
+
+        return $this->guardarClonagem(true, 'Abrindo Tela de Venda', null, (int) $novo->id);
+    }
+
+    public function concluirClonagemPedido(): void
+    {
+        $ok = $this->clonarOk;
+        $novoId = $this->clonarNovoId;
+        $erro = trim($this->clonarEtapa.($this->clonarErro !== '' ? ': '.$this->clonarErro : ''));
+
+        $this->clonarProgressOpen = false;
+        $this->clonarPedidoModalOpen = false;
+        $this->clonarPedidoOrderId = null;
+        $this->clonarOk = false;
+        $this->clonarNovoId = null;
+        $this->clonarEtapa = '';
+        $this->clonarErro = '';
+        $this->pushSelecaoToDetalhePanel();
+
+        if ($ok && $novoId) {
+            $this->redirect(ForcaVendasTelaVendaPage::getUrl(['pedido' => $novoId]));
+
+            return;
+        }
+
+        $this->avisa($erro !== '' ? $erro : 'Não foi possível clonar o pedido.', 'warning');
+    }
+
+    /**
+     * @return array{ok: bool, etapa: string, erro: ?string, pedidoId: ?int}
+     */
+    private function guardarClonagem(bool $ok, string $etapa, ?string $erro, ?int $pedidoId): array
+    {
+        $this->clonarOk = $ok;
+        $this->clonarNovoId = $pedidoId;
+        $this->clonarEtapa = $etapa;
+        $this->clonarErro = (string) ($erro ?? '');
+
+        return [
+            'ok' => $ok,
+            'etapa' => $etapa,
+            'erro' => $erro,
+            'pedidoId' => $pedidoId,
+        ];
+    }
+
+    public function recusarClonarPedidoCancelado(): void
+    {
+        $this->clonarPedidoModalOpen = false;
+        $this->clonarPedidoOrderId = null;
+    }
+
 
     protected function pedidoSelecionadoOuAvisa(): ?ForcaVendasOrder
     {
@@ -1401,7 +2426,7 @@ class ListForcaVendasMonitor extends ListRecords
             return null;
         }
 
-        $order = ForcaVendasOrder::query()->with('orcamento')->find($recordId);
+        $order = ForcaVendasOrder::query()->with('pedido')->find($recordId);
 
         if (! $order) {
             $this->avisa('Pedido não encontrado.', 'warning');

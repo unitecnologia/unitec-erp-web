@@ -8,7 +8,12 @@
     class="erp-fv-tv-root"
     x-data
     x-init="$nextTick(() => {
-        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen)) return;
+        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen)) return;
+        // Após lançar item / fechar modal o Livewire remonta: não roubar o foco de volta ao cliente.
+        if (@js(count($this->itens) > 0) || window.__erpFvTvInitialFocusDone) {
+            return;
+        }
+        window.__erpFvTvInitialFocusDone = true;
         const clienteEl = document.getElementById('fv-tv-cliente-busca');
         if (clienteEl && !@js($isEdicaoPedido)) {
             clienteEl.focus();
@@ -17,47 +22,112 @@
         }
         $refs.barcode?.focus();
     })"
-    x-on:keydown.window="
+    x-on:keydown.window.capture="
         const finOpen = $wire.etapa === 'finalizacao';
         const descontoOpen = !!$wire.descontoModalOpen;
         const excluirOpen = !!$wire.excluirItemModalOpen;
+        const importarOpen = !!$wire.fvImportarOrcamentoOpen;
+        const margemOpen = !!$wire.margemModalOpen;
         const canhotoOpen = !!$wire.finalizarCartaoCanhotoAberta;
+        const boletoPickOpen = !!$wire.boletoContaPickOpen;
+        const boletoSucessoOpen = !!(typeof $wire.boletoSucessoDetalhe === 'string' && $wire.boletoSucessoDetalhe);
+        const tecla = ($event.key || '');
 
+        // Ctrl+D: sempre bloquear favorito do Chrome (mesmo com foco em input).
+        if ($event.ctrlKey && (tecla === 'd' || tecla === 'D')) {
+            $event.preventDefault();
+            $event.stopPropagation();
+            if (!finOpen && !descontoOpen && !excluirOpen && !importarOpen && !margemOpen && !boletoPickOpen && !boletoSucessoOpen) {
+                $wire.abrirModalDescontoItem();
+            }
+            return;
+        }
+
+        if (boletoPickOpen) {
+            if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarGerarBoletoComConta(); return; }
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.closeBoletoContaPickModal(); return; }
+            return;
+        }
+        if (boletoSucessoOpen) {
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.acknowledgeBoletoSucessoOverlay(); }
+            return;
+        }
+
+        if (margemOpen) {
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharMargemVenda(); }
+            return;
+        }
         if (excluirOpen) {
             if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarExcluirItem(); return; }
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelarExcluirItem(); return; }
             return;
         }
+        if (importarOpen) {
+            if ($event.key === 'ArrowDown') { $event.preventDefault(); $wire.moveFvImportarOrcamentoSelection(1); return; }
+            if ($event.key === 'ArrowUp') { $event.preventDefault(); $wire.moveFvImportarOrcamentoSelection(-1); return; }
+            if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarImportarOrcamento(); return; }
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharImportarOrcamento(); return; }
+            return;
+        }
 
         const target = $event.target;
         const inField = target.closest?.('input, textarea, select, button.erp-fv-tv__combo-btn');
-        const inValorPagamento = typeof target?.id === 'string' && target.id.startsWith('erp-fv-finalizar-valor-');
         const inClienteFin = target?.id === 'erp-fv-fin-cliente';
         const inAjusteFin = !!target.closest?.('.erp-fv-fin__ajuste');
-        const tecla = ($event.key || '');
         const teclaAtalho = tecla.length === 1 && /[a-zA-Z0-9]/.test(tecla) && !$event.ctrlKey && !$event.altKey && !$event.metaKey;
-
-        if ($event.key === 'Delete' && !inField && !finOpen && !descontoOpen) {
-            $event.preventDefault();
-            $wire.pedirConfirmacaoExcluirItem();
-            return;
-        }
-        if ($event.ctrlKey && (tecla === 'd' || tecla === 'D')) {
-            if (!finOpen && !inField) {
-                $event.preventDefault();
-                $wire.abrirModalDescontoItem();
-                return;
-            }
-        }
 
         // Finalização: atalhos A/B/C… preenchem o restante (padrão PDV), mesmo com foco no Valor.
         if (finOpen) {
+            const parcelasOpen = !!$wire.fvTabelaPrazoConsulta;
+            const tabelasPrazoOpen = !!$wire.fvTabelasPrazoListaAberta;
+            const transporteOpen = !!$wire.fvTransporteModalOpen;
+
+            if (transporteOpen) {
+                if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharFvTransporteModal(); return; }
+                if ($event.key === 'Enter' && !$event.target?.closest?.('textarea, select')) {
+                    // Enter nos campos de busca já tem wire:keydown; não forçar confirmar.
+                }
+                return;
+            }
+
             if (canhotoOpen) {
                 if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelFinalizarCartaoCanhoto(); return; }
                 if ($event.key === 'F2') { $event.preventDefault(); $wire.gerarParcelasCartaoCanhoto(); return; }
                 if ($event.key === 'F7') { $event.preventDefault(); $wire.concluirCartaoCanhoto(); return; }
                 return;
             }
+
+            if (parcelasOpen) {
+                if (tabelasPrazoOpen) {
+                    if ($event.key === 'ArrowDown' || $event.key === 'ArrowUp') {
+                        $event.preventDefault();
+                        $wire.moveFvTabelaPredefinidaSelection($event.key === 'ArrowDown' ? 1 : -1);
+                        return;
+                    }
+                    if ($event.key === 'Enter') { $event.preventDefault(); $wire.aplicarFvTabelaPrazoPredefinida(); return; }
+                    if ($event.key === 'Escape' || $event.key === 'F4') { $event.preventDefault(); $wire.fecharFvTabelasPrazoPredefinidas(); return; }
+                    return;
+                }
+                if ($event.key === 'F2') { $event.preventDefault(); $wire.gerarFvParcelasCrediario(); return; }
+                if ($event.key === 'F8') { $event.preventDefault(); $wire.abrirFvTabelasPrazoPredefinidas(); return; }
+                if ($event.key === 'F3') { $event.preventDefault(); $wire.excluirFvParcelaCrediario(); return; }
+                if ($event.key === 'F4' || $event.key === 'Escape') { $event.preventDefault(); $wire.cancelarFvTabelaPrazoConsulta(); return; }
+                if ($event.key === 'F7') { $event.preventDefault(); $wire.concluirFvParcelasCrediario(); return; }
+                if ($event.key === 'Enter') {
+                    const typing = document.activeElement?.id === 'erp-fv-parcelas-qtd'
+                        || document.activeElement?.id === 'erp-fv-parcelas-intervalo';
+                    $event.preventDefault();
+                    if (typing) { $wire.gerarFvParcelasCrediario(); } else { $wire.concluirFvParcelasCrediario(); }
+                    return;
+                }
+                if ($event.key === 'ArrowDown' || $event.key === 'ArrowUp') {
+                    $event.preventDefault();
+                    $wire.moveFvParcelaSelection($event.key === 'ArrowDown' ? 1 : -1);
+                    return;
+                }
+                return;
+            }
+
             if ($event.key === 'Escape') {
                 $event.preventDefault();
                 if (document.querySelector('.erp-fv-fin__suggest')) {
@@ -67,11 +137,23 @@
                 $wire.voltarParaVenda();
                 return;
             }
-            if ($event.key === 'F4' || $event.key === 'F6') { $event.preventDefault(); return; }
-            if ($event.key === 'F5') { $event.preventDefault(); $wire.confirmarPedido(); return; }
-            if ($event.key === 'F8') { $event.preventDefault(); $wire.faturarPedido(); return; }
+            if ($event.key === 'F10') { $event.preventDefault(); $wire.faturarPedido(); return; }
+            if ($event.key === 'F9') { $event.preventDefault(); $wire.abrirFvTransporteModal(); return; }
+            // F8 = próxima forma (padrão PDV); Concluir é F10.
+            if ($event.key === 'F8') {
+                $event.preventDefault();
+                if (! inClienteFin && ! inAjusteFin) {
+                    $wire.movePagamentoSelection(1);
+                }
+                return;
+            }
 
             if (inClienteFin || inAjusteFin) {
+                return;
+            }
+            if ($event.key === 'ArrowDown' || $event.key === 'ArrowUp') {
+                $event.preventDefault();
+                $wire.movePagamentoSelection($event.key === 'ArrowDown' ? 1 : -1);
                 return;
             }
             // Só letras/atalhos das formas (A, B, C…). Dígitos e vírgula ficam livres no Valor.
@@ -93,7 +175,8 @@
                 $event.preventDefault();
                 return;
             }
-            if ($event.key === 'F4' || $event.key === 'F5' || $event.key === 'F8') {
+            // Atalhos de ação também com foco em input (F2 Importar, F3 Pendente, F4 Fechar…).
+            if ($event.key === 'F2' || $event.key === 'F3' || $event.key === 'F4' || $event.key === 'F5' || $event.key === 'F8' || $event.key === 'F9' || $event.key === 'F10') {
                 $event.preventDefault();
             } else {
                 return;
@@ -103,11 +186,21 @@
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharModalDescontoItem(); }
             return;
         }
-        if ($event.key === 'F4') { $event.preventDefault(); $wire.irParaFinalizacao(); }
-        if ($event.key === 'F5' || $event.key === 'Escape') { $event.preventDefault(); $wire.cancelarVenda(); }
+        if ($event.key === 'F2') { $event.preventDefault(); $wire.abrirImportarOrcamento(); return; }
+        if ($event.key === 'F3') { $event.preventDefault(); $wire.gravarPedidoPendente(); return; }
+        if ($event.key === 'F4') { $event.preventDefault(); $wire.irParaFinalizacao(); return; }
+        if ($event.key === 'F5' || $event.key === 'Escape') { $event.preventDefault(); $wire.cancelarVenda(); return; }
     "
     x-on:fv-tela-venda-focus-cliente.window="$nextTick(() => { const el = document.getElementById('fv-tv-cliente-busca'); el?.focus(); el?.select?.(); })"
-    x-on:fv-tela-venda-focus-barcode.window="$nextTick(() => { $refs.barcode?.focus(); $refs.barcode?.select?.(); })"
+    x-on:fv-tela-venda-focus-barcode.window="
+        $nextTick(() => {
+            requestAnimationFrame(() => {
+                const el = document.getElementById('fv-tv-barcode') || $refs.barcode;
+                el?.focus();
+                el?.select?.();
+            });
+        })
+    "
     x-on:fv-tela-venda-focus-qtd.window="$nextTick(() => { const el = document.getElementById('fv-tv-qtd'); el?.focus(); el?.select?.(); })"
     x-on:fv-tela-venda-focus-preco.window="$nextTick(() => { const el = document.getElementById('fv-tv-preco'); el?.focus(); el?.select?.(); })"
     x-on:erp-fv-scroll-cliente-sugestao.window="
@@ -125,12 +218,21 @@
     "
     x-on:erp-fv-focus-desconto-item.window="$nextTick(() => { const el = document.getElementById('erp-fv-desconto-preco'); el?.focus(); el?.select?.(); })"
     x-on:erp-fv-focus-excluir-item-sim.window="$nextTick(() => document.getElementById('erp-fv-excluir-sim')?.focus())"
+    x-on:erp-fv-focus-importar-orcamento.window="$nextTick(() => { const el = document.getElementById('erp-fv-importar-orc-search'); el?.focus(); el?.select?.(); })"
+    x-on:erp-fv-scroll-importar-orcamento.window="
+        $nextTick(() => {
+            const i = $event.detail.index ?? 0;
+            document.getElementById('erp-fv-importar-orc-row-' + i)?.scrollIntoView({ block: 'nearest' });
+        })
+    "
 >
-    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen ? 'is-dimmed' : '' }}">
+    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
         @include('filament.components.erp.forca-vendas.tela-venda.venda')
     </div>
 
-    @include('filament.components.erp.forca-vendas.tela-venda.action-bar')
+    @unless ($this->boletoContaPickOpen || filled($this->boletoSucessoDetalhe))
+        @include('filament.components.erp.forca-vendas.tela-venda.action-bar')
+    @endunless
 
     @if ($finOpen)
         @include('filament.components.erp.forca-vendas.tela-venda.finalizacao')
@@ -138,6 +240,9 @@
 
     @include('filament.components.erp.forca-vendas.tela-venda.desconto-item')
     @include('filament.components.erp.forca-vendas.tela-venda.excluir-item')
+    @include('filament.components.erp.forca-vendas.tela-venda.importar-orcamento')
+    @include('filament.components.erp.forca-vendas.tela-venda.margem-venda')
+    @include('filament.components.erp.boleto-pos-documento')
 
     <div
         wire:ignore

@@ -133,79 +133,70 @@
     }
 }
 
+/* ── Abas estilo fichário (padrão Orçamentos) ── */
+
 .erp-devolucao-compra-page .erp-orcamentos__tabs-wrap {
     flex-shrink: 0;
-    margin: 0;
+    margin: 0 0 -1px;
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-devolucao-compra-page .erp-orcamentos__tabs {
     margin: 0;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
-.erp-devolucao-compra-page .erp-orcamentos__tab {
+.erp-devolucao-compra-page .erp-orcamentos__tab,
+.erp-devolucao-compra-page .erp-orcamentos__tab--todos,
+.erp-devolucao-compra-page .erp-orcamentos__tab--aberto,
+.erp-devolucao-compra-page .erp-orcamentos__tab--fechado,
+.erp-devolucao-compra-page .erp-orcamentos__tab--cancelado {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0.2rem 0.65rem;
     line-height: 1.1;
     min-height: 0;
-    font-weight: 700;
-    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: #64748b;
+    background: #e8edf3;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
+    cursor: pointer;
+    appearance: none;
+    transition: none;
 }
 
-.erp-devolucao-compra-page .erp-orcamentos__tab--todos {
-    background: #111827;
-    color: #fff;
-    border-color: #030712;
+.erp-devolucao-compra-page .erp-orcamentos__tab:hover:not(.erp-orcamentos__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
 }
 
-.erp-devolucao-compra-page .erp-orcamentos__tab--todos.erp-orcamentos__tab--active {
-    background: #030712;
-    color: #fff;
-    border-color: #000;
-    box-shadow: inset 0 -2px 0 #000;
-}
-
-.erp-devolucao-compra-page .erp-orcamentos__tab--aberto {
-    background: #facc15;
-    color: #422006;
-    border-color: #ca8a04;
-}
-
-.erp-devolucao-compra-page .erp-orcamentos__tab--aberto.erp-orcamentos__tab--active {
-    background: #eab308;
-    border-color: #a16207;
-    box-shadow: inset 0 -2px 0 #a16207;
-}
-
-.erp-devolucao-compra-page .erp-orcamentos__tab--fechado {
-    background: #2563eb;
-    color: #fff;
-    border-color: #1d4ed8;
-}
-
-.erp-devolucao-compra-page .erp-orcamentos__tab--fechado.erp-orcamentos__tab--active {
-    background: #1d4ed8;
-    border-color: #1e3a8a;
-    box-shadow: inset 0 -2px 0 #1e3a8a;
-}
-
-.erp-devolucao-compra-page .erp-orcamentos__tab--cancelado {
-    background: #dc2626;
-    color: #fff;
-    border-color: #b91c1c;
-}
-
+.erp-devolucao-compra-page .erp-orcamentos__tab--active,
+.erp-devolucao-compra-page .erp-orcamentos__tab--todos.erp-orcamentos__tab--active,
+.erp-devolucao-compra-page .erp-orcamentos__tab--aberto.erp-orcamentos__tab--active,
+.erp-devolucao-compra-page .erp-orcamentos__tab--fechado.erp-orcamentos__tab--active,
 .erp-devolucao-compra-page .erp-orcamentos__tab--cancelado.erp-orcamentos__tab--active {
-    background: #b91c1c;
-    border-color: #7f1d1d;
-    box-shadow: inset 0 -2px 0 #7f1d1d;
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 .erp-devolucao-compra-page .erp-orcamentos__total {

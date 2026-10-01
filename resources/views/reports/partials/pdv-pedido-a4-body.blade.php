@@ -41,6 +41,12 @@
                 <span><strong>CLIENTE:</strong> {{ $clienteNome }}</span>
             </div>
             <div class="pdv-pedido-a4__meta-row">
+                <span>
+                    <strong>CNPJ:</strong> {{ $clienteDocumento ?: '' }}
+                    &nbsp;<strong>IE:</strong> {{ $clienteIe ?: '' }}
+                </span>
+            </div>
+            <div class="pdv-pedido-a4__meta-row">
                 <span><strong>VENDEDOR:</strong> {{ $vendedorNome }}</span>
             </div>
             <div class="pdv-pedido-a4__meta-row">

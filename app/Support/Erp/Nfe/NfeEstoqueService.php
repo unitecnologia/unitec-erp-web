@@ -4,9 +4,11 @@ namespace App\Support\Erp\Nfe;
 
 use App\Models\Empresa;
 use App\Models\Estoque;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Cfop;
 use App\Models\Nfe;
 use App\Models\Product;
+use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\Pdv\PdvStockService;
 use Illuminate\Support\Facades\Schema;
@@ -121,6 +123,13 @@ final class NfeEstoqueService
                 docSaida: $docSaida,
                 estoqueId: $estoqueId,
                 empresa: $empresa,
+                movimentacao: EstoqueMovimentacaoContext::make(
+                    EstoqueMovimentacao::TIPO_VENDA,
+                    empresaId: (int) $empresa->id,
+                    origemTipo: ((string) ($nfe->modelo ?? '') === '65') ? 'nfce' : 'nfe',
+                    origemId: (int) $nfe->id,
+                    origemNumero: $nfe->numero !== null ? ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero : null,
+                ),
             );
         }
 
@@ -163,6 +172,13 @@ final class NfeEstoqueService
                 product: $product,
                 quantidade: $qtd,
                 estoqueId: $estoqueId,
+                movimentacao: EstoqueMovimentacaoContext::make(
+                    EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                    empresaId: (int) $empresa->id,
+                    origemTipo: ((string) ($nfe->modelo ?? '') === '65') ? 'nfce' : 'nfe',
+                    origemId: (int) $nfe->id,
+                    origemNumero: $nfe->numero !== null ? ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero : null,
+                ),
             );
         }
 
@@ -200,6 +216,11 @@ final class NfeEstoqueService
             filled($nfe->npedido)
             && (str_contains($obs, 'IMPORTADO DO PEDIDO') || str_contains($obs, 'IMPORTADO DOS PEDIDOS'))
         ) {
+            return false;
+        }
+
+        // OS já baixou estoque no faturamento — NF-e só documenta as peças.
+        if (str_contains($obs, 'ORIGINADA DA OS')) {
             return false;
         }
 

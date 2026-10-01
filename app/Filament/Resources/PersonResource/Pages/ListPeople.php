@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PersonResource\Pages;
 
+use App\Filament\Concerns\EmbedsInPdvOverlay;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\ManagesErpSearchColumn;
@@ -21,6 +22,7 @@ use Livewire\Attributes\Url;
 
 class ListPeople extends ListRecords
 {
+    use EmbedsInPdvOverlay;
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use ManagesErpSearchColumn;
@@ -67,7 +69,7 @@ class ListPeople extends ListRecords
             return;
         }
 
-        $this->pushPersonListRefresh(resetSort: true);
+        $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function erpListSyncPollEnabled(): bool
@@ -153,12 +155,47 @@ class ListPeople extends ListRecords
             $params['q'] = $searchValue;
         }
 
-        return PersonResource::getUrl('index') . '?' . http_build_query($params);
+        if ($this->embedsInPdv) {
+            $params['pdv'] = '1';
+        }
+
+        $query = http_build_query($params);
+
+        return PersonResource::getUrl('index') . ($query !== '' ? '?' . $query : '');
     }
 
     protected static function erpListPageClass(): string
     {
         return 'erp-pessoas-page';
+    }
+
+    public function getPageClasses(): array
+    {
+        $classes = [
+            ...parent::getPageClasses(),
+            'erp-list-page',
+            static::erpListPageClass(),
+            ...$this->erpListExtraPageClasses(),
+        ];
+
+        if ($this->embedsInPdv) {
+            $classes[] = 'erp-pdv-embed';
+        }
+
+        return $classes;
+    }
+
+    public function closeScreen(): void
+    {
+        if ($this->embedsInParentOverlay()) {
+            $this->closeEmbedOverlay();
+
+            return;
+        }
+
+        ErpScreen::set('Principal');
+
+        $this->redirect(filament()->getUrl());
     }
 
     protected function erpListEntityName(): string
@@ -194,14 +231,42 @@ class ListPeople extends ListRecords
         $this->localSearch = '';
         $this->clearListSelection();
         $this->syncErpScreenTitle();
-        $this->pushPersonListRefresh(resetSort: true);
+        $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function setStatusFilter(string $filter): void
     {
         $this->statusFilter = $this->normalizeStatusFilter($filter);
         $this->clearListSelection();
-        $this->pushPersonListRefresh();
+        $this->pushPersonListRefresh(skipParentRender: false);
+    }
+
+    /**
+     * Contagens das abas Ativos / Inativos / Todos (respeita tipo e busca atuais).
+     *
+     * @return array{ativos: int, inativos: int, todos: int}
+     */
+    public function personStatusCounts(): array
+    {
+        $tipoFilter = $this->tipoFilter;
+        $searchColumn = $this->searchColumn;
+        $localSearch = $this->localSearch;
+
+        $countFor = static function (string $status) use ($tipoFilter, $searchColumn, $localSearch): int {
+            return (new PersonListQueryBuilder(
+                statusFilter: $status,
+                tipoFilter: $tipoFilter,
+                searchColumn: $searchColumn,
+                localSearch: $localSearch,
+                applyDefaultOrder: false,
+            ))->build()->count();
+        };
+
+        return [
+            'ativos' => $countFor('ativos'),
+            'inativos' => $countFor('inativos'),
+            'todos' => $countFor('todos'),
+        ];
     }
 
     public function updatedTableRecordsPerPage(): void
@@ -214,7 +279,7 @@ class ListPeople extends ListRecords
     {
         $this->normalizeLocalSearchCase();
         $this->clearListSelection();
-        $this->pushPersonListRefresh(resetSort: true);
+        $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
     }
 
     protected function normalizeLocalSearchCase(): void
@@ -235,7 +300,7 @@ class ListPeople extends ListRecords
         $this->localSearch = '';
         $this->searchColumn = 'nome_razao';
         $this->clearListSelection();
-        $this->pushPersonListRefresh(resetSort: true);
+        $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function pollErpListSync(): void
@@ -264,10 +329,10 @@ class ListPeople extends ListRecords
         }
 
         $this->erpListSyncVersion = $current;
-        $this->pushPersonListRefresh();
+        $this->pushPersonListRefresh(skipParentRender: false);
     }
 
-    protected function pushPersonListRefresh(bool $resetSort = false): void
+    protected function pushPersonListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
     {
         $this->dispatch(
             'erp-person-list-refresh',
@@ -279,7 +344,9 @@ class ListPeople extends ListRecords
             resetSort: $resetSort,
         )->to(PersonListTable::class);
 
-        $this->skipRender();
+        if ($skipParentRender) {
+            $this->skipRender();
+        }
     }
 
     public function refreshTable(): void
@@ -328,9 +395,13 @@ class ListPeople extends ListRecords
             return;
         }
 
-        $this->redirect(PersonResource::getUrl('create', [
-            'tipo' => $this->tipoFilter,
-        ]));
+        $createUrl = PersonResource::getUrl('create');
+
+        if ($this->tipoFilter !== 'clientes') {
+            $createUrl .= '?tipo=' . urlencode($this->tipoFilter);
+        }
+
+        $this->redirect($this->urlWithPdvEmbed($createUrl));
     }
 
     public function editPerson(int | string | null $recordId = null): void
@@ -347,7 +418,9 @@ class ListPeople extends ListRecords
             return;
         }
 
-        $this->redirect(PersonResource::getUrl('edit', ['record' => $resolvedId]));
+        $this->redirect($this->urlWithPdvEmbed(
+            PersonResource::getUrl('edit', ['record' => $resolvedId])
+        ));
     }
 
     public function deletePerson(int | string | null $recordId = null): void

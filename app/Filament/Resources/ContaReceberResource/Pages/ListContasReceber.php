@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\ContaReceberResource\Pages;
 
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberBaixaModal;
+use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberDesdobramentos;
+use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberBoletoModal;
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberFormModal;
 use App\Filament\Resources\ContaReceberResource\Pages\Concerns\ManagesContaReceberViewModal;
 use App\Filament\Concerns\InteractsWithLocalClienteSearchLookup;
@@ -33,6 +35,8 @@ class ListContasReceber extends ListRecords
     use \App\Filament\Concerns\InteractsWithErpPermissions;
     use InteractsWithLocalClienteSearchLookup;
     use ManagesContaReceberBaixaModal;
+    use ManagesContaReceberBoletoModal;
+    use ManagesContaReceberDesdobramentos;
     use ManagesContaReceberFormModal;
     use ManagesContaReceberViewModal;
 
@@ -65,6 +69,11 @@ class ListContasReceber extends ListRecords
 
     public string $viewTab = 'dados';
 
+    /** @var list<string> */
+    public array $searchFieldsActive = ['cliente'];
+
+    private const FILTRO_SESSION_KEY = 'erp_receber_filtro';
+
     /** @var array<int, string> */
     public array $selecionadosParaBaixa = [];
 
@@ -74,19 +83,148 @@ class ListContasReceber extends ListRecords
 
         ErpScreen::set('Contas a Receber');
 
-        if (! in_array($this->searchColumn, [
-            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
-            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
-        ], true)) {
+        $saved = session(self::FILTRO_SESSION_KEY);
+        $saved = is_array($saved) ? $saved : [];
+        $urlTemFiltro = request()->hasAny(['q', 'campo', 'cliente', 'situacao', 'forma']);
+
+        if (! $urlTemFiltro && $saved !== []) {
+            $this->applySavedReceberFiltro($saved);
+        }
+
+        if (! in_array($this->searchColumn, $this->receberSearchColumns(), true)) {
             $this->searchColumn = 'cliente';
         }
 
-        // Sem filtro de período padrão: campos vazios = listar todos os títulos.
-        // O usuário aplica o intervalo explicitamente em "Filtrar Período".
+        $this->searchFieldsActive = $this->normalizeReceberSearchFields($this->searchFieldsActive);
+
+        if (
+            $urlTemFiltro
+            && ($saved['searchColumn'] ?? null) === $this->searchColumn
+            && ($saved['localSearch'] ?? null) === $this->localSearch
+            && is_array($saved['searchFieldsActive'] ?? null)
+        ) {
+            $this->searchFieldsActive = $this->normalizeReceberSearchFields($saved['searchFieldsActive']);
+        }
+
+        if ($this->searchFieldsActive === [] || ! in_array($this->searchColumn, $this->searchFieldsActive, true)) {
+            $this->searchFieldsActive = [$this->searchColumn];
+        }
+
+        $this->restoreClienteConfirmado();
     }
 
     public function mountInteractsWithTable(): void
     {
+    }
+
+    public function updated(string $property): void
+    {
+        $root = strstr($property, '.', true) ?: $property;
+
+        if (! in_array($root, [
+            'localSearch', 'searchColumn', 'searchFieldsActive', 'clienteFilter',
+            'situacaoFilter', 'formaFilter', 'periodoDe', 'periodoAte',
+            'periodoDeApplied', 'periodoAteApplied',
+        ], true)) {
+            return;
+        }
+
+        $this->rememberReceberFiltro();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function receberSearchColumns(): array
+    {
+        return [
+            'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+        ];
+    }
+
+    /**
+     * @param  array<mixed>  $fields
+     * @return list<string>
+     */
+    protected function normalizeReceberSearchFields(array $fields): array
+    {
+        $allowed = [
+            'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'valor', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+        ];
+
+        return array_values(array_unique(array_filter(
+            $fields,
+            fn (mixed $column): bool => is_string($column) && in_array($column, $allowed, true),
+        )));
+    }
+
+    /**
+     * @param  array<string, mixed>  $saved
+     */
+    protected function applySavedReceberFiltro(array $saved): void
+    {
+        if (is_string($saved['searchColumn'] ?? null)) {
+            $this->searchColumn = $saved['searchColumn'];
+        }
+
+        if (is_array($saved['searchFieldsActive'] ?? null)) {
+            $this->searchFieldsActive = $saved['searchFieldsActive'];
+        }
+
+        if (is_string($saved['localSearch'] ?? null)) {
+            $this->localSearch = $saved['localSearch'];
+        }
+
+        if (is_string($saved['clienteFilter'] ?? null) && $saved['clienteFilter'] !== '') {
+            $this->clienteFilter = $saved['clienteFilter'];
+        }
+
+        if (in_array($saved['situacaoFilter'] ?? null, ['todos', 'a_receber', 'atrasadas', 'recebidas'], true)) {
+            $this->situacaoFilter = $saved['situacaoFilter'];
+        }
+
+        if (in_array($saved['formaFilter'] ?? null, [
+            'todos',
+            ContaReceber::FORMA_CARTEIRA,
+            ContaReceber::FORMA_CHEQUE,
+            ContaReceber::FORMA_CARTAO,
+            ContaReceber::FORMA_BOLETO,
+        ], true)) {
+            $this->formaFilter = $saved['formaFilter'];
+        }
+
+        foreach (['periodoDe', 'periodoAte', 'periodoDeApplied', 'periodoAteApplied'] as $field) {
+            if (is_string($saved[$field] ?? null)) {
+                $this->{$field} = $saved[$field];
+            }
+        }
+    }
+
+    protected function restoreClienteConfirmado(): void
+    {
+        if ($this->searchFieldsActive !== ['cliente'] || ! is_numeric($this->clienteFilter)) {
+            return;
+        }
+
+        $this->localClienteConfirmedTerm = mb_strtoupper(trim($this->localSearch), 'UTF-8');
+    }
+
+    protected function rememberReceberFiltro(): void
+    {
+        session([self::FILTRO_SESSION_KEY => [
+            'searchFieldsActive' => $this->normalizeReceberSearchFields($this->searchFieldsActive),
+            'searchColumn' => $this->searchColumn,
+            'localSearch' => $this->localSearch,
+            'clienteFilter' => $this->clienteFilter,
+            'situacaoFilter' => $this->situacaoFilter,
+            'formaFilter' => $this->formaFilter,
+            'periodoDe' => $this->periodoDe,
+            'periodoAte' => $this->periodoAte,
+            'periodoDeApplied' => $this->periodoDeApplied,
+            'periodoAteApplied' => $this->periodoAteApplied,
+        ]]);
     }
 
     public function shouldSkipContaReceberLocalSearch(): bool
@@ -104,6 +242,16 @@ class ListContasReceber extends ListRecords
         return 'uma conta';
     }
 
+    /**
+     * @return array<int, string>
+     */
+    protected function erpListExtraPageClasses(): array
+    {
+        return $this->viewTab === 'desdobramentos'
+            ? ['erp-receber-page--desdobramentos']
+            : [];
+    }
+
     protected function customErpListKeyboardConfig(): array
     {
         return [
@@ -111,10 +259,15 @@ class ListContasReceber extends ListRecords
             'create' => 'createConta',
             'edit' => 'editConta',
             'delete' => 'deleteConta',
-            'extraKeys' => [
-                'F4' => ['method' => 'printContasReceber'],
-                'F8' => ['method' => 'baixarConta'],
-            ],
+            'extraKeys' => $this->viewTab === 'desdobramentos'
+                ? [
+                    'F11' => ['method' => 'pedirEstornoDesdobramento'],
+                ]
+                : [
+                    'F4' => ['method' => 'printContasReceber'],
+                    'F8' => ['method' => 'baixarConta'],
+                    'F11' => ['method' => 'pedirEstornoDesdobramento'],
+                ],
         ];
     }
 
@@ -155,6 +308,7 @@ class ListContasReceber extends ListRecords
             periodoDe: $this->periodoDeApplied,
             periodoAte: $this->periodoAteApplied,
             skipLocalSearch: $this->shouldSkipLocalSearchWhileTyping(),
+            searchFieldsActive: $this->searchFieldsActive,
         );
     }
 
@@ -241,17 +395,36 @@ class ListContasReceber extends ListRecords
 
     public function content(Schema $schema): Schema
     {
+        $components = [
+            View::make('filament.components.erp.receber.screen'),
+        ];
+
+        if ($this->viewTab === 'desdobramentos') {
+            $components[] = View::make('filament.components.erp.receber.desdobramentos');
+        } else {
+            $components[] = View::make('filament.components.erp.receber.table-host')
+                ->columnSpanFull();
+            $components[] = View::make('filament.components.erp.receber.footer-summary');
+        }
+
+        $components[] = View::make('filament.components.erp.receber.action-bar');
+        $components[] = View::make('filament.components.erp.receber.view-modal');
+        $components[] = View::make('filament.components.erp.receber.baixa-modal');
+        $components[] = View::make('filament.components.erp.receber.estorno-confirm-modal');
+        $components[] = View::make('filament.components.erp.receber.form-modal');
+
         return $schema
             ->gap(false)
             ->components([
-                View::make('filament.components.erp.receber.screen'),
-                View::make('filament.components.erp.receber.table-host')
-                    ->columnSpanFull(),
-                View::make('filament.components.erp.receber.footer-summary'),
-                View::make('filament.components.erp.receber.action-bar'),
-                View::make('filament.components.erp.receber.view-modal'),
-                View::make('filament.components.erp.receber.baixa-modal'),
-                View::make('filament.components.erp.receber.form-modal'),
+                ...$components,
+                View::make('filament.components.erp.receber.boleto-vencimento-progress'),
+                View::make('filament.components.erp.receber.boleto-emit-progress'),
+                View::make('filament.components.erp.receber.boleto-vencimento-sucesso-overlay'),
+                View::make('filament.components.erp.receber.boleto-vencimento-erro-overlay'),
+                View::make('filament.components.erp.receber.boleto-forma-bloqueio-overlay'),
+                View::make('filament.components.erp.receber.boleto-conta-modal'),
+                View::make('filament.components.erp.receber.boleto-sucesso-overlay'),
+                View::make('filament.components.erp.receber.boleto-enviar-modal'),
             ]);
     }
 
@@ -277,6 +450,7 @@ class ListContasReceber extends ListRecords
         $this->periodoDeApplied = trim($this->periodoDe);
         $this->periodoAteApplied = trim($this->periodoAte);
         $this->clearListSelection();
+        $this->rememberReceberFiltro();
         $this->pushContaReceberListRefresh();
     }
 
@@ -290,6 +464,7 @@ class ListContasReceber extends ListRecords
 
         $this->situacaoFilter = $filter;
         $this->clearListSelection();
+        $this->rememberReceberFiltro();
         $this->pushContaReceberListRefresh();
     }
 
@@ -309,27 +484,89 @@ class ListContasReceber extends ListRecords
 
         $this->formaFilter = $filter;
         $this->clearListSelection();
+        $this->rememberReceberFiltro();
         $this->pushContaReceberListRefresh();
     }
 
     public function setViewTab(string $tab): void
     {
         if ($tab === 'desdobramentos') {
-            $this->modulePending('Desdobramentos de Parcelas');
+            $this->abrirDesdobramentos();
 
             return;
         }
 
-        $this->viewTab = 'dados';
+        $this->voltarParaTitulos();
+    }
+
+    public function isLocalClienteSearchColumn(): bool
+    {
+        return $this->searchFieldsActive === ['cliente'];
+    }
+
+    public function toggleSearchField(string $column): void
+    {
+        $allowed = [
+            'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'valor', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
+        ];
+
+        if (! in_array($column, $allowed, true)) {
+            return;
+        }
+
+        $active = array_values(array_filter(
+            $this->searchFieldsActive,
+            fn (mixed $item): bool => is_string($item) && in_array($item, $allowed, true),
+        ));
+
+        if (in_array($column, $active, true)) {
+            if (count($active) === 1) {
+                return;
+            }
+
+            $active = array_values(array_filter(
+                $active,
+                fn (string $item): bool => $item !== $column,
+            ));
+        } else {
+            $active[] = $column;
+        }
+
+        $previous = $this->searchColumn;
+        $this->searchFieldsActive = $active;
+        $this->searchColumn = $active[array_key_last($active)];
+        $this->syncClienteLookupWithSearchFields();
+
+        $this->rememberReceberFiltro();
+
+        if ($this->searchColumn === $previous) {
+            $this->clearListSelection();
+            $this->pushContaReceberListRefresh();
+        }
+    }
+
+    protected function syncClienteLookupWithSearchFields(): void
+    {
+        if ($this->isLocalClienteSearchColumn()) {
+            return;
+        }
+
+        $this->clienteFilter = 'todos';
+        $this->localClienteConfirmedTerm = '';
+        $this->closeLocalClienteLookup();
     }
 
     public function clearSearch(): void
     {
         $this->localSearch = '';
+        $this->searchFieldsActive = ['cliente'];
         $this->searchColumn = 'cliente';
         $this->clienteFilter = 'todos';
+        $this->localClienteConfirmedTerm = '';
         $this->closeLocalClienteLookup();
         $this->clearListSelection();
+        $this->rememberReceberFiltro();
         $this->pushContaReceberListRefresh(resetSort: true);
     }
 
@@ -341,11 +578,21 @@ class ListContasReceber extends ListRecords
 
         $this->clienteFilter = (string) $person->id;
         $this->selecionadosParaBaixa = [];
+        $this->rememberReceberFiltro();
     }
 
     protected function onLocalSearchChanged(string $value): void
     {
         if ($this->searchColumn !== 'cliente') {
+            return;
+        }
+
+        // Já confirmou este cliente: não zera o filtro.
+        if (
+            $this->localClienteConfirmedTerm !== ''
+            && mb_strtoupper(trim($value), 'UTF-8') === $this->localClienteConfirmedTerm
+            && is_numeric($this->clienteFilter)
+        ) {
             return;
         }
 
@@ -357,11 +604,9 @@ class ListContasReceber extends ListRecords
 
     public function updatedSearchColumn(): void
     {
-        $this->localSearch = '';
-        $this->clienteFilter = 'todos';
-        $this->closeLocalClienteLookup();
+        $this->syncClienteLookupWithSearchFields();
         $this->clearListSelection();
-        $this->pushContaReceberListRefresh(resetSort: true);
+        $this->pushContaReceberListRefresh();
     }
 
     protected function clearListSelection(): void
@@ -422,6 +667,8 @@ class ListContasReceber extends ListRecords
     {
         return match ($action) {
             'baixar' => 'uma conta para baixar',
+            'desdobramentos' => 'um título para ver as baixas',
+            'gerar boleto' => 'uma conta para gerar boleto',
             default => $this->defaultErpListSelectPrompt($action),
         };
     }
@@ -432,15 +679,15 @@ class ListContasReceber extends ListRecords
             return;
         }
 
-        // F4 gera o relatório de cartões, respeitando situação/período/cliente da tela.
         $builder = new ContaReceberListQueryBuilder(
             situacaoFilter: $this->situacaoFilter,
-            formaFilter: 'cartao',
+            formaFilter: $this->formaFilter,
             clienteFilter: $this->clienteFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             periodoDe: $this->periodoDeApplied,
             periodoAte: $this->periodoAteApplied,
+            searchFieldsActive: $this->searchFieldsActive,
         );
 
         $params = array_filter(
@@ -448,7 +695,11 @@ class ListContasReceber extends ListRecords
             fn ($value): bool => filled($value),
         );
 
-        $this->redirect(route('erp.reports.contas-receber-cartoes', $params), navigate: false);
+        foreach ($this->searchFieldsActive as $campo) {
+            $params['campos'][] = $campo;
+        }
+
+        $this->redirect(route('erp.reports.contas-receber', $params), navigate: false);
     }
 
     #[On('erp-receber-open-view')]
@@ -469,7 +720,15 @@ class ListContasReceber extends ListRecords
         }
 
         $this->selecionadosParaBaixa = $ids->unique()->values()->all();
-        $this->pushContaReceberListRefreshSelectionOnly();
+
+        // Só sincroniza estado + rodapé — sem redesenhar a grade (azul já no clique).
+        $this->dispatch(
+            'erp-receber-selection-sync',
+            selecionadosParaBaixa: $this->selecionadosParaBaixa,
+        )->to(ContaReceberListTable::class);
+
+        $this->skipRender();
+        $this->patchReceberFooterSelecionado();
     }
 
     public function refreshTable(): void
@@ -487,7 +746,10 @@ class ListContasReceber extends ListRecords
         $this->pushContaReceberListRefresh();
     }
 
-    protected function pushContaReceberListRefresh(bool $resetSort = false): void
+    /**
+     * @param  bool  $skipPageRender  false quando a página precisa redesenhar overlays/modais
+     */
+    protected function pushContaReceberListRefresh(bool $resetSort = false, bool $skipPageRender = true): void
     {
         $builder = $this->listQueryBuilder();
         $totalAReceber = $builder->sumSaldoFiltered();
@@ -506,9 +768,12 @@ class ListContasReceber extends ListRecords
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             selecionadosParaBaixa: $this->selecionadosParaBaixa,
             resetSort: $resetSort,
+            searchFieldsActive: $this->searchFieldsActive,
         )->to(ContaReceberListTable::class);
 
-        $this->skipRender();
+        if ($skipPageRender) {
+            $this->skipRender();
+        }
 
         $this->patchReceberFooterTotals($totalAReceber, $totalRecebido);
         $this->patchReceberFooterSelecionado();
@@ -529,6 +794,7 @@ class ListContasReceber extends ListRecords
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             selecionadosParaBaixa: $this->selecionadosParaBaixa,
             resetSort: false,
+            searchFieldsActive: $this->searchFieldsActive,
         )->to(ContaReceberListTable::class);
 
         $this->skipRender();

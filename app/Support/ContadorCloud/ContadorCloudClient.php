@@ -2,7 +2,7 @@
 
 namespace App\Support\ContadorCloud;
 
-use Illuminate\Support\Facades\Http;
+use App\Support\Erp\License\LicencaHttpClient;
 
 class ContadorCloudClient
 {
@@ -23,7 +23,8 @@ class ContadorCloudClient
         $endpoint = $config->syncUrl();
 
         try {
-            $response = Http::timeout($config->timeout)
+            $response = LicencaHttpClient::make()
+                ->timeout($config->timeout)
                 ->withToken($config->token)
                 ->acceptJson()
                 ->asJson()
@@ -82,7 +83,8 @@ class ContadorCloudClient
         $endpoint = $config->syncUrl();
 
         try {
-            $response = Http::timeout($config->timeout)
+            $response = LicencaHttpClient::make()
+                ->timeout($config->timeout)
                 ->withToken($config->token)
                 ->acceptJson()
                 ->asJson()

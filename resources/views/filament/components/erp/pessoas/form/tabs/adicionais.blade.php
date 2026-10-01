@@ -24,8 +24,25 @@
         ->orderBy('codigo')
         ->get(['id', 'codigo', 'descricao']);
 
+    // Carteira FV/Loja: só operadores do RH (vendedores órfãos do legado ficam de fora).
+    // Mantém o valor já gravado no cliente, para não sumir da tela ao editar.
+    $vendedorIdsSelecionados = array_values(array_unique(array_filter([
+        (int) ($this->data['vendedor_fv_id'] ?? 0),
+        (int) ($this->data['vendedor_loja_id'] ?? 0),
+    ])));
+
     $vendedores = Vendedor::query()
         ->where('ativo', true)
+        ->where(function ($query) use ($vendedorIdsSelecionados): void {
+            $query->whereHas(
+                'rhFuncionario',
+                fn ($rh) => $rh->where('ativo', true)
+            );
+
+            if ($vendedorIdsSelecionados !== []) {
+                $query->orWhereIn('id', $vendedorIdsSelecionados);
+            }
+        })
         ->orderBy('nome')
         ->get(['id', 'codigo', 'nome']);
 @endphp

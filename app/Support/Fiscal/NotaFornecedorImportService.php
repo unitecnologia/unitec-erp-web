@@ -5,6 +5,7 @@ namespace App\Support\Fiscal;
 use App\Models\Empresa;
 use App\Models\NotaFornecedor;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
+use App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService;
 use Illuminate\Support\Carbon;
 use Unitec\FiscalEngine\Dto\DfeResumoNfe;
 
@@ -50,6 +51,7 @@ final class NotaFornecedorImportService
                 ]);
 
                 $nota = $existente->fresh() ?? $existente;
+                $this->syncItens($nota);
                 $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
 
                 return ['nota' => $nota, 'criada' => false];
@@ -58,6 +60,7 @@ final class NotaFornecedorImportService
             $existente->update($payload);
 
             $nota = $existente->fresh() ?? $existente;
+            $this->syncItens($nota);
             $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
 
             return ['nota' => $nota, 'criada' => false];
@@ -68,9 +71,19 @@ final class NotaFornecedorImportService
             'status' => NotaFornecedor::STATUS_PENDENTE,
         ]);
 
+        $this->syncItens($nota);
         $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
 
         return ['nota' => $nota, 'criada' => true];
+    }
+
+    private function syncItens(NotaFornecedor $nota): void
+    {
+        if (blank($nota->xml)) {
+            return;
+        }
+
+        (new NotaFornecedorItensSyncService())->sync($nota);
     }
 
     private function dispararPortalContador(

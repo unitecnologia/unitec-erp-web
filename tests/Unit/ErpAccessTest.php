@@ -5,12 +5,12 @@ namespace Tests\Unit;
 use App\Models\User;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpPermissionCatalog;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Tests\TestCase;
 
 class ErpAccessTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     public function test_admin_user_has_all_permissions(): void
     {

@@ -188,11 +188,6 @@
                                 </select>
                                 @error('vendedorForm.estoque_id') <span class="erp-vendedor-form-modal__error">{{ $message }}</span> @enderror
                             </div>
-                            <div class="erp-pcad-form__row erp-vform__cell">
-                                <label class="erp-vform__check">
-                                    <input type="checkbox" wire:model="vendedorForm.usar_agendamento"> Usar agendamento
-                                </label>
-                            </div>
                             <div class="erp-pcad-form__row erp-vform__cell erp-vform__cell--full">
                                 <p class="erp-vform__hint" style="margin:0;font-size:0.72rem;color:#64748b;">
                                     Dados pessoais, endereço, contato e trabalhistas ficam em <strong>RH → Funcionários</strong>.

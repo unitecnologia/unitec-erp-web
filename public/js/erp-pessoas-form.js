@@ -14,6 +14,10 @@ document.addEventListener('livewire:init', () => {
         scheduleErpPessoaFocus('pcad-email');
     });
 
+    window.Livewire.on('erp-pessoa-focus-cpf', () => {
+        scheduleErpPessoaFocus('pcad-cpf');
+    });
+
     window.Livewire.hook('morph.updated', () => {
         const page = document.querySelector('.erp-pessoas-form-page');
 

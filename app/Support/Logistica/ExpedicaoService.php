@@ -5,11 +5,13 @@ namespace App\Support\Logistica;
 use App\Models\Entrega;
 use App\Models\EntregaEvento;
 use App\Models\EntregaItem;
+use App\Models\ForcaVendasOrder;
+use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Venda;
-use App\Support\Erp\Expedicao\ExpedicaoConfig;
+use App\Models\VendasInternasOrder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,10 +27,6 @@ final class ExpedicaoService
 
         if (Entrega::query()->where('venda_id', $venda->id)->exists()) {
             return Entrega::query()->where('venda_id', $venda->id)->first();
-        }
-
-        if (! ExpedicaoConfig::make()->origemHabilitada($origem)) {
-            return null;
         }
 
         $venda->loadMissing(['itens.product', 'cliente']);
@@ -80,6 +78,75 @@ final class ExpedicaoService
 
             return $entrega->fresh(['itens']);
         });
+    }
+
+    /**
+     * Gera entregas para vendas fechadas que ainda não têm registro em entregas.
+     *
+     * @return array{criadas: int, ja_existiam: int, ignoradas: int}
+     */
+    public function backfillEntregasFaltantes(?int $limit = null): array
+    {
+        $query = Venda::query()
+            ->where('status', Venda::STATUS_FECHADO)
+            ->whereDoesntHave('entrega')
+            ->orderBy('id');
+
+        if ($limit !== null && $limit > 0) {
+            $query->limit($limit);
+        }
+
+        $criadas = 0;
+        $jaExistiam = 0;
+        $ignoradas = 0;
+
+        foreach ($query->cursor() as $venda) {
+            $antes = Entrega::query()->where('venda_id', $venda->id)->exists();
+            $entrega = $this->criarAPartirDaVenda($venda, $this->inferirOrigem($venda));
+
+            if ($entrega === null) {
+                $ignoradas++;
+
+                continue;
+            }
+
+            if ($antes) {
+                $jaExistiam++;
+            } else {
+                $criadas++;
+            }
+        }
+
+        return [
+            'criadas' => $criadas,
+            'ja_existiam' => $jaExistiam,
+            'ignoradas' => $ignoradas,
+        ];
+    }
+
+    public function inferirOrigem(Venda $venda): string
+    {
+        $order = ForcaVendasOrder::query()
+            ->where('venda_id', $venda->id)
+            ->first();
+
+        if ($order !== null) {
+            $payloadOrigem = (string) (($order->payload['origem'] ?? '') ?: '');
+
+            return $payloadOrigem === 'vendas_internas'
+                ? Entrega::ORIGEM_VI
+                : Entrega::ORIGEM_MONITOR;
+        }
+
+        if (VendasInternasOrder::query()->where('venda_id', $venda->id)->exists()) {
+            return Entrega::ORIGEM_VI;
+        }
+
+        if (PdvVenda::query()->where('venda_id', $venda->id)->exists()) {
+            return Entrega::ORIGEM_PDV;
+        }
+
+        return Entrega::ORIGEM_ERP;
     }
 
     /**

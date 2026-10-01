@@ -36,37 +36,21 @@ trait ManagesProductFormUi
 
     public function setActiveEstoqueSubTab(string $tab): void
     {
-        if (! in_array($tab, ['estoques', 'localizacoes', 'trocas', 'dados_anp'], true)) {
+        if (! in_array($tab, ['estoques', 'localizacoes', 'trocas', 'dados_anp', 'movimentacoes'], true)) {
             return;
         }
 
         // Ao sair de Localizações, grava partes já presentes no estado Livewire
         // (o DOM é lido no save; aqui só garante a subaba).
         $this->activeEstoqueSubTab = $tab;
+
+        if ($tab === 'movimentacoes' && method_exists($this, 'loadProductMovimentacoes')) {
+            $this->loadProductMovimentacoes($this->record ?? null);
+        }
     }
 
     public function setActiveFormTab(string $tab): void
     {
-        if ($this->embedsInPdv) {
-            if (in_array($tab, ['adicionais'], true)) {
-                $this->modulePending(ucfirst(str_replace('_', ' ', $tab)));
-
-                return;
-            }
-
-            if (in_array($tab, ['dados', 'impostos', 'foto'], true)) {
-                $this->activeFormTab = $tab;
-
-                if ($tab === 'impostos' && method_exists($this, 'refreshEmpresaImpostoPadraoOnImpostosTab')) {
-                    $this->refreshEmpresaImpostoPadraoOnImpostosTab();
-                }
-
-                $this->dispatch('erp-masks-refresh');
-
-                return;
-            }
-        }
-
         $allowed = collect($this->visibleProductFormTabs)->pluck('key')->all();
 
         if (! in_array($tab, $allowed, true)) {

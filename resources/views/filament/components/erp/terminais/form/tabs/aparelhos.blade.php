@@ -18,8 +18,9 @@
             </select>
         </label>
         <p class="erp-terminais-aparelhos__hint">
-            Confira o código no celular e use <kbd>F2</kbd> para autorizar ou <kbd>F4</kbd> para revogar.
-            Aparelhos autorizados passam a contar no limite de telefones em Terminais.
+            Confira o código no celular e use <kbd>F2</kbd> para autorizar ou <kbd>F4</kbd> para excluir.
+            Aparelhos autorizados (Força de Vendas / Vendas Internas / Unitec OS) ficam nesta aba.
+            Telefones não aparecem na lista Dispositivo à esquerda. Excluir remove o aparelho e libera a vaga da licença.
         </p>
     </div>
 

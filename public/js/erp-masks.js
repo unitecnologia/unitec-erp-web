@@ -66,12 +66,14 @@ window.ErpMasks = {
     },
 
     formatCpfCnpj(value, pessoaTipo = 'juridica') {
-        const maxDigits = pessoaTipo === 'fisica' ? 11 : 14;
-        const digits = this.digits(value).slice(0, maxDigits);
+        // Documento já com >11 dígitos = CNPJ: nunca fatiar para 11 (evita corrida com select ainda em "fisica").
+        const rawDigits = this.digits(value);
+        const asCnpj = rawDigits.length > 11 || pessoaTipo !== 'fisica';
+        const digits = rawDigits.slice(0, asCnpj ? 14 : 11);
 
-        return pessoaTipo === 'fisica'
-            ? this.formatCpf(digits)
-            : this.formatCnpj(digits);
+        return asCnpj
+            ? this.formatCnpj(digits)
+            : this.formatCpf(digits);
     },
 
     isValidCpf(value) {
@@ -693,6 +695,9 @@ window.ErpMasks = {
             if (input.value !== '') {
                 this.apply(input, { allowEmptySync: true });
             }
+        } else if (input.dataset.mask === 'cpf-cnpj' && input.value) {
+            // Abertura/hidratação: só formata visualmente — não wire.set (não corromper CNPJ).
+            this.apply(input, { sync: false });
         } else if (input.value) {
             this.apply(input);
         }

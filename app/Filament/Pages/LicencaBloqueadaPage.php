@@ -33,8 +33,6 @@ class LicencaBloqueadaPage extends Page
 
     public string $mensagem = '';
 
-    public string $pagamentoUrl = '';
-
     public string $cnpj = '';
 
     public string $feedback = '';
@@ -58,7 +56,6 @@ class LicencaBloqueadaPage extends Page
     public function mount(LicencaRemotaService $licencas): void
     {
         ErpScreen::set('Licença');
-        $this->pagamentoUrl = $licencas->pagamentoUrl();
         $this->cnpj = $licencas->currentCnpj() ?? '';
 
         $portal = $licencas->checkCurrentEmpresa();
@@ -196,7 +193,7 @@ class LicencaBloqueadaPage extends Page
             $this->pixMessage = '';
 
             if ($this->pixQrDataUrl === '' && $this->pixBrCode === '') {
-                $this->pixMessage = 'Pix gerado sem QR. Use Abrir portal ou tente novamente.';
+                $this->pixMessage = 'Pix gerado sem QR. Tente verificar novamente.';
             }
         } finally {
             $this->pixLoading = false;

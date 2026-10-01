@@ -2,6 +2,9 @@
 
 namespace App\Support\Erp;
 
+use App\Models\PlanoConta;
+use App\Models\Empresa;
+
 final class EmpresaParametros
 {
     /**
@@ -12,132 +15,53 @@ final class EmpresaParametros
     public static function numericFields(): array
     {
         return [
-            'param_cod_caixa_geral' => [
-                'label' => 'Código do Caixa Geral',
-                'default' => 1,
-                'type' => 'integer',
-            ],
-            'param_plano_transferencia_credito' => [
-                'label' => 'Plano Transf. Crédito',
-                'default' => 3,
-                'type' => 'integer',
-            ],
-            'param_plano_transferencia_debito' => [
-                'label' => 'Plano Transf. Débito',
-                'default' => 4,
-                'type' => 'integer',
-            ],
-            'param_empresa_padrao_relatorios' => [
-                'label' => 'Empresa Padrão Relatórios',
-                'default' => 1,
-                'type' => 'integer',
-            ],
-            'param_plano_ficha_cliente' => [
-                'label' => 'Plano Ficha Cliente',
-                'default' => 10,
-                'type' => 'integer',
-            ],
-            'param_ultimo_nsu' => [
-                'label' => 'Último NSU',
-                'default' => '0000000000',
-                'type' => 'string',
-            ],
             'param_desconto_maximo' => [
                 'label' => 'Desconto Máximo',
+                'hint' => 'Percentual máximo de desconto permitido nas vendas.',
                 'default' => '0.00',
                 'type' => 'decimal',
                 'decimals' => 2,
             ],
             'param_acrescimo_maximo' => [
                 'label' => 'Acréscimo Máximo',
+                'hint' => 'Percentual máximo de acréscimo permitido nas vendas.',
                 'default' => '0.00',
                 'type' => 'decimal',
                 'decimals' => 2,
-            ],
-            'param_pdv_modelo_balanca' => [
-                'label' => 'Modelo Etiqueta Balança',
-                'default' => 4,
-                'type' => 'integer',
-            ],
-            'param_pdv_carga_intervalo_min' => [
-                'label' => 'Intervalo Carga PDV (min)',
-                'default' => 15,
-                'type' => 'integer',
-            ],
-            'param_pdv_marquee_texto' => [
-                'label' => 'Letreiro do PDV',
-                'default' => '',
-                'type' => 'string',
-            ],
-            'param_plano_abertura_caixa' => [
-                'label' => 'Plano Abertura de Caixa',
-                'default' => 14,
-                'type' => 'integer',
-            ],
-            'param_cod_dinheiro_fpg' => [
-                'label' => 'Cód. Dinheiro FPG',
-                'default' => 1,
-                'type' => 'integer',
-            ],
-            'param_nfe_serie' => [
-                'label' => 'NFe Série',
-                'default' => 1,
-                'type' => 'integer',
-            ],
-            'param_plano_sangria' => [
-                'label' => 'Plano Sangria',
-                'default' => 11,
-                'type' => 'integer',
-            ],
-            'param_plano_venda' => [
-                'label' => 'Plano Venda',
-                'default' => 2,
-                'type' => 'integer',
-            ],
-            'param_plano_taxa_cartao' => [
-                'label' => 'Plano Taxa Cartão',
-                'default' => 8,
-                'type' => 'integer',
-            ],
-            'param_plano_devolucao' => [
-                'label' => 'Plano Devolução',
-                'default' => 9,
-                'type' => 'integer',
-            ],
-            'param_plano_compra' => [
-                'label' => 'Plano Compra',
-                'default' => 15,
-                'type' => 'integer',
-            ],
-            'param_plano_boleto' => [
-                'label' => 'Plano Boleto',
-                'default' => 16,
-                'type' => 'integer',
             ],
             'param_carencia_juros' => [
-                'label' => 'Carência Juros',
-                'default' => '0.00',
-                'type' => 'decimal',
-                'decimals' => 2,
+                'label' => 'Carência Juros (dias)',
+                'hint' => 'Quantidade de dias após o vencimento antes de iniciar a cobrança de juros/multa.',
+                'default' => 0,
+                'type' => 'integer',
             ],
             'param_juros_diario_pct' => [
                 'label' => '% de Juros Diário',
+                'hint' => 'Percentual de juros aplicado por dia de atraso após a carência.',
+                'default' => '0.00',
+                'type' => 'decimal',
+                'decimals' => 2,
+            ],
+            'param_multa_atraso_pct' => [
+                'label' => '% Multa por atraso',
+                'hint' => 'Percentual de multa aplicado uma única vez ao título vencido, após a carência.',
                 'default' => '0.00',
                 'type' => 'decimal',
                 'decimals' => 2,
             ],
             'param_lucro_padrao' => [
                 'label' => 'Lucro Padrão',
+                'hint' => 'Margem/lucro padrão usado como referência nos cadastros e cálculos do sistema.',
                 'default' => '0.00',
                 'type' => 'decimal',
                 'decimals' => 2,
             ],
             'param_meta_vendas_mensal' => [
                 'label' => 'Meta Vendas Mensal',
+                'hint' => 'Valor de meta mensal usado nos indicadores de vendas.',
                 'default' => '0.00',
                 'type' => 'decimal',
                 'decimals' => 2,
-                'hint' => 'Preenchida (> 0) aparece no dashboard; vazia ou zero some.',
             ],
         ];
     }
@@ -161,7 +85,6 @@ final class EmpresaParametros
 
             'param_geral_informar_gtin' => ['label' => 'Informar GTIN', 'default' => false],
             'param_geral_desconto_prod_promocao' => ['label' => 'Dar Desconto Prod. Promoção', 'default' => false],
-            'param_geral_bloquear_cpf_repetido' => ['label' => 'Bloquear Cadastro de CPF repetido', 'default' => null, 'tri' => true],
             'param_geral_ratear_preco_custo_xml' => ['label' => 'Ratear Preço de Custo (Compra XML)', 'default' => true],
             'param_geral_bloquear_estoque_negativo' => ['label' => 'Bloquear Estoque Negativo', 'default' => false],
             'param_geral_usar_transportadora' => ['label' => 'Usar Transportadora', 'default' => false],
@@ -175,6 +98,11 @@ final class EmpresaParametros
             'param_geral_perguntar_replicar_preco_filiais' => [
                 'label' => 'Perguntar ao replicar preço nas filiais',
                 'default' => false,
+            ],
+            'param_geral_usar_pdv_erp' => [
+                'label' => 'Usar PDV no ERP',
+                'hint' => 'Marcado: PDV disponível na retaguarda. Desmarcado: ícone some; use o PDV offline.',
+                'default' => true,
             ],
 
             'param_fiscal_puxar_cfop_produto' => ['label' => 'Puxar CFOP do Produto', 'default' => false],
@@ -191,7 +119,52 @@ final class EmpresaParametros
                 'hint' => 'Marcado: no Força de Vendas cada vendedor sincroniza todos os clientes e pode vender para qualquer um. Desmarcado: só a carteira (Vendedor Força de Vendas na Pessoa).',
                 'default' => false,
             ],
+
+            'param_monitor_vendas_escolher_empresa_emitente_nfe' => [
+                'label' => 'Escolher empresa emitente da NF-e',
+                'hint' => 'Quando habilitado, o Monitor permite escolher qual empresa autorizada emitirá a NF-e.',
+                'default' => false,
+            ],
+            'param_monitor_vendas_exibir_mais_opcoes' => [
+                'label' => 'Exibir “Mais opções” na Tela de Venda e Monitor',
+                'default' => false,
+            ],
+            'param_monitor_vendas_exibir_custo_produto' => [
+                'label' => 'Exibir custo dos produtos nas grades',
+                'hint' => 'Exibe o custo unitário atual dos produtos na Tela de Venda e no Monitor.',
+                'default' => false,
+            ],
         ];
+    }
+
+    public const DESCONTO_REAIS_ITEM_UNITARIO = 'unitario';
+
+    public const DESCONTO_REAIS_ITEM_LINHA = 'linha';
+
+    /**
+     * Como o app Força de Vendas interpreta o desconto em R$ do item.
+     * Não altera o modo %.
+     *
+     * @return array{label: string, hint: string, default: string, options: array<string, string>}
+     */
+    public static function monitorVendasDescontoReaisItemModoField(): array
+    {
+        return [
+            'label' => 'Desconto em R$ nos itens',
+            'hint' => 'Define se o desconto informado em R$ no item será aplicado em cada unidade ou uma única vez sobre o total da linha.',
+            'default' => self::DESCONTO_REAIS_ITEM_UNITARIO,
+            'options' => [
+                self::DESCONTO_REAIS_ITEM_UNITARIO => 'Por unidade',
+                self::DESCONTO_REAIS_ITEM_LINHA => 'Total da linha',
+            ],
+        ];
+    }
+
+    public static function normalizarDescontoReaisItemModo(mixed $valor): string
+    {
+        return $valor === self::DESCONTO_REAIS_ITEM_LINHA
+            ? self::DESCONTO_REAIS_ITEM_LINHA
+            : self::DESCONTO_REAIS_ITEM_UNITARIO;
     }
 
     /**
@@ -285,6 +258,22 @@ final class EmpresaParametros
     }
 
     /**
+     * Campos NFS-e da tabela empresas (colunas próprias, não param_*).
+     * Mantidos fora de defaultFormValues()/allFieldNames() para não virar fillable
+     * e zerar a config ao gravar o cadastro sem esses inputs na tela.
+     *
+     * @return array<string, array{label: string, default: string, type: string}>
+     */
+    public static function nfseFields(): array
+    {
+        return [
+            'nfse_ambiente' => ['label' => 'Ambiente NFS-e', 'default' => '', 'type' => 'string'],
+            'nfse_reg_esp_trib' => ['label' => 'Regime especial de tributação', 'default' => '', 'type' => 'string'],
+            'nfse_reg_ap_trib_sn' => ['label' => 'Regime de apuração do Simples', 'default' => '', 'type' => 'string'],
+        ];
+    }
+
+    /**
      * @return array<string, array{label: string, default: int|float|string|null, type: string, decimals?: int}>
      */
     public static function difalFields(): array
@@ -324,6 +313,62 @@ final class EmpresaParametros
         return [
             'mercadopago' => 'Mercado Pago',
         ];
+    }
+
+    /** Código COMPE do Ailos / Cecred. */
+    public const BOLETO_BANCO_AILOS = '085';
+
+    /** Código COMPE do Sicredi. */
+    public const BOLETO_BANCO_SICREDI = '748';
+
+    public const BOLETO_POS_VENCIMENTO_NENHUMA = 'nenhuma';
+
+    public const BOLETO_POS_VENCIMENTO_PROTESTO = 'protesto';
+
+    public const BOLETO_POS_VENCIMENTO_NEGATIVACAO = 'negativacao';
+
+    /**
+     * Callback central de autenticação Ailos (JWT) na infraestrutura Unitecnologia.
+     * Não depende de Cloudflare Tunnel / URL pública de cada cliente.
+     */
+    public const BOLETO_AILOS_AUTH_CALLBACK_URL = 'https://unitecnologia.unierp.uk/api/integracoes/ailos/auth/callback';
+
+    /**
+     * URL de callback Ailos usada em todos os clientes (central Unitecnologia).
+     *
+     * @param  string|null  $erpPublicUrl  Ignorado — mantido só por compatibilidade de assinatura.
+     */
+    public static function boletoAilosAuthCallbackUrl(?string $erpPublicUrl = null): string
+    {
+        return self::BOLETO_AILOS_AUTH_CALLBACK_URL;
+    }
+
+    /**
+     * Opções do select "Após vencimento" (conta de cobrança / parâmetros de boleto).
+     *
+     * @return array<string, string>
+     */
+    public static function boletoPosVencimentoOptions(): array
+    {
+        return [
+            self::BOLETO_POS_VENCIMENTO_NENHUMA => 'Nenhuma (sem protesto/negativação automática)',
+            self::BOLETO_POS_VENCIMENTO_PROTESTO => 'Protesto em cartório',
+            self::BOLETO_POS_VENCIMENTO_NEGATIVACAO => 'Negativação (Serasa)',
+        ];
+    }
+
+    /**
+     * Ação pós-vencimento normalizada (empresa ou objeto com param_boleto_pos_vencimento).
+     */
+    public static function boletoPosVencimentoAcao(?object $empresa): string
+    {
+        $raw = mb_strtolower(trim((string) ($empresa->param_boleto_pos_vencimento ?? '')), 'UTF-8');
+
+        return match ($raw) {
+            self::BOLETO_POS_VENCIMENTO_PROTESTO, 'cartorio', 'cartório' => self::BOLETO_POS_VENCIMENTO_PROTESTO,
+            self::BOLETO_POS_VENCIMENTO_NEGATIVACAO, 'serasa', 'negativar' => self::BOLETO_POS_VENCIMENTO_NEGATIVACAO,
+            default => self::BOLETO_POS_VENCIMENTO_NENHUMA,
+        };
     }
 
     /**
@@ -366,6 +411,7 @@ final class EmpresaParametros
             'param_boleto_desconto_pct' => ['label' => 'Desconto (%)', 'default' => '', 'type' => 'string'],
             'param_boleto_carencia_dias' => ['label' => 'Carência após vencimento (dias)', 'default' => '', 'type' => 'string'],
             'param_boleto_protesto_dias' => ['label' => 'Protestar após (dias)', 'default' => '', 'type' => 'string'],
+            'param_boleto_pos_vencimento' => ['label' => 'Após vencimento', 'default' => 'nenhuma', 'type' => 'string'],
             'param_boleto_baixa_dias' => ['label' => 'Baixar/Devolver após (dias)', 'default' => '', 'type' => 'string'],
         ];
     }
@@ -1217,6 +1263,7 @@ final class EmpresaParametros
             'geral' => 'Ajustes Gerais',
             'fiscal' => 'Ajustes Fiscais',
             'forca_vendas' => 'Força de Vendas',
+            'monitor_vendas' => 'Monitor de vendas',
         ];
     }
 
@@ -1235,6 +1282,10 @@ final class EmpresaParametros
 
         if (str_starts_with($field, 'param_forca_vendas_')) {
             return 'forca_vendas';
+        }
+
+        if (str_starts_with($field, 'param_monitor_vendas_')) {
+            return 'monitor_vendas';
         }
 
         return 'fiscal';
@@ -1301,9 +1352,15 @@ final class EmpresaParametros
             $defaults[$field] = $meta['default'];
         }
 
+        foreach (self::planoContaFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
         foreach (self::permissionFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
+
+        $defaults['param_monitor_vendas_desconto_reais_item_modo'] = self::monitorVendasDescontoReaisItemModoField()['default'];
 
         foreach (self::moduleEnableFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
@@ -1429,48 +1486,153 @@ final class EmpresaParametros
     }
 
     /**
+     * Plano de venda da empresa para o Livro Caixa.
+     * Compra e taxa de cartão ainda não entram nos lançamentos.
+     *
+     * @return array{id: int, nome: string}|null
+     */
+    public static function planoVendaLancamento(?int $empresaId): ?array
+    {
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return null;
+        }
+
+        $planoId = (int) (Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_plano_conta_venda_id') ?? 0);
+
+        if ($planoId <= 0) {
+            return null;
+        }
+
+        $plano = PlanoConta::query()
+            ->whereKey($planoId)
+            ->where('ativo', true)
+            ->where('dc', 'C')
+            ->first(['id', 'descricao']);
+
+        if ($plano === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $plano->id,
+            'nome' => mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120),
+        ];
+    }
+
+    /**
+     * Planos padrão gravados na empresa.
+     * O de venda entra no Livro Caixa das vendas. Compra e taxa de cartão ainda não.
+     *
+     * @return array<string, array{label: string, hint: string, dc: string, default: null}>
+     */
+    public static function planoContaFields(): array
+    {
+        return [
+            'param_plano_conta_venda_id' => [
+                'label' => 'Plano de Contas de Venda',
+                'hint' => 'Plano padrão utilizado nos lançamentos financeiros originados de vendas. Somente planos de crédito.',
+                'dc' => 'C',
+                'default' => null,
+            ],
+            'param_plano_conta_compra_id' => [
+                'label' => 'Plano de Contas de Compra',
+                'hint' => 'Plano padrão utilizado nos lançamentos financeiros originados de compras. Somente planos de débito.',
+                'dc' => 'D',
+                'default' => null,
+            ],
+            'param_plano_conta_taxa_cartao_id' => [
+                'label' => 'Plano de Contas Taxa Cartão',
+                'hint' => 'Plano utilizado para registrar taxas/descontos cobrados pelas operadoras de cartão. Somente planos de débito.',
+                'dc' => 'D',
+                'default' => null,
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public static function planoContaOptions(string $dc, ?int $selectedId = null): array
+    {
+        return PlanoConta::query()
+            ->where('dc', $dc)
+            ->where(function ($query) use ($selectedId): void {
+                $query->where('ativo', true);
+
+                if ($selectedId) {
+                    $query->orWhere('id', $selectedId);
+                }
+            })
+            ->orderBy('codigo')
+            ->get(['id', 'codigo', 'descricao'])
+            ->map(fn (PlanoConta $plano): array => [
+                'id' => (int) $plano->id,
+                'label' => trim((string) $plano->codigo).' — '.mb_strtoupper((string) $plano->descricao, 'UTF-8'),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Blocos do topo da aba Parâmetros.
+     *
+     * @return list<array{title: string, numeric?: list<string>, planos?: list<string>, density?: bool}>
+     */
+    public static function parametrosTopoBlocos(): array
+    {
+        return [
+            [
+                'title' => 'Comercial',
+                'numeric' => [
+                    'param_desconto_maximo',
+                    'param_acrescimo_maximo',
+                    'param_lucro_padrao',
+                    'param_meta_vendas_mensal',
+                ],
+            ],
+            [
+                'title' => 'Juros e cobrança',
+                'numeric' => [
+                    'param_carencia_juros',
+                    'param_juros_diario_pct',
+                    'param_multa_atraso_pct',
+                ],
+            ],
+            [
+                'title' => 'Plano de contas',
+                'planos' => array_keys(self::planoContaFields()),
+            ],
+            [
+                'title' => 'Interface',
+                'density' => true,
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public static function numericColumnsByGroup(): array
     {
         // 3 colunas equilibradas (mesmo padrão compacto label + input).
-        $col1 = [
-            'param_cod_caixa_geral',
-            'param_empresa_padrao_relatorios',
-            'param_ultimo_nsu',
-            'param_nfe_serie',
-            'param_desconto_maximo',
-            'param_acrescimo_maximo',
-            'param_carencia_juros',
-            'param_juros_diario_pct',
-        ];
-
-        $col2 = [
-            'param_plano_venda',
-            'param_plano_compra',
-            'param_plano_devolucao',
-            'param_plano_boleto',
-            'param_plano_taxa_cartao',
-            'param_plano_sangria',
-            'param_plano_abertura_caixa',
-            'param_plano_ficha_cliente',
-        ];
-
-        $col3 = [
-            'param_plano_transferencia_credito',
-            'param_plano_transferencia_debito',
-            'param_cod_dinheiro_fpg',
-            'param_pdv_modelo_balanca',
-            'param_pdv_carga_intervalo_min',
-            'param_lucro_padrao',
-            'param_meta_vendas_mensal',
-            'param_pdv_marquee_texto',
-        ];
-
         return [
-            'col1' => $col1,
-            'col2' => $col2,
-            'col3' => $col3,
+            'col1' => [
+                'param_desconto_maximo',
+                'param_acrescimo_maximo',
+            ],
+            'col2' => [
+                'param_carencia_juros',
+                'param_juros_diario_pct',
+                'param_multa_atraso_pct',
+            ],
+            'col3' => [
+                'param_lucro_padrao',
+                'param_meta_vendas_mensal',
+            ],
         ];
     }
 

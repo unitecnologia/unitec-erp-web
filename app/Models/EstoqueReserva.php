@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'forca_vendas_order_id',
     'orcamento_id',
     'orcamento_item_id',
+    'pedido_id',
+    'pedido_item_id',
     'vendedor_id',
     'vendedor_nome',
     'user_id',
@@ -56,6 +58,11 @@ class EstoqueReserva extends Model
     public function orcamento(): BelongsTo
     {
         return $this->belongsTo(Orcamento::class);
+    }
+
+    public function pedido(): BelongsTo
+    {
+        return $this->belongsTo(Pedido::class);
     }
 
     public function vendedor(): BelongsTo

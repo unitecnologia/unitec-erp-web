@@ -16,6 +16,7 @@
         "mike42/escpos-php": "^5.0",
         "minishlink/web-push": "^9.0",
         "robrichards/xmlseclibs": "^3.1",
+        "smalot/pdfparser": "^2.12",
         "unitec/fiscal-engine": "@dev",
         "unitec/pdv-ui": "@dev"
     },

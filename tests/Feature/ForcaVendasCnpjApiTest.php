@@ -5,14 +5,14 @@ namespace Tests\Feature;
 use App\Models\ForcaVendasDevice;
 use App\Models\User;
 use App\Support\Erp\CnpjLookupService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use Tests\TestCase;
 
 class ForcaVendasCnpjApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     public function test_consulta_cnpj_retorna_campos_para_o_app(): void
     {

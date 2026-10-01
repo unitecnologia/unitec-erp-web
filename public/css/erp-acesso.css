@@ -918,6 +918,12 @@
     font-size: 0.74rem;
 }
 
+.erp-permissoes-page .erp-permissoes__editor input.erp-permissoes__input-readonly {
+    background: #f1f5f9;
+    color: #334155;
+    cursor: default;
+}
+
 .erp-permissoes-page .erp-permissoes__editor,
 .erp-permissoes-page .erp-permissoes__tree {
     flex: 1;
@@ -962,6 +968,123 @@
     background: #fff;
     font: inherit;
     font-size: 0.74rem;
+}
+
+.erp-permissoes-page .erp-permissoes__apps {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__apps > span {
+    display: block;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.74rem;
+    color: #1e293b;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-summary.is-empty {
+    color: #94a3b8;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-caret {
+    flex: 0 0 auto;
+    width: 0.9rem;
+    height: 0.9rem;
+    color: #64748b;
+    transition: transform 0.15s ease;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.15rem);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 9rem;
+    overflow-y: auto;
+    padding: 0.1rem 0;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgb(15 23 42 / 12%);
+}
+
+.erp-permissoes-page .erp-permissoes__editor .erp-permissoes__apps-check,
+.erp-permissoes-page .erp-permissoes__apps-check {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.15rem 0.45rem;
+    max-width: none;
+    min-height: 1.45rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.15;
+    color: #1e293b;
+    text-transform: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__apps-check:hover {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__editor .erp-permissoes__apps-check input,
+.erp-permissoes-page .erp-permissoes__apps-check input {
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin: 0;
+    accent-color: #2563eb;
+}
+
+.erp-permissoes-page .erp-permissoes__editor .erp-permissoes__apps-check > span {
+    display: inline;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .erp-permissoes-page .erp-permissoes__form-actions {
@@ -2341,6 +2464,97 @@
     background: #f1f5f9;
     font-size: 0.74rem;
     color: #334155;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.78rem;
+    color: #1e293b;
+    text-align: left;
+    cursor: pointer;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-summary.is-empty {
+    color: #94a3b8;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-caret {
+    flex: 0 0 auto;
+    width: 0.9rem;
+    height: 0.9rem;
+    color: #64748b;
+    transition: transform 0.15s ease;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-panel {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.15rem);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 9rem;
+    overflow-y: auto;
+    padding: 0.1rem 0;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgb(15 23 42 / 12%);
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-check {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.15rem 0.45rem;
+    min-height: 1.45rem;
+    border-radius: 0;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.15;
+    color: #1e293b;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-check:hover {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-usuarios-page .erp-usuario-form-modal__apps-check input {
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin: 0;
+    accent-color: #2563eb;
 }
 
 .erp-usuarios-page .erp-usuario-form-modal__vinculo.is-linked {

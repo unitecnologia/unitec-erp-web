@@ -55,6 +55,8 @@ final class PdvPedidoReportData
                 $venda->person?->nome_razao ?? 'CONSUMIDOR FINAL',
                 'UTF-8',
             ),
+            'clienteDocumento' => (string) ($venda->person?->cpf_cnpj ?? ''),
+            'clienteIe' => (string) ($venda->person?->rg_ie ?? ''),
             'vendedorNome' => mb_strtoupper(
                 $venda->vendedor_nome
                     ?: ($venda->vendedor?->nome ?? 'LOJA'),

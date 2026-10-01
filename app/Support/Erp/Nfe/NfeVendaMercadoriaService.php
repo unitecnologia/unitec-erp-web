@@ -18,9 +18,9 @@ use RuntimeException;
 
 class NfeVendaMercadoriaService
 {
-    public function validar(Venda $venda): void
+    public function validar(Venda $venda, ?Empresa $empresaEmitente = null): void
     {
-        $venda->loadMissing(['itens', 'cliente', 'vendedor', 'forcaVendasOrder.orcamento']);
+        $venda->loadMissing(['itens', 'cliente', 'vendedor', 'forcaVendasOrder.pedido']);
 
         if ((int) ($venda->cliente_id ?? 0) <= 0) {
             throw new RuntimeException('A venda não possui cliente vinculado.');
@@ -36,16 +36,94 @@ class NfeVendaMercadoriaService
             throw new RuntimeException('Somente pedido faturado pode gerar NF-e pelo Monitor de Vendas.');
         }
 
-        $empresa = $this->resolveEmpresa($venda, $order);
+        $empresa = $empresaEmitente ?? $this->resolveEmpresaOrigem($venda, $order);
 
         if ($empresa === null) {
             throw new RuntimeException('Empresa não identificada para a venda.');
         }
 
+        $this->assertClienteAptoParaNfe($venda->cliente);
         $this->resolveCfop($empresa, $venda->cliente);
 
         if ($this->temNfeAtiva($venda)) {
             throw new RuntimeException('Esta venda já possui NF-e vinculada.');
+        }
+    }
+
+    /**
+     * Cliente mínimo para NF-e (não consumidor; documento e endereço completos).
+     */
+    public function assertClienteAptoParaNfe(?Person $cliente): void
+    {
+        if (! $cliente) {
+            throw new RuntimeException('A venda não possui cliente vinculado.');
+        }
+
+        if (Person::isCodigoConsumidorFinal($cliente->codigo)) {
+            throw new RuntimeException('Consumidor final não pode emitir NF-e. Cadastre o cliente completo.');
+        }
+
+        $nome = mb_strtoupper(trim((string) ($cliente->nome_razao ?? '')), 'UTF-8');
+
+        if ($nome === '' || $nome === 'CONSUMIDOR FINAL') {
+            throw new RuntimeException('Cliente inválido para NF-e (consumidor final).');
+        }
+
+        $digits = preg_replace('/\D/', '', (string) ($cliente->cpf_cnpj ?? '')) ?? '';
+
+        if (strlen($digits) !== 11 && strlen($digits) !== 14) {
+            throw new RuntimeException(
+                'Cliente sem CPF/CNPJ válido para NF-e: '.trim((string) ($cliente->nome_razao ?? '—')).'.'
+            );
+        }
+
+        $faltando = [];
+
+        if (trim((string) ($cliente->endereco ?? '')) === '') {
+            $faltando[] = 'endereço';
+        }
+
+        if (trim((string) ($cliente->bairro ?? '')) === '') {
+            $faltando[] = 'bairro';
+        }
+
+        if (trim((string) ($cliente->uf ?? '')) === '') {
+            $faltando[] = 'UF';
+        }
+
+        $cep = preg_replace('/\D/', '', (string) ($cliente->cep ?? '')) ?? '';
+
+        if (strlen($cep) !== 8) {
+            $faltando[] = 'CEP';
+        }
+
+        if (trim((string) ($cliente->cidade_nome ?? '')) === '') {
+            $faltando[] = 'cidade';
+        }
+
+        if (! \App\Support\Erp\CepLookupService::isValidIbgeCode($cliente->cidade_codigo ?? null)) {
+            $faltando[] = 'código IBGE da cidade';
+        }
+
+        if ($faltando !== []) {
+            throw new RuntimeException(
+                'Cliente incompleto para NF-e ('.trim((string) ($cliente->nome_razao ?? '—')).'): '
+                .implode(', ', $faltando).'.'
+            );
+        }
+    }
+
+    /**
+     * Motivo curto se o cliente/venda não estiver apto (null = apto).
+     */
+    public function motivoInaptoParaNfe(Venda $venda): ?string
+    {
+        try {
+            $this->validar($venda);
+
+            return null;
+        } catch (\Throwable $e) {
+            return $e->getMessage();
         }
     }
 
@@ -66,14 +144,17 @@ class NfeVendaMercadoriaService
      *     rows: list<array{product_id: int, quantidade: float, valor_unitario: float, descricao: string, cfop: string}>
      * }
      */
-    public function montarPayload(Venda $venda): array
+    /**
+     * @param  Empresa|null  $empresaEmitente  Quando informada (Monitor multi-empresa), CFOP/natureza usam esta empresa; itens/valores/faturas continuam da venda da Matriz.
+     */
+    public function montarPayload(Venda $venda, ?Empresa $empresaEmitente = null): array
     {
-        $this->validar($venda);
+        $this->validar($venda, $empresaEmitente);
 
-        $venda->loadMissing(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.orcamento']);
+        $venda->loadMissing(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido']);
 
         $order = $venda->forcaVendasOrder;
-        $empresa = $this->resolveEmpresa($venda, $order);
+        $empresa = $empresaEmitente ?? $this->resolveEmpresaOrigem($venda, $order);
         $cliente = $venda->cliente;
         $cfop = $this->resolveCfop($empresa, $cliente);
         $natureza = $this->formatNaturezaOperacao($cfop);
@@ -121,6 +202,10 @@ class NfeVendaMercadoriaService
             $obs .= ' Vendedor: '.$vendedorNome.'.';
         }
 
+        $transporte = is_array($order?->payload['transporte'] ?? null)
+            ? $order->payload['transporte']
+            : null;
+
         return [
             'venda_id' => (int) $venda->id,
             'cliente_id' => (int) $venda->cliente_id,
@@ -135,6 +220,7 @@ class NfeVendaMercadoriaService
             'obs_contribuinte' => $obs,
             'faturas' => $this->montarFaturas($order),
             'rows' => $rows,
+            'transporte' => $transporte,
         ];
     }
 
@@ -142,20 +228,32 @@ class NfeVendaMercadoriaService
     {
         return Nfe::query()
             ->where('venda_id', $venda->id)
-            ->where('status', '!=', Nfe::STATUS_CANCELADA)
+            ->whereNotIn('status', [
+                Nfe::STATUS_CANCELADA,
+                Nfe::STATUS_INUTILIZADA,
+            ])
             ->exists();
     }
 
-    protected function resolveEmpresa(Venda $venda, ?ForcaVendasOrder $order): ?Empresa
+    /**
+     * Empresa de origem do pedido/venda (Matriz) — estoque/financeiro. Não é a emitente fiscal.
+     */
+    protected function resolveEmpresaOrigem(Venda $venda, ?ForcaVendasOrder $order): ?Empresa
     {
-        $empresaId = (int) ($order?->empresa_id ?? ErpContext::currentEmpresaId() ?? 0);
+        $empresaId = (int) ($order?->empresa_id ?? $venda->empresa_id ?? ErpContext::currentEmpresaId() ?? 0);
 
         return $empresaId > 0 ? Empresa::query()->find($empresaId) : null;
     }
 
+    /** @deprecated Use resolveEmpresaOrigem */
+    protected function resolveEmpresa(Venda $venda, ?ForcaVendasOrder $order): ?Empresa
+    {
+        return $this->resolveEmpresaOrigem($venda, $order);
+    }
+
     protected function resolveNumeroPedido(Venda $venda, ?ForcaVendasOrder $order): string
     {
-        $dav = trim((string) ($order?->orcamento?->numero ?? ''));
+        $dav = trim((string) ($order?->pedido?->numero ?? ''));
 
         if ($dav !== '') {
             $digits = ltrim(preg_replace('/\D/', '', $dav) ?? '', '0');

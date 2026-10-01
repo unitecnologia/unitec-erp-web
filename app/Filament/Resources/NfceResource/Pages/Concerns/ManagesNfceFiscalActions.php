@@ -13,6 +13,8 @@ use App\Support\Fiscal\PdvNfceInutilizacaoService;
 use App\Support\Fiscal\PdvNfceTransmissaoService;
 use DomainException;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
 
 trait ManagesNfceFiscalActions
@@ -135,41 +137,108 @@ trait ManagesNfceFiscalActions
 
     public function recuperarNfce(): void
     {
-        $id = $this->highlightedRecordIdOrNotify('recuperar');
-        if (! $id) {
-            return;
-        }
+        $ids = $this->resolveNfceIdsParaTransmitir();
 
-        $nfce = PdvVendaNfce::query()->find($id);
-        $empresa = $this->resolveNfceEmpresa($nfce);
-
-        if (! $nfce || ! $empresa) {
-            $this->notifyNfceWarning('Não foi possível localizar a NFC-e para consulta.');
+        if ($ids === []) {
+            $this->notifyNfceWarning('Selecione uma NFC-e para consultar na SEFAZ.');
 
             return;
         }
 
-        try {
-            $nfce = (new PdvNfceConsultaService())->recuperar($nfce, $empresa);
-        } catch (FiscalEngineException $exception) {
-            $this->notifyNfceFiscalError($exception);
+        $service = new PdvNfceConsultaService();
+        $ok = 0;
+        $erros = 0;
+        $primeiraMensagemErro = null;
+        $primeiraExcecaoFiscal = null;
+        $ultimoStatus = null;
+        $ultimoMotivo = null;
 
-            return;
+        foreach ($ids as $id) {
+            $nfce = PdvVendaNfce::query()->find($id);
+            $empresa = $this->resolveNfceEmpresa($nfce);
+
+            if (! $nfce || ! $empresa) {
+                $erros++;
+                $primeiraMensagemErro ??= 'Não foi possível localizar a NFC-e para consulta.';
+
+                continue;
+            }
+
+            try {
+                $nfce = $service->recuperar($nfce, $empresa);
+                $ok++;
+                $ultimoStatus = (string) $nfce->status;
+                $ultimoMotivo = trim((string) ($nfce->motivo_rejeicao ?? ''));
+                $this->nfceSelecionadosTransmitir = array_values(array_filter(
+                    $this->nfceSelecionadosTransmitir,
+                    fn (string $value): bool => $value !== (string) $id,
+                ));
+            } catch (Throwable $exception) {
+                $erros++;
+                $mensagem = trim($exception->getMessage());
+                if ($mensagem === '') {
+                    $mensagem = $exception::class;
+                }
+
+                $primeiraMensagemErro ??= $mensagem;
+
+                if ($exception instanceof FiscalEngineException) {
+                    $primeiraExcecaoFiscal ??= $exception;
+                }
+
+                Log::warning('NFC-e consulta SEFAZ falhou', [
+                    'nfce_id' => $nfce->id,
+                    'numero' => $nfce->numero,
+                    'chave' => $nfce->chave,
+                    'message' => $mensagem,
+                ]);
+            }
         }
 
         $this->resetTable();
 
-        $motivo = trim((string) ($nfce->motivo_rejeicao ?? ''));
-        $body = 'Status: '.mb_strtoupper((string) $nfce->status, 'UTF-8');
-        if ($motivo !== '') {
-            $body .= ' — '.$motivo;
+        if ($ok === 0 && $primeiraExcecaoFiscal instanceof FiscalEngineException) {
+            $this->notifyNfceFiscalError($primeiraExcecaoFiscal);
+
+            return;
         }
 
-        Notification::make()
-            ->title('Consulta SEFAZ concluída.')
-            ->body($body)
-            ->success()
-            ->send();
+        if ($ok === 0) {
+            $this->notifyNfceWarning($primeiraMensagemErro ?: 'Nenhuma NFC-e foi consultada na SEFAZ.');
+
+            return;
+        }
+
+        if ($ok === 1 && $erros === 0) {
+            $body = 'Status: '.mb_strtoupper((string) $ultimoStatus, 'UTF-8');
+            if (filled($ultimoMotivo)) {
+                $body .= ' — '.$ultimoMotivo;
+            }
+
+            Notification::make()
+                ->title('Consulta SEFAZ concluída.')
+                ->body($body)
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        $notification = Notification::make()
+            ->title($erros > 0
+                ? "{$ok} consultada(s), {$erros} com erro."
+                : "{$ok} NFC-e consultadas na SEFAZ.");
+
+        if ($erros > 0) {
+            $notification->warning();
+            if (filled($primeiraMensagemErro)) {
+                $notification->body($primeiraMensagemErro);
+            }
+        } else {
+            $notification->success();
+        }
+
+        $notification->send();
     }
 
     public function transmitirNfce(): void
@@ -194,13 +263,15 @@ trait ManagesNfceFiscalActions
         $transmitidas = 0;
         $erros = 0;
         $ultimoProtocolo = null;
-        $primeiraExcecao = null;
+        $primeiraExcecaoFiscal = null;
+        $primeiraMensagemErro = null;
 
         foreach ($ids as $id) {
             $nfce = PdvVendaNfce::query()->find($id);
 
             if (! $nfce) {
                 $erros++;
+                $primeiraMensagemErro ??= 'NFC-e não encontrada.';
 
                 continue;
             }
@@ -213,21 +284,44 @@ trait ManagesNfceFiscalActions
                     $this->nfceSelecionadosTransmitir,
                     fn (string $value): bool => $value !== (string) $id,
                 ));
-            } catch (FiscalEngineException $exception) {
+            } catch (Throwable $exception) {
                 $erros++;
-                $primeiraExcecao ??= $exception;
+                $mensagem = trim($exception->getMessage());
+                if ($mensagem === '') {
+                    $mensagem = $exception::class;
+                }
+
+                $primeiraMensagemErro ??= $mensagem;
+
+                if ($exception instanceof FiscalEngineException) {
+                    $primeiraExcecaoFiscal ??= $exception;
+                }
+
+                Log::warning('NFC-e transmissão falhou', [
+                    'nfce_id' => $nfce->id,
+                    'numero' => $nfce->numero,
+                    'chave' => $nfce->chave,
+                    'message' => $mensagem,
+                ]);
+
+                try {
+                    $nfce->forceFill([
+                        'motivo_rejeicao' => mb_substr($mensagem, 0, 2000, 'UTF-8'),
+                    ])->save();
+                } catch (Throwable) {
+                }
             }
         }
 
         $this->resetTable();
 
-        if ($transmitidas === 0 && $primeiraExcecao instanceof FiscalEngineException) {
-            $this->notifyNfceFiscalError($primeiraExcecao);
+        if ($erros > 0 && $transmitidas === 0 && $primeiraExcecaoFiscal instanceof FiscalEngineException) {
+            $this->notifyNfceFiscalError($primeiraExcecaoFiscal);
 
             return;
         }
 
-        $this->notifyNfceTransmitirResumo($transmitidas, $erros, $ultimoProtocolo);
+        $this->notifyNfceTransmitirResumo($transmitidas, $erros, $ultimoProtocolo, $primeiraMensagemErro);
     }
 
     public function inutilizarNfce(): void

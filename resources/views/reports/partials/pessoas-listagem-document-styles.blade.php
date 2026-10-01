@@ -59,6 +59,8 @@
         font-size: 14px;
         font-weight: 800;
         text-align: center;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
     .pessoa-list-doc__company-name {
@@ -104,6 +106,8 @@
         font-weight: 700;
         text-align: left;
         border-color: rgba(255, 255, 255, 0.15);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
     .pessoa-list-doc__table td.num,
@@ -126,6 +130,31 @@
         background: #d9d9d9;
         font-weight: 700;
         border-top: 2px solid #888;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    @media print {
+        .pessoa-list-doc,
+        .pessoa-list-doc * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pessoa-list-doc__table thead th {
+            background: #0f3460 !important;
+            color: #fff !important;
+            border-color: #0f3460 !important;
+        }
+
+        .pessoa-list-doc__table th,
+        .pessoa-list-doc__table td {
+            border: 1px solid #888 !important;
+        }
+
+        .pessoa-list-doc__frame {
+            border: 1px solid #111 !important;
+        }
     }
 
     .pessoa-list-doc__footer {

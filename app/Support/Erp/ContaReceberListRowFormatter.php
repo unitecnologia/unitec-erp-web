@@ -8,6 +8,13 @@ use Illuminate\Support\Carbon;
 final class ContaReceberListRowFormatter
 {
     /**
+     * id do pedido no Monitor (forca_vendas_orders) => Nº Pedido exibido.
+     *
+     * @var array<int, string>
+     */
+    public array $pedidosMonitor = [];
+
+    /**
      * @param  array<int, int|string>  $selecionadosParaBaixa
      * @return array<string, string>
      */
@@ -21,40 +28,49 @@ final class ContaReceberListRowFormatter
 
         return [
             'baixa' => $this->formatBaixaCheckbox((int) $record->getKey(), $podeMarcar, $checked),
-            'numero' => e((string) ($record->numero ?? '—')),
+            'numero' => e($this->formatNumero($record->numero)),
             'emissao' => e($this->formatData($record->emissao)),
             'historico' => e((string) ($record->historico ?? '—')),
-            'documento' => filled($record->documento) ? e((string) $record->documento) : '—',
+            'documento' => e(ContaReceberPedidoExibicao::texto($record->documento, $this->pedidosMonitor)),
             'cartao_maquininha' => filled($record->cartao_maquininha) ? e((string) $record->cartao_maquininha) : '—',
             'cartao_bandeira' => filled($record->cartao_bandeira) ? e((string) $record->cartao_bandeira) : '—',
             'cliente' => e($record->cliente?->nome_razao ?? '—'),
             'vencimento' => e($this->formatData($record->vencimento)),
-            'valor' => e($this->formatMoney($record->valor)),
+            'valor' => $this->formatMoneyCell($record->valor),
             'numero_cheque' => filled($record->numero_cheque) ? e((string) $record->numero_cheque) : '—',
-            'desconto' => e($this->formatMoney($record->desconto)),
-            'juros' => e($this->formatMoney($record->juros)),
-            'valor_recebido' => e($this->formatMoney($record->valor_recebido)),
+            'desconto' => $this->formatMoneyCell($record->desconto),
+            'juros' => $this->formatMoneyCell($record->juros),
+            'multa' => $this->formatMoneyCell($record->multa),
+            'valor_recebido' => $this->formatMoneyCell($record->valor_recebido),
             'recebido_em' => e($this->formatData($record->recebido_em)),
-            'saldo' => e($this->formatMoney($record->saldo)),
+            'saldo' => $this->formatMoneyCell($record->saldo),
             'visualizar' => $this->formatViewButton((int) $record->getKey()),
-            'row_class' => $this->rowClass($record),
+            'row_class' => $this->rowClass($record, $checked),
         ];
     }
 
     /**
      * @return array<int, string>
      */
-    public function rowClass(ContaReceber $record): array
+    public function rowClass(ContaReceber $record, bool $selected = false): array
     {
+        $classes = [];
+
+        if ($selected) {
+            $classes[] = 'erp-row-selected';
+        }
+
         if ((float) $record->saldo <= 0) {
-            return ['erp-receber-row--recebida'];
+            $classes[] = 'erp-receber-row--recebida';
+
+            return $classes;
         }
 
         if ($record->vencimento && $record->vencimento->isBefore(now()->startOfDay())) {
-            return ['erp-receber-row--vencida'];
+            $classes[] = 'erp-receber-row--vencida';
         }
 
-        return [];
+        return $classes;
     }
 
     private function formatBaixaCheckbox(int $contaId, bool $podeMarcar, bool $checked): string
@@ -64,6 +80,7 @@ final class ContaReceberListRowFormatter
         $checkedAttr = $checked ? ' checked' : '';
 
         return '<input type="checkbox" class="erp-receber__check" value="'.$contaId.'"'
+            . ' onclick="const row=this.closest(\'tr\'); if(row){ row.classList.toggle(\'erp-row-selected\', this.checked); }"'
             . ' wire:click.stop="$dispatch(\'erp-receber-toggle-baixa\', { contaId: '.$contaId.', selected: $event.target.checked })"'
             . ' wire:key="receber-baixa-'.$contaId.'"'
             . $checkedAttr
@@ -85,6 +102,19 @@ final class ContaReceberListRowFormatter
             . '</svg></span>';
     }
 
+    private function formatNumero(mixed $numero): string
+    {
+        $texto = trim((string) ($numero ?? ''));
+
+        if ($texto === '') {
+            return '—';
+        }
+
+        $semZeros = ltrim($texto, '0');
+
+        return $semZeros !== '' ? $semZeros : '0';
+    }
+
     private function formatData(mixed $state): string
     {
         if ($state === null || $state === '') {
@@ -101,5 +131,15 @@ final class ContaReceberListRowFormatter
     private function formatMoney(mixed $state): string
     {
         return number_format((float) ($state ?? 0), 2, ',', '.');
+    }
+
+    private function formatMoneyCell(mixed $state): string
+    {
+        $valor = $this->formatMoney($state);
+
+        return '<span class="erp-receber-money">'
+            .'<span class="erp-receber-money__currency">R$</span>'
+            .'<span class="erp-receber-money__amount" title="R$ '.e($valor).'">'.e($valor).'</span>'
+            .'</span>';
     }
 }

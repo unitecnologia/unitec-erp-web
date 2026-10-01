@@ -107,7 +107,7 @@
 
                         <div class="erp-pcad-form__row">
 
-                            <label class="erp-pcad-form__label" for="usuario-senha">Senha</label>
+                            <label class="erp-pcad-form__label" for="usuario-senha">{{ $this->userModalRecordId ? 'Nova senha (opcional)' : 'Senha' }}</label>
 
                             <div class="erp-pcad-form__password-wrap erp-pcad-form__input--grow">
 
@@ -175,25 +175,28 @@
 
                         </div>
 
-
-
+                        @if ($this->userModalRecordId)
                         <div class="erp-pcad-form__row">
 
-                            <label class="erp-pcad-form__label" for="usuario-senha-conf">Confirmar Senha</label>
+                            <label class="erp-pcad-form__label" for="usuario-senha-atual">Senha atual</label>
 
                             <div class="erp-pcad-form__password-wrap erp-pcad-form__input--grow">
 
                                 <input
 
-                                    id="usuario-senha-conf"
+                                    id="usuario-senha-atual"
 
                                     type="text"
 
-                                    wire:model="userForm.password_confirmation"
+                                    wire:model="userForm.senha_atual"
 
                                     data-erp-password-mask="plain"
 
                                     class="erp-pcad-form__input erp-pcad-form__input--password is-masked"
+
+                                    readonly
+
+                                    tabindex="-1"
 
                                     autocomplete="off"
 
@@ -205,7 +208,7 @@
 
                                     class="erp-pcad-form__password-toggle"
 
-                                    data-erp-password-toggle="usuario-senha-conf"
+                                    data-erp-password-toggle="usuario-senha-atual"
 
                                     title="Exibir senha"
 
@@ -237,19 +240,14 @@
 
                             </div>
 
-                            @error('userForm.password_confirmation')
-
-                                <span class="erp-usuario-form-modal__error">{{ $message }}</span>
-
-                            @enderror
-
                         </div>
+                        @endif
 
 
 
                         <div class="erp-pcad-form__row">
 
-                            <label class="erp-pcad-form__label" for="usuario-senha-app">Senha App Força de Vendas</label>
+                            <label class="erp-pcad-form__label" for="usuario-senha-app">Senha do app</label>
 
                             <div class="erp-pcad-form__password-wrap erp-pcad-form__input--grow">
 
@@ -313,6 +311,61 @@
 
                             @enderror
 
+                        </div>
+
+                        <div class="erp-pcad-form__row erp-usuario-form-modal__apps-row">
+                            <label class="erp-pcad-form__label">Apps liberados</label>
+                            <div
+                                class="erp-usuario-form-modal__apps"
+                                x-data="{
+                                    open: false,
+                                    labels: {
+                                        acesso_app_forca_vendas: 'Força de Vendas',
+                                        acesso_app_vendas_internas: 'Vendas Internas',
+                                        acesso_app_unitec_os: 'Unitec OS',
+                                        acesso_app_entregas: 'Entregas',
+                                        acesso_app_gestao: 'Gestão',
+                                    },
+                                    summary() {
+                                        const form = $wire.userForm || {};
+                                        const selected = Object.keys(this.labels).filter((key) => !!form[key]).map((key) => this.labels[key]);
+                                        return selected.length ? selected.join(', ') : '— Nenhum —';
+                                    },
+                                    count() {
+                                        const form = $wire.userForm || {};
+                                        return Object.keys(this.labels).filter((key) => !!form[key]).length;
+                                    }
+                                }"
+                                @click.outside="open = false"
+                                @keydown.escape.stop="open = false"
+                            >
+                                <button type="button" class="erp-usuario-form-modal__apps-toggle" @click="open = !open" :aria-expanded="open">
+                                    <span class="erp-usuario-form-modal__apps-summary" :class="{ 'is-empty': count() === 0 }" x-text="summary()"></span>
+                                    <svg class="erp-usuario-form-modal__apps-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" :style="open ? 'transform:rotate(180deg)' : ''"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="erp-usuario-form-modal__apps-panel" x-show="open" x-cloak x-transition.opacity role="listbox" aria-label="Apps liberados">
+                                    <label class="erp-usuario-form-modal__apps-check">
+                                        <input type="checkbox" wire:model.live="userForm.acesso_app_forca_vendas">
+                                        Força de Vendas
+                                    </label>
+                                    <label class="erp-usuario-form-modal__apps-check">
+                                        <input type="checkbox" wire:model.live="userForm.acesso_app_vendas_internas">
+                                        Vendas Internas
+                                    </label>
+                                    <label class="erp-usuario-form-modal__apps-check">
+                                        <input type="checkbox" wire:model.live="userForm.acesso_app_unitec_os">
+                                        Unitec OS
+                                    </label>
+                                    <label class="erp-usuario-form-modal__apps-check">
+                                        <input type="checkbox" wire:model.live="userForm.acesso_app_entregas">
+                                        Entregas
+                                    </label>
+                                    <label class="erp-usuario-form-modal__apps-check">
+                                        <input type="checkbox" wire:model.live="userForm.acesso_app_gestao">
+                                        Gestão
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
 

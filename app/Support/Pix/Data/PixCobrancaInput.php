@@ -17,6 +17,8 @@ final class PixCobrancaInput
         public readonly ?string $payerEmail = null,
         public readonly ?string $externalReference = null,
         public readonly ?string $notificationUrl = null,
+        public readonly ?string $debtorName = null,
+        public readonly ?string $debtorDocument = null,
     ) {
     }
 }

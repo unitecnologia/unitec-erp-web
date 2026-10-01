@@ -2,14 +2,14 @@
 
 namespace App\Support\Erp\License;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class LicencaPortalPagamentoService
 {
     /**
-     * Próxima mensalidade em aberto (vencimento de pagamento).
+     * Referência de vencimento para o KPI da licença.
+     * Preferência: fatura em aberto (a pagar). Senão: maior dueDate de fatura paga (= pago até).
      *
      * @return array{
      *     ok: bool,
@@ -17,7 +17,8 @@ class LicencaPortalPagamentoService
      *     invoice_id?: int,
      *     amount?: string,
      *     description?: string,
-     *     due_date?: string
+     *     due_date?: string,
+     *     pending?: bool
      * }
      */
     public function proximaMensalidade(string $cnpj): array
@@ -28,18 +29,32 @@ class LicencaPortalPagamentoService
 
         try {
             $session = $this->loginCliente($cnpj, timeout: 4);
-            $invoice = $this->proximaFaturaPendente($session, timeout: 4);
+            $pending = $this->proximaFaturaPendente($session, timeout: 4);
 
-            if ($invoice === null) {
-                return ['ok' => false, 'message' => 'Nenhuma mensalidade pendente no portal.'];
+            if ($pending !== null) {
+                return [
+                    'ok' => true,
+                    'pending' => true,
+                    'invoice_id' => (int) ($pending['id'] ?? 0),
+                    'amount' => (string) ($pending['amount'] ?? ''),
+                    'description' => (string) ($pending['description'] ?? ''),
+                    'due_date' => (string) ($pending['dueDate'] ?? ''),
+                ];
+            }
+
+            $paidUntil = $this->faturaPagoAte($session, timeout: 4);
+
+            if ($paidUntil === null) {
+                return ['ok' => false, 'message' => 'Nenhuma mensalidade com vencimento no portal.'];
             }
 
             return [
                 'ok' => true,
-                'invoice_id' => (int) ($invoice['id'] ?? 0),
-                'amount' => (string) ($invoice['amount'] ?? ''),
-                'description' => (string) ($invoice['description'] ?? ''),
-                'due_date' => (string) ($invoice['dueDate'] ?? ''),
+                'pending' => false,
+                'invoice_id' => (int) ($paidUntil['id'] ?? 0),
+                'amount' => (string) ($paidUntil['amount'] ?? ''),
+                'description' => (string) ($paidUntil['description'] ?? ''),
+                'due_date' => (string) ($paidUntil['dueDate'] ?? ''),
             ];
         } catch (Throwable $e) {
             Log::warning('Falha ao consultar mensalidade no portal de licença.', [
@@ -121,7 +136,7 @@ class LicencaPortalPagamentoService
             $timeout = max(3, (int) config('unitec.licenca_api.timeout', 8));
             $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
 
-            $response = Http::withOptions(['cookies' => $session])
+            $response = LicencaHttpClient::make(['cookies' => $session])
                 ->timeout($timeout)
                 ->acceptJson()
                 ->asJson()
@@ -178,7 +193,7 @@ class LicencaPortalPagamentoService
         $timeout = max(2, $timeout ?? (int) config('unitec.licenca_api.timeout', 8));
         $jar = new \GuzzleHttp\Cookie\CookieJar;
 
-        $response = Http::withOptions(['cookies' => $jar])
+        $response = LicencaHttpClient::make(['cookies' => $jar])
             ->timeout($timeout)
             ->connectTimeout(min(2, $timeout))
             ->acceptJson()
@@ -204,7 +219,7 @@ class LicencaPortalPagamentoService
         $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
         $timeout = max(2, $timeout ?? (int) config('unitec.licenca_api.timeout', 8));
 
-        $response = Http::withOptions(['cookies' => $session])
+        $response = LicencaHttpClient::make(['cookies' => $session])
             ->timeout($timeout)
             ->connectTimeout(min(2, $timeout))
             ->acceptJson()
@@ -245,6 +260,66 @@ class LicencaPortalPagamentoService
     }
 
     /**
+     * Maior dueDate entre faturas pagas (= "pago até" essa data).
+     *
+     * @param  \GuzzleHttp\Cookie\CookieJar  $session
+     * @return array<string, mixed>|null
+     */
+    private function faturaPagoAte($session, ?int $timeout = null): ?array
+    {
+        $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
+        $timeout = max(2, $timeout ?? (int) config('unitec.licenca_api.timeout', 8));
+
+        $response = LicencaHttpClient::make(['cookies' => $session])
+            ->timeout($timeout)
+            ->connectTimeout(min(2, $timeout))
+            ->acceptJson()
+            ->get($baseUrl.'/api/invoices');
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $items = $response->json();
+
+        if (! is_array($items)) {
+            return null;
+        }
+
+        $paid = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $status = strtolower((string) ($item['status'] ?? ''));
+            $paidAt = $item['paidAt'] ?? null;
+            $due = trim((string) ($item['dueDate'] ?? ''));
+
+            if ($due === '') {
+                continue;
+            }
+
+            if ($status !== 'paid' && blank($paidAt)) {
+                continue;
+            }
+
+            $paid[] = $item;
+        }
+
+        if ($paid === []) {
+            return null;
+        }
+
+        usort($paid, static function (array $a, array $b): int {
+            return strcmp((string) ($b['dueDate'] ?? ''), (string) ($a['dueDate'] ?? ''));
+        });
+
+        return $paid[0] ?? null;
+    }
+
+    /**
      * @param  \GuzzleHttp\Cookie\CookieJar  $session
      * @return array<string, mixed>|null
      */
@@ -257,7 +332,7 @@ class LicencaPortalPagamentoService
         $baseUrl = rtrim((string) config('unitec.licenca_api.base_url'), '/');
         $timeout = max(5, (int) config('unitec.licenca_api.timeout', 8));
 
-        $response = Http::withOptions(['cookies' => $session])
+        $response = LicencaHttpClient::make(['cookies' => $session])
             ->timeout($timeout)
             ->acceptJson()
             ->get($baseUrl.'/api/invoices/'.$invoiceId.'/pix');

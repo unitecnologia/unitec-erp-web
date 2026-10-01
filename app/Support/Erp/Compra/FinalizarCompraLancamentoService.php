@@ -10,10 +10,13 @@ use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
 use App\Support\Erp\Financeiro\ContaPagarCadastroService;
 use App\Support\Erp\Product\ProductPriceHistoryRecorder;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Models\EstoqueMovimentacao;
 use DomainException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -121,10 +124,21 @@ final class FinalizarCompraLancamentoService
                     $product = $item->product ?? Product::query()->find($item->product_id);
 
                     if ($product && ! $product->is_servico) {
+                        $doc = EstoqueMovimentacaoDocumento::fromCompra($compra);
                         $this->saldos->incrementar(
                             (int) $product->id,
                             (float) $item->quantidade,
                             $estoqueId,
+                            null,
+                            EstoqueMovimentacaoContext::make(
+                                EstoqueMovimentacao::TIPO_ENTRADA_COMPRA,
+                                empresaId: $compra->empresa_id ? (int) $compra->empresa_id : null,
+                                origemTipo: $doc['origemTipo'],
+                                origemId: $doc['origemId'],
+                                origemNumero: $doc['origemNumero'],
+                                docFiscalTipo: $doc['docFiscalTipo'],
+                                docFiscalNumero: $doc['docFiscalNumero'],
+                            ),
                         );
 
                         if ($product->controla_lote_validade) {

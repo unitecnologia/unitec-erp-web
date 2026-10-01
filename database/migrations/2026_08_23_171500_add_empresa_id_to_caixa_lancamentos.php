@@ -38,7 +38,9 @@ return new class extends Migration
 
     private function backfillFromFvOrders(): void
     {
-        if (! Schema::hasTable('forca_vendas_orders') || ! Schema::hasColumn('forca_vendas_orders', 'empresa_id')) {
+        if (! Schema::hasTable('forca_vendas_orders')
+            || ! Schema::hasColumn('forca_vendas_orders', 'empresa_id')
+            || Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 

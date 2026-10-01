@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\ContaReceber;
+use App\Support\Erp\ContaReceberPedidoExibicao;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class ContaReceberListQueryBuilder
         public string $orderBy = 'emissao',
         public string $orderDirection = 'desc',
         public bool $applyDefaultOrder = true,
+        public array $searchFieldsActive = [],
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -28,7 +30,7 @@ class ContaReceberListQueryBuilder
         $allowedSituacao = ['todos', 'a_receber', 'atrasadas', 'recebidas'];
         $allowedForma = array_merge(['todos'], array_keys(ContaReceber::formaLabels()));
         $allowedCampo = [
-            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'emissao', 'historico', 'documento', 'cliente', 'vencimento',
             'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
         ];
 
@@ -73,6 +75,7 @@ class ContaReceberListQueryBuilder
             "{$table}.numero_cheque",
             "{$table}.desconto",
             "{$table}.juros",
+            "{$table}.multa",
             "{$table}.valor_recebido",
             "{$table}.recebido_em",
             "{$table}.saldo",
@@ -151,20 +154,66 @@ class ContaReceberListQueryBuilder
             return;
         }
 
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
-            : 'cliente';
+        $columns = $this->activeLocalSearchColumns();
 
+        if (count($columns) === 1) {
+            $this->applyLocalSearchOnColumn($query, $columns[0], $term);
+
+            return;
+        }
+
+        $query->where(function (Builder $outer) use ($columns, $term): void {
+            foreach ($columns as $index => $column) {
+                $apply = function (Builder $inner) use ($column, $term): void {
+                    $this->applyLocalSearchOnColumn($inner, $column, $term);
+                };
+
+                if ($index === 0) {
+                    $outer->where($apply);
+                } else {
+                    $outer->orWhere($apply);
+                }
+            }
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function activeLocalSearchColumns(): array
+    {
+        $allowed = $this->localSearchColumns();
+        $active = array_values(array_unique(array_filter(
+            $this->searchFieldsActive,
+            fn (mixed $column): bool => is_string($column) && in_array($column, $allowed, true),
+        )));
+
+        if ($active !== []) {
+            return $active;
+        }
+
+        return [in_array($this->searchColumn, $allowed, true) ? $this->searchColumn : 'cliente'];
+    }
+
+    protected function applyLocalSearchOnColumn(Builder $query, string $column, string $term): void
+    {
         $prefixLike = $term.'%';
 
         match ($column) {
             'numero' => $query->where('numero', 'like', $prefixLike),
             'historico' => $query->where('historico', 'like', $prefixLike),
-            'documento' => $query->where('documento', 'like', $prefixLike),
+            'documento' => $this->applyLocalSearchByDocumento($query, $term),
             'numero_cheque' => $query->where('numero_cheque', 'like', $prefixLike),
             'cliente' => $query->whereHas(
                 'cliente',
-                fn (Builder $clienteQuery): Builder => $clienteQuery->where('nome_razao', 'like', $prefixLike),
+                function (Builder $clienteQuery) use ($term): Builder {
+                    $like = '%'.$term.'%';
+
+                    return $clienteQuery->where(function (Builder $inner) use ($like): void {
+                        $inner->where('nome_razao', 'like', $like)
+                            ->orWhere('apelido_fantasia', 'like', $like);
+                    });
+                },
             ),
             'emissao', 'vencimento', 'recebido_em' => $this->applyLocalSearchByDate($query, $term, $column),
             'valor', 'desconto', 'juros', 'valor_recebido', 'saldo' => $this->applyLocalSearchByMoney($query, $term, $column),
@@ -178,9 +227,64 @@ class ContaReceberListQueryBuilder
     protected function localSearchColumns(): array
     {
         return [
-            'numero', 'emissao', 'historico', 'documento', 'cliente', 'vencimento',
+            'emissao', 'historico', 'documento', 'cliente', 'vencimento',
             'valor', 'numero_cheque', 'desconto', 'juros', 'valor_recebido', 'recebido_em', 'saldo',
         ];
+    }
+
+    /**
+     * Número puro encontra o documento sem o prefixo (FV-83, PDV-000083, OS-83/2).
+     * Texto com letras continua no começo do documento (FV, PDV, FV-83).
+     */
+    protected function applyLocalSearchByDocumento(Builder $query, string $term): void
+    {
+        $numero = preg_match('/^\d+$/', $term) === 1 ? (int) $term : null;
+
+        $query->where(function (Builder $inner) use ($term, $numero): void {
+            $inner->where('documento', 'like', $term.'%');
+
+            if ($numero === null) {
+                return;
+            }
+
+            $documento = 'documento';
+
+            if ($this->databaseDriver($inner) === 'sqlite') {
+                $inner->orWhereRaw(
+                    "CAST(
+                        CASE
+                            WHEN instr(substr({$documento}, instr({$documento}, '-') + 1), '/') > 0
+                            THEN substr(
+                                substr({$documento}, instr({$documento}, '-') + 1),
+                                1,
+                                instr(substr({$documento}, instr({$documento}, '-') + 1), '/') - 1
+                            )
+                            ELSE substr({$documento}, instr({$documento}, '-') + 1)
+                        END AS INTEGER
+                    ) = ?",
+                    [$numero],
+                );
+
+            } else {
+                $inner->orWhereRaw(
+                    "CAST(SUBSTRING_INDEX(SUBSTRING_INDEX({$documento}, '-', -1), '/', 1) AS UNSIGNED) = ?",
+                    [$numero],
+                );
+            }
+
+            $this->applyLocalSearchByNumeroMonitor($inner, $numero);
+        });
+    }
+
+    /**
+     * O número digitado é o Nº Pedido do Monitor (vendas.numero), não o id FV-.
+     */
+    protected function applyLocalSearchByNumeroMonitor(Builder $query, int $numero): void
+    {
+        foreach (ContaReceberPedidoExibicao::orderIdsDoNumero($numero) as $orderId) {
+            $query->orWhere('documento', 'FV-'.$orderId)
+                ->orWhere('documento', 'like', 'FV-'.$orderId.'/%');
+        }
     }
 
     protected function applyLocalSearchByDate(Builder $query, string $term, string $column): void

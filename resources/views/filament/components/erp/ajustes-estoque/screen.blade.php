@@ -7,6 +7,7 @@
     ],
     'uppercaseColumns' => 'produto',
     'wireKeyPrefix' => 'ajustes-estoque',
-    'hint' => 'Pressione Enter ou clique em Pesquisa. Informe o período quando necessário.',
+    'hint' => null,
     'beforeFiltersView' => 'filament.components.erp.ajustes-estoque.period-block',
+    'beforeFiltersInline' => true,
 ])

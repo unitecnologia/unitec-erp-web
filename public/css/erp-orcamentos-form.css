@@ -1041,7 +1041,8 @@
 }
 
 /* Overlay cadastros — mesmas dimensões da janela modal de Produtos/Pessoas */
-.erp-orcamentos-form-page .erp-form-overlay {
+.erp-orcamentos-form-page .erp-form-overlay,
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) {
     position: fixed;
     inset: 0;
     z-index: 200;
@@ -1051,13 +1052,15 @@
     padding: 0.75rem;
 }
 
-.erp-orcamentos-form-page .erp-form-overlay__backdrop {
+.erp-orcamentos-form-page .erp-form-overlay__backdrop,
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__backdrop {
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.48);
 }
 
-.erp-orcamentos-form-page .erp-form-overlay__panel {
+.erp-orcamentos-form-page .erp-form-overlay__panel,
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel {
     position: relative;
     z-index: 1;
     display: flex;
@@ -1073,7 +1076,8 @@
     border-radius: var(--erp-radius-lg, 10px);
 }
 
-.erp-orcamentos-form-page .erp-form-overlay__iframe {
+.erp-orcamentos-form-page .erp-form-overlay__iframe,
+.erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__iframe {
     flex: 1;
     width: 100%;
     height: 100%;
@@ -1083,9 +1087,10 @@
 }
 
 @supports not (height: 100dvh) {
-    .erp-orcamentos-form-page .erp-form-overlay__panel {
-        height: calc(100vh - 5.5rem);
-        max-height: calc(100vh - 5.5rem);
+    .erp-orcamentos-form-page .erp-form-overlay__panel,
+    .erp-os-form-page .erp-form-overlay:not(.erp-os-preview-overlay) .erp-form-overlay__panel {
+        height: min(calc(100vh - 5.5rem + 6cm), calc(100vh - 0.4rem)) !important;
+        max-height: min(calc(100vh - 5.5rem + 6cm), calc(100vh - 0.4rem)) !important;
     }
 }
 

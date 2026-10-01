@@ -92,7 +92,16 @@
 >
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-codigo">Código</label>
-        <input id="pcad-codigo" type="text" wire:model="data.codigo" class="erp-pcad-form__input erp-pcad-form__input--xs">
+        <input
+            id="pcad-codigo"
+            type="text"
+            wire:model="data.codigo"
+            class="erp-pcad-form__input erp-pcad-form__input--xs"
+            @if ($this->record?->exists)
+                readonly
+                tabindex="-1"
+            @endif
+        >
         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-pessoa">Pessoa</label>
         <select id="pcad-pessoa" wire:model.live="data.pessoa_tipo" class="erp-pcad-form__select erp-pcad-form__select--sm">
             @foreach (Person::pessoaTipos() as $value => $label)

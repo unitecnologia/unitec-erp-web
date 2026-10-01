@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\OrdemServicoResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Pages\NfsePage;
 use App\Filament\Resources\OrdemServicoResource;
 use App\Models\OrdemServico;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpContext;
+use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -17,11 +20,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListOrdensServico extends ListRecords
 {
     use InteractsWithErpListPage;
+    use Concerns\ManagesOrdemServicoEmailModal;
+    use Concerns\ManagesOrdemServicoEspelhoModal;
 
     protected static string $resource = OrdemServicoResource::class;
 
@@ -43,6 +49,12 @@ class ListOrdensServico extends ListRecords
     public string $periodoDeApplied = '';
 
     public string $periodoAteApplied = '';
+
+    public bool $previewOverlayOpen = false;
+
+    public ?string $previewOverlayUrl = null;
+
+    public bool $printModalOpen = false;
 
     public function mount(): void
     {
@@ -91,8 +103,10 @@ class ListOrdensServico extends ListRecords
             'edit' => 'editOrdem',
             'delete' => 'cancelOrdem',
             'extraKeys' => [
-                'F6' => ['method' => 'modulePending', 'params' => ['Imprimir OS']],
+                'F6' => ['method' => 'openPrintModal'],
+                'F9' => ['method' => 'openSendModal'],
             ],
+            'searchFocusKey' => 'F12',
         ];
     }
 
@@ -109,7 +123,7 @@ class ListOrdensServico extends ListRecords
     protected function buildListQuery(): Builder
     {
         $query = parent::getTableQuery()
-            ->with(['cliente', 'atendente']);
+            ->with(['cliente', 'atendente', 'nfse']);
 
         if ($this->statusFilter === OrdemServico::SITUACAO_ABERTA) {
             $query->whereIn('situacao', [
@@ -194,7 +208,80 @@ class ListOrdensServico extends ListRecords
                 EmbeddedTable::make()->columnSpanFull(),
                 View::make('filament.components.erp.ordens-servico.footer-total'),
                 View::make('filament.components.erp.ordens-servico.action-bar'),
+                View::make('filament.components.erp.ordens-servico.print-modal'),
+                View::make('filament.components.erp.ordens-servico.send-modal'),
+                View::make('filament.components.erp.ordens-servico.preview-overlay'),
+                View::make('filament.components.erp.ordens-servico.email-modal'),
+                View::make('filament.components.erp.ordens-servico.espelho-modal'),
             ]);
+    }
+
+    public function openPrintModal(): void
+    {
+        if (! $this->highlightedRecordId) {
+            Notification::make()->title('Selecione uma ordem de serviço.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'ordens_servico.print')) {
+            return;
+        }
+
+        $this->printModalOpen = true;
+    }
+
+    public function closePrintModal(): void
+    {
+        $this->printModalOpen = false;
+    }
+
+    public function imprimirOs(): void
+    {
+        $this->openPrintModal();
+    }
+
+    public function imprimirOsCompleta(): void
+    {
+        $this->abrirPreviewOs(tecnica: false);
+    }
+
+    public function imprimirOsTecnica(): void
+    {
+        $this->abrirPreviewOs(tecnica: true);
+    }
+
+    protected function abrirPreviewOs(bool $tecnica): void
+    {
+        if (! $this->highlightedRecordId) {
+            Notification::make()->title('Selecione uma ordem de serviço.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'ordens_servico.print')) {
+            return;
+        }
+
+        $params = [
+            'ordem' => $this->highlightedRecordId,
+            'embed' => 1,
+        ];
+
+        if ($tecnica) {
+            $params['tecnica'] = 1;
+        }
+
+        $this->closePrintModal();
+        $this->previewOverlayUrl = route('erp.reports.ordem-servico', $params);
+        $this->previewOverlayOpen = true;
+    }
+
+    #[On('close-os-preview')]
+    public function closePreviewOverlay(): void
+    {
+        $this->previewOverlayOpen = false;
+        $this->previewOverlayUrl = null;
     }
 
     public function setStatusFilter(string $filter): void
@@ -350,5 +437,42 @@ class ListOrdensServico extends ListRecords
         $this->resetTable();
 
         Notification::make()->title('Ordem de serviço cancelada.')->success()->send();
+    }
+
+    public function emitirNfseDaOs(): void
+    {
+        if (! $this->highlightedRecordId) {
+            Notification::make()->title('Selecione uma ordem de serviço.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfse.access')) {
+            return;
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+        $ordem = OrdemServico::query()
+            ->with(['cliente', 'itens.product'])
+            ->when($empresaId !== null, fn ($query) => $query->where(function ($query) use ($empresaId): void {
+                $query->whereNull('empresa_id')->orWhere('empresa_id', $empresaId);
+            }))
+            ->find($this->highlightedRecordId);
+
+        if ($ordem === null) {
+            Notification::make()->title('Ordem de serviço não encontrada.')->warning()->send();
+
+            return;
+        }
+
+        $motivo = NfseFromOrdemServico::motivoBloqueio($ordem);
+
+        if ($motivo !== null) {
+            Notification::make()->title($motivo)->warning()->send();
+
+            return;
+        }
+
+        $this->redirect(NfsePage::getUrl().'?os='.$ordem->id, navigate: false);
     }
 }

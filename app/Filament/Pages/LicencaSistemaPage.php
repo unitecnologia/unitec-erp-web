@@ -44,10 +44,6 @@ class LicencaSistemaPage extends Page
 
     public string $mensagem = '';
 
-    public string $pagamentoUrl = '';
-
-    public string $portalUrl = '';
-
     public string $computador = '';
 
     public string $mac = '';
@@ -74,9 +70,6 @@ class LicencaSistemaPage extends Page
     {
         ErpScreen::set('Licença do Sistema');
 
-        $this->pagamentoUrl = $licencas->pagamentoUrl();
-        $this->portalUrl = rtrim((string) config('unitec.licenca_api.base_url', ''), '/')
-            ?: $this->pagamentoUrl;
         $this->suporteEmail = (string) config('unitec.licenca_suporte.email', 'sac@unitecnologiasc.com.br');
         $this->suporteWhatsapp = (string) config('unitec.licenca_suporte.whatsapp', '47984002117');
         $this->suporteSite = (string) config('unitec.licenca_suporte.site', '');

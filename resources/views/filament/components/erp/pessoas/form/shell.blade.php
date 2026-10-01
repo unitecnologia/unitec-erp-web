@@ -11,6 +11,7 @@
         'adicionais' => 'Adicionais',
         'contatos' => 'Contatos',
         'foto' => 'Foto',
+        'creditos' => 'Créditos',
     ];
 
     $parametros = [
@@ -52,6 +53,8 @@
                 @include('filament.components.erp.pessoas.form.tabs.contatos')
             @elseif ($this->activeFormTab === 'foto')
                 @include('filament.components.erp.pessoas.form.tabs.foto')
+            @elseif ($this->activeFormTab === 'creditos')
+                @include('filament.components.erp.pessoas.form.tabs.creditos')
             @endif
         </div>
 
@@ -72,4 +75,14 @@
 </div>
 
 @include('filament.components.erp.form-scripts')
+@php
+    $webcamJsPath = public_path('js/erp-pessoas-webcam.js');
+    $webcamJsVersion = file_exists($webcamJsPath) ? filemtime($webcamJsPath) : time();
+@endphp
 <script src="{{ asset('js/erp-pessoas-form.js') }}?v={{ $jsVersion }}" defer></script>
+<script src="{{ asset('js/erp-pessoas-webcam.js') }}?v={{ $webcamJsVersion }}"></script>
+
+{{-- PDV embed: shell sem window — modal fica aqui. --}}
+@if ($this->embedsInPdv)
+    @include('filament.components.erp.pessoas.form.documento-duplicado-modal')
+@endif

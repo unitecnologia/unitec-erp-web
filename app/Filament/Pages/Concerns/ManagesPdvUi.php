@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PersonResource;
+use App\Filament\Resources\ProductResource;
 use App\Models\CaixaConta;
 use App\Support\Erp\CloudflaredStatus;
 use App\Support\Erp\ErpContext;
@@ -14,25 +15,30 @@ use Illuminate\Support\Facades\Auth;
 
 trait ManagesPdvUi
 {
+    use ManagesBoletoPosDocumentoPrompt;
     use ManagesPdvAutorizacao;
     use ManagesPdvBloqueio;
     use ManagesPdvBuscaAvancada;
     use ManagesPdvBuscaPreco;
     use ManagesPdvCaixa;
     use ManagesPdvClienteLimite;
+    use ManagesPdvClienteCredito;
     use ManagesPdvConfig;
     use ManagesPdvConsultaVenda;
     use ManagesPdvDesconto;
     use ManagesPdvGaveta;
     use ManagesPdvGrade;
     use ManagesPdvImportar;
+    use ManagesPdvMenuFiscal;
     use ManagesPdvAcessoRapido;
     use ManagesPdvReceber;
     use ManagesPdvReimprimir;
     use ManagesPdvRemoverItens;
     use ManagesPdvSerial;
     use ManagesPdvTabelaPreco;
-    use ManagesPdvVenda;
+    use ManagesPdvVenda {
+        ManagesPdvVenda::afterBoletoPosDocumentoFluxo insteadof ManagesBoletoPosDocumentoPrompt;
+    }
     use ManagesPdvVendaEspera;
     use ManagesPdvVendedor;
 
@@ -54,6 +60,8 @@ trait ManagesPdvUi
     public ?string $activeModal = null;
 
     public bool $overlayPersonOpen = false;
+
+    public bool $overlayProductOpen = false;
 
     /** @var array<string, string> */
     public array $sangriaForm = [
@@ -237,7 +245,12 @@ trait ManagesPdvUi
 
     public function getPersonOverlayUrlProperty(): string
     {
-        return PersonResource::getUrl('create') . '?tipo=clientes&pdv=1';
+        return PersonResource::getUrl('index') . '?pdv=1';
+    }
+
+    public function getProductOverlayUrlProperty(): string
+    {
+        return ProductResource::getUrl('index') . '?pdv=1';
     }
 
     protected function loadPdvSessionState(): void
@@ -327,6 +340,12 @@ trait ManagesPdvUi
             return;
         }
 
+        if ($this->overlayProductOpen) {
+            $this->closeProductOverlay();
+
+            return;
+        }
+
         if ($this->overlayPersonOpen) {
             $this->closePersonOverlay();
 
@@ -405,6 +424,12 @@ trait ManagesPdvUi
                     return;
                 }
 
+                if ($this->finalizarPixQrAberta) {
+                    $this->cancelFinalizarPixQrcode();
+
+                    return;
+                }
+
                 $this->requestCloseFinalizar();
 
                 return;
@@ -429,6 +454,10 @@ trait ManagesPdvUi
                 'autorizacao' => $this->cancelPdvAutorizacao(),
                 'bloqueio' => $this->cancelUnlockPdv(),
                 'acesso_rapido' => $this->fecharAcessoRapido(),
+                'menu_fiscal_identificacao' => $this->closeMenuFiscalIdentificacao(),
+                'menu_fiscal_exportacao_xml' => $this->closeMenuFiscalExportacaoXml(),
+                'menu_fiscal_registros' => $this->closeMenuFiscalRegistros(),
+                'menu_fiscal_dav' => $this->closeMenuFiscalDav(),
                 default => $this->closePdvModal(),
             };
 
@@ -496,6 +525,7 @@ trait ManagesPdvUi
             return;
         }
 
+        $this->overlayProductOpen = false;
         $this->overlayPersonOpen = true;
         $this->dispatch('erp-pdv-overlay-opened', type: 'person');
     }
@@ -507,6 +537,33 @@ trait ManagesPdvUi
         }
 
         $this->overlayPersonOpen = false;
+        $this->dispatch('erp-pdv-overlay-closed');
+    }
+
+    public function openProductOverlay(): void
+    {
+        if (! $this->caixaAberto) {
+            Notification::make()
+                ->title('Caixa fechado.')
+                ->body('Abra o caixa com F2 antes de continuar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->overlayPersonOpen = false;
+        $this->overlayProductOpen = true;
+        $this->dispatch('erp-pdv-overlay-opened', type: 'product');
+    }
+
+    public function closeProductOverlay(): void
+    {
+        if (! $this->overlayProductOpen) {
+            return;
+        }
+
+        $this->overlayProductOpen = false;
         $this->dispatch('erp-pdv-overlay-closed');
     }
 

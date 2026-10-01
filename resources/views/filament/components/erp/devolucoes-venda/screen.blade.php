@@ -98,3 +98,18 @@
 
     @include('filament.components.erp.form-scripts')
 </div>
+
+@if ($this->creditoDevolucaoEstornoModal)
+    <div class="erp-devvenda-credito" role="dialog" aria-modal="true">
+        <div class="erp-devvenda-credito__backdrop" wire:click="cancelarEstornoCreditoDevolucao"></div>
+        <div class="erp-devvenda-credito__window">
+            <h2>Estornar crédito da devolução</h2>
+            <p>Será gravado um movimento inverso no extrato do cliente. O lançamento original não é apagado.</p>
+            <p class="erp-devvenda-credito__hint">Estoque e caixa desta devolução não são desfeitos. Se o cliente já usou o saldo, o estorno é recusado.</p>
+            <footer>
+                <button type="button" class="erp-devvenda-credito__btn" wire:click="cancelarEstornoCreditoDevolucao">Cancelar</button>
+                <button type="button" class="erp-devvenda-credito__btn erp-devvenda-credito__btn--primary" wire:click="confirmarEstornoCreditoDevolucao">Estornar crédito</button>
+            </footer>
+        </div>
+    </div>
+@endif

@@ -191,24 +191,22 @@ class FormaPagamento extends Model
 
         $isCartao = in_array($tipo, ['cartao_credito', 'cartao_debito', 'tef'], true);
         $isCarne = in_array($tipo, ['boleto', 'cheque', 'crediario'], true);
-        $isParcelavel = $isCartao || $isCarne;
         $isPix = $tipo === 'pix';
 
         return [
             // Conta destino / movimento: válidos para qualquer tipo (destino financeiro).
             'conta_destino' => true,
-            // Cartão / TEF (canhoto PDV) — fora de modo_prazo.
+            // Campos próprios do cartão / TEF.
             'taxa_cartao' => $isCartao,
             'prazo_cartao' => $isCartao,
             'usa_tef' => $isCartao,
             'usa_super_tef' => $isCartao,
             'bandeiras' => $isCartao,
-            // Parcelamento: cartão + carnê (boleto/cheque/crediário).
-            'max_parcelas' => $isParcelavel,
-            'intervalo_parcelas' => $isParcelavel,
-            // modo_prazo só no carnê (mutuamente exclusivo Financeiro × Tabela).
-            'modo_prazo' => $isCarne,
-            'tabelas_prazo' => $isParcelavel,
+            // Cartão segue o mesmo financeiro do carnê: flag Financeiro ou Tabela de Prazo.
+            'max_parcelas' => $isCartao || $isCarne,
+            'intervalo_parcelas' => $isCartao || $isCarne,
+            'modo_prazo' => $isCartao || $isCarne,
+            'tabelas_prazo' => $isCartao || $isCarne,
             // QR Code PDV: exclusivo PIX (PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv).
             'gerar_qrcode_pdv' => $isPix,
             // Flags gerais sem vínculo exclusivo a um tipo no código.

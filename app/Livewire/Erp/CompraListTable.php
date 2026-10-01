@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Erp;
 
+use App\Models\Compra;
 use App\Support\Erp\CompraListRowFormatter;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\Queries\CompraListQueryBuilder;
@@ -31,6 +32,63 @@ class CompraListTable extends Component
     public ?string $sortColumn = null;
 
     public string $sortDirection = 'desc';
+
+    /**
+     * Troca de aba de status: 1 request (grade + total + URL).
+     */
+    public function setStatusFilter(string $filter): void
+    {
+        $allowed = [
+            'todas',
+            Compra::STATUS_ABERTA,
+            Compra::STATUS_FECHADA,
+            Compra::STATUS_CANCELADA,
+        ];
+
+        if (! in_array($filter, $allowed, true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->sortColumn = null;
+        $this->sortDirection = 'desc';
+        $this->resetPage();
+
+        $total = (new CompraListQueryBuilder(
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+        ))->sumFilteredTotal();
+
+        $this->js(sprintf(
+            '(() => {
+                const status = %s;
+                const totalLabel = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("statusFilter", status, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (status === "todas") {
+                        url.searchParams.delete("status");
+                    } else {
+                        url.searchParams.set("status", status);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+                const el = document.querySelector(".erp-compras__total-value");
+                if (el) el.textContent = totalLabel;
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.compra-resource.pages.list-compras', JSON_UNESCAPED_UNICODE),
+        ));
+    }
 
     #[On('erp-compra-list-refresh')]
     public function refreshFromParent(

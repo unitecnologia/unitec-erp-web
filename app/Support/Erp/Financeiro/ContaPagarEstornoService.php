@@ -75,6 +75,8 @@ final class ContaPagarEstornoService
 
             $pagamento->delete();
 
+            app(ComissaoPeriodoService::class)->syncStatusPagaFromContaPagar($conta->fresh() ?? $conta);
+
             return [
                 'ok' => true,
                 'valor' => $valorPago,

@@ -36,15 +36,15 @@ final class ScNfceEndpoints
     public static function consultaProtocolo(int $tpAmb): string
     {
         return $tpAmb === 1
-            ? 'https://nfce.svrs.rs.gov.br/ws/NfeConsultaProtocolo/NFeConsultaProtocolo4.asmx'
-            : 'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeConsultaProtocolo/NFeConsultaProtocolo4.asmx';
+            ? 'https://nfce.svrs.rs.gov.br/ws/NfeConsulta/NfeConsulta4.asmx'
+            : 'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeConsulta/NfeConsulta4.asmx';
     }
 
     public static function inutilizacao(int $tpAmb): string
     {
         return $tpAmb === 1
-            ? 'https://nfce.svrs.rs.gov.br/ws/NfeInutilizacao/NFeInutilizacao4.asmx'
-            : 'https://nfce-homologacao.svrs.rs.gov.br/ws/NfeInutilizacao/NFeInutilizacao4.asmx';
+            ? 'https://nfce.svrs.rs.gov.br/ws/nfeinutilizacao/nfeinutilizacao4.asmx'
+            : 'https://nfce-homologacao.svrs.rs.gov.br/ws/nfeinutilizacao/nfeinutilizacao4.asmx';
     }
 
     public static function soapActionAutorizacao(): string

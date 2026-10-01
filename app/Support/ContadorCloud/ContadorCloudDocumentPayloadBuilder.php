@@ -15,6 +15,8 @@ final class ContadorCloudDocumentPayloadBuilder
 
     public const EVENTO_CANCELADO = 'cancelado';
 
+    public const EVENTO_CONTINGENCIA = 'contingencia';
+
     public const TIPO_NFE_SAIDA = 'nfe_saida';
 
     public const TIPO_NFE_ENTRADA = 'nfe_entrada';
@@ -28,6 +30,8 @@ final class ContadorCloudDocumentPayloadBuilder
     public const PORTAL_TIPO_NF_EMITIDA = 'NF_EMITIDA';
 
     public const PORTAL_TIPO_NF_CANCELADA = 'NF_CANCELADA';
+
+    public const PORTAL_TIPO_NF_CONTINGENCIA = 'NF_CONTINGENCIA';
 
     public const PORTAL_TIPO_XML_COMPRA = 'XML_COMPRA';
 
@@ -44,6 +48,11 @@ final class ContadorCloudDocumentPayloadBuilder
         $chave = $this->onlyDigits((string) ($documento['chave'] ?? ''));
         $numero = (string) ($documento['numero'] ?? '');
         $xml = $this->resolveXmlContent($documento);
+        $modelo = (string) ($documento['modelo'] ?? '');
+        $tpEmis = (int) ($documento['tp_emis'] ?? 1);
+        $contingencia = (bool) ($documento['contingencia'] ?? false)
+            || $evento === self::EVENTO_CONTINGENCIA
+            || $tpEmis === 9;
 
         $payload = [
             'cnpj' => $this->formatCnpj($this->resolveCnpjEmpresa($tipoInterno, $documento)),
@@ -51,10 +60,17 @@ final class ContadorCloudDocumentPayloadBuilder
             'numero' => $numero,
             'dataEmissao' => $dataEmissao !== '' ? $dataEmissao : now()->format('Y-m-d'),
             'competencia' => $this->competenciaFromDate($dataEmissao),
+            'modelo' => $modelo !== '' ? $modelo : ($tipoInterno === self::TIPO_NFCE_SAIDA ? '65' : '55'),
+            'contingencia' => $contingencia,
+            'tpEmis' => $tpEmis > 0 ? $tpEmis : 1,
         ];
 
         if ($chave !== '') {
             $payload['chaveAcesso'] = $chave;
+        }
+
+        if (filled($documento['motivo_contingencia'] ?? null)) {
+            $payload['motivoContingencia'] = trim((string) $documento['motivo_contingencia']);
         }
 
         if ($xml !== '') {
@@ -74,9 +90,17 @@ final class ContadorCloudDocumentPayloadBuilder
 
         $isEntrada = (string) ($nfe->movimento ?? '1') === '0';
         $tipo = $isEntrada ? self::TIPO_NFE_ENTRADA : self::TIPO_NFE_SAIDA;
+        $tpEmis = (int) ltrim((string) ($nfe->tipo_emissao ?: '1'), '0') ?: 1;
+        $emContingencia = $nfe->status === Nfe::STATUS_CONTINGENCIA || $evento === self::EVENTO_CONTINGENCIA;
         $xml = $evento === self::EVENTO_CANCELADO
             ? (string) ($nfe->xml_cancelamento ?? '')
             : (string) ($nfe->xml ?? '');
+
+        $status = match (true) {
+            $evento === self::EVENTO_CANCELADO => 'cancelada',
+            $emContingencia => 'contingencia',
+            default => 'autorizada',
+        };
 
         return $this->documentoBase(
             tipo: $tipo,
@@ -91,12 +115,15 @@ final class ContadorCloudDocumentPayloadBuilder
             cnpjParceiro: $this->onlyDigits((string) ($nfe->cliente?->cpf_cnpj ?? '')),
             nomeParceiro: (string) ($nfe->cliente?->nome_razao ?? ''),
             valorTotal: (float) $nfe->total,
-            status: $evento === self::EVENTO_CANCELADO ? 'cancelada' : 'autorizada',
+            status: $status,
             protocolo: (string) ($nfe->protocolo ?? ''),
             protocoloCancelamento: (string) ($nfe->protocolo_cancelamento ?? ''),
             xml: $xml,
             referenciaType: 'nfe',
             referenciaId: (int) $nfe->id,
+            tpEmis: $emContingencia ? 9 : $tpEmis,
+            contingencia: $emContingencia || $tpEmis === 9,
+            motivoContingencia: (string) ($nfe->motivo_contingencia ?? ''),
         );
     }
 
@@ -113,6 +140,14 @@ final class ContadorCloudDocumentPayloadBuilder
         $venda = $nfce->pdvVenda;
         $consumidor = $venda ? NfceConsumidorIdentificado::resolvePerson($venda) : null;
         $nomeParceiro = NfceConsumidorIdentificado::nome($consumidor) ?: 'CONSUMIDOR';
+        $tpEmis = (int) ltrim((string) ($nfce->tipo_emissao ?: '1'), '0') ?: 1;
+        $emContingencia = $nfce->status === PdvVendaNfce::STATUS_CONTINGENCIA || $evento === self::EVENTO_CONTINGENCIA;
+
+        $status = match (true) {
+            $evento === self::EVENTO_CANCELADO => 'cancelada',
+            $emContingencia => 'contingencia',
+            default => 'autorizada',
+        };
 
         return $this->documentoBase(
             tipo: self::TIPO_NFCE_SAIDA,
@@ -127,12 +162,15 @@ final class ContadorCloudDocumentPayloadBuilder
             cnpjParceiro: $venda ? NfceConsumidorIdentificado::cpfDigits($venda->cpf_nota) : '',
             nomeParceiro: $nomeParceiro,
             valorTotal: (float) ($venda?->total ?? 0),
-            status: $evento === self::EVENTO_CANCELADO ? 'cancelada' : 'autorizada',
+            status: $status,
             protocolo: (string) ($nfce->protocolo ?? ''),
             protocoloCancelamento: (string) ($nfce->protocolo_cancelamento ?? ''),
             xml: $xml,
             referenciaType: 'pdv_venda_nfce',
             referenciaId: (int) $nfce->id,
+            tpEmis: $emContingencia ? 9 : $tpEmis,
+            contingencia: $emContingencia || $tpEmis === 9,
+            motivoContingencia: (string) ($nfce->motivo_contingencia ?? ''),
         );
     }
 
@@ -211,6 +249,10 @@ final class ContadorCloudDocumentPayloadBuilder
             return self::PORTAL_TIPO_NF_CANCELADA;
         }
 
+        if ($evento === self::EVENTO_CONTINGENCIA) {
+            return self::PORTAL_TIPO_NF_CONTINGENCIA;
+        }
+
         return match ($tipoInterno) {
             self::TIPO_NOTA_FORNECEDOR,
             self::TIPO_COMPRA_ENTRADA,
@@ -272,6 +314,9 @@ final class ContadorCloudDocumentPayloadBuilder
         string $xml,
         string $referenciaType,
         int $referenciaId,
+        int $tpEmis = 1,
+        bool $contingencia = false,
+        string $motivoContingencia = '',
     ): array {
         return [
             'tipo' => $tipo,
@@ -290,6 +335,9 @@ final class ContadorCloudDocumentPayloadBuilder
             'protocolo' => $protocolo,
             'protocolo_cancelamento' => $protocoloCancelamento,
             'xml_base64' => $xml !== '' ? base64_encode($xml) : null,
+            'tp_emis' => $tpEmis,
+            'contingencia' => $contingencia,
+            'motivo_contingencia' => $motivoContingencia,
             'referencia' => [
                 'tipo' => $referenciaType,
                 'id' => $referenciaId,

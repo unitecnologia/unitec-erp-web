@@ -1646,8 +1646,9 @@ trait ManagesNfeItemGrid
      */
     protected function formatNfeModalRowsForDisplay(array $rows, ?\App\Models\Empresa $empresa = null): array
     {
+        $regime = strtolower((string) ($empresa?->regime_tributario ?? 'simples'));
         $isSimples = $empresa === null
-            || strtolower((string) ($empresa->regime_tributario ?? 'simples')) === 'simples';
+            || in_array($regime, ['simples', 'mei', 'simei'], true);
 
         $money2 = [
             'desconto', 'frete', 'seguro', 'outros',

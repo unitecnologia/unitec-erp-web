@@ -10,6 +10,9 @@ use App\Models\Venda;
 
 final class ContaReceberExclusaoService
 {
+    /** Origens de pedido em que o Alterar libera só o vencimento. */
+    private const ORIGENS_ALTERAR_SOMENTE_VENCIMENTO = ['forca_vendas', 'venda'];
+
     public function podeExcluir(ContaReceber $conta): bool
     {
         return $this->motivoBloqueio($conta) === null;
@@ -30,6 +33,43 @@ final class ContaReceberExclusaoService
             'orcamento' => 'Conta vinculada a orçamento.',
             default => 'Conta vinculada a outro lançamento do sistema.',
         };
+    }
+
+    /**
+     * Lançamento avulso: alteração total.
+     * Pedido (Força de Vendas / venda): só vencimento.
+     * PDV / orçamento: bloqueado.
+     */
+    public function podeAlterar(ContaReceber $conta): bool
+    {
+        $origem = $this->origemVinculo($conta);
+
+        if ($origem === null) {
+            return true;
+        }
+
+        return $this->origemPermiteAlterarSomenteVencimento($origem);
+    }
+
+    public function podeAlterarSomenteVencimento(ContaReceber $conta): bool
+    {
+        $origem = $this->origemVinculo($conta);
+
+        return $origem !== null && $this->origemPermiteAlterarSomenteVencimento($origem);
+    }
+
+    public function motivoBloqueioAlteracao(ContaReceber $conta): ?string
+    {
+        if ($this->podeAlterar($conta)) {
+            return null;
+        }
+
+        return $this->motivoBloqueio($conta) ?? 'Não é possível alterar esta conta.';
+    }
+
+    private function origemPermiteAlterarSomenteVencimento(string $origem): bool
+    {
+        return in_array($origem, self::ORIGENS_ALTERAR_SOMENTE_VENCIMENTO, true);
     }
 
     private function origemVinculo(ContaReceber $conta): ?string

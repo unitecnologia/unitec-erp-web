@@ -60,6 +60,7 @@ trait ManagesNfeEspelhoModal
         $this->nfeEspelhoNfeId = $nfe->id;
         $this->nfeEspelhoModalOpen = true;
         $this->dispatch('erp-nfe-focus-espelho-modal');
+        $this->forceShowNfeEspelhoModalUi();
     }
 
     public function openNfeEspelhoFromModal(): void
@@ -98,7 +99,9 @@ trait ManagesNfeEspelhoModal
         }
 
         // Grava o estado atual para o espelho refletir a tela.
-        $this->saveNfe();
+        if (! $this->saveNfe(quiet: true)) {
+            return;
+        }
 
         if (! $this->nfeModalRecordId) {
             return;
@@ -107,6 +110,8 @@ trait ManagesNfeEspelhoModal
         $this->nfeEspelhoNfeId = (int) $this->nfeModalRecordId;
         $this->nfeEspelhoModalOpen = true;
         $this->dispatch('erp-nfe-focus-espelho-modal');
+        // Morph do lançamento às vezes não aplica display — força via JS (igual overlay fiscal).
+        $this->forceShowNfeEspelhoModalUi();
     }
 
     public function closeNfeEspelho(): void
@@ -114,6 +119,25 @@ trait ManagesNfeEspelhoModal
         $this->nfeEspelhoModalOpen = false;
         $this->nfeEspelhoNfeId = null;
         $this->closeNfeEspelhoEmailModal();
+        $this->js('window.__erpNfeHideEspelhoModal && window.__erpNfeHideEspelhoModal()');
+    }
+
+    protected function forceShowNfeEspelhoModalUi(): void
+    {
+        if (! $this->nfeEspelhoNfeId) {
+            return;
+        }
+
+        $url = route('erp.reports.nfe-espelho', [
+            'nfe' => $this->nfeEspelhoNfeId,
+            'embed' => 1,
+        ]);
+
+        $this->js(
+            'window.__erpNfeShowEspelhoModal && window.__erpNfeShowEspelhoModal('
+            .Js::from(['url' => $url])
+            .')'
+        );
     }
 
     public function printNfeEspelhoDocument(): void

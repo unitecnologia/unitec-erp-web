@@ -4,7 +4,6 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
 use App\Support\Erp\ProductFormValidator;
 use App\Support\Erp\ProductPriceCalculator;
-use App\Support\Erp\BrDecimal;
 
 trait ManagesProductPriceCalculation
 {
@@ -81,18 +80,7 @@ trait ManagesProductPriceCalculation
             return;
         }
 
-        $compra = BrDecimal::parse($this->data['preco_compra'] ?? 0, 2);
-
-        if ($compra > 0) {
-            $this->data = ProductPriceCalculator::recalculateFromCompra($this->data);
-        } else {
-            $custo = BrDecimal::parse($this->data['preco_custo'] ?? 0, 2);
-
-            if ($custo > 0) {
-                $this->data = ProductPriceCalculator::recalculateFromMargem($this->data);
-            }
-        }
-
+        $this->data = ProductPriceCalculator::recalculateBeforeSave($this->data);
         $this->data = $this->formatProductFormDataForDisplay($this->data);
     }
 
@@ -148,6 +136,8 @@ trait ManagesProductPriceCalculation
     protected function validateAndNormalizeProductBeforeSave(array $data): array
     {
         $excludeId = $this->isEditingProduct() ? $this->record?->getKey() : null;
+
+        $data = ProductFormValidator::normalizeServicoFiscal($data);
 
         ProductFormValidator::validateBeforeSave($data, $excludeId);
 

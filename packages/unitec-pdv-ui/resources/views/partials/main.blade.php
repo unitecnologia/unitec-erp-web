@@ -53,6 +53,9 @@
                                 wire:dblclick="addSearchResultToCupom({{ $index }})"
                                 wire:key="pdv-search-{{ $produto['product_id'] ?? $index }}"
                                 id="erp-pdv-search-row-{{ $index }}"
+                                data-index="{{ $index }}"
+                                data-descricao="{{ $produto['descricao'] ?? '' }}"
+                                data-foto-url="{{ $produto['foto_url'] ?? '' }}"
                                 @class([
                                     'erp-pdv__grid-row',
                                     'erp-pdv__grid-row--selected' => $this->selectedSearchIndex === $index,
@@ -83,6 +86,7 @@
             @else
                 <table class="erp-pdv__grid erp-pdv__grid--cupom">
                     <colgroup>
+                        <col class="erp-pdv__col-excluir">
                         <col class="erp-pdv__col-item">
                         <col class="erp-pdv__col-codigo">
                         <col class="erp-pdv__col-barras">
@@ -94,6 +98,7 @@
                     </colgroup>
                     <thead>
                         <tr>
+                            <th class="erp-pdv__grid-col-center erp-pdv__th-excluir" aria-label="Excluir"></th>
                             <th class="erp-pdv__grid-col-center">Item</th>
                             <th>Código</th>
                             <th>Cód. Barras</th>
@@ -112,6 +117,22 @@
                                 id="erp-pdv-cupom-row-{{ $index }}"
                                 @class(['erp-pdv__grid-row', 'erp-pdv__grid-row--selected' => $this->pdvMostrarDetalheItem && $this->selectedCupomIndex === $index])
                             >
+                                <td class="erp-pdv__grid-col-center erp-pdv__td-excluir">
+                                    <button
+                                        type="button"
+                                        class="erp-pdv__item-del"
+                                        wire:click.stop="requestExcluirCupomItem({{ $index }})"
+                                        title="Excluir item"
+                                        aria-label="Excluir item {{ $index + 1 }}"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <polyline points="3 6 5 6 21 6"/>
+                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                            <path d="M10 11v6M14 11v6"/>
+                                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                        </svg>
+                                    </button>
+                                </td>
                                 <td class="erp-pdv__grid-col-center">{{ $index + 1 }}</td>
                                 <td class="erp-pdv__grid-col-codigo">{{ $item['codigo'] ?? '—' }}</td>
                                 <td class="erp-pdv__grid-col-codigo">{{ ($item['codigo_barras'] ?? '') !== '' ? $item['codigo_barras'] : '—' }}</td>
@@ -130,7 +151,7 @@
                             </tr>
                         @empty
                             <tr class="erp-pdv__grid-empty">
-                                <td colspan="8">&nbsp;</td>
+                                <td colspan="9">&nbsp;</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -138,9 +159,7 @@
             @endif
         </div>
 
-        @if (! ($this->pdvHotPathEnabled ?? false) || ($this->pdvEmConsulta && $this->pdvSearchResults !== []))
-            <div class="erp-pdv__product-line" id="erp-pdv-product-name" aria-live="polite">{{ $this->pdvPreviewProductName }}</div>
-        @endif
+        <div class="erp-pdv__product-line" id="erp-pdv-product-name" aria-live="polite">{{ $this->pdvPreviewProductName }}</div>
     </section>
 
     <aside class="erp-pdv__side-panel">
@@ -199,7 +218,8 @@
                     syncDescriptionSearch() {
                         const value = String(this.$refs.codigo ? this.$refs.codigo.value : (this.q ?? ''));
                         this.q = value;
-                        if (! this.looksLikeDescription(value)) {
+                        // Empty clears Livewire filter; skip live sync only for pure numeric (barcode).
+                        if (value !== '' && ! this.looksLikeDescription(value)) {
                             return;
                         }
                         if (this.$wire && typeof this.$wire.set === 'function') {
@@ -228,10 +248,11 @@
                         };
                         if (this.$wire && typeof this.$wire.$watch === 'function') {
                             this.$wire.$watch('pdvSearch', (value) => {
-                                if (! this.looksLikeDescription(value)) {
+                                const next = String(value ?? '');
+                                // Allow empty so PHP clears (Esc / after launch) keep the input aligned.
+                                if (next !== '' && ! this.looksLikeDescription(next)) {
                                     return;
                                 }
-                                const next = String(value ?? '');
                                 if (this.q === next) {
                                     return;
                                 }
@@ -362,6 +383,10 @@
 
     @php($caixaAberto = (bool) ($this->caixaAberto ?? false))
     <div class="erp-pdv__toolbar-actions">
+        <button type="button" wire:click="openMenuFiscal" class="erp-pdv__tool-btn" title="Menu Fiscal">
+            @include('pdvui::partials.tool-icon', ['name' => 'menu-fiscal'])
+            <span class="erp-pdv__tool-label">Menu Fiscal</span>
+        </button>
         <button type="button" wire:click="openImportarModal" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
             @include('pdvui::partials.tool-icon', ['name' => 'import'])
             <span class="erp-pdv__tool-label"><kbd>F5</kbd> - Importar</span>
@@ -373,6 +398,18 @@
         <button type="button" wire:click="openFinalizarVenda" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
             @include('pdvui::partials.tool-icon', ['name' => 'finish'])
             <span class="erp-pdv__tool-label"><kbd>F7</kbd> - Finaliza</span>
+        </button>
+        <button type="button" wire:click="suspenderVendaEmEspera" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
+            @include('pdvui::partials.tool-icon', ['name' => 'pause'])
+            <span class="erp-pdv__tool-label">Suspender venda</span>
+        </button>
+        <button type="button" wire:click="openVendasEsperaModal" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
+            @include('pdvui::partials.tool-icon', ['name' => 'import'])
+            <span class="erp-pdv__tool-label">Recuperar venda</span>
+        </button>
+        <button type="button" wire:click="openPdvModal('acesso_rapido')" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
+            @include('pdvui::partials.tool-icon', ['name' => 'acesso-rapido'])
+            <span class="erp-pdv__tool-label"><kbd>F3</kbd> - Acesso Rápido</span>
         </button>
         @if ($this->pdvExibirResumoCaixa)
         <button type="button" wire:click="openPdvModal('resumo')" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">

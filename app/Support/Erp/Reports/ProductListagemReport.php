@@ -125,9 +125,11 @@ class ProductListagemReport
      */
     public static function columnTotals(iterable $products, array $columns): array
     {
+        $productsList = is_array($products) ? $products : iterator_to_array($products);
+        $count = count($productsList);
         $sums = array_fill_keys($columns, 0.0);
 
-        foreach ($products as $product) {
+        foreach ($productsList as $product) {
             foreach ($columns as $column) {
                 $raw = static::columnRawValue($product, $column);
 
@@ -141,6 +143,12 @@ class ProductListagemReport
         $labelPlaced = false;
 
         foreach ($columns as $column) {
+            if ($column === 'descricao') {
+                $totals[$column] = (string) $count;
+
+                continue;
+            }
+
             if (! static::isSummableColumn($column)) {
                 $totals[$column] = $labelPlaced ? '' : 'TOTAL';
                 $labelPlaced = true;

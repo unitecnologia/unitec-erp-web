@@ -5,6 +5,7 @@ namespace App\Support\Erp\Nfe;
 use App\Mail\OrcamentoEmail;
 use App\Models\Empresa;
 use App\Models\VendasParametro;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -343,12 +344,102 @@ final class NfeFiscalConfig
         }
 
         if (File::exists($relative)) {
+            self::ensureCertificadoPfxNoBanco($params, $relative);
+
             return $relative;
         }
 
         $storagePath = Storage::disk('local')->path($relative);
 
-        return File::exists($storagePath) ? $storagePath : null;
+        if (File::exists($storagePath)) {
+            self::ensureCertificadoPfxNoBanco($params, $storagePath);
+
+            return $storagePath;
+        }
+
+        if (self::restoreCertificadoPfxFromDatabase($params, $relative, $storagePath)) {
+            return File::exists($relative) ? $relative : (File::exists($storagePath) ? $storagePath : null);
+        }
+
+        return null;
+    }
+
+    /**
+     * Cliente antigo: .pfx no disco e campo do banco vazio → grava cópia criptografada.
+     */
+    private static function ensureCertificadoPfxNoBanco(VendasParametro $params, string $absolutePath): void
+    {
+        if (! $params->exists || $params->getKey() === null) {
+            return;
+        }
+
+        if (filled($params->getRawOriginal('certificado_pfx'))) {
+            return;
+        }
+
+        $content = @file_get_contents($absolutePath);
+
+        if ($content === false || $content === '') {
+            return;
+        }
+
+        try {
+            $params->forceFill(['certificado_pfx' => $content])->save();
+        } catch (Throwable) {
+            return;
+        }
+    }
+
+    /**
+     * Backup restaurado sem storage: recria o .pfx a partir do banco.
+     */
+    private static function restoreCertificadoPfxFromDatabase(
+        VendasParametro $params,
+        string $relative,
+        string $storagePath,
+    ): bool {
+        if (! filled($params->getRawOriginal('certificado_pfx'))) {
+            return false;
+        }
+
+        try {
+            $content = $params->certificado_pfx;
+        } catch (DecryptException) {
+            return false;
+        } catch (Throwable) {
+            return false;
+        }
+
+        if (! is_string($content) || $content === '') {
+            return false;
+        }
+
+        $isAbsolute = preg_match('/^[a-zA-Z]:[\\\\\\/]/', $relative) === 1
+            || str_starts_with($relative, '/')
+            || str_starts_with($relative, '\\');
+
+        if ($isAbsolute) {
+            $dir = dirname($relative);
+
+            if (! is_dir($dir) && ! @mkdir($dir, 0755, true) && ! is_dir($dir)) {
+                return false;
+            }
+
+            return @file_put_contents($relative, $content) !== false;
+        }
+
+        try {
+            $dir = dirname(str_replace('\\', '/', $relative));
+            if ($dir !== '' && $dir !== '.') {
+                Storage::disk('local')->makeDirectory($dir);
+            }
+
+            Storage::disk('local')->put($relative, $content);
+
+            return File::exists($storagePath);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -359,26 +450,31 @@ final class NfeFiscalConfig
         \App\Support\Erp\OpenSslLegacy::ensure();
 
         $certs = [];
+        $opensslError = '';
 
         while (openssl_error_string() !== false) {
         }
 
-        $ok = @openssl_pkcs12_read($content, $certs, $senha);
-        $opensslError = '';
+        try {
+            $ok = @openssl_pkcs12_read($content, $certs, $senha);
+        } catch (\Throwable $e) {
+            $ok = false;
+            $opensslError = $e->getMessage();
+        }
 
         if (! $ok) {
-            $opensslError = \App\Support\Erp\OpenSslLegacy::lastError();
-            $needsLegacy = $opensslError !== '' && (
-                str_contains(mb_strtolower($opensslError), 'unsupported')
-                || str_contains(mb_strtolower($opensslError), 'legacy')
-                || str_contains(mb_strtolower($opensslError), 'digital envelope')
-            );
+            if ($opensslError === '') {
+                $opensslError = \App\Support\Erp\OpenSslLegacy::lastError();
+            }
 
-            if ($needsLegacy) {
+            // OpenSSL 3 / PFX A1: "mac verify failure", "The MAC is invalid", etc.
+            if (\App\Support\Erp\OpenSslLegacy::shouldRetryViaSubprocess($opensslError)
+                || self::isPkcs12MacOrLegacyError($opensslError)) {
                 $viaSub = \App\Support\Erp\OpenSslLegacy::readPkcs12ViaSubprocess($content, $senha);
                 if ($viaSub['ok'] ?? false) {
                     $certs = $viaSub['certs'] ?? [];
                     $ok = true;
+                    $opensslError = '';
                 } else {
                     $opensslError = (string) ($viaSub['error'] ?? $opensslError);
                 }
@@ -386,22 +482,17 @@ final class NfeFiscalConfig
         }
 
         if (! $ok) {
-            $hint = ' Senha diferencia maiúsculas/minúsculas. Confira a senha usada no Windows.';
-
-            if ($opensslError !== '' && (str_contains(mb_strtolower($opensslError), 'unsupported')
-                || str_contains(mb_strtolower($opensslError), 'legacy')
-                || str_contains(mb_strtolower($opensslError), 'digital envelope'))) {
-                $hint = ' Certificado com criptografia antiga (RC2). Atualize o sistema ou reexporte o .pfx.';
-            }
-
             return [
                 'ok' => false,
-                'message' => 'Senha inválida ou .pfx inválido.'.$hint
-                    .($opensslError !== '' ? ' ('.$opensslError.')' : ''),
+                'message' => self::formatPkcs12ReadError($opensslError),
             ];
         }
 
-        $parsed = openssl_x509_parse($certs['cert'] ?? '');
+        try {
+            $parsed = openssl_x509_parse($certs['cert'] ?? '');
+        } catch (\Throwable) {
+            $parsed = false;
+        }
 
         if ($parsed === false) {
             return ['ok' => false, 'message' => 'Não foi possível ler o certificado.'];
@@ -419,6 +510,41 @@ final class NfeFiscalConfig
             'titulo' => self::formatCertificadoNome($parsed['subject'] ?? []),
             'emissor' => self::formatCertificadoNome($parsed['issuer'] ?? []),
         ];
+    }
+
+    private static function isPkcs12MacOrLegacyError(string $opensslError): bool
+    {
+        $normalizedError = mb_strtolower($opensslError);
+
+        return $normalizedError !== '' && (
+            str_contains($normalizedError, 'unsupported')
+            || str_contains($normalizedError, 'legacy')
+            || str_contains($normalizedError, 'digital envelope')
+            || str_contains($normalizedError, 'mac verify')
+            || str_contains($normalizedError, 'mac is invalid')
+            || str_contains($normalizedError, 'rc2')
+            || str_contains($normalizedError, 'pkcs12')
+        );
+    }
+
+    private static function formatPkcs12ReadError(string $opensslError): string
+    {
+        $hint = ' Senha diferencia maiúsculas/minúsculas. Digite de novo a senha do .pfx (a mesma do Windows).';
+        $normalizedError = mb_strtolower($opensslError);
+
+        if (self::isPkcs12MacOrLegacyError($opensslError)) {
+            $hint = ' Em geral a senha do .pfx está incorreta (diferencia maiúsculas/minúsculas). '
+                .'Confira a senha ou reexporte o certificado no Windows (PFX com todas as chaves).';
+        }
+
+        // Nunca devolve jargão cru de OpenSSL/Laravel como título principal.
+        $message = 'Não foi possível abrir o certificado .pfx.'.$hint;
+
+        if ($opensslError !== '' && ! str_contains($normalizedError, 'mac is invalid')) {
+            $message .= ' ('.$opensslError.')';
+        }
+
+        return $message;
     }
 
     /**

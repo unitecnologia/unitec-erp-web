@@ -5,10 +5,15 @@ namespace Unitec.ErpServer;
 
 public sealed class ErpServerWorker : BackgroundService
 {
+    private static readonly TimeSpan ScheduleInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ScheduleRunTimeout = TimeSpan.FromMinutes(10);
+
     private readonly ILogger<ErpServerWorker> _logger;
     private readonly string _appPath;
     private Process? _php;
     private DateTime _nextUpdateCheckUtc = DateTime.MinValue;
+    private DateTime _nextScheduleRunUtc = DateTime.MinValue;
+    private int _scheduleRunBusy;
     private int _stopping;
 
     public ErpServerWorker(ILogger<ErpServerWorker> logger)
@@ -78,6 +83,13 @@ public sealed class ErpServerWorker : BackgroundService
             // evitando disputa de disco/rede durante o boot.
             _nextUpdateCheckUtc = DateTime.UtcNow.AddMinutes(2);
             DesktopLog.Write(_appPath, "UpdateCheck agendado para 2 minutos apos o start");
+
+            // Laravel Scheduler (erp:backup --scheduled, etc.). Só dispara schedule:run;
+            // o intervalo do backup permanece no comando PHP.
+            // Alinhado ao minuto do relógio para o backup cair no mesmo minuto do último.
+            _nextScheduleRunUtc = NextAlignedScheduleUtc(DateTime.UtcNow);
+            DesktopLog.Write(_appPath,
+                $"Laravel schedule:run alinhado a cada 1 min (próximo UTC {_nextScheduleRunUtc:HH:mm:ss})");
         }
         catch (OperationCanceledException) when (IsStopping(stoppingToken))
         {
@@ -156,6 +168,8 @@ public sealed class ErpServerWorker : BackgroundService
                     UpdateCheckService.CheckAndDownloadAsync(_appPath);
                     _nextUpdateCheckUtc = DateTime.UtcNow.AddHours(5);
                 }
+
+                TryQueueLaravelScheduleRun();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -215,4 +229,132 @@ public sealed class ErpServerWorker : BackgroundService
 
     private bool IsStopping(CancellationToken stoppingToken)
         => Volatile.Read(ref _stopping) != 0 || stoppingToken.IsCancellationRequested;
+
+    /// <summary>
+    /// Dispara <c>php artisan schedule:run</c> a cada minuto.
+    /// Não chama backup diretamente — o Laravel decide o que executar.
+    /// </summary>
+    private void TryQueueLaravelScheduleRun()
+    {
+        if (Volatile.Read(ref _stopping) != 0)
+        {
+            return;
+        }
+
+        if (DateTime.UtcNow < _nextScheduleRunUtc)
+        {
+            return;
+        }
+
+        // Agenda o próximo minuto do relógio, não "agora + 1".
+        _nextScheduleRunUtc = NextAlignedScheduleUtc(DateTime.UtcNow);
+
+        if (Interlocked.CompareExchange(ref _scheduleRunBusy, 1, 0) != 0)
+        {
+            DesktopLog.Write(_appPath, "schedule:run pulado — execução anterior ainda em andamento");
+            _logger.LogWarning("schedule:run pulado: execução anterior ainda em andamento");
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                RunLaravelScheduleOnce();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _scheduleRunBusy, 0);
+            }
+        });
+    }
+
+    private void RunLaravelScheduleOnce()
+    {
+        string php;
+        try
+        {
+            php = ErpPaths.ResolvePhpExe(_appPath);
+        }
+        catch (Exception ex)
+        {
+            DesktopLog.Write(_appPath, "schedule:run erro ao resolver PHP: " + ex.Message);
+            _logger.LogWarning(ex, "Falha ao resolver PHP para schedule:run");
+            return;
+        }
+
+        DesktopLog.Write(_appPath, $"schedule:run begin cwd={_appPath} php={php} args=artisan schedule:run");
+
+        try
+        {
+            using var proc = ProcessHelper.StartHidden(php, "artisan schedule:run", _appPath);
+
+            // Drena stdout/stderr para não travar o pipe no Windows.
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+            var stderrTask = proc.StandardError.ReadToEndAsync();
+
+            if (!proc.WaitForExit((int)ScheduleRunTimeout.TotalMilliseconds))
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { /* ignore */ }
+
+                DesktopLog.Write(_appPath, "schedule:run TIMEOUT — processo encerrado; MariaDB/PHP do ERP seguem ativos");
+                _logger.LogWarning("schedule:run excedeu {TimeoutMinutes} minutos e foi encerrado", ScheduleRunTimeout.TotalMinutes);
+                return;
+            }
+
+            var stdout = stdoutTask.GetAwaiter().GetResult().Trim();
+            var stderr = stderrTask.GetAwaiter().GetResult().Trim();
+
+            if (proc.ExitCode != 0)
+            {
+                DesktopLog.Write(_appPath,
+                    $"schedule:run FALHOU exit={proc.ExitCode}"
+                    + (stderr.Length > 0 ? $" stderr={TruncateForLog(stderr)}" : "")
+                    + (stdout.Length > 0 ? $" stdout={TruncateForLog(stdout)}" : ""));
+                _logger.LogWarning(
+                    "schedule:run falhou exit={ExitCode}. stderr={Stderr}",
+                    proc.ExitCode,
+                    TruncateForLog(stderr));
+                return;
+            }
+
+            DesktopLog.Write(_appPath,
+                "schedule:run OK"
+                + (stdout.Length > 0 ? $" stdout={TruncateForLog(stdout)}" : ""));
+        }
+        catch (Exception ex)
+        {
+            // Nunca derrubar MariaDB/PHP/ERP por falha do scheduler.
+            DesktopLog.Write(_appPath, "schedule:run erro: " + ex.Message);
+            _logger.LogWarning(ex, "Falha ao executar artisan schedule:run (ERP continua ativo)");
+        }
+    }
+
+    /// <summary>
+    /// Próximo instante UTC alinhado ao minuto do relógio.
+    /// Sempre estritamente no futuro em relação a <paramref name="utcNow"/>.
+    /// Ex.: 22:17:00 → 22:18:00; 22:17:01 → 22:18:00; 22:59:40 → 23:00:00.
+    /// </summary>
+    internal static DateTime NextAlignedScheduleUtc(DateTime utcNow)
+    {
+        var utc = utcNow.Kind == DateTimeKind.Utc
+            ? utcNow
+            : DateTime.SpecifyKind(utcNow.ToUniversalTime(), DateTimeKind.Utc);
+
+        var currentSlot = new DateTime(
+            utc.Year, utc.Month, utc.Day, utc.Hour, utc.Minute, 0, DateTimeKind.Utc);
+
+        return currentSlot.Add(ScheduleInterval);
+    }
+
+    private static string TruncateForLog(string text, int max = 500)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var oneLine = text.Replace("\r", " ").Replace("\n", " ").Trim();
+        return oneLine.Length <= max ? oneLine : oneLine[..max] + "…";
+    }
 }

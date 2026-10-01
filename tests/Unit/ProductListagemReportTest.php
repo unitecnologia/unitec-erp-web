@@ -69,9 +69,24 @@ class ProductListagemReportTest extends TestCase
         $columns = ['descricao', 'preco_venda', 'preco_compra', 'estoque'];
         $totals = ProductListagemReport::columnTotals($products, $columns);
 
-        $this->assertSame('TOTAL', $totals['descricao']);
+        $this->assertSame('2', $totals['descricao']);
         $this->assertSame('35,00', $totals['preco_venda']);
         $this->assertSame('15,50', $totals['preco_compra']);
         $this->assertSame('5', $totals['estoque']);
+    }
+
+    public function test_totaliza_coloca_label_total_na_primeira_coluna_texto(): void
+    {
+        $products = [
+            new \App\Models\Product(['preco_venda' => 10, 'estoque' => 1]),
+        ];
+
+        $columns = ['codigo', 'descricao', 'preco_venda', 'estoque'];
+        $totals = ProductListagemReport::columnTotals($products, $columns);
+
+        $this->assertSame('TOTAL', $totals['codigo']);
+        $this->assertSame('1', $totals['descricao']);
+        $this->assertSame('10,00', $totals['preco_venda']);
+        $this->assertSame('1', $totals['estoque']);
     }
 }

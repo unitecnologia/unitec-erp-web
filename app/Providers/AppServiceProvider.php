@@ -3,13 +3,18 @@
 namespace App\Providers;
 
 use App\Http\Responses\LoginResponse;
+use App\Services\Ailos\AilosAuthService;
+use App\Services\Ailos\AilosCobrancaAuth;
+use App\Support\Erp\Boleto\Api\BoletoApi;
+use App\Support\Erp\Boleto\Api\Drivers\AilosBoletoDriver;
+use App\Support\Erp\Boleto\Api\Drivers\SicrediBoletoDriver;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\Nfse\NfseSefinEnvio;
+use App\Support\Erp\Nfse\NfseSefinHttp;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Illuminate\Auth\Events\Logout;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +27,15 @@ class AppServiceProvider extends ServiceProvider
         require_once app_path('helpers.php');
 
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
+        $this->app->bind(NfseSefinEnvio::class, NfseSefinHttp::class);
+        $this->app->bind(AilosCobrancaAuth::class, AilosAuthService::class);
+
+        $this->app->singleton(BoletoApi::class, function ($app): BoletoApi {
+            return new BoletoApi([
+                $app->make(AilosBoletoDriver::class),
+                $app->make(SicrediBoletoDriver::class),
+            ]);
+        });
     }
 
     /**
@@ -49,49 +63,5 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Schema::defaultStringLength(191);
-
-        if ($this->app->runningInConsole() || ! $this->app->bound('request')) {
-            return;
-        }
-
-        $origin = $this->resolveRequestOrigin(request());
-
-        if ($origin) {
-            URL::useOrigin($origin);
-        }
-    }
-
-    private function resolveRequestOrigin(Request $request): ?string
-    {
-        $scheme = $request->getScheme();
-        $host = $request->getHost();
-        $port = $request->getPort();
-
-        if ($host === '') {
-            return null;
-        }
-
-        // Só herda a porta do APP_URL (ex.: :8000) quando o host também é o do APP_URL.
-        // Em Cloudflare Tunnel / proxy, injetar :8000 quebra CSS/JS/login no celular.
-        $configured = parse_url((string) config('app.url')) ?: [];
-        $configuredHost = strtolower((string) ($configured['host'] ?? ''));
-        $configuredPort = (int) ($configured['port'] ?? 0);
-
-        if (
-            $configuredPort > 0
-            && $configuredHost !== ''
-            && strtolower($host) === $configuredHost
-            && (! $port || in_array((int) $port, [80, 443], true))
-        ) {
-            $port = $configuredPort;
-        }
-
-        $origin = $scheme.'://'.$host;
-
-        if ($port && ! in_array((int) $port, [80, 443], true)) {
-            $origin .= ':'.$port;
-        }
-
-        return $origin;
     }
 }

@@ -227,12 +227,18 @@
                             </div>
                             <div class="erp-fpgto-bandeiras__grid-wrap">
                                 <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                    <colgroup>
+                                        <col class="erp-fpgto-bandeiras__col-codigo">
+                                        <col class="erp-fpgto-bandeiras__col-nome">
+                                        <col class="erp-fpgto-bandeiras__col-ativo">
+                                        <col class="erp-fpgto-bandeiras__col-acoes">
+                                    </colgroup>
                                     <thead>
                                         <tr>
-                                            <th style="width:4.5rem;">Código</th>
+                                            <th>Código</th>
                                             <th>Nome</th>
-                                            <th style="width:4rem;" class="erp-pdv__grid-col-center">Ativo</th>
-                                            <th style="width:7rem;" class="erp-pdv__grid-col-center">Ações</th>
+                                            <th>Ativo</th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -271,12 +277,18 @@
                             </div>
                             <div class="erp-fpgto-bandeiras__grid-wrap">
                                 <table class="erp-pdv__grid erp-fpgto-bandeiras__grid">
+                                    <colgroup>
+                                        <col class="erp-fpgto-bandeiras__col-codigo">
+                                        <col class="erp-fpgto-bandeiras__col-nome">
+                                        <col class="erp-fpgto-bandeiras__col-ativo">
+                                        <col class="erp-fpgto-bandeiras__col-acoes">
+                                    </colgroup>
                                     <thead>
                                         <tr>
-                                            <th style="width:4.5rem;">Código</th>
+                                            <th>Código</th>
                                             <th>Nome</th>
-                                            <th style="width:4rem;" class="erp-pdv__grid-col-center">Ativo</th>
-                                            <th style="width:7rem;" class="erp-pdv__grid-col-center">Ações</th>
+                                            <th>Ativo</th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>

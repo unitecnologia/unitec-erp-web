@@ -12,101 +12,73 @@
 }
 
 .fi-body:has(.erp-backup-page) .erp-menu-bar,
-.fi-body:has(.erp-backup-page) .erp-shortcut-bar {
-    display: none !important;
-}
-
-.fi-body:has(.erp-backup-page) .erp-title-bar {
-    opacity: 0.35;
-    pointer-events: none;
-}
-
-.fi-body:has(.erp-backup-page) .erp-status-bar {
+.fi-body:has(.erp-backup-page) .erp-shortcut-bar,
+.fi-body:has(.erp-backup-page) .erp-title-bar,
+.fi-body:has(.erp-backup-page) .erp-status-bar,
+.fi-body:has(.erp-backup-page) .fi-sidebar,
+.fi-body:has(.erp-backup-page) .fi-sidebar-close-overlay {
     display: none !important;
 }
 
 .fi-body:has(.erp-backup-page) .fi-layout,
-.fi-body:has(.erp-backup-page) .fi-main-ctn {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    background: transparent !important;
-}
-
+.fi-body:has(.erp-backup-page) .fi-main-ctn,
 .fi-body:has(.erp-backup-page) .fi-main,
 .fi-main:has(.erp-backup-page) {
-    display: flex !important;
-    flex: 1 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 1rem !important;
-    background: transparent !important;
-    overflow: hidden !important;
-}
-
-.fi-body:has(.erp-backup-page) .fi-main > *,
-.fi-main:has(.erp-backup-page) > :has(.erp-backup-page) {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 0 0 auto !important;
-    width: min(38rem, 96vw) !important;
-    height: auto !important;
-    max-height: calc(100dvh - 2.5rem) !important;
-    margin: 0 auto !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.fi-page.erp-backup-page {
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;
     width: 100% !important;
-    height: auto !important;
-    max-height: calc(100dvh - 2.5rem) !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
-    border: 1px solid rgba(148, 163, 184, 0.28) !important;
-    border-radius: 14px !important;
     background: transparent !important;
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.08),
-        0 22px 44px rgba(8, 20, 40, 0.36) !important;
+}
+
+.fi-body:has(.erp-backup-page) .fi-main > *,
+.fi-main:has(.erp-backup-page) > :has(.erp-backup-page),
+.fi-page.erp-backup-page,
+.erp-backup-page .fi-page-content,
+.erp-backup-page .fi-sc,
+.erp-backup-page .fi-sc > div {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
 }
 
 .erp-backup-page .fi-header {
     display: none !important;
 }
 
-.erp-backup-page .fi-page-content,
-.erp-backup-page .fi-sc,
-.erp-backup-page .fi-sc > div {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 0 1 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-    padding: 0 !important;
-    gap: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
+/* Painel fixo: topo + centro, tamanho generoso */
 .erp-backup {
+    position: fixed;
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 80;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    max-height: calc(100dvh - 2.5rem);
+    width: min(56rem, calc(100vw - 1.2rem));
+    height: calc(100vh - 1.2rem);
+    height: calc(100dvh - 1.2rem);
+    max-height: calc(100vh - 1.2rem);
+    max-height: calc(100dvh - 1.2rem);
     color: var(--erp-text, #0f172a);
     background:
         linear-gradient(180deg, #edf3fb 0%, #e3ecf7 42%, #d8e4f2 100%);
+    border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 14px;
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 22px 44px rgba(8, 20, 40, 0.36);
     overflow: hidden;
 }
 
@@ -116,7 +88,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    flex-shrink: 0;
+    flex: 0 0 auto;
     padding: 0.7rem 0.95rem;
     background:
         linear-gradient(135deg, #1e5a9e 0%, #164a85 55%, #0f3460 100%);
@@ -159,14 +131,17 @@
     border-color: rgba(255, 255, 255, 0.35);
 }
 
-/* Body */
+/* Body — preenche entre header e footer; scroll interno */
 .erp-backup__body {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.65rem 0.75rem 0.7rem;
+    gap: 0.55rem;
+    padding: 0.75rem 0.85rem;
+    flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .erp-backup__card {
@@ -191,6 +166,13 @@
     font-weight: 700;
     color: #1e3a5f;
     letter-spacing: -0.01em;
+}
+
+.erp-backup__section-note {
+    margin: -0.15rem 0 0.75rem;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: #64748b;
 }
 
 .erp-backup__section-head .erp-backup__section-title {
@@ -456,7 +438,9 @@
 
 /* Table */
 .erp-backup__table-wrap {
-    max-height: 7.25rem;
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 10rem;
     overflow: auto;
     border: 1px solid #d0dceb;
     border-radius: 9px;
@@ -596,16 +580,17 @@
     padding: 0.75rem 0.55rem !important;
 }
 
-/* Footer */
+/* Footer — sempre visível abaixo do body com scroll */
 .erp-backup__footer {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem;
-    flex-shrink: 0;
+    flex: 0 0 auto;
     padding: 0.55rem 0.75rem 0.65rem;
     border-top: 1px solid #c7d5e8;
     background: linear-gradient(180deg, #dbe6f4 0%, #cfdced 100%);
+    z-index: 2;
 }
 
 .erp-backup__btn {
@@ -631,6 +616,17 @@
 
 .erp-backup__btn--primary:hover {
     background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+}
+
+.erp-backup > .erp-backup__feedback {
+    margin: 0.65rem 0.85rem 0;
+}
+
+.erp-backup__portal-test {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.74rem;
+    line-height: 1.35;
 }
 
 .erp-backup__btn--secondary {

@@ -49,6 +49,12 @@ class NfeResource extends Resource
                     ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('npedido')
+                    ->label('OS/DAV')
+                    ->state(fn (Nfe $record): string => self::formatOsDav($record))
+                    ->html()
+                    ->placeholder('—')
+                    ->alignStart(),
                 TextColumn::make('data_emissao')
                     ->label('Dt.Emissão')
                     ->date('d/m/Y')
@@ -110,6 +116,53 @@ class NfeResource extends Resource
             ->recordActions([])
             ->toolbarActions([])
             ->emptyStateHeading('Nenhuma NF-e encontrada');
+    }
+
+    /**
+     * Prefixo O- (ordem de serviço) ou D- (DAV) + número, letra à esquerda.
+     */
+    public static function formatOsDav(Nfe $nfe): string
+    {
+        $raw = trim((string) ($nfe->npedido ?? ''));
+
+        if ($raw === '') {
+            return '—';
+        }
+
+        $digits = preg_replace('/\D/', '', $raw) ?? '';
+        $num = $digits !== '' ? (string) (int) $digits : $raw;
+        $prefix = self::osDavPrefix($nfe);
+
+        if ($prefix === '') {
+            return e($num);
+        }
+
+        return '<span class="erp-doc-pref"><span class="erp-doc-pref__letra">'.e($prefix).'-</span><span class="erp-doc-pref__num">'.e($num).'</span></span>';
+    }
+
+    protected static function osDavPrefix(Nfe $nfe): string
+    {
+        $obs = mb_strtoupper(trim((string) ($nfe->obs_contribuinte ?? '')), 'UTF-8');
+
+        if ($obs !== '' && (
+            str_contains($obs, 'ORIGINADA DA OS')
+            || (bool) preg_match('/\bOS\s*N[º°O.]/u', $obs)
+        )) {
+            return 'O';
+        }
+
+        if ((int) ($nfe->venda_id ?? 0) > 0) {
+            return 'D';
+        }
+
+        if ($obs !== '' && (
+            str_contains($obs, 'DAV')
+            || str_contains($obs, 'PEDIDO FV')
+        )) {
+            return 'D';
+        }
+
+        return '';
     }
 
     public static function getPages(): array

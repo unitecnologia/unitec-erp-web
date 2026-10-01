@@ -1,71 +1,78 @@
 @php
-    use App\Support\Erp\EmpresaParametros;
-
-    $fields = EmpresaParametros::boletoFields();
-    $booleans = EmpresaParametros::boletoBooleanFields();
-    $bancos = EmpresaParametros::boletoBancoOptions();
-    $ambientes = EmpresaParametros::boletoAmbienteOptions();
-    $especies = EmpresaParametros::boletoEspecieOptions();
+    $contas = $this->boletoContasApiRows;
+    $empresaSalva = property_exists($this, 'record') && $this->record?->getKey();
 @endphp
 
-<div class="erp-empresas-parametros__checks erp-empresas-parametros__checks--inline">
-    @foreach ($booleans as $field => $meta)
-        <label class="erp-pcad__check">
-            <input type="checkbox" wire:model="data.{{ $field }}">
-            <span>{{ $meta['label'] }}</span>
-        </label>
-    @endforeach
-</div>
-
-<p class="erp-empresas-parametros__hint">
-    Os campos exigidos variam conforme o banco. Preencha de acordo com o manual da API de
-    Cobrança do banco selecionado (convênio/carteira, credenciais OAuth e, quando exigido,
-    certificado mTLS).
-</p>
-
-<div class="erp-empresas-parametros__form-grid erp-empresas-parametros__form-grid--boleto">
-    @foreach ($fields as $field => $meta)
-        <div class="erp-empresas-parametros__field">
-            <label class="erp-pcad-form__label" for="param-{{ $field }}">{{ $meta['label'] }}</label>
-            @if ($field === 'param_boleto_banco')
-                <select id="param-{{ $field }}" wire:model="data.{{ $field }}" class="erp-pcad-form__select erp-pcad-form__select--md">
-                    @foreach ($bancos as $value => $rotulo)
-                        <option value="{{ $value }}">{{ $rotulo }}</option>
-                    @endforeach
-                </select>
-            @elseif ($field === 'param_boleto_ambiente')
-                <select id="param-{{ $field }}" wire:model="data.{{ $field }}" class="erp-pcad-form__select erp-pcad-form__select--md">
-                    @foreach ($ambientes as $value => $rotulo)
-                        <option value="{{ $value }}">{{ $rotulo }}</option>
-                    @endforeach
-                </select>
-            @elseif ($field === 'param_boleto_especie_documento')
-                <select id="param-{{ $field }}" wire:model="data.{{ $field }}" class="erp-pcad-form__select erp-pcad-form__select--md">
-                    @foreach ($especies as $value => $rotulo)
-                        <option value="{{ $value }}">{{ $rotulo }}</option>
-                    @endforeach
-                </select>
-            @elseif ($field === 'param_boleto_certificado_senha' || $field === 'param_boleto_client_secret')
-                <input
-                    id="param-{{ $field }}"
-                    type="password"
-                    autocomplete="off"
-                    data-erp-preserve-case
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    data-bwignore="true"
-                    data-google-password-manager="ignore"
-                    wire:model="data.{{ $field }}"
-                    class="erp-pcad-form__input erp-pcad-form__input--password erp-pcad-form__input--grow"
-                >
-            @else
-                <input
-                    id="param-{{ $field }}"
-                    type="text"
-                    wire:model="data.{{ $field }}"
-                    class="erp-pcad-form__input erp-pcad-form__input--grow"
-                >
-            @endif
+<div class="erp-empresas-boleto">
+    <div class="erp-empresas-boleto__header">
+        <div class="erp-empresas-parametros__checks erp-empresas-parametros__checks--inline">
+            <label class="erp-pcad__check">
+                <input type="checkbox" wire:model="data.param_boleto_habilitar">
+                <span>Habilitar API Boleto</span>
+            </label>
         </div>
-    @endforeach
+        <p class="erp-empresas-parametros__hint">
+            Cadastre uma ou mais contas (Ailos e/ou Sicredi). Na geração do boleto o operador escolhe a conta
+            se houver mais de uma. Depois de emitido, o banco fica travado.
+        </p>
+    </div>
+
+    @unless ($empresaSalva)
+        <p class="erp-empresas-parametros__hint">Salve a empresa primeiro para cadastrar contas de cobrança.</p>
+    @else
+        <div class="erp-empresas-boleto__toolbar">
+            <button type="button" class="erp-empresas-boleto__btn-nova" wire:click="openBoletoContaCreate">
+                + Nova conta
+            </button>
+        </div>
+
+        <div class="erp-empresas-boleto__grid-wrap">
+            <table class="erp-empresas-boleto__grid">
+                <thead>
+                    <tr>
+                        <th>Conta</th>
+                        <th class="erp-empresas-boleto__col-banco">Banco</th>
+                        <th class="erp-empresas-boleto__col-ambiente">Ambiente</th>
+                        <th class="erp-empresas-boleto__col-status">Status</th>
+                        <th class="erp-empresas-boleto__col-acoes">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($contas as $row)
+                        <tr wire:key="boleto-conta-{{ $row['id'] }}">
+                            <td>
+                                {{ $row['rotulo'] }}
+                                @if ($row['padrao'])
+                                    <span class="erp-empresas-boleto__badge">Padrão</span>
+                                @endif
+                            </td>
+                            <td class="erp-empresas-boleto__col-banco">{{ $row['banco'] }}</td>
+                            <td class="erp-empresas-boleto__col-ambiente">
+                                {{ ($row['ambiente'] ?? '') === 'producao' ? 'Produção' : 'Homologação' }}
+                            </td>
+                            <td class="erp-empresas-boleto__col-status">{{ $row['ativo'] ? 'Ativa' : 'Inativa' }}</td>
+                            <td class="erp-empresas-boleto__col-acoes">
+                                <div class="erp-empresas-boleto__acoes">
+                                    <button type="button" class="erp-empresas-boleto__link" wire:click="openBoletoContaEdit({{ $row['id'] }})">Editar</button>
+                                    @if (! $row['padrao'])
+                                        <button type="button" class="erp-empresas-boleto__link" wire:click="marcarBoletoContaPadrao({{ $row['id'] }})">Padrão</button>
+                                    @endif
+                                    <button
+                                        type="button"
+                                        class="erp-empresas-boleto__link erp-empresas-boleto__link--danger"
+                                        wire:click="excluirBoletoConta({{ $row['id'] }})"
+                                        wire:confirm="Excluir esta conta de cobrança?"
+                                    >Excluir</button>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="erp-empresas-boleto__empty">Nenhuma conta cadastrada ainda.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    @endunless
 </div>

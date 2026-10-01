@@ -21,12 +21,14 @@ use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\OperacaoFiscal;
+use App\Models\OrdemServico;
 use App\Models\OutrasSaidaMovimento;
 use App\Models\Person;
 use App\Models\Venda;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
+use App\Support\Erp\Nfe\NfeOrdemServicoService;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -112,9 +114,25 @@ class ListNfes extends ListRecords
             return;
         }
 
+        // Fatia 4B1: reabrir NF-e aberta existente (não cria rascunho).
+        $nfeId = (int) request()->query('nfe_id', 0);
+        if ($nfeId > 0) {
+            $this->abrirNfeExistentePorId($nfeId);
+
+            return;
+        }
+
         $vendaId = (int) request()->query('venda_id', 0);
         if ($vendaId > 0) {
-            $this->abrirNfeDeVendaMercadoria($vendaId);
+            $emitenteId = (int) request()->query('empresa_emitente_id', 0);
+            $this->abrirNfeDeVendaMercadoria($vendaId, $emitenteId > 0 ? $emitenteId : null);
+
+            return;
+        }
+
+        $ordemServicoId = (int) request()->query('ordem_servico_id', 0);
+        if ($ordemServicoId > 0) {
+            $this->abrirNfeDeOrdemServico($ordemServicoId);
         }
     }
 
@@ -294,12 +312,130 @@ class ListNfes extends ListRecords
         $this->dispatch('erp-nfe-focus-item-codigo');
     }
 
-    private function abrirNfeDeVendaMercadoria(int $vendaId): void
+    /**
+     * Fatia 4B1: reabre NF-e aberta existente (deep link ?nfe_id=).
+     * Não cria rascunho; não altera a listagem multiempresa.
+     */
+    public function abrirNfeExistentePorId(int $nfeId): void
+    {
+        if ($nfeId <= 0) {
+            Notification::make()
+                ->title('NF-e inválida.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $nfe = Nfe::query()
+            ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda.forcaVendasOrder'])
+            ->find($nfeId);
+
+        if (! $nfe) {
+            Notification::make()
+                ->title('NF-e não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($nfe->status !== Nfe::STATUS_ABERTA) {
+            Notification::make()
+                ->title('Somente NF-e aberta pode ser reaberta por este caminho.')
+                ->body('Status atual: '.(Nfe::statusLabels()[$nfe->status] ?? $nfe->status).'.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! $nfe->venda_id) {
+            Notification::make()
+                ->title('NF-e sem venda vinculada.')
+                ->body('Este caminho de reabertura exige vínculo com uma venda.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresaLogadaId = (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+        $venda = $nfe->venda ?? Venda::query()->with('forcaVendasOrder')->find((int) $nfe->venda_id);
+
+        if (! $venda) {
+            Notification::make()
+                ->title('Venda vinculada à NF-e não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $vendaEmpresaId = (int) ($venda->forcaVendasOrder?->empresa_id ?? $venda->empresa_id ?? 0);
+
+        if ($empresaLogadaId <= 0 || $vendaEmpresaId !== $empresaLogadaId) {
+            Notification::make()
+                ->title('NF-e não pertence a uma venda da empresa logada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $nfeEmpresaId = (int) ($nfe->empresa_id ?? 0);
+        $user = Auth::user();
+
+        if ($nfeEmpresaId <= 0 || ! $user instanceof \App\Models\User) {
+            Notification::make()
+                ->title('Não foi possível validar o acesso à empresa da NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $acessiveis = array_map('intval', $user->accessibleEmpresaIds());
+
+        if (! in_array($nfeEmpresaId, $acessiveis, true)) {
+            Notification::make()
+                ->title('Sem acesso à empresa emitente desta NF-e.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($nfeEmpresaId !== $empresaLogadaId) {
+            $resolver = app(\App\Support\Erp\Nfe\NfeMonitorEmitenteResolver::class);
+            $matriz = \App\Support\Erp\ErpContext::currentEmpresa();
+
+            if (! $resolver->emitentePermitida($nfeEmpresaId, $matriz, $user)) {
+                Notification::make()
+                    ->title('Empresa emitente não autorizada para esta Matriz.')
+                    ->body('A NF-e pertence a uma empresa que não está liberada como emitente no Monitor.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+        }
+
+        $this->loadNfeIntoModal($nfe);
+        $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    /**
+     * Abre o modal de NF-e a partir de uma venda do Monitor.
+     *
+     * @param  int|null  $empresaEmitenteId  Emitente autorizada (Fatia 3A). Null = fluxo antigo (sessão).
+     */
+    public function abrirNfeDeVendaMercadoria(int $vendaId, ?int $empresaEmitenteId = null): void
     {
         $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
 
         $venda = Venda::query()
-            ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.orcamento'])
+            ->with(['itens.product', 'cliente', 'vendedor', 'forcaVendasOrder.pedido'])
             ->whereKey($vendaId)
             ->when(
                 $empresaId,
@@ -319,10 +455,38 @@ class ListNfes extends ListRecords
             return;
         }
 
-        try {
-            $payload = app(NfeVendaMercadoriaService::class)->montarPayload($venda);
+        $emitente = null;
 
-            $this->createNfe();
+        if ($empresaEmitenteId !== null && $empresaEmitenteId > 0) {
+            $resolver = app(\App\Support\Erp\Nfe\NfeMonitorEmitenteResolver::class);
+            $matriz = \App\Support\Erp\ErpContext::currentEmpresa();
+
+            if (! $resolver->emitentePermitida($empresaEmitenteId, $matriz, \Illuminate\Support\Facades\Auth::user())) {
+                Notification::make()
+                    ->title('Empresa emitente inválida ou não autorizada.')
+                    ->body('A emitente informada não está liberada para este usuário nesta Matriz.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $emitente = Empresa::query()->find($empresaEmitenteId);
+
+            if (! $emitente || ! $emitente->ativo) {
+                Notification::make()
+                    ->title('Empresa emitente inválida ou inativa.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+        }
+
+        try {
+            $payload = app(NfeVendaMercadoriaService::class)->montarPayload($venda, $emitente);
+
+            $this->createNfe($emitente?->id);
 
             $this->nfeModalVendaId = (int) $payload['venda_id'];
             $this->nfeForm['cliente_id'] = (string) $payload['cliente_id'];
@@ -338,6 +502,7 @@ class ListNfes extends ListRecords
             $this->nfeForm['obs_contribuinte'] = mb_strtoupper((string) $payload['obs_contribuinte'], 'UTF-8');
             $this->nfeModalFaturas = $payload['faturas'];
             $this->nfeModalRows = $payload['rows'];
+            $this->aplicarTransporteDePedidoFv(is_array($payload['transporte'] ?? null) ? $payload['transporte'] : null);
             $this->recalculateNfeTotais();
         } catch (\Throwable $exception) {
             $this->closeNfeModal();
@@ -357,6 +522,68 @@ class ListNfes extends ListRecords
 
         Notification::make()
             ->title('NF-e de venda preparada.')
+            ->body('Revise os dados e transmita a nota.')
+            ->success()
+            ->send();
+
+        $this->dispatch('erp-nfe-focus-item-codigo');
+    }
+
+    private function abrirNfeDeOrdemServico(int $ordemServicoId): void
+    {
+        $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
+
+        $ordem = OrdemServico::query()
+            ->with(['itens.product', 'cliente', 'empresa'])
+            ->whereKey($ordemServicoId)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
+            ->first();
+
+        if (! $ordem) {
+            Notification::make()
+                ->title('Ordem de serviço não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $payload = app(NfeOrdemServicoService::class)->montarPayload($ordem);
+
+            $this->createNfe();
+
+            $this->nfeForm['cliente_id'] = (string) $payload['cliente_id'];
+            $this->updatedNfeFormClienteId();
+            $this->nfeForm['finalidade'] = $payload['finalidade'];
+            $this->nfeForm['movimento'] = $payload['movimento'];
+            $this->nfeForm['numero_pedido'] = $payload['numero_pedido'];
+            $this->nfeForm['natureza_operacao'] = $payload['natureza_operacao'];
+            $this->nfeForm['data_emissao'] = $payload['data_emissao'];
+            $this->nfeForm['data_saida'] = $payload['data_saida'];
+            $this->nfeForm['forma_pgto'] = $payload['forma_pgto'];
+            $this->nfeForm['meio_pgto'] = $payload['meio_pgto'];
+            $this->nfeForm['obs_contribuinte'] = mb_strtoupper((string) $payload['obs_contribuinte'], 'UTF-8');
+            $this->nfeModalFaturas = $payload['faturas'];
+            $this->nfeModalRows = $payload['rows'];
+            $this->recalculateNfeTotais();
+        } catch (\Throwable $exception) {
+            $this->closeNfeModal();
+
+            Notification::make()
+                ->title('Não foi possível preparar a NF-e da OS.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // saveNfe no mount quebra o layout Livewire (MissingLayoutException).
+        $this->js('queueMicrotask(() => $wire.saveNfeDraftFromMount())');
+
+        Notification::make()
+            ->title('NF-e das peças da OS preparada.')
             ->body('Revise os dados e transmita a nota.')
             ->success()
             ->send();

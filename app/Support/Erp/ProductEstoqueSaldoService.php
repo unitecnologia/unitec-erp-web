@@ -3,10 +3,12 @@
 namespace App\Support\Erp;
 
 use App\Models\Estoque;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Models\ProductEstoqueSaldo;
 use App\Models\Empresa;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -15,6 +17,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * Quando o vendedor tem estoque_id (ex.: 2 — ALENCAR), a FV reserva/baixa nesse depósito.
  * Estoque ainda não lançado em depósitos fica no depósito principal da empresa (legado).
+ *
+ * Extrato: cada incrementar/decrementar grava estoque_movimentacoes na mesma transaction.
+ * Pendência (fora do hub): {@see EstoqueMovimentacaoBypassesPendencia}.
  */
 final class ProductEstoqueSaldoService
 {
@@ -70,30 +75,45 @@ final class ProductEstoqueSaldoService
     /**
      * Decrementa o depósito (se informado) e o estoque global do produto.
      */
-    public function decrementar(int $productId, float $quantidade, ?int $estoqueId = null, ?Empresa $empresa = null): void
-    {
+    public function decrementar(
+        int $productId,
+        float $quantidade,
+        ?int $estoqueId = null,
+        ?Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
         if ($quantidade == 0.0) {
             return;
         }
 
-        $this->ajustar($productId, -$quantidade, $estoqueId, $empresa);
+        $this->ajustar($productId, -$quantidade, $estoqueId, $empresa, $movimentacao);
     }
 
     /**
      * Incrementa o depósito (se informado) e o estoque global do produto.
      */
-    public function incrementar(int $productId, float $quantidade, ?int $estoqueId = null, ?Empresa $empresa = null): void
-    {
+    public function incrementar(
+        int $productId,
+        float $quantidade,
+        ?int $estoqueId = null,
+        ?Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
         if ($quantidade == 0.0) {
             return;
         }
 
-        $this->ajustar($productId, $quantidade, $estoqueId, $empresa);
+        $this->ajustar($productId, $quantidade, $estoqueId, $empresa, $movimentacao);
     }
 
-    private function ajustar(int $productId, float $delta, ?int $estoqueId, ?Empresa $empresa = null): void
-    {
-        DB::transaction(function () use ($productId, $delta, $estoqueId, $empresa): void {
+    private function ajustar(
+        int $productId,
+        float $delta,
+        ?int $estoqueId,
+        ?Empresa $empresa = null,
+        ?EstoqueMovimentacaoContext $movimentacao = null,
+    ): void {
+        DB::transaction(function () use ($productId, $delta, $estoqueId, $empresa, $movimentacao): void {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
 
             if ($product === null) {
@@ -130,6 +150,9 @@ final class ProductEstoqueSaldoService
                 }
             }
 
+            // Saldo global do produto (extrato) — captura antes de alterar.
+            $saldoAnterior = $this->estoqueDecimal3Attribute($product);
+
             if ($estoqueId !== null && $this->tabelaDisponivel()) {
                 $this->materializarNaoDistribuido($productId, $estoqueId, $product);
 
@@ -160,7 +183,121 @@ final class ProductEstoqueSaldoService
 
             $product->estoque = round((float) $product->estoque + $delta, 3);
             $product->save();
+
+            $saldoAtual = $this->estoqueDecimal3Attribute($product);
+            $this->registrarMovimentacao(
+                $productId,
+                $estoqueId,
+                $delta,
+                $saldoAnterior,
+                $saldoAtual,
+                $empresa,
+                $movimentacao,
+            );
         });
+    }
+
+    /**
+     * Normaliza o atributo estoque do produto para decimal(12,3) sem float intermediário no log.
+     */
+    private function estoqueDecimal3Attribute(Product $product): string
+    {
+        $raw = $product->getAttributes()['estoque'] ?? '0';
+
+        return $this->normalizeDecimal3($raw);
+    }
+
+    private function normalizeDecimal3(mixed $value): string
+    {
+        $raw = trim((string) ($value ?? '0'));
+        if ($raw === '' || ! is_numeric($raw)) {
+            $raw = '0';
+        }
+
+        if (function_exists('bcadd')) {
+            return bcadd($raw, '0', 3);
+        }
+
+        // Fallback raro: mesma precisão do hub (3 casas).
+        return sprintf('%.3f', round((float) $raw, 3));
+    }
+
+    private function registrarMovimentacao(
+        int $productId,
+        ?int $estoqueId,
+        float $delta,
+        string $saldoAnterior,
+        string $saldoAtual,
+        ?Empresa $empresa,
+        ?EstoqueMovimentacaoContext $movimentacao,
+    ): void {
+        if (! Schema::hasTable('estoque_movimentacoes')) {
+            return;
+        }
+
+        $quantidade = $this->normalizeDecimal3(sprintf('%.3f', round($delta, 3)));
+        $ctx = $movimentacao ?? new EstoqueMovimentacaoContext();
+        $empresaId = $this->resolveEmpresaIdParaMovimentacao($ctx, $empresa, $estoqueId);
+
+        $usuarioId = $ctx->usuarioId;
+        if ($usuarioId === null || $usuarioId <= 0) {
+            $usuarioId = Auth::id() !== null ? (int) Auth::id() : null;
+        }
+
+        $tipo = $ctx->tipo !== '' ? $ctx->tipo : EstoqueMovimentacao::TIPO_SISTEMA;
+
+        $payload = [
+            'empresa_id' => $empresaId,
+            'produto_id' => $productId,
+            'estoque_id' => $estoqueId,
+            'data_movimentacao' => now(),
+            'tipo' => $tipo,
+            'quantidade' => $quantidade,
+            'saldo_anterior' => $saldoAnterior,
+            'saldo_atual' => $saldoAtual,
+            'origem_tipo' => $ctx->origemTipo,
+            'origem_id' => $ctx->origemId,
+            'origem_numero' => $ctx->origemNumero,
+            'usuario_id' => $usuarioId,
+            'observacao' => $ctx->observacao,
+        ];
+
+        if (Schema::hasColumn('estoque_movimentacoes', 'doc_fiscal_tipo')) {
+            $payload['doc_fiscal_tipo'] = $ctx->docFiscalTipo;
+            $payload['doc_fiscal_numero'] = $ctx->docFiscalNumero;
+        }
+
+        EstoqueMovimentacao::query()->create($payload);
+    }
+
+    /**
+     * Resolve a empresa da movimentação (metadado do log). Não altera cálculo de saldo.
+     *
+     * Ordem: contexto → objeto Empresa → depósito → empresa ativa no ERP.
+     */
+    private function resolveEmpresaIdParaMovimentacao(
+        EstoqueMovimentacaoContext $ctx,
+        ?Empresa $empresa,
+        ?int $estoqueId,
+    ): ?int {
+        if ($ctx->empresaId !== null && $ctx->empresaId > 0) {
+            return (int) $ctx->empresaId;
+        }
+
+        if ($empresa?->id !== null && (int) $empresa->id > 0) {
+            return (int) $empresa->id;
+        }
+
+        if ($estoqueId !== null && $estoqueId > 0 && Schema::hasTable('estoques')) {
+            $fromEstoque = Estoque::query()->whereKey($estoqueId)->value('empresa_id');
+            if ($fromEstoque !== null && (int) $fromEstoque > 0) {
+                return (int) $fromEstoque;
+            }
+        }
+
+        $fromContext = (int) (ErpContext::currentEmpresaId() ?? session('erp_empresa_id') ?? 0);
+
+        return $fromContext > 0 ? $fromContext : null;
     }
 
     /**

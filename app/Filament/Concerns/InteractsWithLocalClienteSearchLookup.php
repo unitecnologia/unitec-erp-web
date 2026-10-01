@@ -13,6 +13,9 @@ trait InteractsWithLocalClienteSearchLookup
 
     public ?int $selectedLocalClienteIndex = null;
 
+    /** Evita o debounce reabrir o lookup após Enter/seleção. */
+    public string $localClienteConfirmedTerm = '';
+
     public function isLocalClienteSearchColumn(): bool
     {
         $active = property_exists($this, 'searchFieldsActive') && is_array($this->searchFieldsActive)
@@ -40,12 +43,28 @@ trait InteractsWithLocalClienteSearchLookup
 
         $this->onLocalClienteSearchTyped($value);
         $this->clearListSelection();
-        $this->resetTable();
+
+        // Enquanto digita o cliente, só atualiza o lookup — não recarrega a grade.
+        if (! $this->shouldSkipLocalSearchWhileTyping()) {
+            $this->resetTable();
+        }
     }
 
     public function openLocalClienteLookup(): void
     {
         if (! $this->isLocalClienteSearchColumn()) {
+            return;
+        }
+
+        // Já selecionou o cliente: não reabre a lista só por focar o campo.
+        $filter = $this->localClienteFilter();
+        if (
+            $this->localClienteConfirmedTerm !== ''
+            && is_numeric($filter)
+            && mb_strtoupper(trim($this->localClienteSearchTerm()), 'UTF-8') === $this->localClienteConfirmedTerm
+        ) {
+            $this->closeLocalClienteLookup();
+
             return;
         }
 
@@ -148,7 +167,7 @@ trait InteractsWithLocalClienteSearchLookup
         $index = $this->selectedLocalClienteIndex;
 
         if ($index === null || ! isset($this->localClienteResults[$index])) {
-            $this->localClienteLookupOpen = false;
+            $this->closeLocalClienteLookup();
 
             return;
         }
@@ -160,12 +179,14 @@ trait InteractsWithLocalClienteSearchLookup
             return;
         }
 
-        $this->setLocalClienteSearchTerm(mb_strtoupper($person->nome_razao, 'UTF-8'));
+        $nome = mb_strtoupper((string) $person->nome_razao, 'UTF-8');
+
+        // Fecha antes de setar o texto — evita updatedLocalSearch reabrir a lista / zerar o filtro.
+        $this->localClienteConfirmedTerm = $nome;
+        $this->closeLocalClienteLookup();
         $this->setLocalClienteFilter((string) $person->id);
+        $this->setLocalClienteSearchTerm($nome);
         $this->onLocalClienteConfirmed($person);
-        $this->localClienteLookupOpen = false;
-        $this->localClienteResults = [];
-        $this->selectedLocalClienteIndex = null;
         $this->clearListSelection();
         $this->resetTable();
     }
@@ -177,6 +198,7 @@ trait InteractsWithLocalClienteSearchLookup
         }
 
         if (trim($this->localClienteSearchTerm()) === '') {
+            $this->localClienteConfirmedTerm = '';
             $this->setLocalClienteFilter('todos');
             $this->closeLocalClienteLookup();
             $this->clearListSelection();
@@ -187,7 +209,7 @@ trait InteractsWithLocalClienteSearchLookup
 
         if ($this->localClienteLookupOpen) {
             if ($this->localClienteResults === []) {
-                $this->localClienteLookupOpen = false;
+                $this->closeLocalClienteLookup();
                 $this->clearListSelection();
                 $this->resetTable();
 
@@ -195,7 +217,11 @@ trait InteractsWithLocalClienteSearchLookup
             }
 
             $this->confirmLocalClienteSelection();
+
+            return;
         }
+
+        // Enter com texto e lookup fechado: não reabrir lista.
     }
 
     public function closeLocalClienteLookup(): void
@@ -222,6 +248,32 @@ trait InteractsWithLocalClienteSearchLookup
         }
 
         $upper = mb_strtoupper($value, 'UTF-8');
+        $term = trim($upper);
+
+        if ($term === '') {
+            $this->localClienteConfirmedTerm = '';
+            $this->setLocalClienteSearchTerm('');
+            $this->setLocalClienteFilter('todos');
+            $this->closeLocalClienteLookup();
+
+            return;
+        }
+
+        // Após Enter/seleção (ou debounce atrasado): mantém cliente e não reabre a lista.
+        $filter = $this->localClienteFilter();
+        if (
+            $this->localClienteConfirmedTerm !== ''
+            && $term === $this->localClienteConfirmedTerm
+            && is_numeric($filter)
+        ) {
+            $this->closeLocalClienteLookup();
+
+            return;
+        }
+
+        if ($this->localClienteConfirmedTerm !== '' && $term !== $this->localClienteConfirmedTerm) {
+            $this->localClienteConfirmedTerm = '';
+        }
 
         if ($this->localClienteSearchTerm() !== $upper) {
             $this->setLocalClienteSearchTerm($upper);

@@ -96,20 +96,6 @@
                     @endforeach
                 </select>
             </div>
-
-            <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                <label class="erp-pcad-form__label" for="param-param_portal_bkp_token">Token Portal BKP</label>
-                <input
-                    id="param-param_portal_bkp_token"
-                    type="text"
-                    wire:model="data.param_portal_bkp_token"
-                    class="erp-pcad-form__input erp-pcad-form__input--grow"
-                    autocomplete="off"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    spellcheck="false"
-                >
-            </div>
         </div>
     </section>
 </div>

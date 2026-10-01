@@ -1,235 +1,331 @@
 @php
+    $readOnly = $readOnly ?? false;
     $itensTab = $this->itensByActiveTab();
     $atendentes = $this->atendenteOptions();
+    $showFoto = $this->activeItemTab === 'pecas';
+    $colCount = ($readOnly ? 11 : 12);
+    $tabTotal = count($itensTab);
+    $tecnicoNome = collect($atendentes)->firstWhere('id', $this->atendenteId)['nome'] ?? '—';
 @endphp
 
-<div class="erp-os-itens">
-    <p class="erp-os-itens__hint">
-        Clique no <strong>✕</strong> ou use <kbd>CTRL</kbd>+<kbd>DEL</kbd> para excluir um item da grade
-    </p>
+<div class="erp-os-itens erp-os-itens--fv">
+    @unless ($readOnly)
+        <section @class([
+            'erp-fv-tv__panel erp-fv-tv__panel--produto erp-orc-produto-bar erp-os-produto-bar',
+            'erp-os-produto-bar--editing' => $this->editingItemIndex !== null,
+        ])>
+            <div class="erp-fv-tv__box">
+                <span class="erp-fv-tv__box-legend">
+                    {{ $this->activeItemTab === 'servicos' ? 'Serviço' : 'Peça' }}
+                </span>
 
-    <div class="erp-os-itens__grid-wrap">
-        <table class="erp-os-itens__grid">
-            <thead>
-                <tr>
-                    @unless ($readOnly)
-                        <th class="erp-os-itens__col-delete" aria-label="Excluir"></th>
-                    @endunless
-                    <th>Cód.</th>
-                    <th>Pesquisar por Código ou Descrição</th>
-                    <th>Qtd.</th>
-                    <th>Preço</th>
-                    <th>Total</th>
-                    <th>Técnico</th>
-                    <th>Concluído Em</th>
-                </tr>
-            </thead>
-            <tbody>
-                @unless ($readOnly)
-                    <tr @class([
-                        'erp-os-itens__row',
-                        'erp-os-itens__row--entry',
-                        'erp-os-itens__row--entry-pending' => $this->itemPendingProductId !== null,
-                    ])>
-                        <td class="erp-os-itens__col-delete"></td>
-                        <td>
+                <div class="erp-fv-tv__row erp-fv-tv__row--produto">
+                    <label class="erp-fv-tv__field erp-fv-tv__field--barcode erp-fv-tv__field--suggest">
+                        <span>Código / barras / nome</span>
+                        <div class="erp-fv-tv__barcode-wrap erp-os-produto-field erp-orc-produto-field">
                             <input
-                                id="os-item-codigo"
+                                id="os-item-descricao"
+                                class="erp-nfe__input erp-fv-tv__input--barcode"
                                 type="text"
-                                wire:model="itemCodigoInput"
-                                wire:keydown.enter.prevent="handleItemCodigoEnter"
-                                @readonly($this->itemPendingProductId !== null)
-                                class="erp-os-itens__cell-input erp-os-itens__cell-input--codigo"
+                                wire:model.live.debounce.200ms="itemProdutoSearch"
+                                wire:focus="openProdutoLookup"
+                                wire:keydown.enter.prevent="confirmarItemProdutoBar($event.target.value)"
+                                wire:keydown.escape.prevent="closeProdutoLookup"
+                                wire:keydown.arrow-up.prevent="moveProdutoSelection(-1)"
+                                wire:keydown.arrow-down.prevent="moveProdutoSelection(1)"
+                                data-erp-os-prod-suggest="1"
+                                @disabled($readOnly)
+                                data-erp-uppercase
+                                autocomplete="off"
+                                placeholder="Código, barras ou nome do produto — Enter"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded="{{ $this->produtoLookupOpen && $this->produtoResults !== [] ? 'true' : 'false' }}"
+                            >
+                            @if ($this->produtoLookupOpen && $this->produtoResults !== [])
+                                <ul @class([
+                                    'erp-fv-tv__suggest erp-fv-tv__suggest--produto',
+                                    'erp-os-suggest--pecas' => $this->activeItemTab === 'pecas',
+                                ]) role="listbox" aria-label="Produtos encontrados">
+                                    @foreach ($this->produtoResults as $index => $sug)
+                                        <li wire:key="os-prod-sug-{{ $sug['id'] }}" role="presentation">
+                                            <button
+                                                type="button"
+                                                role="option"
+                                                aria-selected="{{ $this->selectedProdutoIndex === $index ? 'true' : 'false' }}"
+                                                wire:mousedown.prevent="selectProdutoResult({{ $index }})"
+                                                @class([
+                                                    'erp-os-suggest-btn',
+                                                    'is-selected' => $this->selectedProdutoIndex === $index,
+                                                ])
+                                            >
+                                                <span class="erp-fv-tv__suggest-code">{{ $sug['codigo'] }}</span>
+                                                <span class="erp-os-suggest-main">
+                                                    <span class="erp-fv-tv__suggest-nome">{{ $sug['descricao'] }}</span>
+                                                    @if ($this->activeItemTab === 'pecas')
+                                                        <span class="erp-os-suggest-meta">
+                                                            <span class="erp-os-suggest-meta__item">EAN {{ $sug['codigo_barras'] ?? '—' }}</span>
+                                                            <span class="erp-os-suggest-meta__item">IMEI {{ $sug['imei_resumo'] ?? '—' }}</span>
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                                @if ($this->activeItemTab === 'pecas')
+                                                    <span class="erp-fv-tv__suggest-estoques">
+                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--atual">Atual {{ $sug['atual'] ?? '0,000' }}</span>
+                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--reservado">Res {{ $sug['reservado'] ?? '0,000' }}</span>
+                                                        <span class="erp-fv-tv__suggest-est erp-fv-tv__suggest-est--disponivel">Disp {{ $sug['disponivel'] ?? '0,000' }}</span>
+                                                    </span>
+                                                @endif
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @elseif ($this->produtoLookupOpen && filled($this->itemProdutoSearch))
+                                <div class="erp-orc-produto-lookup erp-orc-produto-lookup--empty">
+                                    Nenhum produto encontrado.
+                                </div>
+                            @endif
+                        </div>
+                    </label>
+
+                    <label class="erp-fv-tv__field erp-fv-tv__field--qtd">
+                        <span>Qtde</span>
+                        <input
+                            id="os-item-qtd"
+                            class="erp-nfe__input"
+                            type="text"
+                            wire:model="itemQtdInput"
+                            wire:blur="normalizeItemQtdInput"
+                            wire:keydown.enter.prevent="focoPrecoAposQtd"
+                            @disabled($this->itemPendingProductId === null && $this->editingItemIndex === null)
+                            inputmode="decimal"
+                            autocomplete="off"
+                        >
+                    </label>
+
+                    <div class="erp-fv-tv__field erp-fv-tv__field--money erp-fv-tv__field--preco">
+                        <span>Vlr. unit.</span>
+                        <div class="erp-fv-tv__preco-wrap">
+                            <input
+                                id="os-item-preco"
+                                class="erp-nfe__input"
+                                type="text"
+                                wire:model="itemPrecoInput"
+                                wire:keydown.enter.prevent="confirmPendingItemEntry"
+                                @disabled($this->itemPendingProductId === null && $this->editingItemIndex === null)
+                                data-mask="money"
+                                inputmode="decimal"
                                 autocomplete="off"
                             >
-                        </td>
-                        <td>
-                            <div class="erp-os-produto-field erp-orc-produto-field">
-                                <input
-                                    id="os-item-descricao"
-                                    type="text"
-                                    wire:model="itemProdutoSearch"
-                                    wire:focus="openProdutoLookup"
-                                    wire:keydown.arrow-up.prevent="moveProdutoSelection(-1)"
-                                    wire:keydown.arrow-down.prevent="moveProdutoSelection(1)"
-                                    wire:keydown.enter.prevent="submitItemProdutoSearch($event.target.value)"
-                                    wire:keydown.escape.prevent="closeProdutoLookup"
-                                    @input.debounce.300ms="$wire.searchItemProduto($event.target.value)"
-                                    @readonly($this->itemPendingProductId !== null)
-                                    class="erp-os-itens__cell-input"
-                                    data-erp-uppercase
-                                    autocomplete="off"
-                                    placeholder="Pesquisar por código ou descrição"
-                                >
-                                @if ($this->produtoLookupOpen && filled($this->itemProdutoSearch))
-                                    @if ($this->produtoResults !== [])
-                                        @include('filament.components.erp.orcamentos.form.produto-lookup')
-                                    @else
-                                        <div class="erp-orc-produto-lookup erp-orc-produto-lookup--empty">
-                                            Nenhum produto encontrado.
-                                        </div>
-                                    @endif
-                                @endif
-                            </div>
-                        </td>
-                        <td>
-                            @if ($this->itemPendingProductId)
-                                <input
-                                    id="os-item-qtd"
-                                    type="text"
-                                    wire:model="itemQtdInput"
-                                    wire:keydown.enter.prevent="confirmPendingItemEntry"
-                                    class="erp-os-itens__cell-input erp-os-itens__cell-input--num"
-                                    autocomplete="off"
-                                >
-                            @else
-                                <span class="erp-os-itens__entry-muted">1,000</span>
-                            @endif
-                        </td>
-                        <td>
-                            @if ($this->itemPendingProductId)
-                                <input
-                                    id="os-item-preco"
-                                    type="text"
-                                    wire:model="itemPrecoInput"
-                                    wire:keydown.enter.prevent="confirmPendingItemEntry"
-                                    class="erp-os-itens__cell-input erp-os-itens__cell-input--num"
-                                    data-mask="money"
-                                    autocomplete="off"
-                                >
-                            @else
-                                <span class="erp-os-itens__entry-muted">—</span>
-                            @endif
-                        </td>
-                        <td class="erp-os-itens__entry-muted">—</td>
-                        <td class="erp-os-itens__entry-muted">—</td>
-                        <td class="erp-os-itens__entry-muted">—</td>
-                    </tr>
-                @endunless
+                            <button
+                                type="button"
+                                class="erp-fv-tv__btn-desc"
+                                wire:click="abrirModalDescontoItem"
+                                @disabled($this->itemPendingProductId === null && $this->editingItemIndex === null)
+                                title="Desconto / Acréscimo (Ctrl+D)"
+                            >%</button>
+                        </div>
+                    </div>
 
-                @forelse ($itensTab as $index => $item)
-                    <tr
-                        wire:key="{{ $item['key'] ?? ('os-item-' . $index) }}"
-                        @click="$wire.selectItemRow({{ $index }})"
-                        @class(['erp-os-itens__row', 'erp-os-itens__row--selected' => $this->selectedItemIndex === $index])
-                    >
+                    <label class="erp-fv-tv__field erp-fv-tv__field--money erp-fv-tv__field--total-item">
+                        <span>Total item</span>
+                        <input
+                            id="os-item-total"
+                            class="erp-nfe__input erp-fv-tv__input--total"
+                            type="text"
+                            value="{{ $this->itemPendingProductId !== null || $this->editingItemIndex !== null ? $this->itemTotalEntryDisplay : '0,00' }}"
+                            readonly
+                            tabindex="-1"
+                        >
+                    </label>
+                </div>
+            </div>
+        </section>
+    @endunless
+
+    <div @class(['erp-fv-tv__body', 'erp-os-itens__body', 'erp-os-itens__body--no-foto' => ! $showFoto])>
+        <div class="erp-fv-tv__grid-wrap">
+            <table class="erp-fv-tv__grid erp-os-itens__grid-fv">
+                <thead>
+                    <tr>
                         @unless ($readOnly)
-                            <td class="erp-os-itens__col-delete">
-                                <button
-                                    type="button"
-                                    class="erp-os-itens__delete-btn"
-                                    @click.stop.prevent="$wire.requestDeleteItem({{ $index }})"
-                                    title="Excluir item"
-                                    aria-label="Excluir item"
-                                >✕</button>
-                            </td>
+                            <th class="erp-fv-tv__col-idx" aria-label="Excluir"></th>
                         @endunless
-                        <td>{{ $item['product_codigo'] ?? '' }}</td>
-                        <td>
-                            @if ($readOnly)
-                                {{ $item['discriminacao'] ?? '' }}
-                            @else
-                                <input
-                                    type="text"
-                                    wire:key="os-item-{{ $item['key'] }}-desc"
-                                    value="{{ $item['discriminacao'] ?? '' }}"
-                                    @blur="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'discriminacao', $event.target.value)"
-                                    wire:click.stop
-                                    class="erp-os-itens__cell-input"
-                                >
-                            @endif
-                        </td>
-                        <td>
-                            @if ($readOnly)
-                                {{ $item['qtd'] ?? '' }}
-                            @else
-                                <input
-                                    type="text"
-                                    wire:key="os-item-{{ $item['key'] }}-qtd"
-                                    value="{{ $item['qtd'] ?? '' }}"
-                                    @blur="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'qtd', $event.target.value)"
-                                    wire:click.stop
-                                    class="erp-os-itens__cell-input erp-os-itens__cell-input--num"
-                                >
-                            @endif
-                        </td>
-                        <td>
-                            @if ($readOnly)
-                                {{ $item['preco'] ?? '' }}
-                            @else
-                                <input
-                                    type="text"
-                                    wire:key="os-item-{{ $item['key'] }}-preco"
-                                    value="{{ $item['preco'] ?? '' }}"
-                                    @blur="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'preco', $event.target.value)"
-                                    wire:click.stop
-                                    class="erp-os-itens__cell-input erp-os-itens__cell-input--num"
-                                    data-mask="money"
-                                >
-                            @endif
-                        </td>
-                        <td style="text-align:right; font-weight:700;">{{ $item['total'] ?? '' }}</td>
-                        <td>
-                            @if ($readOnly)
-                                @php
-                                    $tecNome = collect($atendentes)->firstWhere('id', $item['funcionario_id'] ?? null)['nome'] ?? '—';
-                                @endphp
-                                {{ $tecNome }}
-                            @else
-                                <select
-                                    wire:key="os-item-{{ $item['key'] }}-tec"
-                                    @change="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'funcionario_id', $event.target.value)"
-                                    wire:click.stop
-                                    class="erp-os-itens__cell-input"
-                                >
-                                    <option value="">—</option>
-                                    @foreach ($atendentes as $atendente)
-                                        <option
-                                            value="{{ $atendente['id'] }}"
-                                            @selected((int) ($item['funcionario_id'] ?? 0) === (int) $atendente['id'])
-                                        >{{ $atendente['nome'] }}</option>
-                                    @endforeach
-                                </select>
-                            @endif
-                        </td>
-                        <td>
-                            @if ($readOnly)
-                                {{ filled($item['concluido_em'] ?? null) ? \Illuminate\Support\Str::replace('T', ' ', $item['concluido_em']) : '—' }}
-                            @else
-                                <input
-                                    type="datetime-local"
-                                    wire:key="os-item-{{ $item['key'] }}-concl"
-                                    value="{{ $item['concluido_em'] ?? '' }}"
-                                    @change="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'concluido_em', $event.target.value)"
-                                    wire:click.stop
-                                    class="erp-os-itens__cell-input"
-                                >
-                            @endif
-                        </td>
+                        <th class="erp-fv-tv__col-idx">#</th>
+                        <th class="erp-fv-tv__col-cod">Código</th>
+                        <th class="erp-os-itens__col-descricao">Descrição</th>
+                        <th class="erp-fv-tv__col-num">Qtde</th>
+                        <th class="erp-fv-tv__col-num">Vlr. unit.</th>
+                        <th class="erp-fv-tv__col-num">TT bruto</th>
+                        <th class="erp-fv-tv__col-num">Acrés.</th>
+                        <th class="erp-fv-tv__col-num">Desc.</th>
+                        <th class="erp-fv-tv__col-num">TT líq.</th>
+                        <th class="erp-os-itens__col-tecnico">Técnico</th>
+                        <th class="erp-os-itens__col-concluido">Concluído em</th>
                     </tr>
-                @empty
-                    @if ($readOnly)
-                        <tr>
-                            <td colspan="8" class="erp-os-itens__empty">Nenhum item nesta aba.</td>
+                </thead>
+                <tbody>
+                    @php $posInTab = 0; @endphp
+                    @forelse ($itensTab as $index => $item)
+                        @php
+                            $lineNum = $this->resolveItemDisplayNumberInTab($posInTab, $tabTotal);
+                            $posInTab++;
+                            $qtdVal = \App\Support\Erp\ErpMoney::parseBr($item['qtd'] ?? 0, 3);
+                            $precoVal = \App\Support\Erp\ErpMoney::parseBr($item['preco'] ?? 0);
+                            $bruto = round($qtdVal * $precoVal, 2);
+                            $acrVal = \App\Support\Erp\ErpMoney::parseBr($item['acrescimo'] ?? 0);
+                            $descVal = \App\Support\Erp\ErpMoney::parseBr($item['desconto'] ?? 0);
+                            $liqVal = \App\Support\Erp\ErpMoney::parseBr($item['total'] ?? ($bruto + $acrVal - $descVal));
+                        @endphp
+                        <tr
+                            wire:key="{{ $item['key'] ?? ('os-item-' . $index) }}"
+                            wire:click="selectItemRow({{ $index }})"
+                            @unless ($readOnly)
+                                wire:dblclick.stop="startEditItem({{ $index }})"
+                            @endunless
+                            @class([
+                                'is-selected' => $this->selectedItemIndex === $index,
+                                'is-editing' => $this->editingItemIndex === $index,
+                            ])
+                        >
+                            @unless ($readOnly)
+                                <td class="erp-fv-tv__col-idx">
+                                    <button
+                                        type="button"
+                                        class="erp-os-itens__trash-btn"
+                                        wire:click.stop="requestDeleteItem({{ $index }})"
+                                        title="Excluir item"
+                                        aria-label="Excluir item"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M4 7h16"/>
+                                            <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                            <path d="M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/>
+                                            <path d="M10 11v6M14 11v6"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            @endunless
+                            <td class="erp-fv-tv__col-idx">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--center">{{ $lineNum }}</div>
+                            </td>
+                            <td class="erp-fv-tv__col-cod">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--center">{{ $item['product_codigo'] ?? '' }}</div>
+                            </td>
+                            <td class="erp-os-itens__col-descricao">
+                                <div class="erp-os-itens__desc-cell">
+                                    <div
+                                        class="erp-fv-tv__cell erp-fv-tv__cell--desc"
+                                        title="{{ $item['discriminacao'] ?? '' }}"
+                                    >{{ $item['discriminacao'] ?? '' }}</div>
+                                    @if ($this->activeItemTab === 'servicos' && ! $readOnly)
+                                        <button
+                                            type="button"
+                                            class="erp-os-itens__desc-edit"
+                                            wire:click.stop="abrirModalServicoPrestado"
+                                            title="Serviços prestados (impressão / app)"
+                                            aria-label="Editar serviços prestados"
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/>
+                                                <path d="M13.5 6.5l3 3"/>
+                                            </svg>
+                                        </button>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="erp-fv-tv__col-num">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--num">{{ $item['qtd'] ?? '' }}</div>
+                            </td>
+                            <td class="erp-fv-tv__col-num">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ $item['preco'] ?? '0,00' }}</span>
+                                </div>
+                            </td>
+                            <td class="erp-fv-tv__col-num">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($bruto) }}</span>
+                                </div>
+                            </td>
+                            <td class="erp-fv-tv__col-num">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-acr">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($acrVal) }}</span>
+                                </div>
+                            </td>
+                            <td class="erp-fv-tv__col-num">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money erp-fv-tv__val-desc">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($descVal) }}</span>
+                                </div>
+                            </td>
+                            <td class="erp-fv-tv__col-num erp-fv-tv__val-liq">
+                                <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                    <span class="erp-fv-tv__money-rs">R$</span>
+                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($liqVal) }}</span>
+                                </div>
+                            </td>
+                            <td class="erp-os-itens__col-tecnico">
+                                <div class="erp-fv-tv__cell erp-os-itens__cell-tecnico" title="{{ $tecnicoNome }}">{{ $tecnicoNome }}</div>
+                            </td>
+                            <td class="erp-os-itens__col-concluido">
+                                @if ($readOnly)
+                                    <div class="erp-fv-tv__cell erp-os-itens__cell-concluido">{{ filled($item['concluido_em'] ?? null) ? \Illuminate\Support\Str::replace('T', ' ', $item['concluido_em']) : '—' }}</div>
+                                @else
+                                    <input
+                                        type="datetime-local"
+                                        wire:key="os-item-{{ $item['key'] }}-concl"
+                                        value="{{ $item['concluido_em'] ?? '' }}"
+                                        @change="$wire.blurItemFieldByKey('{{ $item['key'] }}', 'concluido_em', $event.target.value)"
+                                        wire:click.stop
+                                        class="erp-fv-tv__cell erp-os-itens__cell-input--concluido"
+                                    >
+                                @endif
+                            </td>
                         </tr>
-                    @endif
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                    @empty
+                        <tr class="erp-fv-tv__empty">
+                            <td colspan="{{ $colCount }}">Nenhum item nesta aba — informe o código e pressione Enter</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
 
-    <div class="erp-os-itens__barcode">
-        <label class="erp-os-itens__barcode-label" for="os-barcode">
-            <kbd>F11</kbd> | Passe o Código de Barras para Adicionar Item
-        </label>
-        <input
-            id="os-barcode"
-            type="text"
-            wire:model="barcodeInput"
-            wire:keydown.enter.prevent="submitBarcodeItem"
-            @disabled($readOnly)
-            class="erp-os-itens__barcode-input"
-            autocomplete="off"
-        >
+        @if ($showFoto)
+            <aside class="erp-fv-tv__aside">
+                <div class="erp-fv-tv__foto">
+                    @if ($this->produtoAtualFoto)
+                        <img
+                            src="{{ $this->produtoAtualFoto }}"
+                            alt="{{ $this->produtoAtualNome }}"
+                            onerror="this.style.display='none'; const ph=this.parentElement.querySelector('.erp-fv-tv__foto-empty'); if(ph){ ph.hidden=false; }"
+                        >
+                        <div class="erp-fv-tv__foto-empty" hidden>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                <circle cx="8.5" cy="10.5" r="1.5"/>
+                                <path d="M21 16l-5-5-4 4-2-2-5 5"/>
+                            </svg>
+                            <span>Foto do produto</span>
+                        </div>
+                    @else
+                        <div class="erp-fv-tv__foto-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                <circle cx="8.5" cy="10.5" r="1.5"/>
+                                <path d="M21 16l-5-5-4 4-2-2-5 5"/>
+                            </svg>
+                            <span>Foto do produto</span>
+                        </div>
+                    @endif
+                    @if ($this->produtoAtualNome !== '')
+                        <p class="erp-fv-tv__foto-caption">{{ $this->produtoAtualNome }}</p>
+                    @endif
+                </div>
+            </aside>
+        @endif
     </div>
 </div>

@@ -1,26 +1,26 @@
 @php
     $columns = [
         ['key' => 'baixa', 'label' => '', 'sortable' => false, 'align' => 'center', 'html' => true],
-        ['key' => 'numero', 'label' => '>>Número', 'sortable' => true, 'align' => 'center'],
+        ['key' => 'documento', 'label' => 'Pedido', 'sortable' => false, 'align' => 'center'],
+        ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],
         ['key' => 'emissao', 'label' => 'Emissão', 'sortable' => true, 'align' => 'center'],
         ['key' => 'historico', 'label' => 'Histórico', 'sortable' => false, 'align' => 'start'],
-        ['key' => 'documento', 'label' => 'Doc.', 'sortable' => false, 'align' => 'center'],
         ['key' => 'cartao_maquininha', 'label' => 'Maquininha', 'sortable' => false, 'align' => 'center'],
         ['key' => 'cartao_bandeira', 'label' => 'Bandeira', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'cliente', 'label' => 'Cliente', 'sortable' => false, 'align' => 'start'],
         ['key' => 'vencimento', 'label' => 'Vencimento', 'sortable' => true, 'align' => 'center'],
-        ['key' => 'valor', 'label' => 'Valor', 'sortable' => false, 'align' => 'end'],
+        ['key' => 'valor', 'label' => 'Valor', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'numero_cheque', 'label' => 'Nº Cheque', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'desconto', 'label' => 'Desconto', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'juros', 'label' => 'Juros', 'sortable' => false, 'align' => 'end'],
-        ['key' => 'valor_recebido', 'label' => 'Vl Recebido', 'sortable' => false, 'align' => 'end'],
+        ['key' => 'desconto', 'label' => 'Desconto', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'juros', 'label' => 'Juros', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'multa', 'label' => 'Multa', 'sortable' => false, 'align' => 'start', 'html' => true],
+        ['key' => 'valor_recebido', 'label' => 'V.Recebido', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'recebido_em', 'label' => 'Recebido Em', 'sortable' => false, 'align' => 'center'],
-        ['key' => 'saldo', 'label' => 'Saldo', 'sortable' => false, 'align' => 'end'],
+        ['key' => 'saldo', 'label' => 'Saldo', 'sortable' => false, 'align' => 'start', 'html' => true],
         ['key' => 'visualizar', 'label' => '', 'sortable' => false, 'align' => 'center', 'html' => true],
     ];
 @endphp
 
-<div class="fi-ta-ctn overflow-x-auto">
+<div class="fi-ta-ctn">
     <table class="fi-ta-table">
         <thead>
             <tr>
@@ -29,14 +29,7 @@
                         $isSorted = $sortColumn === $column['key'];
                         $ariaSort = $isSorted ? ($sortDirection === 'desc' ? 'descending' : 'ascending') : 'none';
                     @endphp
-                    <th
-                        scope="col"
-                        @class([
-                            'fi-ta-header-cell',
-                            'text-' . $column['align'] => filled($column['align'] ?? null),
-                        ])
-                        aria-sort="{{ $ariaSort }}"
-                    >
+                    <th scope="col" class="fi-ta-header-cell" aria-sort="{{ $ariaSort }}">
                         @if ($column['sortable'] ?? false)
                             <button
                                 type="button"

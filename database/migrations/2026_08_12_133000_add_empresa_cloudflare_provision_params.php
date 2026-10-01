@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -12,6 +13,26 @@ return new class extends Migration
     public function up(): void
     {
         if (! Schema::hasTable('empresas')) {
+            return;
+        }
+
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            Schema::table('empresas', function (Blueprint $table): void {
+                foreach ([
+                    'param_cf_api_token',
+                    'param_cf_account_id',
+                    'param_cf_zone_id',
+                    'param_cf_base_domain',
+                    'param_cf_subdomain',
+                    'param_cf_tunnel_id',
+                    'param_cf_hostname',
+                ] as $field) {
+                    if (! Schema::hasColumn('empresas', $field)) {
+                        $table->text($field)->nullable();
+                    }
+                }
+            });
+
             return;
         }
 

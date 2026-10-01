@@ -442,12 +442,13 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     font-size: var(--erp-font-size-xs, 0.75rem);
 }
 
-/* ── Larguras das colunas ───────────────────────────────────────── */
+/* ── Larguras das colunas ─────────────────────────────────────────
+   1 Pedido | 2 Emissão | 3 Histórico | 4 Plano | 5 Contas | 6 Entrada | 7 Saída | 8 olho */
 
 .erp-caixa-page .fi-ta-header-cell:nth-child(1),
 .erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(1) {
-    width: 4.5rem;
-    max-width: 5rem;
+    width: 5.5rem;
+    max-width: 6.5rem;
 }
 
 .erp-caixa-page .fi-ta-header-cell:nth-child(2),
@@ -458,47 +459,41 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
 
 .erp-caixa-page .fi-ta-header-cell:nth-child(3),
 .erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(3) {
-    width: 5.5rem;
-    max-width: 6.5rem;
-}
-
-.erp-caixa-page .fi-ta-header-cell:nth-child(4),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(4) {
     width: auto !important;
     min-width: 12rem;
     max-width: none !important;
 }
 
-.erp-caixa-page .fi-ta-header-cell:nth-child(5),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(5) {
+.erp-caixa-page .fi-ta-header-cell:nth-child(4),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(4) {
     width: calc(10rem + 2cm);
     min-width: calc(10rem + 2cm);
     max-width: calc(12rem + 2cm);
 }
 
-.erp-caixa-page .fi-ta-header-cell:nth-child(6),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(6) {
+.erp-caixa-page .fi-ta-header-cell:nth-child(5),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(5) {
     width: calc(8rem + 1cm);
     min-width: calc(8rem + 1cm);
     max-width: calc(10rem + 1cm);
 }
 
-.erp-caixa-page .fi-ta-header-cell:nth-child(7),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+.erp-caixa-page .fi-ta-header-cell:nth-child(6),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(6) {
     width: 6.5rem;
     max-width: 7.5rem;
 }
 
-.erp-caixa-page .fi-ta-header-cell:nth-child(8),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-caixa-page .fi-ta-header-cell:nth-child(7),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-caixa-page .fi-ta-header-cell-saida,
 .erp-caixa-page .fi-ta-cell-saida {
     width: 6.5rem;
     max-width: 7.5rem;
 }
 
-.erp-caixa-page .fi-ta-header-cell:nth-child(9),
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-caixa-page .fi-ta-header-cell:nth-child(8),
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(8),
 .erp-caixa-page .fi-ta-header-cell-ver-itens,
 .erp-caixa-page .fi-ta-cell-ver-itens {
     width: 1.35rem !important;
@@ -508,7 +503,7 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     overflow: hidden;
 }
 
-.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
+.erp-caixa-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
 .erp-caixa-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -564,7 +559,7 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
 }
 
 .erp-caixa-page .fi-ta-header-cell-ver-itens,
-.erp-caixa-page .fi-ta-header-cell:nth-child(9) {
+.erp-caixa-page .fi-ta-header-cell:nth-child(8) {
     padding: 0 !important;
 }
 

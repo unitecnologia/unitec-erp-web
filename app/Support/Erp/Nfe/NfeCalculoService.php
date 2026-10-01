@@ -8,6 +8,7 @@ use App\Models\Product;
 
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Fiscal\IbptLookupService;
+use App\Support\Fiscal\MeiFiscalNormalizer;
 
 final class NfeCalculoService
 
@@ -79,7 +80,21 @@ final class NfeCalculoService
 
                 : $this->resolveCfop($product, $interestadual, $empresa);
 
+            $isDevolucaoCompra = $this->isDevolucaoCompraFiscal($row);
+
             ['cst' => $cst, 'csosn' => $csosn] = $this->resolveIcmsForRow($row, $product, $interestadual, $empresa);
+
+            // NT 2024.001: MEI (CRT=4) só aceita CSOSN/CFOP específicos (cStat 782/337).
+            if (MeiFiscalNormalizer::isMeiRegime($empresa?->regime_tributario)) {
+                $mei = MeiFiscalNormalizer::normalizeItem(
+                    (string) $csosn,
+                    (string) $cfop,
+                    MeiFiscalNormalizer::MODELO_NFE,
+                );
+                $csosn = $mei['csosn'];
+                $cfop = $mei['cfop'];
+                $cst = '';
+            }
 
             $defaultAliqIcms = $this->resolveAliqIcms($product, $interestadual);
 
@@ -94,6 +109,7 @@ final class NfeCalculoService
                 $this->isEmpresaSimples($empresa)
                 && $this->csosnSemBaseIcms($csosn)
                 && $defaultAliqIcms <= 0
+                && ! $isDevolucaoCompra
             ) {
                 $defaultBaseIcms = 0.0;
             }
@@ -113,30 +129,45 @@ final class NfeCalculoService
                 $editedField,
             );
 
+            // Devolução vinculada: bases PIS/COFINS/IPI vêm do override (não = BC ICMS).
+            $basePis = $isDevolucaoCompra
+                ? $this->rowMoney($row, 'base_pis_icms', 0.0)
+                : $baseIcms;
+            $baseCofins = $isDevolucaoCompra
+                ? $this->rowMoney($row, 'base_cofins_icms', 0.0)
+                : $baseIcms;
+            $baseIpi = $isDevolucaoCompra
+                ? $this->rowMoney($row, 'base_ipi', 0.0)
+                : $baseIcms;
+
+            $defaultAliqPisRow = $isDevolucaoCompra ? 0.0 : $defaultAliqPis;
+            $defaultAliqCofRow = $isDevolucaoCompra ? 0.0 : $defaultAliqCof;
+            $defaultAliqIpiRow = $isDevolucaoCompra ? 0.0 : $defaultAliqIpi;
+
             [$aliqPis, $valorPis] = $this->resolveTaxPair(
-                $baseIcms,
+                $basePis,
                 $row,
                 'aliq_pis_icms',
                 'valor_pis_icms',
-                $defaultAliqPis,
+                $defaultAliqPisRow,
                 $editedField,
             );
 
             [$aliqCof, $valorCof] = $this->resolveTaxPair(
-                $baseIcms,
+                $baseCofins,
                 $row,
                 'aliq_cofins_icms',
                 'valor_cofins_icms',
-                $defaultAliqCof,
+                $defaultAliqCofRow,
                 $editedField,
             );
 
             [$aliqIpi, $valorIpi] = $this->resolveTaxPair(
-                $baseIcms,
+                $baseIpi,
                 $row,
                 'aliq_ipi',
                 'valor_ipi',
-                $defaultAliqIpi,
+                $defaultAliqIpiRow,
                 $editedField,
             );
 
@@ -150,8 +181,12 @@ final class NfeCalculoService
 
             $alqIbsUf = $this->rowMoney($row, 'alq_ibs_uf', (float) ($product?->aliq_ibs_uf ?? 0));
 
-            $redIbs = (float) ($product?->reducao_ibs ?? 0);
-            $redCbs = (float) ($product?->reducao_cbs ?? 0);
+            $redIbs = array_key_exists('p_red_ibs', $row)
+                ? $this->rowMoney($row, 'p_red_ibs', 0.0)
+                : (float) ($product?->reducao_ibs ?? 0);
+            $redCbs = array_key_exists('p_red_cbs', $row)
+                ? $this->rowMoney($row, 'p_red_cbs', 0.0)
+                : (float) ($product?->reducao_cbs ?? 0);
             $alqCbsEfet = $redCbs > 0 ? $alqCbs * (1 - ($redCbs / 100)) : $alqCbs;
             $alqIbsMunEfet = $redIbs > 0 ? $alqIbsMun * (1 - ($redIbs / 100)) : $alqIbsMun;
             $alqIbsUfEfet = $redIbs > 0 ? $alqIbsUf * (1 - ($redIbs / 100)) : $alqIbsUf;
@@ -161,6 +196,22 @@ final class NfeCalculoService
             $vIbsMun = $this->rowMoney($row, 'v_ibs_mun', round($bcIbs * $alqIbsMunEfet / 100, 2));
 
             $vIbsUf = $this->rowMoney($row, 'v_ibs_uf', round($bcIbs * $alqIbsUfEfet / 100, 2));
+
+            $origemMercadoria = array_key_exists('origem', $row)
+                ? (int) $row['origem']
+                : (int) ($product?->origem ?? 0);
+
+            $cstPis = filled($row['cst_pis'] ?? null)
+                ? (string) $row['cst_pis']
+                : ($isDevolucaoCompra
+                    ? ($this->isEmpresaSimples($empresa) ? '99' : '49')
+                    : ($product?->cst_saida ?? '01'));
+
+            $cstCofins = filled($row['cst_cofins'] ?? null)
+                ? (string) $row['cst_cofins']
+                : ($isDevolucaoCompra
+                    ? ($this->isEmpresaSimples($empresa) ? '99' : '49')
+                    : ($product?->cst_cofins ?? $product?->cst_saida ?? '01'));
 
             $calculatedRows[] = [
 
@@ -180,9 +231,11 @@ final class NfeCalculoService
 
                 'csosn' => $csosn,
 
-                'ncm' => $product?->ncm,
+                'origem' => $origemMercadoria,
 
-                'cest' => $product?->cest,
+                'ncm' => filled($row['ncm'] ?? null) ? (string) $row['ncm'] : $product?->ncm,
+
+                'cest' => filled($row['cest'] ?? null) ? (string) $row['cest'] : $product?->cest,
 
                 'cod_barra' => filled($row['cod_barra'] ?? null)
                     ? (string) $row['cod_barra']
@@ -224,6 +277,10 @@ final class NfeCalculoService
 
                 'valor_icms' => $valorIcms,
 
+                'p_red_bc_icms' => $this->rowMoney($row, 'p_red_bc_icms', 0.0),
+
+                'mod_bc_icms' => filled($row['mod_bc_icms'] ?? null) ? (string) $row['mod_bc_icms'] : null,
+
                 'motivo_desoneracao' => (string) ($row['motivo_desoneracao'] ?? ''),
 
                 'base_desoneracao' => $this->rowMoney($row, 'base_desoneracao', 0.0),
@@ -232,7 +289,7 @@ final class NfeCalculoService
 
                 'valor_desoneracao' => $valorDesoneracao,
 
-                'base_ipi' => $baseIcms,
+                'base_ipi' => $baseIpi,
 
                 'aliq_ipi' => $aliqIpi,
 
@@ -242,21 +299,17 @@ final class NfeCalculoService
                     ? (string) $row['cst_ipi']
                     : ($product?->cst_ipi ?? '99'),
 
-                'cst_pis' => filled($row['cst_pis'] ?? null)
-                    ? (string) $row['cst_pis']
-                    : ($product?->cst_saida ?? '01'),
+                'cst_pis' => $cstPis,
 
-                'base_pis_icms' => $baseIcms,
+                'base_pis_icms' => $basePis,
 
                 'aliq_pis_icms' => $aliqPis,
 
                 'valor_pis_icms' => $valorPis,
 
-                'cst_cofins' => filled($row['cst_cofins'] ?? null)
-                    ? (string) $row['cst_cofins']
-                    : ($product?->cst_cofins ?? $product?->cst_saida ?? '01'),
+                'cst_cofins' => $cstCofins,
 
-                'base_cofins_icms' => $baseIcms,
+                'base_cofins_icms' => $baseCofins,
 
                 'aliq_cofins_icms' => $aliqCof,
 
@@ -280,6 +333,10 @@ final class NfeCalculoService
 
                 'alq_ibs_uf' => $alqIbsUf,
 
+                'p_red_ibs' => $redIbs,
+
+                'p_red_cbs' => $redCbs,
+
             ];
 
             $totais['subtotal'] += $bruto;
@@ -298,15 +355,15 @@ final class NfeCalculoService
 
             $totais['valor_icms'] += $valorIcms;
 
-            $totais['base_ipi'] += $baseIcms;
+            $totais['base_ipi'] += $baseIpi;
 
             $totais['valor_ipi'] += $valorIpi;
 
-            $totais['base_pis'] += $baseIcms;
+            $totais['base_pis'] += $basePis;
 
             $totais['valor_pis'] += $valorPis;
 
-            $totais['base_cofins'] += $baseIcms;
+            $totais['base_cofins'] += $baseCofins;
 
             $totais['valor_cofins'] += $valorCof;
 
@@ -444,7 +501,17 @@ final class NfeCalculoService
      */
     protected function resolveIcmsForRow(array $row, ?Product $product, bool $interestadual, ?Empresa $empresa): array
     {
+        // Devolução de compra: CRT 1/4 → CSOSN 900 (não copiar CST 20 da entrada).
+        if ($this->isDevolucaoCompraFiscal($row) && $this->isEmpresaSimples($empresa)) {
+            return ['cst' => '', 'csosn' => '900'];
+        }
+
         if ($this->isEmpresaSimples($empresa)) {
+            if ($this->isDevolucaoCompraFiscal($row)) {
+                // Já tratado acima; fallback defensivo.
+                return ['cst' => '', 'csosn' => '900'];
+            }
+
             if (filled($row['cst'] ?? null)) {
                 $cstNorm = preg_replace('/\D/', '', (string) $row['cst']) ?: '';
                 $csosnNorm = preg_replace('/\D/', '', (string) ($row['csosn'] ?? '')) ?: '';
@@ -479,13 +546,23 @@ final class NfeCalculoService
         return ['cst' => $cst, 'csosn' => $csosn];
     }
 
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function isDevolucaoCompraFiscal(array $row): bool
+    {
+        return (bool) ($row['devolucao_compra_fiscal'] ?? false);
+    }
+
     protected function isEmpresaSimples(?Empresa $empresa): bool
     {
         if ($empresa === null) {
             return true;
         }
 
-        return strtolower((string) ($empresa->regime_tributario ?? 'simples')) === 'simples';
+        $regime = strtolower((string) ($empresa->regime_tributario ?? 'simples'));
+
+        return in_array($regime, ['simples', 'mei', 'simei'], true);
     }
 
     protected function csosnSemBaseIcms(string $csosn): bool

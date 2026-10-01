@@ -6,13 +6,17 @@ use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContrac
 use Filament\Facades\Filament;
 use Illuminate\Http\RedirectResponse;
 use Livewire\Features\SupportRedirects\Redirector;
+use App\Support\Erp\RequestOrigin;
 
 class LoginResponse implements LoginResponseContract
 {
     public function toResponse($request): RedirectResponse | Redirector
     {
+        $intended = (string) $request->session()->pull('url.intended', '');
+        $target = RequestOrigin::toBrowserUrl($intended !== '' ? $intended : (string) Filament::getUrl());
+
         return redirect()
-            ->intended(Filament::getUrl())
+            ->away($target)
             ->setStatusCode(303);
     }
 }

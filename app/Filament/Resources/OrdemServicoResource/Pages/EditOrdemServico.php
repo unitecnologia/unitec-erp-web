@@ -37,6 +37,14 @@ class EditOrdemServico extends EditRecord
         }
 
         $this->loadOsFormFromRecord($ordem);
+
+        if (session()->pull('erp_os_faturamento')) {
+            $this->abrirFaturamentoOsCarregado();
+        }
+
+        if (session()->pull('erp_os_post_save_prompt')) {
+            $this->openPostSavePromptFromSession();
+        }
     }
 
     protected function getRedirectUrl(): string

@@ -189,12 +189,12 @@ class ErpDashboardDemoData
      */
     public static function fiscalDocsChart(): array
     {
-        return [
+        return ErpDashboardFiscalDocsChart::withoutZeroSlices([
             'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
             'values' => [42.0, 8.0, 186.0, 11.0],
             'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
             'unit' => 'count',
-        ];
+        ]);
     }
 
     /**

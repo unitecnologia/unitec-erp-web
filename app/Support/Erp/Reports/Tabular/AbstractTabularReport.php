@@ -6,6 +6,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Reports\ReportEmpresaScope;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -332,7 +333,13 @@ abstract class AbstractTabularReport implements TabularReportDefinition
 
             foreach ($columns as $column) {
                 $value = $row[$column] ?? '';
-                $stringRow[$column] = is_string($value) ? $value : (string) $value;
+
+                // Htmlable (ex.: link de mapa) permanece para a view tabular.
+                if ($value instanceof Htmlable) {
+                    $stringRow[$column] = $value;
+                } else {
+                    $stringRow[$column] = is_string($value) ? $value : (string) $value;
+                }
             }
 
             $stringRows[] = $stringRow;

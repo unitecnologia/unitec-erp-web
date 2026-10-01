@@ -30,7 +30,7 @@
             </div>
 
             <div class="erp-lookup-modal__body erp-receber-view-modal__body">
-                <div class="erp-receber-view-modal__section">
+                <div class="erp-receber-view-modal__section erp-receber-view-modal__section--resumo">
                     <h3 class="erp-receber-view-modal__section-title">Origem da venda</h3>
                     <div class="erp-receber-view-modal__fields">
                         <div class="erp-receber-view-modal__field">
@@ -46,13 +46,23 @@
                             <span class="erp-receber-view-modal__value">{{ $this->viewModalData['vendedor'] ?? '—' }}</span>
                         </div>
                         <div class="erp-receber-view-modal__field">
-                            <span class="erp-receber-view-modal__label">Forma pagto.</span>
+                            <span class="erp-receber-view-modal__label">Forma original</span>
                             <span class="erp-receber-view-modal__value">{{ $this->viewModalData['forma_pagamento'] ?? '—' }}</span>
                         </div>
+                        @if (! empty($this->viewModalData['mostrar_boleto_info']))
+                            <div class="erp-receber-view-modal__field">
+                                <span class="erp-receber-view-modal__label">Banco (boleto)</span>
+                                <span class="erp-receber-view-modal__value">{{ $this->viewModalData['boleto_banco'] ?? '—' }}</span>
+                            </div>
+                            <div class="erp-receber-view-modal__field erp-receber-view-modal__field--wide">
+                                <span class="erp-receber-view-modal__label">Conta bancária</span>
+                                <span class="erp-receber-view-modal__value">{{ $this->viewModalData['boleto_conta_bancaria'] ?? '—' }}</span>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
-                <div class="erp-receber-view-modal__section">
+                <div class="erp-receber-view-modal__section erp-receber-view-modal__section--resumo">
                     <h3 class="erp-receber-view-modal__section-title">Cliente</h3>
                     <div class="erp-receber-view-modal__fields">
                         <div class="erp-receber-view-modal__field">
@@ -74,7 +84,7 @@
                     </div>
                 </div>
 
-                <div class="erp-receber-view-modal__section erp-receber-view-modal__section--titulo">
+                <div class="erp-receber-view-modal__section erp-receber-view-modal__section--resumo">
                     <h3 class="erp-receber-view-modal__section-title">Título selecionado</h3>
                     <div class="erp-receber-view-modal__fields">
                         <div class="erp-receber-view-modal__field">
@@ -97,13 +107,11 @@
                             <span class="erp-receber-view-modal__label">Vencimento</span>
                             <span class="erp-receber-view-modal__value">{{ $conta['vencimento'] ?? '—' }}</span>
                         </div>
-                        <div class="erp-receber-view-modal__field">
-                            <span class="erp-receber-view-modal__label">Forma</span>
-                            <span class="erp-receber-view-modal__value">{{ $conta['forma'] ?? '—' }}</span>
-                        </div>
+                    </div>
+                    <div class="erp-receber-view-modal__fields">
                         <div class="erp-receber-view-modal__field">
                             <span class="erp-receber-view-modal__label">Valor</span>
-                            <span class="erp-receber-view-modal__value">{{ $conta['valor'] ?? '—' }}</span>
+                            <span class="erp-receber-view-modal__value erp-receber-view-modal__value--valor">{{ $conta['valor'] ?? '—' }}</span>
                         </div>
                         <div class="erp-receber-view-modal__field">
                             <span class="erp-receber-view-modal__label">Desconto</span>
@@ -115,7 +123,7 @@
                         </div>
                         <div class="erp-receber-view-modal__field">
                             <span class="erp-receber-view-modal__label">Recebido</span>
-                            <span class="erp-receber-view-modal__value">{{ $conta['valor_recebido'] ?? '—' }}</span>
+                            <span class="erp-receber-view-modal__value erp-receber-view-modal__value--recebido">{{ $conta['valor_recebido'] ?? '—' }}</span>
                         </div>
                         <div class="erp-receber-view-modal__field">
                             <span class="erp-receber-view-modal__label">Recebido em</span>
@@ -140,6 +148,7 @@
                                     <th class="erp-receber-view-modal__num">Qtd</th>
                                     <th>Un.</th>
                                     <th class="erp-receber-view-modal__num">Preço</th>
+                                    <th class="erp-receber-view-modal__num">Desconto</th>
                                     <th class="erp-receber-view-modal__num">Total</th>
                                 </tr>
                             </thead>
@@ -152,11 +161,12 @@
                                         <td class="erp-receber-view-modal__num">{{ $item['quantidade'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__center">{{ $item['unidade'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__num">{{ $item['preco'] ?? '—' }}</td>
+                                        <td class="erp-receber-view-modal__num">{{ $item['desconto'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__num">{{ $item['total'] ?? '—' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="erp-lookup-modal__empty">
+                                        <td colspan="8" class="erp-lookup-modal__empty">
                                             Nenhum produto vinculado a este título.
                                         </td>
                                     </tr>
@@ -166,8 +176,8 @@
                     </div>
 
                     <div class="erp-receber-view-modal__totais">
-                        <span>Subtotal: <strong>{{ $totais['subtotal'] ?? '—' }}</strong></span>
-                        <span>Desconto: <strong>{{ $totais['desconto'] ?? '—' }}</strong></span>
+                        <span>Bruto: <strong>{{ $totais['subtotal'] ?? '—' }}</strong></span>
+                        <span>Desconto dos itens: <strong>{{ $totais['desconto'] ?? '—' }}</strong></span>
                         <span>Total: <strong>{{ $totais['total'] ?? '—' }}</strong></span>
                     </div>
                 </div>
@@ -182,6 +192,7 @@
                                     <th>Documento</th>
                                     <th>Vencimento</th>
                                     <th class="erp-receber-view-modal__num">Valor</th>
+                                    <th class="erp-receber-view-modal__num">Valor recebido</th>
                                     <th class="erp-receber-view-modal__num">Saldo</th>
                                     <th>Situação</th>
                                 </tr>
@@ -193,18 +204,27 @@
                                         <td>{{ $parcela['documento'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__center">{{ $parcela['vencimento'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__num">{{ $parcela['valor'] ?? '—' }}</td>
+                                        <td class="erp-receber-view-modal__num">{{ $parcela['valor_recebido'] ?? '—' }}</td>
                                         <td class="erp-receber-view-modal__num">{{ $parcela['saldo'] ?? '—' }}</td>
                                         <td>{{ $parcela['situacao'] ?? '—' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="erp-lookup-modal__empty">Nenhuma parcela encontrada.</td>
+                                        <td colspan="7" class="erp-lookup-modal__empty">Nenhuma parcela encontrada.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+
+            <div class="erp-receber-view-modal__footer">
+                <button
+                    type="button"
+                    class="erp-receber-view-modal__fechar"
+                    wire:click="closeContaReceberView"
+                >Fechar</button>
             </div>
         </div>
     </div>

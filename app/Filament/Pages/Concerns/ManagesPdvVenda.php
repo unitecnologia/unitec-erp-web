@@ -8,6 +8,7 @@ use App\Models\PdvVendaItem;
 use App\Models\PdvVendaPagamento;
 use App\Models\Person;
 use App\Models\Product;
+use App\Models\ClienteCreditoMovimentacao;
 use App\Models\VendasParametro;
 use App\Support\Erp\Balanca\BalancaEtiquetaLayout;
 use App\Support\Erp\ErpMoney;
@@ -29,6 +30,8 @@ trait ManagesPdvVenda
     use ManagesPdvFinalizarTotais;
     use ManagesPdvFinalizarTabelaPrazo;
     use ManagesPdvFinalizarCartaoCanhoto;
+    use ManagesPdvPixQrcode;
+
     /** @var array<int, array<string, mixed>> */
     public array $cupomItens = [];
 
@@ -121,7 +124,7 @@ trait ManagesPdvVenda
     protected string $finalizarClienteSnapshot = 'CONSUMIDOR FINAL';
 
     /**
-     * @return array<int, array{forma: string, atalho: string, valor: string, tipo?: string, aparece_contas_receber?: bool, max_parcelas?: int, prazo_cartao?: int, intervalo_parcelas?: int}>
+     * @return array<int, array{forma: string, atalho: string, valor: string, tipo?: string, aparece_contas_receber?: bool, max_parcelas?: int, prazo_cartao?: int, intervalo_parcelas?: int, gerar_qrcode_pdv?: bool}>
      */
     protected function defaultFinalizarPagamentos(): array
     {
@@ -138,6 +141,7 @@ trait ManagesPdvVenda
                 'max_parcelas',
                 'prazo_cartao',
                 'intervalo_parcelas',
+                'gerar_qrcode_pdv',
             ]);
 
         if ($formas->isEmpty()) {
@@ -165,7 +169,9 @@ trait ManagesPdvVenda
                 'max_parcelas' => max(1, (int) ($forma->max_parcelas ?: 1)),
                 'prazo_cartao' => max(0, (int) ($forma->prazo_cartao ?: 0)),
                 'intervalo_parcelas' => max(0, (int) ($forma->intervalo_parcelas ?: 30)),
+                'gerar_qrcode_pdv' => (bool) ($forma->gerar_qrcode_pdv ?? false),
                 'valor' => '0,00',
+                'credito_cliente_linha' => (string) ($forma->tipo_movimento ?? '') === 'credito_cliente',
             ];
         }
 
@@ -284,6 +290,7 @@ trait ManagesPdvVenda
             $this->finalizarClienteSearch = (string) $clienteNome;
             $this->finalizarClienteId = filled($clienteId) ? (int) $clienteId : null;
             $this->finalizarClienteSnapshot = (string) $clienteNome;
+            $this->sincronizarLinhaCreditoCliente();
         } else {
             $this->finalizarClienteSearch = 'CONSUMIDOR FINAL';
             $this->finalizarClienteId = null;
@@ -295,6 +302,7 @@ trait ManagesPdvVenda
         $this->selectedFinalizarClienteIndex = null;
         $this->resetFinalizarTabelaPrazo();
         $this->resetFinalizarCartaoCanhoto();
+        $this->resetFinalizarPixQrcode();
         $this->sincronizarTabelaPrazoComCliente();
     }
 
@@ -381,6 +389,7 @@ trait ManagesPdvVenda
         $this->finalizarClienteResults = [];
         $this->selectedFinalizarClienteIndex = null;
         $this->sincronizarTabelaPrazoComCliente();
+        $this->sincronizarLinhaCreditoCliente();
         $this->dispatch('erp-pdv-focus-finalizar-pagamento', index: 0);
     }
 
@@ -525,6 +534,15 @@ trait ManagesPdvVenda
             return;
         }
 
+        if (
+            ! empty($this->finalizarPagamentos[$index]['credito_cliente_linha'])
+            || ClienteCreditoMovimentacao::isFormaPdv((string) ($this->finalizarPagamentos[$index]['forma'] ?? ''))
+        ) {
+            $this->aplicarCreditoClienteNaLinha($index);
+
+            return;
+        }
+
         $outros = 0.0;
 
         foreach ($this->finalizarPagamentos as $i => $pagamento) {
@@ -563,6 +581,12 @@ trait ManagesPdvVenda
             $this->finalizarCartaoCanhotoConfirmado = false;
             $this->finalizarCartaoParcelasRows = [];
             $this->ensureCartaoCanhoto();
+
+            return;
+        }
+
+        if (PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv($pagamentos[$index])) {
+            $this->finalizarPixQrConfirmado = false;
         }
     }
 
@@ -668,7 +692,7 @@ trait ManagesPdvVenda
             }
         }
 
-        return null;
+        return $this->validaCreditoClienteFinalizar();
     }
 
     public function getFinalizarTotalAPagarProperty(): string
@@ -1009,6 +1033,15 @@ trait ManagesPdvVenda
             $this->pdvLaunchPreco = ErpMoney::formatBr($preco);
         }
 
+        // Produto com preço variável: pede quantidade primeiro, depois preço.
+        // No Caixa Rápido o step padrão era 'preco', pulando a qtd.
+        if ($this->pdvCaixaRapido && $this->pdvLaunchStep !== 'qtd') {
+            $this->pdvLaunchStep = 'qtd';
+            $this->dispatch('erp-pdv-focus-launch', field: 'qtd');
+
+            return;
+        }
+
         $this->pdvLaunchStep = 'preco';
         $this->dispatch('erp-pdv-focus-launch', field: 'preco');
     }
@@ -1116,6 +1149,32 @@ trait ManagesPdvVenda
         $this->syncPdvPreviewFotoFromSearchSelection();
     }
 
+    /**
+     * Sync leve do índice após setas no JS (highlight já pintado no cliente).
+     * Sem Product::find / resolvePreco — preço só no clique ou no Enter/lançamento.
+     */
+    public function setSearchSelectionIndex(int $index): void
+    {
+        if (! isset($this->pdvSearchResults[$index])) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $row = $this->pdvSearchResults[$index];
+        $this->selectedSearchIndex = $index;
+        $this->pdvPendingLaunchProductId = (int) ($row['product_id'] ?? 0) ?: null;
+        $this->pdvLaunchStep = 'search';
+
+        $descricao = trim((string) ($row['descricao'] ?? ''));
+        $this->pdvPreviewProductName = $descricao !== '' ? $descricao : null;
+
+        $fotoUrl = trim((string) ($row['foto_url'] ?? ''));
+        $this->pdvPreviewFotoUrl = $fotoUrl !== '' ? $fotoUrl : null;
+
+        $this->skipRender();
+    }
+
     public function cupomTemItens(): bool
     {
         if ($this->cupomItens !== []) {
@@ -1147,6 +1206,22 @@ trait ManagesPdvVenda
         $this->syncPdvPreviewFotoFromCupomSelection();
     }
 
+    public function requestExcluirCupomItem(int $index): void
+    {
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
+        }
+
+        if (! isset($this->cupomItens[$index])) {
+            return;
+        }
+
+        $this->selectedCupomIndex = $index;
+        $this->pdvMostrarDetalheItem = true;
+        $this->syncPdvPreviewFotoFromCupomSelection();
+        $this->deletarItemCupom();
+    }
+
     public function moveCupomSelection(int $delta): void
     {
         if ($this->pdvEmConsulta || $this->cupomItens === [] || ! $this->pdvMostrarDetalheItem || $this->selectedCupomIndex === null) {
@@ -1176,12 +1251,10 @@ trait ManagesPdvVenda
             return;
         }
 
-        if ($this->selectedCupomIndex === null || ! isset($this->cupomItens[$this->selectedCupomIndex])) {
-            Notification::make()
-                ->title('Selecione um item do cupom.')
-                ->info()
-                ->send();
-
+        // Delete / lixeira: sem item selecionado, não exclui nada.
+        if (! $this->pdvMostrarDetalheItem
+            || $this->selectedCupomIndex === null
+            || ! isset($this->cupomItens[$this->selectedCupomIndex])) {
             return;
         }
 
@@ -1207,14 +1280,24 @@ trait ManagesPdvVenda
 
         unset($this->cupomItens[$index]);
         $this->cupomItens = array_values($this->cupomItens);
-        $this->selectedCupomIndex = null;
-        $this->pdvMostrarDetalheItem = false;
+
+        $count = count($this->cupomItens);
+        if ($count === 0) {
+            $this->selectedCupomIndex = null;
+            $this->pdvMostrarDetalheItem = false;
+        } else {
+            // Preferir a próxima (agora no mesmo índice); senão a anterior.
+            $this->selectedCupomIndex = $index < $count ? $index : $count - 1;
+            $this->pdvMostrarDetalheItem = true;
+        }
 
         $this->persistCupomToSession();
+        $this->dispatch('erp-pdv-hot-set-selection', index: $this->selectedCupomIndex)->to(PdvHotPath::class);
         $this->closePdvModal();
         $this->clearPdvAutorizacao();
         $this->syncPdvPreviewFotoFromCupomSelection();
         $this->dispatch('erp-pdv-item-added');
+        $this->dispatch('erp-pdv-focus-search');
     }
 
     public function cancelExcluirItemCupom(): void
@@ -1291,8 +1374,15 @@ trait ManagesPdvVenda
     #[On('erp-pdv-hot-delegate')]
     public function handlePdvHotDelegate(string $codigo = ''): void
     {
+        // O hot path (PdvHotPath) grava o cupom na session; ao delegar (ex.: preco_variavel/DIVERSOS),
+        // o PdvPage pode estar com estado antigo e sobrescrever a sessão ao persistir.
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->loadCupomFromSession();
+        }
+
         $this->handlePdvSearchEnter($codigo);
-        $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        // Não disparar reload aqui: o cupom ainda não foi alterado (produto com preco_variavel
+        // abre o passo qtd/preco; o reload é feito ao confirmar o item em confirmAddProduct).
     }
 
     #[On('erp-pdv-hot-empty-enter')]
@@ -1305,6 +1395,12 @@ trait ManagesPdvVenda
     public function handlePdvHotSelectCupom(int $index): void
     {
         $this->selectCupomItem($index);
+    }
+
+    #[On('erp-pdv-hot-excluir-cupom')]
+    public function handlePdvHotExcluirCupom(int $index): void
+    {
+        $this->requestExcluirCupomItem($index);
     }
 
     protected function proceedAfterProductSelected(Product $product): void
@@ -1860,6 +1956,7 @@ trait ManagesPdvVenda
                         : '',
                     'preco_variavel' => (bool) $product->preco_variavel,
                     'produto_pesado' => (bool) $product->produto_pesado,
+                    'foto_url' => $product->fotoUrl(),
                 ];
             })
             ->values()
@@ -2147,6 +2244,12 @@ trait ManagesPdvVenda
             return;
         }
 
+        if ($this->finalizarPixQrAberta) {
+            $this->cancelFinalizarPixQrcode();
+
+            return;
+        }
+
         $this->finalizarConfirmSair = true;
         $this->dispatch('erp-pdv-finalizar-sair-opened');
     }
@@ -2184,9 +2287,13 @@ trait ManagesPdvVenda
             return;
         }
 
+        $this->finalizarPixPendingOperacao = $operacao;
+
         if (! $this->validarPreCondicoesFinalizarVenda()) {
             return;
         }
+
+        $this->finalizarPixPendingOperacao = null;
 
         if (PdvFinalizarOperacao::solicitaConfirmacaoImpressao($operacao)) {
             $this->finalizarOperacaoPendente = $operacao;
@@ -2229,6 +2336,19 @@ trait ManagesPdvVenda
 
         if ($imprimir && $vendaId) {
             $this->imprimirNfceCupomPosVenda((int) $vendaId, 1);
+        }
+
+        $this->dispatch('erp-pdv-focus-search');
+        $this->dispatch('erp-pdv-caixa-opened');
+    }
+
+    protected function afterBoletoPosDocumentoFluxo(): void
+    {
+        if ($this->pdvImprimirPosVendaId) {
+            $this->pdvConfirmImprimirPosVenda = true;
+            $this->dispatch('erp-pdv-imprimir-pos-venda-opened');
+
+            return;
         }
 
         $this->dispatch('erp-pdv-focus-search');
@@ -2309,6 +2429,18 @@ trait ManagesPdvVenda
                     'Valor restante: R$ ' . ErpMoney::formatBr($restante),
                 );
             }
+
+            return false;
+        }
+
+        if (! $this->ensurePixQrcodePdv()) {
+            $this->dispatch('erp-pdv-hide-fiscal-progress');
+
+            return false;
+        }
+
+        if ($msg = $this->validaPixQrcodeFinalizar()) {
+            $this->notifyPdvError($msg);
 
             return false;
         }
@@ -2459,6 +2591,7 @@ trait ManagesPdvVenda
         $dinheiroRow = collect($this->finalizarPagamentos)->firstWhere('forma', 'DINHEIRO');
         $dinheiro = ErpMoney::parseBr(is_array($dinheiroRow) ? ($dinheiroRow['valor'] ?? '0') : '0');
         $vendaId = null;
+        $contasReceberCriadas = [];
         $nfceSimulada = false;
         $nfceContingencia = false;
         $emitirNfceAposCommit = $fiscal && filled($nfceOperacao);
@@ -2478,7 +2611,7 @@ trait ManagesPdvVenda
         }
 
         try {
-            DB::transaction(function () use ($fiscal, $nfceOperacao, $formaPagamento, $total, $subtotal, $desconto, $acrescimo, $observacoes, $cpfNota, $troco, $dinheiro, &$vendaId): void {
+            DB::transaction(function () use ($fiscal, $nfceOperacao, $formaPagamento, $total, $subtotal, $desconto, $acrescimo, $observacoes, $cpfNota, $troco, $dinheiro, &$vendaId, &$contasReceberCriadas): void {
             $numero = PdvVenda::nextNumero($this->caixaSessaoId);
             $docSaida = 'PDV-' . str_pad((string) $numero, 6, '0', STR_PAD_LEFT);
             $stockService = new \App\Support\Erp\Pdv\PdvStockService();
@@ -2541,6 +2674,15 @@ trait ManagesPdvVenda
                             isset($item['product_grade_id']) ? (int) $item['product_grade_id'] : null,
                             isset($item['product_serial_id']) ? (int) $item['product_serial_id'] : null,
                             $docSaida,
+                            null,
+                            null,
+                            new \App\Support\Erp\EstoqueMovimentacaoContext(
+                                tipo: \App\Models\EstoqueMovimentacao::TIPO_VENDA,
+                                empresaId: \App\Support\Erp\ErpContext::currentEmpresaId(),
+                                origemTipo: 'pdv_venda',
+                                origemId: (int) $venda->id,
+                                origemNumero: (string) $numero,
+                            ),
                         );
                     }
                 }
@@ -2579,7 +2721,9 @@ trait ManagesPdvVenda
                 PdvVendaPagamento::query()->create($payload);
             }
 
-            (new \App\Support\Erp\Pdv\PdvVendaFinanceiroService())->gerarContasReceber(
+            $this->consumirCreditoClienteDaVenda($venda, $personId ? (int) $personId : null, (string) $numero);
+
+            $contasReceberCriadas = (new \App\Support\Erp\Pdv\PdvVendaFinanceiroService())->gerarContasReceber(
                 $venda,
                 $this->finalizarClienteId,
                 $this->finalizarPagamentos,
@@ -2717,6 +2861,16 @@ trait ManagesPdvVenda
 
         if ($askPrintAfter && $vendaId) {
             $this->pdvImprimirPosVendaId = (int) $vendaId;
+        }
+
+        if ($this->offerEmitirBoletosPosDocumento($contasReceberCriadas)) {
+            $this->dispatch('erp-pdv-focus-search');
+            $this->dispatch('erp-pdv-caixa-opened');
+
+            return;
+        }
+
+        if ($askPrintAfter && $vendaId) {
             $this->pdvConfirmImprimirPosVenda = true;
             $this->dispatch('erp-pdv-imprimir-pos-venda-opened');
 
@@ -2727,7 +2881,7 @@ trait ManagesPdvVenda
             $imprimir((int) $vendaId);
         }
 
-        // Sempre devolve o operador para o CÃ³digo, pronto para a prÃ³xima venda.
+        // Sempre devolve o operador para o Código, pronto para a próxima venda.
         $this->dispatch('erp-pdv-focus-search');
         $this->dispatch('erp-pdv-caixa-opened');
     }

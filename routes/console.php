@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('erp:backup --scheduled')
-    ->hourly()
+    ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/erp-backup-schedule.log'));
 
@@ -18,7 +18,7 @@ Schedule::command('gestor:push-alertas')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/gestor-push-schedule.log'));
 
-Schedule::command('rh:verificar-vencimentos')
-    ->dailyAt('07:30')
+Schedule::command('pix:consultar-pendentes')
+    ->everyMinute()
     ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/rh-vencimentos-schedule.log'));
+    ->appendOutputTo(storage_path('logs/pix-consultar-pendentes.log'));

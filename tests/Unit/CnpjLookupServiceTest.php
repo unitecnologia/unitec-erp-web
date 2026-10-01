@@ -3,14 +3,14 @@
 namespace Tests\Unit;
 
 use App\Support\Erp\CnpjLookupService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CnpjLookupServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     protected function setUp(): void
     {

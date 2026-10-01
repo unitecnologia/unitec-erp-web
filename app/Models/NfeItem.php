@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cfop',
     'cst',
     'csosn',
+    'origem',
     'cest',
     'unidade',
     'descricao',
@@ -31,6 +32,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'outros',
     'base_icms',
     'aliq_icms',
+    'p_red_bc_icms',
+    'mod_bc_icms',
     'valor_icms',
     'base_icms_st',
     'aliq_icms_st',
@@ -68,6 +71,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'alq_cbs',
     'alq_ibs_mun',
     'alq_ibs_uf',
+    'p_red_ibs',
+    'p_red_cbs',
 ])]
 class NfeItem extends Model
 {
@@ -96,6 +101,7 @@ class NfeItem extends Model
             'outros' => 'decimal:2',
             'base_icms' => 'decimal:2',
             'aliq_icms' => 'decimal:2',
+            'p_red_bc_icms' => 'decimal:4',
             'valor_icms' => 'decimal:2',
             'base_icms_st' => 'decimal:2',
             'aliq_icms_st' => 'decimal:2',
@@ -119,6 +125,9 @@ class NfeItem extends Model
             'alq_cbs' => 'decimal:4',
             'alq_ibs_mun' => 'decimal:4',
             'alq_ibs_uf' => 'decimal:4',
+            'origem' => 'integer',
+            'p_red_ibs' => 'decimal:4',
+            'p_red_cbs' => 'decimal:4',
         ];
     }
 }

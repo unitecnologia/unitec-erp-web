@@ -258,13 +258,16 @@
 
 .erp-produtos-page .erp-produtos__status-wrap {
     flex-shrink: 0;
-    margin: 0 0.65rem 0;
+    margin: 0 0.65rem -1px;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-produtos-page .erp-produtos__status {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
 .erp-produtos-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
@@ -280,19 +283,24 @@
     }
 }
 
+/* ── Abas estilo fichário (padrão Orçamentos) ── */
+
 .erp-produtos-page .erp-produtos__tabs-wrap {
     flex-shrink: 0;
-    margin: 0;
+    margin: 0 0 -1px;
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-produtos-page .erp-produtos__tabs {
     margin: 0;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
 .erp-produtos-page .erp-produtos__tab {
@@ -303,8 +311,34 @@
     line-height: 1.1;
     min-height: 0;
     font-family: inherit;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: #64748b;
+    background: #e8edf3;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
     cursor: pointer;
     appearance: none;
+    transition: none;
+}
+
+.erp-produtos-page .erp-produtos__tab:hover:not(.erp-produtos__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
+}
+
+.erp-produtos-page .erp-produtos__tab--active {
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 .erp-produtos-page .fi-sc > div:not(.fi-hidden) {
@@ -712,8 +746,15 @@
 
 .erp-produtos-cardex-page .erp-produtos-cardex-window {
     width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
     max-height: none;
     height: 100%;
+}
+
+.fi-page.erp-produtos-form-page.erp-produtos-cardex-page:not(.erp-pdv-embed):not(.erp-orcamento-embed) {
+    width: 100% !important;
+    max-width: min(1600px, calc(100vw - 0.35rem)) !important;
 }
 
 .erp-produtos-cardex-page .erp-produtos-cardex__body {
@@ -774,8 +815,44 @@
     padding: 0.75rem 1rem 0.5rem;
 }
 
+.erp-cardex-modal__periodo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    margin: 0 0 0.55rem;
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f3460;
+}
+
+.erp-produtos-form-page .erp-cardex-modal__periodo .erp-pcad-form__input,
+.erp-produtos-form-page .erp-cardex-modal__resumo-field .erp-pcad-form__input {
+    border-radius: 8px !important;
+}
+
+.erp-cardex-modal__periodo .erp-pcad-form__input {
+    width: 7.5rem;
+    height: 1.75rem;
+    padding: 0 1.8rem 0 0.5rem;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.erp-cardex-modal__grade-total {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.18rem 0.45rem;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: right;
+    color: var(--erp-text, #0f172a);
+    background: var(--erp-bg-muted, #f8fafc);
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
 .erp-cardex-modal__product {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.55rem;
     padding: 0.45rem 0.65rem;
     font-size: var(--erp-font-size-sm);
     font-weight: 700;
@@ -883,10 +960,78 @@
     font-size: var(--erp-font-size-xs);
 }
 
-.erp-cardex-modal__totals-highlight {
-    margin-left: auto;
+.erp-cardex-modal__totals-note {
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--erp-text-muted, #64748b);
+    white-space: nowrap;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__fieldset {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 0 0.35rem;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas button {
+    appearance: none;
+    margin: 0;
+    border: 1px solid var(--erp-border-light);
+    border-radius: var(--erp-radius-sm);
+    background: transparent;
+    color: var(--erp-text-muted);
+    font: inherit;
+    font-size: 11px;
     font-weight: 700;
+    line-height: 1.2;
+    padding: 0.12rem 0.4rem;
+    cursor: pointer;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas button.is-active {
+    border-color: var(--erp-brand-primary);
+    background: #fff;
     color: var(--erp-brand-primary);
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas-grade {
+    display: flex;
+    flex-direction: column;
+    height: calc(120px + 6cm);
+    max-height: calc(120px + 6cm);
+    overflow: hidden;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.erp-produtos-cardex-page .erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__abas-grade {
+    height: calc(8.5rem + 6cm);
+    max-height: calc(8.5rem + 6cm);
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__grid {
+    width: 100%;
+}
+
+.erp-cardex-modal__panel--saidas-abas .erp-cardex-modal__grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .erp-cardex-modal__actions {
@@ -905,10 +1050,5 @@
 
     .erp-cardex-modal__grid-wrap--tall {
         max-height: 220px;
-    }
-
-    .erp-cardex-modal__totals-highlight {
-        margin-left: 0;
-        width: 100%;
     }
 }

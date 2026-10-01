@@ -60,6 +60,7 @@ final class ContaPagarBaixaService
     {
         return PlanoConta::query()
             ->where('ativo', true)
+            ->where('dc', 'D')
             ->orderBy('codigo')
             ->get(['id', 'codigo', 'descricao'])
             ->map(fn (PlanoConta $plano): array => [
@@ -139,7 +140,7 @@ final class ContaPagarBaixaService
         }
 
         $planoContaId = filled($opcoes['plano_conta_id'] ?? null) ? (int) $opcoes['plano_conta_id'] : null;
-        if ($planoContaId && ! PlanoConta::query()->whereKey($planoContaId)->where('ativo', true)->exists()) {
+        if ($planoContaId && ! PlanoConta::query()->whereKey($planoContaId)->where('ativo', true)->where('dc', 'D')->exists()) {
             throw new InvalidArgumentException('Plano de contas inválido.');
         }
 
@@ -241,6 +242,8 @@ final class ContaPagarBaixaService
                 $conta->valor_pago = round((float) $conta->valor_pago + $valorPago, 2);
                 $conta->pago_em = $pagoEm;
                 $conta->save();
+
+                app(ComissaoPeriodoService::class)->syncStatusPagaFromContaPagar($conta->fresh() ?? $conta);
 
                 $this->lancarSaidaCaixa(
                     valor: $valorPago,

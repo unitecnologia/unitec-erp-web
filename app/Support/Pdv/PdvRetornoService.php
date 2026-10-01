@@ -190,6 +190,15 @@ class PdvRetornoService
                             'PDV-OFF-'.str_pad((string) $pdvVenda->numero, 6, '0', STR_PAD_LEFT),
                             null,
                             $empresa,
+                            new \App\Support\Erp\EstoqueMovimentacaoContext(
+                                tipo: \App\Models\EstoqueMovimentacao::TIPO_VENDA,
+                                empresaId: $empresa?->id !== null
+                                    ? (int) $empresa->id
+                                    : \App\Support\Erp\ErpContext::currentEmpresaId(),
+                                origemTipo: 'pdv_venda',
+                                origemId: (int) $pdvVenda->id,
+                                origemNumero: $pdvVenda->numero !== null ? (string) $pdvVenda->numero : null,
+                            ),
                         );
                     }
                 }

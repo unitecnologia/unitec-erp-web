@@ -158,7 +158,7 @@ class ProductListQueryBuilder
         }
 
         if ($orderBy === 'codigo') {
-            return $query->orderBy('codigo');
+            return self::orderByCodigoNumerico($query);
         }
 
         if ($orderBy === 'validade') {
@@ -171,6 +171,17 @@ class ProductListQueryBuilder
         }
 
         return $query->orderBy($orderBy);
+    }
+
+    public static function orderByCodigoNumerico(Builder $query, string $direction = 'asc'): Builder
+    {
+        $dir = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+        $bare = $query->getModel()->getTable();
+        $qualified = $query->getConnection()->getTablePrefix().$bare;
+
+        return $query
+            ->orderByRaw("CAST({$qualified}.codigo AS UNSIGNED) {$dir}")
+            ->orderBy("{$bare}.codigo", $dir);
     }
 
     protected function applyEstoqueFilter(Builder $query, ProductEstoqueSaldoService $estoqueService, int $empresaId): void

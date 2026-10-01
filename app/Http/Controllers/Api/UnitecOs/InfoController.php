@@ -43,9 +43,7 @@ class InfoController
         $empresaId = $request->integer('empresa_id');
 
         $users = User::query()
-            ->where('ativo', true)
-            ->whereNotNull('senha_app_forca_vendas')
-            ->where('senha_app_forca_vendas', '!=', '')
+            ->comAcessoApp(User::APP_UNITEC_OS)
             ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
             ->orderBy('name')
             ->get(['id', 'name', 'empresa_id', 'vendedor_id'])

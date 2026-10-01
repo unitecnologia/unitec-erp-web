@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Erp;
 
+use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\PersonListRowFormatter;
 use App\Support\Erp\Queries\PersonListQueryBuilder;
@@ -29,6 +30,82 @@ class PersonListTable extends Component
     public ?string $sortColumn = null;
 
     public string $sortDirection = 'asc';
+
+    public function setTipoFilter(string $tipo): void
+    {
+        if (! in_array($tipo, ['clientes', 'funcionarios', 'fornecedores', 'administradoras', 'parceiros', 'todos'], true)) {
+            return;
+        }
+
+        $this->tipoFilter = $tipo;
+        $this->localSearch = '';
+        $this->sortColumn = null;
+        $this->sortDirection = 'asc';
+        $this->resetPage();
+
+        ErpScreen::set(match ($tipo) {
+            'ccf_spc' => 'Lista SPC/CCF',
+            'todos' => 'Contatos',
+            default => 'Pessoas',
+        });
+
+        $this->js(sprintf(
+            '(() => {
+                const tipo = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("tipoFilter", tipo, false);
+                    parent.set("localSearch", "", false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (tipo === "clientes") {
+                        url.searchParams.delete("tipo");
+                    } else {
+                        url.searchParams.set("tipo", tipo);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+            })()',
+            json_encode($tipo, JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.person-resource.pages.list-people', JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    public function setStatusFilter(string $filter): void
+    {
+        if (! in_array($filter, ['ativos', 'inativos', 'todos'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->resetPage();
+
+        $this->js(sprintf(
+            '(() => {
+                const status = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("statusFilter", status, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (status === "ativos") {
+                        url.searchParams.delete("status");
+                    } else {
+                        url.searchParams.set("status", status);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.person-resource.pages.list-people', JSON_UNESCAPED_UNICODE),
+        ));
+    }
 
     #[On('erp-person-list-refresh')]
     public function refreshFromParent(

@@ -564,6 +564,8 @@ body,
 .erp-shortcut--green { border-top: 3px solid #16a34a; }
 .erp-shortcut--gray { border-top: 3px solid #6b7280; }
 .erp-shortcut--slate { border-top: 3px solid #475569; }
+.erp-shortcut--purple { border-top: 3px solid #9333ea; }
+.erp-shortcut--amber { border-top: 3px solid #d97706; }
 
 .erp-shortcut--blue .erp-shortcut__svg { color: #2563eb; }
 .erp-shortcut--orange .erp-shortcut__svg { color: #ea580c; }
@@ -573,6 +575,8 @@ body,
 .erp-shortcut--green .erp-shortcut__svg { color: #16a34a; }
 .erp-shortcut--gray .erp-shortcut__svg { color: #6b7280; }
 .erp-shortcut--slate .erp-shortcut__svg { color: #475569; }
+.erp-shortcut--purple .erp-shortcut__svg { color: #9333ea; }
+.erp-shortcut--amber .erp-shortcut__svg { color: #d97706; }
 
 .erp-shortcut__label {
     flex: 0 0 auto;
@@ -705,15 +709,9 @@ body,
     --livewire-progress-bar-color: var(--erp-brand-accent-soft, #16a34a);
 }
 
-#nprogress .bar {
-    height: 4px !important;
-    background: var(--erp-brand-accent-soft, #16a34a) !important;
-}
-
-#nprogress .peg {
-    box-shadow:
-        0 0 10px var(--erp-brand-accent-soft, #16a34a),
-        0 0 5px var(--erp-brand-accent-soft, #16a34a) !important;
+/* Só esconde o indicador visual; wire:navigate / Livewire / Filament SPA seguem ativos. */
+#nprogress {
+    display: none !important;
 }
 
 /* ── Modal Atualizar Sistema ───────────────────────────────────── */

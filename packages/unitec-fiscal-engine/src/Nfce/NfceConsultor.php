@@ -98,7 +98,7 @@ final class NfceConsultor
             'motivo' => $motivo,
             'protocolo' => $protocolo,
             'xml' => $xml,
-            'autorizada' => $cStat === '100',
+            'autorizada' => in_array($cStat, ['100', '150'], true),
             'cancelada' => in_array($cStat, ['101', '151', '155'], true),
             'denegada' => in_array($cStat, ['110', '301', '302', '303'], true),
         ];

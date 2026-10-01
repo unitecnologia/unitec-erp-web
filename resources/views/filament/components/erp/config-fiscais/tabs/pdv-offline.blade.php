@@ -3,11 +3,9 @@
         <legend class="erp-pcad__group-title">NFC-e por caixa</legend>
 
         <p class="erp-pcad-form__hint">
-            Cada caixa (PDV offline e o da <strong>retaguarda</strong>) emite NFC-e com série exclusiva,
-            para não colidir a numeração. CSC, ambiente e QR-code vêm da aba NFC-e.
-            A série e o próximo número daqui vão na carga do PDV offline (o caixa que já emitiu
-            continua a sequência local).
-            <strong>F2 | Gravar</strong> salva o CSC e as séries dos caixas juntos.
+            A série por caixa é opcional. Pode ficar em branco — a NFC-e usa a série na hora da emissão.
+            Se preencher, cada caixa precisa de série exclusiva. CSC, ambiente e QR-code vêm da aba NFC-e.
+            <strong>F2 | Gravar</strong> salva o restante das configurações mesmo com a série vazia.
         </p>
 
         @if (empty($this->terminais))

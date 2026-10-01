@@ -62,6 +62,17 @@ return new class extends Migration
     private function indexExists(string $table, string $index): bool
     {
         $connection = Schema::getConnection();
+
+        if ($connection->getDriverName() !== 'mysql') {
+            foreach (Schema::getIndexes($table) as $row) {
+                if (($row['name'] ?? '') === $index) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $database = $connection->getDatabaseName();
         $prefix = $connection->getTablePrefix();
         $tableName = $prefix.$table;

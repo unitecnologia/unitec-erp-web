@@ -1959,6 +1959,7 @@ trait ManagesImportarXmlModal
             $und = ($undXml !== '' && array_key_exists($undXml, $unidadesCadastradas)) ? $undXml : '';
 
             return [
+                'n_item' => (int) ($item['item'] ?? 0),
                 'codigo' => (string) ($item['codigo'] ?? '—'),
                 'ean' => (string) ($item['ean'] ?? ''),
                 'descricao' => (string) ($item['descricao'] ?? '—'),
@@ -1993,6 +1994,10 @@ trait ManagesImportarXmlModal
         }, $parsed['itens']));
 
         $this->importarXmlItens = (new NotaFornecedorXmlProdutoMatcher())->matchItens($itensBase, $cnpjFornecedor);
+
+        if ($nota->id) {
+            (new \App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService())->sync($nota);
+        }
 
         foreach ($this->importarXmlItens as $matchedIndex => $matchedItem) {
             $productId = (int) ($matchedItem['product_id'] ?? 0);

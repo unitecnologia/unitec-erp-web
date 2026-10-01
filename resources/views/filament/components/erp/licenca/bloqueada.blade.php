@@ -124,8 +124,8 @@
                             class="erp-licenca-bloqueada__qr"
                             src="{{ $this->pixQrDataUrl }}"
                             alt="QR Code Pix"
-                            width="128"
-                            height="128"
+                            width="176"
+                            height="176"
                         >
                     @endif
                     <p class="erp-licenca-bloqueada__pix-hint">Escaneie o QR ou copie o código Pix.</p>
@@ -169,15 +169,6 @@
                 <span wire:loading.remove wire:target="verificarNovamente">Verificar liberação</span>
                 <span wire:loading wire:target="verificarNovamente">Verificando…</span>
             </button>
-
-            @if (filled($this->pagamentoUrl))
-                <a
-                    href="{{ $this->pagamentoUrl }}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="erp-licenca-bloqueada__btn erp-licenca-bloqueada__btn--ghost"
-                >Abrir portal</a>
-            @endif
 
             <button
                 type="button"

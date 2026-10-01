@@ -1,15 +1,14 @@
 @php
     $searchFields = [
-        'numero' => 'NÚMERO',
         'emissao' => 'EMISSÃO',
         'historico' => 'HISTÓRICO',
-        'documento' => 'DOC.',
+        'documento' => 'PEDIDO',
         'cliente' => 'CLIENTE',
         'vencimento' => 'VENCIMENTO',
         'valor' => 'VALOR',
         'desconto' => 'DESCONTO',
         'juros' => 'JUROS',
-        'valor_recebido' => 'VL. RECEBIDO',
+        'valor_recebido' => 'V.RECEBIDO',
         'recebido_em' => 'RECEBIDO EM',
         'saldo' => 'SALDO',
     ];
@@ -20,30 +19,51 @@
     ];
 
     $pageSizeOptions = [25, 50, 100];
+    $activeFields = $this->searchFieldsActive !== [] ? $this->searchFieldsActive : [$this->searchColumn ?: 'cliente'];
+    $searchButtonLabel = collect($activeFields)
+        ->map(fn (string $column): string => $searchFields[$column] ?? mb_strtoupper($column, 'UTF-8'))
+        ->implode(' + ');
+    $clienteLookup = $activeFields === ['cliente'];
 @endphp
 
 <div class="erp-receber" wire:ignore.self>
+    @if ($this->viewTab !== 'desdobramentos')
     <div class="erp-receber__filter-block">
         <span class="erp-receber__filter-title">Filtro</span>
 
         <div class="erp-receber__locate-group">
             <span class="erp-receber__locate-label">Localizar</span>
-            <select wire:model.live="searchColumn" class="erp-receber__select erp-receber__search-field">
-                @foreach ($searchFields as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            <span class="erp-receber__locate-search-field">
+            @include('filament.components.erp.shared.search-field-dropdown', [
+                'fields' => $searchFields,
+                'searchColumn' => $this->searchColumn,
+                'markedFields' => $activeFields,
+                'buttonLabel' => $searchButtonLabel,
+                'wireMethod' => 'toggleSearchField',
+                'closeOnSelect' => false,
+            ])
+            <span
+                class="erp-receber__locate-search-field"
+                @if ($clienteLookup)
+                    x-data="{
+                        hideClienteLookup() {
+                            this.$root.querySelectorAll('.erp-cliente-filter-lookup').forEach((el) => {
+                                el.style.display = 'none';
+                            });
+                        }
+                    }"
+                @endif
+            >
                 <input
                     type="text"
-                    wire:model.live.debounce.250ms="localSearch"
-                    wire:key="receber-local-search-{{ $this->searchColumn }}"
-                    @if ($this->searchColumn === 'cliente')
+                    wire:model.live.debounce.150ms="localSearch"
+                    wire:key="receber-local-search-{{ $clienteLookup ? 'cliente' : 'texto' }}"
+                    @if ($clienteLookup)
                         wire:focus="openLocalClienteLookup"
                         wire:keydown.arrow-up.prevent="moveLocalClienteSelection(-1)"
                         wire:keydown.arrow-down.prevent="moveLocalClienteSelection(1)"
-                        wire:keydown.enter.prevent="handleLocalClienteEnter"
-                        wire:keydown.escape.prevent="closeLocalClienteLookup"
+                        x-on:keydown.enter.prevent="hideClienteLookup(); $wire.handleLocalClienteEnter()"
+                        x-on:keydown.escape.prevent="hideClienteLookup(); $wire.closeLocalClienteLookup()"
+                        x-on:input="if (String($event.target.value || '').trim() === '') { hideClienteLookup(); $wire.closeLocalClienteLookup() }"
                         data-erp-uppercase
                         placeholder="DIGITE O NOME DO CLIENTE"
                     @else
@@ -52,7 +72,7 @@
                     class="erp-receber__input erp-receber__search-text"
                     autocomplete="off"
                 >
-                @if ($this->searchColumn === 'cliente' && $this->localClienteLookupOpen && filled($this->localSearch))
+                @if ($clienteLookup && $this->localClienteLookupOpen && filled($this->localSearch))
                     @if ($this->localClienteResults !== [])
                         @include('filament.components.erp.shared.local-cliente-lookup-panel')
                     @else
@@ -101,12 +121,14 @@
         </div>
     </div>
 
+    @endif
+
     <div class="erp-receber__view-tabs">
         @foreach ($viewTabs as $value => $label)
             <button
                 type="button"
+                class="erp-receber__view-tab {{ ($this->viewTab ?: 'dados') === $value ? 'erp-receber__view-tab--active' : '' }}"
                 wire:click="setViewTab('{{ $value }}')"
-                @class(['erp-receber__view-tab', 'erp-receber__view-tab--active' => $this->viewTab === $value])
             >{{ $label }}</button>
         @endforeach
     </div>

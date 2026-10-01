@@ -53,6 +53,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'agencia',
     'gerente',
     'fone_gerente',
+    'representante',
     'is_atendente',
     'is_tecnico',
     'foto_path',
@@ -80,6 +81,13 @@ class Person extends Model
 
     protected static function booted(): void
     {
+        static::saving(static function (Person $person): void {
+            // Vazio → NULL (UNIQUE em cpf_cnpj_digits permite vários sem documento).
+            if ($person->cpf_cnpj !== null && trim((string) $person->cpf_cnpj) === '') {
+                $person->cpf_cnpj = null;
+            }
+        });
+
         static::saved(static function (): void {
             ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PEOPLE);
         });
@@ -250,6 +258,11 @@ class Person extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(PersonContact::class)->orderByDesc('contato_em');
+    }
+
+    public function creditoMovimentacoes(): HasMany
+    {
+        return $this->hasMany(ClienteCreditoMovimentacao::class, 'cliente_id')->orderByDesc('id');
     }
 
     public function formaPagamento(): BelongsTo

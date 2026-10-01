@@ -20,13 +20,24 @@ class ErpDashboardLicense
 
         if ($snapshot === null) {
             $snapshot = $service->ensureLoginGateWithoutRemote();
+        } else {
+            $service->hydrateMensalidadeFromCache($service->currentCnpj());
+        }
+
+        // Se ainda não há data (ex.: após restore), agenda sync pós-resposta.
+        if ($service->loginGateMensalidadeDueDate() === null && $service->lastKnownValidoAte() === null) {
+            $service->scheduleMensalidadeSync();
         }
 
         $status = $snapshot->status;
 
-        // Preferência: vencimento da mensalidade (pagamento). Fallback: valido_ate do contrato.
-        $expiresAt = static::mensalidadeDueAt($service) ?? $snapshot->expiresAt() ?? static::localExpiresAt();
+        // Preferência: vencimento da mensalidade (pagamento). Fallback: valido_ate do contrato/cache.
+        $expiresAt = static::mensalidadeDueAt($service)
+            ?? $snapshot->expiresAt()
+            ?? static::parseDate($service->lastKnownValidoAte())
+            ?? static::localExpiresAt();
         $usingMensalidade = static::mensalidadeDueAt($service) !== null;
+        $mensalidadePendente = $service->loginGateMensalidadeIsPending();
         $daysRemaining = static::daysRemaining($expiresAt);
 
         $tone = match (true) {
@@ -34,6 +45,7 @@ class ErpDashboardLicense
             $status === LicencaSnapshot::STATUS_NAO_ENCONTRADO,
             $status === LicencaSnapshot::STATUS_SEM_CNPJ => 'red',
             $status === LicencaSnapshot::STATUS_INDISPONIVEL && $daysRemaining === null => 'slate',
+            $daysRemaining === null && $status === LicencaSnapshot::STATUS_ATIVO => 'amber',
             $daysRemaining === null => 'slate',
             $daysRemaining < 0 => 'red',
             $daysRemaining <= 7 => 'red',
@@ -45,6 +57,7 @@ class ErpDashboardLicense
             $status === LicencaSnapshot::STATUS_BLOQUEADO => 'Bloqueada',
             $status === LicencaSnapshot::STATUS_NAO_ENCONTRADO => 'Não encontrada',
             $status === LicencaSnapshot::STATUS_SEM_CNPJ => 'Sem CNPJ',
+            $daysRemaining === null && $status === LicencaSnapshot::STATUS_ATIVO => 'Ativa',
             $daysRemaining === null => '—',
             $daysRemaining < 0 => 'Vencida',
             $daysRemaining === 0 => 'Vence hoje',
@@ -70,11 +83,14 @@ class ErpDashboardLicense
         }
 
         $hint = match (true) {
-            $status === LicencaSnapshot::STATUS_BLOQUEADO => 'Regularize no portal',
+            $status === LicencaSnapshot::STATUS_BLOQUEADO => 'Regularize o pagamento',
             $status === LicencaSnapshot::STATUS_NAO_ENCONTRADO => 'CNPJ não cadastrado',
             $status === LicencaSnapshot::STATUS_SEM_CNPJ => 'Cadastre o CNPJ',
             $usingMensalidade && $daysRemaining !== null && $daysRemaining < 0 => 'Mensalidade vencida',
+            $usingMensalidade && $mensalidadePendente === true => 'Mensalidade',
+            $usingMensalidade && $mensalidadePendente === false => 'Pago até',
             $usingMensalidade => 'Mensalidade',
+            $status === LicencaSnapshot::STATUS_ATIVO && $daysRemaining === null => 'Em dia',
             $status === LicencaSnapshot::STATUS_INDISPONIVEL => 'Portal offline',
             $daysRemaining === null => 'Sem data',
             $daysRemaining < 0 => 'Regularize',
@@ -88,7 +104,7 @@ class ErpDashboardLicense
             'hint' => $hint,
             'tone' => $tone,
             'icon' => 'heroicon-o-shield-exclamation',
-            'action_url' => $service->pagamentoUrl(),
+            'action_wire' => 'abrirRenovacaoPix',
             'action_label' => 'Renovar',
         ];
     }
@@ -108,23 +124,28 @@ class ErpDashboardLicense
         }
     }
 
-    private static function localExpiresAt(): ?Carbon
+    private static function parseDate(?string $raw): ?Carbon
     {
-        $raw = trim((string) config('unitec.licenca', ''));
+        $raw = trim((string) $raw);
 
         if ($raw === '') {
             return null;
         }
 
         try {
-            return Carbon::createFromFormat('d/m/Y', $raw)->startOfDay();
+            return Carbon::parse($raw)->startOfDay();
         } catch (Throwable) {
             try {
-                return Carbon::parse($raw)->startOfDay();
+                return Carbon::createFromFormat('d/m/Y', $raw)->startOfDay();
             } catch (Throwable) {
                 return null;
             }
         }
+    }
+
+    private static function localExpiresAt(): ?Carbon
+    {
+        return static::parseDate((string) config('unitec.licenca', ''));
     }
 
     private static function daysRemaining(?Carbon $expiresAt): ?int

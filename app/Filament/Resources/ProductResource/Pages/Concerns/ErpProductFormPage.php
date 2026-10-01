@@ -12,8 +12,14 @@ use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpUppercase;
+use App\Support\Erp\Printing\Documents\GondolaEtiquetaPrintDocument;
+use App\Support\Erp\Printing\EtiquetasPrintPrefs;
+use App\Support\Erp\Printing\PrintFacade;
+use App\Support\Erp\Printing\PrintTarget;
+use App\Support\Erp\ProductEmpresaPrecoService;
 use App\Support\Erp\ProductFormValidator;
 use App\Support\Erp\ProductLocalizacao;
+use App\Support\Erp\Terminais\TerminalFormOptions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
@@ -32,6 +38,7 @@ trait ErpProductFormPage
     use ManagesProductBarcodeLookup;
     use ManagesProductCardex;
     use ManagesProductPhoto;
+    use ManagesProductImageSearch;
     use NormalizesErpUppercaseFormData;
     use ManagesProductCadastroLookup;
     use ManagesProductDuplicateCheck;
@@ -47,6 +54,7 @@ trait ErpProductFormPage
     use ManagesProductImpostoPadrao;
     use ManagesProductLocalizacao;
     use ManagesProductReservas;
+    use ManagesProductMovimentacoes;
     use ManagesProductLotes;
     use ManagesProductExitConfirm;
 
@@ -110,21 +118,8 @@ trait ErpProductFormPage
 
     public function content(Schema $schema): Schema
     {
-        if ($this->embedsInPdv) {
-            return $schema
-                ->gap(false)
-                ->components([
-                    View::make('filament.components.erp.produtos.form.shell'),
-                    Form::make([EmbeddedSchema::make('form')])
-                        ->id('form')
-                        ->livewireSubmitHandler($this->getSubmitFormLivewireMethodName())
-                        ->extraAttributes(['class' => 'erp-pcad__filament-hidden']),
-                    View::make('filament.components.erp.produtos.form.action-bar'),
-                ]);
-        }
-
-        // Standalone: rodapé vai dentro da janela (window.blade) para altura fullscreen.
-        // Embed (orçamento/nota): mantém action-bar externo como antes.
+        // Standalone e PDV: rodapé dentro da janela (altura controlada).
+        // Orçamento/nota: action-bar externo como antes.
         $components = [
             View::make('filament.components.erp.produtos.form.window'),
         ];
@@ -190,15 +185,42 @@ trait ErpProductFormPage
                 ->body('Já existe um produto com estes dados.')
                 ->danger()
                 ->send();
+        } catch (\Illuminate\Database\QueryException $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Não foi possível gravar o produto.')
+                ->body($this->mensagemErroGravacaoProduto($exception))
+                ->danger()
+                ->send();
         } catch (\Throwable $exception) {
             report($exception);
 
             Notification::make()
                 ->title('Não foi possível gravar o produto.')
-                ->body($exception->getMessage())
+                ->body('Não foi possível concluir a gravação. Tente novamente.')
                 ->danger()
                 ->send();
         }
+    }
+
+    protected function mensagemErroGravacaoProduto(\Illuminate\Database\QueryException $exception): string
+    {
+        $sql = $exception->getMessage();
+
+        if (str_contains($sql, 'unitec_product_imeis_fornecedor_id_foreign')) {
+            return 'O fornecedor informado no IMEI não está cadastrado. Deixe o campo em branco ou use o ID de um fornecedor existente.';
+        }
+
+        if (str_contains($sql, 'Data too long for column') && str_contains($sql, 'ncm_descricao')) {
+            return 'A descrição do NCM é muito longa. Atualize o sistema ou limpe o campo Descrição NCM e grave novamente.';
+        }
+
+        if (str_contains($sql, 'Integrity constraint violation')) {
+            return 'Há um vínculo inválido no cadastro. Confira fornecedor, grupo e demais códigos informados.';
+        }
+
+        return 'Não foi possível concluir a gravação. Tente novamente.';
     }
 
     protected function handleProductUniqueConstraintViolation(UniqueConstraintViolationException $exception): bool
@@ -596,6 +618,12 @@ trait ErpProductFormPage
 
     protected function leaveProductForm(): void
     {
+        if ($this->embedsInPdv) {
+            $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('index')));
+
+            return;
+        }
+
         if ($this->embedsInParentOverlay()) {
             $this->closeEmbedOverlay();
 
@@ -615,13 +643,13 @@ trait ErpProductFormPage
 
     protected function getProductListRedirectUrl(): string
     {
-        return ProductResource::getUrl('index');
+        return $this->urlWithPdvEmbed(ProductResource::getUrl('index'));
     }
 
     protected function getRedirectUrl(): string
     {
         if ($this->embedsInPdv) {
-            return ProductResource::getUrl('create') . '?pdv=1';
+            return $this->urlWithPdvEmbed(ProductResource::getUrl('index'));
         }
 
         if ($this->embedsInOrcamento) {
@@ -653,6 +681,109 @@ trait ErpProductFormPage
     public function isEditingProduct(): bool
     {
         return $this instanceof EditRecord && $this->record?->exists;
+    }
+
+    public function imprimirEtiqueta(): void
+    {
+        if (! $this->isEditingProduct()) {
+            Notification::make()
+                ->title('Grave o produto antes de imprimir a etiqueta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        /** @var Product $product */
+        $product = $this->record;
+
+        $prefs = EtiquetasPrintPrefs::load();
+        $modelo = trim((string) ($prefs['modelo'] ?? ''));
+        $impressora = trim((string) ($prefs['impressora'] ?? ''));
+
+        if ($prefs === null || $modelo === '' || $impressora === '') {
+            Notification::make()
+                ->title('Configure o modelo e a impressora na tela de Impressão de Etiquetas.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($modelo !== 'gondola') {
+            Notification::make()
+                ->title('Configure o modelo e a impressora na tela de Impressão de Etiquetas.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $empresaId = $this->currentProductEmpresaId();
+        $preco = app(ProductEmpresaPrecoService::class)
+            ->resolvePrecoVenda($product, $empresaId > 0 ? $empresaId : null);
+
+        $itens = [[
+            'codigo' => (string) ($product->codigo ?? ''),
+            'codigo_barras' => (string) ($product->codigo_barras ?? ''),
+            'descricao' => (string) ($product->descricao ?? ''),
+            'preco' => $preco,
+            'quantidade' => 1,
+        ]];
+
+        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($impressora);
+        $nomeImpressora = $fromRaw ?? $impressora;
+        $base = PrintFacade::targetFromTerminal(1);
+        $target = new PrintTarget(
+            printerName: $nomeImpressora !== '' ? $nomeImpressora : null,
+            copies: 1,
+            tipoImpressora: $base->tipoImpressora,
+            useDeviceService: true,
+        );
+
+        if (! $target->useDeviceService || ! $target->hasPrinter()) {
+            Notification::make()
+                ->title('Configure o modelo e a impressora na tela de Impressão de Etiquetas.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $document = new GondolaEtiquetaPrintDocument($itens);
+        $payload = $document->buildEscPosPayload($target);
+        $printer = $payload['printer'] ?? null;
+        $raw = $payload['raw_base64'] ?? '';
+
+        if (! filled($printer) || $raw === '') {
+            Notification::make()
+                ->title('Falha ao montar ESC/POS da etiqueta.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->js(
+            '(async function () {'
+            .'  const printer = '.json_encode($printer).';'
+            .'  const data = '.json_encode($raw).';'
+            .'  try {'
+            .'    if (!window.ErpDeviceService) throw new Error("Device Service indisponível.");'
+            .'    const online = await window.ErpDeviceService.status();'
+            .'    if (!online) throw new Error("Device Service offline.");'
+            .'    await window.ErpDeviceService.printRaw(printer, data, 1);'
+            .'    if (window.FilamentNotification) {'
+            .'      new FilamentNotification().title("Impressão").body("Etiqueta enviada à impressora.").success().send();'
+            .'    }'
+            .'  } catch (e) {'
+            .'    const msg = (e && e.message) ? e.message : String(e);'
+            .'    if (window.FilamentNotification) {'
+            .'      new FilamentNotification().title("Impressão").body(msg).danger().send();'
+            .'    }'
+            .'  }'
+            .'})();'
+        );
     }
 
     protected function formatProductValidationMessage(\Illuminate\Validation\ValidationException $exception): string
@@ -826,6 +957,10 @@ trait ErpProductFormPage
             'preco_variavel' => false,
             'is_composicao' => false,
             'is_servico' => false,
+            'c_trib_nac' => null,
+            'c_nbs' => null,
+            'c_trib_mun' => null,
+            'c_ind_op' => null,
             'is_grade' => false,
             'usa_tab_preco' => false,
             'is_combustivel' => false,

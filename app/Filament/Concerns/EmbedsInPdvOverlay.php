@@ -35,6 +35,15 @@ trait EmbedsInPdvOverlay
         return $this->embedsInPdv || $this->embedsInOrcamento || $this->embedsInNotaFornecedor;
     }
 
+    protected function urlWithPdvEmbed(string $url): string
+    {
+        if (! $this->embedsInPdv) {
+            return $url;
+        }
+
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'pdv=1';
+    }
+
     /**
      * @param  array<string, mixed>|null  $payload
      */

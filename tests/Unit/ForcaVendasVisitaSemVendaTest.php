@@ -7,12 +7,12 @@ use App\Models\Person;
 use App\Models\User;
 use App\Models\Vendedor;
 use App\Support\ForcaVendas\ForcaVendasSyncService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Tests\TestCase;
 
 class ForcaVendasVisitaSemVendaTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     public function test_rejeita_motivo_curto(): void
     {

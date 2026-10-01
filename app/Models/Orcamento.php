@@ -256,7 +256,8 @@ class Orcamento extends Model
 
     /**
      * Orçamentos visíveis na tela Orçamentos do ERP.
-     * Pedidos do app (tipo "pedido") ficam apenas no Monitor de Vendas.
+     * Pedidos/DAV ficam em `pedidos` + Monitor; este scope ainda exclui legado
+     * se algum forca_vendas_orders.tipo=pedido ainda apontar para orcamento_id.
      */
     public function scopeVisivelNaListaOrcamentos(Builder $query): Builder
     {

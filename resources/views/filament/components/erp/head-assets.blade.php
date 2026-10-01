@@ -17,9 +17,14 @@
 @endif
 @if (ErpPageAssets::resourceSegment() === 'contas-receber')
     <script src="{{ asset('js/erp-receber-form-enter.js') }}?v={{ $version }}"></script>
+    <script src="{{ asset('js/erp-receber-boleto-venc-progress.js') }}?v={{ $version }}-v2"></script>
+    <script src="{{ asset('js/erp-boleto-print.js') }}?v={{ $version }}-v2"></script>
 @endif
 @if (ErpPageAssets::resourceSegment() === 'nfe')
     <script src="{{ asset('js/erp-nfe-lancamento.js') }}?v={{ $version }}" defer></script>
+@endif
+@if (ErpPageAssets::resourceSegment() === 'nfse')
+    <script src="{{ asset('js/erp-nfse-lancamento.js') }}?v={{ $version }}" defer></script>
 @endif
 
 @if (ErpPageAssets::resourceSegment() === 'notas-fornecedores')

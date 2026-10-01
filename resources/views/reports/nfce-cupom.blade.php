@@ -259,6 +259,22 @@
             <div class="meta meta--left" style="margin-top: 4px;">{{ $obsNfce }}</div>
         @endif
 
+        @if (! empty($mensagemCreditoDanfeNfce))
+            <div class="meta meta--left" style="margin-top: 6px; font-weight: 800; text-transform: uppercase;">
+                {{ $mensagemCreditoDanfeNfce }}
+            </div>
+        @endif
+
+        @if (! empty($mensagensLegaisNfce) && is_array($mensagensLegaisNfce))
+            <div class="meta meta--left" style="margin-top: 4px;">
+                @foreach ($mensagensLegaisNfce as $mensagemLegal)
+                    @if ($mensagemLegal !== ($mensagemCreditoDanfeNfce ?? null))
+                        <div>{{ $mensagemLegal }}</div>
+                    @endif
+                @endforeach
+            </div>
+        @endif
+
         <div class="meta" style="margin-top: 6px;">
             @if (! empty($textoIbpt))
                 <div class="meta meta--left">{{ $textoIbpt }}</div>

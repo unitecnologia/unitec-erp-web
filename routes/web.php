@@ -1,21 +1,27 @@
 <?php
 
 use App\Http\Controllers\Erp\AjusteEstoqueListagemReportController;
+use App\Http\Controllers\Erp\BoletoPdfReportController;
 use App\Http\Controllers\Erp\AtualizacaoProgressController;
 use App\Http\Controllers\Erp\ComissaoVendedoresReportController;
 use App\Http\Controllers\Erp\CompraDanfeReportController;
 use App\Http\Controllers\Erp\NotaFornecedorDanfeReportController;
 use App\Http\Controllers\Erp\NfeCartaCorrecaoReportController;
+use App\Http\Controllers\Erp\NfseEspelhoReportController;
+use App\Http\Controllers\Erp\NfseImpressaoReportController;
 use App\Http\Controllers\Erp\NfeDanfeReportController;
 use App\Http\Controllers\Erp\NfeEspelhoReportController;
 use App\Http\Controllers\Erp\NfeEtiquetaVolumeReportController;
 use App\Http\Controllers\Erp\NfeListagemReportController;
+use App\Http\Controllers\Erp\CargaRomaneioReportController;
 use App\Http\Controllers\Erp\ExpedicaoRetiradaReportController;
 use App\Http\Controllers\Erp\ExpedicaoSeparacaoReportController;
 use App\Http\Controllers\Erp\ErpWarmUrlsController;
 use App\Http\Controllers\Erp\ErpBrowserResetController;
 use App\Http\Controllers\Erp\DeviceServiceEnsureController;
+use App\Http\Controllers\Erp\MonitorPedidosReportController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
+use App\Http\Controllers\Erp\OrdemServicoReportController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloEscPosPrintController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloReportController;
 use App\Http\Controllers\Erp\NfceCupomReportController;
@@ -30,6 +36,7 @@ use App\Http\Controllers\Erp\PdvMovimentoCaixaReportController;
 use App\Http\Controllers\Erp\PersonListagemReportController;
 use App\Http\Controllers\Erp\ProductEstoqueReportController;
 use App\Http\Controllers\Erp\ContaReceberCartoesReportController;
+use App\Http\Controllers\Erp\ContaReceberRelatorioController;
 use App\Http\Controllers\Erp\ReciboEscPosPrintController;
 use App\Http\Controllers\Erp\ReciboReportController;
 use App\Http\Controllers\Erp\TabularReportController;
@@ -76,9 +83,15 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/contas-receber-cartoes', ContaReceberCartoesReportController::class)
         ->middleware('erp.permission:contas_receber.print')
         ->name('erp.reports.contas-receber-cartoes');
+    Route::get('/admin/reports/contas-receber', ContaReceberRelatorioController::class)
+        ->middleware('erp.permission:contas_receber.print')
+        ->name('erp.reports.contas-receber');
     Route::get('/admin/reports/recibo/{recibo}', ReciboReportController::class)
         ->middleware('erp.permission:recibos.print')
         ->name('erp.reports.recibo');
+    Route::get('/admin/reports/boleto/{boleto}/pdf', BoletoPdfReportController::class)
+        ->middleware('erp.permission:contas_receber.access')
+        ->name('erp.reports.boleto-pdf');
     Route::get('/admin/print/recibo-escpos/{recibo}', ReciboEscPosPrintController::class)
         ->middleware('erp.permission:recibos.print')
         ->name('erp.print.recibo-escpos');
@@ -140,6 +153,12 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.reports.nota-fornecedor-danfe');
     Route::get('/admin/reports/nfe-danfe/{nfe}', NfeDanfeReportController::class)
         ->name('erp.reports.nfe-danfe');
+    Route::get('/admin/reports/nfse-impressao/{nfse}', NfseImpressaoReportController::class)
+        ->middleware('erp.permission:nfse.access')
+        ->name('erp.reports.nfse-impressao');
+    Route::get('/admin/reports/nfse-espelho/{nfse}', NfseEspelhoReportController::class)
+        ->middleware('erp.permission:nfse.access')
+        ->name('erp.reports.nfse-espelho');
     Route::get('/admin/reports/nfe-espelho/{nfe}', NfeEspelhoReportController::class)
         ->name('erp.reports.nfe-espelho');
     Route::get('/admin/reports/nfe-etiqueta-volume/{nfe}', NfeEtiquetaVolumeReportController::class)
@@ -151,10 +170,18 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         ->name('erp.reports.nfe-carta-correcao');
     Route::get('/admin/reports/orcamento/{orcamento}', OrcamentoReportController::class)
         ->name('erp.reports.orcamento');
+    Route::get('/admin/reports/monitor-pedidos', MonitorPedidosReportController::class)
+        ->name('erp.reports.monitor-pedidos');
+    Route::get('/admin/reports/ordem-servico/{ordem}', OrdemServicoReportController::class)
+        ->middleware('erp.permission:ordens_servico.print')
+        ->name('erp.reports.ordem-servico');
     Route::get('/admin/reports/expedicao-separacao', ExpedicaoSeparacaoReportController::class)
         ->middleware('erp.permission:logistica.print')
         ->name('erp.reports.expedicao-separacao');
     Route::get('/admin/reports/expedicao-retirada/{entrega}', ExpedicaoRetiradaReportController::class)
         ->middleware('erp.permission:logistica.print')
         ->name('erp.reports.expedicao-retirada');
+    Route::get('/admin/reports/carga-romaneio/{carga}', CargaRomaneioReportController::class)
+        ->middleware('erp.permission:cargas.print')
+        ->name('erp.reports.carga-romaneio');
 });

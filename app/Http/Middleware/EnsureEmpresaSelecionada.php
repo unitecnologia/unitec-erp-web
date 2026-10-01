@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Empresa;
 use App\Support\Erp\ErpContext;
+use App\Support\Gestor\GestorLoginDiag;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,11 @@ class EnsureEmpresaSelecionada
         if ($empresaId !== null && ErpContext::userCanAccessEmpresa($empresaId, $user)) {
             return $next($request);
         }
+
+        GestorLoginDiag::log('bloqueio_empresa', [
+            'user_id' => $user->getAuthIdentifier(),
+            'empresa_id' => $empresaId,
+        ]);
 
         Auth::guard('web')->logout();
         session()->forget('erp_empresa_id');

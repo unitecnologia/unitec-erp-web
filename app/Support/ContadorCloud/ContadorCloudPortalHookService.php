@@ -60,6 +60,28 @@ final class ContadorCloudPortalHookService
         );
     }
 
+    public function onNfceContingencia(PdvVendaNfce $nfce, Empresa $empresa): void
+    {
+        if ($nfce->simulada) {
+            return;
+        }
+
+        $nfce->loadMissing('pdvVenda');
+
+        $this->safeDispatch(
+            $empresa,
+            $this->payloadBuilder->fromNfce($nfce, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_CONTINGENCIA),
+        );
+    }
+
+    public function onNfeContingencia(Nfe $nfe, Empresa $empresa): void
+    {
+        $this->safeDispatch(
+            $empresa,
+            $this->payloadBuilder->fromNfe($nfe, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_CONTINGENCIA),
+        );
+    }
+
     public function onNotaFornecedorImportada(
         NotaFornecedor $nota,
         Empresa $empresa,

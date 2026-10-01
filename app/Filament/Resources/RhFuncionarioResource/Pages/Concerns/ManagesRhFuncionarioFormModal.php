@@ -82,7 +82,7 @@ trait ManagesRhFuncionarioFormModal
             'usuario_id' => '',
             'terminais' => [],
             'estoque_id' => $this->defaultEstoqueId(),
-            'usar_agendamento' => false,
+            'entregador' => true,
             'setor_vendas' => true,
             'tabela_venda_id' => $this->defaultTabelaVendaId(),
             'comissao_av' => '0,00',
@@ -217,7 +217,7 @@ trait ManagesRhFuncionarioFormModal
                 : ($record->user_id ? (string) $record->user_id : ''),
             'terminais' => $vendedor->terminais->pluck('id')->map(fn ($id): int => (int) $id)->all(),
             'estoque_id' => $vendedor->estoque_id ? (string) $vendedor->estoque_id : $blank['estoque_id'],
-            'usar_agendamento' => (bool) $vendedor->usar_agendamento,
+            'entregador' => (bool) $vendedor->entregador,
             'setor_vendas' => (bool) $vendedor->setor_vendas,
             'tabela_venda_id' => $vendedor->tabela_venda_id
                 ? (string) $vendedor->tabela_venda_id
@@ -385,7 +385,7 @@ trait ManagesRhFuncionarioFormModal
             'estoque_id' => filled($this->rhFuncionarioForm['estoque_id'] ?? null)
                 ? (int) $this->rhFuncionarioForm['estoque_id']
                 : null,
-            'usar_agendamento' => (bool) ($this->rhFuncionarioForm['usar_agendamento'] ?? false),
+            'entregador' => (bool) ($this->rhFuncionarioForm['entregador'] ?? true),
             'setor_vendas' => (bool) ($this->rhFuncionarioForm['setor_vendas'] ?? true),
             'tabela_venda_id' => filled($this->rhFuncionarioForm['tabela_venda_id'] ?? null)
                 ? (int) $this->rhFuncionarioForm['tabela_venda_id']

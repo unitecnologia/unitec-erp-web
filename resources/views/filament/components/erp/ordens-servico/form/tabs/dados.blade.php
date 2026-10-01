@@ -1,5 +1,5 @@
-<div class="erp-os-panel">
-    <h3 class="erp-os-panel__title">Dados da OS</h3>
+<div class="erp-os-panel erp-os-panel--dados">
+    <span class="erp-os-panel__legend">Dados da OS</span>
 
     <div class="erp-os-form-row">
         <div class="erp-os-form-group erp-os-form-group--xs">
@@ -50,8 +50,8 @@
 
     <div class="erp-os-form-row">
         <div class="erp-os-form-group erp-os-form-group--atendente">
-            <label class="erp-os-form-label" for="os-atendente">Atendente</label>
-            <select id="os-atendente" wire:model="atendenteId" @disabled($readOnly) class="erp-os-form-select">
+            <label class="erp-os-form-label" for="os-atendente">Técnico</label>
+            <select id="os-atendente" wire:model.live="atendenteId" @disabled($readOnly) class="erp-os-form-select">
                 <option value="">Selecione...</option>
                 @foreach ($this->atendenteOptions() as $atendente)
                     <option value="{{ $atendente['id'] }}">{{ $atendente['nome'] }}</option>

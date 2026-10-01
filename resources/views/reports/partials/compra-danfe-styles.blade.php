@@ -91,25 +91,30 @@
     .danfe__emitente {
         display: table;
         width: 100%;
+        min-height: 28mm;
     }
 
     .danfe__emitente-text {
         display: table-cell;
         vertical-align: top;
+        width: 58%;
+        padding-right: 3px;
     }
 
     .danfe__emitente-logo {
         display: table-cell;
         vertical-align: middle;
-        width: 32%;
+        width: 42%;
         padding-left: 4px;
-        text-align: right;
+        text-align: center;
     }
 
     .danfe__emitente-logo img {
         display: inline-block;
         max-width: 100%;
-        max-height: 56px;
+        max-height: 26mm;
+        width: auto;
+        height: auto;
         object-fit: contain;
     }
 
@@ -182,6 +187,16 @@
 
     .danfe__item-cell--desc {
         font-weight: 400;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+
+    .danfe__item-infadprod {
+        display: block;
+        margin-top: 1px;
+        font-size: 5.5pt;
+        font-weight: 400;
+        line-height: 1.2;
         white-space: normal;
         word-wrap: break-word;
     }

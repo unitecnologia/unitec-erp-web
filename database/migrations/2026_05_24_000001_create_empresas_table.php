@@ -15,6 +15,15 @@ return new class extends Migration
             $table->boolean('ativo')->default(true);
             $table->timestamps();
         });
+
+        // Evita row size 1118 quando muitas colunas param_* forem adicionadas depois.
+        if (in_array(Schema::getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $table = Schema::getConnection()->getTablePrefix().'empresas';
+            try {
+                \Illuminate\Support\Facades\DB::statement("ALTER TABLE `{$table}` ROW_FORMAT=DYNAMIC");
+            } catch (\Throwable) {
+            }
+        }
     }
 
     public function down(): void

@@ -3,6 +3,8 @@
 namespace App\Support\Erp\NotaFornecedor;
 
 use App\Models\Person;
+use App\Support\Erp\PersonCpfCnpjUnicidade;
+use App\Support\Erp\PersonDocumentoDuplicadoException;
 
 /**
  * Garante cadastro do emitente do XML como fornecedor (sem interação).
@@ -52,6 +54,26 @@ final class NotaFornecedorFornecedorCadastro
             ];
         }
 
+        try {
+            app(PersonCpfCnpjUnicidade::class)->assertDisponivel($digits);
+        } catch (PersonDocumentoDuplicadoException $e) {
+            $existente = $e->existente;
+            if ($existente) {
+                $existente->forceFill(array_merge(
+                    $this->payloadFromEmitente($emitente, $digits, forUpdate: true),
+                    ['is_fornecedor' => true, 'ativo' => true],
+                ))->save();
+
+                return [
+                    'person' => $existente->fresh() ?? $existente,
+                    'status' => 'automatico',
+                    'label' => 'Fornecedor cadastrado automaticamente',
+                ];
+            }
+
+            throw $e;
+        }
+
         $person = Person::query()->create(array_merge(
             $this->payloadFromEmitente($emitente, $digits, forUpdate: false),
             [
@@ -73,17 +95,7 @@ final class NotaFornecedorFornecedorCadastro
 
     private function findByDocumento(string $digits): ?Person
     {
-        return Person::query()
-            ->where(function ($query) use ($digits): void {
-                $query->where('cpf_cnpj', $digits)
-                    ->orWhereRaw(
-                        "REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '/', ''), '-', ''), ' ', '') = ?",
-                        [$digits],
-                    );
-            })
-            ->orderByDesc('is_fornecedor')
-            ->orderByDesc('ativo')
-            ->first();
+        return app(PersonCpfCnpjUnicidade::class)->encontrar($digits);
     }
 
     /**

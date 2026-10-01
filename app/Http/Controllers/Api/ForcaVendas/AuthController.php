@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AuthController
@@ -48,6 +49,12 @@ class AuthController
         if (! $user instanceof User || blank($user->senha_app_forca_vendas)) {
             throw ValidationException::withMessages([
                 'senha' => 'Usuário ou senha do app inválidos.',
+            ]);
+        }
+
+        if (! $user->podeAcessarApp(User::APP_FORCA_VENDAS)) {
+            throw ValidationException::withMessages([
+                'senha' => 'Usuário sem acesso a este app.',
             ]);
         }
 
@@ -142,6 +149,12 @@ class AuthController
             'tabela_venda_codigo' => $tabela?->codigo,
             'tabela_venda_descricao' => $tabela?->descricao,
             'pix_api_habilitada' => (bool) ($empresa?->param_pix_habilitar ?? false),
+            'ver_todos_clientes' => (bool) ($empresa?->param_forca_vendas_ver_todos_clientes ?? false),
+            'desconto_reais_item_modo' => \App\Support\Erp\EmpresaParametros::normalizarDescontoReaisItemModo(
+                ($empresa !== null && Schema::hasColumn('empresas', 'param_monitor_vendas_desconto_reais_item_modo'))
+                    ? $empresa->param_monitor_vendas_desconto_reais_item_modo
+                    : null,
+            ),
             'is_admin' => (bool) $user->is_admin,
             'permissions' => $user->effectivePermissionKeys(),
         ];

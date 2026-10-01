@@ -4,6 +4,7 @@ namespace App\Filament\Resources\NfceResource\Pages\Concerns;
 
 use App\Models\Contador;
 use App\Models\Empresa;
+use App\Models\PdvVendaNfce;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfce\NfceContadorPacoteService;
@@ -12,12 +13,19 @@ use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
 use App\Support\Erp\WhatsApp\WhatsAppPhone;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
 
 trait ManagesNfceContadorEmail
 {
     public bool $nfceContadorEmailModalOpen = false;
+
+    public bool $nfceContadorPendenciaAvisoOpen = false;
+
+    /** @var list<string> */
+    public array $nfceContadorPendenciaAvisoLines = [];
 
     public string $nfceContadorCompetencia = '';
 
@@ -70,6 +78,11 @@ trait ManagesNfceContadorEmail
         }
 
         $competencia = now()->subMonth()->format('Y-m');
+
+        if (! $this->assertNfceContadorSemPendencias($empresa, $competencia)) {
+            return;
+        }
+
         $periodo = NfceRelatorioReportService::competenciaPeriod($competencia);
 
         $this->nfceContadorCompetencia = $competencia;
@@ -84,6 +97,12 @@ trait ManagesNfceContadorEmail
     {
         $this->nfceContadorEmailModalOpen = false;
         $this->nfceContadorWhatsAppTo = '';
+    }
+
+    public function closeNfceContadorPendenciaAviso(): void
+    {
+        $this->nfceContadorPendenciaAvisoOpen = false;
+        $this->nfceContadorPendenciaAvisoLines = [];
     }
 
     public function nfceContadorPacoteAnexoLabel(): string
@@ -297,6 +316,10 @@ trait ManagesNfceContadorEmail
      */
     protected function buildNfceContadorPacoteOrNotify(NfceContadorPacoteService $service, Empresa $empresa): ?array
     {
+        if (! $this->assertNfceContadorSemPendencias($empresa, $this->nfceContadorCompetencia)) {
+            return null;
+        }
+
         $pacote = $service->buildPacoteMensal($empresa, $this->nfceContadorCompetencia);
 
         if ($pacote['totalNotas'] === 0) {
@@ -314,6 +337,107 @@ trait ManagesNfceContadorEmail
         }
 
         return $pacote;
+    }
+
+    /**
+     * Bloqueia o pacote do contador se houver NFC-e em contingência ou duplicidade
+     * na competência. Só deve ser chamado no F11 / envio (não na listagem).
+     *
+     * Data da competência: mesma regra do pacote (autorizada_em; se null, fechado_em da venda).
+     */
+    protected function assertNfceContadorSemPendencias(Empresa $empresa, string $competencia): bool
+    {
+        if (! preg_match('/^\d{4}-\d{2}$/', $competencia)) {
+            return true;
+        }
+
+        $empresaId = (int) $empresa->id;
+        $inicio = Carbon::createFromFormat('Y-m', $competencia)->startOfMonth();
+        $proximoMes = $inicio->copy()->addMonth();
+
+        $contingencia = $this->countNfcePendenciasNaCompetencia(
+            $empresaId,
+            PdvVendaNfce::statusesForTab(PdvVendaNfce::TAB_CONTINGENCIA),
+            $inicio,
+            $proximoMes,
+        );
+
+        $duplicidade = $this->countNfcePendenciasNaCompetencia(
+            $empresaId,
+            PdvVendaNfce::statusesForTab(PdvVendaNfce::TAB_DUPLICIDADE),
+            $inicio,
+            $proximoMes,
+        );
+
+        if ($contingencia === 0 && $duplicidade === 0) {
+            return true;
+        }
+
+        $partes = [];
+        $abas = [];
+
+        if ($contingencia > 0) {
+            $partes[] = $contingencia === 1
+                ? '1 NFC-e em contingência'
+                : "{$contingencia} NFC-e em contingência";
+            $abas[] = 'Contingência';
+        }
+
+        if ($duplicidade > 0) {
+            $partes[] = $duplicidade === 1
+                ? '1 NFC-e em duplicidade'
+                : "{$duplicidade} NFC-e em duplicidade";
+            $abas[] = 'Duplicidade';
+        }
+
+        $competenciaLabel = Carbon::createFromFormat('Y-m', $competencia)->format('m/Y');
+        $listaPendencias = implode(' e ', $partes);
+        $listaAbas = count($abas) === 1
+            ? 'aba '.$abas[0]
+            : 'abas '.implode(' e ', $abas);
+
+        $this->nfceContadorPendenciaAvisoLines = [
+            "Na competência <strong>{$competenciaLabel}</strong> há <strong>{$listaPendencias}</strong>.",
+            "Resolva na {$listaAbas} antes de enviar o pacote ao contador.",
+        ];
+        $this->nfceContadorPendenciaAvisoOpen = true;
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>  $statuses
+     */
+    protected function countNfcePendenciasNaCompetencia(
+        int $empresaId,
+        array $statuses,
+        Carbon $inicio,
+        Carbon $proximoMes,
+    ): int {
+        // Intervalo half-open em horário local (mesma competência do pacote: autorizada_em / fechado_em).
+        $inicioStr = $inicio->format('Y-m-d H:i:s');
+        $proximoStr = $proximoMes->format('Y-m-d H:i:s');
+
+        return (int) PdvVendaNfce::query()
+            ->where('empresa_id', $empresaId)
+            ->whereIn('status', $statuses)
+            ->where(function (Builder $query) use ($inicioStr, $proximoStr): void {
+                $query->where(function (Builder $autorizada) use ($inicioStr, $proximoStr): void {
+                    $autorizada->whereNotNull('autorizada_em')
+                        ->where('autorizada_em', '>=', $inicioStr)
+                        ->where('autorizada_em', '<', $proximoStr);
+                })->orWhere(function (Builder $fallback) use ($inicioStr, $proximoStr): void {
+                    $fallback->whereNull('autorizada_em')
+                        ->whereExists(function ($sub) use ($inicioStr, $proximoStr): void {
+                            $sub->selectRaw('1')
+                                ->from('pdv_vendas')
+                                ->whereColumn('pdv_vendas.id', 'pdv_venda_nfce.pdv_venda_id')
+                                ->where('pdv_vendas.fechado_em', '>=', $inicioStr)
+                                ->where('pdv_vendas.fechado_em', '<', $proximoStr);
+                        });
+                });
+            })
+            ->count();
     }
 
     /**

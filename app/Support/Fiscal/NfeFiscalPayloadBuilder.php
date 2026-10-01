@@ -105,13 +105,15 @@ final class NfeFiscalPayloadBuilder
             )->setTimeFromTimeString((string) $nfe->hora_saida);
         }
 
+        $crt = $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples'));
         $itens = $nfe->itens
             ->sortBy('item')
             ->values()
             ->map(fn (NfeItem $item, int $index): ItemDto => $this->mapItem(
                 $item,
                 $index + 1,
-                $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples')),
+                $crt,
+                $emissao,
             ))
             ->all();
 
@@ -139,10 +141,13 @@ final class NfeFiscalPayloadBuilder
                     return new FaturaParcelaDto(
                         numero: (string) $fatura->numero,
                         vencimento: $fatura->data_vencimento,
-                        valor: (float) $fatura->valor,
+                        valor: round((float) $fatura->valor, 2),
                     );
                 })
                 ->all();
+
+            // Fecha centavos: soma(vDup) deve bater com o total da nota / vLiq (cStat 851).
+            $parcelas = $this->alinharParcelasAoTotal($parcelas, round((float) $nfe->total, 2));
         }
 
         $informacoesContribuinte = trim((string) ($nfe->obs_contribuinte ?? ''));
@@ -151,6 +156,7 @@ final class NfeFiscalPayloadBuilder
             (float) ($nfe->trib_fed ?? 0) + (float) ($nfe->trib_est ?? 0) + (float) ($nfe->trib_mun ?? 0),
             2,
         );
+        $textoIbpt = '';
 
         if ($valorTotTrib <= 0 && $informacoesContribuinte === '') {
             $ibptAgg = app(\App\Support\Erp\Fiscal\IbptLookupService::class)->agregarItens(
@@ -162,9 +168,22 @@ final class NfeFiscalPayloadBuilder
                 ])->all()
             );
             $valorTotTrib = (float) $ibptAgg['v_tot_trib'];
-            $informacoesContribuinte = app(\App\Support\Erp\Fiscal\IbptLookupService::class)
+            $textoIbpt = app(\App\Support\Erp\Fiscal\IbptLookupService::class)
                 ->formatarTextoLei12741($ibptAgg);
         }
+
+        $mensagensLegais = app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class);
+        $creditoSn = $mensagensLegais->resumirCreditoSnDosItens($nfe->itens);
+        $informacoesContribuinte = $mensagensLegais->comporInfCpl(
+            $informacoesContribuinte,
+            $mensagensLegais->mensagens([
+                'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFE,
+                'crt' => $crt,
+                'p_cred_sn' => $creditoSn['p_cred_sn'],
+                'v_cred_icms_sn' => $creditoSn['v_cred_icms_sn'],
+            ]),
+            $textoIbpt,
+        );
 
         return new EmitirNfeRequest(
             certificate: $certificate,
@@ -323,9 +342,15 @@ final class NfeFiscalPayloadBuilder
         return (int) ($nfe->consumidor_final === '1' ? 1 : 0);
     }
 
-    private function mapItem(NfeItem $item, int $numero, int $crt = 1): ItemDto
-    {
-        $origem = (int) ($item->product?->origem ?? 0);
+    private function mapItem(
+        NfeItem $item,
+        int $numero,
+        int $crt = 1,
+        ?\DateTimeInterface $dataEmissao = null,
+    ): ItemDto {
+        $origem = $item->origem !== null
+            ? (int) $item->origem
+            : (int) ($item->product?->origem ?? 0);
         $ncm = $this->resolveNcmItem($item);
         $vTotTrib = round(
             (float) ($item->trib_fed ?? 0) + (float) ($item->trib_est ?? 0) + (float) ($item->trib_mun ?? 0),
@@ -346,6 +371,22 @@ final class NfeFiscalPayloadBuilder
             $csosn = trim((string) $item->cst);
         }
 
+        $cfop = (string) ($item->cfop ?: '5102');
+        if ($csosn === '') {
+            $csosn = '102';
+        }
+
+        // NT 2024.001 / cStat 782: CSOSN 500 etc. inválidos para MEI na transmissão.
+        if (MeiFiscalNormalizer::isMeiCrt($crt)) {
+            $mei = MeiFiscalNormalizer::normalizeItem(
+                $csosn,
+                $cfop,
+                MeiFiscalNormalizer::MODELO_NFE,
+            );
+            $csosn = $mei['csosn'];
+            $cfop = $mei['cfop'];
+        }
+
         [$valorUnitario, $valorBruto, $desconto] = $this->valoresComerciaisItem($item);
 
         return new ItemDto(
@@ -353,7 +394,7 @@ final class NfeFiscalPayloadBuilder
             codigo: (string) ($item->cod_barra ?: $item->product_id ?: $numero),
             descricao: (string) $item->descricao,
             ncm: $ncm,
-            cfop: (string) ($item->cfop ?: '5102'),
+            cfop: $cfop,
             unidade: (string) ($item->unidade ?: 'UN'),
             quantidade: (float) $item->quantidade,
             valorUnitario: $valorUnitario,
@@ -361,10 +402,11 @@ final class NfeFiscalPayloadBuilder
             imposto: IbscbsImpostoFactory::fromNfeItem(
                 item: $item,
                 origem: $origem,
-                csosn: $csosn !== '' ? $csosn : '102',
+                csosn: $csosn,
                 vIcms: (float) ($item->valor_icms ?? 0),
                 vTotTrib: $vTotTrib,
                 crt: $crt,
+                dataEmissao: $dataEmissao,
             ),
             desconto: $desconto,
             frete: (float) ($item->frete ?? 0),
@@ -460,10 +502,51 @@ final class NfeFiscalPayloadBuilder
         return array_values($chaves);
     }
 
+    /**
+     * Ajusta a última parcela para que a soma feche exatamente o total (cStat 851).
+     *
+     * @param  list<FaturaParcelaDto>  $parcelas
+     * @return list<FaturaParcelaDto>
+     */
+    private function alinharParcelasAoTotal(array $parcelas, float $totalNota): array
+    {
+        if ($parcelas === [] || $totalNota <= 0) {
+            return $parcelas;
+        }
+
+        $soma = round(array_sum(array_map(
+            static fn (FaturaParcelaDto $p): float => $p->valor,
+            $parcelas,
+        )), 2);
+
+        $diferenca = round($totalNota - $soma, 2);
+
+        if (abs($diferenca) < 0.005) {
+            return $parcelas;
+        }
+
+        $ultima = $parcelas[array_key_last($parcelas)];
+        $novoValor = round($ultima->valor + $diferenca, 2);
+
+        if ($novoValor <= 0) {
+            return $parcelas;
+        }
+
+        $parcelas[array_key_last($parcelas)] = new FaturaParcelaDto(
+            numero: $ultima->numero,
+            vencimento: $ultima->vencimento,
+            valor: $novoValor,
+        );
+
+        return $parcelas;
+    }
+
     private function mapCrt(string $regime): int
     {
         return match (strtolower($regime)) {
             'simples' => 1,
+            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
+            'mei', 'simei' => 4,
             'presumido', 'real', 'normal' => 3,
             default => 1,
         };
@@ -490,23 +573,9 @@ final class NfeFiscalPayloadBuilder
         }
 
         return [new PagamentoDto(
-            tipo: $this->mapMeioPgto((string) ($nfe->meio_pgto ?? 'dinheiro')),
+            tipo: FormaPagamentoTPagMap::fromMeioPgto((string) ($nfe->meio_pgto ?? 'dinheiro')),
             valor: $valor,
         )];
-    }
-
-    private function mapMeioPgto(string $meio): string
-    {
-        return match (strtolower($meio)) {
-            'cartao' => '03',
-            'boleto' => '15',
-            'pix' => '20',
-            'cheque' => '02',
-            'credito_loja' => '05',
-            'deposito' => '16',
-            'transferencia' => '18',
-            default => '01',
-        };
     }
 
     private function buildTransporte(Nfe $nfe): ?NfeTransporteDto

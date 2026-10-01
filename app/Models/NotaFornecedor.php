@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'empresa_id',
@@ -67,6 +68,11 @@ class NotaFornecedor extends Model
     public function compra(): BelongsTo
     {
         return $this->belongsTo(Compra::class);
+    }
+
+    public function itens(): HasMany
+    {
+        return $this->hasMany(NotaFornecedorItem::class);
     }
 
     protected function casts(): array

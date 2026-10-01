@@ -47,6 +47,10 @@ class EditProduct extends EditRecord
 
     protected function getRedirectUrl(): string
     {
+        if ($this->embedsInPdv) {
+            return $this->urlWithPdvEmbed(ProductResource::getUrl('index'));
+        }
+
         return $this->erpFormReturnRedirectUrl($this->getProductListRedirectUrl());
     }
 

@@ -85,6 +85,8 @@ final class PdvNfceSimuladaService
             'vendedorNome' => $vendedorNome !== '' ? $vendedorNome : null,
             'obsNfce' => trim((string) ($empresa?->obs_nfce ?? '')),
             'textoIbpt' => $ibpt['texto'],
+            'mensagensLegaisNfce' => $this->mensagensLegaisNfce($empresa),
+            'mensagemCreditoDanfeNfce' => $this->mensagemCreditoDanfeNfce($empresa),
             'tribFed' => $ibpt['trib_fed'],
             'tribEst' => $ibpt['trib_est'],
             'tribMun' => $ibpt['trib_mun'],
@@ -102,6 +104,36 @@ final class PdvNfceSimuladaService
             'autoPrint' => $autoPrint,
             'printedAt' => $printedAt,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function mensagensLegaisNfce(?Empresa $empresa): array
+    {
+        $crt = $this->mapCrtEmpresa($empresa);
+
+        return app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class)->mensagens([
+            'modelo' => \App\Support\Erp\Fiscal\FiscalMensagensLegais::MODELO_NFCE,
+            'crt' => $crt,
+        ]);
+    }
+
+    private function mensagemCreditoDanfeNfce(?Empresa $empresa): string
+    {
+        return app(\App\Support\Erp\Fiscal\FiscalMensagensLegais::class)
+            ->mensagemFormaDanfeNfce($this->mapCrtEmpresa($empresa));
+    }
+
+    private function mapCrtEmpresa(?Empresa $empresa): int
+    {
+        return match (strtolower((string) ($empresa?->regime_tributario ?? 'simples'))) {
+            'simples' => 1,
+            'excesso_sublimite', 'excesso', 'simples_excesso' => 2,
+            'mei', 'simei' => 4,
+            'presumido', 'real', 'normal' => 3,
+            default => 1,
+        };
     }
 
     /**

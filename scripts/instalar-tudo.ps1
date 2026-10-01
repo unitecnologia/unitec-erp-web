@@ -457,19 +457,13 @@ Leia tambem o arquivo "COMO USAR - Unitec ERP" na Area de Trabalho.
     if ($LeigoMode) {
 
         Show-UnitecLeigoMessage -Title 'Instalacao nao concluida' -Icon Error -Message @"
-
 Nao foi possivel concluir a instalacao.
-
-
 
 $($_.Exception.Message)
 
-
-
+Log completo: $logFile
 Entre em contato com o suporte da Unitecnologia
-
 e informe que a instalacao falhou.
-
 "@
 
     } else {

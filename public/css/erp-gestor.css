@@ -71,6 +71,29 @@ html, body, .fi-body, .fi-main, .fi-main-ctn, .fi-page, .fi-page-content, .fi-si
 .gestor-login__title { margin: 0.2rem 0 0.35rem; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
 .gestor-login__hint { margin: 0; font-size: 0.95rem; opacity: 0.9; }
 .gestor-login__card { background: #fff; border-radius: 18px; box-shadow: var(--gx-shadow); padding: 1rem; }
+.gestor-login__alert {
+    margin: 0 0 0.85rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+.gestor-login__alert-title {
+    display: block;
+    margin: 0 0 0.25rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.gestor-login__alert-body {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #991b1b;
+}
 .gestor-login__foot { margin: 0.9rem 0 0; text-align: center; color: #64748b; font-size: 0.78rem; }
 
 /* Teclado virtual: sobe o formulário e deixa rolar até o Entrar */

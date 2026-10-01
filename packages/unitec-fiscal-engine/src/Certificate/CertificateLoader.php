@@ -22,13 +22,9 @@ final class CertificateLoader
 
         if (! $ok && class_exists(\App\Support\Erp\OpenSslLegacy::class)) {
             $err = \App\Support\Erp\OpenSslLegacy::lastError();
-            $needsLegacy = $err !== '' && (
-                str_contains(mb_strtolower($err), 'unsupported')
-                || str_contains(mb_strtolower($err), 'legacy')
-                || str_contains(mb_strtolower($err), 'digital envelope')
-            );
 
-            if ($needsLegacy) {
+            // "mac verify failure" também exige legacy (PFX A1 antigo no OpenSSL 3).
+            if (\App\Support\Erp\OpenSslLegacy::shouldRetryViaSubprocess($err)) {
                 $viaSub = \App\Support\Erp\OpenSslLegacy::readPkcs12ViaSubprocess($content, $password);
                 if ($viaSub['ok'] ?? false) {
                     $certs = $viaSub['certs'] ?? [];

@@ -92,6 +92,8 @@ final class NfeXmlBuilder
         $this->appendInformacoes($infNFe, $request->informacoesComplementares, $request->informacoesFisco);
         $this->appendRespTecnico($infNFe, $request->respTecnico, $chave);
 
+        NfeXmlSchemaGuard::assertDetLayout($dom);
+
         return [
             'dom' => $dom,
             'chave' => $chave,
@@ -151,7 +153,12 @@ final class NfeXmlBuilder
         XmlHelper::append($ideEl, 'procEmi', '0');
         XmlHelper::append($ideEl, 'verProc', 'UnitecERP-1.0');
 
-        $this->appendReferencias($ideEl, $request->chavesReferenciadas);
+        $this->appendReferencias(
+            $ideEl,
+            $request->chavesReferenciadas,
+            $request->finNFe,
+            $ide->dataEmissao,
+        );
 
         if ($ide->tpEmis !== 1) {
             $justificativa = XmlHelper::sanitizeText($ide->justificativaContingencia ?? '', 256);
@@ -169,8 +176,18 @@ final class NfeXmlBuilder
     /**
      * @param  list<string>  $chavesReferenciadas
      */
-    private function appendReferencias(DOMElement $ideEl, array $chavesReferenciadas): void
-    {
+    private function appendReferencias(
+        DOMElement $ideEl,
+        array $chavesReferenciadas,
+        int $finNFe,
+        \DateTimeInterface $dataEmissao,
+    ): void {
+        // NT 2025.002-RTC: NF-e 55 finNFe=4 a partir de 01/09/2026 referencia só via
+        // det/DFeReferenciado — NFref/refNFe no ide fica proibido nesse cenário.
+        if ($finNFe === 4 && $dataEmissao->format('Y-m-d') >= '2026-09-01') {
+            return;
+        }
+
         foreach ($chavesReferenciadas as $chave) {
             $digits = NumberFormatter::onlyDigits((string) $chave);
 
@@ -303,11 +320,6 @@ final class NfeXmlBuilder
 
         XmlHelper::append($prod, 'indTot', '1');
 
-        $infoAdicionais = XmlHelper::sanitizeInfAdProd((string) ($item->infoAdicionais ?? ''));
-        if ($infoAdicionais !== '') {
-            XmlHelper::append($prod, 'infAdProd', $infoAdicionais);
-        }
-
         $imposto = $det->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'imposto');
         $det->appendChild($imposto);
 
@@ -322,12 +334,18 @@ final class NfeXmlBuilder
 
         IbscbsXmlBuilder::appendItem($imposto, $item->imposto);
 
+        // Schema PL_010: infAdProd é filho de det (após imposto), não de prod.
+        $infoAdicionais = XmlHelper::sanitizeInfAdProd((string) ($item->infoAdicionais ?? ''));
+        if ($infoAdicionais !== '') {
+            XmlHelper::append($det, 'infAdProd', $infoAdicionais);
+        }
+
         $this->appendDfeReferenciado($det, $item);
     }
 
     /**
      * Em devolução (finNFe=4) a SVRS/SEFAZ valida VC02-14 pelo grupo DFeReferenciado
-     * no item; só NFref no ide gera cStat 321 mesmo com a chave na aba Referência.
+     * no item. A partir de 01/09/2026 (NT 2025.002-RTC) o ide não recebe NFref/refNFe.
      */
     private function withDfeReferenciadoDevolucao(ItemDto $item, EmitirNfeRequest $request): ItemDto
     {
@@ -541,17 +559,19 @@ final class NfeXmlBuilder
         $cob = $infNFe->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'cobr');
         $infNFe->appendChild($cob);
 
-        $valorOriginal = array_reduce(
+        // cStat 851: soma(vDup) deve ser igual a vLiq. Usar a soma das parcelas
+        // em vOrig/vLiq (sem desconto de fatura) evita divergência com valorNota.
+        $valorParcelas = round(array_reduce(
             $request->parcelas,
             fn (float $carry, FaturaParcelaDto $parcela): float => $carry + $parcela->valor,
             0.0,
-        );
+        ), 2);
 
         $fat = $cob->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'fat');
         $cob->appendChild($fat);
         XmlHelper::append($fat, 'nFat', (string) $request->ide->numero);
-        XmlHelper::append($fat, 'vOrig', NumberFormatter::decimal($valorOriginal));
-        XmlHelper::append($fat, 'vLiq', NumberFormatter::decimal($request->valorNota));
+        XmlHelper::append($fat, 'vOrig', NumberFormatter::decimal($valorParcelas));
+        XmlHelper::append($fat, 'vLiq', NumberFormatter::decimal($valorParcelas));
 
         foreach ($request->parcelas as $parcela) {
             $dup = $cob->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'dup');

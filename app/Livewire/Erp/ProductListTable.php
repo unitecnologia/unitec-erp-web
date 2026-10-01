@@ -34,6 +34,86 @@ class ProductListTable extends Component
 
     public string $sortDirection = 'asc';
 
+    public function setViewFilter(string $view): void
+    {
+        if (! in_array($view, ['produtos', 'seriais'], true)) {
+            return;
+        }
+
+        $this->viewFilter = $view;
+        $this->searchColumn = $view === 'seriais' ? 'descricao' : $this->searchColumn;
+        $this->localSearch = '';
+        $this->sortColumn = null;
+        $this->sortDirection = 'asc';
+        $this->resetPage();
+
+        \App\Support\Erp\ErpScreen::set($view === 'seriais' ? 'Seriais' : 'Produtos');
+
+        $this->js(sprintf(
+            '(() => {
+                const view = %s;
+                const searchColumn = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("viewFilter", view, false);
+                    parent.set("searchColumn", searchColumn, false);
+                    parent.set("localSearch", "", false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (view === "produtos") {
+                        url.searchParams.delete("view");
+                    } else {
+                        url.searchParams.set("view", view);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+            })()',
+            json_encode($view, JSON_UNESCAPED_UNICODE),
+            json_encode($this->searchColumn, JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.product-resource.pages.list-products', JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    public function setStatusFilter(string $filter): void
+    {
+        if ($this->isSeriaisView()) {
+            return;
+        }
+
+        if (! in_array($filter, ['ativos', 'inativos', 'todos'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->resetPage();
+
+        $this->js(sprintf(
+            '(() => {
+                const status = %s;
+                const parents = window.Livewire?.getByName?.(%s) || [];
+                const parent = parents[0] || null;
+                if (parent) {
+                    parent.set("statusFilter", status, false);
+                    try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    if (status === "ativos") {
+                        url.searchParams.delete("status");
+                    } else {
+                        url.searchParams.set("status", status);
+                    }
+                    window.history.replaceState({}, "", url);
+                } catch (e) {}
+            })()',
+            json_encode($filter, JSON_UNESCAPED_UNICODE),
+            json_encode('app.filament.resources.product-resource.pages.list-products', JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
     #[On('erp-product-list-refresh')]
     public function refreshFromParent(
         string $statusFilter,
@@ -137,13 +217,19 @@ class ProductListTable extends Component
             return;
         }
 
+        $dir = $this->sortDirection === 'desc' ? 'desc' : 'asc';
+
         if ($this->sortColumn === null) {
+            if ($this->searchColumn === 'codigo') {
+                ProductListQueryBuilder::orderByCodigoNumerico($query, $dir);
+
+                return;
+            }
+
             $query->orderBy('codigo');
 
             return;
         }
-
-        $dir = $this->sortDirection === 'desc' ? 'desc' : 'asc';
 
         if ($this->sortColumn === 'validade') {
             $query->orderByRaw("validade IS NULL ASC, validade {$dir}");
@@ -167,6 +253,12 @@ class ProductListTable extends Component
         }
 
         $allowed = ['codigo', 'descricao', 'grupo', 'preco_venda', 'lote'];
+
+        if ($this->sortColumn === 'codigo') {
+            ProductListQueryBuilder::orderByCodigoNumerico($query, $dir);
+
+            return;
+        }
 
         if (in_array($this->sortColumn, $allowed, true)) {
             $query->orderBy($this->sortColumn, $dir);

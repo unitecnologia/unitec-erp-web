@@ -3,7 +3,7 @@
  * Capture para foco imediato; não usa stopImmediatePropagation.
  */
 (function () {
-    const VERSION = 'v1-receber-form-enter';
+    const VERSION = 'v2-receber-form-enter-lock';
 
     if (window.__erpReceberFormEnterVersion === VERSION) {
         return;
@@ -20,9 +20,16 @@
     }
 
     function unlock(el) {
-        if (el instanceof HTMLElement) {
-            el.removeAttribute('readonly');
+        if (! (el instanceof HTMLElement)) {
+            return;
         }
+
+        // Campos travados (pedido FV/venda): não liberar readonly no Enter.
+        if (el.disabled || el.classList.contains('erp-receber-form-modal__input--ro')) {
+            return;
+        }
+
+        el.removeAttribute('readonly');
     }
 
     function finalizeMask(el) {

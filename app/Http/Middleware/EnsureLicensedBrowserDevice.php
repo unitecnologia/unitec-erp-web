@@ -7,6 +7,7 @@ use App\Support\Erp\License\DeviceLicenseLimitExceeded;
 use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\Erp\ErpSchema;
+use App\Support\Gestor\GestorLoginDiag;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -63,6 +64,13 @@ final class EnsureLicensedBrowserDevice
 
             session([$gateKey => time() + 300]);
         } catch (DeviceLicenseLimitExceeded $e) {
+            GestorLoginDiag::log('bloqueio_dispositivo', [
+                'user_id' => Auth::id(),
+                'empresa_id' => $empresaId,
+                'origin' => $origin,
+                'message' => $e->getMessage(),
+            ]);
+
             session()->forget($gateKey);
             Auth::guard('web')->logout();
             $request->session()->invalidate();

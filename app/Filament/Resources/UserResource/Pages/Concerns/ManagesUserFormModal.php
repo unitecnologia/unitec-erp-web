@@ -6,6 +6,7 @@ use App\Models\ErpProfile;
 use App\Models\User;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpOnboarding;
+use App\Support\Erp\Rh\OperadorFromFuncionarioSync;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -124,14 +125,8 @@ trait ManagesUserFormModal
         ];
         if ($isCreate) {
             $rules['userForm.password'] = ['required', 'string', 'min:2', 'max:60'];
-            $rules['userForm.password_confirmation'] = ['required', 'same:userForm.password'];
         } else {
             $rules['userForm.password'] = ['nullable', 'string', 'min:2', 'max:60'];
-            if (filled($this->userForm['password'] ?? null)) {
-                $rules['userForm.password_confirmation'] = ['required', 'same:userForm.password'];
-            } else {
-                $rules['userForm.password_confirmation'] = ['nullable', 'same:userForm.password'];
-            }
         }
         if (($this->userForm['copiar_permissoes'] ?? 'N') === 'S') {
             $rules['userForm.copiar_permissoes_de'] = [
@@ -150,8 +145,6 @@ trait ManagesUserFormModal
             'userForm.name.required' => 'Informe o usuário.',
             'userForm.name.unique' => 'Este usuário já está em uso.',
             'userForm.password.required' => 'Informe a senha.',
-            'userForm.password_confirmation.required' => 'Confirme a senha.',
-            'userForm.password_confirmation.same' => 'A confirmação de senha não confere.',
             'userForm.empresa_id.required' => 'Selecione a empresa padrão.',
             'userForm.empresa_id.exists' => 'Empresa padrão inválida.',
             'userForm.empresas.required' => 'Selecione ao menos uma empresa liberada.',
@@ -161,7 +154,6 @@ trait ManagesUserFormModal
         ], [
             'userForm.name' => 'usuário',
             'userForm.password' => 'senha',
-            'userForm.password_confirmation' => 'confirmação de senha',
             'userForm.senha_app_forca_vendas' => 'senha app força de vendas',
             'userForm.empresa_id' => 'empresa padrão',
             'userForm.empresas' => 'empresas liberadas',
@@ -179,6 +171,11 @@ trait ManagesUserFormModal
             'senha_app_forca_vendas' => filled($this->userForm['senha_app_forca_vendas'] ?? null)
                 ? (string) $this->userForm['senha_app_forca_vendas']
                 : null,
+            'acesso_app_forca_vendas' => filter_var($this->userForm['acesso_app_forca_vendas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_vendas_internas' => filter_var($this->userForm['acesso_app_vendas_internas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_unitec_os' => filter_var($this->userForm['acesso_app_unitec_os'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_entregas' => filter_var($this->userForm['acesso_app_entregas'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_gestao' => filter_var($this->userForm['acesso_app_gestao'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
         ];
@@ -203,6 +200,13 @@ trait ManagesUserFormModal
         }
 
         $record->empresas()->sync($empresaIds);
+
+        // Usuário inativo não pode continuar como operador de venda.
+        if (! $record->ativo && filled($record->vendedor_id)) {
+            (new OperadorFromFuncionarioSync)->desativarVendedor((int) $record->vendedor_id);
+            $record->unsetRelation('vendedor');
+            $record->vendedor_id = null;
+        }
 
         if (($this->userForm['copiar_permissoes'] ?? 'N') === 'S' && filled($this->userForm['copiar_permissoes_de'] ?? null)) {
             $this->copyUserPermissionsFrom((int) $this->userForm['copiar_permissoes_de'], $record);
@@ -238,7 +242,7 @@ trait ManagesUserFormModal
     {
         $form = $this->userForm;
 
-        foreach (['name', 'password', 'password_confirmation', 'senha_app_forca_vendas'] as $field) {
+        foreach (['name', 'password', 'senha_app_forca_vendas'] as $field) {
             if (! array_key_exists($field, $form) || $form[$field] === null) {
                 $form[$field] = '';
             } else {
@@ -271,6 +275,16 @@ trait ManagesUserFormModal
             $form[$field] = (($form[$field] ?? 'N') === 'S') ? 'S' : 'N';
         }
 
+        foreach ([
+            'acesso_app_forca_vendas',
+            'acesso_app_vendas_internas',
+            'acesso_app_unitec_os',
+            'acesso_app_entregas',
+            'acesso_app_gestao',
+        ] as $field) {
+            $form[$field] = filter_var($form[$field] ?? false, FILTER_VALIDATE_BOOLEAN);
+        }
+
         $this->userForm = $form;
     }
 
@@ -294,6 +308,12 @@ trait ManagesUserFormModal
         if (! $record) {
             return;
         }
+
+        // Preserva histórico: só desativa o vendedor vinculado (sem DELETE).
+        if (filled($record->vendedor_id)) {
+            (new OperadorFromFuncionarioSync)->desativarVendedor((int) $record->vendedor_id);
+        }
+
         $record->delete();
         $this->clearListSelection();
         $this->resetTable();
@@ -333,8 +353,13 @@ trait ManagesUserFormModal
         return [
             'name' => '',
             'password' => '',
-            'password_confirmation' => '',
+            'senha_atual' => '',
             'senha_app_forca_vendas' => '',
+            'acesso_app_forca_vendas' => false,
+            'acesso_app_vendas_internas' => false,
+            'acesso_app_unitec_os' => false,
+            'acesso_app_entregas' => false,
+            'acesso_app_gestao' => false,
             'empresa_id' => (string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1),
             'empresas' => [(string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1)],
             'erp_profile_id' => '',
@@ -357,9 +382,14 @@ trait ManagesUserFormModal
             ->value('id');
         return [
             'name' => $record->name,
-            'password' => (string) ($record->senha ?? ''),
-            'password_confirmation' => (string) ($record->senha ?? ''),
+            'password' => '',
+            'senha_atual' => (string) ($record->senha ?? ''),
             'senha_app_forca_vendas' => (string) ($record->senha_app_forca_vendas ?? ''),
+            'acesso_app_forca_vendas' => (bool) $record->acesso_app_forca_vendas,
+            'acesso_app_vendas_internas' => (bool) $record->acesso_app_vendas_internas,
+            'acesso_app_unitec_os' => (bool) $record->acesso_app_unitec_os,
+            'acesso_app_entregas' => (bool) $record->acesso_app_entregas,
+            'acesso_app_gestao' => (bool) $record->acesso_app_gestao,
             'empresa_id' => (string) ($record->empresa_id ?? ''),
             'empresas' => $record->empresas->pluck('id')->map(fn ($id): string => (string) $id)->values()->all()
                 ?: array_values(array_filter([(string) ($record->empresa_id ?? '')])),

@@ -1,0 +1,763 @@
+/* ERP — Gestão de Entregas
+   Página travada (sem scroll). Só a grade rola.
+   Barra F5/Sair fixa no rodapé da viewport. */
+
+.erp-gestao-entregas-page {
+    --erp-ge-actions-h: 3.35rem;
+}
+
+.erp-gestao-entregas-page .fi-header,
+.erp-gestao-entregas-page .fi-page-header {
+    display: none !important;
+}
+
+html:has(.erp-gestao-entregas-page),
+body:has(.erp-gestao-entregas-page),
+.fi-body:has(.erp-gestao-entregas-page) {
+    overflow: hidden !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+}
+
+.fi-body:has(.erp-gestao-entregas-page) .fi-layout,
+.fi-body:has(.erp-gestao-entregas-page) .fi-main-ctn,
+.fi-body:has(.erp-gestao-entregas-page) .fi-main,
+.fi-body:has(.erp-gestao-entregas-page) .fi-main > * {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.fi-body:has(.erp-gestao-entregas-page) .fi-main {
+    padding: 0 !important;
+}
+
+.erp-gestao-entregas-page.fi-page,
+.erp-gestao-entregas-page .fi-page-header-main-ctn,
+.erp-gestao-entregas-page .fi-page-main,
+.erp-gestao-entregas-page .fi-page-content,
+.erp-gestao-entregas-page .fi-page__content,
+.erp-gestao-entregas-page .fi-sc {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    background: var(--erp-bg-app, #eef4fb) !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.erp-gestao-entregas-page .fi-page-content > div,
+.erp-gestao-entregas-page .fi-page__content > div,
+.erp-gestao-entregas-page .fi-sc > div,
+.erp-list-page.erp-gestao-entregas-page .fi-sc > div:not(.fi-hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Conteúdo acima da barra fixa */
+.erp-gestao-entregas-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding-bottom: var(--erp-ge-actions-h);
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    width: calc(100% - 4mm);
+    margin: 2mm 2mm 0;
+    overflow: hidden !important;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md, 8px);
+    box-shadow: var(--erp-shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-gestao-entregas__topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: calc(0.3rem - 1mm) 0.75rem;
+    line-height: 1.1;
+    border-top-left-radius: var(--erp-radius-md, 8px);
+    border-top-right-radius: var(--erp-radius-md, 8px);
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: var(--erp-text-on-brand, #fff);
+    font-size: var(--erp-font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.erp-gestao-entregas__topbar-title {
+    letter-spacing: 0.01em;
+}
+
+/* Campos para Consulta — barra compacta ancorada */
+.erp-gestao-entregas__consulta {
+    flex: 0 0 auto;
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+    padding: 0.28rem 0.55rem 0.35rem;
+    background: linear-gradient(180deg, #f4f7fb 0%, #eef3f9 100%);
+}
+
+.erp-gestao-entregas__consulta > legend {
+    float: left;
+    width: 100%;
+    padding: 0 0 0.2rem;
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+.erp-gestao-entregas__consulta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.3rem 0.45rem;
+    clear: both;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
+}
+
+.erp-gestao-entregas__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #64748b;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.erp-gestao-entregas__field > span {
+    line-height: 1;
+}
+
+.erp-gestao-entregas__field--periodo {
+    flex: 0 0 auto;
+}
+
+.erp-gestao-entregas__field--numero {
+    flex: 0 0 7.5rem;
+}
+
+.erp-gestao-entregas__field--entregador {
+    flex: 0 1 9.5rem;
+    min-width: 7.5rem;
+}
+
+.erp-gestao-entregas__field--veiculo {
+    flex: 0 1 8.5rem;
+    min-width: 6.5rem;
+}
+
+.erp-gestao-entregas__field--status {
+    flex: 0 0 7.2rem;
+}
+
+.erp-gestao-entregas__numero-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 0.2rem;
+}
+
+.erp-gestao-entregas__numero-wrap .erp-nfe__input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-gestao-entregas__lupa {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    min-height: 1.55rem;
+    padding: 0;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: 4px;
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.22);
+}
+
+.erp-gestao-entregas__lupa:hover {
+    background: linear-gradient(180deg, #1d4ed8 0%, #164a82 100%);
+}
+
+.erp-gestao-entregas__lupa svg {
+    width: 0.78rem;
+    height: 0.78rem;
+    display: block;
+}
+
+.erp-gestao-entregas-carga-lookup__window {
+    width: min(720px, calc(100vw - 1.5rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-gestao-entregas-carga-lookup__hint {
+    margin: 0 0 0.55rem;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid-wrap {
+    max-height: min(22rem, calc(100vh - 12rem));
+    overflow: auto;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th,
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td {
+    padding: 0.35rem 0.55rem;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid rgb(255 255 255 / 35%);
+    vertical-align: middle;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th:last-child,
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td:last-child {
+    border-right: 0;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%) !important;
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
+    border-bottom: 1px solid rgb(255 255 255 / 25%);
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th:nth-child(1),
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td:nth-child(1) {
+    width: 4.2rem;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th:nth-child(2),
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td:nth-child(2) {
+    width: 6.2rem;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th:nth-child(3),
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td:nth-child(3) {
+    width: auto;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid th:nth-child(n+4),
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td:nth-child(n+4) {
+    width: 5.2rem;
+    text-align: center;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__grid td.num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__empty {
+    text-align: center;
+    color: #64748b;
+    padding: 1rem 0.75rem !important;
+    white-space: normal;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__row {
+    cursor: pointer;
+}
+
+.erp-gestao-entregas-carga-lookup .erp-lookup-modal__row:hover td {
+    background: #e8f1ff;
+}
+
+.erp-gestao-entregas__periodo {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.erp-gestao-entregas__periodo-sep {
+    font-size: 0.62rem;
+    font-weight: 650;
+    text-transform: lowercase;
+    letter-spacing: 0;
+    color: #64748b;
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas__field .erp-nfe__select,
+.erp-gestao-entregas-page .erp-gestao-entregas__field .erp-nfe__input,
+.erp-gestao-entregas-page .erp-gestao-entregas__periodo .erp-nfe__period-input {
+    height: 1.55rem;
+    min-height: 1.55rem;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--erp-text, #0f172a);
+    background: #fff;
+    border: 1px solid #9fb5cf;
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas__periodo .erp-nfe__period-input {
+    width: 7.4rem;
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas__field .erp-nfe__select:focus,
+.erp-gestao-entregas-page .erp-gestao-entregas__field .erp-nfe__input:focus,
+.erp-gestao-entregas-page .erp-gestao-entregas__periodo .erp-nfe__period-input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.14);
+}
+
+.erp-gestao-entregas__btn-consultar {
+    height: 1.55rem;
+    min-height: 1.55rem;
+    margin-left: auto;
+    padding: 0 0.7rem;
+    border: 1px solid #8fa3bc;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
+    color: #1e293b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.erp-gestao-entregas__btn-consultar:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    background: #eff6ff;
+    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-gestao-entregas__legend {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.55rem;
+    min-height: 1.55rem;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid #c5d4e8;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-size: 0.7rem;
+    font-weight: 650;
+    color: #334155;
+}
+
+.erp-gestao-entregas__legend-title {
+    margin-right: 0.15rem;
+    padding-right: 0.4rem;
+    border-right: 1px solid #c5d4e8;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-gestao-entregas__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    white-space: nowrap;
+}
+
+.erp-gestao-entregas__dot {
+    width: 0.62rem;
+    height: 0.62rem;
+    border-radius: 2px;
+    flex: 0 0 auto;
+    display: inline-block;
+}
+
+.erp-gestao-entregas__dot--pendente {
+    background: #ca8a04;
+}
+
+.erp-gestao-entregas__dot--entregue {
+    background: #2e7d32;
+}
+
+.erp-gestao-entregas__dot--parcial {
+    background: #1565c0;
+}
+
+.erp-gestao-entregas__dot--nao {
+    background: #c62828;
+}
+
+.erp-gestao-entregas__topbar,
+.erp-gestao-entregas__consulta,
+.erp-gestao-entregas__resultados {
+    flex: 0 0 auto !important;
+}
+
+/* Único scroll */
+.erp-gestao-entregas__grid-area {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    background: #fff;
+    border-top: 1px solid var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-gestao-entregas__table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+    font-family: var(--erp-font, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+}
+
+.erp-gestao-entregas__table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.erp-gestao-entregas__table th {
+    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
+    color: #fff;
+    font-weight: 700;
+    font-size: var(--erp-font-size-grid, 0.8125rem);
+    padding: 0.28rem 0.45rem;
+    line-height: 1.15;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid rgb(255 255 255 / 25%);
+    border-right: 1px solid rgb(255 255 255 / 40%);
+    box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
+}
+
+.erp-gestao-entregas__table th:last-child {
+    border-right: 0;
+}
+
+.erp-gestao-entregas__table td {
+    padding: 0.28rem 0.45rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #eef2f7;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #fff;
+}
+
+.erp-gestao-entregas__table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.erp-gestao-entregas__table td:last-child {
+    border-right: 0;
+}
+
+.erp-gestao-entregas__table td.num {
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-gestao-entregas__table td.empty {
+    text-align: center;
+    color: #64748b;
+    padding: 1.25rem;
+}
+
+.erp-gestao-entregas__row {
+    cursor: pointer;
+}
+
+.erp-gestao-entregas__row:hover td {
+    background: #e8f1ff !important;
+}
+
+.erp-gestao-entregas__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-gestao-entregas__badge--entregue {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.erp-gestao-entregas__badge--parcial {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.erp-gestao-entregas__badge--nao {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.erp-gestao-entregas__badge--pendente {
+    background: #fff8e1;
+    color: #ca8a04;
+}
+
+.erp-gestao-entregas__resultados {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 0.35rem 0.65rem;
+    border-top: 1px solid var(--erp-border-light, #c7d5e8);
+    background: linear-gradient(90deg, #ffffff 0%, #eef4fb 100%);
+    font-size: 0.8125rem;
+    color: #0f172a;
+}
+
+.erp-gestao-entregas__resultados strong {
+    color: #0f3460;
+}
+
+/* Barra SEMPRE visível — fixa no rodapé da janela */
+.erp-gestao-entregas-page .erp-gestao-entregas-actions.erp-nfe-actions {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 80 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 0.35rem !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    padding: 0.4rem 0.65rem !important;
+    flex: none !important;
+    flex-shrink: 0 !important;
+    background: var(--erp-action-bg, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
+    border-top: 1px solid #60a5fa !important;
+}
+
+/* Botões compactos — nunca esticar */
+.erp-gestao-entregas-page .erp-gestao-entregas-actions .erp-nfe-actions__btn {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    min-width: 5.4rem !important;
+    max-width: 8rem !important;
+    height: 3rem !important;
+    padding: 0.2rem 0.35rem !important;
+    margin: 0 !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: var(--erp-radius-md, 8px) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: var(--erp-text, #0f172a) !important;
+    box-shadow: var(--erp-shadow-md, 0 2px 6px rgba(15, 23, 42, 0.12)) !important;
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas-actions .erp-nfe-actions__btn--close {
+    margin-left: auto !important;
+    border-color: #f87171 !important;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%) !important;
+    color: #fff !important;
+}
+
+.erp-gestao-entregas-page .erp-gestao-entregas-actions .erp-nfe-actions__btn--close .erp-nfe-actions__label,
+.erp-gestao-entregas-page .erp-gestao-entregas-actions .erp-nfe-actions__btn--close .erp-nfe-actions__label kbd,
+.erp-gestao-entregas-page .erp-gestao-entregas-actions .erp-nfe-actions__btn--close .erp-nfe-actions__icon {
+    color: #fff !important;
+}
+
+@supports not (height: 100dvh) {
+    html:has(.erp-gestao-entregas-page),
+    body:has(.erp-gestao-entregas-page),
+    .fi-body:has(.erp-gestao-entregas-page) {
+        height: 100vh !important;
+        max-height: 100vh !important;
+    }
+}
+
+/* Modal detalhe */
+.erp-gestao-entregas-modal__window {
+    width: min(640px, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+}
+
+.erp-gestao-entregas-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem 1.1rem !important;
+    overflow: auto;
+}
+
+.erp-gestao-entregas-modal__meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem 1rem;
+    font-size: 0.875rem;
+}
+
+.erp-gestao-entregas-modal__status {
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.erp-gestao-entregas-modal__status.is-entregue {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #81c784;
+}
+
+.erp-gestao-entregas-modal__status.is-nao {
+    background: #fff3e0;
+    color: #ef6c00;
+    border: 1px solid #ffb74d;
+}
+
+.erp-gestao-entregas-modal__status.is-pendente {
+    background: #fffde7;
+    color: #f9a825;
+    border: 1px solid #ffe082;
+}
+
+.erp-gestao-entregas-modal__block {
+    font-size: 0.875rem;
+}
+
+.erp-gestao-entregas-modal__block strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #0f3460;
+}
+
+.erp-gestao-entregas-modal__foto {
+    margin-top: 0.35rem;
+    border: 1px solid #c7d5e8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0f172a;
+}
+
+.erp-gestao-entregas-modal__foto--assinatura {
+    background: #fff;
+}
+
+.erp-gestao-entregas-modal__foto img {
+    display: block;
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+    background: #0f172a;
+}
+
+.erp-gestao-entregas-modal__foto--assinatura img {
+    max-height: 200px;
+    background: #fff;
+}
+
+.erp-gestao-entregas-modal__hint {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.erp-gestao-entregas-modal__itens {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.35rem;
+    font-size: 0.78rem;
+}
+
+.erp-gestao-entregas-modal__itens th,
+.erp-gestao-entregas-modal__itens td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.3rem 0.4rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.erp-gestao-entregas-modal__itens th {
+    background: #f1f5f9;
+    font-weight: 700;
+    color: #334155;
+}
+
+.erp-gestao-entregas-modal__itens td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-gestao-entregas-modal__item-desc {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-gestao-entregas-modal__item-cod {
+    font-size: 0.72rem;
+    color: #64748b;
+}

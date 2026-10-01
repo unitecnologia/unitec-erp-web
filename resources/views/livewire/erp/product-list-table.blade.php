@@ -99,6 +99,19 @@
         </tbody>
     </table>
 
+    @if (! $isSeriais)
+        @php
+            $statusLabel = match ($statusFilter) {
+                'inativos' => 'Total inativos',
+                'todos' => 'Total',
+                default => 'Total ativos',
+            };
+        @endphp
+        <div class="mt-2 px-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ $statusLabel }}: {{ $records->total() }}
+        </div>
+    @endif
+
     @if ($records->hasPages())
         <nav class="fi-pagination mt-2 px-2" aria-label="Paginação">
             <div class="flex items-center gap-2 text-sm">

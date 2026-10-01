@@ -701,30 +701,8 @@
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-text-item,
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .fi-ta-col .fi-ta-text {
-    font-weight: 800 !important;
+    font-weight: 400 !important;
     color: #0f172a !important;
-}
-
-/* ---- Linha marcada para faturar (checkbox): verde escuro ---- */
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-cell {
-    background: #166534 !important;
-    color: #f0fdf4 !important;
-    box-shadow: none !important;
-}
-
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked {
-    box-shadow: inset 5px 0 0 #064e3b;
-    outline: none;
-}
-
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked:hover .fi-ta-cell {
-    background: #15803d !important;
-}
-
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-text-item,
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .fi-ta-col .fi-ta-text {
-    font-weight: 800 !important;
-    color: #f0fdf4 !important;
 }
 
 /* ---- Detalhe: itens + pagamentos ---- */
@@ -749,7 +727,7 @@
     border: 1px solid var(--erp-border-light, #c7d5e8);
     border-radius: var(--erp-radius-md, 8px);
     box-shadow: var(--erp-shadow-sm, 0 1px 3px rgba(30, 90, 158, 0.1));
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
 }
@@ -758,6 +736,7 @@
     overflow: auto;
     max-height: calc(220px + 1mm);
     min-height: calc(120px + 1mm);
+    border-radius: var(--erp-radius-md, 8px) var(--erp-radius-md, 8px) 0 0;
 }
 
 .erp-fv-mon__table {
@@ -839,6 +818,53 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Código do produto: estreito; Cód. Barras permanece com --code sem largura fixa. */
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(1),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(1) {
+    width: 4.5rem;
+    max-width: 4.5rem;
+    text-align: center;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(2),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(2) {
+    width: 8.5rem;
+    max-width: 8.5rem;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__table th:nth-child(4),
+.erp-fv-mon__panel--itens .erp-fv-mon__table td:nth-child(4) {
+    width: calc(3.4rem + 0.3cm);
+    max-width: calc(3.4rem + 0.3cm);
+    min-width: 0;
+}
+
+/* Larguras monetárias por classe (coluna Custo opcional não quebra nth-child). */
+.erp-fv-mon__panel--itens .erp-fv-mon__th--vlr,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--vlr,
+.erp-fv-mon__panel--itens .erp-fv-mon__th--custo,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--custo {
+    width: calc(5.1rem + 0.3cm);
+    max-width: calc(5.1rem + 0.3cm);
+    min-width: 0;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__th--desc,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--desc,
+.erp-fv-mon__panel--itens .erp-fv-mon__th--acre,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--acre {
+    width: calc(4.4rem + 0.3cm);
+    max-width: calc(4.4rem + 0.3cm);
+    min-width: 0;
+}
+
+.erp-fv-mon__panel--itens .erp-fv-mon__th--liq,
+.erp-fv-mon__panel--itens .erp-fv-mon__td--liq {
+    width: calc(5.6rem + 0.3cm);
+    max-width: calc(5.6rem + 0.3cm);
+    min-width: 0;
+}
+
 .erp-fv-mon__empty {
     text-align: center;
     padding: 1.5rem 1rem;
@@ -849,6 +875,9 @@
 
 /* ---- Rodapé dos grids (contador + total) ---- */
 .erp-fv-mon__foot {
+    position: relative;
+    z-index: 5;
+    overflow: visible;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -856,6 +885,7 @@
     padding: 0.02rem 0.55rem;
     line-height: 1.15;
     border-top: 1px solid var(--erp-border, #94a3b8);
+    border-radius: 0 0 var(--erp-radius-md, 8px) var(--erp-radius-md, 8px);
     background: var(--erp-bg-muted, #eef3fa);
     font-size: var(--erp-font-size-xs, 0.8125rem);
 }
@@ -869,6 +899,19 @@
     text-align: center;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+}
+
+.erp-fv-mon__foot-end {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.erp-fv-mon__foot-pedido {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--erp-text, #0f172a);
 }
 
 .erp-fv-mon__foot-total {
@@ -919,6 +962,23 @@
 
 .erp-fv-monitor-page .erp-fv-mon__check {
     cursor: pointer !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    min-width: 1.15rem !important;
+    min-height: 1.15rem !important;
+    margin: 0 !important;
+    accent-color: #1d4ed8;
+    flex-shrink: 0;
+}
+
+/* Coluna do checkbox: área de clique maior */
+.erp-fv-monitor-page .fi-ta-row .fi-ta-cell:has(.erp-fv-mon__check),
+.erp-fv-monitor-page .fi-ta-header-cell:has(.erp-fv-mon__check) {
+    width: 2.2rem !important;
+    min-width: 2.2rem !important;
+    max-width: 2.2rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
 }
 
 .erp-fv-monitor-page .fi-ta-row .fi-ta-cell {
@@ -997,11 +1057,11 @@
     display: none !important;
 }
 
-/* Checkbox de seleção 2mm menor (não esticar a coluna) */
+/* Checkbox nativo do Filament (se houver) — um pouco maior que o padrão antigo */
 .erp-fv-monitor-page .fi-ta-table input[type="checkbox"],
 .erp-fv-monitor-page .fi-ta-table .fi-checkbox-input {
-    width: calc(1.25rem - 1.5mm) !important;
-    height: calc(1.25rem - 1.5mm) !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
 }
 
 .erp-fv-monitor-page .fi-ta-selection-cell,
@@ -1112,7 +1172,7 @@
         0 2px 3px rgba(15, 40, 71, 0.30);
 }
 
-/* Estornar (vermelho 3D) */
+/* Cancelar (vermelho 3D) */
 .erp-fv-monitor-page .erp-nfe-actions__icon--cancel {
     font-size: 0.8rem;
     border-radius: 50%;
@@ -1243,15 +1303,818 @@
     text-overflow: ellipsis;
 }
 
+.erp-fv-monitor-page .erp-fv-mon-money-cell--desc .erp-fv-mon-money,
+.erp-fv-monitor-page .erp-fv-mon-money-cell--desc .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .erp-fv-mon-money-cell--desc .erp-fv-mon-money__amount {
+    color: #b91c1c !important;
+    opacity: 1;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-money-cell--acre .erp-fv-mon-money,
+.erp-fv-monitor-page .erp-fv-mon-money-cell--acre .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .erp-fv-mon-money-cell--acre .erp-fv-mon-money__amount {
+    color: #15803d !important;
+    opacity: 1;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--desc .erp-fv-mon-money,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--desc .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--desc .erp-fv-mon-money__amount {
+    color: #fecaca !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--acre .erp-fv-mon-money,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--acre .erp-fv-mon-money__currency,
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money-cell--acre .erp-fv-mon-money__amount {
+    color: #bbf7d0 !important;
+}
+
+.erp-fv-mon__td--desc .erp-fv-mon-money,
+.erp-fv-mon__td--desc .erp-fv-mon-money__currency,
+.erp-fv-mon__td--desc .erp-fv-mon-money__amount {
+    color: #b91c1c;
+}
+
+.erp-fv-mon__td--acre .erp-fv-mon-money,
+.erp-fv-mon__td--acre .erp-fv-mon-money__currency,
+.erp-fv-mon__td--acre .erp-fv-mon-money__amount {
+    color: #15803d;
+}
+
 .erp-fv-monitor-page .erp-fv-mon-money-cell--bold .erp-fv-mon-money,
 .erp-fv-monitor-page .fi-ta-cell-total .erp-fv-mon-money {
     font-weight: 700;
 }
 
 .erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__currency,
-.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__amount,
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .erp-fv-mon-money__currency,
-.erp-fv-monitor-page .fi-ta-row.erp-fv-mon-row--checked .erp-fv-mon-money__amount {
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-money__amount {
     color: inherit;
     opacity: 1;
+}
+
+/* Meio Pgto = PIX: verde forte (o color do Filament é sobrescrito pela grade) */
+.erp-fv-monitor-page .erp-fv-mon-meio--pix {
+    color: #16a34a !important;
+    font-weight: 700 !important;
+}
+
+.erp-fv-monitor-page .fi-ta-row.erp-row-selected .erp-fv-mon-meio--pix {
+    color: #166534 !important;
+}
+
+/* ---- NF-e lote (overlay no Monitor) ---- */
+.erp-fv-monitor-page .erp-nfe-fiscal-progress.erp-fv-mon-nfe-lote {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 320;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-monitor-page .erp-nfe-fiscal-progress.erp-fv-mon-nfe-lote.is-visible {
+    display: flex;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 48%);
+    backdrop-filter: blur(2px);
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__panel {
+    position: relative;
+    width: min(26rem, 100%);
+    padding: 1.35rem 1.4rem 1.15rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow:
+        0 24px 48px rgb(15 52 96 / 28%),
+        0 0 0 1px rgb(255 255 255 / 70%) inset;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__spinner {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin: 0 auto 0.75rem;
+    border: 3px solid #dbeafe;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: erp-fv-mon-nfe-spin 0.85s linear infinite;
+}
+
+@keyframes erp-fv-mon-nfe-spin {
+    to { transform: rotate(360deg); }
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__title {
+    margin: 0 0 0.35rem;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f3460;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__status {
+    margin: 0 0 0.85rem;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    min-height: 1.2em;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__track {
+    height: 0.45rem;
+    margin: 0 0 0.9rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__bar {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    transition: width 0.25s ease;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.28rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: #cbd5e1;
+    flex-shrink: 0;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-active {
+    color: #1e40af;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-active::before {
+    background: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 22%);
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-done {
+    color: #15803d;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-done::before {
+    background: #16a34a;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-error {
+    color: #b91c1c;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__steps li.is-error::before {
+    background: #dc2626;
+    box-shadow: none;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__status.is-error {
+    color: #b91c1c;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-faturar-log {
+    margin: 0 0 0.65rem;
+    padding: 0;
+    list-style: none;
+    max-height: 4.5rem;
+    overflow: auto;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-faturar-log .is-ok {
+    color: #15803d;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-faturar-log .is-erro {
+    color: #b91c1c;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar .erp-nfe-fiscal-progress__bar {
+    transition: width 0.08s linear;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto {
+    display: none;
+    margin: 0 0 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    background: #fffbeb;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto.is-visible {
+    display: block;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto p {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #78350f;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto__actions button {
+    min-width: 5rem;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid #d97706;
+    border-radius: 6px;
+    background: #fff;
+    color: #78350f;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-cancelar-boleto__actions button[data-erp-fv-mon-cancelar-boleto-sim] {
+    border-color: #b45309;
+    background: #f59e0b;
+    color: #fff;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-nfe-lote .erp-nfe-fiscal-progress__hint {
+    margin: 0;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-actions__btn--lote:not(:disabled) {
+    border-color: #2563eb;
+}
+
+.erp-fv-mon-nfe-lote-resumo {
+    position: fixed;
+    inset: 0;
+    z-index: 330;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 340;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 45%);
+}
+
+.erp-fv-mon-nfe-emitente-modal__dialog {
+    position: relative;
+    width: min(28rem, 100%);
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #94a3b8;
+    box-shadow: 0 18px 40px rgb(15 52 96 / 28%);
+    overflow: hidden;
+}
+
+.erp-fv-mon-nfe-emitente-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    border-bottom: 1px solid #94a3b8;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #0f2847;
+}
+
+.erp-fv-mon-nfe-emitente-modal__close {
+    border: 0;
+    background: transparent;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #475569;
+}
+
+.erp-fv-mon-nfe-emitente-modal__body {
+    padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal__hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem;
+    color: #334155;
+    line-height: 1.35;
+}
+
+.erp-fv-mon-nfe-emitente-modal__list {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 16rem;
+    overflow: auto;
+}
+
+.erp-fv-mon-nfe-emitente-modal__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: #0f172a;
+}
+
+.erp-fv-mon-nfe-emitente-modal__item:has(input:checked) {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.erp-fv-mon-nfe-emitente-modal__item input {
+    margin-top: 0.15rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal__item span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal__fantasia,
+.erp-fv-mon-nfe-emitente-modal__cnpj {
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.erp-fv-mon-nfe-emitente-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.55rem 0.85rem 0.75rem;
+}
+
+.erp-fv-mon-nfe-emitente-modal__btn {
+    min-width: 6rem;
+    padding: 0.32rem 0.7rem;
+    border: 1px solid #94a3b8;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #fff 0%, #eef2f7 100%);
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #0f172a;
+    cursor: pointer;
+}
+
+.erp-fv-mon-nfe-emitente-modal__btn--ok {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+}
+
+.erp-fv-mon-nfe-emitente-modal__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.erp-fv-mon-nfe-emitente-modal__btn:hover:not(:disabled) {
+    filter: brightness(1.03);
+}
+
+.erp-fv-mon-nfe-lote-resumo__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 45%);
+}
+
+.erp-fv-mon-nfe-lote-resumo__panel {
+    position: relative;
+    width: min(32rem, 100%);
+    padding: 1.25rem 1.35rem;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 20px 40px rgb(15 52 96 / 25%);
+}
+
+.erp-fv-mon-nfe-lote-resumo__panel h2 {
+    margin: 0 0 0.65rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f3460;
+}
+
+.erp-fv-mon-nfe-lote-resumo__text {
+    margin: 0 0 0.85rem;
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: #334155;
+}
+
+.erp-fv-mon-nfe-lote-resumo__erros {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    max-height: 14rem;
+    overflow: auto;
+}
+
+.erp-fv-mon-nfe-lote-resumo__erro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.45rem 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+}
+
+.erp-fv-mon-nfe-lote-resumo__erro-msg {
+    flex: 1 1 12rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #9a3412;
+    word-break: break-word;
+}
+
+.erp-fv-mon-nfe-lote-resumo__abrir {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 6px;
+    background: #0f3460;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.erp-fv-mon-nfe-lote-resumo__abrir:hover {
+    background: #1e4976;
+    color: #fff;
+}
+
+.erp-fv-mon-nfe-lote-resumo__btn {
+    display: inline-flex;
+    min-width: 5.5rem;
+    justify-content: center;
+    align-items: center;
+    padding: 0.45rem 1rem;
+    border: none;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-fv-mon-nfe-lote-resumo__btn:hover {
+    background: #1d4ed8;
+}
+
+/* Vendedor: largura fixa para caber "ANDERSON WAGNER". */
+.erp-fv-monitor-page .fi-ta-header-cell.erp-fv-mon-vendedor,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-vendedor {
+    width: calc(18ch + 1.1rem) !important;
+    min-width: calc(18ch + 1.1rem) !important;
+    max-width: calc(18ch + 1.1rem) !important;
+    overflow: hidden;
+}
+
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-vendedor .fi-ta-col,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-vendedor .fi-ta-text,
+.erp-fv-monitor-page .fi-ta-cell.erp-fv-mon-vendedor .fi-ta-text-item {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Local (GPS do pedido) ---- */
+.erp-fv-monitor-page .fi-ta-header-cell:has(.erp-fv-mon-local),
+.erp-fv-monitor-page .fi-ta-cell:has(.erp-fv-mon-local),
+.erp-fv-monitor-page .fi-ta-header-cell-local,
+.erp-fv-monitor-page .fi-ta-cell-local {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 3rem;
+    padding-inline: 0.25rem !important;
+    text-align: center;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-local {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-local:hover {
+    opacity: 0.85;
+    transform: scale(1.08);
+}
+
+.erp-fv-monitor-page .erp-fv-mon-local--vazio {
+    color: #94a3b8;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: default;
+    transform: none;
+}
+
+/* ---- Env. (envio e-mail / WhatsApp) ---- */
+.erp-fv-monitor-page .erp-fv-mon-envio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-envio--email {
+    color: #2563eb;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-envio--whats {
+    color: #16a34a;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-envio--vazio {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+/* Modal cancelar pedidos (reusa classes erp-vendas-cancel-modal) */
+.erp-fv-monitor-page .erp-vendas-cancel-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, calc(100vw - 2rem));
+    border: 1px solid #7f96b3;
+    border-radius: 10px;
+    background: #f4f7fb;
+    box-shadow: 0 22px 56px rgba(15, 40, 71, 0.42);
+    overflow: hidden;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.7rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__close {
+    width: 1.55rem;
+    height: 1.55rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__body {
+    padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.78rem;
+    color: #334155;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__textarea {
+    display: block;
+    width: 100%;
+    min-height: 5.5rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    resize: vertical;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__textarea:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+    border-color: #3b82f6;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__counter {
+    margin: 0.35rem 0 0;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__counter--warn {
+    color: #c2410c;
+    font-weight: 600;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__counter--ok {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding: 0.55rem 0.85rem 0.75rem;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__btn {
+    min-width: 5.5rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    color: #0f172a;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-vendas-cancel-modal__btn--danger {
+    border-color: #b91c1c;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+}
+
+/* Confirmação de clonagem — mesmo cartão do aviso "produto não encontrado", em laranja */
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: grid;
+    place-items: center;
+    background: rgba(15, 52, 96, 0.18);
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__box {
+    width: min(90vw, 30rem);
+    background: #fff;
+    border: 3px solid #ea580c;
+    border-radius: 16px;
+    box-shadow: 0 22px 60px rgba(234, 88, 12, 0.4);
+    padding: 1.8rem 2rem 1.5rem;
+    text-align: center;
+    animation: erp-fv-mon-clonar-aviso-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes erp-fv-mon-clonar-aviso-pulse {
+    from { transform: scale(1); box-shadow: 0 22px 60px rgba(234, 88, 12, 0.4); }
+    to   { transform: scale(1.03); box-shadow: 0 26px 72px rgba(234, 88, 12, 0.55); }
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__icon {
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: 0 auto 0.6rem;
+    border-radius: 50%;
+    background: #ea580c;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 3.2rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__title {
+    margin: 0 0 0.4rem;
+    color: #c2410c;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__text {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__btn {
+    min-width: 8rem;
+    padding: 0.6rem 1.4rem;
+    background: #ea580c;
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__btn:hover {
+    background: #c2410c;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__btn--nao {
+    background: #fff;
+    color: #c2410c;
+    border: 2px solid #ea580c;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-clonar-aviso__btn--nao:hover {
+    background: #fff7ed;
 }

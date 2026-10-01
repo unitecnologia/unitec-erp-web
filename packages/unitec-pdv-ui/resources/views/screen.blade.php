@@ -11,10 +11,18 @@
 @endphp
 
 @includeWhen($modal === 'options', 'pdvui::modals.options')
+@includeWhen($modal === 'menu_fiscal', 'pdvui::modals.menu-fiscal')
+@includeWhen($modal === 'menu_fiscal_identificacao', 'pdvui::modals.menu-fiscal-identificacao')
+@includeWhen($modal === 'menu_fiscal_exportacao_xml', 'pdvui::modals.menu-fiscal-exportacao-xml')
+@includeWhen($modal === 'menu_fiscal_registros', 'pdvui::modals.menu-fiscal-registros')
+@includeWhen($modal === 'menu_fiscal_dav', 'pdvui::modals.menu-fiscal-dav')
 @includeWhen($modal === 'resumo', 'pdvui::modals.resumo-caixa')
 @includeWhen($modal === 'sangria', 'pdvui::modals.sangria')
 @includeWhen($modal === 'suprimento', 'pdvui::modals.suprimento')
 @includeWhen(in_array($modal, ['abrir_caixa', 'fechar_caixa'], true), 'pdvui::modals.caixa')
+@includeWhen($this->fechamentoMoedasModalOpen ?? false, 'pdvui::modals.contar-moedas')
+@includeWhen($modal === 'vendas_espera', 'pdvui::modals.vendas-espera')
+@includeWhen($modal === 'acesso_rapido', 'pdvui::modals.acesso-rapido')
 @includeWhen($modal === 'finalizar', 'pdvui::modals.finalizar')
 @include('pdvui::fiscal-progress')
 
@@ -61,11 +69,13 @@
 @includeWhen($modal === 'sair', 'pdvui::modals.sair')
 @includeWhen(($this->produtoNaoEncontradoCodigo ?? null) !== null, 'pdvui::modals.produto-nao-encontrado')
 
+@include('filament.components.erp.boleto-pos-documento')
+
 {{-- Cadastros: ERP usa iframe Filament; offline pode injetar corpo local via slots/flags. --}}
 @if ($this->overlayProductOpen ?? false)
     @if (! empty($this->productOverlayUrl ?? null))
         @include('pdvui::overlays.iframe', [
-            'title' => 'Cadastro de Produtos',
+            'title' => 'Produtos',
             'iframeUrl' => $this->productOverlayUrl,
             'type' => 'product',
         ])

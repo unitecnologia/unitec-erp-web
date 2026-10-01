@@ -15,6 +15,14 @@ class EditPerson extends EditRecord
 
     public function mount(int | string $record): void
     {
+        if (request()->boolean('pdv')) {
+            $this->embedsInPdv = true;
+        }
+
+        if (request()->boolean('orcamento')) {
+            $this->embedsInOrcamento = true;
+        }
+
         parent::mount($record);
 
         ErpScreen::set('Cadastro de Pessoas');
@@ -35,6 +43,10 @@ class EditPerson extends EditRecord
 
     protected function getRedirectUrl(): string
     {
+        if ($this->embedsInPdv) {
+            return $this->getPersonListRedirectUrl();
+        }
+
         return $this->erpFormReturnRedirectUrl($this->getPersonListRedirectUrl());
     }
 }

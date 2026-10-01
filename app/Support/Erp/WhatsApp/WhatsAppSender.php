@@ -12,6 +12,8 @@ class WhatsAppSender
 
     public const TIPO_RECIBO = 'recibo';
 
+    public const TIPO_ORDEM_SERVICO = 'ordem_servico';
+
     public const TIPO_COBRANCA = 'cobranca';
 
     public const TIPO_NFE = 'nfe';
@@ -19,6 +21,8 @@ class WhatsAppSender
     public const TIPO_NFE_CONTADOR = 'nfe_contador';
 
     public const TIPO_NFCE_CONTADOR = 'nfce_contador';
+
+    public const TIPO_NFSE_CONTADOR = 'nfse_contador';
 
     public const TIPO_COMPRA_CONTADOR = 'compra_contador';
 

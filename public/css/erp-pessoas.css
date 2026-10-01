@@ -112,13 +112,16 @@
 
 .erp-pessoas-page .erp-pessoas__status-wrap {
     flex-shrink: 0;
-    margin: 0 0.65rem 0;
+    margin: 0 0.65rem -1px;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-pessoas-page .erp-pessoas__status {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    align-items: flex-end;
 }
 
 .erp-pessoas-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
@@ -134,20 +137,25 @@
     }
 }
 
+/* ── Abas estilo fichário (padrão Orçamentos) ── */
+
 .erp-pessoas-page .erp-pessoas__tabs-wrap {
     flex-shrink: 0;
-    margin: 0;
+    margin: 0 0 -1px;
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
+    position: relative;
+    z-index: 1;
 }
 
 .erp-pessoas-page .erp-pessoas__tabs {
     margin: 0;
-    gap: 0.25rem;
+    gap: 0.15rem;
     flex-wrap: wrap;
+    align-items: flex-end;
 }
 
 .erp-pessoas-page .erp-pessoas__tab {
@@ -158,8 +166,34 @@
     line-height: 1.1;
     min-height: 0;
     font-family: inherit;
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 600;
+    color: #64748b;
+    background: #e8edf3;
+    border: 1px solid #c5d0dc;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: none;
     cursor: pointer;
     appearance: none;
+    transition: none;
+}
+
+.erp-pessoas-page .erp-pessoas__tab:hover:not(.erp-pessoas__tab--active) {
+    background: #dde4ec;
+    color: #475569;
+    border-color: #b0bcc9;
+}
+
+.erp-pessoas-page .erp-pessoas__tab--active {
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    border-bottom: 1px solid #fff;
+    box-shadow: none;
+    font-weight: 700;
 }
 
 .erp-pessoas-page .fi-sc > div:not(.fi-hidden) {

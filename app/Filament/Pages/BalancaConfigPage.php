@@ -201,7 +201,6 @@ class BalancaConfigPage extends Page
     protected function loadEtiquetaFromEmpresa(mixed $empresa): void
     {
         $modelo = $empresa?->param_balanca_etiqueta_modelo
-            ?? $empresa?->param_pdv_modelo_balanca
             ?? BalancaEtiquetaLayout::DEFAULT_MODELO;
 
         $this->etiquetaModelo = BalancaEtiquetaLayout::normalizeModelo($modelo);
@@ -287,8 +286,6 @@ class BalancaConfigPage extends Page
             'param_balanca_etiqueta_modelo' => $this->etiquetaModelo,
             'param_balanca_prefixo_barra' => $this->etiquetaPrefixo,
             'param_balanca_digitos' => $this->etiquetaDigitos,
-            // Mantém PDV alinhado (mesmo campo legado Delphi).
-            'param_pdv_modelo_balanca' => $this->etiquetaModelo,
         ])->save();
 
         $this->setEtiquetaFeedback('ok', 'Configuração de etiquetas gravada.');

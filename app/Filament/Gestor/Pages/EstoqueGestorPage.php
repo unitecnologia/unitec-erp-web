@@ -40,9 +40,7 @@ class EstoqueGestorPage extends Page
     {
         $this->mountGestorShell();
         $empresaId = app(GestorExecutivoService::class)->empresaId();
-        // Calcula o gauge uma vez; o snapshot reutiliza o memo de saudeEstoque.
         $this->saudeEstoque = ErpDashboardGauges::saudeEstoqueGauge();
-        $this->snapshot = app(GestorExecutivoService::class)->snapshot($empresaId);
         $this->criticos = $this->listarCriticos($empresaId);
     }
 

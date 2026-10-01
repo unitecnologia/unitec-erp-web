@@ -52,6 +52,14 @@ final class ContadorCloudHttpHelper
         return $base.(str_starts_with($path, '/') ? $path : '/'.$path);
     }
 
+    public static function pairingAutoUrl(string $baseUrl = ''): string
+    {
+        $base = self::resolvePortalBaseUrl($baseUrl);
+        $path = (string) config('contador-cloud.pairing_auto_path', '/api/portal/vinculos/auto');
+
+        return $base.(str_starts_with($path, '/') ? $path : '/'.$path);
+    }
+
     public static function pairingStatusUrl(string $vinculoId, string $baseUrl = ''): string
     {
         $base = self::resolvePortalBaseUrl($baseUrl);

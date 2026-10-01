@@ -4,16 +4,20 @@ namespace App\Support\Erp\Vendas;
 
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
+use App\Models\ClienteCreditoMovimentacao;
 use App\Models\ContaReceber;
 use App\Models\DevolucaoVenda;
 use App\Models\DevolucaoVendaItem;
-use App\Models\Empresa;
 use App\Models\PdvVendaItem;
+use App\Models\PlanoConta;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Models\Venda;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\ClienteCreditoService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\Pdv\PdvStockService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +33,10 @@ final class FinalizarDevolucaoVendaService
 {
     public const OPERACAO = 'FINALIZAR_DEVOLUCAO_VENDA';
 
+    public const DESTINO_DINHEIRO = 'dinheiro';
+
+    public const DESTINO_CREDITO = 'credito';
+
     public function __construct(
         private readonly PdvStockService $stockService = new PdvStockService(),
         private readonly ErpOperacaoLogService $operacaoLog = new ErpOperacaoLogService(),
@@ -40,7 +48,7 @@ final class FinalizarDevolucaoVendaService
      *
      * @throws DomainException
      */
-    public function finalizar(DevolucaoVenda $devolucao): DevolucaoVenda
+    public function finalizar(DevolucaoVenda $devolucao, string $destinoResto = self::DESTINO_DINHEIRO): DevolucaoVenda
     {
         $devolucao->loadMissing(['itens.product', 'venda.pdvVenda.itens', 'venda.forcaVendasOrder', 'cliente']);
 
@@ -69,14 +77,21 @@ final class FinalizarDevolucaoVendaService
         $this->validarQuantidades($devolucao, $venda);
 
         $total = round((float) $devolucao->total, 2);
+        $destinoResto = $destinoResto === self::DESTINO_CREDITO
+            ? self::DESTINO_CREDITO
+            : self::DESTINO_DINHEIRO;
 
-        DB::transaction(function () use ($devolucao, $venda, $total): void {
+        DB::transaction(function () use ($devolucao, $venda, $total, $destinoResto): void {
             $this->devolverEstoque($devolucao, $venda);
 
             $restoFinanceiro = $this->estornarContasReceberAbertas($venda, $total, $devolucao);
 
             if ($restoFinanceiro > 0.009) {
-                $this->lancarSaidaCaixa($devolucao, $restoFinanceiro);
+                if ($destinoResto === self::DESTINO_CREDITO) {
+                    $this->gerarCreditoCliente($devolucao, $restoFinanceiro);
+                } else {
+                    $this->lancarSaidaCaixa($devolucao, $restoFinanceiro);
+                }
             }
 
             $devolucao->update([
@@ -95,11 +110,40 @@ final class FinalizarDevolucaoVendaService
                 'venda_id' => $venda->id,
                 'venda_numero' => $venda->numero,
                 'total' => $total,
+                'destino_resto' => $destinoResto,
             ],
             empresaId: $devolucao->empresa_id ? (int) $devolucao->empresa_id : ErpContext::currentEmpresaId(),
         );
 
         return $devolucao->fresh(['itens', 'venda']) ?? $devolucao;
+    }
+
+    /**
+     * Estorna o crédito gerado por esta devolução com movimento inverso.
+     * Não apaga o extrato e não desfaz estoque/caixa.
+     */
+    public function estornarCreditoGerado(DevolucaoVenda $devolucao, ?int $usuarioId = null): int
+    {
+        $estornados = (new ClienteCreditoService())->estornarCreditosDaOrigem(
+            ClienteCreditoMovimentacao::ORIGEM_DEVOLUCAO,
+            (int) $devolucao->id,
+            $usuarioId,
+            'Estorno da devolução #'.($devolucao->numero ?: $devolucao->id),
+        );
+
+        if ($estornados > 0) {
+            $this->operacaoLog->registrar(
+                operacao: 'ESTORNAR_CREDITO_DEVOLUCAO',
+                resumo: 'Crédito da devolução #'.$devolucao->numero.' estornado no extrato do cliente.',
+                origem: 'devolucao_venda',
+                documentoTipo: 'devolucao_venda',
+                documentoId: (int) $devolucao->id,
+                documentoNumero: (string) $devolucao->numero,
+                empresaId: $devolucao->empresa_id ? (int) $devolucao->empresa_id : ErpContext::currentEmpresaId(),
+            );
+        }
+
+        return $estornados;
     }
 
     private function validarQuantidades(DevolucaoVenda $devolucao, Venda $venda): void
@@ -176,6 +220,16 @@ final class FinalizarDevolucaoVendaService
                 (float) $item->qtd,
                 $gradeId,
                 $serialId,
+                null,
+                EstoqueMovimentacaoContext::make(
+                    EstoqueMovimentacao::TIPO_DEVOLUCAO_VENDA,
+                    empresaId: $devolucao->empresa_id
+                        ? (int) $devolucao->empresa_id
+                        : ErpContext::currentEmpresaId(),
+                    origemTipo: 'devolucao_venda',
+                    origemId: (int) $devolucao->id,
+                    origemNumero: $devolucao->numero !== null ? (string) $devolucao->numero : null,
+                ),
             );
         }
     }
@@ -210,14 +264,55 @@ final class FinalizarDevolucaoVendaService
     }
 
     /**
+     * @return array{total: float, abatimentos: float, a_devolver: float}
+     */
+    public function preverRestituicao(?int $vendaId, float $totalDevolucao): array
+    {
+        $total = round($totalDevolucao, 2);
+        $aDevolver = $this->restoDinheiroPrevisto($vendaId, $total);
+
+        return [
+            'total' => $total,
+            'abatimentos' => round(max(0, $total - $aDevolver), 2),
+            'a_devolver' => $aDevolver,
+        ];
+    }
+
+    /**
+     * Valor que iria sair do caixa (já pago), sem alterar títulos.
+     * Crédito só nasce desse resto — título em aberto continua abatendo a conta.
+     */
+    public function restoDinheiroPrevisto(?int $vendaId, float $totalDevolucao): float
+    {
+        $totalDevolucao = round($totalDevolucao, 2);
+
+        if (! $vendaId || $totalDevolucao <= 0) {
+            return 0.0;
+        }
+
+        $venda = Venda::query()->with(['pdvVenda', 'forcaVendasOrder'])->find($vendaId);
+
+        if (! $venda) {
+            return 0.0;
+        }
+
+        return $this->restoAposTitulosAbertos($venda, $totalDevolucao, aplicar: false, devolucao: null);
+    }
+
+    /**
      * Reduz títulos em aberto da venda; devolve o valor que sobrou para saída de caixa.
      */
     private function estornarContasReceberAbertas(Venda $venda, float $totalDevolucao, DevolucaoVenda $devolucao): float
     {
+        return $this->restoAposTitulosAbertos($venda, $totalDevolucao, aplicar: true, devolucao: $devolucao);
+    }
+
+    private function restoAposTitulosAbertos(Venda $venda, float $totalDevolucao, bool $aplicar, ?DevolucaoVenda $devolucao): float
+    {
         $resto = round($totalDevolucao, 2);
 
         if ($resto <= 0 || ! $venda->cliente_id) {
-            return $resto;
+            return max(0, $resto);
         }
 
         if (! Schema::hasTable((new ContaReceber)->getTable())) {
@@ -230,7 +325,7 @@ final class FinalizarDevolucaoVendaService
             return $resto;
         }
 
-        $contas = ContaReceber::query()
+        $query = ContaReceber::query()
             ->where('cliente_id', $venda->cliente_id)
             ->where(function ($q) use ($docs): void {
                 foreach ($docs as $doc) {
@@ -240,28 +335,58 @@ final class FinalizarDevolucaoVendaService
             })
             ->where('saldo', '>', 0)
             ->orderBy('vencimento')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
+            ->orderBy('id');
 
-        foreach ($contas as $conta) {
+        if ($aplicar) {
+            $query->lockForUpdate();
+        }
+
+        foreach ($query->get() as $conta) {
             if ($resto <= 0.009) {
                 break;
             }
 
             $saldo = round((float) $conta->saldo, 2);
-            $aplicar = min($saldo, $resto);
+            $aplicarValor = min($saldo, $resto);
 
-            // Reduz o valor do título (mantém o já recebido).
-            $novoValor = round(max((float) $conta->valor_recebido, (float) $conta->valor - $aplicar), 2);
-            $conta->valor = $novoValor;
-            $conta->historico = trim((string) $conta->historico.' | DEV#'.$devolucao->numero);
-            $conta->save();
+            if ($aplicar && $devolucao) {
+                $novoValor = round(max((float) $conta->valor_recebido, (float) $conta->valor - $aplicarValor), 2);
+                $conta->valor = $novoValor;
+                $conta->historico = trim((string) $conta->historico.' | DEV#'.$devolucao->numero);
+                $conta->save();
+            }
 
-            $resto = round($resto - $aplicar, 2);
+            $resto = round($resto - $aplicarValor, 2);
         }
 
         return max(0, $resto);
+    }
+
+    private function gerarCreditoCliente(DevolucaoVenda $devolucao, float $valor): void
+    {
+        $clienteId = $devolucao->cliente_id ? (int) $devolucao->cliente_id : null;
+        $credito = new ClienteCreditoService();
+
+        if (! $credito->podeReceberCredito($clienteId)) {
+            throw new DomainException('Selecione o cliente da venda para gerar crédito. Consumidor final não recebe saldo.');
+        }
+
+        $empresaId = $devolucao->empresa_id
+            ? (int) $devolucao->empresa_id
+            : (int) (ErpContext::currentEmpresaId() ?? 0);
+
+        $numeroVenda = trim((string) ($devolucao->venda_numero ?: $devolucao->venda_id));
+
+        $credito->gerar(
+            clienteId: (int) $clienteId,
+            valor: $valor,
+            empresaId: $empresaId,
+            origemTipo: ClienteCreditoMovimentacao::ORIGEM_DEVOLUCAO,
+            origemId: (int) $devolucao->id,
+            origemNumero: $numeroVenda !== '' ? $numeroVenda : null,
+            observacao: 'Devolução #'.($devolucao->numero ?: $devolucao->id),
+            usuarioId: $devolucao->usuario_id ? (int) $devolucao->usuario_id : null,
+        );
     }
 
     /**
@@ -292,14 +417,7 @@ final class FinalizarDevolucaoVendaService
             return;
         }
 
-        $empresaId = $devolucao->empresa_id
-            ? (int) $devolucao->empresa_id
-            : ErpContext::currentEmpresaId();
-
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
-        $planoId = $empresa?->param_plano_devolucao
-            ? (int) $empresa->param_plano_devolucao
-            : null;
+        $plano = $this->planoDevolucao(9);
 
         $caixaContaId = (int) CaixaConta::ensureCaixaGeral()->id;
 
@@ -313,11 +431,28 @@ final class FinalizarDevolucaoVendaService
                 0,
                 180
             ),
-            'plano_contas' => null,
-            'plano_conta_id' => $planoId > 0 ? $planoId : null,
+            'plano_contas' => $plano
+                ? mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120)
+                : null,
+            'plano_conta_id' => $plano?->id,
             'caixa_conta_id' => $caixaContaId > 0 ? $caixaContaId : null,
             'entrada' => 0,
             'saida' => $valor,
         ]);
+    }
+
+    /**
+     * Resolve plano de contas por id ou código legado. Se não existir, o caixa segue sem plano.
+     */
+    private function planoDevolucao(mixed $parametro): ?PlanoConta
+    {
+        $valor = (int) $parametro;
+
+        if ($valor <= 0) {
+            return null;
+        }
+
+        return PlanoConta::query()->whereKey($valor)->first()
+            ?? PlanoConta::query()->where('codigo', $valor)->first();
     }
 }

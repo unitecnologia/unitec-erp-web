@@ -41,7 +41,12 @@ class PlanoContaResource extends Resource
                     ->label('Código')
                     ->sortable()
                     ->alignCenter()
-                    ->weight(FontWeight::SemiBold),
+                    ->weight(FontWeight::SemiBold)
+                    ->formatStateUsing(function ($state, PlanoConta $record): string {
+                        $conta = trim((string) ($record->conta_completa ?? ''));
+
+                        return $conta !== '' ? $conta : (string) $state;
+                    }),
                 TextColumn::make('descricao')
                     ->label('Descrição')
                     ->wrap(false)
@@ -51,8 +56,8 @@ class PlanoContaResource extends Resource
                     ->label('Tipo')
                     ->alignCenter()
                     ->formatStateUsing(fn (?string $state): string => match (strtoupper((string) $state)) {
-                        'D' => 'D',
-                        'C' => 'C',
+                        'D' => 'DÉBITO',
+                        'C' => 'CRÉDITO',
                         default => '—',
                     })
                     ->weight(FontWeight::SemiBold),

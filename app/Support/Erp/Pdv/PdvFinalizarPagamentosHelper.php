@@ -167,6 +167,28 @@ final class PdvFinalizarPagamentosHelper
     }
 
     /**
+     * PIX com "Gerar QR Code na tela do PDV".
+     *
+     * @param  array{forma?: string, tipo?: string, gerar_qrcode_pdv?: bool|int|string}  $pagamento
+     */
+    public static function isFormaPixGerarQrcodePdv(array $pagamento): bool
+    {
+        if (! filter_var($pagamento['gerar_qrcode_pdv'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($pagamento['tipo'] ?? '')), 'UTF-8');
+
+        if ($tipo === 'pix') {
+            return true;
+        }
+
+        $forma = mb_strtoupper(trim((string) ($pagamento['forma'] ?? '')), 'UTF-8');
+
+        return str_contains($forma, 'PIX');
+    }
+
+    /**
      * Converte "30,60,90" numa lista de dias [30, 60, 90].
      *
      * @return list<int>

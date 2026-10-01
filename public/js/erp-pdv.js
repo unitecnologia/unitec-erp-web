@@ -439,6 +439,17 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-vendas-espera-motivo', () => {
+        window.setTimeout(() => {
+            const el = document.getElementById('erp-pdv-vendas-espera-motivo');
+            if (! el) {
+                return;
+            }
+            el.focus();
+            el.select?.();
+        }, 50);
+    });
+
     window.Livewire.on('erp-pdv-focus-estorno-venda', () => {
         window.setTimeout(() => {
             const motivo = document.getElementById('erp-pdv-estorno-motivo');
@@ -461,6 +472,67 @@ function bindErpPdvLivewireEvents() {
     window.Livewire.on('erp-pdv-hide-fiscal-progress', () => {
         hidePdvFiscalTransmitProgress();
     });
+
+    window.Livewire.on('erp-pdv-pix-qr-opened', () => {
+        erpPdvFinalizarSubmitting = false;
+        hidePdvFiscalTransmitProgress();
+        window.setTimeout(() => {
+            document.querySelector('.erp-pdv-pix-qr .erp-pdv-modal__btn--primary')
+                ?.focus()
+                || document.querySelector('.erp-pdv-pix-qr .erp-pdv-modal__btn')?.focus();
+        }, 50);
+    });
+
+    /**
+     * Contagem regressiva do QR Pix no PDV (Alpine).
+     * @param {number} endsAtTs unix seconds
+     * @param {number} durationSec
+     */
+    window.erpPdvPixCountdown = function erpPdvPixCountdown(endsAtTs, durationSec) {
+        const duration = Math.max(1, Number(durationSec) || 300);
+        const endsAt = Number(endsAtTs) || (Math.floor(Date.now() / 1000) + duration);
+
+        return {
+            endsAt,
+            duration,
+            left: duration,
+            pct: 100,
+            label: '05:00',
+            timer: null,
+            expiredNotified: false,
+
+            start() {
+                this.tick();
+                this.timer = window.setInterval(() => this.tick(), 250);
+            },
+
+            destroy() {
+                if (this.timer) {
+                    window.clearInterval(this.timer);
+                    this.timer = null;
+                }
+            },
+
+            tick() {
+                const now = Math.floor(Date.now() / 1000);
+                this.left = Math.max(0, this.endsAt - now);
+                this.pct = Math.max(0, Math.min(100, Math.round((this.left / this.duration) * 100)));
+                const m = Math.floor(this.left / 60);
+                const s = this.left % 60;
+                this.label = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+                if (this.left <= 0 && ! this.expiredNotified) {
+                    this.expiredNotified = true;
+                    this.destroy();
+                    try {
+                        this.$wire?.expirarPixQrcodePdv?.();
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            },
+        };
+    };
 
     // "Erro ao carregar a página" / timeout: Livewire morre sem hide — fecha o overlay na hora.
     window.Livewire.hook('request', ({ fail }) => {
@@ -551,6 +623,7 @@ function initErpPdv() {
     bindPdvClickGuard();
     bindPdvLaunchStepBack();
     bindPdvSearchFocusTrap();
+    bindPdvPersonOverlayHeight();
 
     const page = document.querySelector('.erp-pdv-page');
 
@@ -578,6 +651,171 @@ function initErpPdv() {
     }
 
     resetPdvIdleTimer();
+}
+
+/**
+ * Clientes no PDV: listagem usa painel alto; create/edit acompanha a altura do formulário.
+ * Detecta o estado pela URL do iframe (same-origin) — sem postMessage.
+ */
+function bindPdvPersonOverlayHeight() {
+    if (window.__erpPdvPersonOverlayHeightBound) {
+        syncPdvPersonOverlays();
+
+        return;
+    }
+
+    window.__erpPdvPersonOverlayHeightBound = true;
+
+    const sync = () => {
+        window.requestAnimationFrame(() => syncPdvPersonOverlays());
+    };
+
+    window.setInterval(sync, 320);
+    document.addEventListener('load', (event) => {
+        if (event.target?.matches?.('iframe.erp-pdv-overlay__iframe, iframe[data-erp-pdv-overlay-iframe]')) {
+            sync();
+        }
+    }, true);
+
+    if (document.body) {
+        const mo = new MutationObserver((mutations) => {
+            const relevant = mutations.some((mutation) => {
+                if (mutation.type !== 'childList') {
+                    return false;
+                }
+
+                const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+
+                return nodes.some((node) => {
+                    if (! (node instanceof Element)) {
+                        return false;
+                    }
+
+                    return node.matches?.('.erp-pdv-overlay')
+                        || node.querySelector?.('.erp-pdv-overlay');
+                });
+            });
+
+            if (relevant) {
+                sync();
+            }
+        });
+
+        mo.observe(document.body, { childList: true, subtree: true });
+    }
+
+    sync();
+}
+
+function findPdvPersonOverlays() {
+    return document.querySelectorAll(
+        '.erp-pdv-overlay[data-erp-pdv-overlay-type="person"], .erp-pdv-overlay[aria-label="Cadastro de Clientes"]'
+    );
+}
+
+function resolvePdvPersonOverlayMode(pathname) {
+    if (! pathname) {
+        return null;
+    }
+
+    if (pathname.includes('/people/create') || /\/people\/[^/]+\/edit\/?$/.test(pathname)) {
+        return 'form';
+    }
+
+    if (pathname.includes('/people')) {
+        return 'list';
+    }
+
+    return null;
+}
+
+function measurePdvPersonFormContentHeight(doc) {
+    const pcad = doc.querySelector('.erp-pcad');
+    const actions = doc.querySelector('.erp-pcad-actions');
+
+    if (! pcad || ! actions) {
+        return null;
+    }
+
+    const top = Math.min(pcad.getBoundingClientRect().top, actions.getBoundingClientRect().top);
+    const bottom = Math.max(pcad.getBoundingClientRect().bottom, actions.getBoundingClientRect().bottom);
+    const height = Math.ceil(bottom - top);
+
+    return height >= 120 ? height : null;
+}
+
+function applyPdvPersonOverlayLayout(overlay) {
+    const iframe = overlay.querySelector('[data-erp-pdv-overlay-iframe], iframe.erp-pdv-overlay__iframe');
+    const panel = overlay.querySelector('.erp-pdv-overlay__panel');
+    const header = overlay.querySelector('.erp-pdv-overlay__header');
+
+    if (! iframe || ! panel) {
+        return;
+    }
+
+    let pathname = '';
+
+    try {
+        pathname = iframe.contentWindow?.location?.pathname || '';
+    } catch (error) {
+        return;
+    }
+
+    if (! pathname) {
+        return;
+    }
+
+    const mode = resolvePdvPersonOverlayMode(pathname);
+
+    if (! mode) {
+        return;
+    }
+
+    overlay.classList.toggle('erp-pdv-overlay--person-list', mode === 'list');
+    overlay.classList.toggle('erp-pdv-overlay--person-form', mode === 'form');
+
+    if (mode === 'list') {
+        panel.style.removeProperty('height');
+        iframe.style.removeProperty('height');
+        iframe.style.removeProperty('flex');
+        iframe.style.removeProperty('flex-grow');
+        iframe.style.removeProperty('flex-shrink');
+        iframe.style.removeProperty('flex-basis');
+
+        return;
+    }
+
+    let doc = null;
+
+    try {
+        doc = iframe.contentDocument;
+    } catch (error) {
+        return;
+    }
+
+    if (! doc?.body) {
+        return;
+    }
+
+    const contentH = measurePdvPersonFormContentHeight(doc);
+
+    if (! contentH) {
+        return;
+    }
+
+    const headerH = header ? Math.ceil(header.getBoundingClientRect().height) : 37;
+    const gap = 10;
+    const maxPanel = Math.max(240, window.innerHeight - 16);
+    const panelH = Math.min(headerH + contentH + gap, maxPanel);
+    const iframeH = Math.max(160, panelH - headerH);
+
+    panel.style.height = `${panelH}px`;
+    iframe.style.flex = '0 0 auto';
+    iframe.style.height = `${iframeH}px`;
+}
+
+function syncPdvPersonOverlays() {
+    findPdvPersonOverlays().forEach((overlay) => applyPdvPersonOverlayLayout(overlay));
 }
 
 /**
@@ -716,7 +954,20 @@ function bindPdvFiscalTransmitTriggers() {
             return;
         }
 
-        window.setTimeout(startPdvFiscalTransmitProgress, 30);
+        window.setTimeout(() => {
+            const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
+
+            // Pix QR pendente: não inicia overlay fiscal (ele cobria o QR).
+            if (footer?.dataset?.pixQr === '1') {
+                return;
+            }
+
+            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, #erp-pdv-canhoto-title, .erp-pdv-finalizar-aviso')) {
+                return;
+            }
+
+            startPdvFiscalTransmitProgress();
+        }, 120);
     }, true);
 }
 
@@ -1053,6 +1304,10 @@ function forceHidePdvFiscalTransmitProgressStuck(reason) {
 }
 
 function startPdvFiscalTransmitProgress() {
+    if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title')) {
+        return;
+    }
+
     const overlay = getPdvFiscalTransmitProgressOverlay();
 
     if (! overlay) {
@@ -1482,6 +1737,7 @@ async function processPdvScanQueue() {
             }
 
             try {
+                await flushPdvSearchSelectionSync(component);
                 await component.call('handlePdvSearchEnter', code);
                 syncPdvHotPathChrome();
             } catch (error) {
@@ -2629,8 +2885,7 @@ function handlePdvKeydown(event) {
         const delta = event.key === 'ArrowDown' ? 1 : -1;
 
         if (pdvRoot.querySelector('.erp-pdv__grid--consulta')) {
-            component.call('moveSearchSelection', delta);
-            scrollPdvSearchSelectionIntoView();
+            movePdvSearchSelectionLocal(delta, component);
         } else {
             component.call('moveCupomSelection', delta);
             scrollPdvCupomSelectionIntoView();
@@ -2775,7 +3030,19 @@ function triggerFinalizarOperacao(component, atalho) {
     commitPdvFinalizarInformacoes(document.activeElement);
 
     if (btn.classList.contains('erp-pdv-finalizar__operacao-btn--fiscal')) {
-        window.setTimeout(startPdvFiscalTransmitProgress, 30);
+        window.setTimeout(() => {
+            const footer = document.querySelector('.erp-pdv-finalizar__footer-actions');
+
+            if (footer?.dataset?.pixQr === '1') {
+                return;
+            }
+
+            if (document.querySelector('.erp-pdv-pix-qr, #erp-pdv-pix-qr-title, .erp-pdv-finalizar-aviso')) {
+                return;
+            }
+
+            startPdvFiscalTransmitProgress();
+        }, 120);
     }
 
     const call = component.call('confirmFinalizarComOperacao', btn.dataset.operacao);
@@ -3602,6 +3869,19 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         }
     }
 
+    // F2 continua Abrir Caixa. Com o Menu Fiscal aberto, teclas de função não vazam.
+    if (document.getElementById('erp-pdv-menu-fiscal-panel')
+        || document.getElementById('erp-pdv-menu-fiscal-identificacao-title')
+        || document.getElementById('erp-pdv-menu-fiscal-xml-title')
+        || document.getElementById('erp-pdv-menu-fiscal-registros-title')
+        || document.getElementById('erp-pdv-menu-fiscal-dav-title')) {
+        if (/^F\d{1,2}$/.test(event.key)) {
+            event.preventDefault();
+        }
+
+        return;
+    }
+
     dispatchPdvShortcut(event, component);
 }
 
@@ -4058,6 +4338,12 @@ function scrollPdvModalRowIntoView(prefix) {
 }
 
 let erpPdvConfirmTimer = null;
+/** @type {number|null} */
+let erpPdvSearchSelectionPendingIndex = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let erpPdvSearchSelectionSyncTimer = null;
+/** @type {Promise<void>|null} */
+let erpPdvSearchSelectionSyncPromise = null;
 
 function showPdvProdutoConfirmado(nome) {
     const el = document.getElementById('erp-pdv-product-name');
@@ -4075,6 +4361,7 @@ function showPdvProdutoConfirmado(nome) {
 
     erpPdvConfirmTimer = window.setTimeout(() => {
         el.classList.remove('erp-pdv__product-line--flash');
+        el.textContent = '';
         erpPdvConfirmTimer = null;
     }, 700);
 }
@@ -4172,37 +4459,42 @@ function focusPdvLaunchField(field) {
     // Evita o trap do Código roubar o foco no passo Qtde/Preço.
     window.__erpPdvForceSearchFocusUntil = 0;
 
-    const tryFocus = (attempt = 0) => {
-        const id = field === 'preco' ? 'erp-pdv-launch-preco' : 'erp-pdv-launch-qtd';
+    const id = field === 'preco' ? 'erp-pdv-launch-preco' : 'erp-pdv-launch-qtd';
+
+    const doFocus = (input) => {
+        // Blade @readonly + erp-no-browser-hints colocam readonly.
+        input.removeAttribute('readonly');
+
+        try {
+            input.focus({ preventScroll: true });
+        } catch (_) {
+            input.focus();
+        }
+
+        input.select?.();
+
+        if (window.ErpMasks?.refresh) {
+            window.ErpMasks.refresh(input.closest('.erp-pdv') ?? document);
+        }
+    };
+
+    // Tenta focar imediatamente via rAF (campo já pode estar no DOM após render).
+    const tryRaf = (maxFrames = 20) => {
         const input = document.getElementById(id);
 
-        // Blade @readonly + erp-no-browser-hints colocam readonly; se o JS
-        // recusar focar por readOnly, o campo fica "ativo" mas não editável.
         if (input && ! input.disabled) {
-            input.removeAttribute('readonly');
-
-            try {
-                input.focus({ preventScroll: true });
-            } catch (_) {
-                input.focus();
-            }
-            input.select?.();
-
-            if (window.ErpMasks?.refresh) {
-                window.ErpMasks.refresh(input.closest('.erp-pdv') ?? document);
-            }
+            doFocus(input);
 
             return;
         }
 
-        if (attempt < 8) {
-            window.setTimeout(() => tryFocus(attempt + 1), 60);
+        if (maxFrames > 0) {
+            window.requestAnimationFrame(() => tryRaf(maxFrames - 1));
         }
     };
 
-    window.setTimeout(() => tryFocus(), 30);
-    window.setTimeout(() => tryFocus(0), 120);
-    window.setTimeout(() => tryFocus(0), 280);
+    // Primeiro rAF: pega logo após o próximo paint do Livewire.
+    window.requestAnimationFrame(() => tryRaf(20));
 }
 
 function scrollPdvSearchSelectionIntoView() {
@@ -4211,6 +4503,155 @@ function scrollPdvSearchSelectionIntoView() {
             block: 'nearest',
         });
     });
+}
+
+/**
+ * Highlight + descricao + foto no cliente (setas sem round-trip Livewire).
+ * @param {HTMLElement} row
+ */
+function applyPdvSearchSelectionVisual(row) {
+    if (! row) {
+        return;
+    }
+
+    document.querySelectorAll('.erp-pdv__grid--consulta .erp-pdv__grid-row--selected').forEach((el) => {
+        el.classList.remove('erp-pdv__grid-row--selected');
+    });
+    row.classList.add('erp-pdv__grid-row--selected');
+
+    const nameEl = document.getElementById('erp-pdv-product-name');
+    const descricao = String(row.dataset.descricao ?? '').trim();
+
+    if (nameEl && descricao) {
+        nameEl.textContent = descricao;
+        nameEl.classList.remove('erp-pdv__product-line--flash');
+    }
+
+    const photoBox = document.querySelector('[data-erp-pdv-product-photo]');
+    const fotoUrl = String(row.dataset.fotoUrl ?? '').trim();
+
+    if (photoBox) {
+        let img = photoBox.querySelector('img.erp-pdv__product-photo-img');
+
+        if (fotoUrl) {
+            if (! img) {
+                img = document.createElement('img');
+                img.className = 'erp-pdv__product-photo-img';
+                img.alt = 'Foto do produto';
+                photoBox.appendChild(img);
+            }
+
+            if (img.getAttribute('src') !== fotoUrl) {
+                img.setAttribute('src', fotoUrl);
+            }
+        } else if (img) {
+            img.remove();
+        }
+    }
+
+    row.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * @param {number} delta
+ * @param {{ call: Function }|null} component
+ */
+function movePdvSearchSelectionLocal(delta, component) {
+    const rows = Array.from(document.querySelectorAll('.erp-pdv__grid--consulta tbody tr.erp-pdv__grid-row'));
+
+    if (rows.length === 0) {
+        return;
+    }
+
+    const selected = document.querySelector('.erp-pdv__grid--consulta .erp-pdv__grid-row--selected');
+    let current = selected ? rows.indexOf(selected) : -1;
+
+    if (current < 0) {
+        current = 0;
+    }
+
+    const next = Math.max(0, Math.min(rows.length - 1, current + delta));
+    const row = rows[next];
+
+    if (! row) {
+        return;
+    }
+
+    applyPdvSearchSelectionVisual(row);
+
+    const index = Number(row.dataset.index);
+    const syncIndex = Number.isFinite(index) ? index : next;
+
+    erpPdvSearchSelectionPendingIndex = syncIndex;
+    schedulePdvSearchSelectionSync(component, syncIndex);
+}
+
+/**
+ * @param {{ call: Function }|null} component
+ * @param {number} index
+ */
+function schedulePdvSearchSelectionSync(component, index) {
+    if (erpPdvSearchSelectionSyncTimer) {
+        window.clearTimeout(erpPdvSearchSelectionSyncTimer);
+        erpPdvSearchSelectionSyncTimer = null;
+    }
+
+    erpPdvSearchSelectionSyncTimer = window.setTimeout(() => {
+        erpPdvSearchSelectionSyncTimer = null;
+        void syncPdvSearchSelectionIndex(component, index);
+    }, 120);
+}
+
+/**
+ * @param {{ call: Function }|null} component
+ * @param {number} index
+ * @returns {Promise<void>}
+ */
+async function syncPdvSearchSelectionIndex(component, index) {
+    if (! component || typeof component.call !== 'function') {
+        return;
+    }
+
+    if (erpPdvSearchSelectionPendingIndex !== index) {
+        return;
+    }
+
+    const sync = Promise.resolve(component.call('setSearchSelectionIndex', index))
+        .catch((error) => {
+            console.error('[PDV search selection sync]', index, error);
+        })
+        .finally(() => {
+            if (erpPdvSearchSelectionPendingIndex === index) {
+                erpPdvSearchSelectionPendingIndex = null;
+            }
+
+            if (erpPdvSearchSelectionSyncPromise === sync) {
+                erpPdvSearchSelectionSyncPromise = null;
+            }
+        });
+
+    erpPdvSearchSelectionSyncPromise = sync;
+    await sync;
+}
+
+/**
+ * Garante que o Livewire tem o indice antes de Enter / lancamento.
+ * @param {{ call: Function }|null} component
+ * @returns {Promise<void>}
+ */
+async function flushPdvSearchSelectionSync(component) {
+    if (erpPdvSearchSelectionSyncTimer) {
+        window.clearTimeout(erpPdvSearchSelectionSyncTimer);
+        erpPdvSearchSelectionSyncTimer = null;
+    }
+
+    const pending = erpPdvSearchSelectionPendingIndex;
+
+    if (pending !== null && pending !== undefined) {
+        await syncPdvSearchSelectionIndex(component, pending);
+    } else if (erpPdvSearchSelectionSyncPromise) {
+        await erpPdvSearchSelectionSyncPromise;
+    }
 }
 
 function scrollPdvCupomSelectionIntoView() {

@@ -55,7 +55,8 @@ return new class extends Migration
             || ! Schema::hasColumn('contas_pagar', 'empresa_id')
             || ! Schema::hasTable('compras')
             || ! Schema::hasColumn('compras', 'empresa_id')
-            || ! Schema::hasColumn('contas_pagar', 'compra_id')) {
+            || ! Schema::hasColumn('contas_pagar', 'compra_id')
+            || Schema::getConnection()->getDriverName() !== 'mysql') {
             return;
         }
 

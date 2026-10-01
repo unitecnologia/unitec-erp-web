@@ -16,6 +16,8 @@
     x-on:keydown.window.capture="
         if ($wire.etapa !== 'finalizacao') return;
         if ($wire.finalizarCartaoCanhotoAberta) return;
+        if ($wire.fvTabelaPrazoConsulta) return;
+        if ($wire.fvTransporteModalOpen) return;
         const t = $event.target;
         if (t?.id === 'erp-fv-fin-cliente' || t?.closest?.('.erp-fv-fin__ajuste')) return;
         const k = $event.key || '';
@@ -32,9 +34,35 @@
     "
     x-on:erp-fv-focus-pagamento.window="
         $nextTick(() => {
-            const el = document.getElementById('erp-fv-finalizar-valor-' + ($event.detail.index ?? 0));
+            const d = $event.detail?.[0] ?? $event.detail ?? {};
+            const el = document.getElementById('erp-fv-finalizar-valor-' + (d.index ?? 0));
+            if (d.valor != null && d.valor !== '' && el) {
+                el.value = d.valor;
+                delete el.dataset.erpMaskSynced;
+                window.ErpMasks?.apply(el, { sync: false });
+            }
             el?.focus();
             el?.select?.();
+        })
+    "
+    x-on:erp-fv-focus-finalizar-ok.window="
+        $nextTick(() => {
+            const btn = document.getElementById('erp-fv-finalizar-op-concluir')
+                || document.querySelector('.erp-fv-fin .erp-pdv-finalizar__operacao-btn:not([disabled])');
+            btn?.focus();
+        })
+    "
+    x-on:erp-fv-focus-finalizar-parcelas.window="
+        $nextTick(() => {
+            const el = document.getElementById('erp-fv-parcelas-qtd');
+            el?.focus();
+            el?.select?.();
+        })
+    "
+    x-on:erp-fv-focus-finalizar-tabelas-predefinidas.window="
+        $nextTick(() => {
+            document.querySelector('#erp-fv-parcelas-tabelas .erp-pdv__grid-row--selected')
+                ?.scrollIntoView({ block: 'nearest' });
         })
     "
     x-on:erp-pdv-focus-finalizar-cartao-canhoto.window="
@@ -120,6 +148,8 @@
                     </label>
                 </div>
             </div>
+
+            @include('filament.components.erp.forca-vendas.tela-venda.finalizacao-parcelas')
 
             <div class="erp-pdv-finalizar__body">
                 <div class="erp-pdv-finalizar__grid-wrap">
@@ -400,47 +430,28 @@
             <div class="erp-pdv-finalizar__operacao-botoes">
                 <button
                     type="button"
-                    class="erp-pdv-modal__btn erp-pdv-finalizar__operacao-btn erp-pdv-finalizar__operacao-btn--fiscal"
-                    disabled
-                    title="Em breve"
-                    id="erp-fv-finalizar-op-nfce"
+                    class="erp-pdv-modal__btn erp-fv-fin__transporte-btn{{ $this->fvTransportePayload() ? ' is-filled' : '' }}"
+                    wire:click="abrirFvTransporteModal"
+                    id="erp-fv-finalizar-op-transporte"
+                    title="Transportadora, volumes e peso (mesmo da NF-e)"
                 >
-                    <kbd>F4</kbd>
-                    <span>NFCe Online Transmitir</span>
+                    <kbd>F9</kbd>
+                    <span>Transportadora</span>
+                    @if ($resumo = $this->fvTransporteResumo())
+                        <span class="erp-fv-fin__transporte-resumo">{{ $resumo }}</span>
+                    @endif
                 </button>
                 <button
                     type="button"
-                    class="erp-pdv-modal__btn erp-pdv-finalizar__operacao-btn erp-pdv-finalizar__operacao-btn--pedido"
-                    wire:click="confirmarPedido"
-                    wire:loading.attr="disabled"
-                    @disabled($this->gravando)
-                    id="erp-fv-finalizar-op-pedido"
-                >
-                    <kbd>F5</kbd>
-                    <span wire:loading.remove wire:target="confirmarPedido">Pedido</span>
-                    <span wire:loading wire:target="confirmarPedido">Gravando…</span>
-                </button>
-                <button
-                    type="button"
-                    class="erp-pdv-modal__btn erp-pdv-finalizar__operacao-btn erp-pdv-finalizar__operacao-btn--fiscal"
-                    disabled
-                    title="Em breve"
-                    id="erp-fv-finalizar-op-nfe"
-                >
-                    <kbd>F6</kbd>
-                    <span>NFe</span>
-                </button>
-                <button
-                    type="button"
-                    class="erp-pdv-modal__btn erp-pdv-finalizar__operacao-btn erp-pdv-finalizar__operacao-btn--faturar"
+                    class="erp-pdv-modal__btn erp-pdv-modal__btn--primary erp-pdv-finalizar__operacao-btn erp-pdv-finalizar__operacao-btn--concluir"
                     wire:click="faturarPedido"
                     wire:loading.attr="disabled"
                     @disabled($this->gravando)
-                    id="erp-fv-finalizar-op-faturar"
+                    id="erp-fv-finalizar-op-concluir"
                 >
-                    <kbd>F8</kbd>
-                    <span wire:loading.remove wire:target="faturarPedido">Faturar</span>
-                    <span wire:loading wire:target="faturarPedido">Faturando…</span>
+                    <kbd>F10</kbd>
+                    <span wire:loading.remove wire:target="faturarPedido">Concluir</span>
+                    <span wire:loading wire:target="faturarPedido">Concluindo…</span>
                 </button>
             </div>
             <button type="button" wire:click="voltarParaVenda" class="erp-pdv-modal__btn erp-pdv-modal__btn--danger">
@@ -449,3 +460,5 @@
         </footer>
     </div>
 </div>
+
+@include('filament.components.erp.forca-vendas.tela-venda.finalizacao-transporte')

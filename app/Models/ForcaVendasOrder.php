@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'uuid',
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cliente_id',
     'vendedor_id',
     'orcamento_id',
+    'pedido_id',
     'venda_id',
     'total',
     'latitude',
@@ -30,6 +32,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'confirmed_at',
     'faturado_at',
     'canceled_at',
+    'envio_whats_status',
+    'numero_whatsapp',
 ])]
 class ForcaVendasOrder extends Model
 {
@@ -244,14 +248,108 @@ class ForcaVendasOrder extends Model
         return $this->client_created_at ?? $this->received_at;
     }
 
+    public function enviouEmail(): bool
+    {
+        $status = mb_strtoupper(trim((string) ($this->envio_whats_status ?? '')), 'UTF-8');
+
+        return $status === 'E'
+            || $status === 'E/W'
+            || str_contains($status, 'EMAIL')
+            || str_contains($status, 'E-MAIL');
+    }
+
+    public function enviouWhatsApp(): bool
+    {
+        $status = mb_strtoupper(trim((string) ($this->envio_whats_status ?? '')), 'UTF-8');
+
+        if ($status === '' || $status === 'E') {
+            return false;
+        }
+
+        if ($status === 'W' || $status === 'E/W') {
+            return true;
+        }
+
+        return ! str_contains($status, 'EMAIL') && ! str_contains($status, 'E-MAIL');
+    }
+
+    /**
+     * Resumo de envio para a grade: E | W | E/W | —.
+     */
+    public function envioListaLabel(): string
+    {
+        $email = $this->enviouEmail();
+        $whats = $this->enviouWhatsApp();
+
+        if ($email && $whats) {
+            return 'E/W';
+        }
+
+        if ($email) {
+            return 'E';
+        }
+
+        if ($whats) {
+            return 'W';
+        }
+
+        return '—';
+    }
+
+    public function registrarEnvioEmail(): void
+    {
+        $this->forceFill([
+            'envio_whats_status' => $this->enviouWhatsApp() ? 'E/W' : 'E',
+        ])->save();
+    }
+
+    public function registrarEnvioWhatsApp(?string $numero = null): void
+    {
+        $payload = [
+            'envio_whats_status' => $this->enviouEmail() ? 'E/W' : 'W',
+        ];
+
+        $fone = trim((string) $numero);
+
+        if ($fone !== '') {
+            $payload['numero_whatsapp'] = $fone;
+        }
+
+        $this->forceFill($payload)->save();
+    }
+
     public function orcamento(): BelongsTo
     {
         return $this->belongsTo(Orcamento::class);
     }
 
+    public function pedido(): BelongsTo
+    {
+        return $this->belongsTo(Pedido::class);
+    }
+
+    /**
+     * Documento de linhas do pedido (DAV). Orçamento do app continua em orcamento().
+     */
+    public function documentoPedido(): ?Pedido
+    {
+        return $this->pedido;
+    }
+
     public function venda(): BelongsTo
     {
         return $this->belongsTo(Venda::class);
+    }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    public function pixCobrancasPedido(): HasMany
+    {
+        return $this->hasMany(PixCobranca::class, 'order_uuid', 'uuid')
+            ->where('origem', PixCobranca::ORIGEM_PEDIDO);
     }
 
     public function cliente(): BelongsTo

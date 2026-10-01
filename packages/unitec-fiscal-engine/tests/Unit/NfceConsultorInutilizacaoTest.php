@@ -42,6 +42,36 @@ XML;
         $this->assertSame('142260000123456', $parsed['protocolo']);
     }
 
+    public function test_interpreta_consulta_autorizada_fora_prazo_cstat_150(): void
+    {
+        $xml = <<<'XML'
+<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <tpAmb>1</tpAmb>
+  <verAplic>SVRS2026</verAplic>
+  <cStat>100</cStat>
+  <xMotivo>Autorizado o uso da NF-e</xMotivo>
+  <protNFe versao="4.00">
+    <infProt>
+      <tpAmb>1</tpAmb>
+      <verAplic>SVRS2026</verAplic>
+      <chNFe>42260722469772000100650010000000021333536687</chNFe>
+      <dhRecbto>2026-07-06T23:25:00-03:00</dhRecbto>
+      <nProt>142260000123456</nProt>
+      <digVal>abc</digVal>
+      <cStat>150</cStat>
+      <xMotivo>Autorizado o uso da NF-e, autorizacao fora de prazo</xMotivo>
+    </infProt>
+  </protNFe>
+</retConsSitNFe>
+XML;
+
+        $parsed = $this->parseConsultaResponse($xml);
+
+        $this->assertTrue($parsed['autorizada']);
+        $this->assertSame('150', $parsed['codigo']);
+        $this->assertSame('142260000123456', $parsed['protocolo']);
+    }
+
     public function test_monta_xml_inutilizacao_com_id_correto(): void
     {
         $builder = new NfceInutilizacaoXmlBuilder();

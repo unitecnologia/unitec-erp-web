@@ -56,6 +56,9 @@ if (-not $Recovery -and -not $ApplyBundledSeed -and (Test-UnitecExistingInstall 
     $Recovery = $true
 }
 
+$padraoSql = Join-Path $AppPath 'installer\seed\unitec_erp.sql'
+$usePadraoBase = (-not $Recovery) -and (-not $ApplyBundledSeed) -and (Test-Path -LiteralPath $padraoSql) -and ((Get-Item -LiteralPath $padraoSql).Length -gt 1024)
+
 if ($Recovery -and -not $ForceDatabaseReset -and -not $ApplyBundledSeed) {
     Ensure-UnitecEnvFile -AppPath $AppPath -AppUrl $AppUrl | Out-Null
 }
@@ -223,7 +226,7 @@ Invoke-Step 'Preparando banco de dados' {
         Sync-UnitecEnvDatabaseCredentials -AppPath $AppPath -DbHost $DbHost -DbPort $DbPort -DbName $DbName -DbUser $DbUser -DbPassword $DbPassword | Out-Null
     }
 
-    if ($ApplyBundledSeed) {
+    if ($ApplyBundledSeed -or $usePadraoBase) {
         Import-UnitecBundledSeedDatabase -AppPath $AppPath -DbHost $DbHost -DbPort $DbPort -DbUser $DbUser -DbPassword $DbPassword -DbName $DbName
     }
 }
@@ -265,8 +268,8 @@ Invoke-Step 'Criando/atualizando tabelas no banco (migrate)' {
         $dbLooksEmpty = Test-UnitecDatabaseLooksEmpty -AppPath $AppPath
     }
 
-    if ($ApplyBundledSeed) {
-        Write-Ok 'Seed embutido restaurado — migrate incremental (sem migrate:fresh).'
+    if ($ApplyBundledSeed -or $usePadraoBase) {
+        Write-Ok 'Base do instalador restaurada — migrate incremental (sem migrate:fresh).'
         $freshMigrate = $false
     } elseif ($ForceDatabaseReset) {
         Write-Warn 'ForceDatabaseReset ativo — migrate:fresh sera tentado (suporte apenas).'
@@ -292,8 +295,8 @@ Invoke-Step 'Criando/atualizando tabelas no banco (migrate)' {
 
 # Seed so em banco vazio / sem usuarios. Nunca em cliente com dados.
 $runSeed = $false
-if ($ApplyBundledSeed) {
-    Write-Ok 'Seed artisan ignorado (dados vindos do dump embutido).'
+if ($ApplyBundledSeed -or $usePadraoBase) {
+    Write-Ok 'Seed artisan ignorado (dados vindos da base do instalador).'
     $runSeed = $false
 } elseif ($ForceDatabaseReset) {
     $runSeed = $true

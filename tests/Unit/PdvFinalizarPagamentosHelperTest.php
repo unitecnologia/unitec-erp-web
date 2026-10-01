@@ -24,6 +24,27 @@ class PdvFinalizarPagamentosHelperTest extends TestCase
         $this->assertSame('2.621,00', $resultado[4]['valor']);
     }
 
+    public function test_pix_gerar_qrcode_pdv_so_quando_flag_e_pix(): void
+    {
+        $this->assertTrue(PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv([
+            'forma' => 'PIX',
+            'tipo' => 'pix',
+            'gerar_qrcode_pdv' => true,
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv([
+            'forma' => 'PIX',
+            'tipo' => 'pix',
+            'gerar_qrcode_pdv' => false,
+        ]));
+
+        $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaPixGerarQrcodePdv([
+            'forma' => 'DINHEIRO',
+            'tipo' => 'dinheiro',
+            'gerar_qrcode_pdv' => true,
+        ]));
+    }
+
     public function test_pos_credito_nao_e_forma_a_prazo(): void
     {
         $this->assertFalse(PdvFinalizarPagamentosHelper::isFormaAPrazo('POS CREDITO'));

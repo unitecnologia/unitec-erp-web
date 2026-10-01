@@ -3,8 +3,10 @@
     wire:ignore.self
     x-data
     x-on:keydown.escape.window="
-        $event.preventDefault();
-        $wire.closeScreen();
+        if (! $wire.showForm) {
+            $event.preventDefault();
+            $wire.closeScreen();
+        }
     "
 >
     @include('filament.components.erp.shared.cadastro-list-screen', [
@@ -15,6 +17,6 @@
         ],
         'uppercaseColumns' => 'descricao',
         'wireKeyPrefix' => 'planos',
-        'hint' => 'Pressione Enter ou clique em Pesquisa. Use as setas para navegar na lista.',
+        'hint' => 'Enter pesquisa · setas navegam na lista · F2 novo · F3 alterar',
     ])
 </div>

@@ -64,11 +64,16 @@ class SyncController
             'visitas_sem_venda.*.uuid' => ['required', 'string', 'max:100'],
             'visitas_sem_venda.*.cliente_id' => ['required', 'integer'],
             'visitas_sem_venda.*.motivo' => ['required', 'string', 'min:10', 'max:2000'],
+            'customer_updates' => ['nullable', 'array'],
+            'customer_updates.*.uuid' => ['required', 'string', 'max:100'],
+            'customer_updates.*.person_id' => ['required', 'integer', 'min:1'],
+            'customer_updates.*.email' => ['nullable', 'string', 'max:255'],
         ]);
 
         $orders = (array) $request->input('orders', []);
         $visitas = (array) $request->input('visitas_sem_venda', []);
         $customers = (array) $request->input('customers', []);
+        $customerUpdates = (array) $request->input('customer_updates', []);
 
         /** @var User $user */
         $user = $request->user();
@@ -77,6 +82,10 @@ class SyncController
 
         $customerResults = $customers !== []
             ? $this->service->applyCustomersPush($customers, $user)
+            : [];
+
+        $customerUpdateResults = $customerUpdates !== []
+            ? $this->service->applyCustomerEmailUpdates($customerUpdates, $user)
             : [];
 
         $results = $orders !== []
@@ -89,6 +98,7 @@ class SyncController
 
         return response()->json([
             'customer_results' => $customerResults,
+            'customer_update_results' => $customerUpdateResults,
             'results' => $results,
             'visita_results' => $visitaResults,
             'server_time' => now()->toIso8601String(),

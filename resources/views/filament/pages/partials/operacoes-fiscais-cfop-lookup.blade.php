@@ -3,10 +3,10 @@
         <button
             type="button"
             wire:key="operacao-fiscal-cfop-{{ $this->cfopLookupCampo }}-{{ $cfop['codigo'] }}"
-            wire:click="selecionarCfop({{ $cfop['codigo'] }})"
+            wire:mousedown.prevent="selecionarCfop({{ $cfop['codigo'] }})"
+            title="{{ $cfop['codigo'] }} — {{ $cfop['descricao'] }}"
         >
-            <strong>{{ $cfop['codigo'] }}</strong>
-            <span>{{ $cfop['descricao'] }}</span>
+            <span>{{ $cfop['codigo'] }} — {{ $cfop['descricao'] }}</span>
         </button>
     @empty
         <div class="erp-operacoes-fiscais__cfop-empty">Nenhum CFOP cadastrado encontrado.</div>

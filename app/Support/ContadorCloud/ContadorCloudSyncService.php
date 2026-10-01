@@ -126,6 +126,10 @@ final class ContadorCloudSyncService
             return $config->enviarCanceladas;
         }
 
+        if ($evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CONTINGENCIA) {
+            return $config->enviarVendas;
+        }
+
         return match ($tipo) {
             ContadorCloudDocumentPayloadBuilder::TIPO_NFE_SAIDA,
             ContadorCloudDocumentPayloadBuilder::TIPO_NFCE_SAIDA => $config->enviarVendas,

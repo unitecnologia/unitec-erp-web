@@ -200,6 +200,34 @@ final class NfceCupomPrintDocument implements PrintDocument
             }
         }
 
+        $mensagemCreditoDanfe = trim((string) ($data['mensagemCreditoDanfeNfce'] ?? ''));
+        if ($mensagemCreditoDanfe !== '') {
+            $p->setEmphasis(true);
+            foreach (preg_split('/\R/u', wordwrap($mensagemCreditoDanfe, 48, "\n", true)) ?: [] as $linhaCredito) {
+                if (trim($linhaCredito) === '') {
+                    continue;
+                }
+                $p->textRaw(EscPosCharset::encode($linhaCredito)."\n");
+            }
+            $p->setEmphasis(false);
+        }
+
+        $mensagensLegais = $data['mensagensLegaisNfce'] ?? [];
+        if (is_array($mensagensLegais)) {
+            foreach ($mensagensLegais as $mensagemLegal) {
+                $mensagemLegal = trim((string) $mensagemLegal);
+                if ($mensagemLegal === '' || $mensagemLegal === $mensagemCreditoDanfe) {
+                    continue;
+                }
+                foreach (preg_split('/\R/u', wordwrap($mensagemLegal, 48, "\n", true)) ?: [] as $linhaLegal) {
+                    if (trim($linhaLegal) === '') {
+                        continue;
+                    }
+                    $p->textRaw(EscPosCharset::encode($linhaLegal)."\n");
+                }
+            }
+        }
+
         $p->textRaw(str_repeat('-', 48)."\n");
 
         $qr = trim((string) ($data['qrTexto'] ?? ''));

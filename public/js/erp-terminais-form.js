@@ -67,7 +67,7 @@ function bindErpTerminaisFormKeys() {
         if (event.key === 'F4') {
             event.preventDefault();
             if (document.querySelector('.erp-terminais-aparelhos')) {
-                component.call('revogarAparelhoSelecionado');
+                component.call('excluirAparelhoSelecionado');
             } else {
                 component.call('deleteTerminal');
             }

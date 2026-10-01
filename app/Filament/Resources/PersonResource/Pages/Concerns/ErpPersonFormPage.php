@@ -9,6 +9,7 @@ use App\Filament\Resources\PersonResource;
 use App\Models\Person;
 use App\Rules\CelularBrasileiroValido;
 use App\Rules\DocumentoBrasileiroValido;
+use App\Rules\PersonDocumentoUnico;
 use App\Support\Erp\CepLookupService;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpScreen;
@@ -27,6 +28,8 @@ trait ErpPersonFormPage
     use EmbedsInPdvOverlay;
     use InteractsWithErpFormReturnUrl;
     use ManagesPersonContacts;
+    use ManagesPersonCreditos;
+    use ManagesPersonDocumentoDuplicadoModal;
     use NormalizesErpUppercaseFormData;
     use ManagesPersonFormUi;
     use ManagesPersonLookup;
@@ -113,7 +116,15 @@ trait ErpPersonFormPage
             $pessoaTipo = (string) ($this->data['pessoa_tipo'] ?? Person::PESSOA_JURIDICA);
 
             $rules = [
-                'data.cpf_cnpj' => ['nullable', 'string', 'max:20', new DocumentoBrasileiroValido($pessoaTipo)],
+                'data.cpf_cnpj' => [
+                    'nullable',
+                    'string',
+                    'max:20',
+                    new DocumentoBrasileiroValido($pessoaTipo),
+                    new PersonDocumentoUnico(
+                        $this instanceof EditRecord ? $this->record?->getKey() : null,
+                    ),
+                ],
                 'data.celular1' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
                 'data.celular2' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
                 'data.whatsapp' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
@@ -133,7 +144,9 @@ trait ErpPersonFormPage
 
             $this->validate(
                 $rules,
-                [],
+                [
+                    'data.cidade_codigo.required' => 'Informe o CEP e clique em Pesquisar CEP para obter o código IBGE da cidade.',
+                ],
                 [
                     'data.cpf_cnpj' => 'CPF/CNPJ',
                     'data.celular1' => 'Celular 1',
@@ -150,6 +163,10 @@ trait ErpPersonFormPage
                 $this->create();
             }
         } catch (\Illuminate\Validation\ValidationException $exception) {
+            if ($this->presentPersonDocumentoDuplicadoModalIfNeeded($exception)) {
+                return;
+            }
+
             $body = collect($exception->errors())->flatten()->unique()->filter()->implode(' ');
 
             Notification::make()
@@ -183,7 +200,14 @@ trait ErpPersonFormPage
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return $this->mergeLivewireFormData($data);
+        $data = $this->mergeLivewireFormData($data);
+
+        // Código é imutável na edição (UI readonly + proteção no save).
+        if ($this->record?->exists) {
+            $data['codigo'] = $this->record->getAttribute('codigo');
+        }
+
+        return $data;
     }
 
     /**
@@ -262,6 +286,12 @@ trait ErpPersonFormPage
 
     public function cancelForm(): void
     {
+        if ($this->embedsInPdv) {
+            $this->redirect($this->getPersonListRedirectUrl());
+
+            return;
+        }
+
         if ($this->embedsInParentOverlay()) {
             $this->closeEmbedOverlay();
 
@@ -282,7 +312,7 @@ trait ErpPersonFormPage
     protected function getRedirectUrl(): string
     {
         if ($this->embedsInPdv) {
-            return PersonResource::getUrl('create') . '?tipo=clientes&pdv=1';
+            return $this->getPersonListRedirectUrl();
         }
 
         if ($this->embedsInOrcamento) {
@@ -309,9 +339,20 @@ trait ErpPersonFormPage
 
     protected function getPersonListRedirectUrl(): string
     {
-        return PersonResource::getUrl('index', [
-            'tipo' => $this->resolveListTipoFilter(),
-        ]);
+        $params = [];
+        $tipo = $this->resolveListTipoFilter();
+
+        if ($tipo !== 'clientes') {
+            $params['tipo'] = $tipo;
+        }
+
+        $url = PersonResource::getUrl('index');
+
+        if ($params !== []) {
+            $url .= '?' . http_build_query($params);
+        }
+
+        return $this->urlWithPdvEmbed($url);
     }
 
     protected function resolveListTipoFilter(): string

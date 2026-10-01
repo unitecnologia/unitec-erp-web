@@ -75,6 +75,12 @@
                         @endif
                     </div>
 
+                    @if ($this->finalizarCreditoClienteResumo)
+                        <div class="erp-pdv-finalizar__credito">
+                            <span>Crédito disponível: R$ {{ $this->finalizarCreditoClienteResumo }}</span>
+                        </div>
+                    @endif
+
                     @if ($this->finalizarLimiteClienteResumo)
                         <div class="erp-pdv-finalizar__limite">
                             <span>Limite: R$ {{ $this->finalizarLimiteClienteResumo['limite'] }}</span>
@@ -244,6 +250,87 @@
                             </footer>
                         </div>
                     </div>
+                @endif
+
+                @if ($this->finalizarPixQrAberta)
+                    <div
+                        class="erp-pdv-canhoto-overlay erp-pdv-pix-qr-overlay"
+                        role="dialog"
+                        aria-labelledby="erp-pdv-pix-qr-title"
+                        @if ($this->finalizarPixCobrancaId && ! $this->finalizarPixQrGerando && $this->finalizarPixErro === '' && $this->finalizarPixStatus !== 'Pago')
+                            wire:poll.2s="pollFinalizarPixQrcode"
+                        @endif
+                    >
+                        <div class="erp-pdv-parcelas erp-pdv-pix-qr">
+                            <header class="erp-pdv-parcelas__header">
+                                <h3 id="erp-pdv-pix-qr-title">Pagamento Pix | QR Code</h3>
+                                <button type="button" class="erp-pdv-modal__close" wire:click="cancelFinalizarPixQrcode" title="Fechar">✕</button>
+                            </header>
+
+                            <div class="erp-pdv-pix-qr__body">
+                                <div class="erp-pdv-pix-qr__valor">
+                                    <span>Valor</span>
+                                    <strong>R$ {{ $this->finalizarPixValorLabel !== '' ? $this->finalizarPixValorLabel : '0,00' }}</strong>
+                                </div>
+
+                                @if ($this->finalizarPixErro !== '')
+                                    <p class="erp-pdv-pix-qr__erro">{{ $this->finalizarPixErro }}</p>
+                                    <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="gerarPixQrcodePdvAgora">
+                                        Tentar novamente
+                                    </button>
+                                @elseif (filled($this->finalizarPixQrImagem))
+                                    <img
+                                        class="erp-pdv-pix-qr__img"
+                                        src="{{ $this->finalizarPixQrImagem }}"
+                                        alt="QR Code Pix"
+                                    >
+                                @elseif (filled($this->finalizarPixCopiaCola))
+                                    <p class="erp-pdv-pix-qr__hint">QR gerado. Use o Pix Copia e Cola abaixo.</p>
+                                @else
+                                    <p class="erp-pdv-pix-qr__hint">{{ $this->finalizarPixStatus !== '' ? $this->finalizarPixStatus : 'Gerando QR Code…' }}</p>
+                                @endif
+
+                                @if (filled($this->finalizarPixCopiaCola))
+                                    <label class="erp-pdv-pix-qr__copia">
+                                        <span>Pix Copia e Cola</span>
+                                        <textarea readonly rows="3" onclick="this.select()">{{ $this->finalizarPixCopiaCola }}</textarea>
+                                    </label>
+                                @endif
+
+                                <p class="erp-pdv-pix-qr__status" aria-live="polite">{{ $this->finalizarPixStatus }}</p>
+
+                                @if ($this->finalizarPixExpiraEmTs > 0 && $this->finalizarPixErro === '' && ! $this->finalizarPixQrGerando)
+                                    <div
+                                        class="erp-pdv-pix-qr__countdown"
+                                        wire:ignore
+                                        x-data="erpPdvPixCountdown({{ (int) $this->finalizarPixExpiraEmTs }}, {{ (int) $this->finalizarPixDuracaoSegundos }})"
+                                        x-init="start()"
+                                    >
+                                        <div class="erp-pdv-pix-qr__countdown-row">
+                                            <span>Tempo restante</span>
+                                            <strong x-text="label"></strong>
+                                        </div>
+                                        <div class="erp-pdv-pix-qr__bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100">
+                                            <div class="erp-pdv-pix-qr__bar-fill" :style="'width:' + pct + '%'" :class="{ 'is-low': pct <= 20 }"></div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <footer class="erp-pdv-parcelas__footer">
+                                <div class="erp-pdv-parcelas__footer-actions">
+                                    <button type="button" class="erp-pdv-modal__btn" wire:click="cancelFinalizarPixQrcode">
+                                        <kbd>ESC</kbd> Cancelar
+                                    </button>
+                                    @if ($this->finalizarPixCobrancaId && $this->finalizarPixErro === '' && ! $this->finalizarPixQrGerando)
+                                        <button type="button" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" wire:click="pollFinalizarPixQrcode">
+                                            Consultar pagamento
+                                        </button>
+                                    @endif
+                                </div>
+                            </footer>
+                        </div>
+                    </div>
                 @elseif ($this->finalizarTabelaPrazoEmConsulta)
                     <div class="erp-pdv-parcelas-overlay" role="dialog" aria-labelledby="erp-pdv-parcelas-title">
                         <div class="erp-pdv-parcelas">
@@ -380,9 +467,6 @@
                                     <strong>{{ $this->finalizarParcelasTotalLabel !== '' ? 'R$ '.$this->finalizarParcelasTotalLabel : '' }}</strong>
                                 </div>
                                 <div class="erp-pdv-parcelas__footer-actions">
-                                    <button type="button" class="erp-pdv-modal__btn" disabled title="Em breve">
-                                        <kbd>F5</kbd> Boleto
-                                    </button>
                                     <button type="button" class="erp-pdv-modal__btn" wire:click="abrirCarneImpressao">
                                         <kbd>F6</kbd> Carnê
                                     </button>
@@ -449,7 +533,9 @@
                                     @php
                                         $forma = mb_strtoupper($pagamento['forma'] ?? '', 'UTF-8');
                                         $tipo = strtolower($pagamento['tipo'] ?? '');
-                                        $icone = match ($tipo) {
+                                        $linhaCredito = ! empty($pagamento['credito_cliente_linha'])
+                                            || \App\Models\ClienteCreditoMovimentacao::isFormaPdv((string) ($pagamento['forma'] ?? ''));
+                                        $icone = $linhaCredito ? 'voucher' : (match ($tipo) {
                                             'dinheiro' => 'cash',
                                             'pix' => 'pix',
                                             'cartao_debito' => 'debit',
@@ -471,7 +557,7 @@
                                                 str_contains($forma, 'VALE'), str_contains($forma, 'TROCA') => 'voucher',
                                                 default => 'cash',
                                             },
-                                        };
+                                        });
                                         $temValor = \Unitec\PdvUi\Support\PdvMoney::parseBr($pagamento['valor'] ?? '0') > 0;
                                     @endphp
                                     <tr
@@ -489,7 +575,12 @@
                                         <td>
                                             <span class="erp-pdv-finalizar__forma">
                                                 <span class="erp-pdv-finalizar__forma-icon erp-pdv-finalizar__forma-icon--{{ $icone }}" aria-hidden="true"></span>
-                                                <span class="erp-pdv-finalizar__forma-nome">{{ $pagamento['forma'] }}</span>
+                                                <span class="erp-pdv-finalizar__forma-nome">
+                                                    {{ $pagamento['forma'] }}
+                                                    @if ($linhaCredito && $this->finalizarCreditoClienteResumo)
+                                                        <span class="erp-pdv-finalizar__forma-disponivel"> — disponível R$ {{ $this->finalizarCreditoClienteResumo }}</span>
+                                                    @endif
+                                                </span>
                                             </span>
                                         </td>
                                         <td class="erp-pdv__grid-col-num">
@@ -609,6 +700,7 @@
             <footer
                 class="erp-pdv-modal__footer erp-pdv-finalizar__footer-actions"
                 data-operacao-unica="{{ $this->pdvFinalizarOperacaoUnica ?? '' }}"
+                data-pix-qr="{{ $this->finalizarTemPixGerarQrcodeComValor() && ! $this->finalizarPixQrConfirmado ? '1' : '0' }}"
             >
                 <div class="erp-pdv-finalizar__operacao-botoes">
                     @foreach ($this->pdvFinalizarOperacaoBotoes as $botao)

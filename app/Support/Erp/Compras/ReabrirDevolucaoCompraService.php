@@ -5,9 +5,12 @@ namespace App\Support\Erp\Compras;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Estoque;
+use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Erp\ProductLoteService;
@@ -96,11 +99,21 @@ final class ReabrirDevolucaoCompraService
                 continue;
             }
 
+            $doc = EstoqueMovimentacaoDocumento::fromDevolucaoCompra($devolucao);
             $this->saldos->incrementar(
                 (int) $product->id,
                 (float) $item->qtd,
                 $estoqueId,
                 $empresa,
+                EstoqueMovimentacaoContext::make(
+                    EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                    empresaId: $empresaId,
+                    origemTipo: $doc['origemTipo'],
+                    origemId: $doc['origemId'],
+                    origemNumero: $doc['origemNumero'],
+                    docFiscalTipo: $doc['docFiscalTipo'],
+                    docFiscalNumero: $doc['docFiscalNumero'],
+                ),
             );
 
             if ($product->controla_lote_validade) {

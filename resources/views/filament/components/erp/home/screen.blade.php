@@ -41,7 +41,7 @@
         'kpis' => $dash['kpis'],
     ])
 
-    <div wire:init="loadDashboardHeavy">
+    <div class="erp-dash__heavy" wire:init="loadDashboardHeavy">
         @if ($this->dashboardHeavyReady)
             @include('filament.components.erp.home.partials.gauges', [
                 'gauges' => $dash['gauges'] ?? [],
@@ -75,6 +75,10 @@
                     'alerts' => $dash['alerts'],
                 ])
             </div>
+        @else
+            @include('filament.components.erp.home.partials.heavy-skeleton')
         @endif
     </div>
+
+    @include('filament.components.erp.home.partials.pix-renovar-modal')
 </div>

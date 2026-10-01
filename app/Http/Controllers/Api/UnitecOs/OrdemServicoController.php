@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\UnitecOs;
 use App\Models\OrdemServico;
 use App\Models\Person;
 use App\Models\User;
+use App\Support\Erp\PersonCpfCnpjUnicidade;
+use App\Support\Erp\PersonDocumentoDuplicadoException;
 use App\Support\UnitecOs\OrdemServicoApiPayload;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -248,14 +250,13 @@ class OrdemServicoController
             }
 
             if (! $person instanceof Person && $docDigits !== '') {
-                $person = Person::query()
-                    ->where('ativo', true)
-                    ->where('is_cliente', true)
-                    ->whereRaw(
-                        "replace(replace(replace(replace(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') = ?",
-                        [$docDigits]
-                    )
-                    ->first();
+                $person = app(PersonCpfCnpjUnicidade::class)->encontrar($docDigits);
+                if ($person instanceof Person && (! $person->is_cliente || ! $person->ativo)) {
+                    $person->forceFill([
+                        'is_cliente' => true,
+                        'ativo' => true,
+                    ])->save();
+                }
             }
 
             if (! $person instanceof Person) {
@@ -272,24 +273,44 @@ class OrdemServicoController
                 : Person::PESSOA_FISICA;
 
             if (! $person instanceof Person) {
-                $person = Person::query()->create([
-                    'codigo' => Person::nextCodigo(),
-                    'pessoa_tipo' => $pessoaTipo,
-                    'nome_razao' => $nome,
-                    'apelido_fantasia' => $fantasia !== '' ? $fantasia : null,
-                    'cpf_cnpj' => $cpfCnpj !== '' ? $cpfCnpj : null,
-                    'cep' => $cep !== '' ? $cep : null,
-                    'endereco' => $endereco !== '' ? $endereco : null,
-                    'numero' => $numero !== '' ? $numero : null,
-                    'bairro' => $bairro !== '' ? $bairro : null,
-                    'cidade_nome' => $cidade !== '' ? $cidade : null,
-                    'uf' => $uf !== '' ? $uf : null,
-                    'email' => $email !== '' ? $email : null,
-                    'fone1' => $telefone !== '' ? $telefone : null,
-                    'is_cliente' => true,
-                    'ativo' => true,
-                ]);
-                $clienteCriado = true;
+                if ($docDigits !== '') {
+                    try {
+                        app(PersonCpfCnpjUnicidade::class)->assertDisponivel($docDigits);
+                    } catch (PersonDocumentoDuplicadoException $e) {
+                        if ($e->existente) {
+                            $person = $e->existente;
+                            $person->forceFill([
+                                'is_cliente' => true,
+                                'ativo' => true,
+                            ])->save();
+                        } else {
+                            throw ValidationException::withMessages([
+                                'cliente.cpf_cnpj' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+
+                if (! $person instanceof Person) {
+                    $person = Person::query()->create([
+                        'codigo' => Person::nextCodigo(),
+                        'pessoa_tipo' => $pessoaTipo,
+                        'nome_razao' => $nome,
+                        'apelido_fantasia' => $fantasia !== '' ? $fantasia : null,
+                        'cpf_cnpj' => $cpfCnpj !== '' ? $cpfCnpj : null,
+                        'cep' => $cep !== '' ? $cep : null,
+                        'endereco' => $endereco !== '' ? $endereco : null,
+                        'numero' => $numero !== '' ? $numero : null,
+                        'bairro' => $bairro !== '' ? $bairro : null,
+                        'cidade_nome' => $cidade !== '' ? $cidade : null,
+                        'uf' => $uf !== '' ? $uf : null,
+                        'email' => $email !== '' ? $email : null,
+                        'fone1' => $telefone !== '' ? $telefone : null,
+                        'is_cliente' => true,
+                        'ativo' => true,
+                    ]);
+                    $clienteCriado = true;
+                }
             } else {
                 $updates = [];
                 if ($fantasia !== '' && blank($person->apelido_fantasia)) {
@@ -302,8 +323,15 @@ class OrdemServicoController
                     $updates['email'] = $email;
                 }
                 if ($cpfCnpj !== '' && blank($person->cpf_cnpj)) {
-                    $updates['cpf_cnpj'] = $cpfCnpj;
-                    $updates['pessoa_tipo'] = $pessoaTipo;
+                    try {
+                        app(PersonCpfCnpjUnicidade::class)->assertDisponivel($cpfCnpj, $person->getKey());
+                        $updates['cpf_cnpj'] = $cpfCnpj;
+                        $updates['pessoa_tipo'] = $pessoaTipo;
+                    } catch (PersonDocumentoDuplicadoException $e) {
+                        throw ValidationException::withMessages([
+                            'cliente.cpf_cnpj' => $e->getMessage(),
+                        ]);
+                    }
                 }
                 if ($cep !== '' && blank($person->cep)) {
                     $updates['cep'] = $cep;

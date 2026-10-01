@@ -51,6 +51,12 @@ class AuthController
             ]);
         }
 
+        if (! $user->podeAcessarApp(User::APP_VENDAS_INTERNAS)) {
+            throw ValidationException::withMessages([
+                'senha' => 'Usuário sem acesso a este app.',
+            ]);
+        }
+
         if (! hash_equals((string) $user->senha_app_forca_vendas, (string) $data['senha'])) {
             throw ValidationException::withMessages([
                 'senha' => 'Usuário ou senha do app inválidos.',

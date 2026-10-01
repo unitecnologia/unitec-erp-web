@@ -767,3 +767,89 @@ html.unitec-login-booting body {
         transition: none !important;
     }
 }
+
+.unitec-login__modal:has(.unitec-login__setup) {
+    max-height: min(92vh, 760px);
+}
+
+.unitec-login__right:has(.unitec-login__setup) {
+    min-height: 0;
+    overflow: auto;
+}
+
+.unitec-login__setup {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem 0.65rem;
+}
+
+.unitec-login__setup-span {
+    grid-column: 1 / -1;
+}
+
+.unitec-login__setup label {
+    display: block;
+    margin-bottom: 0.15rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1e5a9e;
+    font-size: 0.68rem;
+}
+
+.unitec-login__setup label span {
+    color: #dc2626;
+}
+
+.unitec-login__setup input,
+.unitec-login__setup select {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.55rem;
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-weight: 650;
+    font-size: 0.84rem;
+}
+
+.unitec-login__setup input:focus,
+.unitec-login__setup select:focus {
+    outline: none;
+    border-color: #1e5a9e;
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+}
+
+.unitec-login__setup-error {
+    margin: 0.12rem 0 0;
+    color: #b91c1c;
+    font-size: 0.7rem;
+    font-weight: 650;
+}
+
+.unitec-login__setup-hint {
+    margin: 0.12rem 0 0;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.unitec-login__setup-submit {
+    grid-column: 1 / -1;
+    margin-top: 0.35rem;
+    min-height: 2.45rem;
+    border-radius: 8px;
+    border: 1px solid #164a82;
+    background: linear-gradient(180deg, #2f6fbf 0%, #1e5a9e 100%);
+    color: #ffffff;
+    font-weight: 750;
+    font-size: 0.84rem;
+    cursor: pointer;
+}
+
+.unitec-login__setup-submit:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}

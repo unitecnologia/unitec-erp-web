@@ -1,0 +1,176 @@
+.erp-comissoes-page .fi-ta-row.erp-row-selected {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+}
+
+.erp-comissoes {
+    padding: 0.5rem 0.75rem 0;
+}
+
+.erp-comissoes__topbar {
+    margin-bottom: 0.5rem;
+}
+
+.erp-comissoes__title {
+    font-size: 0.95rem;
+    font-weight: 650;
+    color: #0f172a;
+}
+
+.erp-comissoes__filtros {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.5rem;
+    background: #f8fafc;
+}
+
+.erp-comissoes__filtros-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 0.85rem;
+    align-items: flex-end;
+}
+
+.erp-comissoes__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.72rem;
+    color: #475569;
+}
+
+.erp-comissoes__periodo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-comissoes__input,
+.erp-comissoes__select {
+    min-height: 2rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.8rem;
+    background: #fff;
+    color: #0f172a;
+}
+
+.erp-comissoes__select {
+    min-width: 10rem;
+}
+
+.erp-comissoes__btn {
+    min-height: 2rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 0.35rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #0f172a;
+}
+
+.erp-comissoes__btn:hover {
+    background: #f1f5f9;
+}
+
+.erp-comissoes__btn--primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+
+.erp-comissoes__btn--primary:hover {
+    background: #1d4ed8;
+}
+
+.erp-comissoes__btn--danger {
+    background: #fff;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.erp-comissoes__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.erp-comissoes__detalhe {
+    margin: 0.35rem 0.75rem 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+    overflow: hidden;
+}
+
+.erp-comissoes__detalhe-title {
+    font-size: 0.75rem;
+    font-weight: 650;
+    padding: 0.4rem 0.6rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.erp-comissoes__detalhe-table-wrap {
+    max-height: 180px;
+    overflow: auto;
+}
+
+.erp-comissoes__detalhe-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.erp-comissoes__detalhe-table th,
+.erp-comissoes__detalhe-table td {
+    padding: 0.28rem 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: left;
+}
+
+.erp-comissoes__num {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-comissoes__modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+}
+
+.erp-comissoes__modal {
+    width: min(420px, 92vw);
+    background: #fff;
+    border-radius: 0.6rem;
+    padding: 1rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+
+.erp-comissoes__modal-title {
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.erp-comissoes__modal-hint {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+}
+
+.erp-comissoes__modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}

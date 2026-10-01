@@ -3,13 +3,17 @@
 namespace App\Support\Pix;
 
 use App\Models\ContaReceber;
+use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\PixCobranca;
+use App\Support\Erp\Boleto\Api\BoletoApi;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
+use App\Support\Pix\Ailos\AilosPixService;
 use App\Support\Pix\Contracts\PixProvider;
 use App\Support\Pix\Data\PixCobrancaInput;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -21,8 +25,11 @@ use Throwable;
  */
 class PixCobrancaService
 {
-    /** Tempo de expiração do QR, em minutos. */
+    /** Tempo de expiração do QR Mercado Pago, em minutos. */
     public const EXPIRA_MINUTOS = 5;
+
+    /** Expiração padrão Ailos (segundos) — alinhada ao kit / config. */
+    public const AILOS_EXPIRA_SEGUNDOS = 86400;
 
     public function __construct(private readonly PixProviderManager $providers)
     {
@@ -38,22 +45,40 @@ class PixCobrancaService
         ?string $payerEmail = null,
         ?int $empresaId = null,
         ?string $descricao = null,
+        ?string $debtorName = null,
+        ?string $debtorDocument = null,
     ): PixCobranca {
         $provider = $this->providers->paraEmpresa($empresaId);
+        $valor = round($valor, 2);
+        $descricaoFinal = $descricao ?? ('Pedido '.$orderUuid);
+        $expiraEm = $this->expiraEmParaProvedor($provider->nome());
+        $txid = $this->txidParaProvedor(
+            $provider->nome(),
+            $orderUuid,
+            $valor,
+            $descricaoFinal,
+            (string) $debtorDocument,
+        );
 
         $cobranca = PixCobranca::query()->create([
             'empresa_id' => $empresaId,
             'origem' => PixCobranca::ORIGEM_PEDIDO,
             'order_uuid' => $orderUuid,
             'provedor' => $provider->nome(),
-            'txid' => (string) Str::uuid(),
-            'valor' => round($valor, 2),
+            'txid' => $txid,
+            'valor' => $valor,
             'status' => PixCobranca::STATUS_PENDENTE,
             'payer_email' => $payerEmail,
-            'expira_em' => ErpTimezone::toLocal()->addMinutes(self::EXPIRA_MINUTOS),
+            'expira_em' => $expiraEm,
         ]);
 
-        return $this->emitirNoProvedor($cobranca, $provider, $descricao ?? ('Pedido '.$orderUuid));
+        return $this->emitirNoProvedor(
+            $cobranca,
+            $provider,
+            $descricaoFinal,
+            $debtorName,
+            $debtorDocument,
+        );
     }
 
     /**
@@ -66,23 +91,37 @@ class PixCobrancaService
     ): PixCobranca {
         $valor = round((float) $conta->saldo, 2);
         $provider = $this->providers->paraEmpresa($empresaId);
+        $descricao = 'Título '.($conta->documento ?: $conta->numero);
+        $cliente = $conta->cliente;
+        $debtorName = $cliente?->nome_razao;
+        $debtorDocument = $cliente?->cpf_cnpj;
+        $expiraEm = $this->expiraEmParaProvedor($provider->nome());
+        $txid = $this->txidParaProvedor(
+            $provider->nome(),
+            'CR'.$conta->id,
+            $valor,
+            $descricao,
+            (string) $debtorDocument,
+        );
 
         $cobranca = PixCobranca::query()->create([
             'empresa_id' => $empresaId,
             'origem' => PixCobranca::ORIGEM_TITULO,
             'conta_receber_id' => $conta->id,
             'provedor' => $provider->nome(),
-            'txid' => (string) Str::uuid(),
+            'txid' => $txid,
             'valor' => $valor,
             'status' => PixCobranca::STATUS_PENDENTE,
-            'payer_email' => $payerEmail ?? $conta->cliente?->email,
-            'expira_em' => ErpTimezone::toLocal()->addMinutes(self::EXPIRA_MINUTOS),
+            'payer_email' => $payerEmail ?? $cliente?->email,
+            'expira_em' => $expiraEm,
         ]);
 
         return $this->emitirNoProvedor(
             $cobranca,
             $provider,
-            'Título '.($conta->documento ?: $conta->numero),
+            $descricao,
+            $debtorName,
+            $debtorDocument,
         );
     }
 
@@ -93,27 +132,48 @@ class PixCobrancaService
         PixCobranca $cobranca,
         PixProvider $provider,
         string $descricao,
+        ?string $debtorName = null,
+        ?string $debtorDocument = null,
     ): PixCobranca {
         try {
-            $webhookUrl = (string) config('services.mercadopago.webhook_url');
+            $webhookUrl = $provider->nome() === 'ailos'
+                ? (string) (Empresa::query()->find($cobranca->empresa_id)?->param_pix_webhook_url
+                    ?: \App\Support\Erp\EmpresaParametros::pixAilosWebhookUrl())
+                : (string) config('services.mercadopago.webhook_url');
 
             $result = $provider->criarCobranca(new PixCobrancaInput(
                 valor: (float) $cobranca->valor,
                 descricao: $descricao,
-                txid: $cobranca->txid,
+                txid: (string) $cobranca->txid,
                 expiraEm: $cobranca->expira_em,
                 payerEmail: $cobranca->payer_email,
-                externalReference: (string) $cobranca->id,
+                externalReference: (string) ($cobranca->conta_receber_id ?: $cobranca->order_uuid ?: $cobranca->id),
                 notificationUrl: $webhookUrl !== '' ? $webhookUrl : null,
+                debtorName: $debtorName,
+                debtorDocument: $debtorDocument,
             ));
 
-            $cobranca->forceFill([
+            $updates = [
                 'provider_ref' => $result->providerRef,
                 'qr_copia_cola' => $result->qrCopiaCola,
                 'qr_imagem_base64' => $result->qrImagemBase64,
                 'status' => $result->status,
                 'raw' => $result->raw,
-            ])->save();
+            ];
+
+            // Ailos: txid estável do provedor (pode diferir do UUID local antigo).
+            if ($provider->nome() === 'ailos' && $result->providerRef !== '') {
+                $updates['txid'] = $result->providerRef;
+                if (isset($result->raw['expirationDate']) && is_string($result->raw['expirationDate'])) {
+                    try {
+                        $updates['expira_em'] = \Illuminate\Support\Carbon::parse($result->raw['expirationDate']);
+                    } catch (Throwable) {
+                        // mantém expira_em local
+                    }
+                }
+            }
+
+            $cobranca->forceFill($updates)->save();
 
             return $cobranca;
         } catch (Throwable $e) {
@@ -122,6 +182,36 @@ class PixCobrancaService
 
             throw $e;
         }
+    }
+
+    private function expiraEmParaProvedor(string $provedor): \Carbon\Carbon
+    {
+        if ($provedor === 'ailos') {
+            $seconds = max(60, (int) config('ailos.expiration_seconds', self::AILOS_EXPIRA_SEGUNDOS));
+
+            return ErpTimezone::toLocal()->addSeconds($seconds);
+        }
+
+        return ErpTimezone::toLocal()->addMinutes(self::EXPIRA_MINUTOS);
+    }
+
+    private function txidParaProvedor(
+        string $provedor,
+        string $reference,
+        float $valor,
+        string $descricao,
+        string $debtorDocument,
+    ): string {
+        if ($provedor === 'ailos') {
+            return AilosPixService::buildTxid(
+                $reference,
+                number_format($valor, 2, '.', ''),
+                $descricao,
+                $debtorDocument,
+            );
+        }
+
+        return (string) Str::uuid();
     }
 
     /**
@@ -166,7 +256,7 @@ class PixCobrancaService
      */
     public function registrarPagamento(PixCobranca $cobranca): PixCobranca
     {
-        return DB::transaction(function () use ($cobranca): PixCobranca {
+        $locked = DB::transaction(function () use ($cobranca): PixCobranca {
             $locked = PixCobranca::query()->whereKey($cobranca->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->isPago()) {
@@ -188,6 +278,28 @@ class PixCobrancaService
 
             return $locked;
         });
+
+        // Fora da transação: API do banco (não desfaz CR/Pix se falhar; reexecuta se já pago).
+        if ($locked->origem === PixCobranca::ORIGEM_TITULO && $locked->conta_receber_id) {
+            $this->tentarBaixaBoletosApi((int) $locked->conta_receber_id);
+        }
+
+        return $locked;
+    }
+
+    /**
+     * Se o título tiver boleto aberto com driver de API, solicita baixa no banco.
+     */
+    private function tentarBaixaBoletosApi(int $contaReceberId): void
+    {
+        try {
+            app(BoletoApi::class)->baixarAbertosDaContaReceber($contaReceberId);
+        } catch (Throwable $e) {
+            Log::warning('Boleto API: não foi possível baixar boletos após Pix do título.', [
+                'conta_receber_id' => $contaReceberId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function baixarTitulo(PixCobranca $cobranca): void

@@ -129,11 +129,15 @@ echo [OK] pdo_mysql
 echo [4/8] Limpando caches quebrados do update...
 del /F /Q "%APP%\bootstrap\cache\*.php" >nul 2>&1
 cd /d "%APP%"
+"%PHPEXE%" artisan package:discover >nul 2>&1
 "%PHPEXE%" artisan optimize:clear >nul 2>&1
 "%PHPEXE%" artisan view:clear >nul 2>&1
 "%PHPEXE%" artisan config:clear >nul 2>&1
 "%PHPEXE%" artisan route:clear >nul 2>&1
 "%PHPEXE%" artisan cache:clear >nul 2>&1
+REM packages.php pode ter ficado com Laravel\Pail (DEV) apos update — rediscover de novo limpo
+del /F /Q "%APP%\bootstrap\cache\packages.php" "%APP%\bootstrap\cache\services.php" >nul 2>&1
+"%PHPEXE%" artisan package:discover >nul 2>&1
 
 echo [5/8] Ajustando .env (debug para capturar erro)...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^

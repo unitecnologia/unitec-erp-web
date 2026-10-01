@@ -79,6 +79,12 @@ class AuthController
             ]);
         }
 
+        if (! $user->podeAcessarApp(User::APP_UNITEC_OS)) {
+            throw ValidationException::withMessages([
+                'senha' => 'Usuário sem acesso a este app.',
+            ]);
+        }
+
         if (! hash_equals((string) $user->senha_app_forca_vendas, (string) $data['senha'])) {
             throw ValidationException::withMessages([
                 'senha' => 'Senha do app inválida (não é a senha do ERP).',

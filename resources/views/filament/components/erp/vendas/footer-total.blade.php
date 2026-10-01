@@ -4,15 +4,22 @@
         'cupom' => 'Cupom',
         'todos' => 'Todos',
     ];
+
+    $tipoAtual = filled($this->tipoFilter) ? (string) $this->tipoFilter : 'todos';
 @endphp
 
 <div class="erp-vendas__footer">
-    <div class="erp-vendas__type-tabs">
+    <div
+        class="erp-vendas__type-tabs"
+        wire:ignore
+        x-data="{ statusAtivo: @js($tipoAtual) }"
+    >
         @foreach ($tipoTabs as $value => $label)
             <button
                 type="button"
-                wire:click="setTipoFilter('{{ $value }}')"
-                @class(['erp-vendas__type-tab', 'erp-vendas__type-tab--active' => $this->tipoFilter === $value])
+                class="erp-vendas__type-tab"
+                :class="{ 'erp-vendas__type-tab--active': statusAtivo === @js($value) }"
+                @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.venda-list-table') || [])[0]; if (t) t.call('setTipoFilter', @js($value))"
             >{{ $label }}</button>
         @endforeach
     </div>

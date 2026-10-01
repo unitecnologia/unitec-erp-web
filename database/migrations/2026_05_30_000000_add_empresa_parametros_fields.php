@@ -51,7 +51,8 @@ return new class extends Migration
                     continue;
                 }
 
-                $table->string($field, 255)->nullable()->default($meta['default'] === '' ? null : (string) $meta['default']);
+                // TEXT: evita MySQL 1118 (row size) em instalação limpa.
+                $table->text($field)->nullable();
             }
 
             foreach (EmpresaParametros::pixBooleanFields() as $field => $meta) {
@@ -70,7 +71,8 @@ return new class extends Migration
                 if ($meta['type'] === 'integer') {
                     $table->unsignedInteger($field)->default((int) $meta['default']);
                 } else {
-                    $table->string($field, 255)->nullable()->default($meta['default'] === '' ? null : (string) $meta['default']);
+                    // TEXT: evita MySQL 1118 (row size) em instalação limpa.
+                    $table->text($field)->nullable();
                 }
             }
 

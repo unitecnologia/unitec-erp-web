@@ -4,6 +4,8 @@ namespace App\Filament\Resources\EmpresaResource\Pages;
 
 use App\Filament\Resources\EmpresaResource;
 use App\Filament\Resources\EmpresaResource\Pages\Concerns\ErpEmpresaFormPage;
+use App\Models\Empresa;
+use App\Support\Erp\Boleto\BoletoContaApiDefaults;
 use App\Support\Erp\ErpScreen;
 use Filament\Resources\Pages\EditRecord;
 
@@ -54,6 +56,10 @@ class EditEmpresa extends EditRecord
 
     protected function afterSave(): void
     {
-        //
+        $empresa = $this->record;
+        if ($empresa instanceof Empresa) {
+            BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
+            $this->syncEmpresaNfeEmitentes();
+        }
     }
 }

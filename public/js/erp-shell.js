@@ -122,6 +122,17 @@
         });
     }
 
+    // F7: bloqueia Caret Browsing do Chrome/Edge sem impedir atalhos do ERP (PDV/OS/Compras/FV).
+    document.addEventListener(
+        'keydown',
+        (event) => {
+            if (event.key === 'F7') {
+                event.preventDefault();
+            }
+        },
+        true
+    );
+
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && updateModal && ! updateModal.hidden && canCloseUpdateModal()) {
             closeSystemUpdateModal();

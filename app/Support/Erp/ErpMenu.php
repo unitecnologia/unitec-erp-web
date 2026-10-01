@@ -9,6 +9,7 @@ use App\Filament\Pages\ForcaVendasTelaVendaPage;
 use App\Filament\Pages\PermissoesPage;
 use App\Filament\Pages\TrocarEmpresaPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
+use App\Filament\Pages\NfsePage;
 use App\Filament\Resources\NfceResource;
 use App\Filament\Resources\NfeResource;
 use App\Filament\Pages\PdvPage;
@@ -18,6 +19,7 @@ use App\Filament\Pages\AnaliseComprasPage;
 use App\Filament\Pages\OutrasSaidasMovimentoPage;
 use App\Filament\Pages\OperacoesFiscaisPage;
 use App\Support\Erp\Pdv\PdvConfig;
+use App\Support\Erp\Pdv\PdvErpPolicy;
 use App\Filament\Resources\AjustaEstoqueGrupoResource;
 use App\Filament\Resources\AjustaPrecoResource;
 use App\Filament\Resources\AjusteEstoqueResource;
@@ -25,6 +27,7 @@ use App\Filament\Resources\AniversarianteResource;
 use App\Filament\Resources\CaixaContaResource;
 use App\Filament\Resources\CaixaResource;
 use App\Filament\Resources\CfopResource;
+use App\Filament\Resources\ComissaoPeriodoResource;
 use App\Filament\Resources\ReciboResource;
 use App\Filament\Resources\CompraResource;
 use App\Filament\Resources\ContaPagarResource;
@@ -44,13 +47,14 @@ use App\Filament\Resources\RhFuncionarioResource;
 use App\Filament\Pages\BoletoConfigPage;
 use App\Filament\Resources\BoletoRemessaResource;
 use App\Filament\Resources\BoletoRetornoResource;
+use App\Filament\Resources\CargaResource;
+use App\Filament\Pages\GestaoEntregasPage;
 use App\Filament\Resources\ExpedicaoResource;
 use App\Filament\Resources\LogisticaDestinatarioResource;
 use App\Filament\Resources\LogisticaRemetenteResource;
 use App\Filament\Resources\NotaFornecedorResource;
 use App\Filament\Resources\PlanoContaResource;
 use App\Filament\Resources\GrupoResource;
-use App\Filament\Resources\ImpressaoEtiquetaResource;
 use App\Filament\Resources\MarcaResource;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\OrdemServicoResource;
@@ -136,19 +140,28 @@ class ErpMenu
             ]);
         }
 
+        $shortcuts[] = static::shortcut('os', 'OS', 'heroicon-o-wrench-screwdriver', 'amber', [
+            'url' => OrdemServicoResource::getUrl('index'),
+            'permission' => 'ordens_servico.access',
+        ]);
+
         $shortcuts = [
             ...$shortcuts,
             static::shortcut('fv-monitor', 'Monitor', 'heroicon-o-computer-desktop', 'teal', [
                 'url' => ForcaVendasMonitorResource::getUrl('index'),
                 'permission' => 'vendas.access',
             ]),
-            static::shortcut('nfce', 'NFCe', 'heroicon-o-receipt-percent', 'orange', [
+            static::shortcut('nfce', 'NFC-e', 'heroicon-o-receipt-percent', 'orange', [
                 'url' => NfceResource::getUrl('index'),
                 'permission' => 'nfce.access',
             ]),
-            static::shortcut('nfe', 'NFe', 'heroicon-o-document-arrow-up', 'indigo', [
+            static::shortcut('nfe', 'NF-e', 'heroicon-o-document-arrow-up', 'indigo', [
                 'url' => NfeResource::getUrl('index'),
                 'permission' => 'nfe.access',
+            ]),
+            static::shortcut('nfse', 'NFS-e', 'heroicon-o-document-text', 'purple', [
+                'url' => NfsePage::getUrl(),
+                'permission' => 'nfse.access',
             ]),
             static::shortcut('receber', 'A Receber', 'heroicon-o-arrow-down-circle', 'green', [
                 'url' => ContaReceberResource::getUrl('index'),
@@ -217,8 +230,7 @@ class ErpMenu
             static::link('Grupo', GrupoResource::getUrl('index'), permission: 'grupos.access', icon: 'heroicon-o-rectangle-group', iconColor: 'erp-menu-bar__icon--teal'),
             static::link('Unidades', UnidadeResource::getUrl('index'), permission: 'unidades.access', icon: 'heroicon-o-scale', iconColor: 'erp-menu-bar__icon--blue'),
             static::link('Marcas', MarcaResource::getUrl('index'), permission: 'marcas.access', icon: 'heroicon-o-tag', iconColor: 'erp-menu-bar__icon--indigo'),
-            static::link('Impressão Etiquetas Novo', ImpressaoEtiquetasNovoPage::getUrl(), permission: 'etiquetas.access', icon: 'heroicon-o-printer', iconColor: 'erp-menu-bar__icon--green'),
-            static::link('Impressão de Etiquetas', ImpressaoEtiquetaResource::getUrl('index'), permission: 'etiquetas.access', icon: 'heroicon-o-qr-code', iconColor: 'erp-menu-bar__icon--amber'),
+            static::link('Impressão Etiquetas', ImpressaoEtiquetasNovoPage::getUrl(), permission: 'etiquetas.access', icon: 'heroicon-o-printer', iconColor: 'erp-menu-bar__icon--green'),
             static::sep(),
             static::group('Movimentações e Ajuste', [
                 static::link('Ajuste de Preço em Lote', AjustaPrecoResource::getUrl('index'), permission: 'ajusta_preco.access', icon: 'heroicon-o-currency-dollar', iconColor: 'erp-menu-bar__icon--green'),
@@ -267,10 +279,13 @@ class ErpMenu
             iconColor: 'erp-menu-bar__icon--amber',
         );
 
+        if (static::restauranteHabilitado()) {
+            $items[] = static::stub('Delivery', icon: 'heroicon-o-truck', iconColor: 'erp-menu-bar__icon--slate');
+            $items[] = static::stub('Restaurante', icon: 'heroicon-o-building-storefront', iconColor: 'erp-menu-bar__icon--slate');
+        }
+
         return [
             ...$items,
-            static::stub('Delivery', icon: 'heroicon-o-truck', iconColor: 'erp-menu-bar__icon--slate'),
-            static::stub('Restaurante', icon: 'heroicon-o-building-storefront', iconColor: 'erp-menu-bar__icon--slate'),
             static::link('Lista de Vendas', VendaResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-shopping-bag', iconColor: 'erp-menu-bar__icon--red'),
             static::link('Tela de Venda', ForcaVendasTelaVendaPage::getUrl(), permission: 'vendas.access', icon: 'heroicon-o-device-phone-mobile', iconColor: 'erp-menu-bar__icon--teal'),
             static::link('Monitor de Vendas', ForcaVendasMonitorResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-computer-desktop', iconColor: 'erp-menu-bar__icon--green'),
@@ -280,8 +295,12 @@ class ErpMenu
 
     protected static function pdvHabilitado(): bool
     {
-        // Flag param_geral_usar_pdv_retaguarda foi removida; PDV no menu (acesso via permissão).
-        return true;
+        return PdvErpPolicy::habilitado();
+    }
+
+    protected static function restauranteHabilitado(): bool
+    {
+        return ErpContext::currentEmpresa()?->tipo_atividade === 'restaurante_lanchonete';
     }
 
     /**
@@ -295,6 +314,7 @@ class ErpMenu
             static::link('Contas', CaixaContaResource::getUrl('index'), permission: 'contas_caixa.access', icon: 'heroicon-o-building-library', iconColor: 'erp-menu-bar__icon--indigo'),
             static::link('Contas a Pagar', ContaPagarResource::getUrl('index'), permission: 'contas_pagar.access', icon: 'heroicon-o-arrow-up-circle', iconColor: 'erp-menu-bar__icon--red'),
             static::link('Contas a Receber', ContaReceberResource::getUrl('index'), permission: 'contas_receber.access', icon: 'heroicon-o-arrow-down-circle', iconColor: 'erp-menu-bar__icon--green'),
+            static::link('Comissões', ComissaoPeriodoResource::getUrl('index'), permission: 'comissoes.access', icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green'),
             static::link('Livro Caixa', CaixaResource::getUrl('index'), permission: 'caixa.access', icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--amber'),
             static::sep(),
             static::link('Impressão de Recibos', ReciboResource::getUrl('index'), permission: 'recibos.access', icon: 'heroicon-o-printer', iconColor: 'erp-menu-bar__icon--orange'),
@@ -315,6 +335,7 @@ class ErpMenu
         return [
             static::link('NFC-e', NfceResource::getUrl('index'), permission: 'nfce.access', icon: 'heroicon-o-receipt-percent', iconColor: 'erp-menu-bar__icon--orange'),
             static::link('NF-e', NfeResource::getUrl('index'), permission: 'nfe.access', icon: 'heroicon-o-document-arrow-up', iconColor: 'erp-menu-bar__icon--indigo'),
+            static::link('NFS-e', NfsePage::getUrl(), permission: 'nfse.access', icon: 'heroicon-o-document-text', iconColor: 'erp-menu-bar__icon--purple'),
             static::stub('CTe-OS', icon: 'heroicon-o-document', iconColor: 'erp-menu-bar__icon--slate'),
             static::stub('CTe', icon: 'heroicon-o-truck', iconColor: 'erp-menu-bar__icon--slate'),
             static::stub('MDFe', icon: 'heroicon-o-map', iconColor: 'erp-menu-bar__icon--slate'),
@@ -339,6 +360,8 @@ class ErpMenu
     {
         return [
             static::link('Controle de Expedição', ExpedicaoResource::getUrl('index'), permission: 'logistica.access', icon: 'heroicon-o-clipboard-document-check', iconColor: 'erp-menu-bar__icon--blue'),
+            static::link('Carga / Romaneio', CargaResource::getUrl('index'), permission: 'cargas.access', icon: 'heroicon-o-truck', iconColor: 'erp-menu-bar__icon--orange'),
+            static::link('Entregas', GestaoEntregasPage::getUrl(), permission: 'cargas.access', icon: 'heroicon-o-map-pin', iconColor: 'erp-menu-bar__icon--green'),
             static::sep(),
             static::group('Transportadora', [
                 static::link('Motorista / Transportador', TransportadoraResource::getUrl('index'), permission: 'transportadoras.access', icon: 'heroicon-o-user', iconColor: 'erp-menu-bar__icon--teal'),
@@ -425,6 +448,7 @@ class ErpMenu
                 static::link('Relatório de Vendas de Produtos - Vendedores', route('erp.reports.tabular', ['slug' => 'vendas-produtos-vendedores']), permission: 'vendas.print', icon: 'heroicon-o-shopping-bag', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Relatório de Vendas Por CFOP/CSOSN', route('erp.reports.tabular', ['slug' => 'vendas-cfop-csosn']), permission: 'vendas.print', icon: 'heroicon-o-hashtag', iconColor: 'erp-menu-bar__icon--teal'),
                 static::link('Relatório de Vendas de Produtos c/ Trib.Monofásica', route('erp.reports.tabular', ['slug' => 'vendas-produtos-monofasica']), permission: 'vendas.print', icon: 'heroicon-o-receipt-percent', iconColor: 'erp-menu-bar__icon--indigo'),
+                static::link('Visitas realizadas sem venda', route('erp.reports.tabular', ['slug' => 'visitas-realizadas-sem-venda']), permission: 'vendas.print', icon: 'heroicon-o-map-pin', iconColor: 'erp-menu-bar__icon--slate'),
             ], icon: 'heroicon-o-shopping-cart', iconColor: 'erp-menu-bar__icon--red'),
             static::group('Financeiro', [
                 static::link('Relatório Comissão de Operadores', route('erp.reports.comissao-vendedores'), permission: 'vendas.print', icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green'),
@@ -448,10 +472,17 @@ class ErpMenu
      */
     protected static function configuracoesItems(): array
     {
-        return [
+        $items = [
             static::link('Empresa', EmpresaResource::getUrl('index'), permission: 'empresa.access', icon: 'heroicon-o-building-office-2', iconColor: 'erp-menu-bar__icon--blue'),
             static::link('Terminais', TerminalResource::getUrl('index'), permission: 'terminais.access', icon: 'heroicon-o-computer-desktop', iconColor: 'erp-menu-bar__icon--teal'),
-            static::stub('Mesas', icon: 'heroicon-o-table-cells', iconColor: 'erp-menu-bar__icon--slate'),
+        ];
+
+        if (static::restauranteHabilitado()) {
+            $items[] = static::stub('Mesas', icon: 'heroicon-o-table-cells', iconColor: 'erp-menu-bar__icon--slate');
+        }
+
+        return [
+            ...$items,
             static::link('Config. Fiscais', ConfigFiscaisPage::getUrl(), permission: 'config_fiscais.access', icon: 'heroicon-o-document-check', iconColor: 'erp-menu-bar__icon--indigo'),
             static::link('Balança', BalancaConfigPage::getUrl(), permission: 'balanca.access', icon: 'heroicon-o-scale', iconColor: 'erp-menu-bar__icon--amber'),
             static::link('Backup', BackupPage::getUrl(), permission: 'backup.access', icon: 'heroicon-o-circle-stack', iconColor: 'erp-menu-bar__icon--green'),

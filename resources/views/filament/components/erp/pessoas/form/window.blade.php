@@ -14,4 +14,6 @@
         @include('filament.components.erp.pessoas.form.shell')
         @include('filament.components.erp.pessoas.form.action-bar')
     </div>
+
+    @include('filament.components.erp.pessoas.form.documento-duplicado-modal')
 </div>

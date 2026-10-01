@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Cloudflare Tunnel / reverse proxy: respeitar X-Forwarded-* (HTTPS real).
         $middleware->trustProxies(at: '*');
 
+        // Global: Filament não usa o grupo `web` — só o middleware do painel.
+        // Sem isso, asset()/logo no /admin/login ficam com 127.0.0.1 atrás do túnel.
+        $middleware->append(\App\Http\Middleware\SyncUrlOriginFromRequest::class);
+
         $middleware->web(prepend: [
             \App\Http\Middleware\EnsureStorageFrameworkDirectories::class,
         ]);
@@ -32,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'forcavendas.device' => \App\Http\Middleware\EnsureForcaVendasDeviceApproved::class,
             'vendasinternas.device' => \App\Http\Middleware\EnsureVendasInternasDeviceApproved::class,
             'unitecos.device' => \App\Http\Middleware\EnsureUnitecOsDeviceApproved::class,
+            'entregas.device' => \App\Http\Middleware\EnsureEntregasDeviceApproved::class,
             'pdv.carga.token' => \App\Http\Middleware\EnsurePdvCargaToken::class,
             'pdv.terminal.ativo' => \App\Http\Middleware\EnsurePdvTerminalAtivo::class,
         ]);

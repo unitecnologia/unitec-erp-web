@@ -10,10 +10,10 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Instalação padrão: usuário USUARIO + perfis + tabelas fiscais oficiais.
-     * Sem empresa — o primeiro login abre o cadastro de empresa.
+     * Instalação padrão: usuário USUARIO + perfis + tabelas fiscais oficiais
+     * + empresa Unitec pré-preenchida (snapshot em database/data/instalador).
      *
-     * Demo completo: php artisan db:seed --class=DemoDatabaseSeeder
+     * Demo completo (produtos/vendas): php artisan db:seed --class=DemoDatabaseSeeder
      */
     public function run(): void
     {

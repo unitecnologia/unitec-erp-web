@@ -57,7 +57,9 @@ class NfeEtiquetaVolumeReportController
             )), 'UTF-8'),
             'destino' => $destino !== '' ? $destino : '—',
             'volumes' => $volumes,
-            'autoPrint' => $request->boolean('auto', true),
+            // Só auto-imprime com ?auto=1 (fallback em nova aba).
+            // No fluxo normal o iframe chama print() via ErpNfePrint.openDanfe.
+            'autoPrint' => $request->boolean('auto'),
         ]);
     }
 

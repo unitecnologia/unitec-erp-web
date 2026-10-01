@@ -43,19 +43,19 @@ readonly class ContadorCloudConfig
         $timeout = $data['param_portal_contador_timeout'] ?? config('contador-cloud.default_timeout', 30);
 
         return new self(
-            habilitar: (bool) ($data['param_portal_contador_habilitar'] ?? false),
+            habilitar: (bool) ($data['param_portal_contador_habilitar'] ?? true),
             url: ContadorCloudHttpHelper::normalizeUrl((string) ($data['param_portal_contador_url'] ?? '')),
             empresaId: trim((string) ($data['param_portal_contador_empresa_id'] ?? '')),
             token: trim((string) ($data['param_portal_contador_token'] ?? '')),
-            ambiente: (string) ($data['param_portal_contador_ambiente'] ?? 'homologacao'),
+            ambiente: (string) ($data['param_portal_contador_ambiente'] ?? 'producao'),
             timeout: max(1, (int) $timeout),
             contadorId: self::nullableInt($data['param_portal_contador_contador_id'] ?? null),
             email: trim((string) ($data['param_portal_contador_email'] ?? '')),
             enviarCompras: (bool) ($data['param_portal_contador_enviar_compras'] ?? true),
-            enviarVendas: (bool) ($data['param_portal_contador_enviar_vendas'] ?? false),
+            enviarVendas: (bool) ($data['param_portal_contador_enviar_vendas'] ?? true),
             enviarXml: (bool) ($data['param_portal_contador_enviar_xml'] ?? true),
             enviarCanceladas: (bool) ($data['param_portal_contador_enviar_canceladas'] ?? true),
-            enviarPacoteMensal: (bool) ($data['param_portal_contador_enviar_pacote_mensal'] ?? false),
+            enviarPacoteMensal: (bool) ($data['param_portal_contador_enviar_pacote_mensal'] ?? true),
         );
     }
 

@@ -4,7 +4,9 @@ namespace App\Support\Erp\Financeiro;
 
 use App\Models\CaixaLancamento;
 use App\Models\ContaReceber;
+use App\Models\ContaReceberPagamento;
 use App\Models\FormaPagamento;
+use App\Models\PlanoConta;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -65,9 +67,20 @@ final class ContaReceberBaixaService
 
     /**
      * @param  list<int>  $contaIds
-     * @return array{ok: int, total: float}
+     * @param  array{
+     *     perc_juros?: float,
+     *     juros?: float,
+     *     perc_desconto?: float,
+     *     desconto?: float,
+     *     valor_recebido?: float|null,
+     *     recebido_em?: string|null,
+     *     numero_cheque?: string|null,
+     *     plano_conta_id?: int|null,
+     *     multa?: float
+     * }  $opcoes
+     * @return array{ok: int, total: float, parciais: int}
      */
-    public function baixarMuitas(array $contaIds, int $formaPagamentoId): array
+    public function baixarMuitas(array $contaIds, int $formaPagamentoId, array $opcoes = []): array
     {
         $ids = collect($contaIds)
             ->map(fn ($id): int => (int) $id)
@@ -89,58 +102,221 @@ final class ContaReceberBaixaService
             throw new InvalidArgumentException('Meio de pagamento inválido ou inativo.');
         }
 
-        $formaConta = $this->mapFormaConta($forma);
         $hoje = ErpTimezone::toLocal()->toDateString();
         $caixaContaId = (int) ($forma->conta_destino_id ?? 0);
 
+        $recebidoEm = trim((string) ($opcoes['recebido_em'] ?? ''));
+        if ($recebidoEm === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $recebidoEm)) {
+            $recebidoEm = $hoje;
+        }
+
+        $percJuros = round((float) ($opcoes['perc_juros'] ?? 0), 4);
+        $jurosInformado = round((float) ($opcoes['juros'] ?? 0), 2);
+        $multaInformada = round((float) ($opcoes['multa'] ?? 0), 2);
+        $percDesconto = round((float) ($opcoes['perc_desconto'] ?? 0), 4);
+        $descontoInformado = round((float) ($opcoes['desconto'] ?? 0), 2);
+        $valorInformado = array_key_exists('valor_recebido', $opcoes) && $opcoes['valor_recebido'] !== null
+            ? round((float) $opcoes['valor_recebido'], 2)
+            : null;
+        $numeroCheque = trim((string) ($opcoes['numero_cheque'] ?? ''));
+        $personalizada = count($ids) === 1 && $valorInformado !== null;
+        $planoContaId = filled($opcoes['plano_conta_id'] ?? null) ? (int) $opcoes['plano_conta_id'] : null;
+        $planoNome = null;
+
+        if ($planoContaId) {
+            $plano = PlanoConta::query()
+                ->whereKey($planoContaId)
+                ->where('ativo', true)
+                ->where('dc', 'C')
+                ->first();
+
+            if (! $plano) {
+                throw new InvalidArgumentException('Plano de contas inválido.');
+            }
+
+            $planoNome = mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120);
+        }
+
         $ok = 0;
         $total = 0.0;
+        $parciais = 0;
 
-        DB::transaction(function () use ($ids, $formaConta, $hoje, $caixaContaId, &$ok, &$total): void {
+        DB::transaction(function () use (
+            $ids,
+            $forma,
+            $recebidoEm,
+            $caixaContaId,
+            $percJuros,
+            $jurosInformado,
+            $multaInformada,
+            $percDesconto,
+            $descontoInformado,
+            $valorInformado,
+            $numeroCheque,
+            $personalizada,
+            $planoContaId,
+            $planoNome,
+            &$ok,
+            &$total,
+            &$parciais,
+        ): void {
             $contas = ContaReceber::query()
                 ->whereIn('id', $ids)
                 ->lockForUpdate()
                 ->get();
 
             foreach ($contas as $conta) {
-                $saldo = round((float) $conta->saldo, 2);
+                if ($personalizada) {
+                    $saldo = round((float) $conta->saldo, 2);
 
-                if ($saldo <= 0) {
-                    continue;
+                    if ($saldo <= 0) {
+                        continue;
+                    }
+
+                    $juros = $jurosInformado;
+                    $desconto = $descontoInformado;
+                    $percJ = $percJuros;
+                    $percD = $percDesconto;
+                    $multa = round((float) $conta->multa, 2) > 0.009
+                        ? 0.0
+                        : $multaInformada;
+
+                    if ($juros <= 0 && $percJ > 0) {
+                        $juros = round($saldo * ($percJ / 100), 2);
+                    }
+
+                    $saldoComJuros = round($saldo + $juros + $multa, 2);
+
+                    if ($desconto <= 0 && $percD > 0) {
+                        $desconto = round($saldoComJuros * ($percD / 100), 2);
+                    }
+
+                    $desconto = min($desconto, $saldoComJuros);
+                    $valorAReceber = round(max(0, $saldoComJuros - $desconto), 2);
+                    $valorRecebido = $valorInformado ?? $valorAReceber;
+
+                    if ($valorRecebido <= 0) {
+                        throw new InvalidArgumentException('Informe o valor recebido.');
+                    }
+
+                    if ($valorRecebido > $valorAReceber + 0.009) {
+                        throw new InvalidArgumentException('Valor recebido maior que o saldo.');
+                    }
+                } else {
+                    $jurosAntes = round((float) $conta->juros, 2);
+                    $multa = ContaReceberJurosCarteira::calcularMulta($conta, \Carbon\Carbon::parse($recebidoEm));
+                    $conta->multa = round((float) $conta->multa + $multa, 2);
+                    ContaReceberJurosCarteira::aplicarNaConta($conta, \Carbon\Carbon::parse($recebidoEm));
+                    $conta->save();
+
+                    $saldo = round((float) $conta->saldo, 2);
+
+                    if ($saldo <= 0) {
+                        continue;
+                    }
+
+                    $juros = round(max(0, (float) $conta->juros - $jurosAntes), 2);
+                    $desconto = 0.0;
+                    $percJ = 0.0;
+                    $percD = 0.0;
+                    $valorAReceber = $saldo;
+                    $valorRecebido = $saldo;
                 }
 
-                $conta->valor_recebido = round((float) $conta->valor_recebido + $saldo, 2);
-                $conta->recebido_em = $hoje;
-                $conta->forma = $formaConta;
+                $this->registrarPagamento(
+                    $conta,
+                    (int) $forma->id,
+                    $recebidoEm,
+                    $juros,
+                    $desconto,
+                    $percJ,
+                    $percD,
+                    $valorRecebido,
+                    $numeroCheque !== '' ? $numeroCheque : null,
+                    $caixaContaId > 0 ? $caixaContaId : null,
+                    $planoContaId,
+                    $multa,
+                );
+
+                $conta->juros = round((float) $conta->juros + ($personalizada ? $juros : 0), 2);
+                $conta->multa = round((float) $conta->multa + ($personalizada ? $multa : 0), 2);
+                $conta->desconto = round((float) $conta->desconto + ($personalizada ? $desconto : 0), 2);
+                $conta->valor_recebido = round((float) $conta->valor_recebido + $valorRecebido, 2);
+                $conta->recebido_em = $recebidoEm;
                 $conta->save();
 
                 $this->lancarEntradaCaixa(
-                    valor: $saldo,
-                    data: $hoje,
+                    valor: $valorRecebido,
+                    data: $recebidoEm,
                     documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
                     historico: 'Recebimento conta a receber #'.($conta->numero ?: $conta->id),
                     caixaContaId: $caixaContaId > 0 ? $caixaContaId : null,
                     empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+                    planoContaId: $planoContaId,
+                    planoNome: $planoNome,
                 );
 
                 $ok++;
-                $total += $saldo;
+                $total += $valorRecebido;
+
+                if ($valorRecebido + 0.009 < $valorAReceber) {
+                    $parciais++;
+                }
             }
         });
 
         return [
             'ok' => $ok,
             'total' => round($total, 2),
+            'parciais' => $parciais,
         ];
     }
 
-    private function lancarEntradaCaixa(
+    private function registrarPagamento(
+        ContaReceber $conta,
+        int $formaPagamentoId,
+        string $data,
+        float $juros,
+        float $desconto,
+        float $percJuros,
+        float $percDesconto,
+        float $valorRecebido,
+        ?string $numeroCheque,
+        ?int $caixaContaId,
+        ?int $planoContaId = null,
+        float $multa = 0,
+    ): void {
+        $max = (int) ContaReceberPagamento::query()->max('codigo_legado');
+
+        ContaReceberPagamento::query()->create([
+            'codigo_legado' => max($max + 1, 1),
+            'conta_receber_id' => (int) $conta->id,
+            'data' => $data,
+            'valor_parcela' => round((float) $conta->valor, 2),
+            'perc_juros' => $percJuros,
+            'juros' => $juros,
+            'multa' => round($multa, 2),
+            'perc_desconto' => $percDesconto,
+            'desconto' => $desconto,
+            'valor_recebido' => $valorRecebido,
+            'forma_pagamento_id' => $formaPagamentoId,
+            'caixa_conta_id' => $caixaContaId,
+            'plano_conta_id' => $planoContaId,
+            'numero_cheque' => $numeroCheque,
+            'cliente_id' => $conta->cliente_id,
+        ]);
+    }
+
+    private function lancarCaixa(
         float $valor,
         string $data,
         string $documento,
         string $historico,
         ?int $caixaContaId,
         ?int $empresaId = null,
+        bool $saida = false,
+        ?int $planoContaId = null,
+        ?string $planoNome = null,
     ): void {
         if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
             return;
@@ -151,11 +327,11 @@ final class ContaReceberBaixaService
             'emissao' => $data,
             'documento' => mb_substr($documento, 0, 40),
             'historico' => mb_substr($historico, 0, 180),
-            'plano_contas' => null,
-            'plano_conta_id' => null,
+            'plano_contas' => $planoNome,
+            'plano_conta_id' => $planoContaId,
             'caixa_conta_id' => $caixaContaId,
-            'entrada' => $valor,
-            'saida' => 0,
+            'entrada' => $saida ? 0 : $valor,
+            'saida' => $saida ? $valor : 0,
         ];
 
         if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
@@ -163,6 +339,19 @@ final class ContaReceberBaixaService
         }
 
         CaixaLancamento::query()->create($payload);
+    }
+
+    private function lancarEntradaCaixa(
+        float $valor,
+        string $data,
+        string $documento,
+        string $historico,
+        ?int $caixaContaId,
+        ?int $empresaId = null,
+        ?int $planoContaId = null,
+        ?string $planoNome = null,
+    ): void {
+        $this->lancarCaixa($valor, $data, $documento, $historico, $caixaContaId, $empresaId, false, $planoContaId, $planoNome);
     }
 
     /**
@@ -175,8 +364,26 @@ final class ContaReceberBaixaService
         string $historico,
         ?int $caixaContaId,
         ?int $empresaId = null,
+        ?int $planoContaId = null,
+        ?string $planoNome = null,
     ): void {
-        $this->lancarEntradaCaixa($valor, $data, $documento, $historico, $caixaContaId, $empresaId);
+        $this->lancarEntradaCaixa($valor, $data, $documento, $historico, $caixaContaId, $empresaId, $planoContaId, $planoNome);
+    }
+
+    /**
+     * Registra saída no Livro Caixa (estorno de entrada do faturamento FV).
+     */
+    public function registrarSaidaCaixa(
+        float $valor,
+        string $data,
+        string $documento,
+        string $historico,
+        ?int $caixaContaId,
+        ?int $empresaId = null,
+        ?int $planoContaId = null,
+        ?string $planoNome = null,
+    ): void {
+        $this->lancarCaixa($valor, $data, $documento, $historico, $caixaContaId, $empresaId, true, $planoContaId, $planoNome);
     }
 
     public function mapFormaConta(FormaPagamento $forma): string

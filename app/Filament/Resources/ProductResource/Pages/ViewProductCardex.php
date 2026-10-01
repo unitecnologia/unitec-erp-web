@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use App\Filament\Concerns\EmbedsInPdvOverlay;
 use App\Filament\Resources\ProductResource;
+use App\Support\Erp\EmpresaModulos;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ProductCardexService;
 use Filament\Notifications\Notification;
@@ -14,6 +17,7 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class ViewProductCardex extends Page
 {
+    use EmbedsInPdvOverlay;
     use InteractsWithRecord;
 
     protected static string $resource = ProductResource::class;
@@ -21,6 +25,12 @@ class ViewProductCardex extends Page
     protected static ?string $title = '';
 
     public string $cardexProdutoLabel = '';
+
+    public string $cardexPeriodoDe = '';
+
+    public string $cardexPeriodoAte = '';
+
+    public bool $cardexPrestador = false;
 
     /** @var array<string, mixed> */
     public array $cardexData = [
@@ -48,7 +58,21 @@ class ViewProductCardex extends Page
 
         ErpScreen::set('Histórico de Movimentação');
 
+        $hoje = now();
+        $this->cardexPeriodoDe = $hoje->copy()->startOfMonth()->toDateString();
+        $this->cardexPeriodoAte = $hoje->copy()->endOfMonth()->toDateString();
+
         $this->loadCardex();
+    }
+
+    public function updatedCardexPeriodoDe(): void
+    {
+        $this->carregarPeriodoCardex();
+    }
+
+    public function updatedCardexPeriodoAte(): void
+    {
+        $this->carregarPeriodoCardex();
     }
 
     public function getHeading(): string | Htmlable | null
@@ -61,12 +85,18 @@ class ViewProductCardex extends Page
      */
     public function getPageClasses(): array
     {
-        return [
+        $classes = [
             ...parent::getPageClasses(),
             'erp-form-page',
             'erp-produtos-form-page',
             'erp-produtos-cardex-page',
         ];
+
+        if ($this->embedsInPdv) {
+            $classes[] = 'erp-pdv-embed';
+        }
+
+        return $classes;
     }
 
     public function content(Schema $schema): Schema
@@ -95,12 +125,12 @@ class ViewProductCardex extends Page
         ErpScreen::set(request()->query('return') === 'edit' ? 'Cadastro de Produtos' : 'Produtos');
 
         if (request()->query('return') === 'edit') {
-            $this->redirect(ProductResource::getUrl('edit', ['record' => $this->getRecord()]));
+            $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('edit', ['record' => $this->getRecord()])));
 
             return;
         }
 
-        $this->redirect(ProductResource::getUrl('index'));
+        $this->redirect($this->urlWithPdvEmbed(ProductResource::getUrl('index')));
     }
 
     protected function loadCardex(): void
@@ -108,6 +138,34 @@ class ViewProductCardex extends Page
         $record = $this->getRecord();
 
         $this->cardexProdutoLabel = $record->codigo . ' — ' . $record->descricao;
-        $this->cardexData = app(ProductCardexService::class)->forProduct($record);
+        $this->cardexPrestador = EmpresaModulos::empresaPrestadorServicos(ErpContext::currentEmpresa());
+        $this->cardexData = app(ProductCardexService::class)->forProduct(
+            $record,
+            $this->cardexPrestador,
+            $this->cardexPeriodoDe,
+            $this->cardexPeriodoAte,
+        );
+    }
+
+    protected function carregarPeriodoCardex(): void
+    {
+        $this->cardexPeriodoDe = $this->dataPeriodo($this->cardexPeriodoDe) ?? now()->startOfMonth()->toDateString();
+        $this->cardexPeriodoAte = $this->dataPeriodo($this->cardexPeriodoAte) ?? now()->endOfMonth()->toDateString();
+        $this->loadCardex();
+    }
+
+    protected function dataPeriodo(string $valor): ?string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) !== 1) {
+            return null;
+        }
+
+        $data = \DateTimeImmutable::createFromFormat('!Y-m-d', $valor);
+
+        if (! $data instanceof \DateTimeImmutable || $data->format('Y-m-d') !== $valor) {
+            return null;
+        }
+
+        return $valor;
     }
 }

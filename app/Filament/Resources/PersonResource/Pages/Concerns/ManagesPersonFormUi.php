@@ -53,8 +53,20 @@ trait ManagesPersonFormUi
             return;
         }
 
-        if (filled($this->data['rg_ie'] ?? null)) {
-            $this->data['tipo_contribuinte'] = 'contribuinte';
+        $ie = mb_strtoupper(trim((string) ($this->data['rg_ie'] ?? '')), 'UTF-8');
+
+        if ($ie === '' || $ie === '-') {
+            $this->data['tipo_contribuinte'] = 'nao_contribuinte';
+
+            return;
         }
+
+        if (in_array($ie, ['ISENTO', 'ISENTA'], true)) {
+            $this->data['tipo_contribuinte'] = 'isento';
+
+            return;
+        }
+
+        $this->data['tipo_contribuinte'] = 'contribuinte';
     }
 }

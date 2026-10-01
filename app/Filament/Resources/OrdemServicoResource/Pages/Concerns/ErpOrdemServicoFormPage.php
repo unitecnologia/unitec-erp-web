@@ -2,17 +2,27 @@
 
 namespace App\Filament\Resources\OrdemServicoResource\Pages\Concerns;
 
+use App\Filament\Pages\Concerns\ManagesBoletoPosDocumentoPrompt;
+use App\Filament\Pages\NfsePage;
 use App\Filament\Resources\OrdemServicoResource;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
+use App\Models\FormaPagamento;
 use App\Models\OrdemServico;
 use App\Models\OrdemServicoItem;
 use App\Models\Person;
 use App\Models\Product;
+use App\Models\ProductImei;
 use App\Models\Vendedor;
+use App\Support\Erp\ErpAccess;
+use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Nfse\NfseFromOrdemServico;
+use App\Support\Erp\Os\OsFaturamentoService;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
@@ -21,14 +31,38 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Livewire\Attributes\On;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use App\Support\Erp\ErpContext;
 
 trait ErpOrdemServicoFormPage
 {
+    use ManagesBoletoPosDocumentoPrompt;
+    use ManagesOrdemServicoFotos;
+    use ManagesOrdemServicoFaturamentoParcelas;
     public string $activeFormTab = 'dados';
+
+    public bool $osFaturamentoOpen = false;
+
+    public bool $previewOverlayOpen = false;
+
+    public ?string $previewOverlayUrl = null;
+
+    public bool $printModalOpen = false;
+
+    /** @var list<array<string, mixed>> */
+    public array $osMeiosPagamento = [];
+
+    public int $osPagamentoIndex = 0;
+
+    public string $osAcrescimoPct = '0,00';
+
+    public string $osAcrescimoValor = '0,00';
+
+    public string $osDescontoPct = '0,00';
+
+    public string $osDescontoValor = '0,00';
 
     public string $activeItemTab = 'servicos';
 
@@ -77,19 +111,11 @@ trait ErpOrdemServicoFormPage
 
     public string $modelo = '';
 
-    public string $marca = '';
-
     public string $ano = '';
 
     public string $placa = '';
 
     public string $km = '';
-
-    public string $modeloVeiculo = '';
-
-    public string $marcaVeiculo = '';
-
-    public string $placaVeiculo = '';
 
     public string $corVeiculo = '';
 
@@ -105,6 +131,8 @@ trait ErpOrdemServicoFormPage
     public array $itens = [];
 
     public ?int $selectedItemIndex = null;
+
+    public ?int $editingItemIndex = null;
 
     public string $itemCodigoInput = '';
 
@@ -123,6 +151,28 @@ trait ErpOrdemServicoFormPage
 
     public string $itemPrecoInput = '';
 
+    public string $itemPendingDesconto = '0,00';
+
+    public string $itemPendingAcrescimo = '0,00';
+
+    public string $itemTotalEntryDisplay = '0,00';
+
+    public bool $postSavePromptOpen = false;
+
+    public bool $descontoModalOpen = false;
+
+    public bool $servicoPrestadoModalOpen = false;
+
+    public string $laudoModalSnapshot = '';
+
+    public ?string $itemAjusteAlvo = null;
+
+    public string $itemAjusteTipo = 'desconto';
+
+    public string $itemAjusteModo = 'percentual';
+
+    public string $itemAjusteValor = '0,00';
+
     public string $barcodeInput = '';
 
     public string $subtotalPecas = '0,00';
@@ -131,6 +181,12 @@ trait ErpOrdemServicoFormPage
 
     public string $subtotalGeral = '0,00';
 
+    /** Desconto extra no cabeçalho (vl_desc_*), além dos descontos por item. */
+    public string $descPecasGlobal = '0,00';
+
+    public string $descServicosGlobal = '0,00';
+
+    /** Exibição: desconto dos itens + global. */
     public string $descPecas = '0,00';
 
     public string $descServicos = '0,00';
@@ -148,6 +204,10 @@ trait ErpOrdemServicoFormPage
     public ?int $itemDeleteConfirmIndex = null;
 
     public bool $isConfirmingPendingItem = false;
+
+    public ?string $produtoAtualFoto = null;
+
+    public string $produtoAtualNome = '';
 
     public function getHeading(): string | Htmlable | null
     {
@@ -215,6 +275,7 @@ trait ErpOrdemServicoFormPage
             $this->activeItemTab = $tab;
             $this->selectedItemIndex = null;
             $this->clearItemEntryRow();
+            $this->clearProdutoAtual();
         }
     }
 
@@ -228,10 +289,120 @@ trait ErpOrdemServicoFormPage
         return $this->isEditingOs() && ! ($this->record?->isEditable() ?? true);
     }
 
+    public function osPodeEmitirNfse(): bool
+    {
+        $ordem = $this->record;
+
+        return $ordem instanceof OrdemServico && NfseFromOrdemServico::podeFaturar($ordem);
+    }
+
+    public function emitirNfseDaOs(): void
+    {
+        $ordem = $this->record;
+
+        if (! $ordem instanceof OrdemServico) {
+            Notification::make()->title('Salve a OS antes de emitir NFS-e.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfse.access')) {
+            return;
+        }
+
+        $motivo = NfseFromOrdemServico::motivoBloqueio($ordem);
+
+        if ($motivo !== null) {
+            Notification::make()->title($motivo)->warning()->send();
+
+            return;
+        }
+
+        $this->redirect(NfsePage::getUrl().'?os='.$ordem->id, navigate: false);
+    }
+
+    public function openPrintModal(): void
+    {
+        $ordem = $this->record;
+
+        if (! $ordem instanceof OrdemServico || ! $ordem->exists) {
+            Notification::make()->title('Salve a OS antes de imprimir.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'ordens_servico.print')) {
+            return;
+        }
+
+        $this->printModalOpen = true;
+    }
+
+    public function closePrintModal(): void
+    {
+        $this->printModalOpen = false;
+    }
+
+    public function imprimirOs(): void
+    {
+        $this->openPrintModal();
+    }
+
+    public function imprimirOsCompleta(): void
+    {
+        $this->abrirPreviewOs(tecnica: false);
+    }
+
+    public function imprimirOsTecnica(): void
+    {
+        $this->abrirPreviewOs(tecnica: true);
+    }
+
+    protected function abrirPreviewOs(bool $tecnica): void
+    {
+        $ordem = $this->record;
+
+        if (! $ordem instanceof OrdemServico || ! $ordem->exists) {
+            Notification::make()->title('Salve a OS antes de imprimir.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'ordens_servico.print')) {
+            return;
+        }
+
+        $params = [
+            'ordem' => $ordem->id,
+            'embed' => 1,
+        ];
+
+        if ($tecnica) {
+            $params['tecnica'] = 1;
+        }
+
+        $this->closePrintModal();
+        $this->previewOverlayUrl = route('erp.reports.ordem-servico', $params);
+        $this->previewOverlayOpen = true;
+    }
+
+    #[On('close-os-preview')]
+    public function closePreviewOverlay(): void
+    {
+        $this->previewOverlayOpen = false;
+        $this->previewOverlayUrl = null;
+    }
+
     public function osNumeroDisplay(): string
     {
+        $fromData = trim((string) ($this->data['numero'] ?? ''));
+
+        if ($fromData !== '') {
+            return $fromData;
+        }
+
         if ($this->isEditingOs()) {
-            return (string) ($this->record?->numero ?? '');
+            return (string) ($this->record?->numero ?? '—');
         }
 
         return OrdemServico::nextNumero();
@@ -240,6 +411,26 @@ trait ErpOrdemServicoFormPage
     /**
      * @return array<int, array{id: int, nome: string}>
      */
+    public function updatedAtendenteId(): void
+    {
+        $this->syncTecnicoEmTodosItens();
+    }
+
+    protected function syncTecnicoEmTodosItens(): void
+    {
+        if ($this->itens === []) {
+            return;
+        }
+
+        $itens = $this->itens;
+
+        foreach (array_keys($itens) as $index) {
+            $itens[$index]['funcionario_id'] = $this->atendenteId;
+        }
+
+        $this->itens = $itens;
+    }
+
     /**
      * Técnicos para NOVAS seleções: ativos, setor_servicos, com RH e empresa atual.
      * Value = vendedores.id (atendente_id / funcionario_id). Label = código/nome do RH.
@@ -302,12 +493,12 @@ trait ErpOrdemServicoFormPage
 
     public function getProductOverlayUrlProperty(): string
     {
-        return ProductResource::getUrl('create');
+        return ProductResource::getUrl('create').'?orcamento=1';
     }
 
     public function getPersonOverlayUrlProperty(): string
     {
-        return PersonResource::getUrl('create') . '?tipo=clientes';
+        return PersonResource::getUrl('create').'?tipo=clientes&orcamento=1';
     }
 
     protected function initializeOsFormDefaults(): void
@@ -324,6 +515,7 @@ trait ErpOrdemServicoFormPage
         $this->activeItemTab = 'servicos';
         $this->itens = [];
         $this->syncTotaisDisplay(0, 0, 0, 0);
+        $this->resetOsFotosState();
 
         $this->data = [
             'numero' => OrdemServico::nextNumero(),
@@ -334,7 +526,7 @@ trait ErpOrdemServicoFormPage
 
     protected function loadOsFormFromRecord(OrdemServico $ordem): void
     {
-        $ordem->load(['cliente', 'itens.product', 'itens.funcionario']);
+        $ordem->load(['cliente', 'itens.product', 'itens.funcionario', 'imagens']);
 
         $this->data = [
             'numero' => $ordem->numero,
@@ -364,17 +556,13 @@ trait ErpOrdemServicoFormPage
             : '';
 
         $this->numeroSerie = (string) ($ordem->numero_serie ?? '');
-        $this->descricao = mb_strtoupper((string) ($ordem->descricao ?? ''), 'UTF-8');
+        $this->descricao = mb_strtoupper((string) ($ordem->descricao ?: $ordem->marca ?: $ordem->marca_veiculo ?: ''), 'UTF-8');
         $this->descricao2 = mb_strtoupper((string) ($ordem->descricao2 ?? ''), 'UTF-8');
-        $this->modelo = mb_strtoupper((string) ($ordem->modelo ?? ''), 'UTF-8');
-        $this->marca = mb_strtoupper((string) ($ordem->marca ?? ''), 'UTF-8');
-        $this->ano = (string) ($ordem->ano ?? '');
-        $this->placa = mb_strtoupper((string) ($ordem->placa ?? ''), 'UTF-8');
+        $this->modelo = mb_strtoupper((string) ($ordem->modelo ?: $ordem->modelo_veiculo ?: ''), 'UTF-8');
+        $this->ano = (string) ($ordem->ano ?: $ordem->ano_veiculo ?: '');
+        $this->placa = mb_strtoupper((string) ($ordem->placa ?: $ordem->placa_veiculo ?: ''), 'UTF-8');
         $this->km = (string) ($ordem->km ?? '');
 
-        $this->modeloVeiculo = mb_strtoupper((string) ($ordem->modelo_veiculo ?? ''), 'UTF-8');
-        $this->marcaVeiculo = mb_strtoupper((string) ($ordem->marca_veiculo ?? ''), 'UTF-8');
-        $this->placaVeiculo = mb_strtoupper((string) ($ordem->placa_veiculo ?? ''), 'UTF-8');
         $this->corVeiculo = mb_strtoupper((string) ($ordem->cor_veiculo ?? ''), 'UTF-8');
         $this->chassiVeiculo = mb_strtoupper((string) ($ordem->chassi_veiculo ?? ''), 'UTF-8');
 
@@ -387,9 +575,12 @@ trait ErpOrdemServicoFormPage
             ->map(fn (OrdemServicoItem $item): array => $this->mapItemToRow($item))
             ->all();
 
-        $this->descPecas = ErpMoney::formatBr((float) $ordem->vl_desc_pecas);
-        $this->descServicos = ErpMoney::formatBr((float) $ordem->vl_desc_servicos);
+        $this->syncTecnicoEmTodosItens();
+
+        $this->descPecasGlobal = ErpMoney::formatBr((float) $ordem->vl_desc_pecas);
+        $this->descServicosGlobal = ErpMoney::formatBr((float) $ordem->vl_desc_servicos);
         $this->recalcTotais();
+        $this->refreshOsFotosFromOrdem($ordem);
     }
 
     /**
@@ -415,6 +606,8 @@ trait ErpOrdemServicoFormPage
             'discriminacao' => mb_strtoupper((string) ($item->discriminacao ?? $item->product?->descricao ?? ''), 'UTF-8'),
             'qtd' => ErpMoney::formatBr((float) $item->qtd, 3),
             'preco' => ErpMoney::formatBr((float) $item->preco),
+            'desconto' => ErpMoney::formatBr((float) ($item->desconto ?? 0)),
+            'acrescimo' => ErpMoney::formatBr((float) ($item->acrescimo ?? 0)),
             'total' => ErpMoney::formatBr((float) $item->total),
             'funcionario_id' => $item->funcionario_id,
             'concluido_em' => $concluido,
@@ -535,6 +728,8 @@ trait ErpOrdemServicoFormPage
         $this->clienteLookupOpen = false;
         $this->clienteResults = [];
         $this->selectedClienteIndex = null;
+
+        $this->focusOsItemEntryAfterCliente();
     }
 
     public function handleClienteEnter(): void
@@ -543,9 +738,29 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        if ($this->clienteLookupOpen) {
-            $this->confirmClienteSelection();
+        if (
+            $this->clienteLookupOpen
+            && $this->clienteResults !== []
+        ) {
+            if ($this->selectedClienteIndex === null) {
+                $this->selectedClienteIndex = 0;
+            }
+
+            if (isset($this->clienteResults[$this->selectedClienteIndex])) {
+                $this->confirmClienteSelection();
+            }
         }
+    }
+
+    protected function focusOsItemEntryAfterCliente(): void
+    {
+        if ($this->osReadOnly()) {
+            return;
+        }
+
+        $this->activeFormTab = 'dados';
+        $this->activeItemTab = 'servicos';
+        $this->dispatch('erp-os-focus-item-descricao');
     }
 
     protected function applyClienteFields(?Person $person): void
@@ -601,15 +816,79 @@ trait ErpOrdemServicoFormPage
     public function itensByActiveTab(): array
     {
         $tipo = $this->activeItemTab === 'servicos' ? 'S' : 'P';
+        $filtered = [];
 
-        return collect($this->itens)
-            ->filter(fn (array $row): bool => ($row['tipo'] ?? 'P') === $tipo)
-            ->all();
+        foreach ($this->itens as $index => $row) {
+            if (($row['tipo'] ?? 'P') === $tipo) {
+                $filtered[$index] = $row;
+            }
+        }
+
+        return $filtered;
     }
 
     public function selectItemRow(int $index): void
     {
         $this->selectedItemIndex = $index;
+
+        if ($this->activeItemTab !== 'pecas' || ! isset($this->itens[$index])) {
+            return;
+        }
+
+        // Foto só do item selecionado (1 consulta no máximo; cache em memória na linha).
+        $this->aplicarFotoDoItemSelecionado($index);
+    }
+
+    public function resolveItemDisplayNumberInTab(int $positionInTab, ?int $tabTotal = null): int
+    {
+        $tabTotal ??= count($this->itensByActiveTab());
+
+        return max(1, $tabTotal - $positionInTab);
+    }
+
+    /**
+     * Duplo clique na linha: carrega o item na barra para editar (mesmo índice ao confirmar).
+     */
+    public function startEditItem(int $index): void
+    {
+        if ($this->osReadOnly() || ! isset($this->itens[$index])) {
+            return;
+        }
+
+        $row = $this->itens[$index];
+        $productId = (int) ($row['product_id'] ?? 0);
+
+        if ($productId <= 0) {
+            return;
+        }
+
+        $this->editingItemIndex = $index;
+        $this->selectedItemIndex = $index;
+        $this->itemPendingProductId = $productId;
+        $this->itemCodigoInput = (string) ($row['product_codigo'] ?? '');
+        $this->itemProdutoSearch = (string) ($row['discriminacao'] ?? '');
+        $this->itemQtdInput = (string) ($row['qtd'] ?? '1,000');
+        $this->itemPrecoInput = (string) ($row['preco'] ?? '0,00');
+        $this->itemPendingAcrescimo = (string) ($row['acrescimo'] ?? '0,00');
+        $this->itemPendingDesconto = (string) ($row['desconto'] ?? '0,00');
+        $this->itemTotalEntryDisplay = (string) ($row['total'] ?? '0,00');
+        $this->produtoLookupOpen = false;
+        $this->produtoResults = [];
+        $this->selectedProdutoIndex = null;
+
+        $this->produtoAtualNome = mb_strtoupper((string) ($row['discriminacao'] ?? ''), 'UTF-8');
+
+        if (($row['tipo'] ?? 'P') === 'P') {
+            $this->produtoAtualFoto = $row['foto'] ?? null;
+
+            if ($this->produtoAtualFoto === null) {
+                $this->aplicarFotoDoItemSelecionado($index);
+            }
+        } else {
+            $this->produtoAtualFoto = null;
+        }
+
+        $this->dispatch('erp-os-focus-item-qtd');
     }
 
     public function updateItemField(int $index, string $field, string $value): void
@@ -618,7 +897,7 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        if (! in_array($field, ['qtd', 'preco', 'discriminacao', 'funcionario_id', 'concluido_em'], true)) {
+        if (! in_array($field, ['qtd', 'preco', 'desconto', 'acrescimo', 'discriminacao', 'concluido_em'], true)) {
             return;
         }
 
@@ -626,8 +905,6 @@ trait ErpOrdemServicoFormPage
 
         if ($field === 'discriminacao') {
             $itens[$index][$field] = mb_strtoupper(trim($value), 'UTF-8');
-        } elseif ($field === 'funcionario_id') {
-            $itens[$index][$field] = filled($value) ? (int) $value : null;
         } elseif ($field === 'concluido_em') {
             $itens[$index][$field] = trim($value);
         } else {
@@ -637,7 +914,7 @@ trait ErpOrdemServicoFormPage
 
         $this->itens = $itens;
 
-        if (in_array($field, ['qtd', 'preco'], true)) {
+        if (in_array($field, ['qtd', 'preco', 'desconto', 'acrescimo'], true)) {
             $this->recalcTotais();
         }
     }
@@ -672,10 +949,16 @@ trait ErpOrdemServicoFormPage
     {
         $qtd = max(0, ErpMoney::parseBr($row['qtd'] ?? 0, 3));
         $preco = max(0, ErpMoney::parseBr($row['preco'] ?? 0));
+        $acrescimo = max(0, ErpMoney::parseBr($row['acrescimo'] ?? 0));
+        $desconto = max(0, ErpMoney::parseBr($row['desconto'] ?? 0));
+        $bruto = round($qtd * $preco, 2);
+        $total = round(max(0, $bruto + $acrescimo - $desconto), 2);
 
         $row['qtd'] = ErpMoney::formatBr($qtd, 3);
         $row['preco'] = ErpMoney::formatBr($preco);
-        $row['total'] = ErpMoney::formatBr(round($qtd * $preco, 2));
+        $row['acrescimo'] = ErpMoney::formatBr($acrescimo);
+        $row['desconto'] = ErpMoney::formatBr($desconto);
+        $row['total'] = ErpMoney::formatBr($total);
 
         return $row;
     }
@@ -686,7 +969,9 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $this->descPecas = ErpMoney::formatBr(max(0, ErpMoney::parseBr($this->descPecas)));
+        $desired = max(0, ErpMoney::parseBr($this->descPecas));
+        $fromItens = $this->sumDescontoItensPorTipo('P');
+        $this->descPecasGlobal = ErpMoney::formatBr(max(0, round($desired - $fromItens, 2)));
         $this->recalcTotais();
     }
 
@@ -696,30 +981,62 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $this->descServicos = ErpMoney::formatBr(max(0, ErpMoney::parseBr($this->descServicos)));
+        $desired = max(0, ErpMoney::parseBr($this->descServicos));
+        $fromItens = $this->sumDescontoItensPorTipo('S');
+        $this->descServicosGlobal = ErpMoney::formatBr(max(0, round($desired - $fromItens, 2)));
         $this->recalcTotais();
+    }
+
+    protected function sumDescontoItensPorTipo(string $tipo): float
+    {
+        $sum = 0.0;
+
+        foreach ($this->itens as $row) {
+            if (($row['tipo'] ?? 'P') !== $tipo) {
+                continue;
+            }
+
+            $sum += max(0, ErpMoney::parseBr($row['desconto'] ?? 0));
+        }
+
+        return round($sum, 2);
     }
 
     protected function recalcTotais(): void
     {
-        $subPecas = 0.0;
-        $subServicos = 0.0;
+        $subBrutoPecas = 0.0;
+        $subBrutoServicos = 0.0;
+        $descItensPecas = 0.0;
+        $descItensServicos = 0.0;
 
         foreach ($this->itens as $row) {
-            $total = ErpMoney::parseBr($row['total'] ?? 0);
+            $qtd = max(0, ErpMoney::parseBr($row['qtd'] ?? 0, 3));
+            $preco = max(0, ErpMoney::parseBr($row['preco'] ?? 0));
+            $acrescimo = max(0, ErpMoney::parseBr($row['acrescimo'] ?? 0));
+            $desconto = max(0, ErpMoney::parseBr($row['desconto'] ?? 0));
+            $bruto = round($qtd * $preco + $acrescimo, 2);
+
             if (($row['tipo'] ?? 'P') === 'S') {
-                $subServicos += $total;
+                $subBrutoServicos += $bruto;
+                $descItensServicos += $desconto;
             } else {
-                $subPecas += $total;
+                $subBrutoPecas += $bruto;
+                $descItensPecas += $desconto;
             }
         }
 
-        $descPecas = max(0, ErpMoney::parseBr($this->descPecas));
-        $descServicos = max(0, ErpMoney::parseBr($this->descServicos));
-        $totalPecas = round(max(0, $subPecas - $descPecas), 2);
-        $totalServicos = round(max(0, $subServicos - $descServicos), 2);
+        $descGlobalPecas = max(0, ErpMoney::parseBr($this->descPecasGlobal));
+        $descGlobalServicos = max(0, ErpMoney::parseBr($this->descServicosGlobal));
+        $descPecasTotal = round($descItensPecas + $descGlobalPecas, 2);
+        $descServicosTotal = round($descItensServicos + $descGlobalServicos, 2);
 
-        $this->syncTotaisDisplay($subPecas, $subServicos, $totalPecas, $totalServicos);
+        $totalPecas = round(max(0, $subBrutoPecas - $descPecasTotal), 2);
+        $totalServicos = round(max(0, $subBrutoServicos - $descServicosTotal), 2);
+
+        $this->descPecas = ErpMoney::formatBr($descPecasTotal);
+        $this->descServicos = ErpMoney::formatBr($descServicosTotal);
+
+        $this->syncTotaisDisplay($subBrutoPecas, $subBrutoServicos, $totalPecas, $totalServicos);
     }
 
     protected function syncTotaisDisplay(
@@ -756,6 +1073,17 @@ trait ErpOrdemServicoFormPage
 
         $index = $this->itemDeleteConfirmIndex;
         $this->itemDeleteConfirmIndex = null;
+
+        $wasEditing = $this->editingItemIndex === $index;
+
+        if ($this->editingItemIndex !== null && $this->editingItemIndex > $index) {
+            $this->editingItemIndex--;
+        }
+
+        if ($wasEditing) {
+            $this->editingItemIndex = null;
+            $this->clearItemEntryRow();
+        }
 
         $itens = $this->itens;
         array_splice($itens, $index, 1);
@@ -862,6 +1190,10 @@ trait ErpOrdemServicoFormPage
         $this->appendProductItem($product, $qtd);
         $this->barcodeInput = '';
         $this->clearItemEntryRow();
+
+        if ($this->activeItemTab === 'pecas' && $this->selectedItemIndex !== null) {
+            $this->aplicarFotoDoItemSelecionado($this->selectedItemIndex);
+        }
     }
 
     public function searchItemProduto(string $value): void
@@ -873,6 +1205,62 @@ trait ErpOrdemServicoFormPage
         $this->itemProdutoSearch = mb_strtoupper($value, 'UTF-8');
         $this->produtoLookupOpen = true;
         $this->refreshProdutoResults();
+    }
+
+    public function updatedItemProdutoSearch(): void
+    {
+        if ($this->osReadOnly()) {
+            return;
+        }
+
+        $upper = mb_strtoupper($this->itemProdutoSearch, 'UTF-8');
+
+        if ($this->itemProdutoSearch !== $upper) {
+            $this->itemProdutoSearch = $upper;
+        }
+
+        $term = trim($this->itemProdutoSearch);
+
+        if ($term === '') {
+            $this->produtoLookupOpen = false;
+            $this->produtoResults = [];
+            $this->selectedProdutoIndex = null;
+
+            if ($this->editingItemIndex === null && $this->itemPendingProductId !== null) {
+                $this->releasePendingProductForSearch();
+            }
+
+            return;
+        }
+
+        if ($this->itemPendingProductId !== null) {
+            $stagedLabel = trim($this->produtoAtualNome);
+
+            if ($stagedLabel !== '' && $term === $stagedLabel) {
+                $this->produtoLookupOpen = false;
+
+                return;
+            }
+
+            if ($this->editingItemIndex === null) {
+                $this->releasePendingProductForSearch();
+            }
+        }
+
+        $this->produtoLookupOpen = true;
+        $this->refreshProdutoResults();
+    }
+
+    protected function releasePendingProductForSearch(): void
+    {
+        $this->itemPendingProductId = null;
+        $this->itemCodigoInput = '';
+        $this->itemQtdInput = '1,000';
+        $this->itemPrecoInput = '0,00';
+        $this->itemTotalEntryDisplay = '0,00';
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
+        $this->clearProdutoAtual();
     }
 
     public function openProdutoLookup(): void
@@ -899,33 +1287,138 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $like = '%' . $term . '%';
-        $preferServico = $this->activeItemTab === 'servicos';
+        $termUpper = mb_strtoupper($term, 'UTF-8');
+        $like = '%' . $termUpper . '%';
+        $prefix = $termUpper . '%';
+        $somenteServico = $this->activeItemTab === 'servicos';
+        $reservas = $somenteServico
+            ? []
+            : app(EstoqueReservaService::class)->totaisReservadosAtivos(null);
 
-        $this->produtoResults = Product::query()
+        $produtos = Product::query()
             ->where('ativo', true)
-            ->where(function ($query) use ($like, $term): void {
+            ->where('is_servico', $somenteServico)
+            ->where(function ($query) use ($like, $termUpper): void {
                 $query->where('codigo', 'like', $like)
                     ->orWhere('descricao', 'like', $like)
                     ->orWhere('referencia', 'like', $like)
-                    ->orWhere('codigo_barras', 'like', $like);
+                    ->orWhere('codigo_barras', 'like', $like)
+                    ->orWhere('codigo_barras_caixa', 'like', $like)
+                    ->orWhereHas('imeis', function ($imeiQuery) use ($like): void {
+                        $imeiQuery->where('ativo', true)->where('imei', 'like', $like);
+                    });
 
-                if (ctype_digit($term)) {
-                    $query->orWhere('codigo', $term);
+                if (ctype_digit($termUpper)) {
+                    $query->orWhere('codigo', $termUpper)
+                        ->orWhereRaw('CAST(codigo AS CHAR) = ?', [$termUpper]);
                 }
             })
-            ->orderByRaw('CASE WHEN is_servico = ? THEN 0 ELSE 1 END', [$preferServico ? 1 : 0])
+            ->orderByRaw(
+                'CASE WHEN UPPER(TRIM(descricao)) = ? THEN 0 WHEN codigo = ? OR CAST(codigo AS CHAR) = ? THEN 1 WHEN codigo_barras = ? OR codigo_barras_caixa = ? OR referencia = ? THEN 2 WHEN descricao LIKE ? THEN 3 WHEN descricao LIKE ? THEN 4 ELSE 5 END',
+                [$termUpper, $termUpper, $termUpper, $termUpper, $termUpper, $termUpper, $prefix, '% ' . $termUpper . '%']
+            )
             ->orderBy('descricao')
             ->limit(40)
-            ->get(['id', 'codigo', 'descricao', 'is_servico'])
-            ->map(fn (Product $product): array => [
-                'id' => $product->id,
-                'codigo' => $product->codigo,
-                'descricao' => mb_strtoupper($product->descricao, 'UTF-8'),
-            ])
+            ->get([
+                'id',
+                'codigo',
+                'descricao',
+                'codigo_barras',
+                'codigo_barras_caixa',
+                'estoque',
+                'usa_imei',
+                'is_servico',
+            ]);
+
+        $imeisPorProduto = collect();
+
+        if (! $somenteServico && $produtos->isNotEmpty()) {
+            $imeisPorProduto = ProductImei::query()
+                ->whereIn('product_id', $produtos->pluck('id'))
+                ->where('ativo', true)
+                ->orderBy('imei')
+                ->get(['product_id', 'imei'])
+                ->groupBy('product_id');
+        }
+
+        $this->produtoResults = $produtos
+            ->map(function (Product $product) use ($reservas, $imeisPorProduto, $termUpper, $somenteServico): array {
+                $descricao = mb_strtoupper((string) $product->descricao, 'UTF-8');
+                $row = [
+                    'id' => (int) $product->id,
+                    'codigo' => mb_strtoupper((string) ($product->codigo ?? ''), 'UTF-8'),
+                    'descricao' => $descricao,
+                    'codigo_barras' => $this->formatOsProdutoCodigoBarras($product),
+                    'imei_resumo' => '—',
+                    'atual' => '—',
+                    'reservado' => '—',
+                    'disponivel' => '—',
+                ];
+
+                if ($somenteServico) {
+                    return $row;
+                }
+
+                $atual = (float) ($product->estoque ?? 0);
+                $reservado = (float) ($reservas[$product->id] ?? 0);
+                $row['atual'] = ErpMoney::formatBr($atual, 3);
+                $row['reservado'] = ErpMoney::formatBr($reservado, 3);
+                $row['disponivel'] = ErpMoney::formatBr($atual - $reservado, 3);
+                $row['imei_resumo'] = $this->formatOsProdutoImeiResumo(
+                    $product,
+                    $imeisPorProduto->get($product->id),
+                    $termUpper,
+                );
+
+                return $row;
+            })
             ->all();
 
         $this->selectedProdutoIndex = $this->produtoResults === [] ? null : 0;
+    }
+
+    protected function formatOsProdutoCodigoBarras(Product $product): string
+    {
+        $barras = trim((string) ($product->codigo_barras ?? ''));
+
+        if ($barras !== '') {
+            return $barras;
+        }
+
+        $caixa = trim((string) ($product->codigo_barras_caixa ?? ''));
+
+        return $caixa !== '' ? $caixa : '—';
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, ProductImei>|null  $imeis
+     */
+    protected function formatOsProdutoImeiResumo(Product $product, $imeis, string $termUpper): string
+    {
+        if (! (bool) $product->usa_imei) {
+            return '—';
+        }
+
+        $items = $imeis ?? collect();
+
+        if ($items->isEmpty()) {
+            return 'Sem IMEI';
+        }
+
+        $matching = $items->filter(
+            static fn (ProductImei $row): bool => str_contains(mb_strtoupper((string) $row->imei, 'UTF-8'), $termUpper)
+        );
+
+        $show = ($matching->isNotEmpty() ? $matching : $items)->take(2);
+        $labels = $show->map(static fn (ProductImei $row): string => (string) $row->imei)->all();
+        $extra = $items->count() - count($labels);
+        $text = implode(', ', $labels);
+
+        if ($extra > 0) {
+            $text .= ' +' . $extra;
+        }
+
+        return $text !== '' ? $text : '—';
     }
 
     public function moveProdutoSelection(int $delta): void
@@ -968,6 +1461,57 @@ trait ErpOrdemServicoFormPage
         $this->stageProductForEntry($product);
     }
 
+    public function confirmarItemProdutoBar(?string $typed = null): void
+    {
+        if ($this->osReadOnly()) {
+            return;
+        }
+
+        if (is_string($typed)) {
+            $this->itemProdutoSearch = mb_strtoupper(trim($typed), 'UTF-8');
+        }
+
+        $term = mb_strtoupper(trim($this->itemProdutoSearch), 'UTF-8');
+
+        if ($term === '') {
+            return;
+        }
+
+        if ($this->editingItemIndex !== null && $this->itemPendingProductId !== null) {
+            $staged = trim($this->produtoAtualNome);
+
+            if ($staged !== '' && $term === $staged) {
+                $this->dispatch('erp-os-focus-item-qtd');
+
+                return;
+            }
+        }
+
+        if ($this->produtoLookupOpen && $this->produtoResults !== []) {
+            $this->selectProdutoResult((int) ($this->selectedProdutoIndex ?? 0));
+
+            return;
+        }
+
+        $product = $this->findProductByCodigo($term);
+
+        if ($product) {
+            $this->stageProductForEntry($product);
+
+            return;
+        }
+
+        $product = $this->findProductByTerm($term);
+
+        if ($product) {
+            $this->stageProductForEntry($product);
+
+            return;
+        }
+
+        $this->submitItemProdutoSearch($term);
+    }
+
     public function submitItemProdutoSearch(?string $term = null): void
     {
         if ($this->osReadOnly()) {
@@ -985,13 +1529,22 @@ trait ErpOrdemServicoFormPage
         $this->refreshProdutoResults();
 
         if ($this->produtoResults === []) {
-            Notification::make()->title('Produto não encontrado.')->warning()->send();
+            Notification::make()
+                ->title($this->activeItemTab === 'servicos' ? 'Serviço não encontrado.' : 'Peça não encontrada.')
+                ->warning()
+                ->send();
 
             return;
         }
 
         if (count($this->produtoResults) === 1) {
             $this->selectProdutoResult(0);
+
+            return;
+        }
+
+        if ($this->selectedProdutoIndex !== null && isset($this->produtoResults[$this->selectedProdutoIndex])) {
+            $this->confirmProdutoSelection();
 
             return;
         }
@@ -1005,78 +1558,507 @@ trait ErpOrdemServicoFormPage
         $this->produtoLookupOpen = false;
     }
 
+    public function normalizeItemQtdInput(): void
+    {
+        if ($this->osReadOnly() || $this->itemPendingProductId === null) {
+            return;
+        }
+
+        $qtd = trim($this->itemQtdInput) === ''
+            ? 0.0
+            : ErpMoney::parseBr($this->itemQtdInput, 3);
+
+        if ($qtd <= 0) {
+            $qtd = 1;
+        }
+
+        $this->itemQtdInput = ErpMoney::formatBr($qtd, 3);
+        $this->recalcOsEntryRowFromPending();
+    }
+
+    public function focoPrecoAposQtd(): void
+    {
+        if ($this->osReadOnly() || $this->itemPendingProductId === null) {
+            return;
+        }
+
+        $this->normalizeItemQtdInput();
+
+        $this->dispatch('erp-os-focus-item-preco');
+    }
+
+    protected function recalcOsEntryRowFromPending(): void
+    {
+        if ($this->itemPendingProductId === null) {
+            return;
+        }
+
+        if (trim($this->itemQtdInput) === '') {
+            return;
+        }
+
+        $qtd = ErpMoney::parseBr($this->itemQtdInput, 3);
+        $preco = ErpMoney::parseBr($this->itemPrecoInput);
+        $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+        $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+        $total = round(max(0, (max(0.0, $qtd) * $preco) + $acr - $desc), 2);
+        $this->itemTotalEntryDisplay = ErpMoney::formatBr($total);
+        $this->dispatch('erp-os-sync-bar-total', total: $this->itemTotalEntryDisplay);
+    }
+
+    public function cancelItemEdit(): void
+    {
+        if ($this->editingItemIndex === null && $this->itemPendingProductId === null) {
+            return;
+        }
+
+        $this->editingItemIndex = null;
+        $this->clearItemEntryRow();
+        $this->dispatch('erp-os-focus-item-descricao');
+    }
+
     public function confirmPendingItemEntry(): void
     {
         if ($this->osReadOnly() || $this->isConfirmingPendingItem || $this->itemPendingProductId === null) {
             return;
         }
 
-        $product = Product::query()->find($this->itemPendingProductId);
-
-        if (! $product) {
-            $this->clearItemEntryRow();
-
-            return;
-        }
+        $this->normalizeItemQtdInput();
 
         $qtd = ErpMoney::parseBr($this->itemQtdInput, 3);
 
         if ($qtd <= 0) {
             Notification::make()->title('Informe a quantidade do item.')->warning()->send();
+            $this->dispatch('erp-os-focus-item-qtd');
 
             return;
         }
 
-        $preco = ErpMoney::parseBr($this->itemPrecoInput);
+        $preco = max(0.0, ErpMoney::parseBr($this->itemPrecoInput));
+
+        if ($preco <= 0) {
+            Notification::make()->title('Informe o valor unitário do item.')->warning()->send();
+            $this->dispatch('erp-os-focus-item-preco');
+
+            return;
+        }
+
+        $acrescimo = max(0, ErpMoney::parseBr($this->itemPendingAcrescimo));
+        $desconto = max(0, ErpMoney::parseBr($this->itemPendingDesconto));
 
         $this->isConfirmingPendingItem = true;
 
         try {
-            $this->appendProductItem($product, $qtd, $preco);
+            if ($this->editingItemIndex !== null) {
+                $this->applyEditedItemFromBar($qtd, $preco, $acrescimo, $desconto);
+                $this->clearItemEntryRow();
+                $this->dispatch('erp-os-focus-item-descricao');
+
+                return;
+            }
+
+            $product = Product::query()->find($this->itemPendingProductId);
+
+            if (! $product) {
+                $this->clearItemEntryRow();
+
+                return;
+            }
+
+            $this->appendProductItem($product, $qtd, $preco, $acrescimo, $desconto);
             $this->clearItemEntryRow();
+            $this->dispatch('erp-os-focus-item-descricao');
+
+            if ($this->activeItemTab === 'pecas' && $this->selectedItemIndex !== null) {
+                $this->aplicarFotoDoItemSelecionado($this->selectedItemIndex);
+            }
         } finally {
             $this->isConfirmingPendingItem = false;
         }
     }
 
+    protected function applyEditedItemFromBar(float $qtd, float $preco, float $acrescimo, float $desconto): void
+    {
+        $index = $this->editingItemIndex;
+
+        if ($index === null || ! isset($this->itens[$index])) {
+            $this->editingItemIndex = null;
+
+            return;
+        }
+
+        $itens = $this->itens;
+        $row = $itens[$index];
+        $row['product_id'] = $this->itemPendingProductId;
+        $row['product_codigo'] = $this->itemCodigoInput !== ''
+            ? $this->itemCodigoInput
+            : (string) ($row['product_codigo'] ?? '');
+        $row['discriminacao'] = $this->produtoAtualNome !== ''
+            ? $this->produtoAtualNome
+            : mb_strtoupper(trim($this->itemProdutoSearch), 'UTF-8');
+        $row['qtd'] = ErpMoney::formatBr($qtd, 3);
+        $row['preco'] = ErpMoney::formatBr($preco);
+        $row['acrescimo'] = ErpMoney::formatBr($acrescimo);
+        $row['desconto'] = ErpMoney::formatBr($desconto);
+        $itens[$index] = $this->recalcItemRowData($row);
+        $this->itens = $itens;
+        $this->selectedItemIndex = $index;
+        $this->editingItemIndex = null;
+        $this->recalcTotais();
+    }
+
     protected function stageProductForEntry(Product $product): void
     {
+        $esperadoServico = $this->activeItemTab === 'servicos';
+
+        if ((bool) $product->is_servico !== $esperadoServico) {
+            return;
+        }
+
         $preco = (float) ($product->preco_venda ?? 0);
         $tipo = $product->is_servico ? 'S' : 'P';
 
-        $this->activeItemTab = $tipo === 'S' ? 'servicos' : 'pecas';
         $this->itemPendingProductId = $product->id;
         $this->itemCodigoInput = (string) $product->codigo;
         $this->itemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
         $this->itemQtdInput = ErpMoney::formatBr(1, 3);
         $this->itemPrecoInput = ErpMoney::formatBr($preco);
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
+
+        // Foto só do produto em lançamento (já carregado; sem varredura da grade).
+        $this->produtoAtualNome = mb_strtoupper($product->descricao, 'UTF-8');
+
+        if ($tipo === 'P') {
+            $this->produtoAtualFoto = $product->fotoUrl();
+        } else {
+            $this->produtoAtualFoto = null;
+        }
+
+        $this->recalcOsEntryRowFromPending();
+        $this->dispatch('erp-os-focus-item-qtd');
     }
 
     protected function clearItemEntryRow(): void
     {
+        $this->editingItemIndex = null;
         $this->itemPendingProductId = null;
         $this->itemCodigoInput = '';
         $this->itemProdutoSearch = '';
         $this->itemQtdInput = '1,000';
         $this->itemPrecoInput = '';
+        $this->itemPendingDesconto = '0,00';
+        $this->itemPendingAcrescimo = '0,00';
+        $this->itemTotalEntryDisplay = '0,00';
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
+        $this->clearProdutoAtual();
     }
 
-    protected function appendProductItem(Product $product, float $qtd = 1.0, ?float $preco = null): void
+    protected function clearProdutoAtual(): void
     {
-        $preco ??= (float) ($product->preco_venda ?? 0);
-        $tipo = $product->is_servico ? 'S' : 'P';
-        $total = round($qtd * $preco, 2);
+        $this->produtoAtualFoto = null;
+        $this->produtoAtualNome = '';
+    }
 
-        $this->activeItemTab = $tipo === 'S' ? 'servicos' : 'pecas';
+    /**
+     * Carrega foto apenas do item selecionado. Cache em memória na linha (não grava no banco).
+     */
+    protected function aplicarFotoDoItemSelecionado(int $index): void
+    {
+        $row = $this->itens[$index];
+        $this->produtoAtualNome = (string) ($row['discriminacao'] ?? '');
+
+        if (array_key_exists('foto', $row)) {
+            $this->produtoAtualFoto = is_string($row['foto']) && $row['foto'] !== '' ? $row['foto'] : null;
+
+            return;
+        }
+
+        $productId = (int) ($row['product_id'] ?? 0);
+
+        if ($productId <= 0) {
+            $this->produtoAtualFoto = null;
+            $itens = $this->itens;
+            $itens[$index]['foto'] = null;
+            $this->itens = $itens;
+
+            return;
+        }
+
+        $product = Product::query()->find($productId);
+        $foto = $product?->fotoUrl();
+        $this->produtoAtualFoto = $foto;
 
         $itens = $this->itens;
-        array_unshift($itens, [
+        $itens[$index]['foto'] = $foto;
+        $this->itens = $itens;
+    }
+
+    /**
+     * Preço unitário efetivo (desconto/acréscimo embutidos) para gravar sem colunas extras.
+     */
+    protected function precoEfetivoFromPendingEntry(float $qtd): float
+    {
+        $preco = max(0.0, ErpMoney::parseBr($this->itemPrecoInput));
+        $acr = ErpMoney::parseBr($this->itemPendingAcrescimo);
+        $desc = ErpMoney::parseBr($this->itemPendingDesconto);
+        $total = round(max(0, ($qtd * $preco) + $acr - $desc), 2);
+
+        if ($qtd <= 0) {
+            return $preco;
+        }
+
+        return round($total / $qtd, 2);
+    }
+
+    public function abrirModalDescontoItem(): void
+    {
+        if ($this->osReadOnly() || $this->descontoModalOpen) {
+            return;
+        }
+
+        if ($this->itemPendingProductId !== null && ErpMoney::parseBr($this->itemPrecoInput) > 0) {
+            $this->itemAjusteAlvo = 'form';
+        } elseif ($this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $this->itemAjusteAlvo = 'grid';
+        } else {
+            Notification::make()
+                ->title('Informe o produto (ou selecione um item) para desconto/acréscimo.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->itemAjusteTipo = 'desconto';
+        $this->itemAjusteModo = 'percentual';
+        $this->itemAjusteValor = '0,00';
+        $this->descontoModalOpen = true;
+    }
+
+    public function fecharModalDescontoItem(): void
+    {
+        $this->descontoModalOpen = false;
+        $this->itemAjusteAlvo = null;
+    }
+
+    public function abrirModalServicoPrestado(): void
+    {
+        if ($this->osReadOnly()) {
+            return;
+        }
+
+        $this->laudoModalSnapshot = $this->laudo;
+        $this->servicoPrestadoModalOpen = true;
+        $this->dispatch('erp-os-focus-servico-prestado');
+    }
+
+    public function fecharModalServicoPrestado(): void
+    {
+        $this->servicoPrestadoModalOpen = false;
+    }
+
+    public function cancelarModalServicoPrestado(): void
+    {
+        $this->laudo = $this->laudoModalSnapshot;
+        $this->fecharModalServicoPrestado();
+    }
+
+    public function confirmarModalServicoPrestado(): void
+    {
+        $this->laudo = trim($this->laudo);
+        $this->fecharModalServicoPrestado();
+    }
+
+    public function setItemAjusteTipo(string $tipo): void
+    {
+        $this->itemAjusteTipo = $tipo === 'acrescimo' ? 'acrescimo' : 'desconto';
+    }
+
+    public function setItemAjusteModo(string $modo): void
+    {
+        $this->itemAjusteModo = $modo === 'valor' ? 'valor' : 'percentual';
+    }
+
+    /**
+     * @return array{descricao: string, base: string, novoPreco: string, total: string, tipo: string, temAjuste: bool}
+     */
+    public function getItemAjustePreviewProperty(): array
+    {
+        $ctx = $this->contextoItemAjuste();
+
+        if ($ctx === null) {
+            return [
+                'descricao' => '',
+                'base' => ErpMoney::formatBr(0),
+                'novoPreco' => ErpMoney::formatBr(0),
+                'total' => ErpMoney::formatBr(0),
+                'tipo' => $this->itemAjusteTipo,
+                'temAjuste' => false,
+            ];
+        }
+
+        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+
+        return [
+            'descricao' => $ctx['descricao'],
+            'base' => ErpMoney::formatBr($calc['base']),
+            'novoPreco' => ErpMoney::formatBr($calc['novoPreco']),
+            'total' => ErpMoney::formatBr($calc['total']),
+            'tipo' => $this->itemAjusteTipo,
+            'temAjuste' => abs($calc['deltaUnit']) > 0.0001,
+        ];
+    }
+
+    public function confirmarItemAjuste(): void
+    {
+        $ctx = $this->contextoItemAjuste();
+
+        if ($ctx === null) {
+            $this->fecharModalDescontoItem();
+
+            return;
+        }
+
+        $calc = $this->calcularItemAjuste($ctx['preco'], $ctx['quantidade']);
+        $ajusteLinha = round(abs($calc['deltaUnit']) * $ctx['quantidade'], 2);
+
+        if ($this->itemAjusteTipo === 'desconto' && $calc['novoPreco'] < 0) {
+            Notification::make()->title('Desconto inválido.')->warning()->send();
+
+            return;
+        }
+
+        if ($this->itemAjusteAlvo === 'form') {
+            if ($this->itemAjusteTipo === 'desconto') {
+                $this->itemPendingDesconto = ErpMoney::formatBr($ajusteLinha);
+                $this->itemPendingAcrescimo = '0,00';
+            } else {
+                $this->itemPendingAcrescimo = ErpMoney::formatBr($ajusteLinha);
+                $this->itemPendingDesconto = '0,00';
+            }
+
+            $this->recalcOsEntryRowFromPending();
+
+            $tipo = $this->itemAjusteTipo;
+            $pendingAntes = $this->itemPendingProductId;
+            $this->fecharModalDescontoItem();
+            $this->confirmPendingItemEntry();
+
+            if ($pendingAntes !== null && $this->itemPendingProductId === null) {
+                Notification::make()
+                    ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+                    ->success()
+                    ->send();
+            }
+
+            return;
+        } else {
+            $index = (int) $this->selectedItemIndex;
+            $itens = $this->itens;
+            $item = $itens[$index];
+
+            if ($this->itemAjusteTipo === 'desconto') {
+                $item['desconto'] = ErpMoney::formatBr($ajusteLinha);
+                $item['acrescimo'] = ErpMoney::formatBr(0);
+            } else {
+                $item['acrescimo'] = ErpMoney::formatBr($ajusteLinha);
+                $item['desconto'] = ErpMoney::formatBr(0);
+            }
+
+            $itens[$index] = $this->recalcItemRowData($item);
+            $this->itens = $itens;
+            $this->recalcTotais();
+        }
+
+        $tipo = $this->itemAjusteTipo;
+        $this->fecharModalDescontoItem();
+        Notification::make()
+            ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return array{descricao: string, preco: float, quantidade: float}|null
+     */
+    protected function contextoItemAjuste(): ?array
+    {
+        if ($this->itemAjusteAlvo === 'form' && $this->itemPendingProductId !== null) {
+            return [
+                'descricao' => trim($this->itemProdutoSearch),
+                'preco' => ErpMoney::parseBr($this->itemPrecoInput),
+                'quantidade' => max(0.0, ErpMoney::parseBr($this->itemQtdInput, 3)),
+            ];
+        }
+
+        if ($this->itemAjusteAlvo === 'grid' && $this->selectedItemIndex !== null && isset($this->itens[$this->selectedItemIndex])) {
+            $item = $this->itens[$this->selectedItemIndex];
+
+            return [
+                'descricao' => (string) ($item['discriminacao'] ?? ''),
+                'preco' => ErpMoney::parseBr($item['preco'] ?? 0),
+                'quantidade' => ErpMoney::parseBr($item['qtd'] ?? 0, 3),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{base: float, deltaUnit: float, novoPreco: float, total: float}
+     */
+    protected function calcularItemAjuste(float $base, float $quantidade): array
+    {
+        $valor = ErpMoney::parseBr($this->itemAjusteValor);
+
+        if ($this->itemAjusteModo === 'percentual') {
+            $deltaUnit = round($base * ($valor / 100), 2);
+        } else {
+            $deltaUnit = round($valor, 2);
+        }
+
+        $novoPreco = $this->itemAjusteTipo === 'acrescimo'
+            ? round($base + $deltaUnit, 2)
+            : round($base - $deltaUnit, 2);
+
+        if ($novoPreco < 0) {
+            $novoPreco = 0.0;
+        }
+
+        $total = round(max(0, $novoPreco * $quantidade), 2);
+
+        return [
+            'base' => $base,
+            'deltaUnit' => abs($deltaUnit),
+            'novoPreco' => $novoPreco,
+            'total' => $total,
+        ];
+    }
+
+    protected function appendProductItem(
+        Product $product,
+        float $qtd = 1.0,
+        ?float $preco = null,
+        float $acrescimo = 0.0,
+        float $desconto = 0.0,
+    ): void {
+        $esperadoServico = $this->activeItemTab === 'servicos';
+
+        if ((bool) $product->is_servico !== $esperadoServico) {
+            return;
+        }
+
+        $preco ??= (float) ($product->preco_venda ?? 0);
+        $tipo = $product->is_servico ? 'S' : 'P';
+
+        $itens = $this->itens;
+        $row = $this->recalcItemRowData([
             'id' => null,
             'key' => 'new-' . Str::uuid()->toString(),
             'tipo' => $tipo,
@@ -1085,10 +2067,16 @@ trait ErpOrdemServicoFormPage
             'discriminacao' => mb_strtoupper($product->descricao, 'UTF-8'),
             'qtd' => ErpMoney::formatBr($qtd, 3),
             'preco' => ErpMoney::formatBr($preco),
-            'total' => ErpMoney::formatBr($total),
+            'acrescimo' => ErpMoney::formatBr(max(0, $acrescimo)),
+            'desconto' => ErpMoney::formatBr(max(0, $desconto)),
+            'total' => ErpMoney::formatBr(0),
             'funcionario_id' => $this->atendenteId,
             'concluido_em' => '',
+            // Cache em memória só para a peça (evita nova consulta ao re-selecionar).
+            'foto' => $tipo === 'P' ? $product->fotoUrl() : null,
         ]);
+
+        array_unshift($itens, $row);
 
         $this->itens = array_values($itens);
         $this->selectedItemIndex = 0;
@@ -1099,6 +2087,7 @@ trait ErpOrdemServicoFormPage
     {
         return Product::query()
             ->where('ativo', true)
+            ->where('is_servico', $this->activeItemTab === 'servicos')
             ->where(function ($query) use ($codigo): void {
                 $query->where('codigo', $codigo)
                     ->orWhere('referencia', $codigo)
@@ -1112,6 +2101,7 @@ trait ErpOrdemServicoFormPage
     {
         return Product::query()
             ->where('ativo', true)
+            ->where('is_servico', $this->activeItemTab === 'servicos')
             ->where(function ($query) use ($term): void {
                 $query->where('codigo', $term)
                     ->orWhere('codigo_barras', $term)
@@ -1131,7 +2121,7 @@ trait ErpOrdemServicoFormPage
         }
 
         if ($this->atendenteId === null) {
-            Notification::make()->title('Informe o Atendente!')->warning()->send();
+            Notification::make()->title('Informe o Técnico!')->warning()->send();
 
             return false;
         }
@@ -1155,39 +2145,363 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        Notification::make()
-            ->title('Ordem de serviço gravada com sucesso!')
-            ->success()
-            ->send();
+        if ($this->isEditingOs()) {
+            $this->notifyOsGravada();
+            $this->openPostSavePrompt();
+        }
     }
 
     public function finalizarOs(): void
     {
+        if ($this->osReadOnly() || $this->osFaturamentoOpen) {
+            return;
+        }
+
         if (! $this->validateBeforeSave(finalizar: true)) {
             return;
         }
 
-        if (! $this->persistOs(finalizar: true)) {
+        if (! $this->isEditingOs()) {
+            session()->flash('erp_os_faturamento', true);
+        }
+
+        if (! $this->persistOs(finalizar: false)) {
             return;
         }
 
+        if (! $this->isEditingOs()) {
+            return;
+        }
+
+        $this->carregarMeiosPagamentoOs();
+
+        if ($this->osMeiosPagamento === []) {
+            Notification::make()
+                ->title('Cadastre uma forma de pagamento para faturar a OS.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->resetAjusteFaturamentoOs();
+        $this->abrirModalFaturamentoOs();
+    }
+
+    public function gravarOsSemFaturar(): void
+    {
+        $this->osFaturamentoOpen = false;
+
         Notification::make()
-            ->title('Ordem de serviço finalizada.')
+            ->title('OS gravada.')
+            ->body('O faturamento ainda não foi feito.')
+            ->success()
+            ->send();
+    }
+
+    public function updatedOsAcrescimoPct(): void
+    {
+        $this->osAcrescimoPct = $this->formatOsMoney($this->moneyOs($this->osAcrescimoPct));
+        $valor = bcdiv(bcmul($this->moneyOs($this->totalGeral), $this->moneyOs($this->osAcrescimoPct), 4), '100', 2);
+        $this->osAcrescimoValor = $this->formatOsMoney($valor);
+        $this->aplicarTotalNaPrimeiraFormaOs();
+    }
+
+    public function updatedOsAcrescimoValor(): void
+    {
+        $this->osAcrescimoValor = $this->formatOsMoney($this->moneyOs($this->osAcrescimoValor));
+        $base = $this->moneyOs($this->totalGeral);
+        $this->osAcrescimoPct = bccomp($base, '0.00', 2) === 1
+            ? $this->formatOsMoney(bcdiv(bcmul($this->moneyOs($this->osAcrescimoValor), '100', 4), $base, 2))
+            : '0,00';
+        $this->aplicarTotalNaPrimeiraFormaOs();
+    }
+
+    public function updatedOsDescontoPct(): void
+    {
+        $this->osDescontoPct = $this->formatOsMoney($this->moneyOs($this->osDescontoPct));
+        $valor = bcdiv(bcmul($this->moneyOs($this->totalGeral), $this->moneyOs($this->osDescontoPct), 4), '100', 4);
+        $this->osDescontoValor = $this->formatOsMoney(bcadd($valor, '0', 2));
+        $this->aplicarTotalNaPrimeiraFormaOs();
+    }
+
+    public function updatedOsDescontoValor(): void
+    {
+        $this->osDescontoValor = $this->formatOsMoney($this->moneyOs($this->osDescontoValor));
+        $base = $this->moneyOs($this->totalGeral);
+        $this->osDescontoPct = bccomp($base, '0.00', 2) === 1
+            ? $this->formatOsMoney(bcdiv(bcmul($this->moneyOs($this->osDescontoValor), '100', 4), $base, 2))
+            : '0,00';
+        $this->aplicarTotalNaPrimeiraFormaOs();
+    }
+
+    public function selectOsPagamentoByAtalho(string $atalho): void
+    {
+        $atalho = strtoupper(trim($atalho));
+
+        foreach ($this->osMeiosPagamento as $index => $meio) {
+            if (strtoupper((string) ($meio['atalho'] ?? '')) === $atalho) {
+                $this->aplicarRestanteOsPagamento($index);
+
+                return;
+            }
+        }
+    }
+
+    public function cancelarFaturamentoOs(): void
+    {
+        if ($this->osTabelaPrazoConsulta) {
+            $this->cancelarOsTabelaPrazoConsulta();
+
+            return;
+        }
+
+        $this->osFaturamentoOpen = false;
+        $this->resetOsParcelasFaturamento();
+    }
+
+    public function selectOsPagamento(int $index): void
+    {
+        if (! isset($this->osMeiosPagamento[$index])) {
+            return;
+        }
+
+        $this->osPagamentoIndex = $index;
+        $this->dispatch('erp-os-focus-finalizar-pagamento', index: $index);
+    }
+
+    public function aplicarRestanteOsPagamento(int $index): void
+    {
+        if (! isset($this->osMeiosPagamento[$index])) {
+            return;
+        }
+
+        $outros = 0.0;
+
+        foreach ($this->osMeiosPagamento as $i => $meio) {
+            if ($i === $index) {
+                continue;
+            }
+
+            $outros += ErpMoney::parseBr($meio['valor'] ?? '0');
+        }
+
+        $total = ErpMoney::parseBr($this->formatOsMoney($this->osTotalLiquido()));
+        $restante = max(0, round($total - $outros, 2));
+        $valorFormatado = ErpMoney::formatBr($restante);
+
+        $meios = $this->osMeiosPagamento;
+        $meios[$index]['valor'] = $valorFormatado;
+
+        $pdvPagamento = $this->osPagamentoComoPdv($meios[$index]);
+
+        if (PdvFinalizarPagamentosHelper::isFormaAPrazoPagamento($pdvPagamento)) {
+            $pdvLinhas = array_map(fn (array $m): array => $this->osPagamentoComoPdv($m), $meios);
+            $pdvLinhas = PdvFinalizarPagamentosHelper::aplicarFormaPrazoExclusiva($pdvLinhas, $index, $total);
+
+            foreach ($pdvLinhas as $i => $linha) {
+                if (isset($meios[$i])) {
+                    $meios[$i]['valor'] = $linha['valor'];
+                }
+            }
+
+            $valorFormatado = (string) ($meios[$index]['valor'] ?? $valorFormatado);
+        }
+
+        $this->osMeiosPagamento = $meios;
+        $this->osPagamentoIndex = $index;
+        $this->osTabelaPrazoDias = null;
+        $this->osParcelasRows = [];
+        $this->dispatch('erp-os-focus-finalizar-pagamento', index: $index, valor: $valorFormatado);
+
+        if (PdvFinalizarPagamentosHelper::precisaParcelasCarne($this->osPagamentoComoPdv($meios[$index]))) {
+            $this->ensureOsTabelaPrazoCrediario();
+        }
+    }
+
+    public function faturarOs(): void
+    {
+        if (! $this->osFaturamentoOpen) {
+            return;
+        }
+
+        if ($this->osTabelaPrazoConsulta) {
+            return;
+        }
+
+        if (! $this->ensureOsTabelaPrazoCrediario(abrirSeNecessario: true)) {
+            return;
+        }
+
+        $ordem = $this->record;
+
+        if (! $ordem instanceof OrdemServico) {
+            return;
+        }
+
+        $liquido = $this->osTotalLiquido();
+
+        if (bccomp($liquido, '0.00', 2) !== 1) {
+            Notification::make()
+                ->title('A OS não tem valor para faturar.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $ordem->total_geral = $liquido;
+
+        try {
+            $contas = app(OsFaturamentoService::class)->faturar(
+                $ordem,
+                $this->osMeiosPagamento,
+                $this->osTabelaPrazoDiasList(),
+                $this->osParcelasChequeNumerosList(),
+            );
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Não foi possível faturar a OS.')
+                ->body($exception->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->osFaturamentoOpen = false;
+        $this->resetOsParcelasFaturamento();
+
+        Notification::make()
+            ->title('OS faturada.')
             ->success()
             ->send();
 
-        ErpScreen::set('Ordem de Serviço');
-        $this->redirect(OrdemServicoResource::getUrl('index'), navigate: false);
+        $indexUrl = OrdemServicoResource::getUrl('index');
+
+        if ($this->offerEmitirBoletosPosDocumento($contas, $indexUrl, navigate: false)) {
+            return;
+        }
+
+        $this->redirect($indexUrl, navigate: false);
     }
 
-    protected function persistOs(bool $finalizar): bool
+    public function osTotalFaturamento(): string
+    {
+        return $this->osTotalLiquido();
+    }
+
+    public function osTotalLiquido(): string
+    {
+        $liquido = bcsub(
+            bcadd($this->moneyOs($this->totalGeral), $this->moneyOs($this->osAcrescimoValor), 2),
+            $this->moneyOs($this->osDescontoValor),
+            2,
+        );
+
+        return bccomp($liquido, '0.00', 2) === 1 ? $liquido : '0.00';
+    }
+
+    public function osVendedorLabel(): string
+    {
+        foreach ($this->atendenteOptions() as $opt) {
+            if ((int) $opt['id'] === (int) $this->atendenteId) {
+                return (string) $opt['nome'];
+            }
+        }
+
+        return '—';
+    }
+
+    public function confirmarValorOsPagamento(int $index, string $valor): void
+    {
+        if (! isset($this->osMeiosPagamento[$index])) {
+            return;
+        }
+
+        $this->osMeiosPagamento[$index]['valor'] = $this->formatOsMoney($this->moneyOs($valor));
+        $this->selectOsPagamento($index);
+
+        $pdv = $this->osPagamentoComoPdv($this->osMeiosPagamento[$index]);
+        $valorNum = ErpMoney::parseBr($this->osMeiosPagamento[$index]['valor'] ?? '0');
+
+        if ($valorNum > 0 && PdvFinalizarPagamentosHelper::precisaParcelasCarne($pdv)) {
+            $this->osTabelaPrazoDias = null;
+            $this->osParcelasRows = [];
+            $this->ensureOsTabelaPrazoCrediario();
+        }
+    }
+
+    public function updatedOsMeiosPagamento(mixed $value, ?string $key = null): void
+    {
+        if (! is_string($key) || preg_match('/^(\d+)\.valor$/', $key, $m) !== 1) {
+            return;
+        }
+
+        $index = (int) $m[1];
+
+        if (! isset($this->osMeiosPagamento[$index])) {
+            return;
+        }
+
+        $this->osMeiosPagamento[$index]['valor'] = $this->formatOsMoney(
+            $this->moneyOs((string) ($this->osMeiosPagamento[$index]['valor'] ?? '0')),
+        );
+    }
+
+    public function osTotalPago(): string
+    {
+        $soma = '0.00';
+
+        foreach ($this->osMeiosPagamento as $meio) {
+            $soma = bcadd($soma, $this->moneyOs((string) ($meio['valor'] ?? '0')), 2);
+        }
+
+        return $soma;
+    }
+
+    public function osValorRestante(?int $excetoIndex = null): string
+    {
+        $pago = '0.00';
+
+        foreach ($this->osMeiosPagamento as $index => $meio) {
+            if ($excetoIndex !== null && $index === $excetoIndex) {
+                continue;
+            }
+
+            $pago = bcadd($pago, $this->moneyOs((string) ($meio['valor'] ?? '0')), 2);
+        }
+
+        $restante = bcsub($this->osTotalFaturamento(), $pago, 2);
+
+        return bccomp($restante, '0.00', 2) === 1 ? $restante : '0.00';
+    }
+
+    public function osTroco(): string
+    {
+        $excesso = bcsub($this->osTotalPago(), $this->osTotalFaturamento(), 2);
+
+        return bccomp($excesso, '0.00', 2) === 1 ? $excesso : '0.00';
+    }
+
+    public function formatOsMoney(string $value): string
+    {
+        $neg = str_starts_with($value, '-');
+        $abs = $neg ? substr($value, 1) : $value;
+        [$int, $frac] = array_pad(explode('.', bcadd($abs, '0', 2), 2), 2, '00');
+        $int = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $int) ?? $int;
+
+        return ($neg ? '-' : '').$int.','.$frac;
+    }
+
+    protected function persistOs(bool $finalizar, bool $redirectOnCreate = true): bool
     {
         $this->recalcTotais();
 
         $subPecas = ErpMoney::parseBr($this->subtotalPecas);
         $subServicos = ErpMoney::parseBr($this->subtotalServicos);
-        $descPecas = ErpMoney::parseBr($this->descPecas);
-        $descServicos = ErpMoney::parseBr($this->descServicos);
+        $descPecas = ErpMoney::parseBr($this->descPecasGlobal);
+        $descServicos = ErpMoney::parseBr($this->descServicosGlobal);
         $totalPecas = ErpMoney::parseBr($this->totalPecas);
         $totalServicos = ErpMoney::parseBr($this->totalServicos);
         $totalGeral = ErpMoney::parseBr($this->totalGeral);
@@ -1228,13 +2542,9 @@ trait ErpOrdemServicoFormPage
                     'descricao' => mb_strtoupper(trim($this->descricao), 'UTF-8') ?: null,
                     'descricao2' => mb_strtoupper(trim($this->descricao2), 'UTF-8') ?: null,
                     'modelo' => mb_strtoupper(trim($this->modelo), 'UTF-8') ?: null,
-                    'marca' => mb_strtoupper(trim($this->marca), 'UTF-8') ?: null,
                     'ano' => trim($this->ano) ?: null,
                     'placa' => mb_strtoupper(trim($this->placa), 'UTF-8') ?: null,
                     'km' => trim($this->km) ?: null,
-                    'modelo_veiculo' => mb_strtoupper(trim($this->modeloVeiculo), 'UTF-8') ?: null,
-                    'marca_veiculo' => mb_strtoupper(trim($this->marcaVeiculo), 'UTF-8') ?: null,
-                    'placa_veiculo' => mb_strtoupper(trim($this->placaVeiculo), 'UTF-8') ?: null,
                     'cor_veiculo' => mb_strtoupper(trim($this->corVeiculo), 'UTF-8') ?: null,
                     'chassi_veiculo' => mb_strtoupper(trim($this->chassiVeiculo), 'UTF-8') ?: null,
                     'problema' => trim($this->problema) ?: null,
@@ -1288,6 +2598,8 @@ trait ErpOrdemServicoFormPage
                         'discriminacao' => mb_strtoupper((string) ($row['discriminacao'] ?? ''), 'UTF-8') ?: null,
                         'qtd' => ErpMoney::parseBr($row['qtd'] ?? 0, 3),
                         'preco' => ErpMoney::parseBr($row['preco'] ?? 0),
+                        'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),
+                        'acrescimo' => ErpMoney::parseBr($row['acrescimo'] ?? 0),
                         'total' => ErpMoney::parseBr($row['total'] ?? 0),
                         'data_termino' => $dataTermino,
                         'hora_termino' => $horaTermino,
@@ -1325,7 +2637,9 @@ trait ErpOrdemServicoFormPage
             return false;
         }
 
-        if ($createdId !== null && ! $finalizar) {
+        if ($createdId !== null && ! $finalizar && $redirectOnCreate) {
+            session()->flash('erp_os_post_save_prompt', true);
+
             $this->redirect(
                 OrdemServicoResource::getUrl('edit', ['record' => $createdId]),
                 navigate: false,
@@ -1335,7 +2649,7 @@ trait ErpOrdemServicoFormPage
         }
 
         if ($this->isEditingOs() && ! $finalizar) {
-            $this->loadOsFormFromRecord($this->record->fresh(['cliente', 'itens.product', 'itens.funcionario']));
+            $this->loadOsFormFromRecord($this->record->fresh(['cliente', 'itens.product', 'itens.funcionario', 'imagens']));
         }
 
         return true;
@@ -1387,6 +2701,7 @@ trait ErpOrdemServicoFormPage
         ErpScreen::set('Cadastro de Produtos');
         $this->overlayPersonOpen = false;
         $this->overlayProductOpen = true;
+        $this->skipRender();
     }
 
     public function openPessoasCadastro(): void
@@ -1394,6 +2709,7 @@ trait ErpOrdemServicoFormPage
         ErpScreen::set('Cadastro de Pessoas');
         $this->overlayProductOpen = false;
         $this->overlayPersonOpen = true;
+        $this->skipRender();
     }
 
     public function closeProductOverlay(): void
@@ -1404,6 +2720,7 @@ trait ErpOrdemServicoFormPage
 
         $this->overlayProductOpen = false;
         ErpScreen::set('Lançamento OS');
+        $this->skipRender();
     }
 
     public function closePersonOverlay(): void
@@ -1414,19 +2731,32 @@ trait ErpOrdemServicoFormPage
 
         $this->overlayPersonOpen = false;
         ErpScreen::set('Lançamento OS');
+        $this->skipRender();
     }
 
     public function applyOverlayProdutoSaved(string $codigo): void
     {
-        if (filled($codigo)) {
-            $this->itemCodigoInput = mb_strtoupper(trim($codigo), 'UTF-8');
-        }
+        $this->overlayProductOpen = false;
+        ErpScreen::set('Lançamento OS');
 
-        $this->closeProductOverlay();
+        if (filled($codigo)) {
+            $codigo = mb_strtoupper(trim($codigo), 'UTF-8');
+            $this->itemCodigoInput = $codigo;
+            $product = $this->findProductByCodigo($codigo);
+
+            if ($product) {
+                $this->stageProductForEntry($product);
+
+                return;
+            }
+        }
     }
 
     public function applyOverlayPersonSaved(int $clienteId): void
     {
+        $this->overlayPersonOpen = false;
+        ErpScreen::set('Lançamento OS');
+
         $person = Person::query()->find($clienteId);
 
         if ($person) {
@@ -1434,12 +2764,28 @@ trait ErpOrdemServicoFormPage
             $this->clienteSearch = mb_strtoupper($person->nome_razao, 'UTF-8');
             $this->applyClienteFields($person);
         }
-
-        $this->closePersonOverlay();
     }
 
     public function handleOsFormEscape(): void
     {
+        if ($this->printModalOpen) {
+            $this->closePrintModal();
+
+            return;
+        }
+
+        if ($this->descontoModalOpen) {
+            $this->fecharModalDescontoItem();
+
+            return;
+        }
+
+        if ($this->servicoPrestadoModalOpen) {
+            $this->cancelarModalServicoPrestado();
+
+            return;
+        }
+
         if ($this->overlayProductOpen) {
             $this->closeProductOverlay();
 
@@ -1452,13 +2798,225 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
+        if ($this->osFaturamentoOpen) {
+            $this->cancelarFaturamentoOs();
+
+            return;
+        }
+
         if ($this->itemDeleteConfirmIndex !== null) {
             $this->cancelDeleteItem();
 
             return;
         }
 
+        if ($this->editingItemIndex !== null || $this->itemPendingProductId !== null) {
+            $this->cancelItemEdit();
+
+            return;
+        }
+
+        if ($this->postSavePromptOpen) {
+            $this->sairAposGravarOs();
+
+            return;
+        }
+
+        $this->sairOsForm();
+    }
+
+    public function sairOsForm(): void
+    {
+        if ($this->editingItemIndex !== null || $this->itemPendingProductId !== null) {
+            $this->cancelItemEdit();
+        }
+
+        if (! $this->osReadOnly() && $this->canPersistOsOnExit()) {
+            if (! $this->persistOs(finalizar: false, redirectOnCreate: false)) {
+                return;
+            }
+        }
+
         $this->cancelForm();
+    }
+
+    /**
+     * Grava ao sair só quando há dados mínimos (sem toast de validação — o usuário quer fechar).
+     */
+    protected function canPersistOsOnExit(): bool
+    {
+        return $this->clienteId !== null
+            && ! blank($this->clienteSearch)
+            && $this->atendenteId !== null;
+    }
+
+    public function handlePostSavePromptEscape(): void
+    {
+        $this->sairAposGravarOs();
+    }
+
+    protected function notifyOsGravada(): void
+    {
+        Notification::make()
+            ->title('Ordem de serviço gravada com sucesso!')
+            ->success()
+            ->send();
+    }
+
+    public function openPostSavePromptFromSession(): void
+    {
+        $this->notifyOsGravada();
+        $this->openPostSavePrompt();
+    }
+
+    protected function openPostSavePrompt(): void
+    {
+        $this->postSavePromptOpen = true;
+        $this->dispatch('erp-os-post-save-prompt-opened');
+    }
+
+    public function continuarOsAposGravar(): void
+    {
+        $this->postSavePromptOpen = false;
+        $this->dispatch('erp-os-focus-item-descricao');
+    }
+
+    public function sairAposGravarOs(): void
+    {
+        $this->postSavePromptOpen = false;
+        ErpScreen::set('Ordem de Serviço');
+        $this->redirect(OrdemServicoResource::getUrl('index'), navigate: false);
+    }
+
+    public function iniciarNovaOs(): void
+    {
+        $this->postSavePromptOpen = false;
+        ErpScreen::set('Lançamento OS');
+        $this->redirect(OrdemServicoResource::getUrl('create'), navigate: false);
+    }
+
+    public function abrirFaturamentoOsCarregado(): void
+    {
+        $this->carregarMeiosPagamentoOs();
+
+        if ($this->osMeiosPagamento === []) {
+            Notification::make()
+                ->title('Cadastre uma forma de pagamento para faturar a OS.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->resetAjusteFaturamentoOs();
+        $this->abrirModalFaturamentoOs();
+    }
+
+    /**
+     * Abre o fechamento como no PDV padrão: todas as formas em 0,00.
+     * O valor entra ao pressionar o atalho (A/B/C…) ou ao digitar.
+     */
+    protected function abrirModalFaturamentoOs(): void
+    {
+        $meios = $this->osMeiosPagamento;
+
+        foreach ($meios as $index => $meio) {
+            $meios[$index]['valor'] = '0,00';
+        }
+
+        $this->osMeiosPagamento = $meios;
+        $this->osPagamentoIndex = 0;
+        $this->resetOsParcelasFaturamento();
+        $this->osFaturamentoOpen = true;
+        $this->dispatch('erp-os-focus-finalizar-pagamento', index: 0);
+    }
+
+    protected function resetAjusteFaturamentoOs(): void
+    {
+        $this->osAcrescimoPct = '0,00';
+        $this->osAcrescimoValor = '0,00';
+        $this->osDescontoPct = '0,00';
+        $this->osDescontoValor = '0,00';
+    }
+
+    protected function aplicarTotalNaPrimeiraFormaOs(): void
+    {
+        if ($this->osMeiosPagamento === []) {
+            return;
+        }
+
+        // Recalcula o restante na forma selecionada (não força Dinheiro).
+        $index = $this->osPagamentoIndex;
+
+        if (! isset($this->osMeiosPagamento[$index])) {
+            $index = 0;
+        }
+
+        foreach ($this->osMeiosPagamento as $i => $meio) {
+            $this->osMeiosPagamento[$i]['valor'] = '0,00';
+        }
+
+        $this->aplicarRestanteOsPagamento($index);
+    }
+
+    protected function carregarMeiosPagamentoOs(): void
+    {
+        $formas = FormaPagamento::query()
+            ->where('ativo', true)
+            ->where('aparece_venda', true)
+            ->orderBy('codigo')
+            ->orderBy('id')
+            ->get();
+
+        if ($formas->isEmpty()) {
+            $formas = FormaPagamento::query()->where('ativo', true)->orderBy('codigo')->orderBy('id')->get();
+        }
+
+        $usados = [];
+        $this->osMeiosPagamento = $formas->map(function (FormaPagamento $forma) use (&$usados): array {
+            $atalho = strtoupper(trim((string) ($forma->atalho ?? '')));
+
+            if ($atalho === '' || isset($usados[$atalho])) {
+                foreach (range('A', 'Z') as $letra) {
+                    if (! isset($usados[$letra])) {
+                        $atalho = $letra;
+                        break;
+                    }
+                }
+            }
+
+            $usados[$atalho] = true;
+
+            return [
+                'id' => (int) $forma->id,
+                'descricao' => (string) $forma->descricao,
+                'forma' => (string) $forma->descricao,
+                'tipo' => (string) ($forma->tipo ?? ''),
+                'tipo_movimento' => (string) ($forma->tipo_movimento ?? ''),
+                'atalho' => $atalho,
+                'valor' => '0,00',
+            ];
+        })->values()->all();
+    }
+
+    protected function moneyOs(string $value): string
+    {
+        $raw = trim($value);
+
+        if ($raw === '') {
+            return '0.00';
+        }
+
+        if (str_contains($raw, ',')) {
+            $raw = str_replace('.', '', $raw);
+            $raw = str_replace(',', '.', $raw);
+        }
+
+        if (preg_match('/^-?\d+(\.\d+)?$/', $raw) !== 1) {
+            return '0.00';
+        }
+
+        return bcadd($raw, '0', 2);
     }
 
     public function cancelForm(): void

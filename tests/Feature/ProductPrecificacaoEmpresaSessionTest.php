@@ -6,13 +6,13 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Models\Empresa;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MigratesSqliteMemory;
 use Livewire\Livewire;
 use Tests\TestCase;
 
 class ProductPrecificacaoEmpresaSessionTest extends TestCase
 {
-    use RefreshDatabase;
+    use MigratesSqliteMemory;
 
     public function test_troca_empresa_na_precificacao_nao_altera_sessao_do_erp(): void
     {

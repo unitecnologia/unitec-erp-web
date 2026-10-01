@@ -8,6 +8,13 @@ use Illuminate\Support\Carbon;
 final class CaixaListRowFormatter
 {
     /**
+     * id do pedido no Monitor => Nº Pedido exibido.
+     *
+     * @var array<int, string>
+     */
+    public array $pedidosMonitor = [];
+
+    /**
      * @return array<string, string>
      */
     public function format(CaixaLancamento $record): array
@@ -20,7 +27,7 @@ final class CaixaListRowFormatter
         return [
             'codigo' => e((string) ($record->codigo ?? '—')),
             'emissao' => e($this->formatData($record->emissao)),
-            'documento' => filled($record->documento) ? e((string) $record->documento) : '—',
+            'documento' => e(ContaReceberPedidoExibicao::texto($record->documento, $this->pedidosMonitor)),
             'historico' => e($historico !== '' ? $historico : '—'),
             'plano_contas' => filled($record->plano_contas) ? e((string) $record->plano_contas) : '—',
             'conta' => e($record->conta?->nome ?? '—'),

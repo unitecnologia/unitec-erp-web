@@ -294,8 +294,56 @@ trait ManagesForcaVendasTelaVendaParcelas
         return max(0, (int) ($dias[0] ?? 30));
     }
 
+    /**
+     * Financeiro ou tabela fixa do cliente: o operador não altera o prazo.
+     */
+    public function fvPrazoCarneTravado(): bool
+    {
+        if ($this->fvClienteTemTabelaPrazoFixa()) {
+            return true;
+        }
+
+        $forma = $this->resolveFvFormaPagamentoCarneAtiva();
+        $modo = mb_strtolower(trim((string) ($forma?->modo_prazo ?? '')), 'UTF-8');
+
+        return $modo === FormaPagamento::MODO_PRAZO_FINANCEIRO;
+    }
+
+    /**
+     * Lista de tabelas só no modo tabela, sem tabela fixa no cliente.
+     */
+    public function fvPodeEscolherTabelaPrazo(): bool
+    {
+        if ($this->fvPrazoCarneTravado()) {
+            return false;
+        }
+
+        $forma = $this->resolveFvFormaPagamentoCarneAtiva();
+        $modo = mb_strtolower(trim((string) ($forma?->modo_prazo ?? '')), 'UTF-8');
+
+        return $modo === FormaPagamento::MODO_PRAZO_TABELA;
+    }
+
+    protected function fvClienteTemTabelaPrazoFixa(): bool
+    {
+        $clienteId = (int) ($this->clienteId ?? 0);
+
+        if ($clienteId <= 0) {
+            return false;
+        }
+
+        return Person::query()
+            ->whereKey($clienteId)
+            ->whereNotNull('tabela_prazo_id')
+            ->exists();
+    }
+
     public function gerarFvParcelasCrediario(): void
     {
+        if ($this->fvPrazoCarneTravado()) {
+            return;
+        }
+
         $this->fvTabelaPrazoId = null;
         $this->fvTabelasPrazoListaAberta = false;
 
@@ -317,6 +365,10 @@ trait ManagesForcaVendasTelaVendaParcelas
 
     public function abrirFvTabelasPrazoPredefinidas(): void
     {
+        if (! $this->fvPodeEscolherTabelaPrazo()) {
+            return;
+        }
+
         $this->refreshFvTabelasPrazoPredefinidas();
 
         if ($this->fvTabelasPrazoPredefinidas === []) {
@@ -343,26 +395,22 @@ trait ManagesForcaVendasTelaVendaParcelas
 
     public function refreshFvTabelasPrazoPredefinidas(): void
     {
-        $formaIds = FormaPagamento::query()
-            ->where('ativo', true)
-            ->whereIn('tipo', ['crediario', 'cheque', 'boleto'])
-            ->pluck('id');
+        $formaId = (int) ($this->resolveFvFormaPagamentoCarneAtiva()?->id ?? 0);
 
-        $this->fvTabelasPrazoPredefinidas = TabelaPrazo::query()
-            ->when(
-                $formaIds->isNotEmpty(),
-                fn ($q) => $q->whereIn('forma_pagamento_id', $formaIds),
-            )
-            ->orderBy('ordem')
-            ->orderBy('id')
-            ->get(['id', 'dias', 'ordem'])
-            ->map(fn (TabelaPrazo $tabela): array => [
-                'tabela_prazo_id' => (int) $tabela->id,
-                'dias' => (string) $tabela->dias,
-                'label' => (string) $tabela->dias,
-            ])
-            ->values()
-            ->all();
+        $this->fvTabelasPrazoPredefinidas = $formaId <= 0
+            ? []
+            : TabelaPrazo::query()
+                ->where('forma_pagamento_id', $formaId)
+                ->orderBy('ordem')
+                ->orderBy('id')
+                ->get(['id', 'dias', 'ordem'])
+                ->map(fn (TabelaPrazo $tabela): array => [
+                    'tabela_prazo_id' => (int) $tabela->id,
+                    'dias' => (string) $tabela->dias,
+                    'label' => (string) $tabela->dias,
+                ])
+                ->values()
+                ->all();
     }
 
     public function selectFvTabelaPredefinida(int $index): void
@@ -385,6 +433,10 @@ trait ManagesForcaVendasTelaVendaParcelas
 
     public function aplicarFvTabelaPrazoPredefinida(): void
     {
+        if (! $this->fvPodeEscolherTabelaPrazo()) {
+            return;
+        }
+
         $index = $this->fvSelectedTabelaPredefinidaIndex;
 
         if ($index === null || ! isset($this->fvTabelasPrazoPredefinidas[$index])) {
@@ -471,6 +523,10 @@ trait ManagesForcaVendasTelaVendaParcelas
 
     public function excluirFvParcelaCrediario(): void
     {
+        if ($this->fvPrazoCarneTravado()) {
+            return;
+        }
+
         $index = $this->fvSelectedParcelaIndex;
 
         if ($index === null || ! isset($this->fvParcelasRows[$index])) {

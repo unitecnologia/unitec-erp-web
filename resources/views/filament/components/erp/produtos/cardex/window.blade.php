@@ -18,3 +18,5 @@
         @include('filament.components.erp.produtos.cardex.body')
     </div>
 </div>
+
+@include('filament.components.erp.form-scripts')

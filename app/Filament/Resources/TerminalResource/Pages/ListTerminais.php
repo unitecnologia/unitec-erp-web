@@ -61,7 +61,7 @@ class ListTerminais extends ListRecords
                 'delete' => null,
                 'extraKeys' => [
                     'F2' => ['method' => 'autorizarAparelhoSelecionado'],
-                    'F4' => ['method' => 'revogarAparelhoSelecionado'],
+                    'F4' => ['method' => 'excluirAparelhoSelecionado'],
                 ],
             ];
         }
@@ -124,6 +124,14 @@ class ListTerminais extends ListRecords
         return Terminal::query()
             ->where('empresa_id', $empresaId)
             ->where('nome', '!=', '')
+            // Telefones (FV/VI/OS) ficam só na aba Aparelhos — não na lista Dispositivo.
+            ->when(
+                \Illuminate\Support\Facades\Schema::hasColumn('terminais', 'categoria_licenca'),
+                fn (Builder $q) => $q->where(function (Builder $inner): void {
+                    $inner->whereNull('categoria_licenca')
+                        ->orWhere('categoria_licenca', '!=', DeviceLicenseService::CATEGORY_TELEFONE);
+                }),
+            )
             ->orderBy('nome')
             ->get($columns);
     }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\DevolucaoCompraResource\Pages\Concerns;
 
 use App\Models\Compra;
+use App\Models\CompraItem;
 use App\Models\DevolucaoCompra;
 use App\Models\DevolucaoCompraItem;
 use App\Support\Erp\Compras\FinalizarDevolucaoCompraService;
@@ -349,7 +350,7 @@ trait ManagesDevolucaoCompraModal
         $compra = null;
 
         if ($compraId) {
-            $compra = Compra::query()->with(['itens.product', 'fornecedor', 'empresa'])->find($compraId);
+            $compra = Compra::query()->with(['itens.product', 'itens.notaFornecedorItem', 'fornecedor', 'empresa'])->find($compraId);
         }
 
         if (! $compra && filled($this->formCompraNumero)) {
@@ -357,7 +358,7 @@ trait ManagesDevolucaoCompraModal
             $empresaId = ErpContext::currentEmpresaId();
 
             $query = Compra::query()
-                ->with(['itens.product', 'fornecedor', 'empresa'])
+                ->with(['itens.product', 'itens.notaFornecedorItem', 'fornecedor', 'empresa'])
                 ->where('status', Compra::STATUS_FECHADA)
                 ->whereDoesntHave(
                     'devolucoes',
@@ -393,19 +394,7 @@ trait ManagesDevolucaoCompraModal
             return;
         }
 
-        $jaDevolvido = DevolucaoCompraItem::query()
-            ->whereNotNull('compra_item_id')
-            ->whereHas('devolucao', function ($q) use ($compra): void {
-                $q->where('compra_id', $compra->id)
-                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA);
-
-                if ($this->lancamentoId) {
-                    $q->where('id', '!=', $this->lancamentoId);
-                }
-            })
-            ->get(['compra_item_id', 'qtd'])
-            ->groupBy('compra_item_id')
-            ->map(fn ($rows): float => round((float) $rows->sum('qtd'), 3));
+        $fiscalDevolucao = app(\App\Support\Erp\NotaFornecedor\NotaFornecedorDevolucaoFiscalService::class);
 
         $this->formCompraId = (int) $compra->id;
         $this->formCompraNumero = (string) $compra->numero;
@@ -422,10 +411,13 @@ trait ManagesDevolucaoCompraModal
             );
         }
 
-        $this->formItens = $compra->itens->values()->map(function ($item) use ($jaDevolvido): ?array {
-            $qtdComprada = round((float) $item->quantidade, 3);
-            $prev = (float) ($jaDevolvido[(int) $item->id] ?? 0);
-            $disponivel = round(max(0, $qtdComprada - $prev), 3);
+        $this->formItens = $compra->itens->values()->map(function ($item) use ($fiscalDevolucao): ?array {
+            // qtd_original = nota_fornecedor_itens.quantidade quando houver vínculo
+            $qtdOriginal = $fiscalDevolucao->quantidadeOriginal($item);
+            $disponivel = $fiscalDevolucao->quantidadeDisponivel(
+                $item,
+                $this->lancamentoId ? (int) $this->lancamentoId : null,
+            );
 
             if ($disponivel <= 0) {
                 return null;
@@ -439,7 +431,7 @@ trait ManagesDevolucaoCompraModal
                 'product_id' => $item->product_id ? (int) $item->product_id : null,
                 'produto_codigo' => (string) ($item->product?->codigo ?? ''),
                 'produto_descricao' => (string) ($item->product?->descricao ?? 'ITEM'),
-                'qtd_comprada' => $qtdComprada,
+                'qtd_comprada' => $qtdOriginal,
                 'qtd' => $disponivel,
                 'preco' => $preco,
                 'total' => round($disponivel * $preco, 2),
@@ -483,22 +475,19 @@ trait ManagesDevolucaoCompraModal
             ? (float) $qtd
             : ErpMoney::parseBr($qtd, 3);
 
-        $max = round((float) ($this->formItens[$index]['qtd_comprada'] ?? 0), 3);
+        $max = round((float) ($this->formItens[$index]['qtd_comprada'] ?? 0), 4);
         $compraItemId = (int) ($this->formItens[$index]['compra_item_id'] ?? 0);
 
-        if ($compraItemId > 0 && $this->formCompraId) {
-            $prev = (float) DevolucaoCompraItem::query()
-                ->where('compra_item_id', $compraItemId)
-                ->whereHas('devolucao', function ($q): void {
-                    $q->where('compra_id', $this->formCompraId)
-                        ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA);
+        if ($compraItemId > 0) {
+            $compraItem = CompraItem::query()->with('notaFornecedorItem')->find($compraItemId);
 
-                    if ($this->lancamentoId) {
-                        $q->where('id', '!=', $this->lancamentoId);
-                    }
-                })
-                ->sum('qtd');
-            $max = round(max(0, $max - $prev), 3);
+            if ($compraItem) {
+                $max = app(\App\Support\Erp\NotaFornecedor\NotaFornecedorDevolucaoFiscalService::class)
+                    ->quantidadeDisponivel(
+                        $compraItem,
+                        $this->lancamentoId ? (int) $this->lancamentoId : null,
+                    );
+            }
         }
 
         if ($valor < 0) {
@@ -639,6 +628,7 @@ trait ManagesDevolucaoCompraModal
                 $recordId = (int) $record->id;
                 $keptIds = [];
                 $itemSeq = 0;
+                $fiscalDevolucao = app(\App\Support\Erp\NotaFornecedor\NotaFornecedorDevolucaoFiscalService::class);
 
                 foreach ($this->formItens as $index => $row) {
                     $qtd = round((float) ($row['qtd'] ?? 0), 3);
@@ -647,11 +637,25 @@ trait ManagesDevolucaoCompraModal
                         continue;
                     }
 
+                    $compraItemId = filled($row['compra_item_id'] ?? null) ? (int) $row['compra_item_id'] : null;
+
+                    if ($compraItemId) {
+                        $compraItem = CompraItem::query()->with('notaFornecedorItem')->find($compraItemId);
+
+                        if ($compraItem) {
+                            $fiscalDevolucao->assertQuantidadePermitida(
+                                $compraItem,
+                                $qtd,
+                                (int) $record->id,
+                            );
+                        }
+                    }
+
                     $itemSeq++;
                     $itemData = [
                         'item' => $itemSeq,
                         'product_id' => filled($row['product_id'] ?? null) ? (int) $row['product_id'] : null,
-                        'compra_item_id' => filled($row['compra_item_id'] ?? null) ? (int) $row['compra_item_id'] : null,
+                        'compra_item_id' => $compraItemId,
                         'produto_codigo' => (string) ($row['produto_codigo'] ?? '') ?: null,
                         'produto_descricao' => mb_strtoupper((string) ($row['produto_descricao'] ?? ''), 'UTF-8') ?: null,
                         'qtd' => $qtd,

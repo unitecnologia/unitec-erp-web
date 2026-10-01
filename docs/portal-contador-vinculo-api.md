@@ -1,18 +1,117 @@
 # Portal do Contador — API de Vínculo ERP ↔ Portal
 
-Especificação para o time do portal implementar o fluxo **prático de autorização**, sem copiar token manualmente.
+Especificação para o time do portal. Inclui o fluxo legado (autorização manual) e o **vínculo automático** (prioridade).
 
-## Objetivo
+## Objetivo (fluxo desejado — prioridade)
 
-1. No **ERP**, o usuário clica em **Conectar ao Portal**.
-2. O ERP envia os dados da empresa (CNPJ, razão social, etc.).
-3. O **contador** abre o portal, vê a solicitação e clica em **Autorizar**.
-4. O ERP recebe automaticamente: `token`, `empresaId`, `apiUrl` e dados do contador.
-5. O envio de documentos passa a funcionar sem configuração manual.
+1. No **ERP**, o usuário escolhe o contador (CNPJ) e clica **Conectar ao Portal**.
+2. O ERP envia dados da empresa + **CNPJ do contador**.
+3. Se o contador existir e estiver ativo no portal: **autoriza na hora**, coloca a empresa na carteira dele e devolve `token` + `empresaId` + `apiUrl`.
+4. O contador só entra no portal e busca pelo **CNPJ do cliente** — sem clicar em Autorizar.
+5. O envio de documentos passa a funcionar sem configuração manual de token.
+
+Fluxo legado (`solicitar` + Autorizar) permanece como **fallback**.
 
 ---
 
-## Fluxo resumido
+## Fluxo automático (novo)
+
+```mermaid
+sequenceDiagram
+    participant ERP
+    participant PortalAPI
+    participant Contador
+
+    ERP->>PortalAPI: POST /api/portal/vinculos/auto
+    Note over ERP,PortalAPI: Bearer ERP_AUTO_VINCULO_SECRET + empresa + contadorCnpj
+    PortalAPI-->>ERP: authorized + credenciais
+    Contador->>PortalAPI: Login e busca CNPJ empresa
+    PortalAPI-->>Contador: Empresa ja na carteira
+```
+
+### `POST /api/portal/vinculos/auto`
+
+**Auth:** `Authorization: Bearer {ERP_AUTO_VINCULO_SECRET}`
+
+Segredo exclusivo compartilhado entre ERP e portal (Replit Secret / `.env` do ERP). **Não** reutilizar senha administrativa nem o token da empresa usado em `POST /documentos`.
+
+Sem o header (ou valor incorreto): portal deve responder `401`/`403`.
+
+#### Request
+
+```json
+{
+  "cnpj": "22.469.772/0001-00",
+  "razaoSocial": "MINHA EMPRESA LTDA",
+  "nomeFantasia": "MINHA EMPRESA",
+  "ie": "123456789",
+  "email": "financeiro@empresa.com.br",
+  "cidade": "Chapecó",
+  "uf": "SC",
+  "erpOrigem": "unitec-erp-web",
+  "erpEmpresaId": "1",
+  "cnpjContador": "12.345.678/0001-90",
+  "contadorCnpj": "12.345.678/0001-90",
+  "emailContador": "contador@escritorio.com.br"
+}
+```
+
+| Campo | Obrigatório | Descrição |
+|-------|-------------|-----------|
+| (campos da empresa) | igual ao `solicitar` | Ver seção 1 abaixo |
+| cnpjContador | Sim | CNPJ (ou CPF) do escritório no portal (nome canônico no portal) |
+| contadorCnpj | Não | Alias enviado pelo ERP (compatibilidade) |
+| emailContador / contadorEmail | Não | Ajuda a casar o cadastro do contador |
+
+Aceitar também `contadorCpf` se o cadastro for de pessoa física.
+
+#### Response `201` — autorizado na hora
+
+```json
+{
+  "vinculoId": "8f3c2a1b-9d4e-4f5a-b6c7-8d9e0f1a2b3c",
+  "status": "authorized",
+  "authorizedAt": "2026-09-11T21:00:00-03:00",
+  "credenciais": {
+    "token": "…",
+    "empresaId": "42",
+    "apiUrl": "https://unitecnologiasc.com.br/api/portal/documentos",
+    "contador": {
+      "id": "7",
+      "nome": "EBSON CONTADOR",
+      "email": "contador@escritorio.com.br",
+      "cnpj": "12.345.678/0001-90"
+    },
+    "empresa": {
+      "id": "42",
+      "cnpj": "22.469.772/0001-00",
+      "razaoSocial": "MINHA EMPRESA LTDA"
+    }
+  }
+}
+```
+
+**Não** retornar `pending` neste endpoint. Token deve funcionar imediatamente em `POST /api/portal/documentos`.
+
+#### Erros
+
+| HTTP | Código / body | Significado |
+|------|---------------|-------------|
+| 404 | `contador_nao_encontrado` | Contador não cadastrado/ativo no portal |
+| 409 | `empresa_vinculada_outro_contador` | Empresa já ligada a outro escritório |
+| 422 | validação | CNPJ inválido / campos obrigatórios |
+
+#### Regras
+
+- Contador precisa estar **cadastrado e ativo**.
+- Empresa aparece **na hora** na carteira do contador (busca por CNPJ).
+- Idempotência: mesmo par empresa+contador → reusa/renova token sem duplicar cliente.
+- Mostrar origem `unitec-erp-web` + data do vínculo (auditoria).
+- Rate limit (ex.: 10/hora por CNPJ empresa).
+
+---
+
+## Fluxo legado (fallback)
 
 ```mermaid
 sequenceDiagram
@@ -23,19 +122,17 @@ sequenceDiagram
 
     ERP->>PortalAPI: POST /api/portal/vinculos/solicitar
     PortalAPI-->>ERP: vinculoId, codigo, authorizeUrl
-    ERP->>Contador: Abre authorizeUrl (navegador)
+    ERP->>Contador: Abre authorizeUrl
     Contador->>PortalWeb: Login + Autorizar empresa
-    PortalWeb->>PortalAPI: Confirma vínculo
-    loop a cada 3s
+    loop poll 3s
         ERP->>PortalAPI: GET /api/portal/vinculos/{id}/status
     end
-    PortalAPI-->>ERP: status=authorized + credenciais
-    ERP->>PortalAPI: POST /api/portal/documentos (Bearer token)
+    PortalAPI-->>ERP: authorized + credenciais
 ```
 
 ---
 
-## 1. Solicitar vínculo
+## 1. Solicitar vínculo (legado)
 
 **POST** `/api/portal/vinculos/solicitar`  
 **Auth:** não requer (público, dados não sensíveis)
@@ -81,7 +178,7 @@ sequenceDiagram
 | Campo | Descrição |
 |-------|-----------|
 | vinculoId | UUID para o ERP consultar status |
-| codigo | Código curto exibido na tela (contador pode digitar se preferir) |
+| codigo | Código curto exibido na tela |
 | authorizeUrl | Link para o contador autorizar no navegador |
 | expiresAt | Validade da solicitação (sugestão: **15 minutos**) |
 
@@ -146,20 +243,22 @@ Vínculo inexistente ou expirado.
 
 ## 3. Tela web do portal (contador)
 
-Rota sugerida: `/portal/vincular?codigo=A7B9-C3D2`
+### Fluxo automático
 
-1. Contador faz login (já existe cadastro de contador).
-2. Exibe dados recebidos do ERP: CNPJ, razão social, fantasia, cidade/UF.
-3. Botões: **Autorizar envio de documentos** | **Recusar**.
-4. Ao autorizar:
-   - Cria ou localiza empresa no portal pelo CNPJ.
-   - Vincula empresa ao escritório/contador logado.
-   - Gera token Bearer exclusivo para essa empresa.
-   - Marca vínculo como `authorized`.
+Contador faz login → busca CNPJ do cliente → empresa **já está** na carteira (criada pelo `/vinculos/auto`).
+
+### Fluxo legado
+
+Rota: `/portal/vincular?codigo=A7B9-C3D2`
+
+1. Contador faz login.
+2. Exibe dados do ERP.
+3. Botões: **Autorizar** | **Recusar**.
+4. Ao autorizar: cria/localiza empresa, vincula, gera token, marca `authorized`.
 
 ---
 
-## 4. Envio de documentos (já existente)
+## 4. Envio de documentos
 
 **POST** `/api/portal/documentos`  
 **Auth:** `Authorization: Bearer {token}`
@@ -171,6 +270,9 @@ Rota sugerida: `/portal/vincular?codigo=A7B9-C3D2`
   "numero": "26",
   "dataEmissao": "2026-07-09",
   "competencia": "2026-07",
+  "modelo": "65",
+  "contingencia": false,
+  "tpEmis": 1,
   "chaveAcesso": "42260722469772000100550010000000261265359931",
   "xmlContent": "<nfeProc>...</nfeProc>",
   "nomeArquivo": "42260_NF26.xml"
@@ -179,50 +281,67 @@ Rota sugerida: `/portal/vincular?codigo=A7B9-C3D2`
 
 | tipo | Uso |
 |------|-----|
-| `NF_EMITIDA` | NF-e / NFC-e autorizada |
+| `NF_EMITIDA` | NF-e / NFC-e autorizada na SEFAZ |
 | `NF_CANCELADA` | NF-e / NFC-e cancelada |
+| `NF_CONTINGENCIA` | Ainda em contingência — **avisar o contador** |
 | `XML_COMPRA` | XML de compra / nota de fornecedor |
 
-O token gerado no vínculo deve aceitar documentos **somente** do CNPJ autorizado.
+### Campos extras (ERP já envia)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `modelo` | string | `55` = NF-e, `65` = NFC-e |
+| `contingencia` | bool | `true` se contingência |
+| `tpEmis` | int | `1` normal, `9` contingência |
+| `motivoContingencia` | string | Justificativa |
+
+### Pedidos de UI no portal
+
+1. Rotular NFC-e vs NF-e pelo `modelo`.
+2. Badge Contingência quando `NF_CONTINGENCIA` ou `contingencia=true`.
+3. Ao receber `NF_EMITIDA` da mesma `chaveAcesso`, limpar alerta.
 
 ---
 
-## 5. Revogar vínculo (opcional, fase 2)
+## 5. Revogar vínculo (opcional)
 
 **POST** `/api/portal/vinculos/{vinculoId}/revogar`  
 **Auth:** Bearer token da empresa
 
-Invalida o token no portal. O ERP pode solicitar novo vínculo.
+---
+
+## 6. Segurança
+
+- Código legado expira em **15 minutos**.
+- Token por empresa + contador.
+- Rate limit em `/solicitar` e `/auto`.
+- Auditoria: quem vinculou, quando, IP.
 
 ---
 
-## 6. Regras de segurança
+## 7. ERP Unitec
 
-- Código de vínculo expira em **15 minutos**.
-- Token é por empresa + contador (não compartilhar entre CNPJs).
-- Rate limit em `/solicitar` (ex.: 10/hora por CNPJ).
-- Log de auditoria: quem autorizou, quando, de qual IP.
+- **Conectar** tenta `/vinculos/auto` com Bearer `ERP_AUTO_VINCULO_SECRET` + CNPJ do contador vinculado; fallback para `solicitar` + poll.
+- Segredo padrão em `config/contador-cloud.php` (vai no ZIP de update); `.env` `ERP_AUTO_VINCULO_SECRET` só sobrescreve.
+- Preenche token/URL/ID automaticamente.
+- Envia `modelo` / `contingencia` / `tpEmis`.
 
----
+**Base URL:** `https://unitecnologiasc.com.br` (`CONTADOR_CLOUD_PORTAL_BASE_URL`)
 
-## 7. O que o ERP já implementa
-
-- Botão **Conectar ao Portal** na aba Parâmetros → Portal do Contador.
-- Envio automático de `solicitar` com dados da empresa cadastrada.
-- Polling do status a cada 3 segundos até autorizar/expirar.
-- Preenchimento automático de URL, token, ID da empresa e e-mail do contador.
-- Envio de documentos no formato acima após vínculo.
-
-**Base URL padrão:** `https://unitecnologiasc.com.br`  
-(Configurável via `CONTADOR_CLOUD_PORTAL_BASE_URL` no `.env` do ERP)
+Pedido resumido: [portal-contador-pedido-melhorias.md](portal-contador-pedido-melhorias.md).
 
 ---
 
-## Checklist para o portal
+## Checklist portal
 
-- [ ] `POST /api/portal/vinculos/solicitar`
-- [ ] `GET /api/portal/vinculos/{id}/status`
-- [ ] Tela `/portal/vincular?codigo=...`
-- [ ] Geração de token Bearer por empresa vinculada
-- [ ] `POST /api/portal/documentos` validando token + CNPJ
-- [ ] (Opcional) Revogação de vínculo
+- [x] `POST /api/portal/vinculos/solicitar`
+- [x] `GET /api/portal/vinculos/{id}/status`
+- [x] Tela `/portal/vincular?codigo=...`
+- [x] Token Bearer + `POST /api/portal/documentos`
+- [ ] **`POST /api/portal/vinculos/auto`** (prioridade)
+- [ ] Auth Bearer `ERP_AUTO_VINCULO_SECRET` (exclusivo)
+- [ ] Empresa na carteira na hora (busca CNPJ)
+- [ ] Erro `contador_nao_encontrado`
+- [ ] Rotular NFC-e vs NF-e (`modelo`)
+- [ ] Badge contingência
+- [ ] (Opcional) Revogar vínculo

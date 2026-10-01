@@ -38,6 +38,8 @@ final class ItemImpostoDto
         public readonly float $vIcmsDeson = 0.0,
         public readonly ?string $motivoDesoneracao = null,
         public readonly int $crt = 1,
+        public readonly float $pRedBc = 0.0,
+        public readonly ?string $modBc = null,
     ) {}
 
     public function usesSimples(): bool
@@ -75,22 +77,32 @@ final class ItemImpostoDto
 
     public function cstPisResolvido(): string
     {
-        if (! $this->hasPisTributado()) {
-            return $this->normalizeCst($this->cstPis ?? '07') ?: '07';
+        $explicit = $this->normalizeCst($this->cstPis ?? '');
+        if (in_array($explicit, ['49', '99'], true)) {
+            return $explicit;
         }
 
-        $cst = $this->normalizeCst($this->cstPis ?? '01') ?: '01';
+        if (! $this->hasPisTributado()) {
+            return $explicit !== '' ? $explicit : '07';
+        }
+
+        $cst = $explicit !== '' ? $explicit : '01';
 
         return in_array($cst, ['01', '02'], true) ? $cst : '01';
     }
 
     public function cstCofinsResolvido(): string
     {
-        if (! $this->hasCofinsTributado()) {
-            return $this->normalizeCst($this->cstCofins ?? '07') ?: '07';
+        $explicit = $this->normalizeCst($this->cstCofins ?? '');
+        if (in_array($explicit, ['49', '99'], true)) {
+            return $explicit;
         }
 
-        $cst = $this->normalizeCst($this->cstCofins ?? '01') ?: '01';
+        if (! $this->hasCofinsTributado()) {
+            return $explicit !== '' ? $explicit : '07';
+        }
+
+        $cst = $explicit !== '' ? $explicit : '01';
 
         return in_array($cst, ['01', '02'], true) ? $cst : '01';
     }

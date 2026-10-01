@@ -36,6 +36,8 @@ Só este atalho. Sem outros lançadores na Área de Trabalho.
 | Usuário | `USUARIO` |
 | Senha | `01` |
 
+A instalação já vem com a **empresa Unitec preenchida** (dados básicos, parâmetros, observações fiscais, CFOPs, NCM, cClassTrib, cargos RH e funcionário USUARIO). Não é necessário cadastrar empresa no primeiro acesso — edite o CNPJ/razão depois se for outro cliente.
+
 Troque a senha após o primeiro acesso.
 
 ---

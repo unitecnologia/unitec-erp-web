@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\FormaPagamento;
+use App\Models\TabelaPrazo;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use PHPUnit\Framework\TestCase;
 
@@ -115,20 +116,109 @@ class ForcaVendasFaturamentoParcelasDiasTest extends TestCase
         $this->assertSame([7], $dias);
     }
 
-    public function test_modo_tabela_nao_usa_max_intervalo_antigo(): void
+    public function test_modo_tabela_sem_tabela_valida_bloqueia(): void
     {
-        $dias = $this->service()->resolverParcelasDias(
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Não existe prazo válido para a forma selecionada.');
+
+        $this->service()->resolverParcelasDias(
             [
                 'forma_pagamento' => 'BOLETO 7',
                 'tabela_prazo_dias' => null,
                 'condicao_pagamento' => null,
             ],
-            $this->forma(1, 7, 'tabela'),
+            $this->formaComTabelas(1, 7, 'tabela', []),
+            null,
+        );
+    }
+
+    public function test_financeiro_1x14_ignora_condicao_pagamento(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['condicao_pagamento' => '21'],
+            $this->forma(1, 14, 'financeiro'),
             null,
         );
 
-        // Sem prazo negociado e sem tabela do cliente → fallback [0].
-        $this->assertSame([0], $dias);
+        $this->assertSame([14], $dias);
+    }
+
+    public function test_financeiro_1x14_ignora_tabela_prazo_dias(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['tabela_prazo_dias' => '21'],
+            $this->forma(1, 14, 'financeiro'),
+            null,
+        );
+
+        $this->assertSame([14], $dias);
+    }
+
+    public function test_financeiro_2x7_ignora_payload_30_60(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['condicao_pagamento' => '30,60', 'tabela_prazo_dias' => '30,60'],
+            $this->forma(2, 7, 'financeiro'),
+            null,
+        );
+
+        $this->assertSame([7, 14], $dias);
+    }
+
+    public function test_financeiro_com_tabela_fixa_do_cliente(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['condicao_pagamento' => '21', 'tabela_prazo_dias' => '21'],
+            $this->forma(1, 14, 'financeiro'),
+            [30, 60],
+        );
+
+        $this->assertSame([30, 60], $dias);
+    }
+
+    public function test_modo_tabela_aceita_14_da_propria_forma(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['tabela_prazo_dias' => '14'],
+            $this->formaComTabelas(1, 14, 'tabela', ['14']),
+            null,
+        );
+
+        $this->assertSame([14], $dias);
+    }
+
+    public function test_modo_tabela_rejeita_21_de_outra_forma(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Não existe prazo válido para a forma selecionada.');
+
+        $this->service()->resolverParcelasDias(
+            ['tabela_prazo_dias' => '21'],
+            $this->formaComTabelas(1, 14, 'tabela', ['14']),
+            null,
+        );
+    }
+
+    public function test_modo_tabela_aceita_28_entre_tabelas_da_forma(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['tabela_prazo_dias' => '28'],
+            $this->formaComTabelas(1, 14, 'tabela', ['14', '28']),
+            null,
+        );
+
+        $this->assertSame([28], $dias);
+    }
+
+    public function test_tabela_fixa_do_cliente_prevalece_sobre_payload(): void
+    {
+        $dias = $this->service()->resolverParcelasDias(
+            ['tabela_prazo_dias' => '21'],
+            $this->formaComTabelas(1, 14, 'tabela', ['14']),
+            [30, 60],
+        );
+
+        $this->assertSame([30, 60], $dias);
     }
 
     public function test_modo_financeiro_aceita_1x30(): void
@@ -140,5 +230,24 @@ class ForcaVendasFaturamentoParcelasDiasTest extends TestCase
         );
 
         $this->assertSame([30], $dias);
+    }
+
+    /**
+     * @param  list<string>  $tabelas
+     */
+    private function formaComTabelas(int $max, int $intervalo, string $modoPrazo, array $tabelas): FormaPagamento
+    {
+        $forma = $this->forma($max, $intervalo, $modoPrazo);
+        $rows = [];
+
+        foreach ($tabelas as $dias) {
+            $tabela = new TabelaPrazo();
+            $tabela->dias = $dias;
+            $rows[] = $tabela;
+        }
+
+        $forma->setRelation('tabelasPrazo', collect($rows));
+
+        return $forma;
     }
 }

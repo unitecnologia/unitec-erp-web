@@ -399,10 +399,7 @@ public static class ErpStackManager
 	bind {$UNITEC_BIND:0.0.0.0}
 	root * {$UNITEC_PUBLIC:public/}
 	encode gzip
-	php_server {
-		env SERVER_NAME {$UNITEC_HTTP_HOST:127.0.0.1:8765}
-		env HTTP_HOST {$UNITEC_HTTP_HOST:127.0.0.1:8765}
-	}
+	php_server
 	file_server
 }
 """;
@@ -459,7 +456,6 @@ public static class ErpStackManager
         var threads = ResolveFrankenPhpThreads(appPath);
         var frankenIni = Path.Combine(Path.GetDirectoryName(frankenExe)!, "php.ini");
         var startLog = Path.Combine(appPath, "storage", "logs", "frankenphp-start.log");
-        var httpHost = $"127.0.0.1:{ErpPaths.Port}";
 
         var psi = new ProcessStartInfo
         {
@@ -475,7 +471,6 @@ public static class ErpStackManager
         psi.Environment["UNITEC_BIND"] = "0.0.0.0";
         psi.Environment["UNITEC_PORT"] = ErpPaths.Port.ToString();
         psi.Environment["UNITEC_PUBLIC"] = "public/";
-        psi.Environment["UNITEC_HTTP_HOST"] = httpHost;
         psi.Environment["FRANKENPHP_NUM_THREADS"] = threads.ToString();
         if (File.Exists(frankenIni))
         {
