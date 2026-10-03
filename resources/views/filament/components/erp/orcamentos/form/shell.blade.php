@@ -8,26 +8,9 @@
 
     @include('filament.components.erp.orcamentos.form.produto-bar', ['readOnly' => $readOnly])
 
-    <div class="erp-pcad__tabs">
-        <button
-            type="button"
-            wire:click="setActiveFormTab('itens')"
-            @class(['erp-pcad__tab', 'erp-pcad__tab--active' => $this->activeFormTab === 'itens'])
-        >Itens</button>
-        <button
-            type="button"
-            wire:click="setActiveFormTab('observacoes')"
-            @class(['erp-pcad__tab', 'erp-pcad__tab--active' => $this->activeFormTab === 'observacoes'])
-        >Observações</button>
-    </div>
-
     <div class="erp-pcad__workspace">
         <div class="erp-pcad__content">
-            @if ($this->activeFormTab === 'itens')
-                @include('filament.components.erp.orcamentos.form.tabs.itens', ['readOnly' => $readOnly])
-            @else
-                @include('filament.components.erp.orcamentos.form.tabs.observacoes', ['readOnly' => $readOnly])
-            @endif
+            @include('filament.components.erp.orcamentos.form.tabs.itens', ['readOnly' => $readOnly])
         </div>
     </div>
 </div>

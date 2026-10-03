@@ -156,10 +156,10 @@
 }
 
 .erp-pagar-page .erp-pagar__search-text--fornecedor {
-    flex: 0 1 calc(16rem + 2cm);
-    max-width: calc(18rem + 2cm);
-    min-width: calc(10rem + 2cm);
-    width: calc(16rem + 2cm);
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
 }
 
 .erp-pagar-page .erp-pagar__locate-group > .erp-pagar__search-text {
@@ -170,10 +170,11 @@
 
 .erp-pagar-page .erp-pagar__locate-group > .erp-pagar__locate-search-field--fornecedor {
     position: relative;
-    flex: 0 1 calc(16rem + 2cm);
-    max-width: calc(18rem + 2cm);
-    min-width: calc(10rem + 2cm);
-    width: calc(16rem + 2cm);
+    display: flex;
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 8rem;
+    width: auto;
 }
 
 .erp-pagar-page .erp-pagar__locate-search-field--fornecedor .erp-pagar__search-text--fornecedor {
@@ -188,7 +189,6 @@
     top: calc(100% + 2px);
     left: 0;
     right: 0;
-    min-width: 28rem;
     z-index: 60;
     max-height: 14rem;
     overflow: auto;
@@ -222,11 +222,9 @@
 }
 
 .erp-pagar-page .erp-cliente-filter-lookup__table th {
-    background: #e8eef6;
-    color: var(--erp-brand-primary);
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
     font-weight: 700;
-    position: sticky;
-    top: 0;
 }
 
 .erp-pagar-page .erp-cliente-filter-lookup__row {
@@ -234,15 +232,16 @@
 }
 
 .erp-pagar-page .erp-cliente-filter-lookup__row:hover {
-    background: #f3f7fc;
+    background: var(--erp-row-hover, #e8f2ff);
 }
 
 .erp-pagar-page .erp-cliente-filter-lookup__row--active {
-    background: #dbeafe;
+    background: #1e3a8a !important;
 }
 
 .erp-pagar-page .erp-cliente-filter-lookup__row--active td {
-    color: #0f3460;
+    color: #fff !important;
+    font-weight: 800;
 }
 
 .erp-pagar-page .erp-pagar__locate-group {

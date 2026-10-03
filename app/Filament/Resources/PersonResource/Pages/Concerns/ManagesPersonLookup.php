@@ -28,7 +28,11 @@ trait ManagesPersonLookup
             $this->data['cpf_cnpj'] = $this->form->getState()['cpf_cnpj'] ?? null;
         }
 
-        if (($this->data['pessoa_tipo'] ?? null) !== Person::PESSOA_JURIDICA) {
+        $cnpj = preg_replace('/\D/', '', (string) ($this->data['cpf_cnpj'] ?? ''));
+
+        if (strlen($cnpj) === 14) {
+            $this->data['pessoa_tipo'] = Person::PESSOA_JURIDICA;
+        } elseif (($this->data['pessoa_tipo'] ?? null) !== Person::PESSOA_JURIDICA) {
             Notification::make()
                 ->title('Selecione Pessoa Jurídica.')
                 ->warning()
@@ -36,8 +40,6 @@ trait ManagesPersonLookup
 
             return;
         }
-
-        $cnpj = preg_replace('/\D/', '', (string) ($this->data['cpf_cnpj'] ?? ''));
 
         if (strlen($cnpj) !== 14) {
             Notification::make()

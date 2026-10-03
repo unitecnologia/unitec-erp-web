@@ -1,6 +1,6 @@
 @if ($this->notaFornecedorDanfeModalOpen && $this->notaFornecedorDanfeId)
     <div
-        class="erp-lookup-modal erp-nfe-espelho-modal erp-nf-forn-danfe-modal"
+        class="erp-lookup-modal erp-nfe-espelho-modal erp-nf-forn-danfe-modal is-visible"
         wire:keydown.escape.window="closeNotaFornecedorDanfe"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeNotaFornecedorDanfe"></div>

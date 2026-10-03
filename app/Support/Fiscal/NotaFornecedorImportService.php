@@ -21,8 +21,12 @@ final class NotaFornecedorImportService
         }
 
         $existente = NotaFornecedor::query()
-            ->where('empresa_id', $empresa->id)
             ->where('chave', $documento->chave)
+            ->where(function ($query) use ($empresa): void {
+                $query->where('empresa_id', $empresa->id)
+                    ->orWhereNull('empresa_id');
+            })
+            ->orderByRaw('empresa_id IS NULL')
             ->first();
 
         $dataEntrada = $documento->dataRecebimento
@@ -43,25 +47,25 @@ final class NotaFornecedorImportService
         ];
 
         if ($existente) {
+            $payload['xml'] = $this->preservarXmlCompleto($existente->xml, $payload['xml']);
+
             if ($existente->status === NotaFornecedor::STATUS_GEROU_COMPRAS) {
-                $existente->update([
+                $updateGerou = [
                     'nsu' => $payload['nsu'] ?? $existente->nsu,
                     'total' => $payload['total'],
-                    'xml' => $payload['xml'] ?? $existente->xml,
-                ]);
-
-                $nota = $existente->fresh() ?? $existente;
-                $this->syncItens($nota);
-                $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
-
-                return ['nota' => $nota, 'criada' => false];
+                    'xml' => $payload['xml'],
+                ];
+                if ($existente->empresa_id === null) {
+                    $updateGerou['empresa_id'] = $empresa->id;
+                }
+                $existente->update($updateGerou);
+            } else {
+                $existente->update($payload);
             }
-
-            $existente->update($payload);
 
             $nota = $existente->fresh() ?? $existente;
             $this->syncItens($nota);
-            $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
+            $this->dispararPortalContador($nota, $empresa, (string) ($nota->xml ?? ''), $syncImmediate);
 
             return ['nota' => $nota, 'criada' => false];
         }
@@ -75,6 +79,28 @@ final class NotaFornecedorImportService
         $this->dispararPortalContador($nota, $empresa, $documento->xml, $syncImmediate);
 
         return ['nota' => $nota, 'criada' => true];
+    }
+
+    public function preservarXmlCompleto(?string $atual, ?string $novo): ?string
+    {
+        if ($this->xmlTemItens($atual) && ! $this->xmlTemItens($novo)) {
+            return $atual;
+        }
+
+        if (filled($novo)) {
+            return $novo;
+        }
+
+        return $atual;
+    }
+
+    private function xmlTemItens(?string $xml): bool
+    {
+        if ($xml === null || $xml === '') {
+            return false;
+        }
+
+        return str_contains($xml, '<det') && (str_contains($xml, '<nfeProc') || str_contains($xml, '<infNFe'));
     }
 
     private function syncItens(NotaFornecedor $nota): void

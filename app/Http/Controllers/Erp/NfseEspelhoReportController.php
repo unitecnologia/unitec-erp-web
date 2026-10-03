@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Erp;
 
 use App\Models\Nfse;
 use App\Support\Erp\Nfse\NfseEspelhoReportService;
+use App\Support\Erp\Nfse\NfseImpressao;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,12 +36,14 @@ class NfseEspelhoReportController
 
         $filename = 'espelho-nfse-'.(preg_replace('/\D+/', '', (string) ($nfse->numero_dps ?: $nfse->id)) ?: (string) $nfse->id).'.pdf';
 
+        $view = (string) ($data['impressao_view'] ?? NfseImpressao::VIEW_NACIONAL);
+
         if ($request->boolean('pdf')) {
-            return Pdf::loadView('reports.nfse-impressao', $data)
+            return Pdf::loadView($view, $data)
                 ->setPaper('a4', 'portrait')
                 ->stream($filename);
         }
 
-        return view('reports.nfse-impressao', $data);
+        return view($view, $data);
     }
 }

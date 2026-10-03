@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
@@ -68,6 +69,8 @@ final class FinalizarCompraLancamentoService
         $empresaId = $compra->empresa_id ? (int) $compra->empresa_id : null;
         $estoqueId = $this->resolveEstoqueId($empresaId);
 
+        $lotesFinalizados = [];
+
         DB::transaction(function () use (
             $compra,
             $rows,
@@ -77,7 +80,18 @@ final class FinalizarCompraLancamentoService
             $estoqueId,
             $parcelasFinanceiro,
             $totalOverride,
+            &$lotesFinalizados,
         ): void {
+            $travada = Compra::query()->whereKey($compra->id)->lockForUpdate()->first();
+
+            if (! $travada || $travada->status !== Compra::STATUS_ABERTA) {
+                throw new DomainException(
+                    $travada && $travada->status === Compra::STATUS_CANCELADA
+                        ? 'Compra cancelada não pode ser finalizada.'
+                        : 'Esta compra já está fechada.',
+                );
+            }
+
             $this->sincronizarItensDoLancamento($compra, $rows);
             $compra->load('itens.product');
 
@@ -116,7 +130,9 @@ final class FinalizarCompraLancamentoService
             }
 
             if ($geraEstoque) {
-                foreach ($compra->itens as $item) {
+                $lotesService = new \App\Support\Erp\ProductLoteService();
+
+                foreach ($compra->itens->values() as $itemIndex => $item) {
                     if (! $item->product_id) {
                         continue;
                     }
@@ -141,9 +157,14 @@ final class FinalizarCompraLancamentoService
                             ),
                         );
 
+                        $linha = $this->linhaDoItem($rows, $item, $itemIndex);
+                        if (is_array($linha) && ! empty($linha['controla_lote_validade']) && ! $product->controla_lote_validade) {
+                            $product->forceFill(['controla_lote_validade' => true])->save();
+                            $product->refresh();
+                        }
+
                         if ($product->controla_lote_validade) {
-                            $lotes = $this->lotesDaLinha($rows, $item);
-                            $lotesService = new \App\Support\Erp\ProductLoteService();
+                            $lotes = $this->lotesDaLinha(is_array($linha) ? $linha : []);
                             try {
                                 $lotesService->validarLinhasEntrada((float) $item->quantidade, $lotes);
                                 $lotesService->entrar($product, $lotes);
@@ -154,6 +175,8 @@ final class FinalizarCompraLancamentoService
                     }
                 }
             }
+
+            $lotesFinalizados = $this->extrairLotesLancados($rows);
 
             foreach ($compra->itens as $item) {
                 if (! $item->product_id) {
@@ -190,6 +213,7 @@ final class FinalizarCompraLancamentoService
                     especialAnterior: $anterior['especial'],
                     custoAnterior: $anterior['custo'],
                     usuario: $usuario,
+                    compraId: (int) $compra->id,
                 );
             }
 
@@ -218,6 +242,7 @@ final class FinalizarCompraLancamentoService
                 'gera_estoque' => $geraEstoque,
                 'total' => (float) $compra->total,
                 'parcelas' => $parcelasFinanceiro !== null ? count($parcelasFinanceiro) : ($gerarFinanceiro ? 1 : 0),
+                'lotes' => $lotesFinalizados,
             ],
             empresaId: $empresaId,
         );
@@ -260,7 +285,11 @@ final class FinalizarCompraLancamentoService
                 'compra_id' => (int) $compra->id,
             ], $parcelasFinanceiro);
 
-            $this->baixarParcelasDinheiro($contas, $parcelasFinanceiro, $emissao);
+            $this->baixarParcelasDinheiro(
+                $contas,
+                $parcelasFinanceiro,
+                ErpTimezone::toLocal()->toDateString(),
+            );
 
             return;
         }
@@ -289,7 +318,8 @@ final class FinalizarCompraLancamentoService
     }
 
     /**
-     * Parcelas em dinheiro: baixa imediata + saída no subcaixa informado.
+     * Dinheiro e PIX: baixa imediata + saída no subcaixa informado.
+     * Boleto e demais formas a prazo permanecem em aberto.
      *
      * @param  list<\App\Models\ContaPagar>  $contas
      * @param  list<array{forma_pagamento_id?: int|null, caixa_conta_id?: int|null}>  $parcelasFinanceiro
@@ -308,13 +338,14 @@ final class FinalizarCompraLancamentoService
             }
 
             $forma = FormaPagamento::query()->whereKey($formaId)->where('ativo', true)->first();
-            if (! $forma || mb_strtolower(trim((string) $forma->tipo), 'UTF-8') !== 'dinheiro') {
+            $tipo = mb_strtolower(trim((string) ($forma->tipo ?? '')), 'UTF-8');
+            if (! $forma || ! in_array($tipo, ['dinheiro', 'pix'], true)) {
                 continue;
             }
 
             $caixaId = (int) ($parcela['caixa_conta_id'] ?? 0);
             if ($caixaId <= 0) {
-                throw new DomainException('Parcela em dinheiro sem subcaixa informado.');
+                throw new DomainException('Parcela em dinheiro ou PIX sem subcaixa informado.');
             }
 
             $caixaOk = CaixaConta::query()
@@ -324,7 +355,7 @@ final class FinalizarCompraLancamentoService
                 ->exists();
 
             if (! $caixaOk) {
-                throw new DomainException('Subcaixa inválido na parcela em dinheiro.');
+                throw new DomainException('Subcaixa inválido na parcela em dinheiro ou PIX.');
             }
 
             $this->contasPagarBaixa->baixarUma((int) $conta->id, $formaId, [
@@ -344,8 +375,10 @@ final class FinalizarCompraLancamentoService
         $itens = $compra->itens->values();
 
         foreach ($rows as $index => $row) {
-            $item = $itens->firstWhere('product_id', (int) ($row['product_id'] ?? 0))
-                ?? $itens->get($index);
+            $itemId = (int) ($row['compra_item_id'] ?? 0);
+            $item = $itemId > 0
+                ? $itens->firstWhere('id', $itemId)
+                : $itens->get($index);
 
             if (! $item) {
                 continue;
@@ -441,37 +474,86 @@ final class FinalizarCompraLancamentoService
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return array<string, mixed>|null
+     */
+    private function linhaDoItem(array $rows, mixed $item, int $itemIndex): ?array
+    {
+        $itemId = (int) ($item->id ?? 0);
+
+        if ($itemId > 0) {
+            foreach ($rows as $row) {
+                if (is_array($row) && (int) ($row['compra_item_id'] ?? 0) === $itemId) {
+                    return $row;
+                }
+            }
+        }
+
+        $porIndice = $rows[$itemIndex] ?? null;
+
+        if (is_array($porIndice) && (int) ($porIndice['compra_item_id'] ?? 0) <= 0) {
+            return $porIndice;
+        }
+
+        return is_array($porIndice) && $itemId <= 0 ? $porIndice : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $linha
      * @return list<array{lote: string, data_validade: string, quantidade: float|string}>
      */
-    private function lotesDaLinha(array $rows, mixed $item): array
+    private function lotesDaLinha(array $linha): array
     {
-        $productId = (int) ($item->product_id ?? 0);
+        $lotes = $linha['lotes'] ?? null;
 
-        foreach ($rows as $row) {
-            if ((int) ($row['product_id'] ?? 0) !== $productId) {
+        if (! is_array($lotes)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($lotes as $lote) {
+            if (! is_array($lote)) {
                 continue;
             }
 
-            $lotes = $row['lotes'] ?? null;
-            if (! is_array($lotes)) {
-                return [];
-            }
-
-            $out = [];
-            foreach ($lotes as $lote) {
-                if (! is_array($lote)) {
-                    continue;
-                }
-                $out[] = [
-                    'lote' => (string) ($lote['lote'] ?? ''),
-                    'data_validade' => (string) ($lote['data_validade'] ?? ''),
-                    'quantidade' => $lote['quantidade'] ?? 0,
-                ];
-            }
-
-            return $out;
+            $out[] = [
+                'lote' => (string) ($lote['lote'] ?? ''),
+                'data_validade' => (string) ($lote['data_validade'] ?? ''),
+                'quantidade' => $lote['quantidade'] ?? 0,
+            ];
         }
 
-        return [];
+        return $out;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{compra_item_id: int, product_id: int, lote: string, data_validade: string, quantidade: mixed}>
+     */
+    private function extrairLotesLancados(array $rows): array
+    {
+        $out = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            foreach ($this->lotesDaLinha($row) as $lote) {
+                if (trim($lote['lote']) === '' && trim($lote['data_validade']) === '') {
+                    continue;
+                }
+
+                $out[] = [
+                    'compra_item_id' => (int) ($row['compra_item_id'] ?? 0),
+                    'product_id' => (int) ($row['product_id'] ?? 0),
+                    'lote' => $lote['lote'],
+                    'data_validade' => $lote['data_validade'],
+                    'quantidade' => $lote['quantidade'],
+                ];
+            }
+        }
+
+        return $out;
     }
 }

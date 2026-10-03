@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Erp;
 
 use App\Models\Nfse;
-use App\Support\Erp\Nfse\NfseDanfseViewData;
+use App\Support\Erp\Nfse\NfseImpressao;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,20 +24,22 @@ class NfseImpressaoReportController
         }
 
         $embedded = $request->boolean('embed');
-        $data = NfseDanfseViewData::for(
+        $data = NfseImpressao::dados(
             $nfse,
             autoPrint: $request->boolean('auto'),
             embedded: $embedded || $request->boolean('pdf'),
         );
+        $view = (string) ($data['impressao_view'] ?? NfseImpressao::VIEW_NACIONAL);
 
         if ($request->boolean('pdf')) {
             $numero = preg_replace('/\D+/', '', (string) ($nfse->numero_nfse ?: $nfse->numero_dps)) ?: (string) $nfse->id;
+            $nome = ($view === NfseImpressao::VIEW_IPM ? 'NFSe-' : 'DANFSe-').$numero.'.pdf';
 
-            return Pdf::loadView('reports.nfse-impressao', $data)
+            return Pdf::loadView($view, $data)
                 ->setPaper('a4', 'portrait')
-                ->download('DANFSe-'.$numero.'.pdf');
+                ->download($nome);
         }
 
-        return view('reports.nfse-impressao', $data);
+        return view($view, $data);
     }
 }

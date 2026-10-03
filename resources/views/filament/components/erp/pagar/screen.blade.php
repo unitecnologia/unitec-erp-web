@@ -63,16 +63,26 @@
                 @foreach ($activeFields as $fieldKey)
                     @continue(in_array($fieldKey, $dateFields, true))
                     @if ($fieldKey === 'fornecedor')
-                        <span class="erp-pagar__locate-search-field erp-pagar__locate-search-field--fornecedor">
+                        <span
+                            class="erp-pagar__locate-search-field erp-pagar__locate-search-field--fornecedor"
+                            x-data="{
+                                hideFornecedorLookup() {
+                                    this.$root.querySelectorAll('.erp-cliente-filter-lookup').forEach((el) => {
+                                        el.style.display = 'none';
+                                    });
+                                }
+                            }"
+                        >
                             <input
                                 type="text"
-                                wire:model.live.debounce.250ms="localSearchByField.fornecedor"
+                                wire:model.live.debounce.150ms="localSearchByField.fornecedor"
                                 wire:key="pagar-local-search-fornecedor"
                                 wire:focus="openLocalFornecedorLookup"
                                 wire:keydown.arrow-up.prevent="moveLocalFornecedorSelection(-1)"
                                 wire:keydown.arrow-down.prevent="moveLocalFornecedorSelection(1)"
-                                wire:keydown.enter.prevent="handleLocalFornecedorEnter"
-                                wire:keydown.escape.prevent="closeLocalFornecedorLookup"
+                                x-on:keydown.enter.prevent="hideFornecedorLookup(); $wire.handleLocalFornecedorEnter()"
+                                x-on:keydown.escape.prevent="hideFornecedorLookup(); $wire.closeLocalFornecedorLookup()"
+                                x-on:input="if (String($event.target.value || '').trim() === '') { hideFornecedorLookup(); $wire.closeLocalFornecedorLookup() }"
                                 class="erp-pagar__input erp-pagar__search-text erp-pagar__search-text--fornecedor"
                                 placeholder="{{ $placeholders['fornecedor'] }}"
                                 autocomplete="off"

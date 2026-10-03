@@ -22,6 +22,7 @@ use App\Http\Controllers\Erp\DeviceServiceEnsureController;
 use App\Http\Controllers\Erp\MonitorPedidosReportController;
 use App\Http\Controllers\Erp\OrcamentoReportController;
 use App\Http\Controllers\Erp\OrdemServicoReportController;
+use App\Http\Controllers\Erp\OsVeiculoHistoricoReportController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloEscPosPrintController;
 use App\Http\Controllers\Erp\NfceCancelamentoProtocoloReportController;
 use App\Http\Controllers\Erp\NfceCupomReportController;
@@ -175,6 +176,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/ordem-servico/{ordem}', OrdemServicoReportController::class)
         ->middleware('erp.permission:ordens_servico.print')
         ->name('erp.reports.ordem-servico');
+    Route::get('/admin/reports/os-veiculo-historico/{veiculo}', OsVeiculoHistoricoReportController::class)
+        ->middleware('erp.permission:ordens_servico.access')
+        ->name('erp.reports.os-veiculo-historico');
     Route::get('/admin/reports/expedicao-separacao', ExpedicaoSeparacaoReportController::class)
         ->middleware('erp.permission:logistica.print')
         ->name('erp.reports.expedicao-separacao');

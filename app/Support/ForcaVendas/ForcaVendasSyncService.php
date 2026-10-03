@@ -68,6 +68,8 @@ class ForcaVendasSyncService
                 'empresa_id' => $empresaId,
                 'ver_todos_clientes' => $verTodosClientes,
                 'desconto_reais_item_modo' => $this->descontoReaisItemModo($empresaId),
+                'imp_valor_liquido' => $this->impressaoPedidoValorLiquido($empresaId),
+                'imp_sem_coluna_desconto' => $this->impressaoPedidoSemColunaDesconto($empresaId),
             ],
             'products' => $this->products($since, $vendedorId),
             'price_tables' => $this->priceTables($since),
@@ -153,6 +155,8 @@ class ForcaVendasSyncService
 
         $parts[] = 'pix_api:'.(int) app(PixProviderManager::class)->apiHabilitadaParaEmpresa($empresaId);
         $parts[] = 'desc_reais_item:'.$this->descontoReaisItemModo($empresaId);
+        $parts[] = 'imp_valor_liquido:'.(int) $this->impressaoPedidoValorLiquido($empresaId);
+        $parts[] = 'imp_sem_coluna_desconto:'.(int) $this->impressaoPedidoSemColunaDesconto($empresaId);
 
         return sha1(implode('|', $parts));
     }
@@ -1472,6 +1476,32 @@ class ForcaVendasSyncService
         return EmpresaParametros::normalizarDescontoReaisItemModo(
             Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_desconto_reais_item_modo'),
         );
+    }
+
+    public function impressaoPedidoValorLiquido(?int $empresaId): bool
+    {
+        if ($empresaId === null || $empresaId <= 0) {
+            return false;
+        }
+
+        if (! Schema::hasColumn('empresas', 'param_monitor_vendas_imp_valor_liquido')) {
+            return false;
+        }
+
+        return (bool) Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_imp_valor_liquido');
+    }
+
+    public function impressaoPedidoSemColunaDesconto(?int $empresaId): bool
+    {
+        if ($empresaId === null || $empresaId <= 0) {
+            return true;
+        }
+
+        if (! Schema::hasColumn('empresas', 'param_monitor_vendas_imp_sem_coluna_desconto')) {
+            return true;
+        }
+
+        return (bool) Empresa::query()->whereKey($empresaId)->value('param_monitor_vendas_imp_sem_coluna_desconto');
     }
 
     /**

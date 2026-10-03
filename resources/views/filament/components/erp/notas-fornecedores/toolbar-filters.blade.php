@@ -1,18 +1,42 @@
 @php
-    use Illuminate\Support\Carbon;
-
     $isPeriodoEntrada = $this->searchColumn === 'periodo_entrada';
     $isDateSearch = $this->searchColumn === 'data_emissao';
 
-    $periodoDeIso = filled($this->periodoDe) ? $this->periodoDe : '';
-    $periodoAteIso = filled($this->periodoAte) ? $this->periodoAte : '';
-    $periodoDeValor = filled($periodoDeIso) ? Carbon::parse($periodoDeIso)->format('d/m/Y') : '';
-    $periodoAteValor = filled($periodoAteIso) ? Carbon::parse($periodoAteIso)->format('d/m/Y') : '';
+    $dataFiltro = static function (?string $value): array {
+        $value = trim((string) $value);
 
-    $emissaoDeIso = filled($this->localSearchDe) ? $this->localSearchDe : '';
-    $emissaoAteIso = filled($this->localSearchAte) ? $this->localSearchAte : '';
-    $emissaoDeValor = filled($emissaoDeIso) ? Carbon::parse($emissaoDeIso)->format('d/m/Y') : '';
-    $emissaoAteValor = filled($emissaoAteIso) ? Carbon::parse($emissaoAteIso)->format('d/m/Y') : '';
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches) === 1
+            && checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1])) {
+            return [
+                'iso' => $value,
+                'br' => sprintf('%02d/%02d/%04d', (int) $matches[3], (int) $matches[2], (int) $matches[1]),
+            ];
+        }
+
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $matches) === 1
+            && checkdate((int) $matches[2], (int) $matches[1], (int) $matches[3])) {
+            return [
+                'iso' => sprintf('%04d-%02d-%02d', (int) $matches[3], (int) $matches[2], (int) $matches[1]),
+                'br' => sprintf('%02d/%02d/%04d', (int) $matches[1], (int) $matches[2], (int) $matches[3]),
+            ];
+        }
+
+        return ['iso' => '', 'br' => ''];
+    };
+
+    $periodoDeData = $dataFiltro($this->periodoDe);
+    $periodoAteData = $dataFiltro($this->periodoAte);
+    $emissaoDeData = $dataFiltro($this->localSearchDe);
+    $emissaoAteData = $dataFiltro($this->localSearchAte);
+
+    $periodoDeIso = $periodoDeData['iso'];
+    $periodoAteIso = $periodoAteData['iso'];
+    $periodoDeValor = $periodoDeData['br'];
+    $periodoAteValor = $periodoAteData['br'];
+    $emissaoDeIso = $emissaoDeData['iso'];
+    $emissaoAteIso = $emissaoAteData['iso'];
+    $emissaoDeValor = $emissaoDeData['br'];
+    $emissaoAteValor = $emissaoAteData['br'];
 @endphp
 
 <div class="erp-nfe__locate erp-nfe__filtro-unificado">

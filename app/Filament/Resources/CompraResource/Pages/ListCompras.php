@@ -132,6 +132,8 @@ class ListCompras extends ListRecords
 
     public bool $lancamentoParamGeraEstoque = true;
 
+    public bool $lancamentoFinalizando = false;
+
     public bool $lancamentoLotesModalOpen = false;
 
     public ?int $lancamentoLotesRowIndex = null;
@@ -171,6 +173,13 @@ class ListCompras extends ListRecords
     public array $lancamentoParcelasRows = [];
 
     public ?int $lancamentoParcelasSelectedIndex = null;
+
+    public ?int $lancamentoParcelasErroIndex = null;
+
+    public string $lancamentoParcelasErroCampo = '';
+
+    /** @var array<int, true>|null */
+    protected ?array $lancamentoFormasCaixaMapa = null;
 
     /** Remonta a grade do lançamento (após aplicar margem em lote, etc.). */
     public int $lancamentoGridEpoch = 0;
@@ -496,6 +505,7 @@ class ListCompras extends ListRecords
         $this->lancamentoParamAjustaPreco = true;
         $this->lancamentoParamGerarFinanceiro = true;
         $this->lancamentoParamGeraEstoque = true;
+        $this->lancamentoFinalizando = false;
         $this->lancamentoModalItemIndex = 0;
         $this->lancamentoGridEpoch++;
         $this->aplicarRateioExtrasNoVlCusto();
@@ -1448,6 +1458,11 @@ class ListCompras extends ListRecords
             }
 
             $this->sincronizarMargemDaLinha($index, $col);
+
+            if ($col === 'venda') {
+                $this->reaplicarPrecoPelaMargemAtual($index, 'atacado', $parsed);
+                $this->reaplicarPrecoPelaMargemAtual($index, 'especial', $parsed);
+            }
         }
 
         $focusIndex = isset($this->lancamentoModalRows[$nextIndex]) ? $nextIndex : $index;
@@ -1524,8 +1539,8 @@ class ListCompras extends ListRecords
         if ($field === 'preco_venda') {
             $this->lancamentoModalRows[$index]['preco_venda_base'] = number_format($parsed, 2, '.', '');
             $this->sincronizarMargemDaLinha($index, 'venda');
-            $this->sincronizarMargemDaLinha($index, 'atacado');
-            $this->sincronizarMargemDaLinha($index, 'especial');
+            $this->reaplicarPrecoPelaMargemAtual($index, 'atacado', $parsed);
+            $this->reaplicarPrecoPelaMargemAtual($index, 'especial', $parsed);
         } else {
             $col = match ($field) {
                 'preco_atacado' => 'atacado',
@@ -1575,10 +1590,32 @@ class ListCompras extends ListRecords
 
         if ($nivel === 'varejo') {
             $this->lancamentoModalRows[$index]['preco_venda_base'] = number_format($preco, 2, '.', '');
-            // Atacado/Especial passam a medir % sobre o novo varejo
-            $this->sincronizarMargemDaLinha($index, 'atacado');
-            $this->sincronizarMargemDaLinha($index, 'especial');
+            $this->reaplicarPrecoPelaMargemAtual($index, 'atacado', $preco);
+            $this->reaplicarPrecoPelaMargemAtual($index, 'especial', $preco);
         }
+    }
+
+    /**
+     * Mantém a Mg% já aplicada e recalcula o preço sobre o varejo novo.
+     * Preço ainda zerado permanece zerado.
+     */
+    protected function reaplicarPrecoPelaMargemAtual(int $index, string $nivel, float $varejo): void
+    {
+        if (! isset($this->lancamentoModalRows[$index]) || $varejo <= 0) {
+            return;
+        }
+
+        $campoPreco = $nivel === 'atacado' ? 'preco_atacado' : 'preco_especial';
+        $campoMargem = $nivel === 'atacado' ? 'margem_atacado' : 'margem_especial';
+        $atual = BrDecimal::parse($this->lancamentoModalRows[$index][$campoPreco] ?? 0, 2);
+
+        if ($atual <= 0) {
+            return;
+        }
+
+        $pct = BrDecimal::parse($this->lancamentoModalRows[$index][$campoMargem] ?? 0, 2);
+        $novo = round($varejo * (1 + ($pct / 100)), 2);
+        $this->lancamentoModalRows[$index][$campoPreco] = number_format($novo, 2, ',', '.');
     }
 
     /** Base da margem: Varejo = V. Custo; Atacado/Especial = Varejo (nunca custo). */
@@ -1681,6 +1718,7 @@ class ListCompras extends ListRecords
         $this->lancamentoParamGerarFinanceiro = true;
         $this->lancamentoParamGeraEstoque = true;
         $this->lancamentoModalItemIndex = 0;
+        $this->lancamentoFinalizando = false;
         $this->lancamentoSkipQtdBlur = false;
         $this->lancamentoSkipTotaisBlur = false;
         $this->lancamentoSkipPrecoBlur = false;
@@ -1696,6 +1734,8 @@ class ListCompras extends ListRecords
         $this->lancamentoParcelasTotal = '0,00';
         $this->lancamentoParcelasQtd = '1';
         $this->lancamentoParcelasIntervalo = '30';
+        $this->lancamentoParcelasErroIndex = null;
+        $this->lancamentoParcelasErroCampo = '';
     }
 
     /**
@@ -1819,7 +1859,18 @@ class ListCompras extends ListRecords
         $freshRows = array_values($estadoAtual['rows']);
         $draftRows = array_values($draft['rows']);
         $this->lancamentoModalRows = $this->mergeLotesFrescosNoDraftRows($draftRows, $freshRows);
+        $totaisFrescos = $this->lancamentoModalTotais;
         $this->lancamentoModalTotais = is_array($draft['totais'] ?? null) ? $draft['totais'] : $this->lancamentoModalTotais;
+
+        foreach (['frete_xml', 'seguro_xml', 'outras_xml', 'total_xml'] as $chaveXml) {
+            if (! array_key_exists($chaveXml, $this->lancamentoModalTotais) && array_key_exists($chaveXml, $totaisFrescos)) {
+                $this->lancamentoModalTotais[$chaveXml] = $totaisFrescos[$chaveXml];
+            }
+        }
+
+        if (array_key_exists('total_xml', $this->lancamentoModalTotais)) {
+            $this->recalcularTotalLancamentoAposExtras();
+        }
 
         $params = is_array($draft['params'] ?? null) ? $draft['params'] : [];
         $this->lancamentoParamAjustaPreco = (bool) ($params['ajusta_preco'] ?? true);
@@ -1873,6 +1924,10 @@ class ListCompras extends ListRecords
         foreach ($draftRows as $i => $row) {
             if (! is_array($row)) {
                 continue;
+            }
+
+            if ((int) ($row['compra_item_id'] ?? 0) <= 0 && isset($freshRows[$i]['compra_item_id'])) {
+                $draftRows[$i]['compra_item_id'] = $freshRows[$i]['compra_item_id'];
             }
 
             if ($this->lancamentoRowLotesTemConteudo($row['lotes'] ?? null)) {
@@ -2098,30 +2153,29 @@ class ListCompras extends ListRecords
 
     public function abrirLancamentoParcelasModal(): void
     {
-        $total = BrDecimal::parse($this->lancamentoModalTotais['total'] ?? 0, 2);
-        if ($total <= 0 && $this->lancamentoModalCompraId) {
-            $compra = $this->scopedCompraQuery()->find($this->lancamentoModalCompraId);
-            $total = (float) ($compra?->total ?? 0);
+        $fromXml = $this->parcelasFinanceiroDoXmlCompra();
+        $somaXml = 0.0;
+        foreach ($fromXml as $row) {
+            $somaXml += BrDecimal::parse($row['valor'] ?? 0, 2);
         }
 
-        $totalFmt = number_format(max(0, $total), 2, ',', '.');
-        $this->lancamentoParcelasSubtotal = $totalFmt;
+        $subtotal = $this->resolverSubtotalLancamentoParcelas();
+        if ($subtotal <= 0 && $somaXml > 0) {
+            $subtotal = round($somaXml, 2);
+        }
+
+        $this->lancamentoParcelasSubtotal = number_format($subtotal, 2, ',', '.');
         $this->lancamentoParcelasEntrada = '0,00';
-        $this->lancamentoParcelasTotal = $totalFmt;
+        $this->sincronizarBasesLancamentoParcelas();
         $this->lancamentoParcelasQtd = '1';
         $this->lancamentoParcelasIntervalo = '30';
         $this->lancamentoParcelasSelectedIndex = null;
         $this->lancamentoParcelasRows = [];
+        $this->limparErroLancamentoParcela();
 
-        $fromXml = $this->parcelasFinanceiroDoXmlCompra();
         if ($fromXml !== []) {
             $this->lancamentoParcelasRows = $fromXml;
             $this->lancamentoParcelasQtd = (string) count($fromXml);
-            $somaXml = 0.0;
-            foreach ($fromXml as $row) {
-                $somaXml += BrDecimal::parse($row['valor'] ?? 0, 2);
-            }
-            $this->lancamentoParcelasTotal = number_format(round($somaXml, 2), 2, ',', '.');
             $this->lancamentoParcelasSelectedIndex = 0;
         } else {
             $this->gerarLancamentoParcelas();
@@ -2135,21 +2189,27 @@ class ListCompras extends ListRecords
         $this->lancamentoParcelasOpen = false;
         $this->lancamentoParcelasRows = [];
         $this->lancamentoParcelasSelectedIndex = null;
+        $this->limparErroLancamentoParcela();
     }
 
-    public function gerarLancamentoParcelas(): void
+    public function updatedLancamentoParcelasSubtotal(): void
     {
-        $subtotal = BrDecimal::parse($this->lancamentoParcelasSubtotal, 2);
-        $entrada = BrDecimal::parse($this->lancamentoParcelasEntrada, 2);
-        if ($entrada < 0) {
-            $entrada = 0.0;
-        }
-        if ($entrada > $subtotal) {
-            $entrada = $subtotal;
-        }
+        $this->sincronizarBasesLancamentoParcelas();
+    }
 
-        $financiado = round(max(0, $subtotal - $entrada), 2);
-        $this->lancamentoParcelasTotal = number_format(round($subtotal, 2), 2, ',', '.');
+    public function updatedLancamentoParcelasEntrada(): void
+    {
+        $this->sincronizarBasesLancamentoParcelas();
+    }
+
+    public function gerarLancamentoParcelas(?array $tela = null): void
+    {
+        $this->aplicarTelaParcelas($tela);
+        $this->limparErroLancamentoParcela();
+        $this->sincronizarBasesLancamentoParcelas();
+
+        $entrada = BrDecimal::parse($this->lancamentoParcelasEntrada, 2);
+        $financiado = BrDecimal::parse($this->lancamentoParcelasTotal, 2);
 
         $qtd = max(1, min(120, (int) preg_replace('/\D/', '', $this->lancamentoParcelasQtd) ?: 1));
         $intervalo = max(0, min(3650, (int) preg_replace('/\D/', '', $this->lancamentoParcelasIntervalo) ?: 0));
@@ -2170,27 +2230,43 @@ class ListCompras extends ListRecords
             ];
         }
 
-        if ($financiado > 0 || $rows === []) {
-            $centavos = (int) round(($financiado > 0 ? $financiado : $subtotal) * 100);
+        if ($financiado > 0) {
+            $centavos = (int) round($financiado * 100);
             $base = $qtd > 0 ? intdiv($centavos, $qtd) : 0;
-            $resto = $qtd > 0 ? $centavos % $qtd : 0;
+            $acumulado = 0;
 
+            $partes = [];
             for ($i = 0; $i < $qtd; $i++) {
-                $valor = round(($base + ($i < $resto ? 1 : 0)) / 100, 2);
-                if ($valor <= 0) {
+                if ($i === $qtd - 1) {
+                    $parte = $centavos - $acumulado;
+                } else {
+                    $parte = $base;
+                    $acumulado += $parte;
+                }
+
+                if ($parte <= 0) {
                     continue;
                 }
 
+                $partes[] = [
+                    'centavos' => $parte,
+                    'ordem' => $i,
+                ];
+            }
+
+            $emitidas = count($partes);
+            foreach ($partes as $n => $parte) {
+                $i = $parte['ordem'];
                 $venc = $intervalo === 0
                     ? $baseDate->copy()
                     : $baseDate->copy()->addDays($intervalo * ($i + 1));
 
                 $rows[] = [
-                    'documento' => ($i + 1).'/'.$qtd,
+                    'documento' => ($n + 1).'/'.$emitidas,
                     'vencimento' => $venc->format('d/m/Y'),
                     'forma_pagamento_id' => '',
                     'caixa_conta_id' => '',
-                    'valor' => number_format($valor, 2, ',', '.'),
+                    'valor' => number_format($parte['centavos'] / 100, 2, ',', '.'),
                 ];
             }
         }
@@ -2208,8 +2284,9 @@ class ListCompras extends ListRecords
         $this->lancamentoParcelasSelectedIndex = $index;
     }
 
-    public function excluirLancamentoParcelaSelecionada(): void
+    public function excluirLancamentoParcelaSelecionada(?array $tela = null): void
     {
+        $this->aplicarTelaParcelas($tela);
         $index = $this->lancamentoParcelasSelectedIndex;
         if ($index === null || ! isset($this->lancamentoParcelasRows[$index])) {
             return;
@@ -2254,6 +2331,11 @@ class ListCompras extends ListRecords
             $formaId = (int) ($this->lancamentoParcelasRows[$index]['forma_pagamento_id'] ?? 0);
             if (! $this->lancamentoParcelaExigeSubcaixa($formaId)) {
                 $this->lancamentoParcelasRows[$index]['caixa_conta_id'] = '';
+            } elseif ((int) ($this->lancamentoParcelasRows[$index]['caixa_conta_id'] ?? 0) <= 0) {
+                $padrao = $this->lancamentoParcelasCaixaPadraoId($formaId);
+                if ($padrao) {
+                    $this->lancamentoParcelasRows[$index]['caixa_conta_id'] = (string) $padrao;
+                }
             }
 
             return;
@@ -2267,13 +2349,22 @@ class ListCompras extends ListRecords
     protected function recalcularSaldoLancamentoParcelas(int $alteradaIndex): void
     {
         $rows = $this->lancamentoParcelasRows;
-        $indicesAjustaveis = array_keys($rows);
+        if (! isset($rows[$alteradaIndex]) || $this->lancamentoParcelaEhEntrada($rows[$alteradaIndex])) {
+            return;
+        }
+
+        $indicesAjustaveis = [];
+        foreach ($rows as $index => $row) {
+            if (! $this->lancamentoParcelaEhEntrada($row)) {
+                $indicesAjustaveis[] = $index;
+            }
+        }
 
         if (count($indicesAjustaveis) < 2) {
             return;
         }
 
-        $indiceSaldo = end($indicesAjustaveis);
+        $indiceSaldo = $indicesAjustaveis[array_key_last($indicesAjustaveis)];
         if ($indiceSaldo === $alteradaIndex) {
             $indiceSaldo = $indicesAjustaveis[count($indicesAjustaveis) - 2];
         }
@@ -2283,12 +2374,12 @@ class ListCompras extends ListRecords
         $rows[$alteradaIndex]['valor'] = number_format(max(0, $valorAlterado), 2, ',', '.');
         $somaSemSaldo = 0.0;
 
-        foreach ($rows as $index => $row) {
+        foreach ($indicesAjustaveis as $index) {
             if ($index === $indiceSaldo) {
                 continue;
             }
 
-            $somaSemSaldo += BrDecimal::parse($row['valor'] ?? 0, 2);
+            $somaSemSaldo += BrDecimal::parse($rows[$index]['valor'] ?? 0, 2);
         }
 
         $saldo = round(max(0, $total - $somaSemSaldo), 2);
@@ -2296,8 +2387,16 @@ class ListCompras extends ListRecords
         $this->lancamentoParcelasRows = $rows;
     }
 
-    public function concluirLancamentoParcelas(): void
+    public function concluirLancamentoParcelas(?array $tela = null): void
     {
+        if ($this->lancamentoFinalizando) {
+            return;
+        }
+
+        $this->aplicarTelaParcelas($tela);
+        $this->limparErroLancamentoParcela();
+        $this->sincronizarBasesLancamentoParcelas();
+
         if ($this->lancamentoParcelasRows === []) {
             Notification::make()
                 ->title('Gere as parcelas')
@@ -2308,44 +2407,98 @@ class ListCompras extends ListRecords
             return;
         }
 
-        $esperado = BrDecimal::parse($this->lancamentoParcelasTotal, 2);
-        $soma = 0.0;
         foreach ($this->lancamentoParcelasRows as $i => $row) {
-            $soma += BrDecimal::parse($row['valor'] ?? 0, 2);
-            $formaId = (int) ($row['forma_pagamento_id'] ?? 0);
+            $linha = $this->rotuloLancamentoParcela($row, $i);
+            $vencimento = trim((string) ($row['vencimento'] ?? ''));
 
-            if ($formaId <= 0) {
-                Notification::make()
-                    ->title('Meio de pagamento obrigatório')
-                    ->body('Informe o meio de pagamento na parcela '.($i + 1).'.')
-                    ->warning()
-                    ->send();
+            if (! $this->lancamentoParcelaVencimentoValido($vencimento)) {
+                $this->recusarLancamentoParcela(
+                    $i,
+                    'vencimento',
+                    'Vencimento obrigatório',
+                    'Informe o vencimento da '.$linha.' no formato dd/mm/aaaa.',
+                );
 
                 return;
             }
 
-            if ($this->lancamentoParcelaExigeSubcaixa($formaId)) {
-                $caixaId = (int) ($row['caixa_conta_id'] ?? 0);
-                if ($caixaId <= 0) {
-                    Notification::make()
-                        ->title('Subcaixa obrigatória')
-                        ->body('Selecione o subcaixa de onde sai o dinheiro na parcela '.($i + 1).'.')
-                        ->warning()
-                        ->send();
+            if (BrDecimal::parse($row['valor'] ?? 0, 2) <= 0) {
+                $this->recusarLancamentoParcela(
+                    $i,
+                    'valor',
+                    'Valor inválido',
+                    'A '.$linha.' precisa ter valor maior que zero.',
+                );
 
-                    return;
-                }
+                return;
+            }
+
+            $formaId = (int) ($row['forma_pagamento_id'] ?? 0);
+
+            if ($formaId <= 0) {
+                $this->recusarLancamentoParcela(
+                    $i,
+                    'forma',
+                    'Meio de pagamento obrigatório',
+                    'Informe o meio de pagamento da '.$linha.'.',
+                );
+
+                return;
+            }
+
+            if ($this->lancamentoParcelaExigeSubcaixa($formaId) && (int) ($row['caixa_conta_id'] ?? 0) <= 0) {
+                $this->recusarLancamentoParcela(
+                    $i,
+                    'caixa',
+                    'Subcaixa obrigatória',
+                    'Selecione o subcaixa de onde sai o dinheiro na '.$linha.'.',
+                );
+
+                return;
             }
         }
-        $soma = round($soma, 2);
 
-        if (abs($soma - $esperado) > 0.05) {
+        $esperado = round(BrDecimal::parse($this->lancamentoParcelasTotal, 2), 2);
+        $somaParcelado = round($this->somarParcelasLancamento(false), 2);
+
+        if (abs($somaParcelado - $esperado) > 0.009) {
+            $indice = $this->indiceUltimaParcelaLancamento();
+            $this->recusarLancamentoParcela(
+                $indice ?? 0,
+                'valor',
+                'Total das parcelas divergente',
+                'A soma do saldo parcelado ('.number_format($somaParcelado, 2, ',', '.')
+                    .') difere do Total ('.number_format($esperado, 2, ',', '.')
+                    .'). Use Gerar para recalcular.',
+            );
+
+            return;
+        }
+
+        $entrada = round(BrDecimal::parse($this->lancamentoParcelasEntrada, 2), 2);
+        $somaEntrada = round($this->somarParcelasLancamento(true), 2);
+
+        if (abs($somaEntrada - $entrada) > 0.009) {
+            $this->lancamentoParcelasErroIndex = null;
+            $this->lancamentoParcelasErroCampo = 'entrada';
+
             Notification::make()
-                ->title('Total das parcelas divergente')
-                ->body('Soma das parcelas ('.number_format($soma, 2, ',', '.').') difere do total ('
-                    .number_format($esperado, 2, ',', '.').').')
+                ->title('Entrada divergente')
+                ->body('A linha de entrada ('.number_format($somaEntrada, 2, ',', '.')
+                    .') difere do campo Entrada ('.number_format($entrada, 2, ',', '.')
+                    .'). Use Gerar para recalcular.')
                 ->warning()
                 ->send();
+
+            $this->js(<<<'JS'
+                requestAnimationFrame(() => {
+                    const el = document.getElementById('erp-parcela-entrada');
+                    if (!el) return;
+                    el.removeAttribute('readonly');
+                    el.focus();
+                    el.select();
+                });
+            JS);
 
             return;
         }
@@ -2361,8 +2514,142 @@ class ListCompras extends ListRecords
             ];
         }
 
-        $this->lancamentoParcelasOpen = false;
         $this->executarFinalizarCompraLancamento($parcelas);
+    }
+
+    public function lancamentoParcelasTotalParcelas(): string
+    {
+        return number_format(round($this->somarParcelasLancamento(false), 2), 2, ',', '.');
+    }
+
+    /**
+     * Total da compra/NF-e. Não usa a soma das duplicatas como segunda base.
+     */
+    protected function resolverSubtotalLancamentoParcelas(): float
+    {
+        foreach (['total', 'total_xml'] as $chave) {
+            $valor = BrDecimal::parse($this->lancamentoModalTotais[$chave] ?? 0, 2);
+            if ($valor > 0) {
+                return round($valor, 2);
+            }
+        }
+
+        if ($this->lancamentoModalCompraId) {
+            $totalCompra = (float) ($this->scopedCompraQuery()
+                ->whereKey($this->lancamentoModalCompraId)
+                ->value('total') ?? 0);
+            if ($totalCompra > 0) {
+                return round($totalCompra, 2);
+            }
+        }
+
+        $somaItens = 0.0;
+        foreach ($this->lancamentoModalRows as $row) {
+            $somaItens += (float) ($row['total_num'] ?? 0);
+        }
+        if ($somaItens > 0) {
+            return round($somaItens, 2);
+        }
+
+        return round(max(0, BrDecimal::parse($this->lancamentoModalTotais['subtotal'] ?? 0, 2)), 2);
+    }
+
+    protected function sincronizarBasesLancamentoParcelas(): void
+    {
+        $subtotal = round(max(0, BrDecimal::parse($this->lancamentoParcelasSubtotal, 2)), 2);
+        $entrada = round(max(0, BrDecimal::parse($this->lancamentoParcelasEntrada, 2)), 2);
+        if ($entrada > $subtotal) {
+            $entrada = $subtotal;
+        }
+
+        $this->lancamentoParcelasSubtotal = number_format($subtotal, 2, ',', '.');
+        $this->lancamentoParcelasEntrada = number_format($entrada, 2, ',', '.');
+        $this->lancamentoParcelasTotal = number_format(round($subtotal - $entrada, 2), 2, ',', '.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function lancamentoParcelaEhEntrada(array $row): bool
+    {
+        return mb_strtoupper(trim((string) ($row['documento'] ?? '')), 'UTF-8') === 'ENTRADA';
+    }
+
+    protected function somarParcelasLancamento(bool $somenteEntrada): float
+    {
+        $soma = 0.0;
+        foreach ($this->lancamentoParcelasRows as $row) {
+            $ehEntrada = $this->lancamentoParcelaEhEntrada($row);
+            if ($somenteEntrada !== $ehEntrada) {
+                continue;
+            }
+
+            $soma += BrDecimal::parse($row['valor'] ?? 0, 2);
+        }
+
+        return $soma;
+    }
+
+    protected function indiceUltimaParcelaLancamento(): ?int
+    {
+        $ultimo = null;
+        foreach ($this->lancamentoParcelasRows as $index => $row) {
+            if (! $this->lancamentoParcelaEhEntrada($row)) {
+                $ultimo = $index;
+            }
+        }
+
+        return $ultimo;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function rotuloLancamentoParcela(array $row, int $index): string
+    {
+        $documento = trim((string) ($row['documento'] ?? ''));
+
+        return $documento !== ''
+            ? 'linha '.($index + 1).' ('.$documento.')'
+            : 'linha '.($index + 1);
+    }
+
+    protected function lancamentoParcelaVencimentoValido(string $valor): bool
+    {
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $valor) !== 1) {
+            return false;
+        }
+
+        $data = \DateTime::createFromFormat('!d/m/Y', $valor);
+
+        return $data instanceof \DateTime && $data->format('d/m/Y') === $valor;
+    }
+
+    protected function limparErroLancamentoParcela(): void
+    {
+        $this->lancamentoParcelasErroIndex = null;
+        $this->lancamentoParcelasErroCampo = '';
+    }
+
+    protected function recusarLancamentoParcela(int $index, string $campo, string $titulo, string $mensagem): void
+    {
+        $this->lancamentoParcelasErroIndex = $index;
+        $this->lancamentoParcelasErroCampo = $campo;
+        $this->lancamentoParcelasSelectedIndex = $index;
+
+        Notification::make()
+            ->title($titulo)
+            ->body($mensagem)
+            ->warning()
+            ->send();
+
+        $campoJs = preg_replace('/[^a-z]/', '', $campo) ?: 'valor';
+
+        $this->js(sprintf(
+            "requestAnimationFrame(() => { const el = document.querySelector('[data-erp-parcela-index=\"%d\"][data-erp-parcela-field=\"%s\"]'); if (!el) return; el.removeAttribute('readonly'); el.focus(); if (typeof el.select === 'function') el.select(); })",
+            $index,
+            $campoJs,
+        ));
     }
 
     #[Computed]
@@ -2398,7 +2685,7 @@ class ListCompras extends ListRecords
             ->where('ativo', true)
             ->orderBy('codigo')
             ->orderBy('descricao')
-            ->get(['id', 'codigo', 'descricao', 'tipo'])
+            ->get(['id', 'codigo', 'descricao', 'tipo', 'tipo_movimento', 'conta_destino_id'])
             ->map(function (FormaPagamento $forma): array {
                 $codigo = (int) ($forma->codigo ?? 0);
                 $descricao = trim((string) ($forma->descricao ?? ''));
@@ -2410,6 +2697,8 @@ class ListCompras extends ListRecords
                     'id' => (int) $forma->id,
                     'label' => $label,
                     'tipo' => $forma->tipo,
+                    'tipo_movimento' => $forma->tipo_movimento,
+                    'caixa_conta_id' => filled($forma->conta_destino_id) ? (int) $forma->conta_destino_id : null,
                 ];
             })
             ->values()
@@ -2435,15 +2724,190 @@ class ListCompras extends ListRecords
             ->all();
     }
 
+    /**
+     * @return list<int>
+     */
+    public function lancamentoParcelasFormasCaixaIds(): array
+    {
+        return array_map('intval', array_keys($this->mapaFormasExigemSubcaixa()));
+    }
+
     public function lancamentoParcelaExigeSubcaixa(int $formaPagamentoId): bool
     {
-        if ($formaPagamentoId <= 0) {
-            return false;
+        return $formaPagamentoId > 0 && isset($this->mapaFormasExigemSubcaixa()[$formaPagamentoId]);
+    }
+
+    /**
+     * Subcaixa sugerido pela conta destino da forma de pagamento.
+     *
+     * @return array<int, int>
+     */
+    public function lancamentoParcelasCaixaPadraoMapa(): array
+    {
+        $subcaixas = array_map(
+            static fn (array $caixa): int => (int) $caixa['id'],
+            $this->lancamentoParcelasSubcaixasOptions,
+        );
+        $mapa = [];
+
+        foreach ($this->lancamentoParcelasFormasOptions as $forma) {
+            $formaId = (int) $forma['id'];
+            $destino = (int) ($forma['caixa_conta_id'] ?? 0);
+
+            if ($this->lancamentoParcelaExigeSubcaixa($formaId) && $destino > 0 && in_array($destino, $subcaixas, true)) {
+                $mapa[$formaId] = $destino;
+            }
         }
 
-        $tipo = FormaPagamento::query()->whereKey($formaPagamentoId)->value('tipo');
+        return $mapa;
+    }
 
-        return mb_strtolower(trim((string) $tipo), 'UTF-8') === 'dinheiro';
+    public function lancamentoParcelasCaixaPadraoId(int $formaPagamentoId): ?int
+    {
+        $id = $this->lancamentoParcelasCaixaPadraoMapa()[$formaPagamentoId] ?? null;
+
+        return $id ? (int) $id : null;
+    }
+
+    /**
+     * Uma consulta por request, reusada por todas as linhas.
+     *
+     * @return array<int, true>
+     */
+    protected function mapaFormasExigemSubcaixa(): array
+    {
+        if ($this->lancamentoFormasCaixaMapa !== null) {
+            return $this->lancamentoFormasCaixaMapa;
+        }
+
+        $mapa = [];
+        foreach ($this->lancamentoParcelasFormasOptions as $forma) {
+            $tipo = mb_strtolower(trim((string) ($forma['tipo'] ?? '')), 'UTF-8');
+            $movimento = mb_strtolower(trim((string) ($forma['tipo_movimento'] ?? '')), 'UTF-8');
+            if ($movimento === 'caixa' || $tipo === 'dinheiro') {
+                $mapa[(int) $forma['id']] = true;
+            }
+        }
+
+        $this->lancamentoFormasCaixaMapa = $mapa;
+
+        return $mapa;
+    }
+
+    /**
+     * Copia o que está visível na modal antes de Gerar, Excluir, ajustar valor ou Concluir.
+     *
+     * @param  array<string, mixed>|null  $tela
+     */
+    protected function aplicarTelaParcelas(?array $tela): void
+    {
+        if (! is_array($tela)) {
+            return;
+        }
+
+        foreach ([
+            'subtotal' => 'lancamentoParcelasSubtotal',
+            'entrada' => 'lancamentoParcelasEntrada',
+            'qtd' => 'lancamentoParcelasQtd',
+            'intervalo' => 'lancamentoParcelasIntervalo',
+        ] as $chave => $propriedade) {
+            if (array_key_exists($chave, $tela) && is_scalar($tela[$chave])) {
+                $this->{$propriedade} = trim((string) $tela[$chave]);
+            }
+        }
+
+        if (array_key_exists('selecionada', $tela)) {
+            $selecionada = $tela['selecionada'];
+            $this->lancamentoParcelasSelectedIndex = ($selecionada === null || $selecionada === '')
+                ? null
+                : (int) $selecionada;
+        }
+
+        $linhas = $tela['rows'] ?? null;
+        if (! is_array($linhas)) {
+            return;
+        }
+
+        foreach ($linhas as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $index = (int) ($row['index'] ?? -1);
+            if ($index < 0 || ! isset($this->lancamentoParcelasRows[$index])) {
+                continue;
+            }
+
+            foreach (['documento', 'vencimento', 'forma_pagamento_id', 'caixa_conta_id', 'valor'] as $campo) {
+                if (array_key_exists($campo, $row) && is_scalar($row[$campo])) {
+                    $this->lancamentoParcelasRows[$index][$campo] = trim((string) $row[$campo]);
+                }
+            }
+
+            $formaId = (int) ($this->lancamentoParcelasRows[$index]['forma_pagamento_id'] ?? 0);
+            if (! $this->lancamentoParcelaExigeSubcaixa($formaId)) {
+                $this->lancamentoParcelasRows[$index]['caixa_conta_id'] = '';
+            } elseif ((int) ($this->lancamentoParcelasRows[$index]['caixa_conta_id'] ?? 0) <= 0) {
+                $padrao = $this->lancamentoParcelasCaixaPadraoId($formaId);
+                if ($padrao) {
+                    $this->lancamentoParcelasRows[$index]['caixa_conta_id'] = (string) $padrao;
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array{subtotal: string, entrada: string, total: string}
+     */
+    public function atualizarBasesLancamentoParcelas(?array $tela = null): array
+    {
+        $this->aplicarTelaParcelas($tela);
+        $this->sincronizarBasesLancamentoParcelas();
+        $this->skipRender();
+
+        return [
+            'subtotal' => $this->lancamentoParcelasSubtotal,
+            'entrada' => $this->lancamentoParcelasEntrada,
+            'total' => $this->lancamentoParcelasTotal,
+        ];
+    }
+
+    /**
+     * @return array{valores: array<int, string>, total_parcelas: string}
+     */
+    public function atualizarValorLancamentoParcela(int $index, ?array $tela = null): array
+    {
+        $this->aplicarTelaParcelas($tela);
+
+        if (isset($this->lancamentoParcelasRows[$index]) && is_array($tela['rows'] ?? null)) {
+            foreach ($tela['rows'] as $row) {
+                if (! is_array($row) || (int) ($row['index'] ?? -1) !== $index) {
+                    continue;
+                }
+
+                $bruto = is_scalar($row['valor'] ?? null) ? (string) $row['valor'] : '0';
+                $this->lancamentoParcelasRows[$index]['valor'] = number_format(
+                    max(0, BrDecimal::parse($bruto, 2)),
+                    2,
+                    ',',
+                    '.',
+                );
+                $this->recalcularSaldoLancamentoParcelas($index);
+                break;
+            }
+        }
+
+        $this->skipRender();
+
+        $valores = [];
+        foreach ($this->lancamentoParcelasRows as $i => $row) {
+            $valores[$i] = (string) ($row['valor'] ?? '');
+        }
+
+        return [
+            'valores' => $valores,
+            'total_parcelas' => $this->lancamentoParcelasTotalParcelas(),
+        ];
     }
 
     protected function formaPagamentoIdPorTipo(string $tipo): ?int
@@ -2462,15 +2926,23 @@ class ListCompras extends ListRecords
      */
     protected function executarFinalizarCompraLancamento(?array $parcelasFinanceiro): void
     {
+        if ($this->lancamentoFinalizando) {
+            return;
+        }
+
         if (! $this->lancamentoModalCompraId) {
             return;
         }
+
+        $this->lancamentoFinalizando = true;
 
         $compra = $this->scopedCompraQuery()
             ->with(['itens.product', 'fornecedor'])
             ->find($this->lancamentoModalCompraId);
 
         if (! $compra) {
+            $this->lancamentoFinalizando = false;
+
             Notification::make()
                 ->title('Compra não encontrada.')
                 ->danger()
@@ -2495,6 +2967,8 @@ class ListCompras extends ListRecords
                 $totalOverride > 0 ? $totalOverride : null,
             );
         } catch (DomainException|\InvalidArgumentException $e) {
+            $this->lancamentoFinalizando = false;
+
             Notification::make()
                 ->title('Não foi possível finalizar')
                 ->body($e->getMessage())
@@ -2504,10 +2978,9 @@ class ListCompras extends ListRecords
             return;
         }
 
-        $this->lancamentoFinalizarConfirmOpen = false;
-        $this->lancamentoParcelasOpen = false;
         $this->closeCompraLancamento();
         $this->pushCompraListRefresh();
+        $this->dispatch('erp-compras-lancamento-fechado');
 
         Notification::make()
             ->title('Compra finalizada')
@@ -2919,7 +3392,6 @@ class ListCompras extends ListRecords
         $index = 1;
         $xmlLotesByIndex = $this->lotesDoXmlPorItemCompra($compra);
         $preservedByKey = $this->indexPreservedLancamentoLotes($preserveFrom);
-        $produtosHabilitarLote = [];
 
         foreach ($compra->itens as $item) {
             $codigo = $item->product?->codigo;
@@ -2931,6 +3403,7 @@ class ListCompras extends ListRecords
             }
 
             $referencia = trim((string) ($item->product?->referencia ?? ''));
+            $productId = (int) ($item->product_id ?? 0);
 
             $qtd = (float) $item->quantidade;
             $valorCheio = (float) $item->total;
@@ -2944,17 +3417,13 @@ class ListCompras extends ListRecords
             $controlaLoteProduto = (bool) ($item->product?->controla_lote_validade ?? false);
             $controlaLote = $controlaLoteProduto;
             $rowIndex = $index - 1;
-            $productId = (int) ($item->product_id ?? 0);
             $lotes = [];
             $xmlLotes = $xmlLotesByIndex[$rowIndex] ?? [];
             $temLotesXml = $this->lancamentoRowLotesTemConteudo($xmlLotes);
 
-            // XML com rastro: já mostra lotes sem precisar clicar em "Habilitar".
+            // XML com rastro: mostra os lotes na grade. O cadastro do produto só muda em Habilitar ou na finalização.
             if ($temLotesXml) {
                 $controlaLote = true;
-                if ($productId > 0 && ! $controlaLoteProduto) {
-                    $produtosHabilitarLote[$productId] = true;
-                }
             }
 
             if ($controlaLote) {
@@ -2968,6 +3437,7 @@ class ListCompras extends ListRecords
 
             $rows[] = [
                 'item' => (string) $index++,
+                'compra_item_id' => (int) $item->id,
                 'product_id' => (string) $productId,
                 'codigo' => $codigoFormatado,
                 'referencia' => $referencia,
@@ -2990,15 +3460,6 @@ class ListCompras extends ListRecords
                 'controla_lote_validade' => $controlaLote,
                 'lotes' => $lotes,
             ];
-        }
-
-        if ($produtosHabilitarLote !== []) {
-            Product::query()
-                ->whereIn('id', array_keys($produtosHabilitarLote))
-                ->where(function ($q): void {
-                    $q->where('controla_lote_validade', false)->orWhereNull('controla_lote_validade');
-                })
-                ->update(['controla_lote_validade' => true]);
         }
 
         return $rows;
@@ -3271,16 +3732,28 @@ class ListCompras extends ListRecords
      */
     protected function recalcularTotalLancamentoAposExtras(): void
     {
-        $subtotal = BrDecimal::parse($this->lancamentoModalTotais['subtotal'] ?? 0, 2);
-        $desconto = BrDecimal::parse($this->lancamentoModalTotais['desconto'] ?? 0, 2);
         $frete = BrDecimal::parse($this->lancamentoModalTotais['frete'] ?? 0, 2);
         $seguro = BrDecimal::parse($this->lancamentoModalTotais['seguro'] ?? 0, 2);
         $outras = BrDecimal::parse($this->lancamentoModalTotais['outras'] ?? 0, 2);
-        $ipi = BrDecimal::parse($this->lancamentoModalTotais['valor_ipi'] ?? 0, 2);
-        $st = BrDecimal::parse($this->lancamentoModalTotais['valor_st'] ?? 0, 2);
 
-        $total = round($subtotal - $desconto + $frete + $seguro + $outras + $ipi + $st, 2);
-        $this->lancamentoModalTotais['total'] = number_format($total, 2, ',', '.');
+        if (array_key_exists('total_xml', $this->lancamentoModalTotais)) {
+            $total = round(
+                BrDecimal::parse($this->lancamentoModalTotais['total_xml'] ?? 0, 2)
+                - BrDecimal::parse($this->lancamentoModalTotais['frete_xml'] ?? 0, 2)
+                - BrDecimal::parse($this->lancamentoModalTotais['seguro_xml'] ?? 0, 2)
+                - BrDecimal::parse($this->lancamentoModalTotais['outras_xml'] ?? 0, 2)
+                + $frete + $seguro + $outras,
+                2,
+            );
+        } else {
+            $subtotal = BrDecimal::parse($this->lancamentoModalTotais['subtotal'] ?? 0, 2);
+            $desconto = BrDecimal::parse($this->lancamentoModalTotais['desconto'] ?? 0, 2);
+            $ipi = BrDecimal::parse($this->lancamentoModalTotais['valor_ipi'] ?? 0, 2);
+            $st = BrDecimal::parse($this->lancamentoModalTotais['valor_st'] ?? 0, 2);
+            $total = round($subtotal - $desconto + $frete + $seguro + $outras + $ipi + $st, 2);
+        }
+
+        $this->lancamentoModalTotais['total'] = number_format(max(0, $total), 2, ',', '.');
     }
 
     protected function refreshLancamentoMargemFromRows(): void
@@ -3407,7 +3880,13 @@ class ListCompras extends ListRecords
         $fromXml = $this->totaisFromNotaXml($compra);
 
         if ($fromXml !== null) {
-            return array_merge($defaults, $fromXml);
+            $totais = array_merge($defaults, $fromXml);
+            $totais['frete_xml'] = $totais['frete'];
+            $totais['seguro_xml'] = $totais['seguro'];
+            $totais['outras_xml'] = $totais['outras'];
+            $totais['total_xml'] = $totais['total'];
+
+            return $totais;
         }
 
         $subtotal = (float) $compra->itens->sum('total');

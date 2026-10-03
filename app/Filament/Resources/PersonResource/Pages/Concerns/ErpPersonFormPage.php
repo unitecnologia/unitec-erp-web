@@ -113,6 +113,8 @@ trait ErpPersonFormPage
     public function saveForm(): void
     {
         try {
+            $this->storePersonContactDraft();
+
             $pessoaTipo = (string) ($this->data['pessoa_tipo'] ?? Person::PESSOA_JURIDICA);
 
             $rules = [
@@ -241,6 +243,13 @@ trait ErpPersonFormPage
             }
         }
 
+        $formaId = $merged['forma_pagamento_id'] ?? null;
+        $prazoId = $merged['tabela_prazo_id'] ?? null;
+
+        if ($prazoId !== null && ! $this->tabelaPrazoPertenceAForma($prazoId, $formaId)) {
+            $merged['tabela_prazo_id'] = null;
+        }
+
         return ErpUppercase::normalizeFormData($merged);
     }
 
@@ -286,6 +295,8 @@ trait ErpPersonFormPage
 
     public function cancelForm(): void
     {
+        $this->discardPendingPersonPhoto();
+
         if ($this->embedsInPdv) {
             $this->redirect($this->getPersonListRedirectUrl());
 

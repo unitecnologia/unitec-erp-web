@@ -280,6 +280,37 @@ function bindErpOrcamentosFormKeys() {
 
     window.__erpOrcFormKeysBound = true;
 
+    // Capture: o Chrome abre favorito no Ctrl+D antes do bubble, inclusive com foco em input.
+    document.addEventListener('keydown', (event) => {
+        if (! document.querySelector('.erp-orcamentos-form-page') || document.querySelector('.erp-os-form-page')) {
+            return;
+        }
+
+        const ctrlD = event.ctrlKey
+            && ! event.altKey
+            && ! event.metaKey
+            && (event.key === 'd' || event.key === 'D' || event.code === 'KeyD');
+
+        if (! ctrlD) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (document.querySelector('.erp-orc-obs-modal, .erp-orc-post-save-modal, .erp-orc-item-delete-modal, .erp-form-overlay, .erp-fv-tv-desconto')) {
+            return;
+        }
+
+        const component = getErpOrcamentosComponent();
+
+        if (! component) {
+            return;
+        }
+
+        component.call('abrirModalDescontoItem');
+    }, true);
+
     document.addEventListener('keydown', (event) => {
         if (! document.querySelector('.erp-orcamentos-form-page') || document.querySelector('.erp-os-form-page')) {
             return;
@@ -288,6 +319,21 @@ function bindErpOrcamentosFormKeys() {
         const component = getErpOrcamentosComponent();
 
         if (! component) {
+            return;
+        }
+
+        if (document.querySelector('.erp-orc-obs-modal')) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                const obsOrcamento = document.getElementById('erp-orc-obs-orcamento');
+
+                if (obsOrcamento) {
+                    component.call('fecharObservacaoOrcamento', obsOrcamento.value);
+                } else {
+                    component.call('fecharObservacaoCliente');
+                }
+            }
+
             return;
         }
 

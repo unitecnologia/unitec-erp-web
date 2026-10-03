@@ -32,19 +32,10 @@
         setTimeout(focusEl, 50);
         setTimeout(focusEl, 150);
     })"
+    x-on:erp-orc-focus-obs.window="$nextTick(() => { const el = document.getElementById('erp-orc-obs-orcamento'); el?.focus(); })"
     x-on:orc-focus-barcode.window="$nextTick(() => { const el = document.getElementById('orc-prod-barcode'); el?.focus(); el?.select?.(); })"
     x-on:orc-focus-qtd.window="$nextTick(() => { const el = document.getElementById('orc-prod-qtd'); el?.focus(); el?.select?.(); })"
     x-on:orc-focus-preco.window="$nextTick(() => { const el = document.getElementById('orc-prod-preco'); el?.focus(); el?.select?.(); })"
-    x-on:keydown.window="
-        if ($event.ctrlKey && ($event.key === 'd' || $event.key === 'D') && !$wire.descontoModalOpen) {
-            const t = $event.target;
-            const inField = t?.closest?.('input, textarea, select');
-            if (!inField) {
-                $event.preventDefault();
-                $wire.abrirModalDescontoItem();
-            }
-        }
-    "
 >
     <header class="erp-orcamentos-window__titlebar">
         <span class="erp-orcamentos-window__title">Lançamento de Orçamento</span>
@@ -79,6 +70,7 @@
         ])
     @endif
 
+    @include('filament.components.erp.orcamentos.form.observacoes-modal')
     @include('filament.components.erp.orcamentos.form.post-save-prompt')
     @include('filament.components.erp.orcamentos.form.item-delete-confirm')
     @include('filament.components.erp.orcamentos.form.desconto-item')

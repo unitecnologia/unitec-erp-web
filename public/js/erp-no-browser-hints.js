@@ -7,7 +7,7 @@
  * Opt-out pontual: data-erp-allow-browser-hints="1" no campo ou ancestral.
  */
 (function initErpNoBrowserHints() {
-    const VERSION = 'v5-stable-name';
+    const VERSION = 'v6-pessoas-text';
 
     if (window.__erpNoBrowserHintsVersion === VERSION) {
         return;
@@ -50,6 +50,10 @@
     function isProductNameSearch(element) {
         if (! (element instanceof HTMLInputElement)) {
             return false;
+        }
+
+        if (element.closest('.erp-pessoas-form-page')) {
+            return element.id === 'pcad-cidade-nome';
         }
 
         const signature = fieldSignature(element);

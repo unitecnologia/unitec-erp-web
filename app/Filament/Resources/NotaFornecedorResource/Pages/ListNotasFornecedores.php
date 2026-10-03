@@ -156,6 +156,7 @@ class ListNotasFornecedores extends ListRecords
         ];
 
         // Na aba Aceitas, só Ler XML / DANFE / Atualizar / Fechar ficam ativos.
+        // create/edit/delete/refresh ficam nulos para o F2–F5 não caírem em método inexistente.
         if ($this->statusFilter !== 'aceita') {
             $extraKeys = [
                 'F2' => ['method' => 'openConsultaChaveModal'],
@@ -169,6 +170,10 @@ class ListNotasFornecedores extends ListRecords
         return [
             'searchInput' => '.erp-nfe__period-from, .erp-nfe__search-text, .erp-nfe__search-date-from',
             'searchFocusKey' => 'F12',
+            'create' => null,
+            'edit' => null,
+            'delete' => null,
+            'refresh' => null,
             'extraKeys' => $extraKeys,
         ];
     }
@@ -202,6 +207,71 @@ class ListNotasFornecedores extends ListRecords
 
                 return implode(' ', array_filter($classes));
             });
+    }
+
+    /**
+     * F4/F5 só valem para nota pendente. Depois de confirmar, ficam desligados.
+     */
+    public function acaoNotaPendenteDesabilitada(): bool
+    {
+        if ($this->statusFilter === 'aceita') {
+            return true;
+        }
+
+        $id = (int) ($this->highlightedRecordId ?? 0);
+
+        if ($id <= 0) {
+            return true;
+        }
+
+        $nota = $this->findNotaNoEscopo($id);
+
+        if (! $nota) {
+            return true;
+        }
+
+        return $nota->status !== NotaFornecedor::STATUS_PENDENTE;
+    }
+
+    /**
+     * F6 fica desabilitado sem nota marcada, para nota pendente ou NF-e cancelada na SEFAZ.
+     */
+    public function lerXmlSelecionadaDesabilitada(): bool
+    {
+        $id = (int) ($this->highlightedRecordId ?? 0);
+
+        if ($id <= 0) {
+            return true;
+        }
+
+        $nota = $this->findNotaNoEscopo($id);
+
+        if (! $nota) {
+            return false;
+        }
+
+        if ($nota->status === NotaFornecedor::STATUS_PENDENTE) {
+            return true;
+        }
+
+        return $this->xmlIndicaNfeCancelada((string) ($nota->xml ?? ''));
+    }
+
+    private function xmlIndicaNfeCancelada(string $xml): bool
+    {
+        if ($xml === '') {
+            return false;
+        }
+
+        if (preg_match('/<cSitNFe>\s*3\s*<\/cSitNFe>/', $xml) === 1) {
+            return true;
+        }
+
+        if (preg_match('/<tpEvento>\s*110111\s*<\/tpEvento>/', $xml) === 1) {
+            return true;
+        }
+
+        return preg_match('/<infProt\b[^>]*>[\s\S]*?<cStat>\s*(101|151)\s*<\/cStat>/', $xml) === 1;
     }
 
     /**
@@ -400,6 +470,39 @@ class ListNotasFornecedores extends ListRecords
         $this->resetTable();
     }
 
+    public function updatedLocalSearch(): void
+    {
+        $this->clearListSelection();
+    }
+
+    public function updatedTableRecordsPerPage(): void
+    {
+        $this->clearListSelection();
+
+        parent::updatedTableRecordsPerPage();
+    }
+
+    public function gotoPage($page, $pageName = 'page'): void
+    {
+        $this->clearListSelection();
+
+        parent::gotoPage($page, $pageName);
+    }
+
+    public function nextPage($pageName = 'page'): void
+    {
+        $this->clearListSelection();
+
+        parent::nextPage($pageName);
+    }
+
+    public function previousPage($pageName = 'page'): void
+    {
+        $this->clearListSelection();
+
+        parent::previousPage($pageName);
+    }
+
     protected function normalizeStatusFilter(string $status): string
     {
         if ($status === 'todas') {
@@ -496,16 +599,17 @@ class ListNotasFornecedores extends ListRecords
 
     public function openNotaFornecedorVisualizar(int $notaId): void
     {
-        // Não usar highlightRecord(): ele faz skipRender() e o modal DANFE não aparece.
-        $this->highlightedRecordId = (int) $notaId;
-
-        $nota = NotaFornecedor::query()->find($notaId);
+        $nota = $this->findNotaNoEscopo($notaId);
 
         if (! $nota) {
+            $this->clearListSelection();
             Notification::make()->title('Nota não encontrada.')->danger()->send();
 
             return;
         }
+
+        // Não usar highlightRecord(): ele faz skipRender() e o modal DANFE não aparece.
+        $this->highlightedRecordId = (int) $nota->id;
 
         if (blank($nota->chave)) {
             Notification::make()
@@ -557,9 +661,9 @@ class ListNotasFornecedores extends ListRecords
 
     public function openNotaFornecedorVisualizarSelecionada(): void
     {
-        $id = $this->highlightedRecordIdOrNotify('visualizar');
+        $id = (int) ($this->highlightedRecordId ?? 0);
 
-        if (! $id) {
+        if ($id <= 0) {
             return;
         }
 
@@ -568,6 +672,10 @@ class ListNotasFornecedores extends ListRecords
 
     public function confirmarNota(): void
     {
+        if (! $this->highlightedRecordId) {
+            return;
+        }
+
         if ($this->bloquearAcaoNaAbaAceitas('Confirmar')) {
             return;
         }
@@ -578,7 +686,7 @@ class ListNotasFornecedores extends ListRecords
             return;
         }
 
-        $nota = NotaFornecedor::query()->find($id);
+        $nota = $this->findNotaNoEscopo($id);
 
         if (! $nota) {
             Notification::make()->title('Nota não encontrada.')->danger()->send();
@@ -616,9 +724,15 @@ class ListNotasFornecedores extends ListRecords
             $nota = (new NotaFornecedorXmlDownloadService())->ensureProcNfe($nota, $empresa);
             $xmlLiberado = true;
         } catch (FiscalEngineException $exception) {
-            if ($exception->sefazCodigo === '596' || str_contains(mb_strtolower($exception->getMessage(), 'UTF-8'), 'prazo de 10 dias')) {
+            $mensagem = mb_strtolower($exception->getMessage(), 'UTF-8');
+            $prazoExpirado = $exception->sefazCodigo === '596' || str_contains($mensagem, 'prazo de 10 dias');
+            $cienciaSemXml = str_contains($mensagem, 'ainda não liberou o xml');
+
+            if ($prazoExpirado || $cienciaSemXml) {
                 $this->showNfFornFiscalOverlay(
-                    'XML completo indisponível (prazo de 10 dias)',
+                    $prazoExpirado
+                        ? 'XML completo indisponível (prazo de 10 dias)'
+                        : 'XML completo ainda não liberado',
                     $exception->getMessage()
                     ."\n\nA nota será marcada como aceita. Para ler os itens, solicite o XML (procNFe) ao fornecedor.",
                     $exception->sefazCodigo,
@@ -648,10 +762,15 @@ class ListNotasFornecedores extends ListRecords
 
         $nota->update(['status' => NotaFornecedor::STATUS_ACEITA]);
 
+        // A nota sai da aba Pendentes; em Todas ela continua na grade, já marcada.
+        if ($this->statusFilter === NotaFornecedor::STATUS_PENDENTE) {
+            $this->statusFilter = 'todas';
+        }
+
         if ($xmlLiberado) {
             Notification::make()
                 ->title('Nota confirmada')
-                ->body('Ciência da Operação enviada. XML liberado — use F6 | Ler XML na aba Aceitas.')
+                ->body('Ciência da Operação enviada. XML liberado — use F6 | Ler XML.')
                 ->success()
                 ->send();
         }
@@ -849,6 +968,10 @@ class ListNotasFornecedores extends ListRecords
 
     public function desconhecerNota(): void
     {
+        if (! $this->highlightedRecordId) {
+            return;
+        }
+
         if ($this->bloquearAcaoNaAbaAceitas('Desconhecer')) {
             return;
         }
@@ -859,7 +982,7 @@ class ListNotasFornecedores extends ListRecords
             return;
         }
 
-        $nota = NotaFornecedor::query()->find($id);
+        $nota = $this->findNotaNoEscopo($id);
 
         if (! $nota) {
             Notification::make()->title('Nota não encontrada.')->danger()->send();
@@ -867,9 +990,9 @@ class ListNotasFornecedores extends ListRecords
             return;
         }
 
-        if ($nota->status === NotaFornecedor::STATUS_GEROU_COMPRAS) {
+        if ($nota->status !== NotaFornecedor::STATUS_PENDENTE) {
             Notification::make()
-                ->title('Nota já vinculada a uma compra.')
+                ->title('Somente notas pendentes podem ser desconhecidas.')
                 ->warning()
                 ->send();
 
@@ -877,6 +1000,7 @@ class ListNotasFornecedores extends ListRecords
         }
 
         $nota->update(['status' => NotaFornecedor::STATUS_DESCONHECIDA]);
+        $this->clearListSelection();
 
         Notification::make()->title('Nota marcada como desconhecida.')->success()->send();
         $this->resetTable();
@@ -911,9 +1035,41 @@ class ListNotasFornecedores extends ListRecords
             return '';
         }
 
-        return NotaFornecedor::query()
-            ->whereKey($this->highlightedRecordId)
-            ->value('chave') ?? '';
+        $records = $this->getTableRecords();
+
+        if (is_object($records) && method_exists($records, 'getCollection')) {
+            $records = $records->getCollection();
+        }
+
+        $nota = $records->first(
+            fn ($record): bool => (int) $record->getKey() === (int) $this->highlightedRecordId
+        );
+
+        return (string) ($nota->chave ?? '');
+    }
+
+    /**
+     * Mesmo recorte da grade: empresa atual ou nota legada sem empresa.
+     */
+    protected function findNotaNoEscopo(int $id): ?NotaFornecedor
+    {
+        $query = NotaFornecedor::query()->whereKey($id);
+        $empresaId = ErpContext::currentEmpresaId();
+
+        if ($empresaId !== null) {
+            $query->where(function (Builder $empresaQuery) use ($empresaId): void {
+                $empresaQuery
+                    ->where('empresa_id', $empresaId)
+                    ->orWhereNull('empresa_id');
+            });
+        }
+
+        return $query->first();
+    }
+
+    protected function findNotaFornecedorParaLeitura(int $notaId): ?NotaFornecedor
+    {
+        return $this->findNotaNoEscopo($notaId);
     }
 
     protected function erpListSelectPrompt(string $action): string

@@ -743,11 +743,16 @@
 }
 
 .erp-permissoes-page .erp-permissoes.erp-os-window {
-    width: min(96vw, 1320px);
-    height: min(91vh, 860px);
-    min-height: 620px;
-    margin: auto;
+    width: min(98vw, 1320px);
+    height: calc(100dvh - var(--erp-os-chrome));
+    max-height: calc(100dvh - var(--erp-os-chrome));
+    min-height: 0;
+    margin: 0 auto;
     overflow: hidden;
+}
+
+.erp-permissoes-page .erp-permissoes.erp-os-window > .erp-os-window__titlebar {
+    flex: 0 0 auto;
 }
 
 .erp-permissoes-page .erp-permissoes__body {
@@ -759,9 +764,11 @@
 
 .erp-permissoes-page .erp-permissoes__sidebar {
     display: flex;
-    flex: 0 0 250px;
+    flex: 0 0 320px;
     min-width: 220px;
     flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
     border-right: 1px solid #bdcde0;
     background: #edf3f9;
 }
@@ -769,18 +776,19 @@
 .erp-permissoes-page .erp-permissoes__sidebar-tabs,
 .erp-permissoes-page .erp-permissoes__main-tabs {
     display: flex;
+    flex: 0 0 auto;
     border-bottom: 1px solid #bdcde0;
 }
 
 .erp-permissoes-page .erp-permissoes__sidebar-tabs button,
 .erp-permissoes-page .erp-permissoes__main-tabs button {
-    padding: 0.68rem 0.8rem;
+    padding: 0.42rem 0.7rem;
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;
     color: #52637a;
     font: inherit;
-    font-size: 0.77rem;
+    font-size: 0.75rem;
     font-weight: 750;
     cursor: pointer;
 }
@@ -793,13 +801,14 @@
 }
 
 .erp-permissoes-page .erp-permissoes__search {
-    margin: 0.65rem;
-    padding: 0.45rem 0.55rem;
+    flex: 0 0 auto;
+    margin: 0.4rem 0.45rem 0.3rem;
+    padding: 0.28rem 0.45rem;
     border: 1px solid #9fb5cf;
-    border-radius: 5px;
+    border-radius: 4px;
     background: #fff;
     font: inherit;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
 }
 
 .erp-permissoes-page .erp-permissoes__list {
@@ -808,45 +817,67 @@
     flex: 1;
     flex-direction: column;
     overflow: auto;
-    padding: 0 0.45rem 0.5rem;
+    padding: 0 0 0.25rem;
 }
 
 .erp-permissoes-page .erp-permissoes__list-row {
-    display: grid;
-    gap: 0.15rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
     width: 100%;
-    padding: 0.6rem 0.65rem;
-    border: 1px solid transparent;
-    border-bottom-color: #d5e0ec;
+    min-height: 1.7rem;
+    padding: 0.22rem 0.5rem 0.22rem 0.55rem;
+    border: 0;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid #e3ebf3;
+    border-radius: 0;
     background: transparent;
     color: #1e293b;
     text-align: left;
     cursor: pointer;
 }
 
-.erp-permissoes-page .erp-permissoes__list-row:hover,
-.erp-permissoes-page .erp-permissoes__list-row.is-selected {
-    border-color: #82a8d3;
-    border-radius: 5px;
-    background: #dceeff;
+.erp-permissoes-page .erp-permissoes__list-row:hover {
+    background: #f4f8fc;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row.is-selected,
+.erp-permissoes-page .erp-permissoes__list-row.is-selected:hover {
+    border-left-color: #1e5a9e;
+    border-bottom-color: #c5daf0;
+    background: #d4e8f8;
 }
 
 .erp-permissoes-page .erp-permissoes__list-row strong {
-    font-size: 0.75rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: #12263f;
+    font-size: 0.78rem;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-permissoes-page .erp-permissoes__list-row.is-selected strong {
+    color: #0c3d73;
 }
 
 .erp-permissoes-page .erp-permissoes__list-row small {
-    overflow: hidden;
-    color: #64748b;
-    font-size: 0.66rem;
-    text-overflow: ellipsis;
+    flex: 0 0 auto;
+    color: #4d6074;
+    font-size: 0.68rem;
+    font-weight: 650;
+    text-align: right;
     white-space: nowrap;
 }
 
 .erp-permissoes-page .erp-permissoes__sidebar-actions {
     display: flex;
-    gap: 0.4rem;
-    padding: 0.6rem;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    padding: 0.4rem 0.45rem;
     border-top: 1px solid #bdcde0;
 }
 
@@ -872,16 +903,19 @@
 .erp-permissoes-page .erp-permissoes__workspace {
     display: flex;
     min-width: 0;
+    min-height: 0;
     flex: 1;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .erp-permissoes-page .erp-permissoes__context {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.8rem 1rem;
+    gap: 0.75rem;
+    padding: 0.38rem 0.7rem;
     border-bottom: 1px solid #bdcde0;
     background: #fff;
 }
@@ -896,9 +930,10 @@
 }
 
 .erp-permissoes-page .erp-permissoes__context h1 {
-    margin: 0.1rem 0 0;
+    margin: 0;
     color: #123d69;
-    font-size: 1.05rem;
+    font-size: 0.92rem;
+    line-height: 1.2;
 }
 
 .erp-permissoes-page .erp-permissoes__template {
@@ -924,18 +959,34 @@
     cursor: default;
 }
 
+.erp-permissoes-page .erp-permissoes__perm-host {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.erp-permissoes-page .erp-permissoes__perm-host.is-hidden {
+    display: none;
+}
+
+.erp-permissoes-page .erp-permissoes__perm-host > .erp-permissoes__notice {
+    margin: 0.4rem 0.6rem 0;
+}
+
 .erp-permissoes-page .erp-permissoes__editor,
 .erp-permissoes-page .erp-permissoes__tree {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 1rem;
+    padding: 0.45rem 0.55rem;
 }
 
 .erp-permissoes-page .erp-permissoes__editor {
     display: grid;
     align-content: start;
     gap: 0.8rem;
+    padding: 0.75rem 1rem;
 }
 
 .erp-permissoes-page .erp-permissoes__editor label {
@@ -1123,28 +1174,49 @@
 }
 
 .erp-permissoes-page .erp-permissoes__tree-group {
-    margin-bottom: 0.8rem;
-    border: 1px solid #bdcde0;
-    border-radius: 6px;
+    margin: 0 0 0.32rem;
+    border: 1px solid #c5d4e4;
+    border-radius: 4px;
     overflow: hidden;
     background: #fff;
 }
 
-.erp-permissoes-page .erp-permissoes__tree-group > header,
-.erp-permissoes-page .erp-permissoes__tree-module > div:first-child {
+.erp-permissoes-page .erp-permissoes__tree-group.is-nested {
+    margin: 0.15rem 0.35rem 0.2rem 1.15rem;
+    border: 0;
+    border-left: 2px solid #9fb4cc;
+    border-radius: 0;
+    background: transparent;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.7rem;
-    padding: 0.55rem 0.7rem;
-    border-bottom: 1px solid #d5e0ec;
-    background: #eaf1f8;
+    gap: 0.5rem;
+    height: 1.72rem;
+    min-height: 1.72rem;
+    padding: 0 0.35rem 0 0.15rem;
+    border-bottom: 0;
+    background: #e7f0f8;
     color: #0f3460;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > .erp-permissoes__tree-body:not([hidden]) {
+    border-top: 1px solid #d5e2ef;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group.is-nested > header {
+    height: 1.55rem;
+    min-height: 1.55rem;
+    padding-left: 0.35rem;
+    background: transparent;
+    color: #3d5670;
 }
 
 .erp-permissoes-page .erp-permissoes__tree-group button,
 .erp-permissoes-page .erp-permissoes__tree-module button {
-    margin-left: 0.25rem;
+    margin-left: 0;
     border: 0;
     background: transparent;
     color: #1e5a9e;
@@ -1156,38 +1228,116 @@
 
 .erp-permissoes-page .erp-permissoes__tree-toggle {
     margin-left: 0 !important;
+    padding: 0 0.2rem;
     color: inherit !important;
-    font-size: 0.74rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 750;
+    line-height: 1.2;
+    text-align: left;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > header > span {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.1rem;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > header > span button {
+    margin: 0;
+    padding: 0.05rem 0.28rem;
+    border-radius: 3px;
+    color: #6a7d92;
+    font-size: 0.62rem;
+    font-weight: 650;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group > header > span button:hover:not(:disabled) {
+    color: #1e5a9e;
+    background: rgba(30, 90, 158, 0.08);
 }
 
 .erp-permissoes-page .erp-permissoes__tree-module {
-    border-bottom: 1px solid #e1e8f0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.65rem;
+    padding: 0.08rem 0.4rem 0.08rem 0.7rem;
+    border-bottom: 1px solid #eef3f8;
+    background: #fff;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-module:last-child {
+    border-bottom: 0;
 }
 
 .erp-permissoes-page .erp-permissoes__tree-module > div:first-child {
-    padding-left: 1.35rem;
-    background: #f7faff;
-    color: #334155;
+    display: flex;
+    flex: 1 1 15rem;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #1e293b;
+}
+
+.erp-permissoes-page .erp-permissoes__row-check,
+.erp-permissoes-page .erp-permissoes__tree-title {
+    display: flex;
+    align-items: center;
+    gap: 0.38rem;
+    margin: 0;
+    color: #16324f;
     font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-title {
+    cursor: default;
+    font-weight: 700;
+}
+
+.erp-permissoes-page .erp-permissoes__row-check input,
+.erp-permissoes-page .erp-permissoes__tree-actions input {
+    flex: 0 0 auto;
+    width: 0.82rem;
+    height: 0.82rem;
+    margin: 0;
+    accent-color: #1e5a9e;
+}
+
+.erp-permissoes-page .erp-permissoes__tree-group button:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .erp-permissoes-page .erp-permissoes__tree-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.35rem;
-    padding: 0.55rem 0.75rem 0.65rem 2.3rem;
+    display: flex;
+    flex: 1 1 16rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.05rem 0.55rem;
+    padding: 0.05rem 0;
 }
 
 .erp-permissoes-page .erp-permissoes__tree-actions label {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    color: #334155;
-    font-size: 0.7rem;
+    gap: 0.28rem;
+    min-height: 1.35rem;
+    margin: 0;
+    color: #5c6e82;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.15;
 }
 
-.erp-permissoes-page .erp-permissoes__tree-actions input {
-    accent-color: #1e5a9e;
+.erp-permissoes-page .erp-permissoes__tree-group.is-nested .erp-permissoes__tree-module {
+    padding-left: 0.45rem;
+    background: transparent;
 }
 
 .erp-permissoes-page .erp-permissoes__empresas {
@@ -1837,11 +1987,13 @@
 }
 
 .erp-permissoes-page .erp-permissoes__actions {
-    display: inline-flex;
+    display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.45rem;
-    padding: 0.65rem 0.9rem;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0.65rem;
     border-top: 1px solid #bdcde0;
     background: #edf3f9;
 }

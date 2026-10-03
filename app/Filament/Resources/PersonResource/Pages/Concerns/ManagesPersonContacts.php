@@ -75,13 +75,20 @@ trait ManagesPersonContacts
 
     public function confirmPersonContact(): void
     {
-        if (blank($this->contactMotivo) && blank($this->contactDescricao)) {
-            Notification::make()
-                ->title('Informe o motivo ou a descrição do contato.')
-                ->warning()
-                ->send();
-
+        if ($this->storePersonContactDraft(notify: true)) {
             return;
+        }
+
+        Notification::make()
+            ->title('Informe o motivo ou a descrição do contato.')
+            ->warning()
+            ->send();
+    }
+
+    protected function storePersonContactDraft(bool $notify = false): bool
+    {
+        if (blank($this->contactMotivo) && blank($this->contactDescricao)) {
+            return false;
         }
 
         $payload = [
@@ -99,16 +106,33 @@ trait ManagesPersonContacts
             $this->personContacts[$this->contactEditingIndex] = $payload;
             $this->selectedContactIndex = $this->contactEditingIndex;
         } else {
+            $lastIndex = array_key_last($this->personContacts);
+            $last = $lastIndex !== null ? $this->personContacts[$lastIndex] : null;
+            $sameAsLast = is_array($last)
+                && (string) ($last['motivo'] ?? '') === (string) $payload['motivo']
+                && (string) ($last['descricao'] ?? '') === (string) $payload['descricao']
+                && (string) ($last['data_retorno'] ?? '') === (string) ($payload['data_retorno'] ?? '');
+
+            if ($sameAsLast) {
+                $this->resetContactDraft();
+
+                return true;
+            }
+
             $this->personContacts[] = $payload;
             $this->selectedContactIndex = count($this->personContacts) - 1;
         }
 
         $this->resetContactDraft();
 
-        Notification::make()
-            ->title('Contato registrado na lista. Salve com F5 para gravar.')
-            ->success()
-            ->send();
+        if ($notify) {
+            Notification::make()
+                ->title('Contato registrado na lista. Salve com F5 para gravar.')
+                ->success()
+                ->send();
+        }
+
+        return true;
     }
 
     public function cancelPersonContact(): void

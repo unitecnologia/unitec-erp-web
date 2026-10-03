@@ -50,8 +50,22 @@
             <output class="erp-config-fiscais-form__ult-nfce" aria-live="polite">{{ $this->ultimaNfeNumeroLabel() }}</output>
         </div>
 
+        <div class="erp-config-fiscais-form__nfce-inline-row">
+            <label class="erp-pcad-form__label" for="cfg-nfe-nsu">Último NSU</label>
+            <input
+                id="cfg-nfe-nsu"
+                type="text"
+                inputmode="numeric"
+                maxlength="15"
+                wire:model="form.dfe_ultimo_nsu"
+                class="erp-pcad-form__input erp-pcad-form__input--nsu"
+                autocomplete="off"
+                spellcheck="false"
+            >
+        </div>
+
         <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact">
-            A numeração da NF-e é independente da NFC-e.
+            A numeração da NF-e é independente da NFC-e. O NSU é da consulta de notas recebidas (Distribuição DF-e): altere só quando precisar retomar de outro ponto.
         </p>
     </fieldset>
 

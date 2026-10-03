@@ -107,6 +107,7 @@
                                                         <th>Quant.</th>
                                                         <th>Un.</th>
                                                         <th>Preço</th>
+                                                        <th>Desconto</th>
                                                         <th>Total</th>
                                                         <th>Grade</th>
                                                     </tr>
@@ -120,12 +121,13 @@
                                                             <td class="erp-orc-itens__cell-input--num">{{ $item['quantidade'] }}</td>
                                                             <td>{{ $item['unidade'] }}</td>
                                                             <td class="erp-orc-itens__cell-input--num">{{ $item['preco'] }}</td>
+                                                            <td class="erp-orc-itens__cell-input--num">{{ $item['desconto'] ?? '0,00' }}</td>
                                                             <td class="erp-orc-itens__cell-input--num">{{ $item['total'] }}</td>
                                                             <td>{{ $item['grade'] ?: '—' }}</td>
                                                         </tr>
                                                     @empty
                                                         <tr>
-                                                            <td colspan="8" class="erp-orc-itens__empty">Nenhum item informado.</td>
+                                                            <td colspan="9" class="erp-orc-itens__empty">Nenhum item informado.</td>
                                                         </tr>
                                                     @endforelse
                                                 </tbody>

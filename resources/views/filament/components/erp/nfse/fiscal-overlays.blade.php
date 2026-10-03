@@ -67,10 +67,10 @@
         <div class="erp-nfe-fiscal-overlay__icon" aria-hidden="true">!</div>
         <h2 id="erp-nfse-erro-title" class="erp-nfe-fiscal-overlay__title">{{ $this->nfseFiscalErroTitulo }}</h2>
         <p class="erp-nfe-fiscal-overlay__codigo" style="display: {{ filled($this->nfseFiscalErroCodigo) ? 'block' : 'none' }};">
-            Código SEFIN: <strong>{{ $this->nfseFiscalErroCodigo }}</strong>
+            {{ $this->nfseFiscalErroRotulo !== '' ? $this->nfseFiscalErroRotulo : 'Código SEFIN' }}: <strong>{{ $this->nfseFiscalErroCodigo }}</strong>
         </p>
         <div class="erp-nfe-fiscal-overlay__text">{!! nl2br(e((string) ($this->nfseFiscalErroMensagem ?? ''))) !!}</div>
-        <p class="erp-nfe-fiscal-overlay__origem" data-erp-nfse-erro-origem style="display: {{ $this->nfseFiscalErroSefin ? 'block' : 'none' }};">Esta é uma mensagem da SEFIN Nacional.</p>
+        <p class="erp-nfe-fiscal-overlay__origem" data-erp-nfse-erro-origem style="display: {{ $this->nfseFiscalErroSefin || $this->nfseFiscalErroOrigem !== '' ? 'block' : 'none' }};">{{ $this->nfseFiscalErroOrigem !== '' ? $this->nfseFiscalErroOrigem : 'Esta é uma mensagem da SEFIN Nacional.' }}</p>
         <button type="button" class="erp-nfe-fiscal-overlay__btn" id="erp-nfse-erro-entendido" wire:click="closeNfseFiscalErro">Entendido</button>
         <p class="erp-nfe-fiscal-overlay__hint">Clique em Entendido para continuar.</p>
     </div>
@@ -110,10 +110,14 @@
         if (titulo && data.titulo) titulo.textContent = data.titulo;
         if (texto) texto.textContent = data.mensagem || '';
         if (codigo) {
+            const rotulo = data.rotuloCodigo || 'Código SEFIN';
             codigo.style.display = data.codigo ? 'block' : 'none';
-            codigo.textContent = data.codigo ? 'Código SEFIN: ' + data.codigo : '';
+            codigo.textContent = data.codigo ? rotulo + ': ' + data.codigo : '';
         }
-        if (origem) origem.style.display = data.sefin ? 'block' : 'none';
+        if (origem) {
+            origem.style.display = data.sefin || data.origem ? 'block' : 'none';
+            origem.textContent = data.origem || 'Esta é uma mensagem da SEFIN Nacional.';
+        }
         window.__erpNfseShowOverlay('erp-nfse-fiscal-erro');
         document.getElementById('erp-nfse-erro-entendido')?.focus();
     };

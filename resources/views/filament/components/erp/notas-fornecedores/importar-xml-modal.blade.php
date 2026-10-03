@@ -46,7 +46,7 @@
                                     @disabled($this->importarXmlImportProgressOpen || $this->importarXmlCadastroProgressOpen)
                                 >
                             </label>
-                            <button type="button" class="erp-nf-forn-import-xml-modal__tool-btn erp-nf-forn-import-xml-modal__tool-btn--ok" wire:click="finalizarImportarXml" @disabled($temNaoVinculado || $this->importarXmlImportProgressOpen || $this->importarXmlCadastroProgressOpen)>
+                            <button type="button" class="erp-nf-forn-import-xml-modal__tool-btn erp-nf-forn-import-xml-modal__tool-btn--ok" wire:click="finalizarImportarXml" wire:loading.attr="disabled" wire:target="finalizarImportarXml" @disabled($temNaoVinculado || $this->importarXmlImportProgressOpen || $this->importarXmlCadastroProgressOpen)>
                                 <span class="erp-nf-forn-import-xml-modal__tool-icon">✓</span>
                                 <span>Finalizar</span>
                             </button>
@@ -382,8 +382,10 @@
                             <button
                                 type="button"
                                 wire:click="cadastrarTodosProdutosXml"
+                                wire:loading.attr="disabled"
+                                wire:target="cadastrarTodosProdutosXml"
                                 @disabled($this->importarXmlCadastroProgressOpen)
-                                title="Cadastra automaticamente um a um; avisa se já existir"
+                                title="Cadastra automaticamente os itens sem vínculo e avisa se já existir"
                             >Cadastrar Todos</button>
                             <button
                                 type="button"
@@ -749,6 +751,27 @@
             <div class="erp-nf-forn-import-xml-progress__track" aria-hidden="true">
                 <div class="erp-nf-forn-import-xml-progress__bar erp-nf-forn-import-xml-progress__bar--indeterminate"></div>
             </div>
+            <p class="erp-nf-forn-import-xml-progress__hint">Aguarde, não feche esta tela.</p>
+        </div>
+    </div>
+
+    <div
+        wire:loading.flex
+        wire:target="cadastrarTodosProdutosXml"
+        class="erp-nf-forn-import-xml-progress"
+        aria-live="polite"
+        aria-busy="true"
+        role="status"
+    >
+        <div class="erp-nf-forn-import-xml-progress__backdrop" aria-hidden="true"></div>
+        <div class="erp-nf-forn-import-xml-progress__panel">
+            <div class="erp-nf-forn-import-xml-progress__spinner" aria-hidden="true"></div>
+            <p class="erp-nf-forn-import-xml-progress__status">Preparando cadastro automático…</p>
+            <p class="erp-nf-forn-import-xml-progress__detail">Verificando os itens do XML</p>
+            <div class="erp-nf-forn-import-xml-progress__track" aria-hidden="true">
+                <div class="erp-nf-forn-import-xml-progress__bar erp-nf-forn-import-xml-progress__bar--indeterminate"></div>
+            </div>
+            <p class="erp-nf-forn-import-xml-progress__meta">Aguarde</p>
             <p class="erp-nf-forn-import-xml-progress__hint">Aguarde, não feche esta tela.</p>
         </div>
     </div>

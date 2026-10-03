@@ -178,8 +178,8 @@ final class NotaFornecedorXmlDownloadService
                 ultNsu: $ultNsu,
             ));
 
+            // NSU só avança em memória nesta busca. Persistir aqui faria a Consulta Lote pular as outras NF-e.
             $ultNsu = $response->ultNsu;
-            $parametros->update(['dfe_ultimo_nsu' => $ultNsu]);
 
             foreach ($response->documentos as $documento) {
                 if ($documento->chave === $chave && $this->hasItens($documento->xml)) {

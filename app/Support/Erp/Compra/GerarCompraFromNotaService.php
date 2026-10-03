@@ -6,12 +6,16 @@ use App\Models\Compra;
 use App\Models\CompraItem;
 use App\Models\NotaFornecedor;
 use App\Models\NotaFornecedorItem;
+use App\Models\Person;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\NotaFornecedor\NotaFornecedorDanfeReportService;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorFornecedorCadastro;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorItensSyncService;
+use App\Support\Erp\NotaFornecedor\NotaFornecedorXmlProdutoMatcher;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -30,11 +34,17 @@ final class GerarCompraFromNotaService
 
     /**
      * @param  list<array<string, mixed>>  $itensVinculados  linhas do modal (product_id, qtd_total, prc_unitario…)
+     * @param  (callable(array<int, array<string, mixed>>): array<int, array<string, mixed>>)|null  $materializarPendentes
      *
      * @throws DomainException
      */
-    public function gerar(NotaFornecedor $nota, array $itensVinculados): Compra
+    public function gerar(NotaFornecedor $nota, array $itensVinculados, ?callable $materializarPendentes = null): Compra
     {
+        $empresaAtual = ErpContext::currentEmpresaId();
+        if ($empresaAtual !== null && $nota->empresa_id !== null && (int) $nota->empresa_id !== (int) $empresaAtual) {
+            throw new DomainException('Esta nota pertence a outra empresa.');
+        }
+
         if ($nota->status === NotaFornecedor::STATUS_GEROU_COMPRAS) {
             $compraExistente = $nota->compra_id
                 ? Compra::query()->find($nota->compra_id)
@@ -54,7 +64,8 @@ final class GerarCompraFromNotaService
         }
 
         $naoVinculados = collect($itensVinculados)->filter(
-            fn (array $row): bool => empty($row['vinculado']) || empty($row['product_id'])
+            fn (array $row): bool => empty($row['vinculado'])
+                || (empty($row['product_id']) && empty($row['cadastro_pendente']))
         )->count();
 
         if ($naoVinculados > 0) {
@@ -63,44 +74,107 @@ final class GerarCompraFromNotaService
             );
         }
 
-        $itens = $this->normalizarItens($itensVinculados);
-
-        if ($itens === []) {
-            throw new DomainException('Nenhum item com quantidade válida para gerar a compra.');
-        }
-
         (new NotaFornecedorItensSyncService())->sync($nota);
         $nota->refresh();
 
-        $fornecedorId = $this->resolveFornecedorId($nota);
-        $empresaId = $nota->empresa_id ? (int) $nota->empresa_id : null;
-        $total = round(array_sum(array_column($itens, 'total')), 2);
         $momento = ErpTimezone::toLocal();
 
         $compra = DB::transaction(function () use (
             $nota,
-            $itens,
-            $fornecedorId,
-            $empresaId,
-            $total,
+            $itensVinculados,
+            $materializarPendentes,
             $momento,
         ): Compra {
+            $notaTravada = NotaFornecedor::query()
+                ->whereKey($nota->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $notaTravada) {
+                throw new DomainException('Nota não encontrada.');
+            }
+
+            $empresaAtual = ErpContext::currentEmpresaId();
+            if ($empresaAtual !== null && $notaTravada->empresa_id !== null && (int) $notaTravada->empresa_id !== (int) $empresaAtual) {
+                throw new DomainException('Esta nota pertence a outra empresa.');
+            }
+
+            if ($notaTravada->compra_id) {
+                $compraExistente = Compra::query()
+                    ->whereKey($notaTravada->compra_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($compraExistente && $compraExistente->status !== Compra::STATUS_CANCELADA) {
+                    return $compraExistente;
+                }
+            }
+
+            if ($notaTravada->status === NotaFornecedor::STATUS_DESCONHECIDA) {
+                throw new DomainException('Nota desconhecida não pode gerar compra.');
+            }
+
+            if ($notaTravada->status === NotaFornecedor::STATUS_PENDENTE) {
+                throw new DomainException('Confirme a nota (F4) antes de gerar a compra.');
+            }
+
+            $fornecedorId = $this->resolveFornecedorId($notaTravada);
+            $fornecedor = $fornecedorId
+                ? Person::query()->whereKey($fornecedorId)->first()
+                : null;
+
+            if ($materializarPendentes !== null) {
+                $itensVinculados = $materializarPendentes($itensVinculados);
+            }
+
+            $itens = $this->normalizarItens($itensVinculados);
+
+            if ($itens === []) {
+                throw new DomainException('Nenhum item com quantidade válida para gerar a compra.');
+            }
+
+            $subtotal = round(array_sum(array_column($itens, 'total')), 2);
+            $total = $this->totalCompraComoLancamento($notaTravada, $subtotal);
+            $empresaCompra = $notaTravada->empresa_id ? (int) $notaTravada->empresa_id : null;
+            if ($empresaCompra === null) {
+                $atual = ErpContext::currentEmpresaId();
+                if ($atual) {
+                    $empresaCompra = (int) $atual;
+                    $notaTravada->empresa_id = $empresaCompra;
+                }
+            }
+
             $compra = Compra::query()->create([
-                'empresa_id' => $empresaId,
+                'empresa_id' => $empresaCompra,
                 'numero' => Compra::nextNumero(),
-                'data_emissao' => $nota->data_emissao?->toDateString()
+                'data_emissao' => $notaTravada->data_emissao?->toDateString()
                     ?? $momento->toDateString(),
-                'data_entrada' => $nota->data_entrada?->toDateString()
+                'data_entrada' => $notaTravada->data_entrada?->toDateString()
                     ?? $momento->toDateString(),
-                'numero_nota' => $nota->numero ? (string) $nota->numero : null,
+                'numero_nota' => $notaTravada->numero ? (string) $notaTravada->numero : null,
                 'fornecedor_id' => $fornecedorId,
-                'chave_nfe' => preg_replace('/\D/', '', (string) $nota->chave) ?: null,
+                'chave_nfe' => preg_replace('/\D/', '', (string) $notaTravada->chave) ?: null,
                 'total' => $total,
                 'status' => Compra::STATUS_ABERTA,
             ]);
 
+            $productIds = array_values(array_unique(array_map(
+                static fn (array $item): int => (int) $item['product_id'],
+                $itens,
+            )));
+            $produtos = Product::query()->whereIn('id', $productIds)->get()->keyBy('id');
+
+            if ($produtos->count() !== count($productIds)) {
+                throw new DomainException('Há produto informado que não existe no cadastro.');
+            }
+
             foreach ($itens as $item) {
                 $notaItemId = $this->resolveNotaFornecedorItemId($nota, $item);
+                $product = $produtos->get($item['product_id']);
+
+                if (! $product instanceof Product) {
+                    throw new DomainException('Há produto informado que não existe no cadastro.');
+                }
 
                 CompraItem::query()->create([
                     'compra_id' => $compra->id,
@@ -112,47 +186,31 @@ final class GerarCompraFromNotaService
                 ]);
 
                 if ($notaItemId) {
+                    $itemNota = ['product_id' => $item['product_id']];
+                    $cfop = (string) ($item['cfop'] ?? '');
+                    if (strlen($cfop) === 4) {
+                        $itemNota['cfop'] = $cfop;
+                    }
+
                     NotaFornecedorItem::query()
                         ->whereKey($notaItemId)
-                        ->whereNull('product_id')
-                        ->update(['product_id' => $item['product_id']]);
+                        ->update($itemNota);
                 }
 
-                $product = Product::query()->find($item['product_id']);
-
-                if ($product) {
-                    $updates = [];
-                    $und = (string) ($item['und'] ?? '');
-                    $grupo = (string) ($item['grupo'] ?? '');
-
-                    if ($und !== '' && $und !== (string) $product->unidade) {
-                        $updates['unidade'] = $und;
-                    }
-
-                    if ($grupo !== '' && $grupo !== (string) $product->grupo) {
-                        $updates['grupo'] = $grupo;
-                    }
-
-                    $custo = (float) $item['valor_unitario'];
-                    if ($custo > 0) {
-                        $updates['preco_compra'] = $custo;
-                        $updates['preco_custo'] = $custo;
-                        $updates['ult_compra'] = $custo;
-                    }
-
-                    if ($updates !== []) {
-                        $product->forceFill($updates)->save();
-                    }
-                }
+                $this->aplicarCadastroDoItem($product, $item, $fornecedor);
             }
 
-            $nota->forceFill([
+            $notaTravada->forceFill([
                 'compra_id' => $compra->id,
                 'status' => NotaFornecedor::STATUS_GEROU_COMPRAS,
             ])->save();
 
             return $compra;
         });
+
+        if (! $compra->wasRecentlyCreated) {
+            return $compra;
+        }
 
         $this->operacaoLog->registrar(
             operacao: self::OPERACAO,
@@ -164,10 +222,10 @@ final class GerarCompraFromNotaService
             detalhes: [
                 'nota_id' => $nota->id,
                 'chave' => $nota->chave,
-                'itens' => count($itens),
-                'total' => $total,
+                'itens' => $compra->itens()->count(),
+                'total' => (float) $compra->total,
             ],
-            empresaId: $empresaId,
+            empresaId: $compra->empresa_id ? (int) $compra->empresa_id : null,
         );
 
         return $compra;
@@ -223,14 +281,100 @@ final class GerarCompraFromNotaService
                 'quantidade' => $qtdTotal,
                 'valor_unitario' => $vlCusto,
                 'total' => $totalLinha,
-                'und' => mb_strtoupper(trim((string) ($row['und'] ?? '')), 'UTF-8'),
                 'grupo' => trim((string) ($row['grupo'] ?? '')),
+                'ncm' => (string) ($row['ncm'] ?? ''),
+                'cest' => (string) ($row['cest'] ?? ''),
+                'descricao' => trim((string) ($row['produto_descricao'] ?? '')),
+                'cfop' => preg_replace('/\D/', '', (string) ($row['cfop'] ?? '')) ?? '',
                 'n_item' => isset($row['n_item']) ? (int) $row['n_item'] : null,
                 'c_prod' => trim((string) ($row['codigo'] ?? '')),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * Mesma conta do lançamento de Compra: subtotal − desconto + frete + seguro + outras + IPI + ST.
+     */
+    private function totalCompraComoLancamento(NotaFornecedor $nota, float $subtotalItens): float
+    {
+        $xml = trim((string) $nota->xml);
+        $totais = [];
+
+        if ($xml !== '') {
+            $parsed = (new NotaFornecedorDanfeReportService())->parseXml($xml);
+            $totais = is_array($parsed['totais'] ?? null) ? $parsed['totais'] : [];
+        }
+
+        $money = static function (mixed $value): float {
+            $text = trim((string) $value);
+            if ($text === '' || $text === '—') {
+                return 0.0;
+            }
+
+            return BrDecimal::parse($text, 2);
+        };
+
+        $subtotalXml = $money($totais['subtotal'] ?? $totais['total_produtos'] ?? null);
+        $subtotal = $subtotalXml > 0 ? $subtotalXml : $subtotalItens;
+        $desconto = $money($totais['desconto'] ?? null);
+        $frete = $money($totais['frete'] ?? null);
+        $seguro = $money($totais['seguro'] ?? null);
+        $outras = $money($totais['outras'] ?? $totais['despesas'] ?? null);
+        $ipi = $money($totais['total_ipi'] ?? null);
+        $st = $money($totais['total_st'] ?? $totais['valor_icms_st'] ?? null);
+        $total = round($subtotal - $desconto + $frete + $seguro + $outras + $ipi + $st, 2);
+
+        return $total > 0 ? $total : round($subtotalItens, 2);
+    }
+
+    /**
+     * Grava vínculo, NCM/CEST, descrição e grupo. Unidade e custo ficam no fluxo do lançamento.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function aplicarCadastroDoItem(Product $product, array $item, ?Person $fornecedor): void
+    {
+        $updates = [];
+        $ncm = preg_replace('/\D/', '', (string) ($item['ncm'] ?? '')) ?? '';
+        $cest = preg_replace('/\D/', '', (string) ($item['cest'] ?? '')) ?? '';
+            $descricao = trim((string) ($item['descricao'] ?? ''));
+        $grupo = trim((string) ($item['grupo'] ?? ''));
+
+        if (strlen($ncm) >= 8) {
+            $ncm = substr($ncm, 0, 8);
+            if ($ncm !== (string) $product->ncm) {
+                $updates['ncm'] = $ncm;
+            }
+        }
+
+        if (strlen($cest) >= 7) {
+            $cest = substr($cest, 0, 7);
+            if ($cest !== (string) $product->cest) {
+                $updates['cest'] = $cest;
+            }
+        }
+
+        if ($descricao !== '' && $descricao !== '—' && $descricao !== (string) $product->descricao) {
+            $updates['descricao'] = $descricao;
+        }
+
+        if ($grupo !== '' && $grupo !== (string) $product->grupo) {
+            $updates['grupo'] = $grupo;
+        }
+
+        if ($updates !== []) {
+            $product->forceFill($updates)->save();
+        }
+
+        if ($fornecedor instanceof Person) {
+            (new NotaFornecedorXmlProdutoMatcher())->vincularProduto(
+                $product,
+                $fornecedor,
+                (string) ($item['c_prod'] ?? $product->codigo),
+            );
+        }
     }
 
     /**

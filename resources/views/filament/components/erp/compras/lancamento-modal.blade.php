@@ -9,6 +9,7 @@
 @if ($this->lancamentoModalOpen)
     <div
         class="erp-lookup-modal erp-compras-lancamento-modal"
+        x-on:erp-compras-lancamento-fechado.window="$el.remove()"
         x-on:erp-compra-romaneio-focus-qtd.window="
             const input = document.getElementById('erp-compra-romaneio-qtd');
             input?.removeAttribute('readonly');
@@ -65,7 +66,8 @@
                                 class="erp-compras-lancamento-modal__tool-btn erp-compras-lancamento-modal__tool-btn--ok"
                                 wire:click="finalizarCompraLancamento"
                                 wire:loading.attr="disabled"
-                                @disabled(! $canFinalize)
+                                wire:target="finalizarCompraLancamento,confirmarFinalizarCompraLancamento,concluirLancamentoParcelas"
+                                @disabled(! $canFinalize || $this->lancamentoFinalizando)
                                 title="{{ $canFinalize ? 'Finalizar alteração' : 'Compra já finalizada' }}"
                             >
                                 <span class="erp-compras-lancamento-modal__tool-icon">✓</span>

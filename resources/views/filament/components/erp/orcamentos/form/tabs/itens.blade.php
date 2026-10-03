@@ -23,14 +23,20 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @php
+                        $rateioDescontoGeral = $this->rateioDescontoGeralPorItem();
+                    @endphp
                     @forelse ($this->itens as $index => $item)
                         @php
                             $qtd = \App\Support\Erp\ErpMoney::parseBr($item['quantidade'] ?? 0, 3);
                             $preco = \App\Support\Erp\ErpMoney::parseBr($item['preco_unitario'] ?? 0);
                             $bruto = round($qtd * $preco, 2);
                             $acr = \App\Support\Erp\ErpMoney::parseBr($item['acrescimo'] ?? 0);
-                            $desc = \App\Support\Erp\ErpMoney::parseBr($item['desconto'] ?? 0);
-                            $liq = \App\Support\Erp\ErpMoney::parseBr($item['total'] ?? ($bruto + $acr - $desc));
+                            $liq = \App\Support\Erp\ErpMoney::parseBr($item['total'] ?? 0);
+                            $descProprio = round(max(0, $bruto + $acr - $liq), 2);
+                            $rateioLinha = round((float) ($rateioDescontoGeral[$index] ?? 0), 2);
+                            $desc = round($descProprio + $rateioLinha, 2);
+                            $liqExibido = round(max(0, $liq - $rateioLinha), 2);
                         @endphp
                         <tr
                             wire:key="{{ $item['key'] ?? ('orc-item-' . $index) }}"
@@ -51,7 +57,15 @@
                                         wire:click.stop="requestDeleteItem({{ $index }})"
                                         title="Excluir item"
                                         aria-label="Excluir item"
-                                    >✕</button>
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M3 6h18"/>
+                                            <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                            <path d="M10 11v6"/>
+                                            <path d="M14 11v6"/>
+                                        </svg>
+                                    </button>
                                 </td>
                             @endunless
                             <td class="erp-fv-tv__col-idx">
@@ -96,7 +110,7 @@
                             <td class="erp-fv-tv__col-num erp-fv-tv__val-liq">
                                 <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
                                     <span class="erp-fv-tv__money-rs">R$</span>
-                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($liq) }}</span>
+                                    <span class="erp-fv-tv__money-val">{{ \App\Support\Erp\ErpMoney::formatBr($liqExibido) }}</span>
                                 </div>
                             </td>
                         </tr>

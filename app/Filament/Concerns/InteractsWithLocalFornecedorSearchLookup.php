@@ -13,6 +13,9 @@ trait InteractsWithLocalFornecedorSearchLookup
 
     public ?int $selectedLocalFornecedorIndex = null;
 
+    /** Evita o debounce reabrir o lookup após Enter/seleção. */
+    public string $localFornecedorConfirmedTerm = '';
+
     public string $fornecedorFilter = 'todos';
 
     public function isLocalFornecedorSearchActive(): bool
@@ -28,6 +31,17 @@ trait InteractsWithLocalFornecedorSearchLookup
     public function openLocalFornecedorLookup(): void
     {
         if (! $this->isLocalFornecedorSearchActive()) {
+            return;
+        }
+
+        // Já selecionou o fornecedor: não reabre a lista só por focar o campo.
+        if (
+            $this->localFornecedorConfirmedTerm !== ''
+            && is_numeric($this->fornecedorFilter)
+            && mb_strtoupper(trim($this->localFornecedorSearchTerm()), 'UTF-8') === $this->localFornecedorConfirmedTerm
+        ) {
+            $this->closeLocalFornecedorLookup();
+
             return;
         }
 
@@ -130,7 +144,7 @@ trait InteractsWithLocalFornecedorSearchLookup
         $index = $this->selectedLocalFornecedorIndex;
 
         if ($index === null || ! isset($this->localFornecedorResults[$index])) {
-            $this->localFornecedorLookupOpen = false;
+            $this->closeLocalFornecedorLookup();
 
             return;
         }
@@ -142,12 +156,14 @@ trait InteractsWithLocalFornecedorSearchLookup
             return;
         }
 
-        $this->setLocalFornecedorSearchTerm(mb_strtoupper($person->nome_razao, 'UTF-8'));
+        $nome = mb_strtoupper((string) $person->nome_razao, 'UTF-8');
+
+        // Fecha antes de setar o texto — evita o debounce reabrir a lista / zerar o filtro.
+        $this->localFornecedorConfirmedTerm = $nome;
+        $this->closeLocalFornecedorLookup();
         $this->fornecedorFilter = (string) $person->id;
+        $this->setLocalFornecedorSearchTerm($nome);
         $this->onLocalFornecedorConfirmed($person);
-        $this->localFornecedorLookupOpen = false;
-        $this->localFornecedorResults = [];
-        $this->selectedLocalFornecedorIndex = null;
         $this->clearListSelection();
         $this->resetTable();
     }
@@ -159,6 +175,7 @@ trait InteractsWithLocalFornecedorSearchLookup
         }
 
         if (trim($this->localFornecedorSearchTerm()) === '') {
+            $this->localFornecedorConfirmedTerm = '';
             $this->fornecedorFilter = 'todos';
             $this->closeLocalFornecedorLookup();
             $this->clearListSelection();
@@ -169,7 +186,7 @@ trait InteractsWithLocalFornecedorSearchLookup
 
         if ($this->localFornecedorLookupOpen) {
             if ($this->localFornecedorResults === []) {
-                $this->localFornecedorLookupOpen = false;
+                $this->closeLocalFornecedorLookup();
                 $this->clearListSelection();
                 $this->resetTable();
 
@@ -177,7 +194,11 @@ trait InteractsWithLocalFornecedorSearchLookup
             }
 
             $this->confirmLocalFornecedorSelection();
+
+            return;
         }
+
+        // Enter com texto e lookup fechado: não reabrir lista.
     }
 
     public function closeLocalFornecedorLookup(): void
@@ -204,6 +225,31 @@ trait InteractsWithLocalFornecedorSearchLookup
         }
 
         $upper = mb_strtoupper($value, 'UTF-8');
+        $term = trim($upper);
+
+        if ($term === '') {
+            $this->localFornecedorConfirmedTerm = '';
+            $this->setLocalFornecedorSearchTerm('');
+            $this->fornecedorFilter = 'todos';
+            $this->closeLocalFornecedorLookup();
+
+            return;
+        }
+
+        // Após Enter/seleção (ou debounce atrasado): mantém fornecedor e não reabre a lista.
+        if (
+            $this->localFornecedorConfirmedTerm !== ''
+            && $term === $this->localFornecedorConfirmedTerm
+            && is_numeric($this->fornecedorFilter)
+        ) {
+            $this->closeLocalFornecedorLookup();
+
+            return;
+        }
+
+        if ($this->localFornecedorConfirmedTerm !== '' && $term !== $this->localFornecedorConfirmedTerm) {
+            $this->localFornecedorConfirmedTerm = '';
+        }
 
         if ($this->localFornecedorSearchTerm() !== $upper) {
             $this->setLocalFornecedorSearchTerm($upper);

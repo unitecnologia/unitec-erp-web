@@ -49,6 +49,12 @@
                 </div>
             </label>
 
+            @if (trim($this->clienteObservacoes) !== '' && ! \App\Models\Person::isCodigoConsumidorFinal($this->clienteCodigo !== '' ? $this->clienteCodigo : null))
+                <button type="button" class="erp-fv-tv__obs-cliente" wire:click="abrirObservacaoCliente" title="Observação do cliente">
+                    Obs. cliente
+                </button>
+            @endif
+
             <label class="erp-fv-tv__field erp-fv-tv__field--doc">
                 <span>CPF/CNPJ</span>
                 <input

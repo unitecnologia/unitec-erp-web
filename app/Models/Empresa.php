@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\Erp\EmpresaParametros;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -44,7 +45,10 @@ use Illuminate\Database\QueryException;
     'logo_path',
     'ativo',
     'configuracao_inicial_concluida',
+    'param_monitor_vendas_imp_valor_liquido',
+    'param_monitor_vendas_imp_sem_coluna_desconto',
 ])]
+#[Hidden(['param_consulta_placa_token'])]
 class Empresa extends Model
 {
     public const PESSOA_FISICA = 'fisica';
@@ -105,6 +109,7 @@ class Empresa extends Model
             ...EmpresaParametros::pixBooleanFields(),
             ...EmpresaParametros::boletoBooleanFields(),
             ...EmpresaParametros::apiServicosBooleanFields(),
+            ...EmpresaParametros::consultaPlacaBooleanFields(),
             ...EmpresaParametros::acessoRemotoBooleanFields(),
             ...EmpresaParametros::licencaApiBooleanFields(),
             ...EmpresaParametros::whatsAppBooleanFields(),
@@ -117,6 +122,8 @@ class Empresa extends Model
         }
 
         $casts['param_api_servicos_timeout'] = 'integer';
+        $casts['param_consulta_placa_timeout'] = 'integer';
+        $casts['param_consulta_placa_token'] = 'encrypted';
         $casts['param_licenca_api_timeout'] = 'integer';
         $casts['param_whatsapp_timeout'] = 'integer';
         $casts['param_whatsapp_gateway_port'] = 'integer';

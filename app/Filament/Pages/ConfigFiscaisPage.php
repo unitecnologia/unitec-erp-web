@@ -5,15 +5,19 @@ namespace App\Filament\Pages;
 use App\Support\Erp\ErpAccess;
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\Nfse;
+use App\Models\NfseDpsSequencia;
 use App\Models\PdvVendaNfce;
 use App\Models\Terminal;
 use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
+use App\Support\Erp\Nfse\NfseDpsNumeracaoRecusada;
 use App\Support\Erp\Nfse\NfseRegimeTributario;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Fiscal\NfceTerminalSequencia;
+use Unitec\FiscalEngine\Nfe\DfeDistribuidor;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -274,11 +278,30 @@ class ConfigFiscaisPage extends Page
             return;
         }
 
+        $this->form['nfse_provedor'] = $this->normalizarNfseProvedor($this->form['nfse_provedor'] ?? null) ?? 'nacional';
         $this->form['nfse_ambiente'] = $this->normalizarNfseAmbiente($this->form['nfse_ambiente'] ?? null);
         $this->form['nfse_reg_esp_trib'] = $this->codigoNfseOuNulo($this->form['nfse_reg_esp_trib'] ?? null);
         $this->form['nfse_reg_ap_trib_sn'] = $this->codigoNfseOuNulo($this->form['nfse_reg_ap_trib_sn'] ?? null);
+        $this->form['nfse_serie_dps'] = trim((string) ($this->form['nfse_serie_dps'] ?? ''));
+        $this->form['nfse_serie_rps'] = trim((string) ($this->form['nfse_serie_rps'] ?? ''));
+        $this->form['nfse_tipo_rps'] = trim((string) ($this->form['nfse_tipo_rps'] ?? ''));
+        $this->form['nfse_ws_usuario'] = trim((string) ($this->form['nfse_ws_usuario'] ?? ''));
+        $this->form['nfse_url_producao'] = trim((string) ($this->form['nfse_url_producao'] ?? ''));
+        $this->form['nfse_url_homologacao'] = trim((string) ($this->form['nfse_url_homologacao'] ?? ''));
+        $this->aplicarPadroesIpm();
+        $nacional = $this->form['nfse_provedor'] === 'nacional';
+        $ipm = $this->form['nfse_provedor'] === 'ipm';
+        $nsuDigits = preg_replace('/\D/', '', (string) ($this->form['dfe_ultimo_nsu'] ?? '')) ?? '';
 
         try {
+            if (strlen($nsuDigits) > 15) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'form.dfe_ultimo_nsu' => 'Último NSU inválido. Informe até 15 dígitos.',
+                ]);
+            }
+
+            $this->form['dfe_ultimo_nsu'] = DfeDistribuidor::normalizarNsu($nsuDigits);
+
             $this->validate([
                 'form.uf' => ['required', 'string', 'size:2'],
                 'form.ambiente' => ['required', 'integer', 'in:0,1'],
@@ -287,6 +310,7 @@ class ConfigFiscaisPage extends Page
                 'form.tentativas' => ['required', 'integer', 'min:1'],
                 'form.numero_nfe' => ['required', 'integer', 'min:1'],
                 'form.serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
+                'form.dfe_ultimo_nsu' => ['required', 'regex:/^\d{15}$/'],
                 'form.id_token' => ['nullable', 'string', 'max:40'],
                 'form.token' => ['nullable', 'string', 'max:120'],
                 'form.versao_qrcode' => ['nullable', 'integer', 'in:2,3'],
@@ -296,14 +320,63 @@ class ConfigFiscaisPage extends Page
                 'form.resp_tecnico_fone' => ['nullable', 'string', 'max:20'],
                 'form.resp_tecnico_id_csrt' => ['nullable', 'string', 'max:6'],
                 'form.resp_tecnico_csrt' => ['nullable', 'string', 'max:100'],
+                'form.nfse_provedor' => ['required', 'in:nacional,ipm'],
                 'form.nfse_ambiente' => ['nullable', 'in:'.implode(',', array_keys(NfseSefinAmbiente::opcoes()))],
                 'form.nfse_reg_esp_trib' => ['nullable', 'in:'.implode(',', array_keys(NfseRegimeTributario::regimesEspeciais()))],
                 'form.nfse_reg_ap_trib_sn' => ['nullable', 'in:'.implode(',', array_keys(NfseRegimeTributario::regimesApuracaoSimples()))],
+                'form.nfse_serie_dps' => [$nacional ? 'required' : 'nullable', 'regex:'.NfseDpsSequencia::SERIE_PATTERN],
+                'form.nfse_proximo_dps' => [$nacional ? 'required' : 'nullable', 'integer', 'min:1', 'max:'.NfseDpsSequencia::NUMERO_MAX],
+                'form.nfse_serie_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[A-Za-z0-9]{1,5}$/'],
+                'form.nfse_proximo_rps' => [$ipm ? 'required' : 'nullable', 'integer', 'min:1', 'max:'.NfseDpsSequencia::NUMERO_MAX],
+                'form.nfse_tipo_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[0-9]$/'],
+                'form.nfse_ws_usuario' => [$ipm ? 'required' : 'nullable', 'string', 'max:20'],
+                'form.nfse_ws_senha' => ['nullable', 'string', 'max:120'],
+                'form.nfse_url_producao' => ['nullable', 'string', 'max:255', 'url'],
+                'form.nfse_url_homologacao' => ['nullable', 'string', 'max:255', 'url'],
             ], [
+                'form.nfse_provedor.required' => 'Selecione o provedor da NFS-e.',
+                'form.nfse_provedor.in' => 'Provedor da NFS-e inválido.',
                 'form.nfse_ambiente.in' => 'Ambiente da NFS-e inválido.',
                 'form.nfse_reg_esp_trib.in' => 'Regime especial de tributação da NFS-e inválido.',
                 'form.nfse_reg_ap_trib_sn.in' => 'Regime de apuração do Simples da NFS-e inválido.',
+                'form.nfse_serie_dps.required' => 'Informe a série DPS.',
+                'form.nfse_serie_dps.regex' => 'Série DPS inválida. Use até 5 dígitos, no máximo 89999.',
+                'form.nfse_proximo_dps.required' => 'Informe o próximo Nº DPS.',
+                'form.nfse_proximo_dps.integer' => 'Próximo Nº DPS inválido.',
+                'form.nfse_proximo_dps.min' => 'O próximo Nº DPS deve ser maior que zero.',
+                'form.nfse_proximo_dps.max' => 'Próximo Nº DPS inválido.',
+                'form.nfse_serie_rps.required' => 'Informe a série RPS.',
+                'form.nfse_serie_rps.regex' => 'Série RPS inválida. Use até 5 letras ou números.',
+                'form.nfse_proximo_rps.required' => 'Informe o próximo Nº RPS.',
+                'form.nfse_proximo_rps.integer' => 'Próximo Nº RPS inválido.',
+                'form.nfse_proximo_rps.min' => 'O próximo Nº RPS deve ser maior que zero.',
+                'form.nfse_proximo_rps.max' => 'Próximo Nº RPS inválido.',
+                'form.nfse_tipo_rps.required' => 'Informe o tipo do RPS.',
+                'form.nfse_tipo_rps.regex' => 'Tipo do RPS inválido. Use um dígito.',
+                'form.nfse_ws_usuario.required' => 'Informe o usuário do WebService.',
+                'form.nfse_ws_usuario.max' => 'Usuário do WebService inválido.',
+                'form.nfse_ws_senha.max' => 'Senha do WebService inválida.',
+                'form.nfse_url_producao.url' => 'URL de produção da NFS-e inválida.',
+                'form.nfse_url_producao.max' => 'URL de produção da NFS-e inválida.',
+                'form.nfse_url_homologacao.url' => 'URL de homologação da NFS-e inválida.',
+                'form.nfse_url_homologacao.max' => 'URL de homologação da NFS-e inválida.',
+                'form.dfe_ultimo_nsu.required' => 'Informe o último NSU.',
+                'form.dfe_ultimo_nsu.regex' => 'Último NSU inválido. Informe até 15 dígitos.',
             ]);
+
+            if ($nacional) {
+                $recusa = NfseDpsSequencia::recusaProximo(
+                    $empresaId,
+                    (string) $this->form['nfse_serie_dps'],
+                    (int) $this->form['nfse_proximo_dps'],
+                );
+
+                if ($recusa !== null) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'form.nfse_proximo_dps' => $recusa,
+                    ]);
+                }
+            }
         } catch (\Illuminate\Validation\ValidationException $e) {
             $primeiro = collect($e->validator->errors()->all())->first();
 
@@ -318,6 +391,14 @@ class ConfigFiscaisPage extends Page
 
         try {
             $this->persistConfigFiscais($empresaId);
+        } catch (NfseDpsNumeracaoRecusada $e) {
+            Notification::make()
+                ->title('Não foi possível gravar')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
         } catch (\Throwable $e) {
             report($e);
 
@@ -353,6 +434,7 @@ class ConfigFiscaisPage extends Page
             'logomarca' => $this->form['logomarca'] ?: null,
             'serie_nfe' => (int) ($this->form['serie_nfe'] ?? 1),
             'numero_nfe' => (int) ($this->form['numero_nfe'] ?? 1),
+            'dfe_ultimo_nsu' => DfeDistribuidor::normalizarNsu((string) ($this->form['dfe_ultimo_nsu'] ?? '')),
             'email_host' => $this->form['email_host'] ?: null,
             'email_porta' => $this->form['email_porta'] ?: null,
             'email_user' => $this->form['email_user'] ?: null,
@@ -396,6 +478,10 @@ class ConfigFiscaisPage extends Page
         $params = NfeFiscalConfig::syncWebStack($params);
 
         $this->persistNfseRegime($empresaId);
+
+        if (($this->form['nfse_provedor'] ?? 'nacional') === 'nacional') {
+            $this->persistNfseNumeracao($empresaId);
+        }
 
         $this->form = NfeFiscalConfig::toFormArray($params);
         $this->form['proxy_senha'] = '';
@@ -799,20 +885,104 @@ class ConfigFiscaisPage extends Page
         return $empresa->fantasia ?: ($empresa->nome ?: $empresa->razao_social);
     }
 
+    public function updatedForm(mixed $value, ?string $key = null): void
+    {
+        if ($key !== 'nfse_provedor') {
+            return;
+        }
+
+        $this->form['nfse_provedor'] = $this->normalizarNfseProvedor($value) ?? 'nacional';
+        $this->aplicarPadroesIpm();
+    }
+
     protected function loadNfseRegime(?Empresa $empresa): void
     {
+        $this->form['nfse_provedor'] = $this->normalizarNfseProvedor($empresa?->nfse_provedor) ?? 'nacional';
         $this->form['nfse_ambiente'] = $this->codigoNfse($empresa?->nfse_ambiente);
         $this->form['nfse_reg_esp_trib'] = $this->codigoNfse($empresa?->nfse_reg_esp_trib);
         $this->form['nfse_reg_ap_trib_sn'] = $this->codigoNfse($empresa?->nfse_reg_ap_trib_sn);
+
+        $serie = trim((string) ($empresa?->nfse_serie_dps ?? ''));
+        $this->form['nfse_serie_dps'] = $serie !== '' ? $serie : Nfse::SERIE_DPS;
+
+        $empresaId = (int) ($empresa?->id ?? 0);
+        $this->form['nfse_proximo_dps'] = $empresaId > 0
+            ? NfseDpsSequencia::proximoConfigurado($empresaId, $this->form['nfse_serie_dps'])
+            : 1;
+
+        $this->form['nfse_serie_rps'] = trim((string) ($empresa?->nfse_serie_rps ?? ''));
+        $proximoRps = (int) ($empresa?->nfse_proximo_rps ?? 0);
+        $this->form['nfse_proximo_rps'] = $proximoRps > 0 ? $proximoRps : 1;
+        $this->form['nfse_tipo_rps'] = trim((string) ($empresa?->nfse_tipo_rps ?? '')) ?: '1';
+        $this->form['nfse_ws_usuario'] = trim((string) ($empresa?->nfse_ws_usuario ?? ''));
+        $this->form['nfse_ws_senha'] = (string) ($empresa?->nfse_ws_senha ?? '');
+        $this->form['nfse_url_producao'] = trim((string) ($empresa?->nfse_url_producao ?? ''));
+        $this->form['nfse_url_homologacao'] = trim((string) ($empresa?->nfse_url_homologacao ?? ''));
+        $this->aplicarPadroesIpm();
     }
 
     protected function persistNfseRegime(int $empresaId): void
     {
+        $proximoRps = (int) ($this->form['nfse_proximo_rps'] ?? 0);
+
         Empresa::query()->whereKey($empresaId)->update([
+            'nfse_provedor' => $this->normalizarNfseProvedor($this->form['nfse_provedor'] ?? null) ?? 'nacional',
             'nfse_ambiente' => $this->normalizarNfseAmbiente($this->form['nfse_ambiente'] ?? null),
             'nfse_reg_esp_trib' => $this->codigoNfseOuNulo($this->form['nfse_reg_esp_trib'] ?? null),
             'nfse_reg_ap_trib_sn' => $this->codigoNfseOuNulo($this->form['nfse_reg_ap_trib_sn'] ?? null),
+            'nfse_serie_rps' => $this->codigoNfseOuNulo($this->form['nfse_serie_rps'] ?? null),
+            'nfse_proximo_rps' => $proximoRps > 0 ? $proximoRps : null,
+            'nfse_tipo_rps' => $this->codigoNfseOuNulo($this->form['nfse_tipo_rps'] ?? null) ?? '1',
+            'nfse_ws_usuario' => $this->codigoNfseOuNulo($this->form['nfse_ws_usuario'] ?? null),
+            'nfse_ws_senha' => $this->codigoNfseOuNulo($this->form['nfse_ws_senha'] ?? null),
+            'nfse_url_producao' => $this->codigoNfseOuNulo($this->form['nfse_url_producao'] ?? null),
+            'nfse_url_homologacao' => $this->codigoNfseOuNulo($this->form['nfse_url_homologacao'] ?? null),
         ]);
+    }
+
+    protected function persistNfseNumeracao(int $empresaId): void
+    {
+        NfseDpsSequencia::configurar(
+            $empresaId,
+            (string) $this->form['nfse_serie_dps'],
+            (int) $this->form['nfse_proximo_dps'],
+        );
+    }
+
+    protected function aplicarPadroesIpm(): void
+    {
+        if (($this->form['nfse_provedor'] ?? 'nacional') !== 'ipm') {
+            return;
+        }
+
+        if (trim((string) ($this->form['nfse_tipo_rps'] ?? '')) === '') {
+            $this->form['nfse_tipo_rps'] = '1';
+        }
+
+        if ((int) ($this->form['nfse_proximo_rps'] ?? 0) < 1) {
+            $this->form['nfse_proximo_rps'] = 1;
+        }
+
+        if (trim((string) ($this->form['nfse_ws_usuario'] ?? '')) !== '') {
+            return;
+        }
+
+        $empresaId = $this->resolveEmpresaId();
+        $cnpj = preg_replace('/\D/', '', (string) (Empresa::query()->whereKey($empresaId)->value('cnpj') ?? '')) ?? '';
+
+        if ($cnpj !== '') {
+            $this->form['nfse_ws_usuario'] = $cnpj;
+        }
+    }
+
+    /**
+     * @return 'nacional'|'ipm'|null
+     */
+    protected function normalizarNfseProvedor(mixed $valor): ?string
+    {
+        $texto = strtolower(trim((string) $valor));
+
+        return in_array($texto, ['nacional', 'ipm'], true) ? $texto : null;
     }
 
     protected function normalizarNfseAmbiente(mixed $valor): ?string

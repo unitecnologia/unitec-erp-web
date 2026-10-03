@@ -12,6 +12,45 @@ use App\Support\Erp\PersonDocumentoDuplicadoException;
 final class NotaFornecedorFornecedorCadastro
 {
     /**
+     * Só consulta. O cadastro do fornecedor fica para o Finalizar da importação.
+     *
+     * @param  array<string, mixed>  $emitente
+     * @return array{
+     *     person: ?Person,
+     *     status: 'existente'|'automatico'|'sem_documento',
+     *     label: string
+     * }
+     */
+    public function preview(array $emitente): array
+    {
+        $digits = preg_replace('/\D/', '', (string) ($emitente['cnpj'] ?? '')) ?? '';
+
+        if (strlen($digits) < 11) {
+            return [
+                'person' => null,
+                'status' => 'sem_documento',
+                'label' => 'Sem CNPJ/CPF no XML',
+            ];
+        }
+
+        $person = $this->findByDocumento($digits);
+
+        if ($person && $person->is_fornecedor) {
+            return [
+                'person' => $person,
+                'status' => 'existente',
+                'label' => 'Fornecedor já cadastrado',
+            ];
+        }
+
+        return [
+            'person' => null,
+            'status' => 'automatico',
+            'label' => 'Fornecedor será cadastrado ao finalizar',
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $emitente
      * @return array{
      *     person: ?Person,

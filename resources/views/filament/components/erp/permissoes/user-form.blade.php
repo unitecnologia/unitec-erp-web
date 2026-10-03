@@ -103,8 +103,8 @@
             <span>Perfil</span>
             <select wire:model="userForm.erp_profile_id">
                 <option value="">— Sem perfil —</option>
-                @foreach ($this->profileOptions() as $id => $nome)
-                    <option value="{{ $id }}">{{ $nome }}</option>
+                @foreach ($this->profileRows as $profile)
+                    <option value="{{ $profile['id'] }}">{{ $profile['nome'] }}</option>
                 @endforeach
             </select>
         </label>

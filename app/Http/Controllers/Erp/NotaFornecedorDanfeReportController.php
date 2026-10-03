@@ -21,7 +21,7 @@ class NotaFornecedorDanfeReportController
 
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
 
-        if ($empresaId && (int) $nota->empresa_id !== (int) $empresaId) {
+        if ($nota->empresa_id && $empresaId && (int) $nota->empresa_id !== (int) $empresaId) {
             abort(403);
         }
 

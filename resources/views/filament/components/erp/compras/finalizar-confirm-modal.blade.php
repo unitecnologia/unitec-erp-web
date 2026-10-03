@@ -4,7 +4,7 @@
         x-data
         x-on:keydown.window="
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelarFinalizarCompraLancamento(); }
-            if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarFinalizarCompraLancamento(); }
+            if ($event.key === 'Enter' && ! $wire.lancamentoFinalizando) { $event.preventDefault(); $wire.confirmarFinalizarCompraLancamento(); }
         "
     >
         <div class="erp-compras-confirm-modal__backdrop" wire:click="cancelarFinalizarCompraLancamento"></div>
@@ -37,6 +37,9 @@
                     type="button"
                     class="erp-compras-confirm-modal__btn erp-compras-confirm-modal__btn--yes"
                     wire:click="confirmarFinalizarCompraLancamento"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmarFinalizarCompraLancamento,concluirLancamentoParcelas"
+                    @disabled($this->lancamentoFinalizando)
                 >
                     Sim
                 </button>

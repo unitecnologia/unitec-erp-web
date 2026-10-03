@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.225',
+    'versao' => '6.4.1.228',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -23,6 +23,15 @@ return [
     */
     'portal_bkp' => [
         'token' => 'alencar@1234',
+    ],
+
+    /*
+    | Consulta de parcelas de todos os clientes no Portal Financeiro.
+    | O atalho só aparece com a flag ligada e o token preenchido no .env.
+    */
+    'portal_erp_parcelas' => [
+        'enabled' => filter_var(env('PORTAL_ERP_PARCELAS', false), FILTER_VALIDATE_BOOL),
+        'token' => (string) env('PORTAL_ERP_TOKEN', ''),
     ],
 
     /*

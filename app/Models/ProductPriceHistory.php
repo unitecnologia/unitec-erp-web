@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'registrado_em',
     'usuario',
     'forma_alteracao',
+    'compra_id',
 ])]
 class ProductPriceHistory extends Model
 {

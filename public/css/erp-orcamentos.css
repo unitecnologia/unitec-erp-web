@@ -1713,6 +1713,18 @@
     overflow: auto;
 }
 
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens__grid:not(:has(.erp-orc-itens__col-delete)) > thead > tr > th:nth-child(8),
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens__grid:not(:has(.erp-orc-itens__col-delete)) > tbody > tr > td:nth-child(8) {
+    width: 5.5rem;
+    text-align: right;
+}
+
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens__grid:not(:has(.erp-orc-itens__col-delete)) > thead > tr > th:nth-child(9),
+.erp-orcamentos-page .erp-orc-view-modal .erp-orc-itens__grid:not(:has(.erp-orc-itens__col-delete)) > tbody > tr > td:nth-child(9) {
+    width: 5rem;
+    text-align: left;
+}
+
 .erp-orcamentos-page .erp-orc-view-modal .erp-orc-view-modal__totals .erp-orc-totals__value {
     pointer-events: none;
 }

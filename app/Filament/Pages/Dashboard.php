@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Support\Erp\Dashboard\ErpDashboardData;
 use App\Support\Erp\Dashboard\ErpDashboardScope;
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\License\LicencaPortalPagamentoService;
@@ -108,12 +109,20 @@ class Dashboard extends BaseDashboard
 
     public function loadDashboardHeavy(): void
     {
+        if (! ErpAccess::currentCan('dashboard.access')) {
+            return;
+        }
+
         $this->dashboardHeavyReady = true;
         unset($this->dashboardHeavy, $this->dashboardData);
     }
 
     public function setDashboardVisao(string $visao): void
     {
+        if (! ErpAccess::currentCan('dashboard.access')) {
+            return;
+        }
+
         if (! in_array($visao, [ErpDashboardScope::VISAO_EMPRESA, ErpDashboardScope::VISAO_GRUPO], true)) {
             return;
         }
@@ -130,6 +139,10 @@ class Dashboard extends BaseDashboard
 
     public function abrirRenovacaoPix(LicencaRemotaService $licencas, LicencaPortalPagamentoService $pagamentos): void
     {
+        if (! ErpAccess::currentCan('dashboard.access')) {
+            return;
+        }
+
         $this->pixRenovacaoOpen = true;
         $this->pixFeedback = '';
         $this->pixLoading = true;
@@ -188,6 +201,10 @@ class Dashboard extends BaseDashboard
         LicencaRemotaService $licencas,
         LicencaPortalPagamentoService $pagamentos,
     ): void {
+        if (! ErpAccess::currentCan('dashboard.access')) {
+            return;
+        }
+
         $this->pixFeedback = '';
         $cnpj = $licencas->currentCnpj() ?? '';
 
@@ -255,7 +272,11 @@ class Dashboard extends BaseDashboard
         return $schema
             ->gap(false)
             ->components([
-                View::make('filament.components.erp.home.screen'),
+                View::make(
+                    ErpAccess::currentCan('dashboard.access')
+                        ? 'filament.components.erp.home.screen'
+                        : 'filament.components.erp.home.logo'
+                ),
             ]);
     }
 

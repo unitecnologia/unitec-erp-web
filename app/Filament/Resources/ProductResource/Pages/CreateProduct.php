@@ -5,12 +5,10 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\Concerns\ErpProductFormPage;
 use App\Models\Empresa;
-use App\Models\Person;
 use App\Models\Product;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\NotaFornecedor\NotaFornecedorProductPrefill;
-use App\Support\Erp\NotaFornecedor\NotaFornecedorXmlProdutoMatcher;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -109,7 +107,6 @@ class CreateProduct extends CreateRecord
         $itemIndex = is_array($prefill) ? (int) ($prefill['item_index'] ?? -1) : -1;
 
         if ($this->embedsInNotaFornecedor && $this->record instanceof Product) {
-            $this->vincularProdutoNotaFornecedor($this->record, $prefill);
             NotaFornecedorProductPrefill::forget();
 
             Notification::make()
@@ -218,32 +215,6 @@ class CreateProduct extends CreateRecord
             'ult_compra' => $preco,
             'ult_fornecedor_id' => $personId > 0 ? $personId : null,
         ], static fn ($value) => $value !== null && $value !== '');
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $prefill
-     */
-    private function vincularProdutoNotaFornecedor(Product $product, ?array $prefill): void
-    {
-        if (! is_array($prefill)) {
-            return;
-        }
-
-        $matcher = new NotaFornecedorXmlProdutoMatcher();
-        $personId = (int) ($prefill['person_id'] ?? 0);
-        $fornecedor = $personId > 0
-            ? Person::query()->find($personId)
-            : $matcher->resolveFornecedorByCnpj((string) ($prefill['cnpj'] ?? ''));
-
-        if (! $fornecedor instanceof Person) {
-            return;
-        }
-
-        $matcher->vincularProduto(
-            $product,
-            $fornecedor,
-            (string) ($prefill['codigo_fornecedor'] ?? $product->codigo),
-        );
     }
 
     private function parseXmlMoney(mixed $value): float

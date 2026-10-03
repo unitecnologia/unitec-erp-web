@@ -134,6 +134,14 @@ final class EmpresaParametros
                 'hint' => 'Exibe o custo unitário atual dos produtos na Tela de Venda e no Monitor.',
                 'default' => false,
             ],
+            'param_monitor_vendas_imp_valor_liquido' => [
+                'label' => 'Imprimir valor unitário líquido nos pedidos',
+                'default' => false,
+            ],
+            'param_monitor_vendas_imp_sem_coluna_desconto' => [
+                'label' => 'Ocultar coluna de desconto na impressão',
+                'default' => true,
+            ],
         ];
     }
 
@@ -267,9 +275,18 @@ final class EmpresaParametros
     public static function nfseFields(): array
     {
         return [
+            'nfse_provedor' => ['label' => 'Provedor NFS-e', 'default' => 'nacional', 'type' => 'string'],
             'nfse_ambiente' => ['label' => 'Ambiente NFS-e', 'default' => '', 'type' => 'string'],
             'nfse_reg_esp_trib' => ['label' => 'Regime especial de tributação', 'default' => '', 'type' => 'string'],
             'nfse_reg_ap_trib_sn' => ['label' => 'Regime de apuração do Simples', 'default' => '', 'type' => 'string'],
+            'nfse_serie_dps' => ['label' => 'Série DPS', 'default' => '', 'type' => 'string'],
+            'nfse_serie_rps' => ['label' => 'Série RPS', 'default' => '', 'type' => 'string'],
+            'nfse_proximo_rps' => ['label' => 'Próximo Nº RPS', 'default' => '', 'type' => 'string'],
+            'nfse_tipo_rps' => ['label' => 'Tipo RPS', 'default' => '1', 'type' => 'string'],
+            'nfse_ws_usuario' => ['label' => 'Usuário WebService', 'default' => '', 'type' => 'string'],
+            'nfse_ws_senha' => ['label' => 'Senha WebService', 'default' => '', 'type' => 'string'],
+            'nfse_url_producao' => ['label' => 'URL Produção', 'default' => '', 'type' => 'string'],
+            'nfse_url_homologacao' => ['label' => 'URL Homologação', 'default' => '', 'type' => 'string'],
         ];
     }
 
@@ -930,6 +947,45 @@ final class EmpresaParametros
     }
 
     /**
+     * Consulta de veículo por placa (Verifica Online). Gravado na empresa.
+     *
+     * @return array<string, array{label: string, default: int|string, type: string}>
+     */
+    public static function consultaPlacaFields(): array
+    {
+        return [
+            'param_consulta_placa_url' => [
+                'label' => 'URL da API',
+                'default' => 'https://api.verifica-online.com.br',
+                'type' => 'string',
+            ],
+            'param_consulta_placa_token' => [
+                'label' => 'Token / API Key',
+                'default' => '',
+                'type' => 'string',
+            ],
+            'param_consulta_placa_timeout' => [
+                'label' => 'Timeout',
+                'default' => 10,
+                'type' => 'integer',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function consultaPlacaBooleanFields(): array
+    {
+        return [
+            'param_consulta_placa_habilitar' => [
+                'label' => 'Habilitar consulta por placa',
+                'default' => false,
+            ],
+        ];
+    }
+
+    /**
      * Timeout da API de licença (URL do portal é nativa em config/unitec.php).
      *
      * @return array<string, array{label: string, default: int|float|string|null, type: string}>
@@ -1403,6 +1459,14 @@ final class EmpresaParametros
         }
 
         foreach (self::apiServicosBooleanFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::consultaPlacaFields() as $field => $meta) {
+            $defaults[$field] = $meta['default'];
+        }
+
+        foreach (self::consultaPlacaBooleanFields() as $field => $meta) {
             $defaults[$field] = $meta['default'];
         }
 

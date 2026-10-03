@@ -131,6 +131,18 @@ class EmpresaResource extends Resource
                 ->dehydratedWhenHidden();
         }
 
+        foreach (EmpresaParametros::consultaPlacaFields() as $field => $meta) {
+            $fields[] = TextInput::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
+        foreach (EmpresaParametros::consultaPlacaBooleanFields() as $field => $meta) {
+            $fields[] = Checkbox::make($field)
+                ->hidden()
+                ->dehydratedWhenHidden();
+        }
+
         foreach (EmpresaParametros::acessoRemotoFields() as $field => $meta) {
             $fields[] = TextInput::make($field)
                 ->hidden()

@@ -57,8 +57,14 @@ final class ReabrirCompraLancamentoService
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
 
         DB::transaction(function () use ($compra, $params, $estoqueId, $empresa): void {
+            $travada = Compra::query()->whereKey($compra->id)->lockForUpdate()->first();
+
+            if (! $travada || $travada->status !== Compra::STATUS_FECHADA) {
+                throw new DomainException('Só é possível reabrir compra fechada.');
+            }
+
             if ($params['gera_estoque']) {
-                $this->estornarEstoque($compra, $estoqueId, $empresa);
+                $this->estornarEstoque($compra, $estoqueId, $empresa, $params['lotes']);
             }
 
             $this->restaurarPrecosProdutos($compra, $params['ajusta_preco']);
@@ -90,7 +96,7 @@ final class ReabrirCompraLancamentoService
     }
 
     /**
-     * @return array{gera_estoque: bool, ajusta_preco: bool, gerar_financeiro: bool}
+     * @return array{gera_estoque: bool, ajusta_preco: bool, gerar_financeiro: bool, lotes: array<int, mixed>|null}
      */
     private function parametrosFinalizacao(Compra $compra): array
     {
@@ -107,6 +113,9 @@ final class ReabrirCompraLancamentoService
             'gera_estoque' => (bool) ($detalhes['gera_estoque'] ?? true),
             'ajusta_preco' => (bool) ($detalhes['ajusta_preco'] ?? true),
             'gerar_financeiro' => (bool) ($detalhes['gerar_financeiro'] ?? true),
+            'lotes' => array_key_exists('lotes', $detalhes) && is_array($detalhes['lotes'])
+                ? $detalhes['lotes']
+                : null,
         ];
     }
 
@@ -118,9 +127,17 @@ final class ReabrirCompraLancamentoService
             ->exists();
     }
 
-    private function estornarEstoque(Compra $compra, ?int $estoqueId, ?Empresa $empresa): void
+    /**
+     * @param  list<array<string, mixed>>|null  $lotesLancados
+     */
+    private function estornarEstoque(Compra $compra, ?int $estoqueId, ?Empresa $empresa, ?array $lotesLancados): void
     {
         $compra->loadMissing('itens');
+        $lotesService = new \App\Support\Erp\ProductLoteService();
+
+        if ($lotesLancados === null && $this->compraControlaLote($compra)) {
+            throw new DomainException('Não é possível reabrir esta compra: os lotes lançados não ficaram registrados. O estorno não usa o lote que vence primeiro, para não baixar a quantidade errada.');
+        }
 
         foreach ($compra->itens as $item) {
             if (! $item->product_id) {
@@ -147,15 +164,95 @@ final class ReabrirCompraLancamentoService
                     ),
                 );
 
-                if ($product->controla_lote_validade) {
-                    try {
-                        (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, (float) $item->quantidade);
-                    } catch (\RuntimeException $e) {
-                        throw new \DomainException($e->getMessage(), 0, $e);
-                    }
+                $lotesItem = $this->lotesDoItem($lotesLancados ?? [], $item, $compra);
+
+                if ($lotesItem === []) {
+                    continue;
+                }
+
+                try {
+                    $lotesService->estornarEntrada($product, $lotesItem);
+                } catch (\RuntimeException $e) {
+                    throw new DomainException($e->getMessage(), 0, $e);
                 }
             }
         }
+    }
+
+    private function compraControlaLote(Compra $compra): bool
+    {
+        foreach ($compra->itens as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+
+            $product = $item->product ?? Product::query()->find($item->product_id);
+
+            if ($product && $product->controla_lote_validade) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lotesLancados
+     * @return list<array<string, mixed>>
+     */
+    private function lotesDoItem(array $lotesLancados, mixed $item, Compra $compra): array
+    {
+        $itemId = (int) ($item->id ?? 0);
+        $porItem = [];
+
+        foreach ($lotesLancados as $lote) {
+            if (! is_array($lote)) {
+                continue;
+            }
+
+            if ($itemId > 0 && (int) ($lote['compra_item_id'] ?? 0) === $itemId) {
+                $porItem[] = $lote;
+            }
+        }
+
+        if ($porItem !== [] || $itemId <= 0) {
+            return $porItem;
+        }
+
+        $productId = (int) ($item->product_id ?? 0);
+        $mesmoProduto = 0;
+
+        foreach ($lotesLancados as $lote) {
+            if (is_array($lote) && (int) ($lote['product_id'] ?? 0) === $productId && (int) ($lote['compra_item_id'] ?? 0) <= 0) {
+                $mesmoProduto++;
+            }
+        }
+
+        if ($mesmoProduto === 0) {
+            return [];
+        }
+
+        $itensDesseProduto = 0;
+
+        foreach ($compra->itens as $irmao) {
+            if ((int) ($irmao->product_id ?? 0) === $productId) {
+                $itensDesseProduto++;
+            }
+        }
+
+        if ($itensDesseProduto !== 1) {
+            throw new DomainException('Não é possível reabrir: há mais de uma linha do mesmo produto e os lotes não estão ligados a cada item.');
+        }
+
+        $porProduto = [];
+
+        foreach ($lotesLancados as $lote) {
+            if (is_array($lote) && (int) ($lote['product_id'] ?? 0) === $productId) {
+                $porProduto[] = $lote;
+            }
+        }
+
+        return $porProduto;
     }
 
     private function restaurarPrecosProdutos(Compra $compra, bool $ajustaPrecoVenda): void
@@ -170,11 +267,11 @@ final class ReabrirCompraLancamentoService
         }
 
         foreach (array_keys($productIds) as $productId) {
-            $this->restaurarPrecoProduto($productId, $ajustaPrecoVenda);
+            $this->restaurarPrecoProduto($productId, $ajustaPrecoVenda, (int) $compra->id);
         }
     }
 
-    private function restaurarPrecoProduto(int $productId, bool $ajustaPrecoVenda): void
+    private function restaurarPrecoProduto(int $productId, bool $ajustaPrecoVenda, int $compraId): void
     {
         $product = Product::query()->find($productId);
 
@@ -182,19 +279,28 @@ final class ReabrirCompraLancamentoService
             return;
         }
 
-        $ultimaCompra = ProductPriceHistory::query()
+        $destaCompra = ProductPriceHistory::query()
             ->where('product_id', $productId)
-            ->where('forma_alteracao', ProductPriceHistoryRecorder::FORMA_COMPRA)
+            ->where('compra_id', $compraId)
             ->orderByDesc('id')
             ->first();
 
-        if (! $ultimaCompra) {
+        if (! $destaCompra) {
+            return;
+        }
+
+        $ultima = ProductPriceHistory::query()
+            ->where('product_id', $productId)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $ultima || (int) $ultima->id !== (int) $destaCompra->id) {
             return;
         }
 
         $anterior = ProductPriceHistory::query()
             ->where('product_id', $productId)
-            ->where('id', '<', $ultimaCompra->id)
+            ->where('id', '<', $destaCompra->id)
             ->orderByDesc('id')
             ->first();
 
@@ -214,7 +320,7 @@ final class ReabrirCompraLancamentoService
             $product->update($updates);
         }
 
-        $ultimaCompra->delete();
+        $destaCompra->delete();
     }
 
     private function estornarFinanceiro(Compra $compra): void
@@ -255,22 +361,28 @@ final class ReabrirCompraLancamentoService
             return new Collection;
         }
 
-        $prefixo = 'COMPRA #'.$numero;
-
-        return ContaPagar::query()
+        $exata = 'COMPRA #'.$numero;
+        $query = ContaPagar::query()
             ->when(
                 $compra->fornecedor_id,
                 fn ($query) => $query->where('fornecedor_id', (int) $compra->fornecedor_id),
             )
-            ->where(function ($query) use ($prefixo, $compra): void {
-                $query->where('produto', 'like', $prefixo.'%')
-                    ->orWhere('produto', $prefixo);
+            ->where(function ($query) use ($exata): void {
+                $query->where('produto', $exata)
+                    ->orWhere('produto', 'like', $exata.' %');
+            });
 
-                if (filled($compra->numero_nota)) {
-                    $query->orWhere('documento', (string) $compra->numero_nota);
-                }
-            })
-            ->get();
+        if (\Illuminate\Support\Facades\Schema::hasColumn('contas_pagar', 'compra_id')) {
+            $query->whereNull('compra_id');
+        }
+
+        $legado = $query->get();
+
+        if ($legado->count() > 1) {
+            throw new DomainException('Há mais de uma conta a pagar antiga para esta compra, sem vínculo seguro. Nenhuma foi estornada.');
+        }
+
+        return $legado;
     }
 
     private function resolveEstoqueId(?int $empresaId): ?int

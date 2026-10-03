@@ -66,6 +66,8 @@ final class ErpUppercase
         'param_cf_tunnel_id',
         'param_portal_bkp_token',
         'param_portal_contador_token',
+        'param_consulta_placa_url',
+        'param_consulta_placa_token',
         'param_portal_contador_empresa_id',
         'param_portal_contador_vinculo_id',
         'param_portal_contador_url',

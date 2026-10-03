@@ -15,16 +15,24 @@ trait ManagesPersonPhoto
 
     public ?string $fotoPreviewUrl = null;
 
+    /** Caminho já gravado no banco. Arquivos novos ficam pendentes até o F5. */
+    public ?string $personFotoOriginalPath = null;
+
     public function mountPersonPhoto(): void
     {
+        $this->personFotoOriginalPath = filled($this->data['foto_path'] ?? null)
+            ? (string) $this->data['foto_path']
+            : null;
         $this->refreshFotoPreviewUrl();
     }
 
     public function getFotoPreviewUrl(): ?string
     {
-        $path = $this->data['foto_path'] ?? null;
+        $path = array_key_exists('foto_path', $this->data ?? [])
+            ? ($this->data['foto_path'] ?? null)
+            : null;
 
-        if (blank($path) && method_exists($this, 'form')) {
+        if (blank($path) && ! array_key_exists('foto_path', $this->data ?? []) && method_exists($this, 'form')) {
             try {
                 $path = $this->form->getState()['foto_path'] ?? null;
             } catch (\Throwable) {
@@ -72,11 +80,7 @@ trait ManagesPersonPhoto
             return;
         }
 
-        $currentPath = $this->data['foto_path'] ?? null;
-
-        if (filled($currentPath)) {
-            Storage::disk('public')->delete($currentPath);
-        }
+        $this->deleteUnsavedPersonPhoto();
 
         try {
             Storage::disk('public')->makeDirectory('people-photos');
@@ -120,11 +124,7 @@ trait ManagesPersonPhoto
             return;
         }
 
-        $currentPath = $this->data['foto_path'] ?? null;
-
-        if (filled($currentPath)) {
-            Storage::disk('public')->delete($currentPath);
-        }
+        $this->deleteUnsavedPersonPhoto();
 
         try {
             Storage::disk('public')->makeDirectory('people-photos');
@@ -154,11 +154,7 @@ trait ManagesPersonPhoto
 
     public function clearPersonPhoto(): void
     {
-        $path = $this->data['foto_path'] ?? null;
-
-        if (filled($path)) {
-            Storage::disk('public')->delete($path);
-        }
+        $this->deleteUnsavedPersonPhoto();
 
         $this->data['foto_path'] = null;
         $this->syncPersonFotoFormState(null);
@@ -181,5 +177,34 @@ trait ManagesPersonPhoto
     protected function refreshFotoPreviewUrl(): void
     {
         $this->fotoPreviewUrl = $this->getFotoPreviewUrl();
+    }
+
+    public function commitPersonPhotoAfterSave(): void
+    {
+        $saved = array_key_exists('foto_path', $this->data ?? [])
+            ? ($this->data['foto_path'] ?? null)
+            : ($this->record?->foto_path ?? null);
+        $saved = filled($saved) ? (string) $saved : null;
+        $original = filled($this->personFotoOriginalPath) ? (string) $this->personFotoOriginalPath : null;
+
+        if ($original !== null && $original !== $saved) {
+            Storage::disk('public')->delete($original);
+        }
+
+        $this->personFotoOriginalPath = $saved;
+    }
+
+    public function discardPendingPersonPhoto(): void
+    {
+        $this->deleteUnsavedPersonPhoto();
+    }
+
+    protected function deleteUnsavedPersonPhoto(): void
+    {
+        $current = $this->data['foto_path'] ?? null;
+
+        if (filled($current) && (string) $current !== (string) $this->personFotoOriginalPath) {
+            Storage::disk('public')->delete((string) $current);
+        }
     }
 }

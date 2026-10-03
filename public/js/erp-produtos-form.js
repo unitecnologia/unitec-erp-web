@@ -293,27 +293,6 @@ function syncErpProdutosPrecoVendaBeforeSave(component, page) {
     component.set('data.preco_venda', String(input.value ?? ''), false);
 }
 
-/**
- * Mesmo fluxo do botão "Aplicar preços": commit do campo focado + aplicar.
- */
-window.aplicarErpProdutosPrecificacao = async function aplicarErpProdutosPrecificacao(component) {
-    component = component || getErpProdutosComponent();
-
-    if (! component) {
-        return;
-    }
-
-    const el = document.activeElement;
-    const id = el && el.id ? String(el.id) : '';
-    const val = el && 'value' in el ? String(el.value) : null;
-
-    if (id.indexOf('precif-') === 0 && val !== null) {
-        await component.call('precificacaoCommitField', id, val);
-    }
-
-    await component.call('aplicarProductPrecificacao');
-};
-
 window.saveErpProdutosForm = async function saveErpProdutosForm() {
     const page = document.querySelector('.erp-produtos-form-page');
 

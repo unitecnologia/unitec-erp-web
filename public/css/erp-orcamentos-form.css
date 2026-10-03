@@ -103,6 +103,15 @@
     min-height: 0 !important;
 }
 
+.erp-orcamentos-form-page .fi-sc > div:has(.erp-pcad__filament-hidden) {
+    display: none !important;
+    flex: 0 0 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
 .erp-orcamentos-form-page .fi-header,
 .erp-orcamentos-form-page .fi-form-actions {
     display: none !important;
@@ -921,6 +930,12 @@
 }
 
 /* ── Totais (faixa horizontal Delphi) ─────────────────────────── */
+.erp-orcamentos-form-page .erp-orc-totals {
+    position: relative;
+    z-index: 20;
+    pointer-events: auto;
+}
+
 .erp-orc-totals {
     display: flex;
     align-items: center;
@@ -957,7 +972,11 @@
 }
 
 .erp-orc-totals__value--edit {
+    position: relative;
+    z-index: 1;
     background: #fff;
+    cursor: text;
+    pointer-events: auto;
 }
 
 .erp-orc-totals__value--total {
@@ -987,6 +1006,89 @@
     height: 3rem;
 }
 
+.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__label,
+.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__label kbd {
+    font-weight: 700;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    margin-left: auto;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions__obs {
+    min-width: 7.4rem;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions .erp-fv-tv-btn__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    margin-bottom: 0.12rem;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #e8f0fa 0%, #d0dff0 100%);
+    color: #1e5a9e;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 1px 2px rgba(15, 52, 96, 0.18);
+    flex-shrink: 0;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions .erp-fv-tv-btn__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    display: block;
+}
+
+.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="F2"] .erp-fv-tv-btn__icon,
+.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="Escape"] .erp-fv-tv-btn__icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.erp-orcamentos-form-page .erp-fv-tv__obs-cliente {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    height: 2.15rem;
+    margin: 0 0.05rem;
+    padding: 0 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-orcamentos-form-page .erp-fv-tv__obs-cliente:hover {
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #60a5fa;
+}
+
+.erp-orcamentos-form-page #erp-orc-obs-orcamento {
+    text-transform: uppercase;
+}
+
+.erp-orcamentos-form-page .erp-fv-tv-obs__text {
+    width: 100%;
+    min-height: 9rem !important;
+    resize: vertical;
+    line-height: 1.4;
+    font-weight: 550;
+}
+
+.erp-orcamentos-form-page .erp-fv-tv-obs__text[readonly],
+.erp-orcamentos-form-page .erp-fv-tv-obs__text[data-erp-locked] {
+    resize: none;
+    background: #f8fafc !important;
+    cursor: default;
+}
+
 .erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="F2"] {
     background: linear-gradient(180deg, #22c55e 0%, #15803d 100%) !important;
     border-color: #86efac !important;
@@ -995,11 +1097,6 @@
 
 .erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label,
 .erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__label kbd {
-    color: #fff !important;
-}
-
-.erp-orcamentos-form-page .erp-orc-actions .erp-pcad-actions__btn[data-erp-key="F2"] .erp-pcad-actions__icon--save {
-    background: rgba(255, 255, 255, 0.25) !important;
     color: #fff !important;
 }
 
@@ -1602,13 +1699,27 @@
     border: 0;
     background: transparent;
     color: #b91c1c;
-    font-size: 0.85rem;
-    font-weight: 700;
+    width: 1.15rem;
+    height: 1.15rem;
     cursor: pointer;
-    line-height: 1;
-    padding: 0.15rem;
+    line-height: 0;
+    padding: 0;
+}
+
+.erp-orc-itens--fv .erp-orc-itens__delete-btn svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    display: block;
 }
 
 .erp-orc-itens--fv .erp-orc-itens__delete-btn:hover {
     color: #7f1d1d;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-selected .erp-orc-itens__delete-btn {
+    color: #fecaca;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-selected .erp-orc-itens__delete-btn:hover {
+    color: #fff;
 }

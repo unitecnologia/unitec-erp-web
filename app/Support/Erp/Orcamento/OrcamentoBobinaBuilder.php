@@ -8,6 +8,7 @@ use App\Models\Orcamento;
 class OrcamentoBobinaBuilder
 {
     /**
+     * @param  array{subtotal_bruto?: float, descontos?: float, total?: float}  $totais
      * @return list<string>
      */
     public function buildLines(
@@ -16,9 +17,15 @@ class OrcamentoBobinaBuilder
         string $numero,
         string $statusLabel,
         string $empresaEndereco,
+        array $totais = [],
     ): array {
         $f = OrcamentoBobinaFormatter::class;
+        $report = app(OrcamentoReportService::class);
         $lines = [];
+
+        if ($totais === []) {
+            $totais = $report->totaisImpressao($orcamento);
+        }
 
         foreach ($f::wrap(mb_strtoupper($empresa?->nome ?? 'UNITECNOLOGIA SISTEMAS', 'UTF-8')) as $line) {
             $lines[] = $f::center($line);
@@ -61,25 +68,19 @@ class OrcamentoBobinaBuilder
 
         $lines[] = $f::rule('-');
         $lines[] = $f::line('IT', 'PRODUTO');
-        $lines[] = $f::padLeft('PRECO', 10) . ' '
+        $lines[] = $f::padLeft('PRECO', 9) . ' '
             . $f::padLeft('QTD', 6) . ' '
             . $f::padRight('UND', 3) . ' '
-            . $f::padLeft('TOTAL', 10);
+            . $f::padLeft('DESC', 9) . ' '
+            . $f::padLeft('TOTAL', 9);
 
         if ($orcamento->itens->isEmpty()) {
             $lines[] = 'Nenhum item informado.';
         }
 
         foreach ($orcamento->itens as $item) {
-            $quantidade = (float) $item->quantidade;
-            $quantidadeLabel = fmod($quantidade, 1.0) === 0.0
-                ? (string) (int) $quantidade
-                : number_format($quantidade, 3, ',', '');
-            $descricao = filled($item->descricao)
-                ? $item->descricao
-                : ($item->product?->descricao ?? '—');
-            $descricao = mb_strtoupper($descricao, 'UTF-8');
-            $unidade = mb_strtoupper($item->product?->unidade ?? 'UN', 'UTF-8');
+            $linha = $report->linhaImpressao($item);
+            $descricao = mb_strtoupper($linha['produto'], 'UTF-8');
             $itemNum = str_pad((string) $item->item, 2, '0', STR_PAD_LEFT);
 
             $descLines = $f::wrap($descricao);
@@ -89,17 +90,22 @@ class OrcamentoBobinaBuilder
                 $lines[] = '   ' . $descLines[$index];
             }
 
-            $detail = $f::padLeft($f::money((float) $item->preco_unitario), 10) . ' '
+            $quantidade = $linha['quantidade'];
+            $quantidadeLabel = fmod($quantidade, 1.0) === 0.0
+                ? (string) (int) $quantidade
+                : number_format($quantidade, 3, ',', '');
+
+            $lines[] = $f::padLeft($f::money($linha['valor_unitario']), 9) . ' '
                 . $f::padLeft($quantidadeLabel, 6) . ' '
-                . $f::padRight($unidade, 3) . ' '
-                . $f::padLeft($f::money((float) $item->total), 10);
-            $lines[] = $detail;
+                . $f::padRight($linha['unidade'], 3) . ' '
+                . $f::padLeft($f::money($linha['desconto']), 9) . ' '
+                . $f::padLeft($f::money($linha['subtotal']), 9);
         }
 
         $lines[] = $f::rule('-');
-        $lines[] = $f::line('SubTotal>>>', $f::money((float) $orcamento->subtotal));
-        $lines[] = $f::line('Desconto>>>', $f::money((float) $orcamento->desconto_valor));
-        $lines[] = $f::line('Total>>>', $f::money((float) $orcamento->total));
+        $lines[] = $f::line('Subtotal bruto', $f::money((float) ($totais['subtotal_bruto'] ?? 0)));
+        $lines[] = $f::line('Descontos', $f::money((float) ($totais['descontos'] ?? 0)));
+        $lines[] = $f::line('Total', $f::money((float) ($totais['total'] ?? $orcamento->total)));
         $lines[] = $f::rule('-');
         $lines[] = 'Observacoes:';
 

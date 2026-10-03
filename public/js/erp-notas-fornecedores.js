@@ -20,6 +20,18 @@ function initErpNotasFornecedores() {
     }
 }
 
+function nfFornOverlayAberto() {
+    return document.querySelector(
+        '.erp-notas-fornecedores-page .erp-nf-forn-danfe-modal, .erp-notas-fornecedores-page .erp-nf-forn-import-xml-modal, .erp-notas-fornecedores-page .erp-nf-forn-consulta-chave-modal, .erp-notas-fornecedores-page .erp-nfe-fiscal-overlay',
+    );
+}
+
+function consultaLoteHabilitada() {
+    const button = document.querySelector('.erp-notas-fornecedores-page [data-erp-key="F3"]');
+
+    return button instanceof HTMLButtonElement && ! button.disabled;
+}
+
 function bindNotasFornecedoresConsultaTriggers() {
     if (window.__erpNfFornConsultaTriggersBound) {
         return;
@@ -27,14 +39,42 @@ function bindNotasFornecedoresConsultaTriggers() {
 
     window.__erpNfFornConsultaTriggersBound = true;
 
+    document.addEventListener('keydown', (event) => {
+        if (! document.querySelector('.erp-notas-fornecedores-page') || ! nfFornOverlayAberto()) {
+            return;
+        }
+
+        if (! ['F2', 'F3', 'F4', 'F5', 'F6', 'F12', 'Delete'].includes(event.key)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }, true);
+
     document.addEventListener('click', (event) => {
         const button = event.target.closest('[wire\\:click="consultarLote"], [wire\\:click\\.prevent="consultarLote"]');
 
-        if (! button || button.disabled) {
+        if (! button || button.disabled || ! consultaLoteHabilitada()) {
             return;
         }
 
         window.setTimeout(startNfFornConsultaLoteProgress, 30);
+    }, true);
+
+    document.addEventListener('keydown', (event) => {
+        if (! ['F4', 'F5'].includes(event.key) || ! document.querySelector('.erp-notas-fornecedores-page')) {
+            return;
+        }
+
+        const acao = document.querySelector('.erp-notas-fornecedores-page [data-erp-key="' + event.key + '"]');
+
+        if (! (acao instanceof HTMLButtonElement) || ! acao.disabled) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
     }, true);
 
     document.addEventListener('keydown', (event) => {
@@ -47,6 +87,10 @@ function bindNotasFornecedoresConsultaTriggers() {
         }
 
         if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
+            return;
+        }
+
+        if (! consultaLoteHabilitada()) {
             return;
         }
 

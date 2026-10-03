@@ -1,0 +1,131 @@
+/* ERP — viewport compartilhado.
+   Só media queries. Largura acima de 1600px e altura acima de 900px não entram aqui.
+   PDV, embed do PDV e a tela de venda do força de vendas ficam de fora. */
+
+/* 1600×900, 1440×900 — cabe na largura; não muda medida quando já cabe */
+@media (max-width: 1600px) {
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-shell,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .fi-main,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-list-page,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-form-page {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__actions"] {
+        flex-wrap: wrap;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-form__row,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__fields-row"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__filters-row"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__period"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__locate"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__locate-controls"] {
+        flex-wrap: wrap;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .erp-list-page .fi-ta-content-ctn,
+    .erp-list-grid-area,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-lookup-modal__grid-wrap,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="__grid-wrap"] {
+        overflow-x: auto !important;
+        max-width: 100%;
+    }
+}
+
+/* 1440×900 e 1366×768 — espaçamento do chrome */
+@media (max-width: 1440px) {
+    .erp-list-page .fi-ta-ctn {
+        margin-left: 0.4rem !important;
+        margin-right: 0.4rem !important;
+    }
+
+    .erp-list-page [class$="__filter-block"],
+    .erp-list-page [class$="__locate"],
+    .erp-list-page [class$="__filters"] {
+        padding: 0.4rem 0.55rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions"]:not([class*="__"]):not(.erp-pcad-actions) {
+        gap: 0.28rem;
+        padding: 0.32rem 0.45rem;
+    }
+}
+
+/* 1280×1024, 1280×800, 1280×768, 1280×720 */
+@media (max-width: 1280px) {
+    .erp-list-page .fi-ta-ctn {
+        margin-left: 0.3rem !important;
+        margin-right: 0.3rem !important;
+    }
+
+    .erp-list-page [class$="__filter-block"],
+    .erp-list-page [class$="__locate"],
+    .erp-list-page [class$="__filters"] {
+        padding: 0.32rem 0.45rem;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-form__input,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-form__select,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-form__textarea {
+        max-width: 100%;
+    }
+}
+
+/* 1152×864 e 1024×768 */
+@media (max-width: 1152px) {
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions"]:not([class*="__"]):not(.erp-pcad-actions) {
+        gap: 0.22rem;
+        padding: 0.28rem 0.35rem;
+    }
+}
+
+/* 1600×900, 1440×900, 1152×864 e alturas menores — modal não passa da altura útil */
+@media (max-height: 900px) {
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-lookup-modal__window,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-aviso-modal__box,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-duplicate-modal__window,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-form-overlay__panel,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-modal__window"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-modal__panel"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-modal__box"] {
+        max-height: calc(100dvh - 1rem) !important;
+        overflow-y: auto;
+    }
+}
+
+/* 1366×768, 1280×768, 1024×768, 1280×720 — barra de ações mais baixa */
+@media (max-height: 768px) {
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions"]:not([class*="__"]):not(.erp-pcad-actions) {
+        gap: 0.22rem;
+        padding-top: 0.22rem;
+        padding-bottom: 0.22rem;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions__btn"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-actions__btn {
+        height: 2.55rem !important;
+    }
+}
+
+@media (max-height: 720px) {
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-lookup-modal,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-aviso-modal,
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-form-overlay {
+        padding: 0.35rem;
+    }
+
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) [class$="-actions__btn"],
+    .fi-body:not(:has(.erp-pdv-page)):not(:has(.erp-fv-tela-venda-page)):not(:has(.erp-pdv-embed)) .erp-pcad-actions__btn {
+        height: 2.35rem !important;
+    }
+}

@@ -124,6 +124,12 @@ final class CompraLancamentoDraftService
         }
 
         foreach ($itens->values() as $index => $item) {
+            $draftItemId = (int) ($rows[$index]['compra_item_id'] ?? 0);
+
+            if ($draftItemId > 0 && $draftItemId !== (int) $item->id) {
+                return false;
+            }
+
             $draftProductId = (int) ($rows[$index]['product_id'] ?? 0);
             $itemProductId = (int) ($item->product_id ?? 0);
 

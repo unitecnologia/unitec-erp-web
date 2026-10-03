@@ -12,7 +12,11 @@
                 <tr
                     wire:key="local-fornecedor-{{ $row['id'] }}"
                     wire:click="highlightLocalFornecedorResult({{ $index }})"
-                    wire:dblclick.prevent="selectLocalFornecedorResult({{ $index }})"
+                    x-on:dblclick.prevent="
+                        const panel = $el.closest('.erp-cliente-filter-lookup');
+                        if (panel) panel.style.display = 'none';
+                        $wire.selectLocalFornecedorResult({{ $index }});
+                    "
                     @class(['erp-cliente-filter-lookup__row', 'erp-cliente-filter-lookup__row--active' => $this->selectedLocalFornecedorIndex === $index])
                 >
                     <td>{{ $row['nome'] }}</td>

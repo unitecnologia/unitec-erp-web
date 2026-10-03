@@ -2481,6 +2481,10 @@
     background: #dbeafe;
 }
 
+.erp-compras-parcelas-modal__grid tr.is-invalid td {
+    background: #fde8e8;
+}
+
 .erp-compras-parcelas-modal__grid td input,
 .erp-compras-parcelas-modal__grid td select {
     width: 100%;
@@ -2515,12 +2519,25 @@
     background: #fff;
 }
 
+.erp-compras-parcelas-modal__grid td input.is-invalid,
+.erp-compras-parcelas-modal__grid td select.is-invalid,
+.erp-compras-parcelas-modal__grid td input.is-invalid:focus,
+.erp-compras-parcelas-modal__grid td select.is-invalid:focus {
+    border-color: #c24141;
+    box-shadow: 0 0 0 1px #c24141;
+}
+
 .erp-compras-parcelas-modal__caixa-na {
     display: inline-block;
     width: 100%;
     text-align: center;
     color: #94a3b8;
     font-weight: 700;
+}
+
+.erp-compras-parcelas-modal__caixa-na[hidden],
+.erp-compras-parcelas-modal__grid td select[hidden] {
+    display: none !important;
 }
 
 .erp-compras-parcelas-modal__empty {

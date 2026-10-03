@@ -1043,9 +1043,8 @@ html:has(.erp-pessoas-form-page.erp-pdv-embed) {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.erp-pessoas-form-page .erp-pcad-form__input[data-erp-pessoa-enter],
 .erp-pessoas-form-page .erp-pcad-form__select[data-erp-pessoa-enter] {
-    cursor: pointer !important;
+    cursor: pointer;
 }
 
 .erp-pessoas-form-page .erp-pcad-form__input:focus,

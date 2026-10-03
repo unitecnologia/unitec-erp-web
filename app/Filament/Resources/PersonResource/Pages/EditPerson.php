@@ -34,6 +34,7 @@ class EditPerson extends EditRecord
 
     protected function afterSave(): void
     {
+        $this->commitPersonPhotoAfterSave();
         $this->syncPersonContacts($this->record);
         $this->syncPersonVisitaDias($this->record);
         $this->loadPersonContacts($this->record);

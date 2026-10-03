@@ -10,6 +10,8 @@ use App\Filament\Pages\PermissoesPage;
 use App\Filament\Pages\TrocarEmpresaPage;
 use App\Filament\Resources\ForcaVendasMonitorResource;
 use App\Filament\Pages\NfsePage;
+use App\Filament\Pages\ParcelasPortalPage;
+use App\Support\Erp\License\LicencaPortalParcelasService;
 use App\Filament\Resources\NfceResource;
 use App\Filament\Resources\NfeResource;
 use App\Filament\Pages\PdvPage;
@@ -58,6 +60,7 @@ use App\Filament\Resources\GrupoResource;
 use App\Filament\Resources\MarcaResource;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\OrdemServicoResource;
+use App\Filament\Resources\OsVeiculoResource;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\TomadorServicoResource;
@@ -171,8 +174,15 @@ class ErpMenu
                 'url' => ContaPagarResource::getUrl('index'),
                 'permission' => 'contas_pagar.access',
             ]),
-            static::shortcut('sair', 'Sair', 'heroicon-o-arrow-right-on-rectangle', 'slate', ['logout' => true]),
         ];
+
+        if (LicencaPortalParcelasService::habilitada()) {
+            $shortcuts[] = static::shortcut('parcelas-portal', 'Parcelas Portal', 'heroicon-o-calendar-days', 'indigo', [
+                'url' => ParcelasPortalPage::getUrl(),
+            ]);
+        }
+
+        $shortcuts[] = static::shortcut('sair', 'Sair', 'heroicon-o-arrow-right-on-rectangle', 'slate', ['logout' => true]);
 
         return static::filterShortcutsByPermission($shortcuts);
     }
@@ -380,6 +390,7 @@ class ErpMenu
     {
         return [
             static::link('Ordem de Serviço', OrdemServicoResource::getUrl('index'), permission: 'ordens_servico.access', icon: 'heroicon-o-wrench-screwdriver', iconColor: 'erp-menu-bar__icon--amber'),
+            static::link('Veículo/Equipamento', OsVeiculoResource::getUrl('index'), permission: 'ordens_servico.access', icon: 'heroicon-o-truck', iconColor: 'erp-menu-bar__icon--amber'),
         ];
     }
 

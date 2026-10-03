@@ -133,6 +133,20 @@ class PersonListQueryBuilder
             $searchTerm = mb_strtoupper($searchTerm, 'UTF-8');
         }
 
+        if ($column === 'nome_razao') {
+            $terms = preg_split('/\s+/u', trim($searchTerm), -1, PREG_SPLIT_NO_EMPTY);
+
+            if ($terms === false || $terms === []) {
+                return;
+            }
+
+            foreach ($terms as $term) {
+                $query->where('nome_razao', 'like', '%'.$term.'%');
+            }
+
+            return;
+        }
+
         if ($column === 'endereco') {
             $query->where(function (Builder $builder) use ($searchTerm): void {
                 $term = $searchTerm . '%';
@@ -145,8 +159,8 @@ class PersonListQueryBuilder
             return;
         }
 
-        // codigo/cpf/rg/nome: prefixo indexável (digitação típica no campo).
-        if (in_array($column, ['codigo', 'cpf_cnpj', 'rg_ie', 'nome_razao', 'apelido_fantasia'], true)) {
+        // codigo/cpf/rg/fantasia: prefixo indexável (digitação típica no campo).
+        if (in_array($column, ['codigo', 'cpf_cnpj', 'rg_ie', 'apelido_fantasia'], true)) {
             $query->where($column, 'like', $searchTerm . '%');
 
             return;

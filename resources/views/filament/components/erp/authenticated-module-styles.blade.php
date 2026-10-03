@@ -25,3 +25,9 @@
 
 @endforeach
 
+@php
+    $responsivePath = public_path('css/erp-responsive.css');
+    $responsiveVersion = file_exists($responsivePath) ? (string) filemtime($responsivePath) : $version;
+@endphp
+<link rel="stylesheet" href="{{ asset('css/erp-responsive.css') }}?v={{ $responsiveVersion }}">
+

@@ -48,31 +48,7 @@
             aria-modal="true"
             aria-labelledby="erp-prod-precificacao-title"
             x-data
-            @keydown.enter="
-                const el = $event.target;
-                if (! (el instanceof HTMLInputElement) || el.disabled) {
-                    return;
-                }
-                if (! el.hasAttribute('data-erp-precif-enter')) {
-                    return;
-                }
-
-                $event.preventDefault();
-
-                const api = window.ErpPrecifEnter;
-                if (! api || ! api.prepareEnter) {
-                    return;
-                }
-
-                const info = api.prepareEnter(el);
-                if (! info) {
-                    return;
-                }
-
-                // Um único request. O PHP recalcula todo o estado e só então
-                // devolve o foco pelo evento erp-precif-focus.
-                $wire.precificacaoEnter(info.fieldId, info.value, info.diag ?? null);
-            "
+            @keydown.enter="window.ErpPrecifEnter && window.ErpPrecifEnter.handleEnter($event, $wire)"
         >
             <div class="erp-lookup-modal__titlebar">
                 <span id="erp-prod-precificacao-title">Precificação do Produto</span>
@@ -421,6 +397,7 @@
             <div class="erp-lookup-modal__actions erp-pcad-actions erp-prod-precificacao__actions">
                 <button
                     type="button"
+                    id="precif-btn-aplicar"
                     x-on:click.prevent="window.aplicarErpProdutosPrecificacao($wire)"
                     class="erp-pcad-actions__btn erp-prod-precificacao__btn erp-prod-precificacao__btn--aplicar"
                     data-erp-key="F5"

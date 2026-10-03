@@ -1,109 +1,187 @@
-<div class="orc-doc">
-    <div class="orc-doc__frame">
-        <div class="orc-doc__header">
-            <div class="orc-doc__logo-cell">
-                <div class="orc-doc__logo">
-                    @if (filled($logoDataUri))
-                        <img src="{{ $logoDataUri }}" alt="Logomarca">
-                    @elseif (filled($logoUrl ?? null))
-                        <img src="{{ $logoUrl }}" alt="Logomarca">
-                    @else
-                        <span class="orc-doc__logo-fallback">U</span>
-                    @endif
-                </div>
-            </div>
+@php
+    use App\Support\Erp\Orcamento\OrcamentoReportService;
 
-            <div class="orc-doc__company-cell">
-                <span class="orc-doc__company-name">{{ mb_strtoupper($empresa?->nome ?? 'UNITECNOLOGIA SISTEMAS', 'UTF-8') }}</span>
+    $report = app(OrcamentoReportService::class);
+    $totais = $totais ?? $report->totaisImpressao($orcamento);
+    $clienteNome = $orcamento->clienteDisplayNome() ?: '—';
+    $fantasia = mb_strtoupper(trim((string) ($orcamento->cliente?->apelido_fantasia ?? '')), 'UTF-8');
+    $endereco = trim(implode(', ', array_filter([
+        $orcamento->clienteDisplayEndereco(),
+        $orcamento->clienteDisplayNumero(),
+    ])));
+    $documento = trim($orcamento->clienteDisplayCpfCnpj());
+    $ie = trim((string) ($orcamento->cliente?->rg_ie ?? ''));
+    $fone = trim($orcamento->clienteDisplayFone() ?: $orcamento->clienteDisplayWhatsapp());
+    $vendedor = mb_strtoupper(trim((string) ($orcamento->vendedor?->nome ?? '')), 'UTF-8');
+    $formaPagamento = mb_strtoupper(trim((string) ($orcamento->forma_pagamento ?? '')), 'UTF-8');
+@endphp
+
+<div class="monitor-pedidos-doc orc-doc">
+    <table class="orc-doc__empresa">
+        <tr>
+            <td class="orc-doc__logo">
+                @if (filled($logoDataUri ?? null))
+                    <img src="{{ $logoDataUri }}" alt="Logomarca">
+                @elseif (filled($logoUrl ?? null))
+                    <img src="{{ $logoUrl }}" alt="Logomarca">
+                @endif
+            </td>
+            <td>
+                <span class="orc-doc__empresa-nome">{{ mb_strtoupper($empresa?->nome ?? 'UNITECNOLOGIA SISTEMAS', 'UTF-8') }}</span>
                 @if (filled($empresa?->responsavel))
-                    <span>{{ mb_strtoupper($empresa->responsavel, 'UTF-8') }}<br></span>
+                    <span class="orc-doc__empresa-linha">{{ mb_strtoupper($empresa->responsavel, 'UTF-8') }}</span>
                 @endif
-                @if (filled($empresaEndereco))
-                    <span>{{ $empresaEndereco }}<br></span>
+                @if (filled($empresaEndereco ?? null))
+                    <span class="orc-doc__empresa-linha">{{ $empresaEndereco }}</span>
                 @endif
-                <span>
-                    FONE: {{ $empresa?->telefone ?: '' }}&nbsp;&nbsp;EMAIL: {{ $empresa?->email ?: '' }}
-                </span>
-            </div>
-        </div>
+                @if (filled($empresaCidadeUf ?? null))
+                    <span class="orc-doc__empresa-linha">{{ $empresaCidadeUf }}</span>
+                @endif
+                @if (filled($empresa?->cnpj))
+                    <span class="orc-doc__empresa-linha">CNPJ: {{ $empresa->cnpj }}</span>
+                @endif
+                <span class="orc-doc__empresa-linha">FONE: {{ $empresa?->telefone ?: '' }}&nbsp;&nbsp;EMAIL: {{ $empresa?->email ?: '' }}</span>
+            </td>
+        </tr>
+    </table>
 
-        <hr class="orc-doc__rule">
+    <table class="monitor-pedidos-doc__sheet-header">
+        <tr>
+            <td>ORÇAMENTO Nº {{ $numero }}</td>
+        </tr>
+    </table>
 
-        <div class="orc-doc__title-row">
-            <div class="orc-doc__title">ORÇAMENTO nº {{ $numero }}</div>
-            <div class="orc-doc__status">{{ $statusLabel }}</div>
-        </div>
-
-        <div class="orc-doc__meta">
-            <div class="orc-doc__meta-row orc-doc__meta-row--split">
-                <span><strong>DATA:</strong> {{ $orcamento->data?->format('d/m/Y') ?? '—' }}</span>
-                <span><strong>VALIDADE:</strong> {{ (int) ($orcamento->validade_dias ?? 0) }} dias</span>
-            </div>
-            <div class="orc-doc__meta-row">
-                <span><strong>CLIENTE:</strong> {{ $orcamento->clienteDisplayNome() ?: '—' }}</span>
-            </div>
-            <div class="orc-doc__meta-row">
-                <span><strong>VENDEDOR:</strong> {{ mb_strtoupper($orcamento->vendedor?->nome ?? '—', 'UTF-8') }}</span>
-            </div>
-            <div class="orc-doc__meta-row">
-                <span><strong>FPG:</strong> {{ mb_strtoupper($orcamento->forma_pagamento ?? '', 'UTF-8') }}</span>
-            </div>
-        </div>
-
-        <hr class="orc-doc__rule">
-
-        <table class="orc-doc__table">
-            <thead>
-                <tr>
-                    <th class="center">ITEM</th>
-                    <th>PRODUTO</th>
-                    <th class="num">PREÇO</th>
-                    <th class="num">QUANTIDADE</th>
-                    <th class="center">UND</th>
-                    <th class="num">TOTAL</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($orcamento->itens as $item)
-                    @php
-                        $quantidade = (float) $item->quantidade;
-                        $quantidadeLabel = fmod($quantidade, 1.0) === 0.0
-                            ? (string) (int) $quantidade
-                            : number_format($quantidade, 3, ',', '');
-                        $descricao = filled($item->descricao)
-                            ? $item->descricao
-                            : ($item->product?->descricao ?? '—');
-                        $unidade = mb_strtoupper($item->product?->unidade ?? 'UN', 'UTF-8');
-                    @endphp
-                    <tr>
-                        <td class="center">{{ $item->item }}</td>
-                        <td class="produto">{{ mb_strtoupper($descricao, 'UTF-8') }}</td>
-                        <td class="num">{{ number_format((float) $item->preco_unitario, 2, ',', '.') }}</td>
-                        <td class="num">{{ $quantidadeLabel }}</td>
-                        <td class="center">{{ $unidade }}</td>
-                        <td class="num">{{ number_format((float) $item->total, 2, ',', '.') }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="6">Nenhum item informado.</td>
-                    </tr>
-                @endforelse
-            </tbody>
+    <div class="monitor-pedidos-doc__meta-wrap">
+        @if (filled($statusLabel ?? null))
+            <span class="monitor-pedidos-doc__status monitor-pedidos-doc__status--{{ $statusKey ?? 'pendente' }}">
+                {{ $statusLabel }}
+            </span>
+        @endif
+        <table class="monitor-pedidos-doc__meta">
+            <tr>
+                <td>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Cliente:</span>
+                        {{ $clienteNome }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Fantasia:</span>
+                        {{ $fantasia }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Endereço:</span>
+                        {{ $endereco }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Município:</span>
+                        {{ $orcamento->clienteDisplayCidade() }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Vendedor:</span>
+                        {{ $vendedor }}
+                    </div>
+                </td>
+                <td>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">CNPJ:</span>
+                        {{ $documento }}
+                        &nbsp;<span class="monitor-pedidos-doc__meta-label">IE:</span>
+                        {{ $ie }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Data:</span>
+                        {{ $orcamento->data?->format('d/m/Y') ?? '' }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Validade:</span>
+                        {{ (int) ($orcamento->validade_dias ?? 0) }} dias
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Forma de Pagamento:</span>
+                        {{ $formaPagamento }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Bairro:</span>
+                        {{ $orcamento->clienteDisplayBairro() }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">CEP:</span>
+                        {{ $orcamento->clienteDisplayCep() }}
+                        &nbsp;&nbsp;
+                        <span class="monitor-pedidos-doc__meta-label">UF:</span>
+                        {{ $orcamento->clienteDisplayUf() }}
+                    </div>
+                    <div class="monitor-pedidos-doc__meta-line">
+                        <span class="monitor-pedidos-doc__meta-label">Fone:</span>
+                        {{ $fone }}
+                    </div>
+                </td>
+            </tr>
         </table>
+    </div>
 
-        <hr class="orc-doc__rule">
+    <table class="monitor-pedidos-doc__table monitor-pedidos-doc__table--com-desconto">
+        @include('reports.partials.monitor-pedidos-document-colgroup', ['impSemColunaDesconto' => false])
+        <thead>
+            <tr class="monitor-pedidos-doc__table-head">
+                <th class="col-codigo">Código</th>
+                <th class="col-produto">Produto</th>
+                <th class="col-un">UN</th>
+                <th class="col-qtd">Qtd</th>
+                <th class="col-unit">Valor Unit.</th>
+                <th class="col-desc">Desconto</th>
+                <th class="col-sub">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($orcamento->itens as $item)
+                @php
+                    $linha = $report->linhaImpressao($item);
+                @endphp
+                <tr>
+                    <td class="col-codigo">{{ $linha['codigo'] }}</td>
+                    <td class="produto">{{ mb_strtoupper($linha['produto'], 'UTF-8') }}</td>
+                    <td class="col-un">{{ $linha['unidade'] }}</td>
+                    <td class="col-qtd">{{ OrcamentoReportService::formatQuantidade($linha['quantidade']) }}</td>
+                    <td class="col-unit">{{ OrcamentoReportService::formatMoney($linha['valor_unitario']) }}</td>
+                    <td class="col-desc">{{ OrcamentoReportService::formatMoney($linha['desconto']) }}</td>
+                    <td class="col-sub">{{ OrcamentoReportService::formatMoney($linha['subtotal']) }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="7">Nenhum item informado.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
 
-        <div class="orc-doc__totals">
-            <span>SubTotal>>> {{ number_format((float) $orcamento->subtotal, 2, ',', '.') }}</span>
-            <span>Desconto>>> {{ number_format((float) $orcamento->desconto_valor, 2, ',', '.') }}</span>
-            <span>Total>>> {{ number_format((float) $orcamento->total, 2, ',', '.') }}</span>
-        </div>
+    <table class="orc-doc__fechamento">
+        <tr>
+            <td class="label">Subtotal bruto</td>
+            <td class="valor">{{ OrcamentoReportService::formatMoney((float) $totais['subtotal_bruto']) }}</td>
+        </tr>
+        <tr>
+            <td class="label">Descontos</td>
+            <td class="valor">{{ OrcamentoReportService::formatMoney((float) $totais['descontos']) }}</td>
+        </tr>
+        <tr class="total">
+            <td class="label">Total</td>
+            <td class="valor">{{ OrcamentoReportService::formatMoney((float) $totais['total']) }}</td>
+        </tr>
+    </table>
 
-        <hr class="orc-doc__rule">
+    <div class="orc-doc__obs">
+        <div class="orc-doc__obs-title">Observações</div>
+        <div class="orc-doc__obs-text">{{ $orcamento->observacoes ?: '' }}</div>
+    </div>
 
-        <div class="orc-doc__obs">
-            <div class="orc-doc__obs-title">Observações:</div>
-            <div class="orc-doc__obs-text">{{ $orcamento->observacoes ?: '' }}</div>
-        </div>
+    <div class="monitor-pedidos-doc__rodape">
+        <span class="monitor-pedidos-doc__impresso">
+            IMPRESSO POR {{ mb_strtoupper((string) ($printedBy ?? '—'), 'UTF-8') }}
+            — {{ ($printedAt ?? now())->format('d/m/Y H:i:s') }}
+        </span>
+        <span class="monitor-pedidos-doc__credito">
+            Desenvolvido Por Unitecnologia Sistemas LTDA
+        </span>
     </div>
 </div>

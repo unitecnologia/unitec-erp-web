@@ -80,6 +80,16 @@ trait ErpOrcamentoFormPage
 
     public string $clienteWhatsapp = '';
 
+    /** Código do cliente selecionado. Usado só para o destaque de observação (não grava). */
+    public string $clienteCodigo = '';
+
+    /** Observação cadastrada em people.observacoes. */
+    public string $clienteObservacoes = '';
+
+    public bool $observacaoOrcamentoModalOpen = false;
+
+    public bool $observacaoClienteModalOpen = false;
+
     public ?int $vendedorId = null;
 
     public string $formaPagamento = '';
@@ -93,6 +103,9 @@ trait ErpOrcamentoFormPage
     public string $percentualDescontoDisplay = '0,00';
 
     public string $descontoValorDisplay = '0,00';
+
+    /** percentual = o % manda ao recalcular; valor = o R$ manda. */
+    public string $descontoGeralBase = 'valor';
 
     public string $totalDisplay = '0,00';
 
@@ -391,6 +404,7 @@ trait ErpOrcamentoFormPage
         $this->formaPagamento = mb_strtoupper((string) ($orcamento->forma_pagamento ?? ''), 'UTF-8');
         $this->validadeDias = (string) ($orcamento->validade_dias ?? 0);
         $this->observacoes = (string) ($orcamento->observacoes ?? '');
+        $this->syncClienteObservacoes($cliente);
 
         $this->itens = $orcamento->itens
             ->sortByDesc('item')
@@ -796,6 +810,7 @@ trait ErpOrcamentoFormPage
         $this->clienteUf = 'SC';
         $this->clienteFone = '';
         $this->clienteWhatsapp = '';
+        $this->syncClienteObservacoes($cf);
         $this->clienteLookupOpen = false;
         $this->clienteResults = [];
         $this->selectedClienteIndex = null;
@@ -873,6 +888,7 @@ trait ErpOrcamentoFormPage
             $this->clienteUf = 'SC';
             $this->clienteFone = '';
             $this->clienteWhatsapp = '';
+            $this->syncClienteObservacoes(null);
 
             return;
         }
@@ -890,6 +906,7 @@ trait ErpOrcamentoFormPage
             $this->clienteUf = 'SC';
             $this->clienteFone = '';
             $this->clienteWhatsapp = '';
+            $this->syncClienteObservacoes($person);
 
             return;
         }
@@ -908,6 +925,63 @@ trait ErpOrcamentoFormPage
         if ($person->vendedor_loja_id) {
             $this->vendedorId = $person->vendedor_loja_id;
         }
+
+        $this->syncClienteObservacoes($person);
+    }
+
+    protected function syncClienteObservacoes(?Person $person): void
+    {
+        $this->observacaoClienteModalOpen = false;
+
+        if (! $person || Person::isCodigoConsumidorFinal($person->codigo !== null ? (string) $person->codigo : null)) {
+            $this->clienteCodigo = $person?->codigo !== null ? (string) $person->codigo : '';
+            $this->clienteObservacoes = '';
+
+            return;
+        }
+
+        $this->clienteCodigo = (string) $person->codigo;
+        $this->clienteObservacoes = trim((string) ($person->observacoes ?? ''));
+    }
+
+    public function abrirObservacaoOrcamento(): void
+    {
+        if (! $this->orcamentoReadOnly()) {
+            $this->observacoes = $this->observacaoOrcamentoCaixaAlta($this->observacoes);
+        }
+
+        $this->observacaoOrcamentoModalOpen = true;
+        $this->dispatch('erp-orc-focus-obs');
+    }
+
+    public function fecharObservacaoOrcamento(?string $texto = null): void
+    {
+        if (! $this->orcamentoReadOnly()) {
+            $this->observacoes = $this->observacaoOrcamentoCaixaAlta($texto ?? $this->observacoes);
+        }
+
+        $this->observacaoOrcamentoModalOpen = false;
+    }
+
+    private function observacaoOrcamentoCaixaAlta(?string $texto): string
+    {
+        return trim(mb_strtoupper((string) $texto, 'UTF-8'));
+    }
+
+    public function abrirObservacaoCliente(): void
+    {
+        if (trim($this->clienteObservacoes) === '' || Person::isCodigoConsumidorFinal($this->clienteCodigo !== '' ? $this->clienteCodigo : null)) {
+            $this->observacaoClienteModalOpen = false;
+
+            return;
+        }
+
+        $this->observacaoClienteModalOpen = true;
+    }
+
+    public function fecharObservacaoCliente(): void
+    {
+        $this->observacaoClienteModalOpen = false;
     }
 
     public function clienteCamposEditaveis(): bool
@@ -1169,37 +1243,88 @@ trait ErpOrcamentoFormPage
         $this->dispatch('orc-focus-field', id: 'orc-cidade');
     }
 
-    public function applyDescontoFromPercentual(): void
+    public function applyDescontoFromPercentual(?string $valor = null): void
     {
         if ($this->orcamentoReadOnly()) {
             return;
         }
 
-        $subtotal = ErpMoney::parseBr($this->subtotalDisplay);
-        $percentual = ErpMoney::parseBr($this->percentualDescontoDisplay);
-        $desconto = round($subtotal * $percentual / 100, 2);
-        $total = round(max(0, $subtotal - $desconto), 2);
+        if (is_string($valor)) {
+            $this->percentualDescontoDisplay = $valor;
+        }
 
-        $this->descontoValorDisplay = ErpMoney::formatBr($desconto);
-        $this->totalDisplay = ErpMoney::formatBr($total);
+        $this->descontoGeralBase = 'percentual';
+        $this->recalcHeaderFromItens();
     }
 
-    public function applyDescontoFromValor(): void
+    public function applyDescontoFromValor(?string $valor = null): void
     {
         if ($this->orcamentoReadOnly()) {
             return;
         }
 
-        $subtotal = ErpMoney::parseBr($this->subtotalDisplay);
-        $desconto = ErpMoney::parseBr($this->descontoValorDisplay);
-        $total = round(max(0, $subtotal - $desconto), 2);
+        if (is_string($valor)) {
+            $this->descontoValorDisplay = $valor;
+        }
 
-        $percentual = $subtotal > 0
-            ? round(100 - (($total * 100) / $subtotal), 2)
-            : 0.0;
+        $this->descontoGeralBase = 'valor';
+        $this->recalcHeaderFromItens();
+    }
 
-        $this->percentualDescontoDisplay = ErpMoney::formatBr($percentual, 2);
-        $this->totalDisplay = ErpMoney::formatBr($total);
+    /**
+     * Cota do desconto geral em cada item, proporcional ao total da linha
+     * (já líquido do desconto do item). O centavo que sobra fica no maior item,
+     * no mesmo critério de OrcamentoDescontoService.
+     *
+     * @return array<int, float>
+     */
+    public function rateioDescontoGeralPorItem(): array
+    {
+        $rateio = array_fill(0, count($this->itens), 0.0);
+        $desconto = max(0, ErpMoney::parseBr($this->descontoValorDisplay));
+
+        if ($desconto <= 0 || $this->itens === []) {
+            return $rateio;
+        }
+
+        $bases = [];
+        $base = 0.0;
+
+        foreach ($this->itens as $index => $row) {
+            $linha = round(max(0, ErpMoney::parseBr($row['total'] ?? 0)), 2);
+            $bases[$index] = $linha;
+            $base += $linha;
+        }
+
+        $base = round($base, 2);
+
+        if ($base <= 0) {
+            return $rateio;
+        }
+
+        $desconto = round(min($desconto, $base), 2);
+        $soma = 0.0;
+        $maiorIndex = null;
+        $maiorTotal = -1.0;
+
+        foreach ($bases as $index => $linha) {
+            $parte = round($desconto * ($linha / $base), 2);
+            $rateio[$index] = $parte;
+            $soma = round($soma + $parte, 2);
+
+            if ($linha > $maiorTotal) {
+                $maiorTotal = $linha;
+                $maiorIndex = $index;
+            }
+        }
+
+        $diferenca = round($desconto - $soma, 2);
+
+        if ($diferenca !== 0.0 && $maiorIndex !== null) {
+            $rateio[$maiorIndex] = round($rateio[$maiorIndex] + $diferenca, 2);
+        }
+
+        return $rateio;
     }
 
     protected function recalcHeaderFromItens(): void
@@ -1210,9 +1335,23 @@ trait ErpOrcamentoFormPage
             $subtotal += ErpMoney::parseBr($row['total'] ?? 0);
         }
 
-        $desconto = ErpMoney::parseBr($this->descontoValorDisplay);
+        $subtotal = round($subtotal, 2);
+
+        if ($this->descontoGeralBase === 'percentual') {
+            $percentual = max(0, min(100, ErpMoney::parseBr($this->percentualDescontoDisplay)));
+            $desconto = $subtotal > 0 ? round($subtotal * $percentual / 100, 2) : 0.0;
+        } else {
+            $desconto = max(0, ErpMoney::parseBr($this->descontoValorDisplay));
+            $percentual = 0.0;
+        }
+
+        $desconto = round(min(max(0, $desconto), $subtotal), 2);
+
+        if ($this->descontoGeralBase !== 'percentual') {
+            $percentual = $subtotal > 0 ? round(($desconto / $subtotal) * 100, 2) : 0.0;
+        }
+
         $total = round(max(0, $subtotal - $desconto), 2);
-        $percentual = $subtotal > 0 ? round(($desconto / $subtotal) * 100, 2) : 0.0;
 
         $this->syncTotaisDisplay($subtotal, $desconto, $total, $percentual);
     }
@@ -2167,6 +2306,20 @@ trait ErpOrcamentoFormPage
             }
 
             $this->recalcEntryRowFromPending();
+
+            $tipo = $this->itemAjusteTipo;
+            $pendingAntes = $this->itemPendingProductId;
+            $this->fecharModalDescontoItem();
+            $this->confirmPendingItemEntry();
+
+            if ($pendingAntes !== null && $this->itemPendingProductId === null) {
+                Notification::make()
+                    ->title($tipo === 'acrescimo' ? 'Acréscimo aplicado.' : 'Desconto aplicado.')
+                    ->success()
+                    ->send();
+            }
+
+            return;
         } else {
             $index = (int) $this->selectedItemIndex;
             $itens = $this->itens;
@@ -2276,10 +2429,15 @@ trait ErpOrcamentoFormPage
 
     public function itensResumoDescontosDisplay(): string
     {
-        $total = 0.0;
+        $total = ErpMoney::parseBr($this->descontoValorDisplay);
 
         foreach ($this->itens as $row) {
-            $total += ErpMoney::parseBr($row['desconto'] ?? 0);
+            $qtd = ErpMoney::parseBr($row['quantidade'] ?? 0, 3);
+            $preco = ErpMoney::parseBr($row['preco_unitario'] ?? 0);
+            $bruto = round($qtd * $preco, 2);
+            $acrescimo = ErpMoney::parseBr($row['acrescimo'] ?? 0);
+            $liquido = ErpMoney::parseBr($row['total'] ?? 0);
+            $total += max(0, round($bruto + $acrescimo - $liquido, 2));
         }
 
         return ErpMoney::formatBr($total);
@@ -2293,7 +2451,9 @@ trait ErpOrcamentoFormPage
             $total += ErpMoney::parseBr($row['total'] ?? 0);
         }
 
-        return ErpMoney::formatBr($total);
+        $total -= ErpMoney::parseBr($this->descontoValorDisplay);
+
+        return ErpMoney::formatBr(max(0, $total));
     }
 
     protected function appendProductItem(
@@ -2666,6 +2826,18 @@ trait ErpOrcamentoFormPage
 
     public function handleOrcamentoFormEscape(): void
     {
+        if ($this->observacaoOrcamentoModalOpen) {
+            $this->fecharObservacaoOrcamento();
+
+            return;
+        }
+
+        if ($this->observacaoClienteModalOpen) {
+            $this->fecharObservacaoCliente();
+
+            return;
+        }
+
         if ($this->descontoModalOpen) {
             $this->fecharModalDescontoItem();
 

@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Nfse;
 
+use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\NfseDpsSequencia;
 use App\Models\Person;
@@ -59,10 +60,11 @@ class NfseGravarService
 
         return DB::transaction(function () use ($empresaId, $nfseId, $cabecalho, $itens): Nfse {
             if ($nfseId === null) {
+                [$serie, $numero] = $this->reservarNumero($empresaId);
                 $nfse = new Nfse;
                 $nfse->empresa_id = $empresaId;
-                $nfse->serie_dps = Nfse::SERIE_DPS;
-                $nfse->numero_dps = NfseDpsSequencia::proximo($empresaId, Nfse::SERIE_DPS);
+                $nfse->serie_dps = $serie;
+                $nfse->numero_dps = $numero;
                 $nfse->numero_nfse = null;
                 $nfse->chave = null;
                 $nfse->protocolo = null;
@@ -149,6 +151,69 @@ class NfseGravarService
 
             return $nfse->fresh(['itens']);
         });
+    }
+
+    /**
+     * Nacional continua na série DPS. IPM reserva a série e o próximo RPS configurados.
+     *
+     * @return array{0: string, 1: int}
+     */
+    private function reservarNumero(int $empresaId): array
+    {
+        $empresa = Empresa::query()->whereKey($empresaId)->first();
+
+        if ($empresa instanceof Empresa && strtolower(trim((string) $empresa->nfse_provedor)) === 'ipm') {
+            return $this->reservarNumeroIpm($empresa);
+        }
+
+        $serie = NfseDpsSequencia::serieEmUso($empresaId);
+
+        return [$serie, NfseDpsSequencia::proximo($empresaId, $serie)];
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private function reservarNumeroIpm(Empresa $empresa): array
+    {
+        $serie = strtoupper(trim((string) $empresa->nfse_serie_rps));
+
+        if (preg_match('/^[A-Z0-9]{1,5}$/', $serie) !== 1) {
+            throw new NfseNaoGravada('Informe a série RPS da NFS-e.');
+        }
+
+        $desejado = max(1, (int) ($empresa->nfse_proximo_rps ?? 1));
+        $agora = now();
+
+        NfseDpsSequencia::query()->insertOrIgnore([
+            'empresa_id' => $empresa->id,
+            'serie_dps' => $serie,
+            'ultimo_numero' => 0,
+            'created_at' => $agora,
+            'updated_at' => $agora,
+        ]);
+
+        $sequencia = NfseDpsSequencia::query()
+            ->where('empresa_id', $empresa->id)
+            ->where('serie_dps', $serie)
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequencia === null) {
+            throw new NfseNaoGravada('Não foi possível reservar o número do RPS.');
+        }
+
+        $maxUsado = (int) (Nfse::query()
+            ->where('empresa_id', $empresa->id)
+            ->where('serie_dps', $serie)
+            ->max('numero_dps') ?? 0);
+
+        if ((int) $sequencia->ultimo_numero < ($desejado - 1) && $maxUsado < $desejado) {
+            $sequencia->ultimo_numero = $desejado - 1;
+            $sequencia->save();
+        }
+
+        return [$serie, NfseDpsSequencia::proximo((int) $empresa->id, $serie)];
     }
 
     /**

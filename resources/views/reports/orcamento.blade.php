@@ -75,6 +75,9 @@
         .viewer__paper {
             width: min(210mm, 100%);
             margin: 0 auto;
+            background: #fff;
+            padding: 8mm;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
         }
 
         @media print {
@@ -93,14 +96,13 @@
 
             .viewer__paper {
                 width: 100%;
-            }
-
-            .orc-doc__frame {
-                border: none;
+                margin: 0;
                 padding: 0;
+                box-shadow: none;
             }
         }
     </style>
+    @include('reports.partials.monitor-pedidos-document-styles')
     @include('reports.partials.orcamento-document-styles')
 </head>
 <body>

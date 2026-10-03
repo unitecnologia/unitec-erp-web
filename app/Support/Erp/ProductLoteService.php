@@ -11,7 +11,7 @@ use RuntimeException;
 
 /**
  * Controle simples de lote/validade (opt-in via products.controla_lote_validade).
- * Entrada na compra; saída FEFO no PDV; estorno devolve no lote de validade mais próxima.
+ * Entrada na compra; saída FEFO no PDV. Estorno de compra devolve o lote exato lançado.
  */
 final class ProductLoteService
 {
@@ -115,6 +115,61 @@ final class ProductLoteService
         }
 
         $this->sincronizarEspelhoProduto($product);
+    }
+
+    /**
+     * Desfaz a entrada de uma compra nos lotes e quantidades informados.
+     * Não escolhe outro lote. Se o saldo não chegar, a reabertura é recusada.
+     *
+     * @param  list<array{lote?: string, data_validade?: string, quantidade?: float|string}>  $linhas
+     */
+    public function estornarEntrada(Product $product, array $linhas): void
+    {
+        if (! $this->tabelaExiste() || $linhas === []) {
+            return;
+        }
+
+        DB::transaction(function () use ($product, $linhas): void {
+            foreach ($linhas as $linha) {
+                $lote = mb_substr(trim((string) ($linha['lote'] ?? '')), 0, 60);
+                $validade = $this->parseDate((string) ($linha['data_validade'] ?? ''));
+                $qtd = $this->parseQtd($linha['quantidade'] ?? 0);
+                $nome = trim((string) ($product->descricao ?? 'produto'));
+
+                if ($lote === '' || ! $validade || $qtd <= 0) {
+                    throw new RuntimeException('Não foi possível reabrir: um lote lançado nesta compra está incompleto.');
+                }
+
+                $validadeBr = $validade->format('d/m/Y');
+                $row = ProductLote::query()
+                    ->where('product_id', $product->id)
+                    ->where('lote', $lote)
+                    ->whereDate('data_validade', $validade->toDateString())
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $row) {
+                    throw new RuntimeException(
+                        'Não foi possível reabrir: o lote '.$lote.' ('.$validadeBr.') de '.$nome.' não existe mais.'
+                    );
+                }
+
+                $disponivel = round((float) $row->quantidade_atual, 3);
+
+                if ($disponivel + 0.0005 < $qtd) {
+                    throw new RuntimeException(
+                        'Não foi possível reabrir: o lote '.$lote.' ('.$validadeBr.') de '.$nome
+                        .' não tem quantidade suficiente para estornar '.number_format($qtd, 3, ',', '.')
+                        .'. Saldo do lote: '.number_format($disponivel, 3, ',', '.').'.'
+                    );
+                }
+
+                $row->quantidade_atual = round($disponivel - $qtd, 3);
+                $row->save();
+            }
+
+            $this->sincronizarEspelhoProduto($product);
+        });
     }
 
     public function consumirFefo(Product|int $product, float $quantidade): void

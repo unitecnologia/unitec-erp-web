@@ -155,6 +155,10 @@ class AuthController
                     ? $empresa->param_monitor_vendas_desconto_reais_item_modo
                     : null,
             ),
+            'imp_valor_liquido' => app(\App\Support\ForcaVendas\ForcaVendasSyncService::class)
+                ->impressaoPedidoValorLiquido($user->empresa_id ? (int) $user->empresa_id : null),
+            'imp_sem_coluna_desconto' => app(\App\Support\ForcaVendas\ForcaVendasSyncService::class)
+                ->impressaoPedidoSemColunaDesconto($user->empresa_id ? (int) $user->empresa_id : null),
             'is_admin' => (bool) $user->is_admin,
             'permissions' => $user->effectivePermissionKeys(),
         ];

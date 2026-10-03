@@ -13,21 +13,10 @@
                 return;
             }
             el.removeAttribute('readonly');
-            const run = () => {
-                try {
-                    el.removeAttribute('readonly');
-                    el.focus({ preventScroll: true });
-                    el.select();
-                    if (typeof el.setSelectionRange === 'function' && el.value !== '') {
-                        el.setSelectionRange(0, el.value.length);
-                    }
-                } catch (e) {}
-            };
-            run();
-            requestAnimationFrame(run);
-            setTimeout(run, 0);
-            setTimeout(run, 50);
-            setTimeout(run, 120);
+            try {
+                el.focus({ preventScroll: true });
+                el.select();
+            } catch (e) {}
         }
     }"
     x-on:erp-pessoa-focus-email.window="
@@ -35,8 +24,6 @@
             const el = document.getElementById('pcad-email');
             if (! el) return;
             selectField(el);
-            setTimeout(() => selectField(el), 60);
-            setTimeout(() => selectField(el), 160);
         })
     "
     @keydown.enter="
@@ -51,8 +38,8 @@
             return;
         }
 
-        // Cidade: Enter é tratado no JS (confirma IBGE/UF e vai para Email).
-        if (el.id === 'pcad-cidade-nome') {
+        // Cidade com lista aberta: o JS confirma a sugestão. Lista fechada segue o Enter normal.
+        if (el.id === 'pcad-cidade-nome' && document.getElementById('pcad-cidade-sugestoes')) {
             return;
         }
 
@@ -77,18 +64,6 @@
             selectField(next);
         }
     "
-    @focusin="
-        const el = $event.target;
-        if (el instanceof HTMLInputElement && el.hasAttribute('data-erp-pessoa-enter')) {
-            selectField(el);
-        }
-    "
-    @click="
-        const el = $event.target;
-        if (el instanceof HTMLInputElement && el.hasAttribute('data-erp-pessoa-enter')) {
-            selectField(el);
-        }
-    "
 >
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-codigo">Código</label>
@@ -100,6 +75,7 @@
             @if ($this->record?->exists)
                 readonly
                 tabindex="-1"
+                data-erp-locked
             @endif
         >
         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-pessoa">Pessoa</label>
@@ -112,7 +88,7 @@
 
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-cpf">CPF/CNPJ</label>
-        <input id="pcad-cpf" type="text" wire:model="data.cpf_cnpj" data-mask="cpf-cnpj" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--doc">
+        <input id="pcad-cpf" type="text" wire:model="data.cpf_cnpj" data-mask="cpf-cnpj" data-erp-pessoa-enter x-on:blur="$wire.finalizarDocumentoPessoa($event.target.value)" class="erp-pcad-form__input erp-pcad-form__input--doc">
         @error('data.cpf_cnpj')
             <span class="erp-pcad-form__error">{{ $message }}</span>
         @enderror
@@ -143,7 +119,7 @@
 
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-cep">CEP</label>
-        <input id="pcad-cep" type="text" wire:model="data.cep" data-mask="cep" data-erp-pessoa-enter x-on:blur="$wire.buscarCepPessoa()" class="erp-pcad-form__input erp-pcad-form__input--cep">
+        <input id="pcad-cep" type="text" wire:model="data.cep" data-mask="cep" data-erp-pessoa-enter x-on:blur="$wire.buscarCepPessoa(true)" class="erp-pcad-form__input erp-pcad-form__input--cep">
         <button type="button" wire:click="buscarCepPessoa" wire:loading.attr="disabled" wire:target="buscarCepPessoa" class="erp-pcad-form__btn">
             <span class="erp-pcad-form__btn-icon">🔍</span> Pesquisar CEP
         </button>

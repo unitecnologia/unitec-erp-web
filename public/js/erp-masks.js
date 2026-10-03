@@ -66,14 +66,14 @@ window.ErpMasks = {
     },
 
     formatCpfCnpj(value, pessoaTipo = 'juridica') {
-        // Documento já com >11 dígitos = CNPJ: nunca fatiar para 11 (evita corrida com select ainda em "fisica").
         const rawDigits = this.digits(value);
+        // 12–14 dígitos é CNPJ ainda em digitação: não cortar para 11 mesmo com o combo em Física.
         const asCnpj = rawDigits.length > 11 || pessoaTipo !== 'fisica';
-        const digits = rawDigits.slice(0, asCnpj ? 14 : 11);
+        const digits = rawDigits.slice(0, 14);
 
         return asCnpj
             ? this.formatCnpj(digits)
-            : this.formatCpf(digits);
+            : this.formatCpf(digits.slice(0, 11));
     },
 
     isValidCpf(value) {

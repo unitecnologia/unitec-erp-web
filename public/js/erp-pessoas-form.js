@@ -65,6 +65,14 @@ function focusErpPessoaField(id) {
 
     el.removeAttribute('readonly');
 
+    const caretPosicionado = document.activeElement === el
+        && typeof el.selectionStart === 'number'
+        && el.selectionStart === el.selectionEnd;
+
+    if (caretPosicionado) {
+        return true;
+    }
+
     try {
         el.focus({ preventScroll: true });
 
@@ -142,6 +150,10 @@ function bindErpPessoaCidadeEnter() {
             return;
         }
 
+        if (! document.getElementById('pcad-cidade-sugestoes')) {
+            return;
+        }
+
         el.removeAttribute('readonly');
         // preventDefault evita submit; NÃO usa stopImmediatePropagation
         // para o wire:keydown.enter do Livewire ainda gravar.
@@ -155,6 +167,16 @@ function bindErpPessoaCidadeEnter() {
             component.call('confirmarPessoaCidadeSugestao');
         }
     }, true);
+}
+
+function erpPessoasModalAberto() {
+    return Array.from(document.querySelectorAll(
+        '.erp-aviso-modal, .erp-pessoa-credito-modal, .erp-pessoas-foto__modal',
+    )).some((el) => {
+        const style = window.getComputedStyle(el);
+
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    });
 }
 
 function bindSearchPessoaJuridica(page) {
@@ -214,6 +236,19 @@ function bindErpPessoasFormKeys(page) {
         }
 
         if (event.key === 'Escape') {
+            if (erpPessoasModalAberto()) {
+                return;
+            }
+
+            if (document.getElementById('pcad-cidade-sugestoes')) {
+                if (event.target?.id !== 'pcad-cidade-nome') {
+                    event.preventDefault();
+                    component.call('fecharPessoaCidadeSugestoes');
+                }
+
+                return;
+            }
+
             event.preventDefault();
             component.call('cancelForm');
         }

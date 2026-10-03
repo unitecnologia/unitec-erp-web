@@ -191,8 +191,37 @@ class NotaFornecedorDanfeReportService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Recusa NF-e cancelada, denegada ou com protocolo incompatível com uso.
+     * XML sem infProt (resumo) não é recusado aqui.
      */
+    public function motivoRecusaImportacao(string $xml): ?string
+    {
+        if (preg_match('/<tpEvento>\s*110111\s*<\/tpEvento>/', $xml) === 1) {
+            return 'NF-e cancelada (evento 110111). A importação foi recusada.';
+        }
+
+        $dom = new DOMDocument();
+        if (! @$dom->loadXML($xml)) {
+            return null;
+        }
+
+        $prot = $dom->getElementsByTagName('infProt')->item(0);
+        if (! $prot instanceof DOMElement) {
+            return null;
+        }
+
+        $cStat = trim($this->child($prot, 'cStat'));
+        if ($cStat === '' || $cStat === '100' || $cStat === '150') {
+            return null;
+        }
+
+        return match ($cStat) {
+            '101', '151' => 'NF-e cancelada (cStat '.$cStat.'). A importação foi recusada.',
+            '110', '301', '302', '303' => 'NF-e denegada (cStat '.$cStat.'). A importação foi recusada.',
+            default => 'NF-e com situação fiscal incompatível (cStat '.$cStat.'). A importação foi recusada.',
+        };
+    }
+
     public function parseXml(string $xml): ?array
     {
         if (! $this->isProcNfeXml($xml) && ! str_contains($xml, '<NFe')) {

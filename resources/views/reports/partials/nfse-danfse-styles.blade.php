@@ -140,6 +140,82 @@
         font-weight: 400;
     }
 
+    .danfse--xml .danfse__qr-msg {
+        font-size: 6pt;
+        font-family: "Microsoft Sans Serif", Arial, Helvetica, sans-serif;
+    }
+
+    .danfse--xml .danfse__chave {
+        letter-spacing: 0;
+        font-size: 7.5pt;
+        white-space: nowrap;
+    }
+
+    .danfse__logo {
+        display: block;
+        width: 4cm;
+        height: auto;
+        max-height: 0.9cm;
+    }
+
+    .danfse__cabeca-mun {
+        font-size: 8pt;
+        font-weight: 400;
+        text-align: right;
+        line-height: 1.2;
+    }
+
+    .danfse__cabeca-amb {
+        font-size: 6pt;
+        font-weight: 400;
+        text-align: right;
+        line-height: 1.2;
+    }
+
+    .danfse__homolog {
+        color: #e10600;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9pt;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.15;
+        margin-top: 2px;
+    }
+
+    .danfse__shade {
+        background: #f2f2f2;
+    }
+
+    .danfse__frase {
+        font-size: 7pt;
+        font-weight: 700;
+        text-align: center;
+        text-transform: uppercase;
+        padding: 3px;
+    }
+
+    .danfse__desc-codigo {
+        font-size: 7pt;
+        font-weight: 400;
+        line-height: 1.2;
+    }
+
+    .danfse__marca {
+        position: fixed;
+        top: 38%;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 50pt;
+        font-weight: 400;
+        color: #8a8a8a;
+        transform: rotate(-35deg);
+        z-index: 5;
+        pointer-events: none;
+        letter-spacing: 1px;
+    }
+
     .danfse__intermediario {
         font-size: 7pt;
         font-weight: 700;

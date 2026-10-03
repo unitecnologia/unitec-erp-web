@@ -5,6 +5,7 @@ namespace App\Support\Erp\Nfe;
 use App\Mail\OrcamentoEmail;
 use App\Models\Empresa;
 use App\Models\VendasParametro;
+use Unitec\FiscalEngine\Nfe\DfeDistribuidor;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
@@ -715,6 +716,7 @@ final class NfeFiscalConfig
             'serie' => (string) ($params->serie ?? '1'),
             'serie_nfe' => (int) ($params->serie_nfe ?? 1),
             'numero_nfe' => (int) ($params->numero_nfe ?? 1),
+            'dfe_ultimo_nsu' => DfeDistribuidor::normalizarNsu((string) ($params->dfe_ultimo_nsu ?? '')),
             'email_host' => $params->email_host ?? '',
             'email_porta' => $params->email_porta ?? '',
             'email_user' => $params->email_user ?? '',

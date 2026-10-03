@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Orcamento\OrcamentoReportService;
 use Filament\Notifications\Notification;
 
 trait ManagesOrcamentoViewModal
@@ -58,26 +59,38 @@ trait ManagesOrcamentoViewModal
             'validade_dias' => (string) ($orcamento->validade_dias ?? 0),
         ];
 
+        $report = app(OrcamentoReportService::class);
+
         $this->viewModalItens = $orcamento->itens
             ->sortByDesc('item')
             ->values()
-            ->map(fn (OrcamentoItem $item): array => [
-                'numero' => (int) $item->item,
-                'codigo' => $this->formatOrcamentoItemCodigo($item->product?->codigo),
-                'descricao' => mb_strtoupper((string) ($item->descricao ?? $item->product?->descricao ?? ''), 'UTF-8'),
-                'quantidade' => ErpMoney::formatBr((float) $item->quantidade, 3),
-                'unidade' => mb_strtoupper((string) ($item->product?->unidade ?? 'UN'), 'UTF-8'),
-                'preco' => ErpMoney::formatBr((float) $item->preco_unitario),
-                'total' => ErpMoney::formatBr((float) $item->total),
-                'grade' => mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8') ?: '—',
-            ])
+            ->map(function (OrcamentoItem $item) use ($report): array {
+                $linha = $report->linhaImpressao($item);
+
+                return [
+                    'numero' => (int) $item->item,
+                    'codigo' => $this->formatOrcamentoItemCodigo($item->product?->codigo),
+                    'descricao' => mb_strtoupper((string) ($item->descricao ?? $item->product?->descricao ?? ''), 'UTF-8'),
+                    'quantidade' => ErpMoney::formatBr((float) $item->quantidade, 3),
+                    'unidade' => mb_strtoupper((string) ($item->product?->unidade ?? 'UN'), 'UTF-8'),
+                    'preco' => ErpMoney::formatBr($linha['valor_unitario']),
+                    'desconto' => ErpMoney::formatBr($linha['desconto']),
+                    'total' => ErpMoney::formatBr($linha['subtotal']),
+                    'grade' => mb_strtoupper((string) ($item->grade?->descricao ?? ''), 'UTF-8') ?: '—',
+                ];
+            })
             ->all();
 
+        $totais = $report->totaisImpressao($orcamento);
+        $percentual = $totais['subtotal_bruto'] > 0
+            ? round(($totais['descontos'] * 100) / $totais['subtotal_bruto'], 2)
+            : 0.0;
+
         $this->viewModalTotais = [
-            'subtotal' => ErpMoney::formatBr((float) $orcamento->subtotal),
-            'desconto_pct' => ErpMoney::formatBr((float) $orcamento->percentual_desconto, 2),
-            'desconto_valor' => ErpMoney::formatBr((float) $orcamento->desconto_valor),
-            'total' => ErpMoney::formatBr((float) $orcamento->total),
+            'subtotal' => ErpMoney::formatBr($totais['subtotal_bruto']),
+            'desconto_pct' => ErpMoney::formatBr($percentual, 2),
+            'desconto_valor' => ErpMoney::formatBr($totais['descontos']),
+            'total' => ErpMoney::formatBr($totais['total']),
         ];
 
         $this->viewModalObservacoes = (string) ($orcamento->observacoes ?? '');

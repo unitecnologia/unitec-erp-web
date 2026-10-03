@@ -46,6 +46,7 @@ class ErpPageAssets
         'comandos-sistema' => ['css/erp-comandos-sistema.css'],
         'trocar-empresa' => ['css/erp-trocar-empresa.css'],
         'licenca-sistema' => ['css/erp-licenca-sistema.css'],
+        'parcelas-portal' => ['css/erp-parcelas-portal.css'],
         'licenca-bloqueada' => ['css/erp-licenca-bloqueada.css'],
         'balanca' => ['css/erp-balanca.css', 'css/erp-form-ui.css'],
         'nfce' => ['css/erp-nfe.css', 'css/erp-form-ui.css'],
@@ -66,6 +67,7 @@ class ErpPageAssets
         'gestao-entregas' => ['css/erp-nfe.css', 'css/erp-form-ui.css', 'css/erp-gestao-entregas.css'],
         'transportadoras' => ['css/erp-transportadoras.css', 'css/erp-logistica-simple.css', 'css/erp-form-ui.css'],
         'veiculos' => ['css/erp-veiculos.css', 'css/erp-logistica-simple.css', 'css/erp-form-ui.css'],
+        'os-veiculos' => ['css/erp-veiculos.css', 'css/erp-logistica-simple.css', 'css/erp-form-ui.css', 'css/erp-os-veiculos.css'],
         'tomadores-servico' => ['css/erp-logistica-simple.css', 'css/erp-form-ui.css'],
         'logistica-destinatarios' => ['css/erp-logistica-simple.css', 'css/erp-form-ui.css'],
         'logistica-remetentes' => ['css/erp-logistica-simple.css', 'css/erp-form-ui.css'],
@@ -111,7 +113,7 @@ class ErpPageAssets
             'cardex' => ['css/erp-form-ui.css'],
             'pdv' => [],
             'list' => ['css/erp-grid.css', 'css/erp-list-ui.css'],
-            'dashboard' => ['css/erp-home.css'],
+            'dashboard' => ErpAccess::currentCan('dashboard.access') ? ['css/erp-home.css'] : [],
             default => [],
         };
 

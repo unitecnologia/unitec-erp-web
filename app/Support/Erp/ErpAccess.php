@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ErpAccess
 {
@@ -117,15 +118,31 @@ class ErpAccess
    */
   public static function syncUserPermissions(User $user, array $permissions): void
   {
-    $valid = array_values(array_intersect($permissions, ErpPermissionCatalog::allKeys()));
-
-    $user->userPermissions()->delete();
-
-    foreach ($valid as $permission) {
-      $user->userPermissions()->create(['permission_key' => $permission]);
+    if ($user->is_admin) {
+      return;
     }
 
-    static::storeInSession($user->fresh() ?? $user, $valid);
+    $valid = array_values(array_unique(array_intersect($permissions, ErpPermissionCatalog::allKeys())));
+    $now = now();
+    $userId = $user->getKey();
+    $rows = array_map(static fn (string $key): array => [
+      'user_id' => $userId,
+      'permission_key' => $key,
+      'created_at' => $now,
+      'updated_at' => $now,
+    ], $valid);
+
+    DB::transaction(static function () use ($userId, $rows): void {
+      DB::table('user_permissions')->where('user_id', $userId)->delete();
+
+      if ($rows !== []) {
+        DB::table('user_permissions')->insert($rows);
+      }
+    });
+
+    if ((int) Auth::id() === (int) $userId) {
+      static::storeInSession($user, $valid);
+    }
   }
 
   /**
@@ -133,12 +150,22 @@ class ErpAccess
    */
   public static function syncProfilePermissions(\App\Models\ErpProfile $profile, array $permissions): void
   {
-    $valid = array_values(array_intersect($permissions, ErpPermissionCatalog::allKeys()));
+    $valid = array_values(array_unique(array_intersect($permissions, ErpPermissionCatalog::allKeys())));
+    $now = now();
+    $profileId = $profile->getKey();
+    $rows = array_map(static fn (string $key): array => [
+      'erp_profile_id' => $profileId,
+      'permission_key' => $key,
+      'created_at' => $now,
+      'updated_at' => $now,
+    ], $valid);
 
-    $profile->permissions()->delete();
+    DB::transaction(static function () use ($profileId, $rows): void {
+      DB::table('erp_profile_permissions')->where('erp_profile_id', $profileId)->delete();
 
-    foreach ($valid as $permission) {
-      $profile->permissions()->create(['permission_key' => $permission]);
-    }
+      if ($rows !== []) {
+        DB::table('erp_profile_permissions')->insert($rows);
+      }
+    });
   }
 }

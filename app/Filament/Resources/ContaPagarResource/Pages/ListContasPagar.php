@@ -295,6 +295,7 @@ class ListContasPagar extends ListRecords
 
         if (! in_array('fornecedor', $active, true)) {
             $this->fornecedorFilter = 'todos';
+            $this->localFornecedorConfirmedTerm = '';
             $this->closeLocalFornecedorLookup();
         }
 
@@ -397,7 +398,7 @@ class ListContasPagar extends ListRecords
         }
     }
 
-    public function updatedLocalSearchByField(): void
+    public function updatedLocalSearchByField(mixed $value = null, ?string $key = null): void
     {
         $fornecedorTerm = (string) ($this->localSearchByField['fornecedor'] ?? '');
 
@@ -406,11 +407,18 @@ class ListContasPagar extends ListRecords
         } else {
             $this->closeLocalFornecedorLookup();
             $this->fornecedorFilter = 'todos';
+            $this->localFornecedorConfirmedTerm = '';
         }
 
         $this->syncLegacyLocalSearch();
         $this->clearListSelection();
-        $this->resetTable();
+
+        $typingFornecedor = ($key === null || $key === 'fornecedor')
+            && $this->shouldSkipFornecedorSearchWhileTyping();
+
+        if (! $typingFornecedor) {
+            $this->resetTable();
+        }
     }
 
     public function applyLocalDateFilter(?string $de = null, ?string $ate = null): void

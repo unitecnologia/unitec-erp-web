@@ -5,7 +5,6 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpContext;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 
 trait ManagesProductPrecificacao
 {
@@ -235,72 +234,57 @@ trait ManagesProductPrecificacao
     }
 
     /**
-     * Enter = Tab na precificação: grava valor, recalcula e foca o próximo.
+     * Enter: grava o valor, recalcula e devolve os campos da modal.
+     * O foco já andou no JS. skipRender evita remontar a página inteira.
+     *
+     * @return array{valores: array<string, string>}
      */
-    public function precificacaoEnter(string $fieldId, ?string $value = null, ?array $diag = null): void
+    public function precificacaoEnter(string $fieldId, ?string $value = null): array
     {
-        if ($diag !== null) {
-            $this->logPrecificacao('enter:tela', ['field' => $fieldId] + $diag);
-        }
+        $this->skipPrecificacaoRender();
 
         if (! $this->productPrecificacaoOpen || $this->precificacao === []) {
-            return;
+            return ['valores' => []];
         }
 
         $fieldId = trim($fieldId);
 
-        if ($fieldId === '') {
-            return;
+        if ($fieldId === '' || ! isset($this->precificacaoFieldMap()[$fieldId])) {
+            return $this->precificacaoPayload();
         }
 
-        if (! isset($this->precificacaoFieldMap()[$fieldId])) {
-            return;
-        }
-
-        $this->logPrecificacao('enter', ['field' => $fieldId, 'value' => $value]);
-
-        $this->precificacaoCommitField($fieldId, $value);
-
-        // Marca Enter recente: blur fantasma com 0,00 não pode apagar o valor.
+        // Blur fantasma com 0,00 não pode apagar o valor recém-enviado.
         $this->precificacaoLastEnterField = $fieldId;
         $this->precificacaoLastEnterAt = microtime(true);
 
-        $order = array_keys($this->precificacaoFieldMap());
-        $index = array_search($fieldId, $order, true);
-        $nextId = $index === false ? null : ($order[$index + 1] ?? null);
+        $this->precificacaoCommitField($fieldId, $value);
 
-        // O foco confiável é o pós-morph: o JS recebe o estado calculado primeiro
-        // e só depois avança. No último campo, apenas confirma o commit.
-        $this->dispatch('erp-precif-focus', id: $nextId, committed: $fieldId);
+        return $this->precificacaoPayload();
     }
 
     /**
      * Commit explícito (Enter/blur). Evita corrida do wire:model.blur com valor antigo.
+     *
+     * @return array{valores: array<string, string>}
      */
-    public function precificacaoCommitField(string $fieldId, ?string $value = null, bool $fromBlur = false): void
+    public function precificacaoCommitField(string $fieldId, ?string $value = null, bool $fromBlur = false): array
     {
+        $this->skipPrecificacaoRender();
+
         if (! $this->productPrecificacaoOpen || $this->precificacao === []) {
-            return;
+            return ['valores' => []];
         }
 
         $fieldId = trim($fieldId);
         $fieldMap = $this->precificacaoFieldMap();
 
         if ($fieldId === '' || ! isset($fieldMap[$fieldId])) {
-            return;
+            return $this->precificacaoPayload();
         }
-
-        $this->logPrecificacao('commit:in', [
-            'field' => $fieldId,
-            'value' => $value,
-            'blur' => $fromBlur,
-        ]);
 
         if ($value !== null) {
             if ($fromBlur && $this->shouldIgnorePrecificacaoZeroBlur($value, $fieldMap[$fieldId])) {
-                $this->logPrecificacao('commit:ignorado-blur-zero', ['field' => $fieldId]);
-
-                return;
+                return $this->precificacaoPayload();
             }
 
             $this->setPrecificacaoFieldValue($fieldMap[$fieldId], $value);
@@ -309,7 +293,59 @@ trait ManagesProductPrecificacao
         $this->recalcularPrecificacao($fieldMap[$fieldId]);
         $this->touchPrecificacao();
 
-        $this->logPrecificacao('commit:out', ['field' => $fieldId]);
+        return $this->precificacaoPayload();
+    }
+
+    protected function skipPrecificacaoRender(): void
+    {
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
+    }
+
+    /**
+     * @return array{valores: array<string, string>}
+     */
+    protected function precificacaoPayload(): array
+    {
+        return ['valores' => $this->precificacaoValoresParaTela()];
+    }
+
+    /**
+     * Mesmos ids do data-precif-values da modal.
+     *
+     * @return array<string, string>
+     */
+    protected function precificacaoValoresParaTela(): array
+    {
+        $p = $this->precificacao;
+
+        $valores = [
+            'precif-compra' => (string) ($p['preco_compra'] ?? ''),
+            'precif-pct-custos' => (string) ($p['pct_custos'] ?? ''),
+            'precif-custos-rs' => (string) ($p['custos_rs'] ?? ''),
+            'precif-frete' => (string) ($p['frete_pct'] ?? ''),
+            'precif-frete-rs' => (string) ($p['frete_rs'] ?? ''),
+            'precif-seguro' => (string) ($p['seguro_pct'] ?? ''),
+            'precif-seguro-rs' => (string) ($p['seguro_rs'] ?? ''),
+            'precif-outras-pct' => (string) ($p['outras_pct'] ?? ''),
+            'precif-outras' => (string) ($p['outras_desp'] ?? ''),
+            'precif-custo-pct' => (string) ($p['custo_pct_total'] ?? ''),
+            'precif-custo' => (string) ($p['preco_custo'] ?? ''),
+        ];
+
+        foreach (['varejo', 'atacado', 'especial'] as $nivel) {
+            $dados = $p['niveis'][$nivel] ?? [];
+            $valores['precif-'.$nivel.'-comissao'] = (string) ($dados['comissao'] ?? '');
+            $valores['precif-'.$nivel.'-comissao-rs'] = (string) ($dados['comissao_rs'] ?? '');
+            $valores['precif-'.$nivel.'-desconto'] = (string) ($dados['desconto'] ?? '');
+            $valores['precif-'.$nivel.'-desconto-rs'] = (string) ($dados['desconto_rs'] ?? '');
+            $valores['precif-'.$nivel.'-margem'] = (string) ($dados['margem'] ?? '');
+            $valores['precif-'.$nivel.'-sugerido'] = (string) ($dados['sugerido'] ?? '');
+            $valores['precif-'.$nivel.'-praticado'] = (string) ($dados['praticado'] ?? '');
+        }
+
+        return $valores;
     }
 
     /**
@@ -330,31 +366,6 @@ trait ManagesProductPrecificacao
         }
 
         return $this->readPrecificacaoPathValue($path) > 0;
-    }
-
-    /**
-     * Diagnóstico temporário (só dev): rastrear quem apaga o valor na modal.
-     *
-     * @param  array<string, mixed>  $contexto
-     */
-    protected function logPrecificacao(string $evento, array $contexto = []): void
-    {
-        if (! app()->environment('local')) {
-            return;
-        }
-
-        Log::build([
-            'driver' => 'single',
-            'path' => storage_path('logs/precificacao.log'),
-            'level' => 'debug',
-        ])->debug($evento, $contexto + [
-            'pct_custos' => $this->precificacao['pct_custos'] ?? null,
-            'custos_rs' => $this->precificacao['custos_rs'] ?? null,
-            'frete_pct' => $this->precificacao['frete_pct'] ?? null,
-            'frete_rs' => $this->precificacao['frete_rs'] ?? null,
-            'preco_compra' => $this->precificacao['preco_compra'] ?? null,
-            'preco_custo' => $this->precificacao['preco_custo'] ?? null,
-        ]);
     }
 
     protected function resetPrecificacaoEnterGuard(): void

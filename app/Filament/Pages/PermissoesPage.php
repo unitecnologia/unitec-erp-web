@@ -7,10 +7,8 @@ use App\Models\ErpProfile;
 use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use App\Support\Erp\EmpresaModulos;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
-use App\Support\Erp\ErpPermissionCatalog;
 use App\Support\Erp\ErpScreen;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -48,16 +46,26 @@ class PermissoesPage extends Page
     #[Url(as: 'aba')]
     public string $activeTab = 'permissoes';
 
-    public string $sidebarSearch = '';
+    public string $contextTitle = 'Selecione um usuário';
 
-    /** @var array<string, bool> */
-    public array $expandedGroups = [];
+    public bool $permissionFullAccess = false;
 
-    /** @var array<string, bool> */
-    public array $expandedModules = [];
+    public bool $permissionLocked = false;
 
-    /** @var array<string, bool> */
-    public array $expandedMenuGroups = [];
+    /**
+     * Lista carregada uma vez. A busca filtra no navegador.
+     *
+     * @var list<array{id: int, name: string, profile: string, ativo: bool}>
+     */
+    public array $userRows = [];
+
+    /**
+     * @var list<array{id: int, nome: string, descricao: string, system: bool}>
+     */
+    public array $profileRows = [];
+
+    /** @var array{keys: list<string>, fullAccess: bool, locked: bool}|null */
+    protected ?array $permBoot = null;
 
     /** @var array<string, mixed> */
     public array $userForm = [];
@@ -88,9 +96,6 @@ class PermissoesPage extends Page
 
     public string $caixaSearchLiberated = '';
 
-    /** @var array<string, bool> */
-    public array $checked = [];
-
     public string $profileNome = '';
 
     public string $profileDescricao = '';
@@ -104,17 +109,36 @@ class PermissoesPage extends Page
     {
         ErpScreen::set('Permissões / Usuários');
 
-        if ($this->selectedUserId) {
-            $this->loadUserPermissions();
+        if ($this->activeTab === 'menu') {
+            $this->activeTab = 'permissoes';
         }
+
+        $this->refreshDirectory();
+        $this->selectLoggedUserWhenNone();
 
         if ($this->selectedProfileId) {
-            $this->selectProfile($this->selectedProfileId);
+            $this->permBoot = $this->captureProfile($this->selectedProfileId);
+        } elseif ($this->selectedUserId) {
+            $this->permBoot = $this->captureUser($this->selectedUserId);
         }
 
-        if ($this->selectedUserId) {
+        $this->applyPermissionHeader($this->permBoot);
+
+        if ($this->activeTab === 'cadastro' && $this->sidebarTab === 'usuarios' && $this->selectedUserId) {
             $this->loadUserForm();
         }
+    }
+
+    /**
+     * @return array{keys: list<string>, fullAccess: bool, locked: bool}
+     */
+    public function permissionBoot(): array
+    {
+        return $this->permBoot ?? [
+            'keys' => [],
+            'fullAccess' => false,
+            'locked' => false,
+        ];
     }
 
     public function getHeading(): string|Htmlable|null
@@ -136,122 +160,86 @@ class PermissoesPage extends Page
             ]);
     }
 
-    /**
-     * @return array<int, string>
-     */
-    public function userOptions(): array
+    public function refreshDirectory(): void
     {
-        return User::query()
-            ->where('ativo', true)
-            ->orderBy('name')
-            ->pluck('name', 'id')
+        $this->userRows = User::query()
+            ->leftJoin('erp_profiles', 'erp_profiles.id', '=', 'users.erp_profile_id')
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name', 'users.ativo', 'erp_profiles.nome as profile_nome'])
+            ->map(static fn (User $user): array => [
+                'id' => (int) $user->id,
+                'name' => (string) $user->name,
+                'profile' => (string) ($user->getAttribute('profile_nome') ?: 'Sem perfil'),
+                'ativo' => (bool) $user->ativo,
+            ])
             ->all();
-    }
 
-    /**
-     * @return array<int, string>
-     */
-    public function profileOptions(): array
-    {
-        return ErpProfile::query()
+        $this->profileRows = ErpProfile::query()
             ->orderBy('nome')
-            ->pluck('nome', 'id')
+            ->get(['id', 'nome', 'descricao', 'is_system'])
+            ->map(static fn (ErpProfile $profile): array => [
+                'id' => (int) $profile->id,
+                'nome' => (string) $profile->nome,
+                'descricao' => (string) ($profile->descricao ?: ($profile->is_system ? 'Perfil do sistema' : 'Perfil personalizado')),
+                'system' => (bool) $profile->is_system,
+            ])
             ->all();
     }
 
-    /**
-     * @return list<User>
-     */
-    public function sidebarUsers(): array
+    protected function selectLoggedUserWhenNone(): void
     {
-        return User::query()
-            ->with('erpProfile')
-            ->when(
-                filled($this->sidebarSearch),
-                fn ($query) => $query->where('name', 'like', '%'.mb_strtoupper(trim($this->sidebarSearch), 'UTF-8').'%'),
-            )
-            ->orderBy('name')
-            ->limit(100)
-            ->get()
-            ->all();
-    }
-
-    /**
-     * @return list<ErpProfile>
-     */
-    public function sidebarProfiles(): array
-    {
-        return ErpProfile::query()
-            ->when(
-                filled($this->sidebarSearch),
-                fn ($query) => $query->where('nome', 'like', '%'.mb_strtoupper(trim($this->sidebarSearch), 'UTF-8').'%'),
-            )
-            ->orderBy('nome')
-            ->limit(100)
-            ->get()
-            ->all();
-    }
-
-    /**
-     * @return array<string, array{label: string, modules: array<string, array{label: string, actions: array<string, string>}>}>
-     */
-    public function permissionGroups(): array
-    {
-        $groups = ErpPermissionCatalog::groupedForUi();
-        $empresa = ErpContext::currentEmpresa();
-
-        foreach ($groups as $groupKey => $group) {
-            foreach (array_keys($group['modules']) as $module) {
-                if (! EmpresaModulos::enabled($empresa, $module)) {
-                    unset($groups[$groupKey]['modules'][$module]);
-                }
-            }
-
-            if (($groups[$groupKey]['modules'] ?? []) === []) {
-                unset($groups[$groupKey]);
-            }
+        if ($this->sidebarTab !== 'usuarios' || $this->selectedUserId || $this->selectedProfileId) {
+            return;
         }
 
-        return $groups;
-    }
+        $authId = (int) Auth::id();
 
-    public function updatedSelectedUserId(): void
-    {
-        $this->selectedProfileId = null;
-        $this->profileTemplateId = null;
-        $this->loadUserPermissions();
+        if ($authId <= 0) {
+            return;
+        }
+
+        foreach ($this->userRows as $row) {
+            if ((int) $row['id'] === $authId) {
+                $this->selectedUserId = $authId;
+
+                return;
+            }
+        }
     }
 
     public function setSidebarTab(string $tab): void
     {
         if (in_array($tab, ['usuarios', 'perfis'], true)) {
             $this->sidebarTab = $tab;
-            $this->sidebarSearch = '';
         }
     }
 
     public function setActiveTab(string $tab): void
     {
-        if (in_array($tab, ['cadastro', 'permissoes', 'menu', 'empresas', 'caixas'], true)) {
-            $this->activeTab = $tab;
+        if (! in_array($tab, ['cadastro', 'permissoes', 'empresas', 'caixas'], true)) {
+            return;
+        }
 
-            if ($this->sidebarTab !== 'usuarios') {
-                return;
-            }
+        $this->activeTab = $tab;
 
-            if ($tab === 'empresas') {
-                $this->loadUserEmpresas();
-            }
+        if ($this->sidebarTab !== 'usuarios' || ! $this->selectedUserId) {
+            return;
+        }
 
-            if ($tab === 'caixas') {
-                $this->loadUserCaixas();
-            }
+        if ($tab === 'cadastro') {
+            $this->loadUserForm();
+        } elseif ($tab === 'empresas') {
+            $this->loadUserEmpresas();
+        } elseif ($tab === 'caixas') {
+            $this->loadUserCaixas();
         }
     }
 
     public function selectUser(int $userId): void
     {
-        if (! User::query()->whereKey($userId)->exists()) {
+        $state = $this->captureUser($userId);
+
+        if ($state === null) {
             return;
         }
 
@@ -267,33 +255,31 @@ class PermissoesPage extends Page
         $this->selectedLiberatedCaixaId = null;
         $this->caixaSearchBlocked = '';
         $this->caixaSearchLiberated = '';
-        $this->loadUserPermissions();
-        $this->loadUserForm();
-        $this->loadUserEmpresas();
-        $this->loadUserCaixas();
-    }
+        $this->applyPermissionHeader($state);
+        $this->dispatch('erp-permissoes-sync', ...$state);
 
-    public function selectedUser(): ?User
-    {
-        return $this->selectedUserId
-            ? User::query()->find($this->selectedUserId)
-            : null;
+        if ($this->activeTab === 'cadastro') {
+            $this->loadUserForm();
+        } elseif ($this->activeTab === 'empresas') {
+            $this->loadUserEmpresas();
+        } elseif ($this->activeTab === 'caixas') {
+            $this->loadUserCaixas();
+        }
     }
 
     public function selectProfile(int $profileId): void
     {
-        $profile = ErpProfile::query()->find($profileId);
+        $state = $this->captureProfile($profileId);
 
-        if (! $profile) {
+        if ($state === null) {
             return;
         }
 
         $this->sidebarTab = 'perfis';
         $this->selectedUserId = null;
-        $this->selectedProfileId = $profile->getKey();
-        $this->profileNome = $profile->nome;
-        $this->profileDescricao = (string) ($profile->descricao ?? '');
-        $this->checked = [];
+        $this->selectedProfileId = $profileId;
+        $this->profileNome = $state['name'];
+        $this->profileDescricao = $state['descricao'];
         $this->userEmpresaIds = [];
         $this->userCaixaIds = [];
         $this->userCaixaPadraoId = null;
@@ -303,9 +289,8 @@ class PermissoesPage extends Page
             $this->activeTab = 'permissoes';
         }
 
-        foreach ($profile->permissionKeys() as $key) {
-            $this->checked[$key] = true;
-        }
+        $this->applyPermissionHeader($state);
+        $this->dispatch('erp-permissoes-sync', ...$state);
     }
 
     public function newProfile(): void
@@ -315,8 +300,11 @@ class PermissoesPage extends Page
         $this->selectedProfileId = null;
         $this->profileNome = '';
         $this->profileDescricao = '';
-        $this->checked = [];
+        $this->contextTitle = 'Novo perfil';
+        $this->permissionFullAccess = false;
+        $this->permissionLocked = false;
         $this->activeTab = 'cadastro';
+        $this->dispatch('erp-permissoes-sync', keys: [], fullAccess: false, locked: false);
     }
 
     public function newUser(): void
@@ -343,8 +331,11 @@ class PermissoesPage extends Page
         $this->userEmpresaIds = filled($empresaId) ? [(int) $empresaId] : [];
         $this->selectedBlockedEmpresaId = null;
         $this->selectedLiberatedEmpresaId = null;
-        $this->checked = [];
+        $this->contextTitle = 'Novo usuário';
+        $this->permissionFullAccess = false;
+        $this->permissionLocked = false;
         $this->activeTab = 'cadastro';
+        $this->dispatch('erp-permissoes-sync', keys: [], fullAccess: false, locked: false);
     }
 
     public function loadUserForm(): void
@@ -504,9 +495,10 @@ class PermissoesPage extends Page
         $this->selectedUserId = $user->getKey();
         $this->selectedProfileId = null;
         $this->profileTemplateId = null;
-        $this->loadUserForm();
-        $this->loadUserEmpresas();
-        $this->loadUserPermissions();
+        $this->refreshDirectory();
+        $state = $this->captureUser((int) $user->getKey());
+        $this->applyPermissionHeader($state);
+        $this->dispatch('erp-permissoes-sync', ...($state ?? ['keys' => [], 'fullAccess' => false, 'locked' => false]));
         $this->activeTab = 'permissoes';
 
         Notification::make()
@@ -1113,143 +1105,153 @@ class PermissoesPage extends Page
         Notification::make()->title('Usuário excluído.')->success()->send();
     }
 
-    public function toggleGroup(string $group): void
-    {
-        $this->expandedGroups[$group] = ! ($this->expandedGroups[$group] ?? true);
-    }
-
-    public function toggleModule(string $module): void
-    {
-        $this->expandedModules[$module] = ! ($this->expandedModules[$module] ?? false);
-    }
-
-    public function isGroupExpanded(string $group): bool
-    {
-        return $this->expandedGroups[$group] ?? true;
-    }
-
-    public function isModuleExpanded(string $module): bool
-    {
-        return $this->expandedModules[$module] ?? false;
-    }
-
     /**
-     * @return list<array<string, mixed>>
+     * @return array{keys: list<string>, fullAccess: bool, locked: bool, name: string}|null
      */
-    public function menuAccessItems(): array
+    protected function captureUser(int $userId): ?array
     {
-        return \App\Support\Erp\ErpMenu::allMenus();
-    }
-
-    public function menuItemAllowed(?string $permission): bool
-    {
-        if ($permission === null) {
-            return true;
-        }
-
-        if ($this->isAdministratorProfileSelected()) {
-            return true;
-        }
-
-        return (bool) ($this->checked[$permission] ?? false);
-    }
-
-    public function setMenuItemAllowed(string $permission, bool $allowed): void
-    {
-        $this->checked[$permission] = $allowed;
-    }
-
-    public function markMenuGroupItems(string $group, bool $allowed): void
-    {
-        $menu = collect($this->menuAccessItems())
-            ->first(fn (array $item): bool => $item['label'] === $group);
-
-        if (! $menu) {
-            return;
-        }
-
-        foreach ($this->menuPermissionsFromItems($menu['items'] ?? []) as $permission) {
-            $this->checked[$permission] = $allowed;
-        }
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $items
-     * @return list<string>
-     */
-    private function menuPermissionsFromItems(array $items): array
-    {
-        $permissions = [];
-
-        foreach ($items as $item) {
-            if (isset($item['permission'])) {
-                $permissions[] = $item['permission'];
-            }
-
-            if (isset($item['items']) && is_array($item['items'])) {
-                $permissions = [...$permissions, ...$this->menuPermissionsFromItems($item['items'])];
-            }
-        }
-
-        return array_values(array_unique($permissions));
-    }
-
-    public function setPermissionAllowed(string $permission, bool $allowed): void
-    {
-        if (! in_array($permission, ErpPermissionCatalog::allKeys(), true)) {
-            return;
-        }
-
-        $this->checked[$permission] = $allowed;
-    }
-
-    public function isAdministratorProfileSelected(): bool
-    {
-        if ($this->sidebarTab !== 'perfis' || ! $this->selectedProfileId) {
-            return false;
-        }
-
-        return ErpProfile::query()
-            ->whereKey($this->selectedProfileId)
-            ->where('nome', 'ADMINISTRADOR')
-            ->exists();
-    }
-
-    public function toggleMenuGroup(string $group): void
-    {
-        $this->expandedMenuGroups[$group] = ! ($this->expandedMenuGroups[$group] ?? false);
-    }
-
-    public function isMenuGroupExpanded(string $group): bool
-    {
-        return $this->expandedMenuGroups[$group] ?? false;
-    }
-
-    public function loadUserPermissions(): void
-    {
-        $this->checked = [];
-
-        if (! $this->selectedUserId) {
-            return;
-        }
-
-        $user = User::query()->find($this->selectedUserId);
+        $user = User::query()->select(['id', 'name', 'is_admin', 'erp_profile_id'])->find($userId);
 
         if (! $user) {
-            return;
+            return null;
         }
 
         if ($user->is_admin) {
-            foreach (ErpPermissionCatalog::allKeys() as $key) {
-                $this->checked[$key] = true;
-            }
+            return [
+                'keys' => [],
+                'fullAccess' => true,
+                'locked' => true,
+                'name' => (string) $user->name,
+            ];
+        }
+
+        return [
+            'keys' => $this->grantedKeys((int) $user->id, $user->erp_profile_id ? (int) $user->erp_profile_id : null),
+            'fullAccess' => false,
+            'locked' => false,
+            'name' => (string) $user->name,
+        ];
+    }
+
+    /**
+     * @return array{keys: list<string>, fullAccess: bool, locked: bool, name: string, descricao: string}|null
+     */
+    protected function captureProfile(int $profileId): ?array
+    {
+        $profile = ErpProfile::query()->select(['id', 'nome', 'descricao', 'is_system'])->find($profileId);
+
+        if (! $profile) {
+            return null;
+        }
+
+        $fullAccess = $profile->nome === 'ADMINISTRADOR';
+
+        return [
+            'keys' => $fullAccess ? [] : $this->profilePermissionKeys((int) $profile->id),
+            'fullAccess' => $fullAccess,
+            'locked' => (bool) $profile->is_system,
+            'name' => (string) $profile->nome,
+            'descricao' => (string) ($profile->descricao ?? ''),
+        ];
+    }
+
+    /**
+     * @param  array{keys?: list<string>, fullAccess?: bool, locked?: bool, name?: string}|null  $state
+     */
+    protected function applyPermissionHeader(?array $state): void
+    {
+        if ($state === null) {
+            $this->contextTitle = $this->sidebarTab === 'perfis' ? 'Novo perfil' : 'Selecione um usuário';
+            $this->permissionFullAccess = false;
+            $this->permissionLocked = false;
 
             return;
         }
 
-        foreach ($user->effectivePermissionKeys() as $key) {
-            $this->checked[$key] = true;
+        $this->contextTitle = (string) ($state['name'] ?? $this->contextTitle);
+        $this->permissionFullAccess = (bool) ($state['fullAccess'] ?? false);
+        $this->permissionLocked = (bool) ($state['locked'] ?? false);
+    }
+
+    /**
+     * Uma consulta para as chaves do usuário e do perfil vinculado.
+     *
+     * @return list<string>
+     */
+    protected function grantedKeys(int $userId, ?int $profileId): array
+    {
+        $query = DB::table('user_permissions')
+            ->where('user_id', $userId)
+            ->select('permission_key');
+
+        if ($profileId) {
+            $query->union(
+                DB::table('erp_profile_permissions')
+                    ->where('erp_profile_id', $profileId)
+                    ->select('permission_key')
+            );
         }
+
+        return array_values(array_unique($query->pluck('permission_key')->map(
+            static fn ($key): string => (string) $key,
+        )->all()));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function profilePermissionKeys(int $profileId): array
+    {
+        return DB::table('erp_profile_permissions')
+            ->where('erp_profile_id', $profileId)
+            ->pluck('permission_key')
+            ->map(static fn ($key): string => (string) $key)
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    public function savePermissionKeys(array $keys): void
+    {
+        if ($this->permissionLocked || $this->permissionFullAccess) {
+            Notification::make()
+                ->title($this->sidebarTab === 'perfis'
+                    ? 'Perfil do sistema não pode ser alterado.'
+                    : 'Usuário administrador possui acesso total.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($this->sidebarTab === 'perfis') {
+            $this->saveProfile($keys);
+
+            return;
+        }
+
+        if (! $this->selectedUserId) {
+            Notification::make()->title('Selecione um usuário.')->warning()->send();
+
+            return;
+        }
+
+        $user = User::query()->select(['id', 'is_admin'])->find($this->selectedUserId);
+
+        if (! $user || $user->is_admin) {
+            Notification::make()
+                ->title('Usuário administrador possui acesso total.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        ErpAccess::syncUserPermissions($user, $keys);
+
+        Notification::make()->title('Permissões do usuário salvas.')->success()->send();
+        $this->closeScreen();
     }
 
     public function loadProfileTemplate(): void
@@ -1258,7 +1260,7 @@ class PermissoesPage extends Page
             return;
         }
 
-        $user = User::query()->find($this->selectedUserId);
+        $user = User::query()->select(['id', 'erp_profile_id'])->find($this->selectedUserId);
 
         if (! $user) {
             return;
@@ -1266,8 +1268,10 @@ class PermissoesPage extends Page
 
         if (! $this->profileTemplateId) {
             $user->update(['erp_profile_id' => null]);
-            $freshUser = $user->fresh();
-            ErpAccess::storeInSession($freshUser, $freshUser->effectivePermissionKeys());
+
+            if ((int) Auth::id() === (int) $user->getKey()) {
+                ErpAccess::storeInSession($user, $this->grantedKeys((int) $user->getKey(), null));
+            }
 
             Notification::make()
                 ->title('Perfil desvinculado do usuário.')
@@ -1278,21 +1282,18 @@ class PermissoesPage extends Page
             return;
         }
 
-        $profile = ErpProfile::query()->find($this->profileTemplateId);
+        $state = $this->captureProfile((int) $this->profileTemplateId);
 
-        if (! $profile) {
+        if ($state === null) {
             return;
         }
 
-        $this->checked = [];
+        $user->update(['erp_profile_id' => (int) $this->profileTemplateId]);
+        $this->dispatch('erp-permissoes-sync', keys: $state['keys'], fullAccess: $state['fullAccess'], locked: false);
 
-        foreach ($profile->permissionKeys() as $key) {
-            $this->checked[$key] = true;
+        if ((int) Auth::id() === (int) $user->getKey()) {
+            ErpAccess::storeInSession($user, $this->grantedKeys((int) $user->getKey(), (int) $this->profileTemplateId));
         }
-
-        $user->update(['erp_profile_id' => $profile->getKey()]);
-        $freshUser = $user->fresh();
-        ErpAccess::storeInSession($freshUser, $freshUser->effectivePermissionKeys());
 
         Notification::make()
             ->title('Perfil aplicado ao usuário.')
@@ -1301,73 +1302,10 @@ class PermissoesPage extends Page
             ->send();
     }
 
-    public function markGroup(string $group, bool $value): void
-    {
-        foreach ($this->permissionGroups()[$group]['modules'] ?? [] as $module => $meta) {
-            foreach (array_keys($meta['actions']) as $action) {
-                $this->checked[ErpPermissionCatalog::key($module, $action)] = $value;
-            }
-        }
-    }
-
-    public function markModule(string $module, bool $value): void
-    {
-        $meta = ErpPermissionCatalog::modules()[$module] ?? null;
-
-        if (! $meta || ! EmpresaModulos::enabled(ErpContext::currentEmpresa(), $module)) {
-            return;
-        }
-
-        foreach (array_keys($meta['actions']) as $action) {
-            $this->checked[ErpPermissionCatalog::key($module, $action)] = $value;
-        }
-    }
-
-    public function savePermissions(): void
-    {
-        if ($this->sidebarTab === 'perfis') {
-            $this->saveProfile();
-
-            return;
-        }
-
-        if (! $this->selectedUserId) {
-            Notification::make()
-                ->title('Selecione um usuário.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $user = User::query()->find($this->selectedUserId);
-
-        if (! $user) {
-            return;
-        }
-
-        if ($user->is_admin) {
-            Notification::make()
-                ->title('Usuário administrador possui acesso total.')
-                ->body('Não é necessário salvar permissões individuais para este usuário.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $keys = array_keys(array_filter($this->checked));
-        ErpAccess::syncUserPermissions($user, $keys);
-
-        Notification::make()
-            ->title('Permissões do usuário salvas.')
-            ->success()
-            ->send();
-
-        $this->closeScreen();
-    }
-
-    protected function saveProfile(): void
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function saveProfile(array $keys): void
     {
         $this->validate([
             'profileNome' => ['required', 'string', 'max:80'],
@@ -1388,31 +1326,29 @@ class PermissoesPage extends Page
                 'descricao' => $this->profileDescricao ?: null,
             ]);
             $this->selectedProfileId = $profile->getKey();
+        } elseif ($profile->is_system) {
+            Notification::make()
+                ->title('Perfil do sistema não pode ser alterado.')
+                ->warning()
+                ->send();
+
+            return;
         } else {
-            if ($profile->is_system) {
-                Notification::make()
-                    ->title('Perfil do sistema não pode ser alterado.')
-                    ->warning()
-                    ->send();
-
-                return;
-            }
-
             $profile->update([
                 'nome' => $nome,
                 'descricao' => $this->profileDescricao ?: null,
             ]);
         }
 
-        $keys = array_keys(array_filter($this->checked));
         ErpAccess::syncProfilePermissions($profile, $keys);
+        $this->refreshDirectory();
+        $this->contextTitle = $nome;
 
         Notification::make()
             ->title('Perfil salvo.')
             ->success()
             ->send();
     }
-
     public function deleteProfile(): void
     {
         if (! $this->selectedProfileId) {
@@ -1441,6 +1377,7 @@ class PermissoesPage extends Page
         }
 
         $profile->delete();
+        $this->refreshDirectory();
         $this->newProfile();
 
         Notification::make()

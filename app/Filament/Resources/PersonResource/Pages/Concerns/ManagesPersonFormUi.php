@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PersonResource\Pages\Concerns;
 
 use App\Models\Person;
+use App\Models\TabelaPrazo;
 use Filament\Notifications\Notification;
 
 trait ManagesPersonFormUi
@@ -39,12 +40,51 @@ trait ManagesPersonFormUi
     {
         $digits = preg_replace('/\D/', '', (string) $value) ?? '';
 
+        // 11 dígitos ainda pode ser CNPJ incompleto. Física só no blur (finalizarDocumentoPessoa).
+        if (strlen($digits) === 14) {
+            $this->data['pessoa_tipo'] = Person::PESSOA_JURIDICA;
+        }
+    }
+
+    public function finalizarDocumentoPessoa(?string $cpfCnpj = null): void
+    {
+        if ($cpfCnpj !== null) {
+            $this->data['cpf_cnpj'] = trim($cpfCnpj);
+        }
+
+        $digits = preg_replace('/\D/', '', (string) ($this->data['cpf_cnpj'] ?? '')) ?? '';
+
         if (strlen($digits) === 11) {
             $this->data['pessoa_tipo'] = Person::PESSOA_FISICA;
             $this->data['tipo_contribuinte'] = 'nao_contribuinte';
         } elseif (strlen($digits) === 14) {
             $this->data['pessoa_tipo'] = Person::PESSOA_JURIDICA;
         }
+    }
+
+    public function updatedDataFormaPagamentoId(mixed $value): void
+    {
+        $prazoId = $this->data['tabela_prazo_id'] ?? null;
+
+        if ($prazoId === null || $prazoId === '') {
+            return;
+        }
+
+        if (! $this->tabelaPrazoPertenceAForma($prazoId, $value)) {
+            $this->data['tabela_prazo_id'] = null;
+        }
+    }
+
+    protected function tabelaPrazoPertenceAForma(mixed $prazoId, mixed $formaId): bool
+    {
+        if ($prazoId === null || $prazoId === '' || $formaId === null || $formaId === '') {
+            return false;
+        }
+
+        return TabelaPrazo::query()
+            ->whereKey((int) $prazoId)
+            ->where('forma_pagamento_id', (int) $formaId)
+            ->exists();
     }
 
     protected function syncTipoContribuinteFromIe(): void

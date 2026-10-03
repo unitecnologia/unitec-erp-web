@@ -62,6 +62,7 @@ class CreatePerson extends CreateRecord
 
     protected function afterCreate(): void
     {
+        $this->commitPersonPhotoAfterSave();
         $this->syncPersonContacts($this->record);
         $this->syncPersonVisitaDias($this->record);
 

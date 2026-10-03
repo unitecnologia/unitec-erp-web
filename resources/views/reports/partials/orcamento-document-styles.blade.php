@@ -1,167 +1,99 @@
 <style>
-    .orc-doc {
-        font-family: "Courier New", Courier, monospace;
-        font-size: 11px;
-        color: #111;
-        line-height: 1.35;
-    }
-
-    .orc-doc__frame {
-        border: 1px solid #111;
-        padding: 7mm 6mm;
-        background: #fff;
-    }
-
-    .orc-doc__rule {
-        height: 0;
-        border: none;
-        border-top: 1px solid #111;
-        margin: 3mm 0;
-    }
-
-    .orc-doc__header {
-        display: table;
+    .orc-doc__empresa {
         width: 100%;
+        border-collapse: collapse;
+        margin: 0 0 0.28rem;
     }
 
-    .orc-doc__logo-cell,
-    .orc-doc__company-cell {
-        display: table-cell;
-        vertical-align: top;
-    }
-
-    .orc-doc__logo-cell {
-        width: 22mm;
-        padding-right: 4mm;
+    .orc-doc__empresa td {
+        vertical-align: middle;
+        padding: 0;
     }
 
     .orc-doc__logo {
-        width: 20mm;
-        height: 20mm;
-        border: 1px solid #bbb;
-        text-align: center;
-        vertical-align: middle;
+        width: 22mm;
+        padding-right: 3mm;
     }
 
     .orc-doc__logo img {
-        max-width: 18mm;
-        max-height: 18mm;
-    }
-
-    .orc-doc__logo-fallback {
-        display: inline-block;
-        width: 16mm;
-        height: 16mm;
-        line-height: 16mm;
-        border-radius: 50%;
-        background: #16a34a;
-        color: #fff;
-        font-size: 14px;
-        font-weight: 800;
-        text-align: center;
-    }
-
-    .orc-doc__company-name {
         display: block;
-        font-size: 12px;
+        max-width: 20mm;
+        max-height: 16mm;
+    }
+
+    .orc-doc__empresa-nome {
+        display: block;
+        font-size: 12pt;
         font-weight: 700;
-        margin-bottom: 1mm;
+        line-height: 1.2;
+        margin: 0 0 0.08rem;
     }
 
-    .orc-doc__title-row {
-        display: table;
-        width: 100%;
-        margin-bottom: 2mm;
-        font-size: 12px;
-        font-weight: 700;
+    .orc-doc__empresa-linha {
+        display: block;
+        font-size: 8pt;
+        line-height: 1.3;
     }
 
-    .orc-doc__title,
-    .orc-doc__status {
-        display: table-cell;
-        vertical-align: middle;
+    .orc-doc .monitor-pedidos-doc__sheet-header {
+        margin: 0 0 0.22rem;
     }
 
-    .orc-doc__title {
-        text-align: center;
-    }
-
-    .orc-doc__status {
-        text-align: right;
-        white-space: nowrap;
-        width: 28mm;
-    }
-
-    .orc-doc__meta {
-        margin-bottom: 1mm;
-    }
-
-    .orc-doc__meta-row {
-        display: table;
-        width: 100%;
-        margin-bottom: 1mm;
-    }
-
-    .orc-doc__meta-row > span {
-        display: table-cell;
-        vertical-align: top;
-    }
-
-    .orc-doc__meta-row--split > span:first-child {
-        width: 50%;
-    }
-
-    .orc-doc__table {
+    .orc-doc__fechamento {
         width: 100%;
         border-collapse: collapse;
+        margin: 0.28rem 0 0;
+        font-size: 9pt;
     }
 
-    .orc-doc__table th,
-    .orc-doc__table td {
-        padding: 1.2mm 1mm;
-        vertical-align: top;
+    .orc-doc__fechamento td {
+        padding: 0.08rem 0.35rem;
+        line-height: 1.25;
     }
 
-    .orc-doc__table thead th {
-        border-bottom: 1px solid #111;
-        font-size: 10px;
-        text-align: left;
-    }
-
-    .orc-doc__table td.num,
-    .orc-doc__table th.num {
+    .orc-doc__fechamento .label {
         text-align: right;
-        white-space: nowrap;
-    }
-
-    .orc-doc__table td.center,
-    .orc-doc__table th.center {
-        text-align: center;
-    }
-
-    .orc-doc__table td.produto {
-        word-break: break-word;
-    }
-
-    .orc-doc__totals {
-        display: table;
-        width: 100%;
         font-weight: 700;
     }
 
-    .orc-doc__totals > span {
-        display: table-cell;
-        width: 33.33%;
-        vertical-align: top;
+    .orc-doc__fechamento .valor {
+        width: 22%;
+        text-align: right;
+        font-weight: 700;
+        white-space: nowrap;
+        padding-right: 0.45rem;
+    }
+
+    .orc-doc__fechamento tr.total td {
+        background: #e5e7eb;
+        font-size: 10pt;
+        border-top: 1px solid #111827;
+        padding-top: 0.14rem;
+        padding-bottom: 0.14rem;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .orc-doc__obs {
+        margin: 0.35rem 0 0;
+        border: 1px solid #111827;
+        padding: 0.28rem 0.4rem;
+        font-size: 8.5pt;
+        page-break-inside: avoid;
+        break-inside: avoid;
     }
 
     .orc-doc__obs-title {
         font-weight: 700;
-        margin-bottom: 1.5mm;
+        margin: 0 0 0.12rem;
     }
 
     .orc-doc__obs-text {
-        min-height: 16mm;
         white-space: pre-wrap;
+        min-height: 1.1rem;
+    }
+
+    .orc-doc .monitor-pedidos-doc__rodape {
+        margin-top: 0.35rem;
     }
 </style>

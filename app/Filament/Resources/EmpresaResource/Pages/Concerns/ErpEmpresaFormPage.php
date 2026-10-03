@@ -271,6 +271,7 @@ trait ErpEmpresaFormPage
         }
 
         $merged = $this->normalizeEmpresaParametrosFormData($merged);
+        $merged = $this->normalizeEmpresaConsultaPlacaFormData($merged);
         $merged = $this->normalizeEmpresaPixSecretsFormData($merged);
         $merged = $this->normalizeEmpresaDocumentFormData($merged);
         $merged = $this->normalizeEmpresaMercadoLivreFormData($merged);
@@ -443,6 +444,45 @@ trait ErpEmpresaFormPage
             if (blank($data['param_pix_webhook_url'] ?? null)) {
                 $data['param_pix_webhook_url'] = EmpresaParametros::pixAilosWebhookUrl();
             }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Consulta por placa: chave vazia não apaga a já salva. A criptografia fica no cast do model.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function normalizeEmpresaConsultaPlacaFormData(array $data): array
+    {
+        if (blank($data['param_consulta_placa_url'] ?? null)) {
+            $data['param_consulta_placa_url'] = (string) (EmpresaParametros::consultaPlacaFields()['param_consulta_placa_url']['default'] ?? '');
+        }
+
+        if (array_key_exists('param_consulta_placa_timeout', $data)) {
+            $timeout = (int) $data['param_consulta_placa_timeout'];
+            $data['param_consulta_placa_timeout'] = ($timeout >= 1 && $timeout <= 300) ? $timeout : 10;
+        }
+
+        if (array_key_exists('param_consulta_placa_habilitar', $data)) {
+            $data['param_consulta_placa_habilitar'] = filter_var(
+                $data['param_consulta_placa_habilitar'],
+                FILTER_VALIDATE_BOOLEAN,
+            );
+        }
+
+        if (! array_key_exists('param_consulta_placa_token', $data)) {
+            return $data;
+        }
+
+        $token = trim((string) ($data['param_consulta_placa_token'] ?? ''));
+
+        if ($token === '') {
+            unset($data['param_consulta_placa_token']);
+        } else {
+            $data['param_consulta_placa_token'] = $token;
         }
 
         return $data;
@@ -697,6 +737,7 @@ trait ErpEmpresaFormPage
         }
 
         $this->hydratePortalContadorFormDefaults();
+        $this->hydrateConsultaPlacaFormDefaults();
         $this->safeFillEmpresaForm();
         $this->hydrateCloudflareCredentialsFromDefaults();
         $this->hydrateUpdateDownloadUrlFromDefault();
@@ -726,6 +767,34 @@ trait ErpEmpresaFormPage
                 $this->data[$field] = (bool) ($meta['default'] ?? true);
             }
         }
+    }
+
+    protected function hydrateConsultaPlacaFormDefaults(): void
+    {
+        if (blank($this->data['param_consulta_placa_url'] ?? null)) {
+            $this->data['param_consulta_placa_url'] = (string) (EmpresaParametros::consultaPlacaFields()['param_consulta_placa_url']['default'] ?? '');
+        }
+
+        if (
+            ! array_key_exists('param_consulta_placa_timeout', $this->data)
+            || $this->data['param_consulta_placa_timeout'] === ''
+            || $this->data['param_consulta_placa_timeout'] === null
+        ) {
+            $this->data['param_consulta_placa_timeout'] = 10;
+        }
+
+        $token = '';
+        $record = property_exists($this, 'record') ? ($this->record ?? null) : null;
+
+        if ($record instanceof Empresa) {
+            try {
+                $token = trim((string) ($record->param_consulta_placa_token ?? ''));
+            } catch (\Throwable) {
+                $token = '';
+            }
+        }
+
+        $this->data['param_consulta_placa_token'] = $token;
     }
 
     protected function getEmpresaListRedirectUrl(): string

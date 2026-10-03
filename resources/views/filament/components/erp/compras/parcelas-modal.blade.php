@@ -1,40 +1,15 @@
-@php
-    $parcelasPodeConcluir = $this->lancamentoParcelasPodeConcluir;
-@endphp
-
 @if ($this->lancamentoParcelasOpen)
+    @php
+        $formasCaixaIds = $this->lancamentoParcelasFormasCaixaIds();
+        $caixasPadrao = $this->lancamentoParcelasCaixaPadraoMapa();
+    @endphp
     <div
         class="erp-compras-parcelas-modal"
         x-data
-        x-on:keydown.window="
-            if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelarLancamentoParcelas(); }
-            if (($event.key === 'F2' || $event.key === 'F5' || $event.key === 'F3' || $event.key === 'F4') && ! $event.repeat) {
-                $event.preventDefault();
-                if ($event.key === 'F2') $wire.gerarLancamentoParcelas();
-                if ($event.key === 'F3') $wire.excluirLancamentoParcelaSelecionada();
-                if ($event.key === 'F4') $wire.cancelarLancamentoParcelas();
-                if ($event.key === 'F5') $wire.concluirLancamentoParcelas();
-            }
-        "
-        x-on:keydown.enter.capture="
-            const field = $event.target;
-            if (! field.matches('[data-erp-parcela-field]')) return;
-            $event.preventDefault();
-            field.removeAttribute('readonly');
-            if (field.dataset.erpParcelaField === 'valor') {
-                $wire.set('lancamentoParcelasRows.' + field.dataset.erpParcelaIndex + '.valor', field.value);
-            }
-            const fields = Array.from($el.querySelectorAll('[data-erp-parcela-field]:not(:disabled)'));
-            const index = fields.indexOf(field);
-            const next = fields[index + 1];
-            if (next) {
-                setTimeout(() => {
-                    next.removeAttribute('readonly');
-                    next.focus();
-                    if (next.tagName === 'INPUT') next.select();
-                }, 0);
-            }
-        "
+        x-init="const el = $el; const ligar = () => window.erpParcelasBind && window.erpParcelasBind(el); ligar(); queueMicrotask(ligar)"
+        x-on:erp-compras-lancamento-fechado.window="$el.remove()"
+        data-erp-formas-caixa='@json($formasCaixaIds)'
+        data-erp-caixa-padrao='@json($caixasPadrao)'
     >
         <div class="erp-compras-parcelas-modal__backdrop" wire:click="cancelarLancamentoParcelas"></div>
 
@@ -58,28 +33,28 @@
                 <div class="erp-compras-parcelas-modal__params">
                     <label class="erp-compras-parcelas-modal__field">
                         <span>SubTotal</span>
-                        <input type="text" wire:model.blur="lancamentoParcelasSubtotal" inputmode="decimal">
+                        <input id="erp-parcela-subtotal" type="text" value="{{ $this->lancamentoParcelasSubtotal }}" data-erp-parcela-base="subtotal" inputmode="decimal" autocomplete="off">
                     </label>
                     <label class="erp-compras-parcelas-modal__field">
                         <span>Entrada (Dinheiro)</span>
-                        <input type="text" wire:model.blur="lancamentoParcelasEntrada" inputmode="decimal">
+                        <input id="erp-parcela-entrada" type="text" value="{{ $this->lancamentoParcelasEntrada }}" data-erp-parcela-base="entrada" inputmode="decimal" autocomplete="off">
                     </label>
                     <label class="erp-compras-parcelas-modal__field">
                         <span>Total</span>
-                        <input type="text" value="{{ $this->lancamentoParcelasTotal }}" readonly tabindex="-1">
+                        <input id="erp-parcela-total" type="text" value="{{ $this->lancamentoParcelasTotal }}" readonly tabindex="-1">
                     </label>
                     <label class="erp-compras-parcelas-modal__field erp-compras-parcelas-modal__field--sm">
                         <span>Parcelas</span>
-                        <input type="text" wire:model="lancamentoParcelasQtd" inputmode="numeric">
+                        <input id="erp-parcela-qtd" type="text" value="{{ $this->lancamentoParcelasQtd }}" inputmode="numeric" autocomplete="off">
                     </label>
                     <label class="erp-compras-parcelas-modal__field erp-compras-parcelas-modal__field--sm">
                         <span>Intervalo</span>
-                        <input type="text" wire:model="lancamentoParcelasIntervalo" inputmode="numeric">
+                        <input id="erp-parcela-intervalo" type="text" value="{{ $this->lancamentoParcelasIntervalo }}" inputmode="numeric" autocomplete="off">
                     </label>
                     <button
                         type="button"
                         class="erp-compras-parcelas-modal__btn erp-compras-parcelas-modal__btn--gerar"
-                        wire:click="gerarLancamentoParcelas"
+                        x-on:click.prevent="window.erpParcelasAcao($wire, 'gerar')"
                         title="Gerar parcelas (F2)"
                     >
                         <span class="erp-compras-parcelas-modal__btn-icon" aria-hidden="true">＋</span>
@@ -102,17 +77,24 @@
                             @forelse ($this->lancamentoParcelasRows as $index => $row)
                                 @php
                                     $formaId = (int) ($row['forma_pagamento_id'] ?? 0);
-                                    $exigeCaixa = $this->lancamentoParcelaExigeSubcaixa($formaId);
+                                    $exigeCaixa = in_array($formaId, $formasCaixaIds, true);
+                                    $caixaId = (string) ($row['caixa_conta_id'] ?? '');
+                                    if ($exigeCaixa && $caixaId === '' && isset($caixasPadrao[$formaId])) {
+                                        $caixaId = (string) $caixasPadrao[$formaId];
+                                    }
+                                    $linhaInvalida = $this->lancamentoParcelasErroIndex === $index;
+                                    $campoInvalido = $linhaInvalida ? $this->lancamentoParcelasErroCampo : '';
                                 @endphp
                                 <tr
                                     wire:key="lanc-parcela-{{ $index }}"
-                                    class="{{ $this->lancamentoParcelasSelectedIndex === $index ? 'is-selected' : '' }}"
-                                    wire:click="selectLancamentoParcela({{ $index }})"
+                                    data-erp-parcela-index="{{ $index }}"
+                                    class="{{ $this->lancamentoParcelasSelectedIndex === $index ? 'is-selected' : '' }}{{ $linhaInvalida ? ' is-invalid' : '' }}"
                                 >
                                     <td>
                                         <input
                                             type="text"
-                                            wire:model.live="lancamentoParcelasRows.{{ $index }}.documento"
+                                            value="{{ $row['documento'] ?? '' }}"
+                                            autocomplete="off"
                                             data-erp-parcela-field="documento"
                                             data-erp-parcela-index="{{ $index }}"
                                         >
@@ -120,45 +102,48 @@
                                     <td>
                                         <input
                                             type="text"
-                                            wire:model.live="lancamentoParcelasRows.{{ $index }}.vencimento"
+                                            value="{{ $row['vencimento'] ?? '' }}"
+                                            autocomplete="off"
                                             data-erp-parcela-field="vencimento"
                                             data-erp-parcela-index="{{ $index }}"
                                             placeholder="dd/mm/aaaa"
+                                            @class(['is-invalid' => $campoInvalido === 'vencimento'])
                                         >
                                     </td>
                                     <td>
                                         <select
-                                            wire:model.live="lancamentoParcelasRows.{{ $index }}.forma_pagamento_id"
+                                            autocomplete="off"
                                             data-erp-parcela-field="forma"
                                             data-erp-parcela-index="{{ $index }}"
+                                            @class(['is-invalid' => $campoInvalido === 'forma'])
                                         >
                                             <option value="">Selecione…</option>
                                             @foreach ($this->lancamentoParcelasFormasOptions as $forma)
-                                                <option value="{{ $forma['id'] }}">{{ $forma['label'] }}</option>
+                                                <option value="{{ $forma['id'] }}" data-erp-tipo="{{ $forma['tipo'] ?? '' }}" @selected((string) $formaId === (string) $forma['id'])>{{ $forma['label'] }}</option>
                                             @endforeach
                                         </select>
                                     </td>
                                     <td>
-                                        @if ($exigeCaixa)
-                                            <select
-                                                wire:model.live="lancamentoParcelasRows.{{ $index }}.caixa_conta_id"
-                                                data-erp-parcela-field="caixa"
-                                                data-erp-parcela-index="{{ $index }}"
-                                            >
-                                                <option value="">Subcaixa…</option>
-                                                @foreach ($this->lancamentoParcelasSubcaixasOptions as $caixa)
-                                                    <option value="{{ $caixa['id'] }}">{{ $caixa['label'] }}</option>
-                                                @endforeach
-                                            </select>
-                                        @else
-                                            <span class="erp-compras-parcelas-modal__caixa-na">—</span>
-                                        @endif
+                                        <select
+                                            data-erp-parcela-field="caixa"
+                                            data-erp-parcela-index="{{ $index }}"
+                                            @class(['is-invalid' => $campoInvalido === 'caixa'])
+                                            @disabled(! $exigeCaixa)
+                                            @if (! $exigeCaixa) hidden @endif
+                                        >
+                                            <option value="">Subcaixa…</option>
+                                            @foreach ($this->lancamentoParcelasSubcaixasOptions as $caixa)
+                                                <option value="{{ $caixa['id'] }}" @selected($caixaId === (string) $caixa['id'])>{{ $caixa['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="erp-compras-parcelas-modal__caixa-na" data-erp-parcela-caixa-vazio @if ($exigeCaixa) hidden @endif>—</span>
                                     </td>
                                     <td class="is-num">
                                         <input
                                             type="text"
-                                            class="is-num"
-                                            wire:model.blur="lancamentoParcelasRows.{{ $index }}.valor"
+                                            @class(['is-num', 'is-invalid' => $campoInvalido === 'valor'])
+                                            value="{{ $row['valor'] ?? '' }}"
+                                            autocomplete="off"
                                             data-erp-parcela-field="valor"
                                             data-erp-parcela-index="{{ $index }}"
                                             inputmode="decimal"
@@ -183,7 +168,7 @@
                     <button
                         type="button"
                         class="erp-compras-parcelas-modal__action"
-                        wire:click="excluirLancamentoParcelaSelecionada"
+                        x-on:click.prevent="window.erpParcelasAcao($wire, 'excluir')"
                         title="Excluir parcela selecionada (F3)"
                     >
                         <span aria-hidden="true">🗑</span>
@@ -201,9 +186,11 @@
                     <button
                         type="button"
                         class="erp-compras-parcelas-modal__action erp-compras-parcelas-modal__action--ok"
-                        wire:click="concluirLancamentoParcelas"
-                        @disabled(! $parcelasPodeConcluir)
-                        title="{{ $parcelasPodeConcluir ? 'Concluir e finalizar compra (F5)' : 'Informe meio de pagamento e caixa em todas as parcelas' }}"
+                        x-on:click.prevent="window.erpParcelasAcao($wire, 'concluir')"
+                        wire:loading.attr="disabled"
+                        wire:target="concluirLancamentoParcelas"
+                        @disabled($this->lancamentoFinalizando)
+                        title="Concluir e finalizar compra (F5)"
                     >
                         <span aria-hidden="true">✓</span>
                         F5 | Concluir
@@ -211,7 +198,7 @@
                 </div>
                 <div class="erp-compras-parcelas-modal__total">
                     Total Parcelas:
-                    <strong>R$ {{ $this->lancamentoParcelasTotal }}</strong>
+                    <strong>R$ <span id="erp-parcela-total-parcelas">{{ $this->lancamentoParcelasTotalParcelas() }}</span></strong>
                 </div>
             </div>
         </div>

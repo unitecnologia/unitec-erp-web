@@ -16,13 +16,15 @@ use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
 use App\Support\Erp\MunicipioLookupService;
-use App\Support\Erp\Nfse\NfseDanfseViewData;
+use App\Support\Erp\Nfse\Ipm\NfseIpmImpressaoViewData;
+use App\Support\Erp\Nfse\NfseImpressao;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\Nfse\NfseGravarService;
 use App\Support\Erp\Nfse\NfseNaoGravada;
 use App\Support\Erp\Nfse\NfseObra;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
+use App\Support\Erp\Nfse\Ipm\NfseIpmEmitirService;
 use App\Support\Erp\Nfse\NfseTransmitirService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -94,6 +96,10 @@ class NfsePage extends Page
     public ?string $nfseFiscalErroMensagem = null;
 
     public bool $nfseFiscalErroSefin = false;
+
+    public string $nfseFiscalErroRotulo = '';
+
+    public string $nfseFiscalErroOrigem = '';
 
     public bool $nfseEnviarModalOpen = false;
 
@@ -678,6 +684,8 @@ class NfsePage extends Page
         $this->nfseFiscalErroCodigo = null;
         $this->nfseFiscalErroMensagem = null;
         $this->nfseFiscalErroSefin = false;
+        $this->nfseFiscalErroRotulo = '';
+        $this->nfseFiscalErroOrigem = '';
         $this->js("document.getElementById('erp-nfse-fiscal-erro')?.style.setProperty('display','none')");
     }
 
@@ -908,7 +916,10 @@ class NfsePage extends Page
         try {
             $gravada = $this->persistirNfseAberta();
             $this->aplicarNfseGravada($gravada);
-            $resultado = app(NfseTransmitirService::class)->transmitir($gravada->fresh(['empresa', 'itens']) ?? $gravada);
+            $nota = $gravada->fresh(['empresa', 'itens']) ?? $gravada;
+            $resultado = $this->nfseProvedorIpm($nota->empresa)
+                ? app(NfseIpmEmitirService::class)->transmitir($nota)
+                : app(NfseTransmitirService::class)->transmitir($nota);
         } catch (NfseNaoGravada|NfseNaoTransmitida $exception) {
             $this->dispatch('erp-nfse-hide-fiscal-progress');
             $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL TRANSMITIR A NFS-E', $exception->getMessage());
@@ -917,7 +928,15 @@ class NfsePage extends Page
         } catch (\Throwable $exception) {
             report($exception);
             $this->dispatch('erp-nfse-hide-fiscal-progress');
-            $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL TRANSMITIR A NFS-E', 'Não foi possível transmitir a DPS.');
+            $ipm = $this->nfseProvedorIpm(ErpContext::currentEmpresa());
+            $this->mostrarNfseFiscalErro(
+                'NÃO FOI POSSÍVEL TRANSMITIR A NFS-E',
+                $ipm ? 'Não foi possível transmitir a NFS-e ao IPM.' : 'Não foi possível transmitir a DPS.',
+                null,
+                ! $ipm,
+                $ipm ? 'Esta é uma mensagem do provedor IPM.' : null,
+                $ipm ? 'Código IPM' : null,
+            );
 
             return;
         }
@@ -935,14 +954,19 @@ class NfsePage extends Page
         }
 
         $this->nfseStatus = Nfse::STATUS_ABERTA;
+        $ipm = $this->nfseProvedorIpm($resultado->nfse->empresa ?? ErpContext::currentEmpresa());
         $mensagem = $resultado->mensagemErros();
-        $this->nfseSefinMensagem = $mensagem !== '' ? $mensagem : 'A SEFIN rejeitou a DPS.';
+        $this->nfseSefinMensagem = $mensagem !== ''
+            ? $mensagem
+            : ($ipm ? 'O provedor IPM rejeitou a NFS-e.' : 'A SEFIN rejeitou a DPS.');
         $codigo = $resultado->erros[0]['codigo'] ?? null;
         $this->mostrarNfseFiscalErro(
             'NÃO FOI POSSÍVEL TRANSMITIR A NFS-E',
             $this->nfseSefinMensagem,
             is_string($codigo) && $codigo !== '' ? $codigo : null,
-            true,
+            ! $ipm,
+            $ipm ? 'Esta é uma mensagem do provedor IPM.' : null,
+            $ipm ? 'Código IPM' : null,
         );
     }
 
@@ -2744,12 +2768,27 @@ class NfsePage extends Page
     protected function mostrarNfseFiscalSucesso(Nfse $nfse, array $alertas = []): void
     {
         $this->closeNfseFiscalErro();
-        $numero = (string) $nfse->numero_dps;
+        $numeroNfse = trim((string) ($nfse->numero_nfse ?? ''));
+        $verificacao = trim((string) ($nfse->chave ?? ''));
         $chave = trim((string) ($nfse->chave_acesso ?? ''));
-        $detalhe = $chave !== '' ? "DPS {$numero} — Chave: {$chave}" : "DPS {$numero} autorizada.";
 
-        if ($alertas !== []) {
-            $detalhe .= "\nA SEFIN retornou alertas.";
+        if ($numeroNfse !== '' && $chave === '') {
+            $detalhe = "NFS-e {$numeroNfse} autorizada.";
+
+            if ($verificacao !== '') {
+                $detalhe .= "\nCódigo de verificação: {$verificacao}";
+            }
+
+            if ($alertas !== []) {
+                $detalhe .= "\nO provedor IPM retornou alertas.";
+            }
+        } else {
+            $numero = (string) $nfse->numero_dps;
+            $detalhe = $chave !== '' ? "DPS {$numero} — Chave: {$chave}" : "DPS {$numero} autorizada.";
+
+            if ($alertas !== []) {
+                $detalhe .= "\nA SEFIN retornou alertas.";
+            }
         }
 
         $osId = (int) ($nfse->ordem_servico_id ?? $this->nfseOsOrigemId ?? 0);
@@ -2773,13 +2812,15 @@ class NfsePage extends Page
         );
     }
 
-    protected function mostrarNfseFiscalErro(string $titulo, string $mensagem, ?string $codigo = null, bool $sefin = false): void
+    protected function mostrarNfseFiscalErro(string $titulo, string $mensagem, ?string $codigo = null, bool $sefin = false, ?string $origem = null, ?string $rotuloCodigo = null): void
     {
         $this->closeNfseFiscalSucesso();
         $this->nfseFiscalErroTitulo = $titulo;
         $this->nfseFiscalErroMensagem = $mensagem;
         $this->nfseFiscalErroCodigo = $codigo;
         $this->nfseFiscalErroSefin = $sefin;
+        $this->nfseFiscalErroOrigem = $origem ?? '';
+        $this->nfseFiscalErroRotulo = $rotuloCodigo ?? '';
         $this->js(
             'window.__erpNfseShowErro && window.__erpNfseShowErro('
             .Js::from([
@@ -2787,6 +2828,8 @@ class NfsePage extends Page
                 'mensagem' => $mensagem,
                 'codigo' => $codigo,
                 'sefin' => $sefin,
+                'origem' => $origem,
+                'rotuloCodigo' => $rotuloCodigo,
             ])
             .')'
         );
@@ -2824,7 +2867,15 @@ class NfsePage extends Page
         }
 
         if ($nfse->status !== Nfse::STATUS_AUTORIZADA || blank($nfse->xml_nfse)) {
-            $this->mostrarNfseFiscalErro('NFS-E AINDA NÃO AUTORIZADA', 'Imprimir e enviar ficam disponíveis depois que a SEFIN autorizar a nota.');
+            $this->mostrarNfseFiscalErro('NFS-E AINDA NÃO AUTORIZADA', 'Imprimir e enviar ficam disponíveis depois que a nota for autorizada.');
+
+            return null;
+        }
+
+        $xmlNacional = str_contains((string) $nfse->xml_nfse, 'http://www.sped.fazenda.gov.br/nfse');
+
+        if (! $xmlNacional && ! NfseIpmImpressaoViewData::aplica($nfse)) {
+            $this->mostrarNfseFiscalErro('IMPRESSÃO INDISPONÍVEL', 'A impressão desta NFS-e ainda não está disponível.');
 
             return null;
         }
@@ -2853,7 +2904,11 @@ class NfsePage extends Page
         }
 
         $pdfPath = $dir.DIRECTORY_SEPARATOR.'NFSe-DPS-'.$numero.'.pdf';
-        \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.nfse-impressao', $this->dadosImpressaoNfse($nfse))
+        $dadosPdf = $this->dadosImpressaoNfse($nfse);
+        \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            (string) ($dadosPdf['impressao_view'] ?? NfseImpressao::VIEW_NACIONAL),
+            $dadosPdf,
+        )
             ->setPaper('a4', 'portrait')
             ->save($pdfPath);
 
@@ -2881,7 +2936,7 @@ class NfsePage extends Page
      */
     protected function dadosImpressaoNfse(Nfse $nfse): array
     {
-        return NfseDanfseViewData::for($nfse, autoPrint: false, embedded: true);
+        return NfseImpressao::dados($nfse, autoPrint: false, embedded: true);
     }
 
     protected function persistirNfseAberta(): Nfse
@@ -2920,6 +2975,10 @@ class NfsePage extends Page
 
         if (! $this->nfseAmbienteAtual() instanceof NfseSefinAmbiente) {
             return 'Selecione o ambiente da NFS-e.';
+        }
+
+        if ($this->nfseProvedorIpm($empresa)) {
+            return $this->motivoBloqueioTransmissaoIpm($empresa);
         }
 
         if ($this->nfseTomadorId === null) {
@@ -2962,6 +3021,76 @@ class NfsePage extends Page
 
         if (! $this->certificadoNfseValido($empresa)) {
             return 'Certificado da empresa inválido ou vencido.';
+        }
+
+        return null;
+    }
+
+    protected function nfseProvedorIpm(?Empresa $empresa): bool
+    {
+        return strtolower(trim((string) ($empresa?->nfse_provedor ?? ''))) === 'ipm';
+    }
+
+    protected function motivoBloqueioTransmissaoIpm(Empresa $empresa): ?string
+    {
+        $serie = trim((string) ($empresa->nfse_serie_rps ?? ''));
+
+        if (preg_match('/^[A-Za-z0-9]{1,5}$/', $serie) !== 1) {
+            return 'Informe a série RPS da NFS-e.';
+        }
+
+        if (trim((string) ($empresa->nfse_ws_usuario ?? '')) === '' || (string) ($empresa->nfse_ws_senha ?? '') === '') {
+            return 'Informe o usuário e a senha do WebService IPM.';
+        }
+
+        $ambiente = strtolower(trim((string) $empresa->nfse_ambiente));
+        $url = trim((string) ($ambiente === 'producao' ? $empresa->nfse_url_producao : $empresa->nfse_url_homologacao));
+
+        if ($url === '') {
+            return $ambiente === 'producao'
+                ? 'Informe a URL de produção do WebService IPM.'
+                : 'Informe a URL de homologação do WebService IPM.';
+        }
+
+        if (trim((string) $empresa->im) === '') {
+            return 'Informe a inscrição municipal da empresa.';
+        }
+
+        if ($this->nfseTomadorId === null) {
+            return 'Selecione o tomador.';
+        }
+
+        $documento = preg_replace('/\D/', '', $this->nfseTomadorCpfCnpj) ?? '';
+
+        if (strlen($documento) !== 11 && strlen($documento) !== 14) {
+            return 'Informe o CPF ou CNPJ do tomador.';
+        }
+
+        if ($this->nfseServicos === []) {
+            return 'Informe ao menos um serviço.';
+        }
+
+        foreach ($this->nfseServicos as $linha) {
+            $nacional = preg_replace('/\D/', '', (string) ($linha['c_trib_nac'] ?? '')) ?? '';
+            $quantidade = $this->nfseNormalizarDecimal($linha['quantidade'] ?? null, 3);
+
+            if (trim((string) ($linha['descricao'] ?? '')) === '' || strlen($nacional) !== 6 || $quantidade === null || bccomp($quantidade, '0', 3) !== 1) {
+                return 'Faltam dados fiscais do serviço.';
+            }
+
+            $obra = NfseObra::pendencia($linha['c_trib_nac'] ?? null, $linha, (string) ($linha['descricao'] ?? ''));
+
+            if ($obra !== null) {
+                return $obra;
+            }
+        }
+
+        if (! CepLookupService::isValidIbgeCode($this->nfseMunicipioPrestacaoCodigo())) {
+            return 'Falta o código IBGE do município da prestação.';
+        }
+
+        if (! array_key_exists($this->nfseTribIssqn, Nfse::tributacoesIssqn()) || ! array_key_exists($this->nfseTpRetIssqn, Nfse::retencoesIssqn())) {
+            return 'Informe a tributação e a retenção do ISSQN.';
         }
 
         return null;

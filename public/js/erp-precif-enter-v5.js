@@ -1,10 +1,10 @@
 /**
- * Precificação: helpers de Enter (máscara, próximo campo, foco) e blur.
- * O commit é feito pelo $wire do Alpine na modal; aqui só o suporte.
+ * Precificação: Enter move o foco na hora e só chama o Livewire se o valor mudou.
+ * A resposta traz os campos recalculados; o JS pinta a modal sem re-render da página.
  * Ordem: % → R$ → próximo % (Custos → Frete → Seguro → …).
  */
 (function () {
-    const VERSION = 'v37-single-request';
+    const VERSION = 'v38-local-enter';
 
     if (window.__erpPrecifEnterVersion === VERSION) {
         return;
@@ -141,6 +141,13 @@
         window.__erpPrecifFocusedAt = 0;
         window.__erpPrecifLastEpoch = 0;
         window.__erpPrecifDirtyMap = Object.create(null);
+        window.__erpPrecifGeneration = (window.__erpPrecifGeneration || 0) + 1;
+        window.__erpPrecifPendingCommit = Object.create(null);
+        window.__erpPrecifServerValues = Object.create(null);
+        window.__erpPrecifServerReady = false;
+        window.__erpPrecifAppliedSeq = 0;
+        window.__erpPrecifCommitSeq = 0;
+        window.__erpPrecifBodyNode = null;
     }
 
     window.__erpPrecifResetState = resetPrecifState;
@@ -170,13 +177,16 @@
             return;
         }
 
-        // Resposta atrasada do Livewire (chega fora de ordem): não repintar com dado velho.
+        // Resposta atrasada no mesmo nó: não repintar com dado velho.
+        // Nó novo (re-render real, ex.: abrir a modal) sempre vale.
         const epoch = Number(body.dataset.precifEpoch || 0);
+        const sameNode = body === window.__erpPrecifBodyNode;
 
-        if (epoch < (window.__erpPrecifLastEpoch || 0)) {
+        if (sameNode && epoch < (window.__erpPrecifLastEpoch || 0)) {
             return;
         }
 
+        window.__erpPrecifBodyNode = body;
         window.__erpPrecifLastEpoch = epoch;
 
         let valores;
@@ -194,8 +204,8 @@
                 return;
             }
 
-            // Digitado e ainda não gravado: nunca sobrescrever (com ou sem foco).
-            if (isDirty(id)) {
+            // Digitado ou já enfileirado num Enter mais novo: não sobrescrever.
+            if (isDirty(id) || hasPendingCommit(id)) {
                 return;
             }
 
@@ -371,12 +381,8 @@
             return;
         }
 
-        // Só grava no blur o campo que o usuário realmente editou.
-        if (! isDirty(fieldId)) {
-            return;
-        }
-
-        if (shouldSkipBlur(fieldId)) {
+        // Enter já enfileirou este campo, ou o usuário não editou.
+        if (! isDirty(fieldId) || hasPendingCommit(fieldId) || shouldSkipBlur(fieldId)) {
             return;
         }
 
@@ -385,13 +391,14 @@
         }
 
         const value = finalizeMask(target);
-        const wire = getWireFromEl(target);
 
-        clearDirty(fieldId);
+        if (! fieldValueChanged(fieldId, value)) {
+            clearDirty(fieldId);
 
-        if (wire && typeof wire.call === 'function') {
-            wire.call('precificacaoCommitField', fieldId, value, true);
+            return;
         }
+
+        queuePrecifCommit(getWireFromEl(target), fieldId, value, true);
     }
 
     window.__erpPrecifEnterFocusOut = onFocusOut;
@@ -439,38 +446,302 @@
             return null;
         }
 
-        const eraDirty = isDirty(fieldId);
-
         target.removeAttribute('readonly');
 
-        const bruto = target.value;
         const value = finalizeMask(target);
         const nextId = nextFieldId(modal, target);
-
-        const diag = {
-            bruto,
-            apos_mascara: value,
-            readonly: target.readOnly,
-            dirty: eraDirty ? '1' : '0',
-            attr_value: target.getAttribute('value'),
-            trace: (window.__erpPrecifTrace || []).slice(-12),
-        };
+        const changed = fieldValueChanged(fieldId, value);
 
         window.__erpPrecifTrace = [];
-
         window.__erpPrecifEnterAt = Date.now();
         skipBlurFor(fieldId, 1200);
 
-        if (nextId) {
-            window.__erpPrecifFocusId = nextId;
-            window.__erpPrecifFocusUntil = Date.now() + 3000;
+        return { fieldId, value, nextId, changed };
+    }
+
+    function hasPendingCommit(fieldId) {
+        const pending = window.__erpPrecifPendingCommit;
+
+        return !!(fieldId && pending && pending[fieldId]);
+    }
+
+    function ensureServerValues() {
+        if (window.__erpPrecifServerReady) {
+            return;
         }
 
-        return { fieldId, value, nextId, diag };
+        const body = getModal()?.querySelector('[data-precif-values]');
+        let valores = {};
+
+        try {
+            valores = JSON.parse(body?.dataset?.precifValues || '{}');
+        } catch (error) {
+            valores = {};
+        }
+
+        window.__erpPrecifServerValues = valores && typeof valores === 'object'
+            ? valores
+            : Object.create(null);
+        window.__erpPrecifServerReady = true;
     }
+
+    function fieldValueChanged(fieldId, value) {
+        ensureServerValues();
+
+        const known = window.__erpPrecifServerValues
+            ? window.__erpPrecifServerValues[fieldId]
+            : undefined;
+
+        if (known === undefined) {
+            return true;
+        }
+
+        return String(known).trim() !== String(value ?? '').trim();
+    }
+
+    function movePrecifFocus(nextId) {
+        if (nextId) {
+            focusById(nextId, { select: true });
+
+            return;
+        }
+
+        // Foca o botão só no keyup. No keydown o Enter ainda soltaria o clique em Aplicar.
+        window.__erpPrecifFocusId = null;
+        window.__erpPrecifFocusUntil = 0;
+
+        document.addEventListener('keyup', function onUp(event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            document.removeEventListener('keyup', onUp, true);
+            document.getElementById('precif-btn-aplicar')?.focus();
+        }, true);
+    }
+
+    let precifCommitChain = Promise.resolve();
+
+    function enqueueCommit(task) {
+        const run = precifCommitChain.then(task, task);
+        precifCommitChain = run.then(() => undefined, () => undefined);
+
+        return run;
+    }
+
+    function queuePrecifCommit(wire, fieldId, value, fromBlur) {
+        if (! fieldId) {
+            return;
+        }
+
+        clearDirty(fieldId);
+
+        const seq = (window.__erpPrecifCommitSeq || 0) + 1;
+        window.__erpPrecifCommitSeq = seq;
+
+        if (! window.__erpPrecifPendingCommit) {
+            window.__erpPrecifPendingCommit = Object.create(null);
+        }
+
+        window.__erpPrecifPendingCommit[fieldId] = { seq, value };
+
+        const gen = window.__erpPrecifGeneration || 0;
+
+        enqueueCommit(() => sendPrecifCommit(wire, fieldId, value, seq, gen, fromBlur));
+    }
+
+    function sendPrecifCommit(wire, fieldId, value, seq, gen, fromBlur) {
+        if (gen !== (window.__erpPrecifGeneration || 0)) {
+            return Promise.resolve();
+        }
+
+        const component = wire || getWireFromEl(getModal());
+
+        if (! component || typeof component.call !== 'function') {
+            return Promise.resolve();
+        }
+
+        const request = fromBlur
+            ? component.call('precificacaoCommitField', fieldId, value, true)
+            : component.call('precificacaoEnter', fieldId, value);
+
+        return Promise.resolve(request).then((payload) => {
+            applyPrecifPayload(payload, seq, gen, fieldId);
+        }).catch(() => undefined);
+    }
+
+    function applyPrecifPayload(payload, seq, gen, committedId) {
+        if (gen !== (window.__erpPrecifGeneration || 0)) {
+            return;
+        }
+
+        if (seq < (window.__erpPrecifAppliedSeq || 0)) {
+            return;
+        }
+
+        window.__erpPrecifAppliedSeq = seq;
+
+        const pending = window.__erpPrecifPendingCommit || Object.create(null);
+
+        if (committedId && pending[committedId] && pending[committedId].seq <= seq) {
+            delete pending[committedId];
+        }
+
+        const valores = payload && payload.valores ? payload.valores : null;
+
+        if (! valores || typeof valores !== 'object') {
+            return;
+        }
+
+        const modal = getModal();
+
+        if (! modal) {
+            return;
+        }
+
+        ensureServerValues();
+
+        const nextValues = Object.assign({}, window.__erpPrecifServerValues);
+
+        Object.keys(valores).forEach((id) => {
+            const newerPending = pending[id] && pending[id].seq > seq;
+
+            if (isDirty(id) || newerPending) {
+                return;
+            }
+
+            const want = String(valores[id] ?? '');
+            nextValues[id] = want;
+
+            const input = modal.querySelector('#' + CSS.escape(id));
+
+            if (! input || input.value === want) {
+                return;
+            }
+
+            input.value = want;
+            delete input.dataset.erpMaskSynced;
+        });
+
+        window.__erpPrecifServerValues = nextValues;
+
+        const body = modal.querySelector('[data-precif-values]');
+
+        if (body) {
+            const epoch = Number(body.dataset.precifEpoch || 0) + 1;
+            body.dataset.precifEpoch = String(epoch);
+            body.dataset.precifValues = JSON.stringify(nextValues);
+            window.__erpPrecifBodyNode = body;
+            window.__erpPrecifLastEpoch = epoch;
+        }
+    }
+
+    function collectUnsyncedPrecifFields() {
+        const modal = getModal();
+
+        if (! modal) {
+            return [];
+        }
+
+        ensureServerValues();
+
+        return ORDER.map((id) => {
+            const input = modal.querySelector('#' + CSS.escape(id));
+
+            if (! input || input.disabled) {
+                return null;
+            }
+
+            input.removeAttribute('readonly');
+
+            return {
+                id: input.id,
+                value: finalizeMask(input),
+            };
+        }).filter((item) => item && (isDirty(item.id) || hasPendingCommit(item.id) || fieldValueChanged(item.id, item.value)));
+    }
+
+    async function flushPrecifToServer(wire) {
+        await precifCommitChain;
+
+        let guard = 0;
+
+        while (guard < 8) {
+            guard += 1;
+            const fields = collectUnsyncedPrecifFields();
+
+            if (fields.length === 0) {
+                break;
+            }
+
+            fields.forEach((item) => {
+                queuePrecifCommit(wire, item.id, item.value, false);
+            });
+
+            await precifCommitChain;
+        }
+    }
+
+    function handleEnter(event, wire) {
+        const el = event.target;
+
+        if (! (el instanceof HTMLInputElement) || el.disabled || ! el.hasAttribute('data-erp-precif-enter')) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const info = prepareEnter(el);
+
+        if (! info) {
+            return;
+        }
+
+        if (info.changed) {
+            queuePrecifCommit(wire, info.fieldId, info.value, false);
+        } else {
+            clearDirty(info.fieldId);
+        }
+
+        movePrecifFocus(info.nextId);
+    }
+
+    window.aplicarErpProdutosPrecificacao = async function aplicarErpProdutosPrecificacao(component) {
+        if (window.__erpPrecifApplying) {
+            return;
+        }
+
+        window.__erpPrecifApplying = true;
+
+        try {
+            const modal = getModal();
+            const wire = component || getWireFromEl(modal);
+
+            if (! wire || typeof wire.call !== 'function') {
+                return;
+            }
+
+            const active = document.activeElement;
+
+            if (active instanceof HTMLInputElement && ORDER.indexOf(active.id) >= 0) {
+                active.removeAttribute('readonly');
+                const value = finalizeMask(active);
+
+                if (isDirty(active.id) || fieldValueChanged(active.id, value)) {
+                    queuePrecifCommit(wire, active.id, value, false);
+                }
+            }
+
+            await flushPrecifToServer(wire);
+            await wire.call('aplicarProductPrecificacao');
+        } finally {
+            window.__erpPrecifApplying = false;
+        }
+    };
 
     window.ErpPrecifEnter.nextFieldId = nextFieldId;
     window.ErpPrecifEnter.prepareEnter = prepareEnter;
+    window.ErpPrecifEnter.handleEnter = handleEnter;
     window.ErpPrecifEnter.order = ORDER;
     window.ErpPrecifEnter.repaint = repaintFromServer;
 
@@ -494,8 +765,9 @@
             const committed = event?.committed
                 ?? (Array.isArray(event) ? event[0]?.committed : null);
 
-            // Só libera o campo digitado quando o servidor confirmou o commit.
-            clearDirty(committed);
+            if (committed && ! hasPendingCommit(committed)) {
+                clearDirty(committed);
+            }
 
             repaintFromServer();
 

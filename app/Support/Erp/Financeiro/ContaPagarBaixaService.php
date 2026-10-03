@@ -8,6 +8,7 @@ use App\Models\ContaPagar;
 use App\Models\ContaPagarPagamento;
 use App\Models\FormaPagamento;
 use App\Models\PlanoConta;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -289,7 +290,7 @@ final class ContaPagarBaixaService
             $planoNome = PlanoConta::query()->whereKey($planoContaId)->value('descricao');
         }
 
-        CaixaLancamento::query()->create([
+        $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),
             'emissao' => $data,
             'documento' => mb_substr($documento, 0, 40),
@@ -299,6 +300,12 @@ final class ContaPagarBaixaService
             'caixa_conta_id' => $caixaContaId,
             'entrada' => 0,
             'saida' => $valor,
-        ]);
+        ];
+
+        if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+            $payload['empresa_id'] = ErpContext::currentEmpresaId();
+        }
+
+        CaixaLancamento::query()->create($payload);
     }
 }

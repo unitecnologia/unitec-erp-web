@@ -1,5 +1,8 @@
 @php
     $somenteLeituraAceitas = $this->statusFilter === 'aceita';
+    $semNotaSelecionada = (int) ($this->highlightedRecordId ?? 0) <= 0;
+    $lerXmlDesabilitado = $this->lerXmlSelecionadaDesabilitada();
+    $acaoNotaDesabilitada = $this->acaoNotaPendenteDesabilitada();
 @endphp
 
 <div class="erp-nfe-actions erp-nf-forn-actions">
@@ -42,8 +45,8 @@
         wire:click="confirmarNota"
         class="erp-nfe-actions__btn"
         data-erp-key="F4"
-        @disabled($somenteLeituraAceitas)
-        title="{{ $somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : '' }}"
+        @disabled($acaoNotaDesabilitada)
+        title="{{ $somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : ($semNotaSelecionada ? 'Selecione uma nota' : ($acaoNotaDesabilitada ? 'Nota já confirmada' : 'Confirmar a nota marcada')) }}"
     >
         <span class="erp-nfe-actions__icon erp-nfe-actions__icon--new">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -57,8 +60,8 @@
         wire:click="desconhecerNota"
         class="erp-nfe-actions__btn"
         data-erp-key="F5"
-        @disabled($somenteLeituraAceitas)
-        title="{{ $somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : '' }}"
+        @disabled($acaoNotaDesabilitada)
+        title="{{ $somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : ($semNotaSelecionada ? 'Selecione uma nota' : ($acaoNotaDesabilitada ? 'Somente notas pendentes podem ser desconhecidas' : '')) }}"
     >
         <span class="erp-nfe-actions__icon erp-nfe-actions__icon--cancel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -73,7 +76,8 @@
         wire:click="openLerXmlSelecionada"
         class="erp-nfe-actions__btn"
         data-erp-key="F6"
-        title="Ler XML da nota selecionada ou buscar arquivo (e-mail / pasta)"
+        @disabled($lerXmlDesabilitado)
+        title="{{ $semNotaSelecionada ? 'Selecione uma nota' : ($lerXmlDesabilitado ? 'Indisponível para nota pendente ou cancelada' : 'Ler XML da nota selecionada') }}"
     >
         <span class="erp-nfe-actions__icon erp-nfe-actions__icon--xml">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -85,7 +89,13 @@
         </span>
         <span class="erp-nfe-actions__label"><kbd>F6</kbd> | Ler XML</span>
     </button>
-    <button type="button" wire:click="openNotaFornecedorVisualizarSelecionada" class="erp-nfe-actions__btn">
+    <button
+        type="button"
+        wire:click="openNotaFornecedorVisualizarSelecionada"
+        class="erp-nfe-actions__btn"
+        @disabled($semNotaSelecionada)
+        title="{{ $semNotaSelecionada ? 'Selecione uma nota' : '' }}"
+    >
         <span class="erp-nfe-actions__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/>

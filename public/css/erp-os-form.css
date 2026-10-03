@@ -319,6 +319,102 @@
 
 .erp-os-form-group--xs { width: 4.5rem; flex: 0 0 auto; }
 .erp-os-form-group--sm { width: 7.5rem; flex: 0 0 auto; }
+.erp-os-form-group--placa { width: auto; flex: 0 0 auto; }
+
+.erp-os-placa-field {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.erp-os-placa-field .erp-os-form-input {
+    width: 7.5rem;
+    flex: 0 0 auto;
+}
+
+.erp-os-placa-btn {
+    min-height: 1.85rem;
+    padding: 0 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-os-placa-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #60a5fa;
+}
+
+.erp-os-placa-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.erp-os-equipamento.erp-os-panel--fill {
+    overflow: visible;
+}
+
+.erp-os-equipamento-field {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.erp-os-equipamento__linha:has(.erp-os-equipamento-lookup) {
+    position: relative;
+    z-index: 40;
+}
+
+.erp-os-equipamento-lookup {
+    width: min(34rem, 70vw);
+    right: auto;
+    z-index: 40;
+}
+
+.erp-os-equipamento__linha {
+    display: grid;
+    align-items: end;
+    gap: 0.35rem 0.5rem;
+}
+
+.erp-os-equipamento__linha--identificacao {
+    grid-template-columns: auto minmax(8rem, 1.4fr) minmax(6rem, 0.9fr) minmax(6rem, 0.9fr) 8.4rem minmax(6rem, 0.8fr);
+}
+
+.erp-os-equipamento__linha--placa {
+    grid-template-columns: 7.4rem 4.6rem 6.2rem minmax(6.5rem, 0.85fr) minmax(8rem, 1.4fr);
+}
+
+.erp-os-equipamento__linha--complemento {
+    grid-template-columns: minmax(7.5rem, 1fr) minmax(6.5rem, 0.9fr) minmax(7.5rem, 1fr) minmax(9rem, 1.35fr);
+}
+
+.erp-os-equipamento__linha--renavam {
+    grid-template-columns: minmax(7rem, 1fr) minmax(6rem, 0.85fr) minmax(7rem, 0.95fr) 8rem minmax(8rem, 1.2fr);
+}
+
+.erp-os-equipamento .erp-os-form-group,
+.erp-os-equipamento .erp-os-form-group--grow,
+.erp-os-equipamento .erp-os-form-group--md,
+.erp-os-equipamento .erp-os-form-group--sm {
+    width: auto;
+    min-width: 0;
+    flex: none;
+}
+
+.erp-os-equipamento .erp-os-form-input--cadastro:disabled {
+    background: #f8fafc;
+    color: #334155;
+    opacity: 1;
+    cursor: default;
+}
+
 .erp-os-form-group--md { width: 10rem; flex: 0 0 auto; }
 .erp-os-form-group--doc { width: 9.5rem; flex: 0 0 auto; }
 .erp-os-form-group--phone { width: 8.5rem; flex: 0 0 auto; }

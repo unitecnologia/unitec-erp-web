@@ -46,6 +46,12 @@ class NotaFornecedorResource extends Resource
                     ->view('filament.components.erp.notas-fornecedores.columns.select')
                     ->alignCenter()
                     ->disabledClick(),
+                TextColumn::make('nome')
+                    ->label('Fornecedor')
+                    ->grow()
+                    ->wrap(false)
+                    ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
+                    ->weight(FontWeight::Bold),
                 TextColumn::make('data_entrada')
                     ->label('Dt.Entrada')
                     ->date('d/m/Y')
@@ -74,12 +80,6 @@ class NotaFornecedorResource extends Resource
                     ->placeholder('—')
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('nome')
-                    ->label('Fornecedor')
-                    ->grow()
-                    ->wrap(false)
-                    ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
-                    ->weight(FontWeight::Bold),
                 TextColumn::make('nsu')
                     ->label('NSU')
                     ->placeholder('—')
@@ -95,13 +95,6 @@ class NotaFornecedorResource extends Resource
                     ->label('Total')
                     ->view('filament.components.erp.nfe.columns.total')
                     ->alignEnd()
-                    ->disabledClick(),
-                ViewColumn::make('visualizar')
-                    ->label('')
-                    ->state(fn (): bool => true)
-                    ->width('1.35rem')
-                    ->view('filament.components.erp.notas-fornecedores.columns.visualizar')
-                    ->alignCenter()
                     ->disabledClick(),
             ])
             ->defaultSort('data_entrada', 'desc')

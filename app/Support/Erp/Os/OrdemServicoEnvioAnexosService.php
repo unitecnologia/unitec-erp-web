@@ -9,7 +9,7 @@ use App\Models\Nfse;
 use App\Models\OrdemServico;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
-use App\Support\Erp\Nfse\NfseDanfseViewData;
+use App\Support\Erp\Nfse\NfseImpressao;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
 use Throwable;
@@ -237,22 +237,23 @@ final class OrdemServicoEnvioAnexosService
      */
     private function storeNfsePdf(Nfse $nfse): array
     {
-        $data = NfseDanfseViewData::for($nfse, autoPrint: false, embedded: true);
+        $data = NfseImpressao::dados($nfse, autoPrint: false, embedded: true);
         $directory = storage_path('app/temp/ordens-servico-envio');
         File::ensureDirectoryExists($directory);
 
         $numero = preg_replace('/\D+/', '', (string) ($nfse->numero_nfse ?: $nfse->numero_dps)) ?: (string) $nfse->id;
+        $ipm = ($data['impressao_view'] ?? '') === NfseImpressao::VIEW_IPM;
         $path = $directory.DIRECTORY_SEPARATOR.'danfse-'.$nfse->id.'-'.uniqid('', true).'.pdf';
-        $name = 'DANFSe-'.$numero.'.pdf';
+        $name = ($ipm ? 'NFSe-' : 'DANFSe-').$numero.'.pdf';
 
-        Pdf::loadView('reports.nfse-impressao', $data)
+        Pdf::loadView((string) ($data['impressao_view'] ?? NfseImpressao::VIEW_NACIONAL), $data)
             ->setPaper('a4', 'portrait')
             ->save($path);
 
         return [
             'path' => $path,
             'name' => $name,
-            'display' => 'DANFSe NFS-e '.$numero,
+            'display' => ($ipm ? 'NFS-e ' : 'DANFSe NFS-e ').$numero,
         ];
     }
 

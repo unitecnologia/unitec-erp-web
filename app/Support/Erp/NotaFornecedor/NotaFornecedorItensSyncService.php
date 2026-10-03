@@ -49,12 +49,16 @@ final class NotaFornecedorItensSyncService
                     ->where('n_item', $nItem)
                     ->first();
 
+                $cfopXml = $row['cfop'] !== '' ? $row['cfop'] : null;
+
                 $comercial = [
                     'c_prod' => $row['c_prod'] !== '' ? $row['c_prod'] : null,
                     'c_ean' => $row['c_ean'] !== '' ? $row['c_ean'] : null,
                     'descricao' => $row['descricao'] !== '' ? $row['descricao'] : null,
                     'ncm' => $row['ncm'] !== '' ? $row['ncm'] : null,
-                    'cfop' => $row['cfop'] !== '' ? $row['cfop'] : null,
+                    'cfop' => $existente
+                        ? $this->preservarCfopEntrada($existente->cfop, $cfopXml)
+                        : $cfopXml,
                     'unidade' => $row['unidade'] !== '' ? $row['unidade'] : null,
                     'quantidade' => round((float) $row['quantidade'], 4),
                     'valor_unitario' => round((float) $row['valor_unitario'], 4),
@@ -133,5 +137,22 @@ final class NotaFornecedorItensSyncService
                 'removidos' => $removidos,
             ];
         });
+    }
+
+    /**
+     * O XML traz CFOP de saída. Se a compra já gravou o CFOP de entrada, o sync não o substitui.
+     */
+    private function preservarCfopEntrada(?string $atual, ?string $doXml): ?string
+    {
+        $gravado = preg_replace('/\D/', '', (string) $atual) ?? '';
+        $xml = preg_replace('/\D/', '', (string) $doXml) ?? '';
+        $entrada = strlen($gravado) === 4 && in_array($gravado[0], ['1', '2', '3'], true);
+        $saida = strlen($xml) === 4 && in_array($xml[0], ['5', '6', '7'], true);
+
+        if ($entrada && $saida) {
+            return $gravado;
+        }
+
+        return $doXml;
     }
 }

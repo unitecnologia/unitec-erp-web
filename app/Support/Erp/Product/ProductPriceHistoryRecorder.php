@@ -51,6 +51,7 @@ final class ProductPriceHistoryRecorder
         ?float $especialNovo = null,
         ?float $custoNovo = null,
         ?string $usuario = null,
+        ?int $compraId = null,
     ): void {
         $varejo = round($varejoNovo ?? (float) $product->preco_venda, 2);
         $atacado = round($atacadoNovo ?? (float) $product->preco_atacado, 2);
@@ -119,6 +120,7 @@ final class ProductPriceHistoryRecorder
             'registrado_em' => now()->toDateString(),
             'usuario' => $usuario ?? (Auth::user()?->name ?? 'Sistema'),
             'forma_alteracao' => $forma,
+            'compra_id' => $compraId !== null && $compraId > 0 ? $compraId : null,
         ]);
     }
 

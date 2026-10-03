@@ -178,9 +178,12 @@
 }
 
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(2),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(2) {
-    width: 5.25rem;
-    max-width: 5.5rem;
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(2),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-nome,
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome {
+    width: auto !important;
+    min-width: 11rem;
+    max-width: none !important;
 }
 
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(3),
@@ -189,8 +192,25 @@
     max-width: 5.5rem;
 }
 
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-col {
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-text-item {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(4),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(4),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(4) {
+    width: 5.25rem;
+    max-width: 5.5rem;
+}
+
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(5),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(5),
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-numero,
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-numero {
     width: 3.6rem !important;
@@ -198,8 +218,8 @@
     max-width: 3.9rem !important;
 }
 
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(5),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(5),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(6),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-chave,
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-chave {
     width: calc(36ch + 1cm + 1.5mm) !important;
@@ -223,8 +243,8 @@
     text-overflow: ellipsis;
 }
 
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(6),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(6),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(7),
+.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(7),
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-cnpj,
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-cnpj {
     /* Sobrescreve regra da NF-e (46ch no 5º filho) */
@@ -237,26 +257,6 @@
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
-    white-space: nowrap;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(7),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(7),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-nome,
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome {
-    width: auto !important;
-    min-width: 11rem;
-    max-width: none !important;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-col {
-    min-width: 0;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-nome .fi-ta-text-item {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -293,16 +293,6 @@
 
 .erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-total .erp-list-total-cell {
     width: 100%;
-}
-
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell:nth-child(11),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-row .fi-ta-cell:nth-child(11),
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-header-cell-visualizar,
-.erp-nfe-page.erp-notas-fornecedores-page .fi-ta-cell-visualizar {
-    width: 2rem !important;
-    min-width: 2rem !important;
-    max-width: 2rem !important;
-    padding-inline: 0.15rem !important;
 }
 
 /* Linha selecionada — destaque azul (padrão Compras/Vendas) */

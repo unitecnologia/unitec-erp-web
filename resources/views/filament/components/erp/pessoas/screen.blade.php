@@ -28,8 +28,7 @@
                 ])
                 <input
                     type="text"
-                    wire:model="localSearch"
-                    wire:keydown.enter="search"
+                    wire:model.live.debounce.350ms="localSearch"
                     wire:key="pessoas-local-search-{{ $this->searchColumn }}-{{ $this->tipoFilter }}"
                     class="erp-pessoas__input erp-pessoas__search-text"
                     placeholder="Digite para pesquisar"
@@ -37,11 +36,6 @@
                     @if (in_array($this->searchColumn, ['nome_razao', 'apelido_fantasia', 'endereco'], true)) data-erp-uppercase @endif
                     @if ($this->searchColumn === 'codigo') inputmode="numeric" @endif
                 >
-            </div>
-
-            <div class="erp-pessoas__search-actions">
-                <button type="button" wire:click="search" class="erp-pessoas__btn">Pesquisa</button>
-                <button type="button" wire:click="clearSearch" class="erp-pessoas__btn erp-pessoas__btn--secondary">Limpar</button>
             </div>
 
             <div class="erp-pessoas__page-size-group">

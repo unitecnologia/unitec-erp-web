@@ -59,17 +59,36 @@ class ListPeople extends ListRecords
     {
     }
 
-    protected function erpAfterSearchColumnChanged(bool $hadSearch = true, bool $changed = true): void
+    public function setSearchColumn(string $column): void
     {
-        $this->clearListSelection();
+        $normalized = $this->erpNormalizeSearchColumn($column);
+        $changed = $normalized !== $this->searchColumn;
+        $hadSearch = filled($this->localSearch);
 
-        if (! $hadSearch) {
+        $this->searchColumn = $normalized;
+        session([$this->erpSearchColumnSessionKey() => $this->searchColumn]);
+
+        if (! $changed) {
             $this->skipRender();
 
             return;
         }
 
+        $this->normalizeLocalSearchCase();
+        $this->clearListSelection();
+
+        if (! $hadSearch) {
+            return;
+        }
+
         $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->normalizeLocalSearchCase();
+        $this->clearListSelection();
+        $this->pushPersonListRefresh(resetSort: true);
     }
 
     public function erpListSyncPollEnabled(): bool

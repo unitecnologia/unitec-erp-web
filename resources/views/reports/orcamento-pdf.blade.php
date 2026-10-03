@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Orçamento nº {{ $numero }}</title>
+    @include('reports.partials.monitor-pedidos-document-styles')
     @include('reports.partials.orcamento-document-styles')
 </head>
 <body style="margin:0;padding:0;">
