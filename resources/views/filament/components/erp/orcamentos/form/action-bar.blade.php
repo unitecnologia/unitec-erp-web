@@ -1,6 +1,6 @@
 <div class="erp-pcad-actions erp-orc-actions">
     @unless ($this->orcamentoReadOnly())
-        <button type="button" wire:click="gravarOrcamento" class="erp-pcad-actions__btn" data-erp-key="F2">
+        <button type="button" wire:click="gravarOrcamento" wire:loading.attr="disabled" wire:target="gravarOrcamento,finalizarOrcamento" @disabled($this->orcamentoPersistindo) class="erp-pcad-actions__btn" data-erp-key="F2">
             <span class="erp-fv-tv-btn__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 13l4 4L19 7"/>
@@ -8,7 +8,7 @@
             </span>
             <span class="erp-pcad-actions__label"><kbd>F2</kbd> | Gravar</span>
         </button>
-        <button type="button" wire:click="finalizarOrcamento" class="erp-pcad-actions__btn" data-erp-key="F3">
+        <button type="button" wire:click="finalizarOrcamento" wire:loading.attr="disabled" wire:target="gravarOrcamento,finalizarOrcamento" @disabled($this->orcamentoPersistindo) class="erp-pcad-actions__btn" data-erp-key="F3">
             <span class="erp-fv-tv-btn__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>

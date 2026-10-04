@@ -151,9 +151,8 @@ class ListNotasFornecedores extends ListRecords
 
     protected function customErpListKeyboardConfig(): array
     {
-        $extraKeys = [
-            'F6' => ['method' => 'openLerXmlSelecionada'],
-        ];
+        $f4LerXml = $this->botaoConfirmarExibeLerXml();
+        $extraKeys = [];
 
         // Na aba Aceitas, só Ler XML / DANFE / Atualizar / Fechar ficam ativos.
         // create/edit/delete/refresh ficam nulos para o F2–F5 não caírem em método inexistente.
@@ -161,10 +160,11 @@ class ListNotasFornecedores extends ListRecords
             $extraKeys = [
                 'F2' => ['method' => 'openConsultaChaveModal'],
                 'F3' => ['method' => 'consultarLote'],
-                'F4' => ['method' => 'confirmarNota'],
+                'F4' => ['method' => $f4LerXml ? 'openLerXmlSelecionada' : 'confirmarNota'],
                 'F5' => ['method' => 'desconhecerNota'],
-                ...$extraKeys,
             ];
+        } elseif ($f4LerXml) {
+            $extraKeys['F4'] = ['method' => 'openLerXmlSelecionada'];
         }
 
         return [
@@ -210,7 +210,8 @@ class ListNotasFornecedores extends ListRecords
     }
 
     /**
-     * F4/F5 só valem para nota pendente. Depois de confirmar, ficam desligados.
+     * Confirmar e Desconhecer só valem para nota pendente.
+     * Nota aceita troca o F4 por Ler XML; o F5 continua desligado.
      */
     public function acaoNotaPendenteDesabilitada(): bool
     {
@@ -234,7 +235,30 @@ class ListNotasFornecedores extends ListRecords
     }
 
     /**
-     * F6 fica desabilitado sem nota marcada, para nota pendente ou NF-e cancelada na SEFAZ.
+     * Nota já aceita/confirmada: o lugar do F4 deixa de ser Confirmar e passa a ler o XML.
+     */
+    public function botaoConfirmarExibeLerXml(): bool
+    {
+        $id = (int) ($this->highlightedRecordId ?? 0);
+
+        if ($id <= 0) {
+            return false;
+        }
+
+        $nota = $this->findNotaNoEscopo($id);
+
+        if (! $nota) {
+            return false;
+        }
+
+        return in_array($nota->status, [
+            NotaFornecedor::STATUS_ACEITA,
+            NotaFornecedor::STATUS_GEROU_COMPRAS,
+        ], true);
+    }
+
+    /**
+     * Ler XML fica bloqueado sem nota marcada, para nota pendente, que já gerou compras ou NF-e cancelada na SEFAZ.
      */
     public function lerXmlSelecionadaDesabilitada(): bool
     {
@@ -250,7 +274,10 @@ class ListNotasFornecedores extends ListRecords
             return false;
         }
 
-        if ($nota->status === NotaFornecedor::STATUS_PENDENTE) {
+        if (in_array($nota->status, [
+            NotaFornecedor::STATUS_PENDENTE,
+            NotaFornecedor::STATUS_GEROU_COMPRAS,
+        ], true)) {
             return true;
         }
 
@@ -770,7 +797,7 @@ class ListNotasFornecedores extends ListRecords
         if ($xmlLiberado) {
             Notification::make()
                 ->title('Nota confirmada')
-                ->body('Ciência da Operação enviada. XML liberado — use F6 | Ler XML.')
+                ->body('Ciência da Operação enviada. XML liberado — use F4 | Ler XML.')
                 ->success()
                 ->send();
         }

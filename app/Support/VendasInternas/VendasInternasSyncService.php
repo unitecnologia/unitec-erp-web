@@ -244,7 +244,7 @@ class VendasInternasSyncService
                 'email' => $c->email,
                 'fone1' => $c->fone1,
                 'celular1' => $c->celular1,
-                'whatsapp' => $c->whatsapp,
+                'whatsapp' => $c->fone1,
                 'limite_credito' => (float) $c->limite_credito,
                 'dia_pgto' => $c->dia_pgto,
                 'forma_pagamento_id' => $c->forma_pagamento_id,

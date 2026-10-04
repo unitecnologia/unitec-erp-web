@@ -137,7 +137,6 @@ trait ManagesOrdemServicoEmailModal
                 $ordem->fone1
                 ?: $ordem->fone2
                 ?: ($cliente?->celular1 ?? '')
-                ?: ($cliente?->whatsapp ?? '')
                 ?: ($cliente?->fone1 ?? '')
             ));
 

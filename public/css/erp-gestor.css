@@ -1644,3 +1644,8 @@ html, body, .fi-body, .fi-main, .fi-main-ctn, .fi-page, .fi-page-content, .fi-si
 .gestor-item__validade--vencido .gestor-item__validade-dot {
     background: radial-gradient(circle at 30% 28%, #fca5a5 0%, #ef4444 42%, #b91c1c 100%);
 }
+
+/* Sucesso some sozinho (~1s via duração do Filament). Sem botão de fechar. */
+.fi-no-notification.fi-status-success > .fi-no-notification-close-btn {
+    display: none !important;
+}

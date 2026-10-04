@@ -1075,6 +1075,10 @@
     color: #15803d;
 }
 
+.erp-receber-page .erp-receber__total-value--late {
+    color: #dc2626;
+}
+
 .erp-receber-page .erp-receber__total-value--selected {
     color: #b45309;
 }
@@ -1160,6 +1164,11 @@
 .erp-receber-page .erp-receber__filter-chip--active:hover {
     background: #fff;
     color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-receber-page .erp-receber__filter-chip-count {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
 }
 
 .erp-receber-page .erp-receber__filter-chip:focus-visible {

@@ -9,6 +9,8 @@ use App\Support\Erp\Pdv\PdvProductPriceService;
 
 final class OrcamentoPrecoService
 {
+    private ?PdvProductPriceService $pdvPrecos = null;
+
     public function resolvePreco(Product $product, float $quantidade = 1, ?ProductGrade $grade = null): float
     {
         if ($grade !== null) {
@@ -19,8 +21,11 @@ final class OrcamentoPrecoService
             }
         }
 
-        $priceService = new PdvProductPriceService(new PdvConfig);
+        return $this->pdvPrecos()->resolvePrecoVenda($product, $quantidade);
+    }
 
-        return $priceService->resolvePrecoVenda($product, $quantidade);
+    private function pdvPrecos(): PdvProductPriceService
+    {
+        return $this->pdvPrecos ??= new PdvProductPriceService(new PdvConfig);
     }
 }

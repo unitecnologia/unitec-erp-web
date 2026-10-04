@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Management;
+using System.Runtime.InteropServices;
 using Unitec.ErpCommon;
 
 namespace Unitec.ErpLauncher;
@@ -21,47 +22,70 @@ internal static class Program
             "launcher.lock");
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
 
-        // Se ja existe janela do ERP (--app + perfil Unitec), so foca/maximiza.
-        if (FocusExistingBrowserApp(maximize: true))
-        {
-            return;
-        }
-
-        using var mutex = new Mutex(true, MutexName, out var created);
-        if (!created)
-        {
-            // Outro launcher esta no meio da abertura.
-            Thread.Sleep(800);
-            FocusExistingBrowserApp(maximize: true);
-            return;
-        }
-
-        if (!TryAcquireLockFile(lockPath))
-        {
-            Thread.Sleep(800);
-            FocusExistingBrowserApp(maximize: true);
-            return;
-        }
-
         DesktopLog.Write(appPath, "Launcher iniciado");
+
+        // Antes de qualquer WMI: clique extra sai na hora, sem Sleep e sem varrer o navegador.
+        using var mutex = new Mutex(false, MutexName);
+        var mutexOwned = false;
+        try
+        {
+            mutexOwned = mutex.WaitOne(0);
+        }
+        catch (AbandonedMutexException)
+        {
+            mutexOwned = true;
+        }
+
+        if (!mutexOwned)
+        {
+            DesktopLog.Write(appPath, "Mutex ocupado — saindo");
+            return;
+        }
 
         try
         {
-            RunAsync(appPath).GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            DesktopLog.Write(appPath, "Launcher erro: " + ex.Message);
-            MessageBox.Show(
-                "Nao foi possivel abrir o Unitec ERP.\n\n" + ex.Message +
-                "\n\nConsulte storage\\logs\\unitec-erp-desktop.log",
-                "Unitec ERP",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+            DesktopLog.Write(appPath, "Mutex adquirido");
+
+            if (!TryAcquireLockFile(lockPath))
+            {
+                DesktopLog.Write(appPath, "Abertura ja em andamento — saindo");
+                return;
+            }
+
+            OpeningSplash.Show();
+
+            try
+            {
+                DesktopLog.Write(appPath, "Verificacao do navegador existente: inicio");
+                var alreadyOpen = FocusExistingBrowserApp(maximize: true);
+                DesktopLog.Write(appPath, "Verificacao do navegador existente: fim");
+                if (alreadyOpen)
+                {
+                    OpeningSplash.Close();
+                    return;
+                }
+
+                RunAsync(appPath).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OpeningSplash.Close();
+                DesktopLog.Write(appPath, "Launcher erro: " + ex.Message);
+                MessageBox.Show(
+                    "Nao foi possivel abrir o Unitec ERP.\n\n" + ex.Message +
+                    "\n\nConsulte storage\\logs\\unitec-erp-desktop.log",
+                    "Unitec ERP",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                try { File.Delete(lockPath); } catch { /* ignore */ }
+            }
         }
         finally
         {
-            try { File.Delete(lockPath); } catch { /* ignore */ }
+            try { mutex.ReleaseMutex(); } catch { /* ignore */ }
         }
     }
 
@@ -100,9 +124,11 @@ internal static class Program
 
     private static async Task RunAsync(string appPath)
     {
+        DesktopLog.Write(appPath, "Health: inicio da espera");
         var health = await HealthClient.ProbeAsync().ConfigureAwait(false);
         if (health.Ok)
         {
+            DesktopLog.Write(appPath, "Health OK");
             OpenOrFocusBrowser(appPath);
             UpdateCheckService.CheckAndDownloadAsync(appPath);
             return;
@@ -148,6 +174,7 @@ internal static class Program
 
             if (health.Ok)
             {
+                DesktopLog.Write(appPath, "Health OK");
                 DesktopLog.Write(appPath, "Health OK pelo servico — abrindo ERP");
                 OpenOrFocusBrowser(appPath);
                 UpdateCheckService.CheckAndDownloadAsync(appPath);
@@ -205,6 +232,7 @@ internal static class Program
                 "Nao foi possivel iniciar o servidor do ERP.\n" + detail);
         }
 
+        DesktopLog.Write(appPath, "Health OK");
         OpenOrFocusBrowser(appPath);
         UpdateCheckService.CheckAndDownloadAsync(appPath);
     }
@@ -213,6 +241,7 @@ internal static class Program
     {
         if (FocusExistingBrowserApp(maximize: true))
         {
+            OpeningSplash.Close();
             return;
         }
 
@@ -224,7 +253,9 @@ internal static class Program
 
         if (browser is null)
         {
+            OpeningSplash.Close();
             Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            DesktopLog.Write(appPath, "Navegador disparado");
             return;
         }
 
@@ -234,6 +265,7 @@ internal static class Program
 
         try
         {
+            OpeningSplash.Close();
             var started = Process.Start(new ProcessStartInfo
             {
                 FileName = browser,
@@ -241,6 +273,7 @@ internal static class Program
                 UseShellExecute = true,
             });
 
+            DesktopLog.Write(appPath, "Navegador disparado");
             DesktopLog.Write(appPath, "Browser iniciado: " + browser + " pid=" + (started?.Id.ToString() ?? "?"));
 
             // Garante maximizar apos a janela --app aparecer.
@@ -445,4 +478,114 @@ internal static class Program
 
         return null;
     }
+}
+
+/// <summary>
+/// Janela leve de "abrindo", em thread propria, para pintar enquanto o health bloqueia.
+/// Forca exibicao normal: o atalho da area de trabalho nasce minimizado.
+/// </summary>
+internal static class OpeningSplash
+{
+    private const int SwShowNormal = 1;
+    private const int SwRestore = 9;
+
+    private static Form? _form;
+    private static int _closeRequested;
+
+    public static void Show()
+    {
+        using var ready = new ManualResetEventSlim(false);
+        var thread = new Thread(() =>
+        {
+            Application.EnableVisualStyles();
+            var form = BuildForm();
+            _ = form.Handle;
+            _form = form;
+            ready.Set();
+            if (Volatile.Read(ref _closeRequested) != 0)
+            {
+                return;
+            }
+
+            Application.Run(form);
+        });
+        thread.IsBackground = true;
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        ready.Wait(TimeSpan.FromSeconds(3));
+    }
+
+    public static void Close()
+    {
+        Interlocked.Exchange(ref _closeRequested, 1);
+        var form = _form;
+        if (form is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!form.IsDisposed && form.IsHandleCreated)
+            {
+                form.BeginInvoke(new Action(() =>
+                {
+                    if (!form.IsDisposed)
+                    {
+                        form.Close();
+                    }
+                }));
+            }
+        }
+        catch
+        {
+            // Janela ja encerrada.
+        }
+    }
+
+    private static Form BuildForm()
+    {
+        var form = new Form
+        {
+            Text = "Unitec ERP",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ControlBox = false,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = true,
+            TopMost = true,
+            StartPosition = FormStartPosition.CenterScreen,
+            ClientSize = new Size(380, 88),
+            ShowIcon = false,
+        };
+
+        form.Controls.Add(new Label
+        {
+            Text = "Abrindo o Unitec ERP...",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+        });
+
+        form.Shown += (_, _) => form.BeginInvoke(new Action(() => ForceVisible(form)));
+        return form;
+    }
+
+    private static void ForceVisible(Form form)
+    {
+        if (form.IsDisposed)
+        {
+            return;
+        }
+
+        form.WindowState = FormWindowState.Normal;
+        ShowWindow(form.Handle, SwShowNormal);
+        ShowWindow(form.Handle, SwRestore);
+        SetForegroundWindow(form.Handle);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
 }

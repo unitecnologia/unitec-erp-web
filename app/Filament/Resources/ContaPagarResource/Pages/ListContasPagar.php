@@ -23,6 +23,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListContasPagar extends ListRecords
@@ -54,6 +55,9 @@ class ListContasPagar extends ListRecords
     public string $situacaoFilter = 'todos';
 
     public string $viewTab = 'titulos';
+
+    /** @var list<int|string> */
+    public array $selecionadosParaBaixa = [];
 
     public string $localSearchDe = '';
 
@@ -204,6 +208,45 @@ class ListContasPagar extends ListRecords
         return $this->listQueryBuilder()->sumValorPagoFiltered();
     }
 
+    #[Computed]
+    public function totalAtrasado(): float
+    {
+        return $this->listQueryBuilder()->sumSaldoAtrasado();
+    }
+
+    #[Computed]
+    public function totalSelecionado(): float
+    {
+        $ids = collect($this->selecionadosParaBaixa)
+            ->map(fn ($id): int => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return 0.0;
+        }
+
+        return (float) ContaPagar::query()
+            ->whereIn('id', $ids)
+            ->sum('saldo');
+    }
+
+    #[Computed]
+    public function quantidadeSelecionada(): int
+    {
+        return count($this->selecionadosParaBaixa);
+    }
+
+    /**
+     * @return array{todos: int, a_pagar: int, atrasadas: int, pagas: int}
+     */
+    #[Computed]
+    public function contagensSituacao(): array
+    {
+        return $this->listQueryBuilder()->contarPorSituacao();
+    }
+
     public function content(Schema $schema): Schema
     {
         $components = [
@@ -252,7 +295,9 @@ class ListContasPagar extends ListRecords
             return;
         }
 
-        $this->voltarParaTitulos();
+        if ($this->viewTab === 'desdobramentos') {
+            $this->voltarParaTitulos();
+        }
     }
 
     public function setSearchColumn(string $column): void
@@ -549,6 +594,7 @@ class ListContasPagar extends ListRecords
                 'forma' => mb_strtoupper((string) ($pagamento->formaPagamento?->descricao ?? '—'), 'UTF-8'),
                 'plano' => mb_strtoupper((string) ($pagamento->planoConta?->descricao ?? '—'), 'UTF-8'),
                 'conta' => mb_strtoupper((string) ($pagamento->caixaConta?->nome ?? '—'), 'UTF-8'),
+                'cheque' => trim((string) ($pagamento->numero_cheque ?? '')) ?: '—',
             ])
             ->all();
 
@@ -613,7 +659,64 @@ class ListContasPagar extends ListRecords
         }
     }
 
-    protected function pushContaPagarListRefresh(bool $resetSort = false): void
+    protected function clearListSelection(): void
+    {
+        $this->highlightedRecordId = null;
+        $this->selecionadosParaBaixa = [];
+    }
+
+    protected function atualizarGradeAposBaixa(): void
+    {
+        $this->pushContaPagarListRefresh(renderPage: true);
+    }
+
+    #[On('erp-pagar-toggle-baixa')]
+    public function onErpPagarToggleBaixa(int $contaId, bool $selected): void
+    {
+        if ($this->fornecedorFilter === 'todos' || ! is_numeric($this->fornecedorFilter)) {
+            Notification::make()
+                ->title('Selecione um fornecedor antes de marcar contas para baixa.')
+                ->warning()
+                ->send();
+            $this->pushContaPagarListRefresh(renderPage: true);
+
+            return;
+        }
+
+        $conta = ContaPagar::query()
+            ->whereKey($contaId)
+            ->first(['id', 'fornecedor_id', 'saldo']);
+
+        if (! $conta || (float) $conta->saldo <= 0 || (int) $conta->fornecedor_id !== (int) $this->fornecedorFilter) {
+            Notification::make()
+                ->title('Só é possível marcar títulos em aberto deste fornecedor.')
+                ->warning()
+                ->send();
+            $this->pushContaPagarListRefresh(renderPage: true);
+
+            return;
+        }
+
+        $ids = collect($this->selecionadosParaBaixa)->map(fn ($id): int => (int) $id);
+
+        if ($selected) {
+            $ids->push($contaId);
+        } else {
+            $ids = $ids->reject(fn (int $id): bool => $id === $contaId);
+        }
+
+        $this->selecionadosParaBaixa = $ids->unique()->values()->all();
+
+        $this->dispatch(
+            'erp-pagar-selection-sync',
+            selecionadosParaBaixa: $this->selecionadosParaBaixa,
+        )->to(ContaPagarListTable::class);
+
+        $this->skipRender();
+        $this->patchPagarFooterSelecionado();
+    }
+
+    protected function pushContaPagarListRefresh(bool $resetSort = false, bool $renderPage = false): void
     {
         if ($this->viewTab !== 'titulos') {
             return;
@@ -622,6 +725,7 @@ class ListContasPagar extends ListRecords
         $builder = $this->listQueryBuilder();
         $totalAPagar = $builder->sumSaldoFiltered();
         $totalPago = $builder->sumValorPagoFiltered();
+        $totalAtrasado = $builder->sumSaldoAtrasado();
 
         $this->dispatch(
             'erp-pagar-list-refresh',
@@ -634,23 +738,86 @@ class ListContasPagar extends ListRecords
             skipFornecedorSearch: $this->shouldSkipFornecedorSearchWhileTyping(),
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
+            selecionadosParaBaixa: $this->selecionadosParaBaixa,
         )->to(ContaPagarListTable::class);
 
-        $this->skipRender();
+        if (! $renderPage) {
+            $this->skipRender();
+        }
 
-        $this->patchPagarFooterTotals($totalAPagar, $totalPago);
+        $this->patchPagarFooterTotals($totalAPagar, $totalPago, $totalAtrasado);
+        $this->patchPagarFooterSelecionado();
+        $this->patchPagarSituacaoContagens();
     }
 
-    protected function patchPagarFooterTotals(float $totalAPagar, float $totalPago): void
+    protected function patchPagarFooterTotals(float $totalAPagar, float $totalPago, float $totalAtrasado): void
     {
         $this->js(sprintf(
             '(() => {
-                const items = document.querySelectorAll(".erp-pagar__totals .erp-pagar__total-value");
-                if (items[0]) items[0].textContent = %s;
-                if (items[1]) items[1].textContent = %s;
+                const open = document.querySelector(".erp-pagar__total-value--open");
+                const paid = document.querySelector(".erp-pagar__total-value--paid");
+                const late = document.querySelector(".erp-pagar__total-value--late");
+                if (open) open.textContent = %s;
+                if (paid) paid.textContent = %s;
+                if (late) late.textContent = %s;
             })()',
             json_encode('R$ '.number_format($totalAPagar, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode('R$ '.number_format($totalPago, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalAtrasado, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    protected function patchPagarSituacaoContagens(): void
+    {
+        $contagens = $this->contagensSituacao;
+
+        $this->js(sprintf(
+            '(() => {
+                const counts = %s;
+                document.querySelectorAll(".erp-pagar__filter-chip-count").forEach((el) => {
+                    const key = el.getAttribute("data-situacao");
+                    if (!key || counts[key] === undefined) return;
+                    el.textContent = "(" + counts[key] + ")";
+                });
+            })()',
+            json_encode($contagens, JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    protected function patchPagarFooterSelecionado(): void
+    {
+        $qtd = $this->quantidadeSelecionada;
+        $total = $this->totalSelecionado;
+        $label = $qtd === 1 ? 'conta' : 'contas';
+
+        $this->js(sprintf(
+            '(() => {
+                const totals = document.querySelector(".erp-pagar__totals");
+                if (!totals) return;
+                let block = totals.querySelector(".erp-pagar__total-item--selected");
+                if (%d < 1) {
+                    if (block) block.remove();
+                    return;
+                }
+                const formatted = %s;
+                const meta = "(%d " + %s + ")";
+                if (!block) {
+                    block = document.createElement("div");
+                    block.className = "erp-pagar__total-item erp-pagar__total-item--selected";
+                    block.innerHTML = "<span class=\\"erp-pagar__total-label\\">TOTAL SELECIONADO |</span>"
+                        + "<span class=\\"erp-pagar__total-value erp-pagar__total-value--selected\\"></span>"
+                        + "<span class=\\"erp-pagar__total-meta\\"></span>";
+                    totals.appendChild(block);
+                }
+                const valueEl = block.querySelector(".erp-pagar__total-value--selected");
+                const metaEl = block.querySelector(".erp-pagar__total-meta");
+                if (valueEl) valueEl.textContent = formatted;
+                if (metaEl) metaEl.textContent = meta;
+            })()',
+            $qtd,
+            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            $qtd,
+            json_encode($label, JSON_UNESCAPED_UNICODE),
         ));
     }
 }

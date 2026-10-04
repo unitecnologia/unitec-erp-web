@@ -17,8 +17,6 @@
                         wire:model.live.debounce.200ms="itemProdutoSearch"
                         wire:keydown.enter.prevent="confirmarCodigoProdutoBar($event.target.value)"
                         wire:keydown.escape.prevent="closeProdutoLookup"
-                        wire:keydown.arrow-up.prevent="moveProdutoSelection(-1)"
-                        wire:keydown.arrow-down.prevent="moveProdutoSelection(1)"
                         @disabled($readOnly)
                         autocomplete="off"
                         placeholder="Código, barras ou nome do produto — Enter"

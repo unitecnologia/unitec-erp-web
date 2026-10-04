@@ -4,7 +4,11 @@ namespace App\Support\Erp\Orcamento;
 
 use App\Models\Product;
 use App\Models\ProductGrade;
+use App\Models\PromocaoItem;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Pdv\PdvConfig;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 final class OrcamentoPrecoDivergenciaService
 {
@@ -50,10 +54,15 @@ final class OrcamentoPrecoDivergenciaService
             return [];
         }
 
+        $productIds = array_values(array_unique($productIds));
+
         $products = Product::query()
-            ->whereIn('id', array_values(array_unique($productIds)))
+            ->with('empresaPrecos')
+            ->whereIn('id', $productIds)
             ->get()
             ->keyBy('id');
+
+        $this->carregarPrecosAgrupados($products);
 
         $grades = $gradeIds === []
             ? collect()
@@ -103,5 +112,48 @@ final class OrcamentoPrecoDivergenciaService
         }
 
         return $divergencias;
+    }
+
+    /**
+     * @param  Collection<int, Product>  $products
+     */
+    private function carregarPrecosAgrupados(Collection $products): void
+    {
+        if ($products->isEmpty()) {
+            return;
+        }
+
+        $config = new PdvConfig;
+        $tableId = $config->habilitarTabelaPreco() ? $config->priceTableId() : null;
+
+        if ($tableId) {
+            $products->load([
+                'priceTableItems' => fn ($query) => $query->where('price_table_id', $tableId),
+            ]);
+        }
+
+        $empresaId = (int) (session('erp_empresa_id') ?? 0);
+
+        if ($empresaId <= 0) {
+            return;
+        }
+
+        $hoje = Carbon::today()->toDateString();
+        $mins = PromocaoItem::query()
+            ->selectRaw('product_id, MIN(preco_promocao) as preco_promocao')
+            ->whereIn('product_id', $products->modelKeys())
+            ->whereHas('promocao', function ($query) use ($empresaId, $hoje): void {
+                $query->where('empresa_id', $empresaId)
+                    ->where('ativa', true)
+                    ->whereDate('data_inicio', '<=', $hoje)
+                    ->whereDate('data_fim', '>=', $hoje);
+            })
+            ->groupBy('product_id')
+            ->pluck('preco_promocao', 'product_id');
+
+        foreach ($products as $product) {
+            $min = $mins->get($product->id);
+            $product->setRelation('precoPromocaoLote', $min === null ? null : (float) $min);
+        }
     }
 }

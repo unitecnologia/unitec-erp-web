@@ -23,20 +23,21 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        $rateioDescontoGeral = $this->rateioDescontoGeralPorItem();
-                    @endphp
                     @forelse ($this->itens as $index => $item)
                         @php
                             $qtd = \App\Support\Erp\ErpMoney::parseBr($item['quantidade'] ?? 0, 3);
                             $preco = \App\Support\Erp\ErpMoney::parseBr($item['preco_unitario'] ?? 0);
+                            $precoCadastro = $item['preco_cadastro_atual'] ?? null;
+                            $precoDivergente = is_string($precoCadastro)
+                                && $precoCadastro !== ''
+                                && abs($preco - \App\Support\Erp\ErpMoney::parseBr($precoCadastro)) >= 0.01;
+                            $precoAlerta = $precoDivergente
+                                ? 'Preço alterado no cadastro. Orçamento: R$ ' . ($item['preco_unitario'] ?? '0,00') . ' | Atual: R$ ' . $precoCadastro
+                                : '';
                             $bruto = round($qtd * $preco, 2);
                             $acr = \App\Support\Erp\ErpMoney::parseBr($item['acrescimo'] ?? 0);
-                            $liq = \App\Support\Erp\ErpMoney::parseBr($item['total'] ?? 0);
-                            $descProprio = round(max(0, $bruto + $acr - $liq), 2);
-                            $rateioLinha = round((float) ($rateioDescontoGeral[$index] ?? 0), 2);
-                            $desc = round($descProprio + $rateioLinha, 2);
-                            $liqExibido = round(max(0, $liq - $rateioLinha), 2);
+                            $desc = \App\Support\Erp\ErpMoney::parseBr($item['desconto'] ?? 0);
+                            $liqExibido = \App\Support\Erp\ErpMoney::parseBr($item['total'] ?? 0);
                         @endphp
                         <tr
                             wire:key="{{ $item['key'] ?? ('orc-item-' . $index) }}"
@@ -47,6 +48,7 @@
                             @class([
                                 'is-selected' => $this->selectedItemIndex === $index,
                                 'is-editing' => $this->editingItemIndex === $index,
+                                'is-preco-alterado' => $precoDivergente,
                             ])
                         >
                             @unless ($readOnly)
@@ -85,6 +87,15 @@
                             </td>
                             <td class="erp-fv-tv__col-num">
                                 <div class="erp-fv-tv__cell erp-fv-tv__cell--money">
+                                    @if ($precoDivergente)
+                                        <span class="erp-orc-itens__preco-alerta" title="{{ $precoAlerta }}" aria-label="{{ $precoAlerta }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M12 9v4"/>
+                                                <path d="M12 17h.01"/>
+                                                <path d="M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/>
+                                            </svg>
+                                        </span>
+                                    @endif
                                     <span class="erp-fv-tv__money-rs">R$</span>
                                     <span class="erp-fv-tv__money-val">{{ $item['preco_unitario'] ?? '0,00' }}</span>
                                 </div>

@@ -3,6 +3,7 @@
     $semNotaSelecionada = (int) ($this->highlightedRecordId ?? 0) <= 0;
     $lerXmlDesabilitado = $this->lerXmlSelecionadaDesabilitada();
     $acaoNotaDesabilitada = $this->acaoNotaPendenteDesabilitada();
+    $botaoConfirmarExibeLerXml = $this->botaoConfirmarExibeLerXml();
 @endphp
 
 <div class="erp-nfe-actions erp-nf-forn-actions">
@@ -42,18 +43,30 @@
     </button>
     <button
         type="button"
-        wire:click="confirmarNota"
+        wire:click="{{ $botaoConfirmarExibeLerXml ? 'openLerXmlSelecionada' : 'confirmarNota' }}"
         class="erp-nfe-actions__btn"
         data-erp-key="F4"
-        @disabled($acaoNotaDesabilitada)
-        title="{{ $somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : ($semNotaSelecionada ? 'Selecione uma nota' : ($acaoNotaDesabilitada ? 'Nota já confirmada' : 'Confirmar a nota marcada')) }}"
+        @disabled($botaoConfirmarExibeLerXml ? $lerXmlDesabilitado : $acaoNotaDesabilitada)
+        title="{{ $botaoConfirmarExibeLerXml ? ($lerXmlDesabilitado ? 'Indisponível para nota pendente, cancelada ou que já gerou compras' : 'Ler XML da nota selecionada') : ($somenteLeituraAceitas ? 'Indisponível na aba Aceitas' : ($semNotaSelecionada ? 'Selecione uma nota' : ($acaoNotaDesabilitada ? 'Nota já confirmada' : 'Confirmar a nota marcada'))) }}"
     >
-        <span class="erp-nfe-actions__icon erp-nfe-actions__icon--new">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M20 6L9 17l-5-5"/>
-            </svg>
-        </span>
-        <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Confirmar</span>
+        @if ($botaoConfirmarExibeLerXml)
+            <span class="erp-nfe-actions__icon erp-nfe-actions__icon--xml">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 3v5h5"/>
+                    <path d="M9.5 12.5l2 2-2 2"/>
+                    <path d="M14.5 12.5l-2 2 2 2"/>
+                </svg>
+            </span>
+            <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Ler XML</span>
+        @else
+            <span class="erp-nfe-actions__icon erp-nfe-actions__icon--new">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5"/>
+                </svg>
+            </span>
+            <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Confirmar</span>
+        @endif
     </button>
     <button
         type="button"
@@ -70,24 +83,6 @@
             </svg>
         </span>
         <span class="erp-nfe-actions__label"><kbd>F5</kbd> | Desconhecer</span>
-    </button>
-    <button
-        type="button"
-        wire:click="openLerXmlSelecionada"
-        class="erp-nfe-actions__btn"
-        data-erp-key="F6"
-        @disabled($lerXmlDesabilitado)
-        title="{{ $semNotaSelecionada ? 'Selecione uma nota' : ($lerXmlDesabilitado ? 'Indisponível para nota pendente ou cancelada' : 'Ler XML da nota selecionada') }}"
-    >
-        <span class="erp-nfe-actions__icon erp-nfe-actions__icon--xml">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-                <path d="M14 3v5h5"/>
-                <path d="M9.5 12.5l2 2-2 2"/>
-                <path d="M14.5 12.5l-2 2 2 2"/>
-            </svg>
-        </span>
-        <span class="erp-nfe-actions__label"><kbd>F6</kbd> | Ler XML</span>
     </button>
     <button
         type="button"

@@ -5,6 +5,7 @@ namespace App\Support\Erp\Financeiro;
 use App\Models\CaixaLancamento;
 use App\Models\ContaPagar;
 use App\Models\ContaPagarPagamento;
+use App\Support\Erp\ErpContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
@@ -64,14 +65,7 @@ final class ContaPagarEstornoService
                 $conta->save();
             }
 
-            $this->lancarEntradaEstornoCaixa(
-                valor: $valorPago,
-                data: optional($pagamento->data)?->toDateString() ?? now()->toDateString(),
-                documento: (string) ($conta->documento ?: $conta->numero ?: ('CP-'.$conta->id)),
-                historico: 'Estorno pagamento conta a pagar #'.($conta->numero ?: $conta->id),
-                caixaContaId: $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null,
-                planoContaId: $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null,
-            );
+            $this->desfazerSaidaDaBaixa($pagamento, $conta);
 
             $pagamento->delete();
 
@@ -84,33 +78,87 @@ final class ContaPagarEstornoService
         });
     }
 
-    private function lancarEntradaEstornoCaixa(
-        float $valor,
-        string $data,
-        string $documento,
-        string $historico,
-        ?int $caixaContaId,
-        ?int $planoContaId,
-    ): void {
-        if (! Schema::hasTable((new CaixaLancamento)->getTable()) || $valor <= 0) {
+    /**
+     * Contra-lançamento só da saída criada por esta baixa.
+     * Baixa sem movimento de caixa (boleto, cartão, cheque etc.) não gera entrada.
+     */
+    private function desfazerSaidaDaBaixa(ContaPagarPagamento $pagamento, ContaPagar $conta): void
+    {
+        if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
             return;
         }
 
-        $planoNome = null;
-        if ($planoContaId) {
-            $planoNome = \App\Models\PlanoConta::query()->whereKey($planoContaId)->value('descricao');
+        $saida = $this->localizarSaidaDaBaixa($pagamento, $conta);
+
+        if (! $saida || (float) $saida->saida <= 0) {
+            return;
         }
 
-        CaixaLancamento::query()->create([
+        $empresaId = $saida->empresa_id
+            ?: ($conta->empresa_id ?: ErpContext::currentEmpresaId());
+
+        $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),
-            'emissao' => $data,
-            'documento' => mb_substr($documento, 0, 40),
-            'historico' => mb_substr($historico, 0, 180),
-            'plano_contas' => $planoNome ? mb_substr(mb_strtoupper((string) $planoNome, 'UTF-8'), 0, 80) : null,
-            'plano_conta_id' => $planoContaId,
-            'caixa_conta_id' => $caixaContaId,
-            'entrada' => $valor,
+            'emissao' => optional($saida->emissao)?->toDateString() ?? optional($pagamento->data)?->toDateString() ?? now()->toDateString(),
+            'documento' => mb_substr((string) ($saida->documento ?: ''), 0, 40),
+            'historico' => app(ContaPagarBaixaService::class)->historicoEstorno($conta, (int) $pagamento->id),
+            'plano_contas' => $saida->plano_contas,
+            'plano_conta_id' => $saida->plano_conta_id,
+            'caixa_conta_id' => $saida->caixa_conta_id,
+            'entrada' => round((float) $saida->saida, 2),
             'saida' => 0,
-        ]);
+        ];
+
+        if (Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+            $payload['empresa_id'] = $empresaId;
+        }
+
+        CaixaLancamento::query()->create($payload);
+    }
+
+    private function localizarSaidaDaBaixa(ContaPagarPagamento $pagamento, ContaPagar $conta): ?CaixaLancamento
+    {
+        $marca = 'baixa:'.(int) $pagamento->id;
+
+        $marcada = CaixaLancamento::query()
+            ->where('saida', '>', 0)
+            ->whereRaw('RIGHT(historico, ?) = ?', [strlen($marca), $marca])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($marcada) {
+            return $marcada;
+        }
+
+        $numero = $conta->numero ?: $conta->id;
+        $historicoLegado = 'Pagamento conta a pagar #'.$numero;
+        $estornoLegado = 'Estorno pagamento conta a pagar #'.$numero;
+        $valor = round((float) $pagamento->valor_pago, 2);
+        $documento = mb_substr((string) ($conta->documento ?: $conta->numero ?: ('CP-'.$conta->id)), 0, 40);
+        $data = optional($pagamento->data)?->toDateString();
+        $caixaId = $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null;
+
+        $saidas = CaixaLancamento::query()
+            ->where('historico', $historicoLegado)
+            ->where('saida', $valor)
+            ->where('documento', $documento)
+            ->when($caixaId, fn ($query) => $query->where('caixa_conta_id', $caixaId))
+            ->when($data, fn ($query) => $query->whereDate('emissao', $data))
+            ->orderBy('id')
+            ->get();
+
+        if ($saidas->isEmpty()) {
+            return null;
+        }
+
+        $estornos = CaixaLancamento::query()
+            ->where('historico', $estornoLegado)
+            ->where('entrada', $valor)
+            ->where('documento', $documento)
+            ->when($caixaId, fn ($query) => $query->where('caixa_conta_id', $caixaId))
+            ->when($data, fn ($query) => $query->whereDate('emissao', $data))
+            ->count();
+
+        return $saidas->slice($estornos, 1)->first();
     }
 }

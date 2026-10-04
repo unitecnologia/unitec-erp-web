@@ -310,7 +310,7 @@ class PdvCargaService
                 'email' => $c->email,
                 'fone1' => $c->fone1,
                 'celular1' => $c->celular1,
-                'whatsapp' => $c->whatsapp,
+                'whatsapp' => $c->fone1,
                 'tipo_contribuinte' => $c->tipo_contribuinte,
                 'limite_credito' => round((float) ($c->limite_credito ?? 0), 2),
                 'saldo_em_aberto' => round((float) ($saldos[$c->id] ?? 0), 2),

@@ -4,6 +4,7 @@ namespace App\Support\Erp\Queries;
 
 use App\Models\Empresa;
 use App\Models\ProductSerial;
+use App\Support\Erp\ErpSearchFieldSelection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -13,6 +14,7 @@ class ProductSerialListQueryBuilder
         public string $searchColumn = 'descricao',
         public string $localSearch = '',
         public ?Empresa $empresa = null,
+        public array $searchFieldsActive = [],
     ) {}
 
     public static function fromRequest(Request $request, ?Empresa $empresa = null): self
@@ -34,13 +36,23 @@ class ProductSerialListQueryBuilder
         if (filled($this->localSearch)) {
             $term = trim($this->localSearch);
             $parte = ($this->empresa?->param_pdv_pesquisa_partes_descricao ?? false) ? '%' : '';
+            $columns = ErpSearchFieldSelection::normalize(
+                $this->searchFieldsActive,
+                ['descricao', 'numero_serie'],
+                $this->searchColumn,
+            );
 
-            if ($this->searchColumn === 'numero_serie') {
-                $query->where('numero_serie', 'like', $parte . $term . '%');
-            } else {
-                $query->whereHas('product', fn (Builder $productQuery): Builder => $productQuery
-                    ->where('descricao', 'like', $parte . $term . '%'));
-            }
+            ErpSearchFieldSelection::applyOr($query, $columns, function (Builder $inner, string $column) use ($term, $parte): void {
+                if ($column === 'numero_serie') {
+                    $inner->where('numero_serie', 'like', $parte . $term . '%');
+
+                    return;
+                }
+
+                $inner->whereHas('product', function (Builder $productQuery) use ($term): void {
+                    ProductListQueryBuilder::whereDescricaoPartes($productQuery, 'descricao', $term);
+                });
+            });
         }
 
         return $query->orderBy('numero_serie');

@@ -1,8 +1,11 @@
 @php
     $columns = [
-        ['key' => 'numero', 'label' => 'Número', 'sortable' => true, 'align' => 'center'],
+        ['key' => 'baixa', 'label' => '', 'sortable' => false, 'align' => 'center', 'check' => true],
+        ['key' => 'numero', 'label' => 'ID', 'sortable' => true, 'align' => 'center'],
+        ['key' => 'num_compra', 'label' => 'Num.Compra', 'sortable' => false, 'align' => 'center'],
         ['key' => 'emissao', 'label' => 'Emissão', 'sortable' => true, 'align' => 'center'],
         ['key' => 'documento', 'label' => 'Doc', 'sortable' => false, 'align' => 'center'],
+        ['key' => 'nota_fiscal', 'label' => 'Nota fiscal', 'sortable' => false, 'align' => 'center'],
         ['key' => 'fornecedor', 'label' => 'Fornecedor', 'sortable' => false, 'align' => 'start'],
         ['key' => 'vencimento', 'label' => 'Vencimento', 'sortable' => true, 'align' => 'center'],
         ['key' => 'valor', 'label' => 'Valor', 'sortable' => false, 'align' => 'end'],
@@ -16,6 +19,11 @@
 
 <div class="fi-ta-ctn overflow-x-auto">
     <table class="fi-ta-table">
+        <colgroup>
+            @foreach ($columns as $column)
+                <col class="erp-pagar-col erp-pagar-col--{{ $column['key'] }}">
+            @endforeach
+        </colgroup>
         <thead>
             <tr>
                 @foreach ($columns as $column)
@@ -27,6 +35,7 @@
                         scope="col"
                         @class([
                             'fi-ta-header-cell',
+                            'erp-pagar-col--'.$column['key'],
                             'text-' . $column['align'] => filled($column['align'] ?? null),
                         ])
                         aria-sort="{{ $ariaSort }}"
@@ -52,13 +61,51 @@
                     $rowClass = trim('fi-ta-row' . ($index % 2 === 1 ? ' fi-striped' : '') . ' ' . $extraClasses);
                     unset($cells['row_class']);
                 @endphp
+                @php
+                    $podeMarcar = $fornecedorFilter !== 'todos'
+                        && is_numeric($fornecedorFilter)
+                        && (int) $record->fornecedor_id === (int) $fornecedorFilter
+                        && (float) $record->saldo > 0;
+                    $marcado = in_array((int) $record->getKey(), array_map('intval', $selecionadosParaBaixa), true);
+                    if ($marcado) {
+                        $rowClass = trim($rowClass.' erp-row-selected');
+                    }
+                @endphp
                 <tr class="{{ $rowClass }}" data-record-key="{{ $record->getKey() }}">
                     @foreach ($columns as $column)
                         @php
                             $value = $cells[$column['key']] ?? '';
                         @endphp
-                        <td @class(['fi-ta-cell', 'text-' . $column['align'] => filled($column['align'] ?? null)])>
-                            {{ $value }}
+                        @php
+                            $cellTitle = match ($column['key']) {
+                                'fornecedor' => $record->fornecedor?->nome_razao,
+                                'nota_fiscal' => $record->compra?->numero_nota,
+                                default => null,
+                            };
+                        @endphp
+                        <td
+                            @class([
+                                'fi-ta-cell',
+                                'erp-pagar-col--'.$column['key'],
+                                'text-' . $column['align'] => filled($column['align'] ?? null),
+                            ])
+                            @if (filled($cellTitle)) title="{{ $cellTitle }}" @endif
+                        >
+                            @if ($column['check'] ?? false)
+                                <input
+                                    type="checkbox"
+                                    class="erp-pagar__check"
+                                    value="{{ $record->getKey() }}"
+                                    @checked($marcado)
+                                    @disabled(! $podeMarcar)
+                                    title="{{ $podeMarcar ? 'Marcar para baixa' : 'Selecione o fornecedor para marcar contas' }}"
+                                    onclick="const row=this.closest('tr'); if(row){ row.classList.toggle('erp-row-selected', this.checked); }"
+                                    wire:click.stop="$dispatch('erp-pagar-toggle-baixa', { contaId: {{ (int) $record->getKey() }}, selected: $event.target.checked })"
+                                    @click.stop
+                                >
+                            @else
+                                {{ $value }}
+                            @endif
                         </td>
                     @endforeach
                 </tr>

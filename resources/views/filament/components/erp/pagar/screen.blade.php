@@ -15,11 +15,8 @@
 
     $viewTabs = [
         'titulos' => 'Títulos',
+        'desdobramentos' => 'Desdobramentos de Parcelas',
     ];
-
-    if ($this->podeVerAbaDesdobramentos()) {
-        $viewTabs['desdobramentos'] = 'Desdobramentos de Parcelas';
-    }
 
     $pageSizeOptions = [25, 50, 100];
     $activeFields = count($this->searchFieldsActive) >= 2
@@ -161,22 +158,15 @@
         </div>
     @endif
 
-    @if (count($viewTabs) > 1 || $this->viewTab === 'desdobramentos')
-        <div
-            class="erp-pagar__view-tabs"
-            wire:ignore
-            x-data="{ statusAtivo: @js($this->viewTab ?: 'dados') }"
-        >
-            @foreach ($viewTabs as $value => $label)
-                <button
-                    type="button"
-                    class="erp-pagar__view-tab"
-                    :class="{ 'erp-pagar__view-tab--active': statusAtivo === @js($value) }"
-                    @click="statusAtivo = @js($value); $wire.setViewTab(@js($value))"
-                >{{ $label }}</button>
-            @endforeach
-        </div>
-    @endif
+    <div class="erp-pagar__view-tabs">
+        @foreach ($viewTabs as $value => $label)
+            <button
+                type="button"
+                class="erp-pagar__view-tab {{ ($this->viewTab ?: 'titulos') === $value ? 'erp-pagar__view-tab--active' : '' }}"
+                wire:click="setViewTab('{{ $value }}')"
+            >{{ $label }}</button>
+        @endforeach
+    </div>
 
     @include('filament.components.erp.list-scripts', [
         'config' => $this->getErpListKeyboardConfigForView(),

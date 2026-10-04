@@ -581,11 +581,9 @@
             function tick() {
                 if (!active || finishing) return;
 
-                const ceiling = 88;
+                const ceiling = 90;
                 if (progress < ceiling) {
-                    const remaining = ceiling - progress;
-                    const step = Math.max(0.08, remaining * 0.028);
-                    progress = Math.min(ceiling, progress + step);
+                    progress = Math.min(ceiling, progress + 0.55);
                     paint();
                 }
 
@@ -707,7 +705,10 @@
                 finishing = true;
                 window.clearInterval(messageTimer);
                 window.clearTimeout(stuckTimer);
-                setMessage('Quase lá...');
+                window.cancelAnimationFrame(raf);
+                setMessage('Abrindo o sistema...');
+                progress = 100;
+                paint();
 
                 const target = (function (raw) {
                     const fallback = '/admin';
@@ -723,31 +724,10 @@
                         return value.charAt(0) === '/' ? value : fallback;
                     }
                 })(url);
-                const start = performance.now();
-                const from = Math.max(progress, 40);
-                progress = from;
-                paint();
-                const duration = 900;
 
-                function finishFrame(now) {
-                    const t = Math.min(1, (now - start) / duration);
-                    const eased = 1 - Math.pow(1 - t, 3);
-                    progress = from + (100 - from) * eased;
-                    paint();
-
-                    if (t < 1) {
-                        raf = window.requestAnimationFrame(finishFrame);
-                        return;
-                    }
-
-                    setMessage('Sistema pronto');
-                    window.setTimeout(function () {
-                        window.location.replace(target);
-                    }, 220);
-                }
-
-                window.cancelAnimationFrame(raf);
-                raf = window.requestAnimationFrame(finishFrame);
+                window.requestAnimationFrame(function () {
+                    window.location.replace(target);
+                });
             }
 
             function isAuthenticateTrigger(target) {

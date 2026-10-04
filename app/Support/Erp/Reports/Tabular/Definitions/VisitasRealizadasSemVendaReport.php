@@ -279,7 +279,7 @@ class VisitasRealizadasSemVendaReport extends AbstractTabularReport
             return '';
         }
 
-        foreach (['celular1', 'whatsapp', 'fone1', 'fone2', 'celular2'] as $campo) {
+        foreach (['celular1', 'fone1', 'fone2', 'celular2'] as $campo) {
             $valor = trim((string) ($cliente->{$campo} ?? ''));
             if ($valor !== '') {
                 return $valor;

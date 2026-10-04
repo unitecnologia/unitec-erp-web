@@ -49,7 +49,7 @@ class PersonResource extends Resource
         $strings = [
             'codigo', 'pessoa_tipo', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj', 'rg_ie',
             'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade_codigo', 'cidade_nome', 'uf',
-            'email', 'email2', 'fone1', 'fone2', 'celular1', 'celular2', 'whatsapp',
+            'email', 'email2', 'fone1', 'fone2', 'celular1', 'celular2',
             'regime_tributario', 'tipo_recebimento', 'tipo_contribuinte',
             'nome_mae', 'nome_pai', 'data_nascimento', 'estado_civil', 'sexo',
             'data_admissao', 'data_demissao', 'observacoes',

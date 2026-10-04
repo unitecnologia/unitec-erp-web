@@ -9,8 +9,10 @@ use App\Support\Erp\Boleto\Api\BoletoApi;
 use App\Support\Erp\Boleto\Api\Drivers\AilosBoletoDriver;
 use App\Support\Erp\Boleto\Api\Drivers\SicrediBoletoDriver;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpFilamentNotification;
 use App\Support\Erp\Nfse\NfseSefinEnvio;
 use App\Support\Erp\Nfse\NfseSefinHttp;
+use Filament\Notifications\Notification;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
@@ -27,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         require_once app_path('helpers.php');
 
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
+        $this->app->bind(Notification::class, ErpFilamentNotification::class);
         $this->app->bind(NfseSefinEnvio::class, NfseSefinHttp::class);
         $this->app->bind(AilosCobrancaAuth::class, AilosAuthService::class);
 

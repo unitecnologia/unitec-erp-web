@@ -95,6 +95,8 @@ class ContaReceberListTable extends Component
 
         $totalAReceber = $builder->sumSaldoFiltered();
         $totalRecebido = $builder->sumValorRecebidoFiltered();
+        $totalAtrasado = $builder->sumSaldoAtrasado();
+        $contagens = $builder->contarPorSituacao();
 
         $this->js(sprintf(
             '(() => {
@@ -104,6 +106,7 @@ class ContaReceberListTable extends Component
                 const defaultValue = %s;
                 const totalAReceber = %s;
                 const totalRecebido = %s;
+                const totalAtrasado = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
@@ -123,6 +126,14 @@ class ContaReceberListTable extends Component
                 const items = document.querySelectorAll(".erp-receber__totals .erp-receber__total-value");
                 if (items[0]) items[0].textContent = totalAReceber;
                 if (items[1]) items[1].textContent = totalRecebido;
+                const late = document.querySelector(".erp-receber__total-value--late");
+                if (late) late.textContent = totalAtrasado;
+                const counts = %s;
+                document.querySelectorAll(".erp-receber__filter-chip-count").forEach((el) => {
+                    const key = el.getAttribute("data-situacao");
+                    if (!key || counts[key] === undefined) return;
+                    el.textContent = "(" + counts[key] + ")";
+                });
                 const selected = document.querySelector(".erp-receber__total-item--selected");
                 if (selected) selected.remove();
             })()',
@@ -132,7 +143,9 @@ class ContaReceberListTable extends Component
             json_encode($default, JSON_UNESCAPED_UNICODE),
             json_encode('R$ '.number_format($totalAReceber, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode('R$ '.number_format($totalRecebido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalAtrasado, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode('app.filament.resources.conta-receber-resource.pages.list-contas-receber', JSON_UNESCAPED_UNICODE),
+            json_encode($contagens, JSON_UNESCAPED_UNICODE),
         ));
     }
 

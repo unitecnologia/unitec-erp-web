@@ -61,12 +61,8 @@ class OrcamentoReportService
     /**
      * Linha só para exibição. Não grava.
      *
-     * Usa `orcamento_itens.desconto`. Quando esse valor já está no `total` da
-     * linha (desconto do item), a conta é preço × qtd − desconto = total.
-     * Quando o rateio do desconto geral só sobrescreveu `desconto` e não
-     * reduziu `total`, o líquido da linha desconta essa parcela uma vez.
-     * O rodapé continua em `totaisImpressao()` (bruto − `orcamentos.total`),
-     * para não somar o geral de novo.
+     * Desconto da linha é só o desconto do item. O desconto geral fica no
+     * cabeçalho e entra uma vez no rodapé (`totaisImpressao()`).
      *
      * @return array{codigo: string, produto: string, unidade: string, quantidade: float, valor_unitario: float, desconto: float, subtotal: float}
      */
@@ -74,18 +70,9 @@ class OrcamentoReportService
     {
         $quantidade = (float) $item->quantidade;
         $valorUnitario = round((float) $item->preco_unitario, 2);
-        $bruto = round($quantidade * $valorUnitario, 2);
-        $descontoGravado = round(max(0, (float) $item->desconto), 2);
-        $totalGravado = round(max(0, (float) $item->total), 2);
-        $descontoJaNoTotal = abs(round($bruto - $descontoGravado, 2) - $totalGravado) <= 0.02;
-
-        if ($descontoJaNoTotal) {
-            $subtotal = $totalGravado;
-            $desconto = $descontoGravado;
-        } else {
-            $subtotal = round(max(0, $totalGravado - $descontoGravado), 2);
-            $desconto = round(max(0, $bruto - $subtotal), 2);
-        }
+        $partes = app(OrcamentoDescontoService::class)->partesDaLinha($item);
+        $desconto = $partes['desconto'];
+        $subtotal = $partes['total'];
 
         $codigo = $item->product?->codigo;
         $codigo = filled($codigo) ? (string) $codigo : '—';

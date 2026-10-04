@@ -2,58 +2,91 @@
 
 namespace App\Support\Erp\Orcamento;
 
-use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Separa desconto do item e desconto geral.
+ * Não grava o desconto geral em orcamento_itens.desconto.
+ */
 final class OrcamentoDescontoService
 {
-    public function ratearDesconto(Orcamento $orcamento): void
+    /**
+     * Desconto próprio da linha e acréscimo reconstruído pelo total gravado:
+     * acréscimo = max(0, total − (quantidade × preço − desconto do item)).
+     *
+     * @return array{desconto: float, acrescimo: float, total: float}
+     */
+    public function partesDaLinha(OrcamentoItem $item): array
     {
-        $orcamento->load('itens');
+        $bruto = round((float) $item->quantidade * (float) $item->preco_unitario, 2);
+        $total = round(max(0, (float) $item->total), 2);
+        $desconto = round(max(0, (float) $item->desconto), 2);
 
-        if ($orcamento->itens->isEmpty()) {
-            return;
+        return [
+            'desconto' => $desconto,
+            'acrescimo' => round(max(0, $total - ($bruto - $desconto)), 2),
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * Cota do desconto geral para a NF-e, no mesmo critério do rateio do
+     * cabeçalho da nota: peso = quantidade × preço, resto no último item.
+     * Não altera o orçamento.
+     *
+     * @param  iterable<int, OrcamentoItem>  $itens
+     * @return array<int, float>
+     */
+    public function cotasDescontoGeral(iterable $itens, float $descontoGeral): array
+    {
+        $itens = array_values(iterator_to_array($itens));
+        $rateio = array_fill(0, count($itens), 0.0);
+        $descontoGeral = round(max(0, $descontoGeral), 2);
+
+        if ($descontoGeral <= 0 || $itens === []) {
+            return $rateio;
         }
 
-        $subtotal = (float) $orcamento->subtotal;
-        $descontoTotal = (float) $orcamento->desconto_valor;
+        $pesos = [];
+        $somaPesos = 0.0;
 
-        if ($subtotal <= 0 || $descontoTotal <= 0) {
-            $orcamento->itens()->update(['desconto' => 0]);
-
-            return;
+        foreach ($itens as $index => $item) {
+            $peso = max(0.0, round((float) $item->quantidade * (float) $item->preco_unitario, 2));
+            $pesos[$index] = $peso;
+            $somaPesos += $peso;
         }
 
-        $soma = 0.0;
-        $maiorItemId = null;
-        $maiorTotal = -1.0;
+        $lastIndex = array_key_last($itens);
+        $restante = $descontoGeral;
 
-        DB::transaction(function () use ($orcamento, $subtotal, $descontoTotal, &$soma, &$maiorItemId, &$maiorTotal): void {
-            foreach ($orcamento->itens as $item) {
-                $percentual = (float) $item->total / $subtotal;
-                $valorDesconto = round($percentual * $descontoTotal, 2);
-                $soma += $valorDesconto;
+        if ($somaPesos <= 0) {
+            $count = count($itens);
 
-                $item->update(['desconto' => $valorDesconto]);
-
-                if ((float) $item->total > $maiorTotal) {
-                    $maiorTotal = (float) $item->total;
-                    $maiorItemId = $item->id;
+            foreach ($itens as $index => $item) {
+                if ($index === $lastIndex) {
+                    $rateio[$index] = $restante;
+                } else {
+                    $parte = round($descontoGeral / $count, 2);
+                    $rateio[$index] = $parte;
+                    $restante = round($restante - $parte, 2);
                 }
             }
 
-            $diferenca = round($descontoTotal - $soma, 2);
+            return $rateio;
+        }
 
-            if ($diferenca !== 0.0 && $maiorItemId !== null) {
-                $maiorItem = OrcamentoItem::query()->find($maiorItemId);
+        foreach ($itens as $index => $item) {
+            if ($index === $lastIndex) {
+                $rateio[$index] = $restante;
 
-                if ($maiorItem) {
-                    $maiorItem->update([
-                        'desconto' => round((float) $maiorItem->desconto + $diferenca, 2),
-                    ]);
-                }
+                continue;
             }
-        });
+
+            $parte = round($descontoGeral * ($pesos[$index] / $somaPesos), 2);
+            $rateio[$index] = $parte;
+            $restante = round($restante - $parte, 2);
+        }
+
+        return $rateio;
     }
 }

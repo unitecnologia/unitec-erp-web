@@ -31,6 +31,7 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -45,6 +46,8 @@ trait ErpOrcamentoFormPage
     public string $clienteSearch = '';
 
     public bool $clienteLookupOpen = false;
+
+    public bool $orcamentoPersistindo = false;
 
     /** @var array<int, array<string, mixed>> */
     public array $clienteResults = [];
@@ -412,6 +415,10 @@ trait ErpOrcamentoFormPage
             ->map(fn (OrcamentoItem $item): array => $this->mapItemToRow($item))
             ->all();
 
+        if ($orcamento->isEditable()) {
+            $this->marcarDivergenciaPrecoCadastro();
+        }
+
         $this->syncTotaisDisplay(
             (float) $orcamento->subtotal,
             (float) $orcamento->desconto_valor,
@@ -419,7 +426,6 @@ trait ErpOrcamentoFormPage
             (float) $orcamento->percentual_desconto,
         );
 
-        $this->sincronizarPrecosComCadastro(notify: true);
         $this->applyOrcamentoShortcutReturnContext();
     }
 
@@ -469,10 +475,10 @@ trait ErpOrcamentoFormPage
     {
         $qtd = (float) $item->quantidade;
         $preco = (float) $item->preco_unitario;
-        $desconto = (float) $item->desconto;
-        $bruto = round($qtd * $preco, 2);
-        $total = (float) $item->total;
-        $acrescimo = max(0, round($total - ($bruto - $desconto), 2));
+        $partes = app(OrcamentoDescontoService::class)->partesDaLinha($item);
+        $desconto = $partes['desconto'];
+        $acrescimo = $partes['acrescimo'];
+        $total = $partes['total'];
 
         return [
             'id' => $item->id,
@@ -625,23 +631,6 @@ trait ErpOrcamentoFormPage
         }
 
         $this->selectedClienteIndex = $this->clienteResults === [] ? null : 0;
-    }
-
-    public function moveClienteSelection(int $delta): void
-    {
-        if ($this->clienteResults === [] && ! $this->clienteLookupOpen) {
-            $this->clienteLookupOpen = true;
-            $this->refreshClienteResults();
-        }
-
-        if ($this->clienteResults === []) {
-            return;
-        }
-
-        $index = ($this->selectedClienteIndex ?? 0) + $delta;
-        $count = count($this->clienteResults);
-        $this->selectedClienteIndex = max(0, min($count - 1, $index));
-        $this->clienteLookupOpen = true;
     }
 
     public function selectClienteResult(int $index): void
@@ -919,8 +908,8 @@ trait ErpOrcamentoFormPage
         $this->clienteCep = $person->cep ?? '';
         $this->clienteCidade = mb_strtoupper((string) ($person->cidade_nome ?? ''), 'UTF-8');
         $this->clienteUf = mb_strtoupper((string) ($person->uf ?? 'SC'), 'UTF-8');
-        $this->clienteFone = $person->fone1 ?? '';
-        $this->clienteWhatsapp = $person->celular1 ?? $person->whatsapp ?? '';
+        $this->clienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
+        $this->clienteWhatsapp = (string) ($person->fone1 ?? $person->celular1 ?? '');
 
         if ($person->vendedor_loja_id) {
             $this->vendedorId = $person->vendedor_loja_id;
@@ -1269,62 +1258,6 @@ trait ErpOrcamentoFormPage
 
         $this->descontoGeralBase = 'valor';
         $this->recalcHeaderFromItens();
-    }
-
-    /**
-     * Cota do desconto geral em cada item, proporcional ao total da linha
-     * (já líquido do desconto do item). O centavo que sobra fica no maior item,
-     * no mesmo critério de OrcamentoDescontoService.
-     *
-     * @return array<int, float>
-     */
-    public function rateioDescontoGeralPorItem(): array
-    {
-        $rateio = array_fill(0, count($this->itens), 0.0);
-        $desconto = max(0, ErpMoney::parseBr($this->descontoValorDisplay));
-
-        if ($desconto <= 0 || $this->itens === []) {
-            return $rateio;
-        }
-
-        $bases = [];
-        $base = 0.0;
-
-        foreach ($this->itens as $index => $row) {
-            $linha = round(max(0, ErpMoney::parseBr($row['total'] ?? 0)), 2);
-            $bases[$index] = $linha;
-            $base += $linha;
-        }
-
-        $base = round($base, 2);
-
-        if ($base <= 0) {
-            return $rateio;
-        }
-
-        $desconto = round(min($desconto, $base), 2);
-        $soma = 0.0;
-        $maiorIndex = null;
-        $maiorTotal = -1.0;
-
-        foreach ($bases as $index => $linha) {
-            $parte = round($desconto * ($linha / $base), 2);
-            $rateio[$index] = $parte;
-            $soma = round($soma + $parte, 2);
-
-            if ($linha > $maiorTotal) {
-                $maiorTotal = $linha;
-                $maiorIndex = $index;
-            }
-        }
-
-        $diferenca = round($desconto - $soma, 2);
-
-        if ($diferenca !== 0.0 && $maiorIndex !== null) {
-            $rateio[$maiorIndex] = round($rateio[$maiorIndex] + $diferenca, 2);
-        }
-
-        return $rateio;
     }
 
     protected function recalcHeaderFromItens(): void
@@ -2116,17 +2049,6 @@ trait ErpOrcamentoFormPage
         $this->selectedProdutoIndex = $this->produtoResults === [] ? null : 0;
     }
 
-    public function moveProdutoSelection(int $delta): void
-    {
-        if ($this->produtoResults === []) {
-            return;
-        }
-
-        $index = ($this->selectedProdutoIndex ?? 0) + $delta;
-        $count = count($this->produtoResults);
-        $this->selectedProdutoIndex = max(0, min($count - 1, $index));
-    }
-
     public function selectProdutoResult(int $index): void
     {
         if (! isset($this->produtoResults[$index])) {
@@ -2596,41 +2518,59 @@ trait ErpOrcamentoFormPage
 
     public function gravarOrcamento(): void
     {
+        if ($this->orcamentoPersistindo) {
+            return;
+        }
+
         if (! $this->validateBeforeSave(finalizar: false)) {
             return;
         }
 
-        if (! $this->persistOrcamento(finalizar: false)) {
-            return;
-        }
+        $this->orcamentoPersistindo = true;
 
-        if ($this->isEditingOrcamento()) {
-            $this->notifyOrcamentoGravado();
-            $this->openPostSavePrompt();
+        try {
+            if (! $this->persistOrcamento(finalizar: false)) {
+                return;
+            }
+
+            if ($this->isEditingOrcamento()) {
+                $this->notifyOrcamentoGravado();
+                $this->openPostSavePrompt();
+            }
+        } finally {
+            $this->orcamentoPersistindo = false;
         }
     }
 
     public function finalizarOrcamento(): void
     {
+        if ($this->orcamentoPersistindo) {
+            return;
+        }
+
         if (! $this->validateBeforeSave(finalizar: true)) {
             return;
         }
 
-        $this->sincronizarPrecosComCadastro(notify: true);
+        $this->orcamentoPersistindo = true;
 
-        if (! $this->persistOrcamento(finalizar: true)) {
-            return;
+        try {
+            if (! $this->persistOrcamento(finalizar: true)) {
+                return;
+            }
+
+            Notification::make()
+                ->title('Orçamento finalizado.')
+                ->success()
+                ->send();
+
+            $this->redirectToErpFormReturnOr(
+                OrcamentoResource::getUrl('index'),
+                'Orçamentos',
+            );
+        } finally {
+            $this->orcamentoPersistindo = false;
         }
-
-        Notification::make()
-            ->title('Orçamento finalizado.')
-            ->success()
-            ->send();
-
-        $this->redirectToErpFormReturnOr(
-            OrcamentoResource::getUrl('index'),
-            'Orçamentos',
-        );
     }
 
     protected function persistOrcamento(bool $finalizar): bool
@@ -2640,8 +2580,31 @@ trait ErpOrcamentoFormPage
         $percentual = ErpMoney::parseBr($this->percentualDescontoDisplay);
         $total = ErpMoney::parseBr($this->totalDisplay);
         $createdId = null;
+        $lock = Cache::lock($this->orcamentoPersistLockKey(), 20);
+
+        if (! $lock->get()) {
+            Notification::make()
+                ->title('O orçamento já está sendo gravado.')
+                ->warning()
+                ->send();
+
+            return false;
+        }
 
         try {
+            if (! $this->isEditingOrcamento()) {
+                $duplicado = $this->orcamentoDuplicadoRecente($total);
+
+                if ($duplicado !== null) {
+                    if ($finalizar && $duplicado->status === Orcamento::STATUS_ABERTO) {
+                        $duplicado->update(['status' => Orcamento::STATUS_FECHADO]);
+                    }
+
+                    $createdId = $duplicado->getKey();
+                }
+            }
+
+            if ($createdId === null) {
             DB::transaction(function () use ($subtotal, $desconto, $percentual, $total, $finalizar, &$createdId): void {
                 $attributes = [
                     'data' => $this->data['data'] ?? now()->format('Y-m-d'),
@@ -2711,11 +2674,8 @@ trait ErpOrcamentoFormPage
                 $orcamento->itens()->whereNotIn('id', $keptIds)->delete();
 
                 app(OrcamentoTotaisService::class)->recalcular($orcamento->fresh(['itens']));
-
-                if ($desconto > 0) {
-                    app(OrcamentoDescontoService::class)->ratearDesconto($orcamento->fresh(['itens']));
-                }
             });
+            }
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -2726,6 +2686,8 @@ trait ErpOrcamentoFormPage
                 ->send();
 
             return false;
+        } finally {
+            $lock->release();
         }
 
         if ($createdId !== null && ! $finalizar) {
@@ -2746,6 +2708,32 @@ trait ErpOrcamentoFormPage
         }
 
         return true;
+    }
+
+    protected function orcamentoPersistLockKey(): string
+    {
+        $alvo = $this->isEditingOrcamento()
+            ? (string) $this->record->getKey()
+            : 'novo';
+
+        return 'orcamento-gravar:'.(auth()->id() ?? 0).':'.$alvo;
+    }
+
+    protected function orcamentoDuplicadoRecente(float $total): ?Orcamento
+    {
+        $candidato = Orcamento::query()
+            ->where('cliente_id', $this->clienteId)
+            ->where('vendedor_id', $this->vendedorId)
+            ->where('total', round($total, 2))
+            ->where('created_at', '>=', now()->subSeconds(8))
+            ->orderByDesc('id')
+            ->first();
+
+        if ($candidato === null || $candidato->itens()->count() !== count($this->itens)) {
+            return null;
+        }
+
+        return $candidato;
     }
 
     protected function orcamentoUrlWithReturn(string $url): string
@@ -2840,6 +2828,18 @@ trait ErpOrcamentoFormPage
 
         if ($this->descontoModalOpen) {
             $this->fecharModalDescontoItem();
+
+            return;
+        }
+
+        if ($this->clienteLookupOpen) {
+            $this->closeClienteLookup();
+
+            return;
+        }
+
+        if ($this->orcCidadeSugestoesOpen) {
+            $this->fecharOrcCidadeSugestoes();
 
             return;
         }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Concerns\EmbedsInPdvOverlay;
+use App\Filament\Concerns\InteractsWithErpDualSearchFields;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\ProductResource;
@@ -28,6 +29,7 @@ use Livewire\Attributes\Url;
 class ListProducts extends ListRecords
 {
     use EmbedsInPdvOverlay;
+    use InteractsWithErpDualSearchFields;
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use ManagesProductCardex;
@@ -66,6 +68,7 @@ class ListProducts extends ListRecords
         $this->searchColumn = $this->isSeriaisView()
             ? $this->normalizeSerialSearchColumn($this->searchColumn)
             : $this->normalizeSearchColumn($this->searchColumn);
+        $this->erpRestoreDualSearchFields($this->productSearchColumns(), $this->productSearchFieldsSessionKey());
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
 
         ErpScreen::set($this->isSeriaisView() ? 'Seriais' : 'Produtos');
@@ -81,19 +84,59 @@ class ListProducts extends ListRecords
 
     public function setSearchColumn(string $column): void
     {
-        $this->searchColumn = $this->isSeriaisView()
+        $normalized = $this->isSeriaisView()
             ? $this->normalizeSerialSearchColumn($column)
             : $this->normalizeSearchColumn($column);
 
-        $sessionKey = $this->isSeriaisView()
+        if (! $this->erpToggleDualSearchField($normalized, $this->productSearchColumns(), $this->productSearchFieldsSessionKey())) {
+            return;
+        }
+
+        session([$this->productSearchColumnSessionKey() => $this->searchColumn]);
+
+        $this->clearListSelection();
+        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function productSearchColumns(): array
+    {
+        return $this->isSeriaisView()
+            ? ['descricao', 'numero_serie']
+            : [
+                'codigo', 'referencia', 'codigo_barras', 'descricao', 'grupo',
+                'preco_venda', 'estoque', 'localizacao',
+            ];
+    }
+
+    protected function productSearchFieldsSessionKey(): string
+    {
+        return $this->isSeriaisView()
+            ? 'erp_produtos_search_fields_seriais'
+            : 'erp_produtos_search_fields';
+    }
+
+    protected function productSearchColumnSessionKey(): string
+    {
+        return $this->isSeriaisView()
             ? 'erp_produtos_search_column_seriais'
             : 'erp_produtos_search_column';
-        session([$sessionKey => $this->searchColumn]);
+    }
 
-        $this->localSearch = '';
-        $this->clearListSelection();
-        // Precisa re-renderizar o pai: o dropdown marca o campo no HTML do screen.
-        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
+    public function persistProductSearchFields(): void
+    {
+        $fields = $this->searchFieldsActive !== [] ? $this->searchFieldsActive : [$this->searchColumn];
+        $this->searchFieldsActive = array_values($fields);
+        $this->searchFieldsQuery = count($this->searchFieldsActive) > 1 ? implode(',', $this->searchFieldsActive) : '';
+
+        session([
+            $this->productSearchFieldsSessionKey() => $this->searchFieldsActive,
+            $this->productSearchColumnSessionKey() => $this->searchColumn,
+        ]);
+
+        $this->skipRender();
     }
 
     protected function normalizeStatusFilter(mixed $value): string
@@ -247,6 +290,8 @@ class ListProducts extends ListRecords
 
         $this->viewFilter = $view;
         $this->searchColumn = $view === 'seriais' ? 'descricao' : $this->normalizeSearchColumn($this->searchColumn);
+        $this->erpApplyDualSearchFields([$this->searchColumn], $this->productSearchFieldsSessionKey());
+        session([$this->productSearchColumnSessionKey() => $this->searchColumn]);
         $this->localSearch = '';
         $this->clearListSelection();
         $this->pushProductListRefresh(resetSort: true);
@@ -275,14 +320,16 @@ class ListProducts extends ListRecords
         $empresa = $this->currentEmpresa();
         $searchColumn = $this->searchColumn;
         $localSearch = $this->localSearch;
+        $searchFieldsActive = $this->searchFieldsActive;
 
-        $countFor = static function (string $status) use ($empresa, $searchColumn, $localSearch): int {
+        $countFor = static function (string $status) use ($empresa, $searchColumn, $localSearch, $searchFieldsActive): int {
             return (new ProductListQueryBuilder(
                 statusFilter: $status,
                 searchColumn: $searchColumn,
                 localSearch: $localSearch,
                 empresa: $empresa,
                 applyDefaultOrder: false,
+                searchFieldsActive: $searchFieldsActive,
             ))->build()->count();
         };
 
@@ -304,16 +351,23 @@ class ListProducts extends ListRecords
         $this->pushProductListRefresh();
     }
 
-    public function search(): void
+    public function updatedLocalSearch(): void
     {
         $this->clearListSelection();
-        $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
+        $this->pushProductListRefresh(resetSort: true);
+    }
+
+    public function search(): void
+    {
+        $this->updatedLocalSearch();
     }
 
     public function clearSearch(): void
     {
         $this->localSearch = '';
-        $this->searchColumn = $this->isSeriaisView() ? 'descricao' : 'descricao';
+        $this->searchColumn = 'descricao';
+        $this->erpApplyDualSearchFields(['descricao'], $this->productSearchFieldsSessionKey());
+        session([$this->productSearchColumnSessionKey() => $this->searchColumn]);
         $this->clearListSelection();
         $this->pushProductListRefresh(resetSort: true, skipParentRender: false);
     }
@@ -357,6 +411,7 @@ class ListProducts extends ListRecords
             viewFilter: $this->viewFilter,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
+            searchFieldsActive: $this->searchFieldsActive,
         )->to(ProductListTable::class);
 
         if ($skipParentRender) {
@@ -391,6 +446,7 @@ class ListProducts extends ListRecords
                 searchColumn: $this->searchColumn,
                 localSearch: $this->localSearch,
                 empresa: $this->currentEmpresa(),
+                searchFieldsActive: $this->searchFieldsActive,
             ))->build();
         }
 
@@ -400,6 +456,7 @@ class ListProducts extends ListRecords
             localSearch: $this->localSearch,
             empresa: $this->currentEmpresa(),
             applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
         ))->build();
     }
 
@@ -593,6 +650,7 @@ class ListProducts extends ListRecords
             localSearch: $this->localSearch,
             empresa: $this->currentEmpresa(),
             orderBy: 'descricao',
+            searchFieldsActive: $this->searchFieldsActive,
         );
 
         $params = array_filter(

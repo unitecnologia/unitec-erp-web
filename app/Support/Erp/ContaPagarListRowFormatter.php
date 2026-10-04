@@ -13,9 +13,11 @@ final class ContaPagarListRowFormatter
     public function format(ContaPagar $record): array
     {
         return [
-            'numero' => e((string) ($record->numero ?? '—')),
+            'numero' => e($this->formatId($record->numero)),
+            'num_compra' => e($this->formatId($record->compra?->numero)),
             'emissao' => e($this->formatData($record->emissao)),
             'documento' => filled($record->documento) ? e((string) $record->documento) : '—',
+            'nota_fiscal' => filled($record->compra?->numero_nota) ? e((string) $record->compra->numero_nota) : '—',
             'fornecedor' => e($record->fornecedor?->nome_razao ?? '—'),
             'vencimento' => e($this->formatData($record->vencimento)),
             'valor' => e($this->formatMoney($record->valor)),
@@ -42,6 +44,18 @@ final class ContaPagarListRowFormatter
         }
 
         return [];
+    }
+
+    private function formatId(mixed $state): string
+    {
+        $raw = trim((string) ($state ?? ''));
+        if ($raw === '') {
+            return '—';
+        }
+
+        $numero = ltrim($raw, '0');
+
+        return $numero !== '' ? $numero : '0';
     }
 
     private function formatData(mixed $state): string

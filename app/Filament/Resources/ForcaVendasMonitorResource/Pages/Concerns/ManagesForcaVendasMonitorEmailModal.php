@@ -77,7 +77,6 @@ trait ManagesForcaVendasMonitorEmailModal
         $cliente = $order->cliente;
         $phoneRaw = trim((string) (
             ($cliente?->celular1 ?? '')
-            ?: ($cliente?->whatsapp ?? '')
             ?: ($cliente?->fone1 ?? '')
         ));
 

@@ -8,6 +8,7 @@
         :local-search-ate="$this->localSearchAte"
         :skip-fornecedor-search="$this->shouldSkipContaPagarFornecedorSearch()"
         :per-page="(int) ($this->tableRecordsPerPage ?? 50)"
+        :selecionados-para-baixa="$this->selecionadosParaBaixa"
         wire:key="erp-pagar-list-table-host"
     />
 </div>

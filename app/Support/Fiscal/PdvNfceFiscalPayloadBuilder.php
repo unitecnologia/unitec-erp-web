@@ -336,7 +336,7 @@ final class PdvNfceFiscalPayloadBuilder
             );
         }
 
-        $telefone = (string) ($person->fone1 ?: $person->celular1 ?: $person->whatsapp ?: '');
+        $telefone = (string) ($person->fone1 ?: $person->celular1 ?: '');
 
         return new DestinatarioDto(
             cpf: $cpf,

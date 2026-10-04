@@ -58,20 +58,12 @@
                             <strong>{{ $this->baixaDados['vencimento'] }}</strong>
                         </div>
                         <div class="erp-pagar-baixa-modal__kv">
-                            <span>Desconto recebido</span>
+                            <span>Desconto concedido</span>
                             <strong>{{ $this->baixaDados['desconto_recebido'] }}</strong>
-                        </div>
-                        <div class="erp-pagar-baixa-modal__kv erp-pagar-baixa-modal__kv--spacer">
-                            <span></span>
-                            <strong></strong>
                         </div>
                         <div class="erp-pagar-baixa-modal__kv">
                             <span>Valor pago</span>
                             <strong>{{ $this->baixaDados['valor_pago_acumulado'] }}</strong>
-                        </div>
-                        <div class="erp-pagar-baixa-modal__kv erp-pagar-baixa-modal__kv--spacer">
-                            <span></span>
-                            <strong></strong>
                         </div>
                         <div class="erp-pagar-baixa-modal__kv erp-pagar-baixa-modal__kv--destaque">
                             <span>Valor a pagar</span>
@@ -93,12 +85,7 @@
 
                     <label class="erp-pagar-baixa-modal__field">
                         <span>Conta de destino</span>
-                        <select class="erp-pagar-baixa-modal__input" wire:model="baixaCaixaContaId">
-                            <option value="">— Selecione —</option>
-                            @foreach ($this->baixaCaixasOptions as $caixa)
-                                <option value="{{ $caixa['id'] }}">{{ $caixa['label'] }}</option>
-                            @endforeach
-                        </select>
+                        <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--ro" value="{{ $this->baixaContaDestino }}" readonly tabindex="-1">
                     </label>
 
                     <label class="erp-pagar-baixa-modal__field">
@@ -156,6 +143,13 @@
                         <span>Pago em</span>
                         <input type="date" class="erp-pagar-baixa-modal__input" wire:model="baixaPagoEm">
                     </label>
+
+                    @if ($this->baixaExigeCheque)
+                        <label class="erp-pagar-baixa-modal__field">
+                            <span>Nº do cheque</span>
+                            <input type="text" class="erp-pagar-baixa-modal__input" wire:model="baixaCheque" maxlength="40">
+                        </label>
+                    @endif
                 </section>
             </div>
 

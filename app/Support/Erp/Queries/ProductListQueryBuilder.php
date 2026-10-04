@@ -5,6 +5,7 @@ namespace App\Support\Erp\Queries;
 use App\Models\Empresa;
 use App\Models\EstoqueReserva;
 use App\Models\Product;
+use App\Support\Erp\ErpSearchFieldSelection;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class ProductListQueryBuilder
         public ?string $validadeDe = null,
         public ?string $validadeAte = null,
         public bool $applyDefaultOrder = true,
+        public array $searchFieldsActive = [],
     ) {}
 
     public static function fromRequest(Request $request, ?Empresa $empresa = null): self
@@ -38,11 +40,21 @@ class ProductListQueryBuilder
         $allowedOrder = ['codigo', 'descricao', 'grupo', 'preco_venda', 'estoque', 'validade'];
         $allowedEstoque = ['todos', 'positivo', 'negativo', 'zero', 'critico'];
         $ordenar = (string) $request->query('ordenar', 'descricao');
+        $searchColumn = in_array($campo, $allowedCampo, true) ? (string) $campo : 'descricao';
+        $campos = $request->query('campos');
+        $searchFieldsActive = is_string($campos) && $campos !== ''
+            ? ErpSearchFieldSelection::normalize(array_map('trim', explode(',', $campos)), $allowedCampo, $searchColumn)
+            : [];
+
+        if ($searchFieldsActive !== []) {
+            $searchColumn = $searchFieldsActive[array_key_last($searchFieldsActive)];
+        }
 
         return new self(
             statusFilter: in_array($status, $allowedStatus, true) ? (string) $status : 'ativos',
-            searchColumn: in_array($campo, $allowedCampo, true) ? (string) $campo : 'descricao',
+            searchColumn: $searchColumn,
             localSearch: trim((string) $request->query('q', '')),
+            searchFieldsActive: $searchFieldsActive,
             empresa: $empresa,
             orderBy: in_array($ordenar, $allowedOrder, true) ? $ordenar : 'descricao',
             estoqueFilter: in_array($request->query('estoque'), $allowedEstoque, true)
@@ -216,23 +228,52 @@ class ProductListQueryBuilder
         };
     }
 
+    /**
+     * @return list<string>
+     */
+    protected function activeSearchColumns(): array
+    {
+        return ErpSearchFieldSelection::normalize(
+            $this->searchFieldsActive,
+            ['codigo', 'referencia', 'codigo_barras', 'descricao', 'grupo', 'preco_venda', 'estoque', 'localizacao'],
+            $this->searchColumn,
+        );
+    }
+
     protected function applySearch(Builder $query, ProductEstoqueSaldoService $estoqueService, int $empresaId): void
     {
         $term = trim($this->localSearch);
+
+        ErpSearchFieldSelection::applyOr(
+            $query,
+            $this->activeSearchColumns(),
+            function (Builder $inner, string $column) use ($term, $estoqueService, $empresaId): void {
+                $this->applySearchOnColumn($inner, $column, $term, $estoqueService, $empresaId);
+            },
+        );
+    }
+
+    protected function applySearchOnColumn(
+        Builder $query,
+        string $column,
+        string $term,
+        ProductEstoqueSaldoService $estoqueService,
+        int $empresaId,
+    ): void {
         $parte = $this->pesquisaPorParte() ? '%' : '';
 
-        if ($this->searchColumn === 'estoque' && $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null)) {
+        if ($column === 'estoque' && $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null)) {
             $expr = $estoqueService->sqlEstoqueEmpresaExpression($estoqueService->estoqueIdParaEmpresa($empresaId));
             $query->whereRaw("{$expr} >= ?", [$this->parseDecimal($term)]);
 
             return;
         }
 
-        match ($this->searchColumn) {
+        match ($column) {
             'codigo' => $query->where('codigo', $term),
             'referencia' => $query->where('referencia', 'like', $parte . $term . '%'),
             'codigo_barras' => $query->where('codigo_barras', 'like', $term . '%'),
-            'descricao' => $query->where('descricao', 'like', $parte . $term . '%'),
+            'descricao' => self::whereDescricaoPartes($query, 'descricao', $term),
             'grupo' => $this->applyGrupoSearch($query, $term),
             'preco_venda' => $query->where('preco_venda', '>=', $this->parseDecimal($term)),
             'estoque' => $query->where('estoque', '>=', $this->parseDecimal($term)),
@@ -271,6 +312,24 @@ class ProductListQueryBuilder
 
         if ($ate !== null) {
             $query->whereDate('validade', '<=', $ate);
+        }
+    }
+
+    /**
+     * Descrição: cada palavra em qualquer parte do texto, sem diferenciar maiúsculas.
+     * Mesmo critério de Nome/Razão em Pessoas. Acentos seguem o collation da coluna.
+     */
+    public static function whereDescricaoPartes(Builder $query, string $column, string $searchTerm): void
+    {
+        $searchTerm = mb_strtoupper(trim($searchTerm), 'UTF-8');
+        $terms = preg_split('/\s+/u', $searchTerm, -1, PREG_SPLIT_NO_EMPTY);
+
+        if ($terms === false || $terms === []) {
+            return;
+        }
+
+        foreach ($terms as $word) {
+            $query->where($column, 'like', '%'.$word.'%');
         }
     }
 
@@ -348,6 +407,7 @@ class ProductListQueryBuilder
         return [
             'status' => $this->statusFilter !== 'ativos' ? $this->statusFilter : null,
             'campo' => $this->searchColumn !== 'descricao' ? $this->searchColumn : null,
+            'campos' => count($this->activeSearchColumns()) > 1 ? implode(',', $this->activeSearchColumns()) : null,
             'q' => filled($this->localSearch) ? $this->localSearch : null,
             'ordenar' => $this->orderBy !== 'descricao' ? $this->orderBy : null,
             'estoque' => $this->estoqueFilter !== 'todos' ? $this->estoqueFilter : null,

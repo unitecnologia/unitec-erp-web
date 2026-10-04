@@ -63,7 +63,7 @@ trait ManagesOrcamentoEmailModal
         $numero = $report->formatNumero($orcamento->numero);
         $pdf = $report->storePdfAttachment($orcamento);
         $cliente = $orcamento->cliente;
-        $phoneRaw = $cliente?->celular1 ?: ($cliente?->whatsapp ?: '');
+        $phoneRaw = $cliente?->celular1 ?: ($cliente?->fone1 ?: '');
 
         $this->emailOrcamentoId = $orcamento->id;
         $this->emailTo = trim((string) ($cliente?->email ?? ''));

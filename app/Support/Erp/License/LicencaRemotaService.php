@@ -77,11 +77,17 @@ class LicencaRemotaService
             return $snapshot;
         }
 
-        // Portal (forceRefresh) + mensalidade: único momento HTTP além do botão Verificar.
-        $snapshot = $this->checkCnpj($cnpj, forceRefresh: true);
+        // Licença em cache/grace ainda vale e bloqueia se estiver vencida ou bloqueada.
+        // Sem cache, consulta o portal uma vez. A mensalidade já em cache também bloqueia;
+        // só busca o vencimento no portal quando ainda não há cache.
+        $snapshot = $this->checkCnpj($cnpj, forceRefresh: false);
         $this->rememberLoginGate($snapshot);
         $this->hydrateMensalidadeFromCache($cnpj);
-        $this->syncMensalidadeNoGate($cnpj);
+
+        if ($this->mensalidadeFromCache($cnpj) === null) {
+            $this->syncMensalidadeNoGate($cnpj);
+        }
+
         $this->rememberLoginGate($snapshot);
 
         return $this->applyMensalidadeExpiry($snapshot);

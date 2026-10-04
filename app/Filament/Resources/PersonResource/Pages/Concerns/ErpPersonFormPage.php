@@ -129,7 +129,6 @@ trait ErpPersonFormPage
                 ],
                 'data.celular1' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
                 'data.celular2' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
-                'data.whatsapp' => ['nullable', 'string', 'max:20', new CelularBrasileiroValido()],
             ];
 
             if ($this->personHasRelevantAddress()) {
@@ -153,7 +152,6 @@ trait ErpPersonFormPage
                     'data.cpf_cnpj' => 'CPF/CNPJ',
                     'data.celular1' => 'Celular 1',
                     'data.celular2' => 'Celular 2',
-                    'data.whatsapp' => 'WhatsApp',
                     'data.cidade_codigo' => 'código IBGE da cidade',
                 ],
             );

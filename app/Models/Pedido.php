@@ -111,7 +111,7 @@ class Pedido extends Model
             return (string) $this->cliente_whatsapp;
         }
 
-        return (string) ($this->cliente?->celular1 ?: ($this->cliente?->whatsapp ?? ''));
+        return (string) ($this->cliente?->celular1 ?: ($this->cliente?->fone1 ?? ''));
     }
 
     public function vendedor(): BelongsTo

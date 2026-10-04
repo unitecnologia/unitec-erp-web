@@ -9,6 +9,13 @@
     ];
 
     $pageSizeOptions = [25, 50, 100];
+    $activeSearchFields = $this->searchFieldsActive !== [] ? $this->searchFieldsActive : [$this->searchColumn];
+    $searchButtonLabel = implode(' + ', array_map(
+        fn (string $key): string => $searchFields[$key] ?? $key,
+        $activeSearchFields,
+    ));
+    $uppercaseSearch = array_intersect($activeSearchFields, ['nome_razao', 'apelido_fantasia', 'endereco']) !== [];
+    $numericSearch = $activeSearchFields !== [] && array_diff($activeSearchFields, ['codigo']) === [];
 @endphp
 
 <div
@@ -25,16 +32,19 @@
                 @include('filament.components.erp.shared.search-field-dropdown', [
                     'fields' => $searchFields,
                     'searchColumn' => $this->searchColumn,
+                    'markedFields' => $activeSearchFields,
+                    'buttonLabel' => $searchButtonLabel,
+                    'closeOnSelect' => false,
                 ])
                 <input
                     type="text"
                     wire:model.live.debounce.350ms="localSearch"
-                    wire:key="pessoas-local-search-{{ $this->searchColumn }}-{{ $this->tipoFilter }}"
+                    wire:key="pessoas-local-search-{{ implode('-', $activeSearchFields) }}-{{ $this->tipoFilter }}"
                     class="erp-pessoas__input erp-pessoas__search-text"
                     placeholder="Digite para pesquisar"
                     autocomplete="off"
-                    @if (in_array($this->searchColumn, ['nome_razao', 'apelido_fantasia', 'endereco'], true)) data-erp-uppercase @endif
-                    @if ($this->searchColumn === 'codigo') inputmode="numeric" @endif
+                    @if ($uppercaseSearch) data-erp-uppercase @endif
+                    @if ($numericSearch) inputmode="numeric" @endif
                 >
             </div>
 

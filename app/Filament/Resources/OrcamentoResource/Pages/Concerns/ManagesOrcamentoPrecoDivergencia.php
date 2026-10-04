@@ -48,4 +48,31 @@ trait ManagesOrcamentoPrecoDivergencia
 
         return $atualizados;
     }
+
+    protected function marcarDivergenciaPrecoCadastro(): void
+    {
+        if ($this->orcamentoReadOnly() || $this->itens === []) {
+            return;
+        }
+
+        $divergencias = app(OrcamentoPrecoDivergenciaService::class)->detectar($this->itens);
+
+        if ($divergencias === []) {
+            return;
+        }
+
+        $itens = $this->itens;
+
+        foreach ($divergencias as $divergencia) {
+            $index = (int) $divergencia['index'];
+
+            if (! isset($itens[$index])) {
+                continue;
+            }
+
+            $itens[$index]['preco_cadastro_atual'] = ErpMoney::formatBr((float) $divergencia['preco_atual']);
+        }
+
+        $this->itens = $itens;
+    }
 }

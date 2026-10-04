@@ -108,7 +108,7 @@ trait ManagesNfeDanfeEmail
 
         $cliente = $nfe->cliente;
         $clienteNome = trim((string) ($cliente?->nome_razao ?? $cliente?->nome ?? ''));
-        $phoneRaw = $cliente?->celular1 ?: ($cliente?->whatsapp ?: ($cliente?->fone1 ?: ''));
+        $phoneRaw = $cliente?->celular1 ?: ($cliente?->fone1 ?: '');
 
         $this->nfeDanfeEmailNfeId = (int) $nfe->id;
         $this->nfeDanfeEmailTo = trim((string) ($cliente?->email ?? ''));

@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Models\FormaPagamento;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 
@@ -182,7 +184,7 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
             $qtd = (float) $item->quantidade;
             $preco = (float) $item->preco_unitario;
-            $desconto = (float) ($item->desconto ?? 0);
+            $partes = app(OrcamentoDescontoService::class)->partesDaLinha($item);
 
             if ($qtd <= 0) {
                 $ignorados[] = $item->descricao ?? $product->descricao;
@@ -203,9 +205,9 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
                 'descricao' => $descricao,
                 'quantidade' => $qtd,
                 'preco_unitario' => $preco,
-                'acrescimo' => 0.0,
-                'desconto' => $desconto,
-                'total' => round(($qtd * $preco) - $desconto, 2),
+                'acrescimo' => $partes['acrescimo'],
+                'desconto' => $partes['desconto'],
+                'total' => $partes['total'],
                 'foto' => $product->fotoUrl(),
             ];
         }
@@ -229,6 +231,8 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
             $this->clienteBusca = $this->formatarClienteBusca($orcamento->cliente);
         }
 
+        $this->aplicarSnapshotClienteOrcamento($orcamento);
+
         if ($orcamento->vendedor) {
             $this->aplicarVendedor($orcamento->vendedor, permitirHistorico: true);
         }
@@ -240,6 +244,7 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
         $this->acrescimoPedidoValor = '0,00';
         $this->acrescimoPedidoPct = '0,00';
         $this->observacoes = trim((string) ($orcamento->observacoes ?? ''));
+        $this->aplicarFormaPagamentoOrcamento($orcamento);
         $this->limparEntradaItem();
 
         $this->fecharImportarOrcamento();
@@ -259,5 +264,81 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
         $notification->send();
         $this->dispatch('fv-tela-venda-focus-barcode');
+    }
+
+    /**
+     * Cliente avulso guarda nome, documento e endereço no orçamento.
+     * Não substitui esse snapshot pelos dados genéricos do Consumidor Final.
+     */
+    protected function aplicarSnapshotClienteOrcamento(Orcamento $orcamento): void
+    {
+        $temSnapshot = filled($orcamento->cliente_nome)
+            || filled($orcamento->cliente_cpf_cnpj)
+            || filled($orcamento->cliente_endereco)
+            || filled($orcamento->cliente_numero)
+            || filled($orcamento->cliente_bairro)
+            || filled($orcamento->cliente_cep)
+            || filled($orcamento->cliente_cidade)
+            || filled($orcamento->cliente_fone)
+            || filled($orcamento->cliente_whatsapp);
+
+        if (! $temSnapshot) {
+            return;
+        }
+
+        $nome = $orcamento->clienteDisplayNome();
+
+        if ($nome !== '') {
+            $this->clienteNome = $nome;
+            $this->clienteBusca = $nome;
+        }
+
+        $this->clienteCpfCnpj = (string) ($orcamento->cliente_cpf_cnpj ?? '');
+        $this->clienteEndereco = (string) ($orcamento->cliente_endereco ?? '');
+        $this->clienteNumero = (string) ($orcamento->cliente_numero ?? '');
+        $this->clienteBairro = (string) ($orcamento->cliente_bairro ?? '');
+        $this->clienteCep = (string) ($orcamento->cliente_cep ?? '');
+        $this->clienteCidade = (string) ($orcamento->cliente_cidade ?? '');
+        $this->clienteUf = (string) ($orcamento->cliente_uf ?? '');
+        $this->clienteFone = (string) ($orcamento->cliente_fone ?? '');
+        $this->clienteWhatsapp = (string) ($orcamento->cliente_whatsapp ?? '');
+    }
+
+    protected function aplicarFormaPagamentoOrcamento(Orcamento $orcamento): void
+    {
+        $formaNome = trim((string) ($orcamento->forma_pagamento ?? ''));
+
+        if ($formaNome === '') {
+            return;
+        }
+
+        $this->carregarMeiosPagamento();
+
+        $formaId = (int) (FormaPagamento::query()
+            ->where(function ($query) use ($formaNome): void {
+                $query->where('descricao', $formaNome)
+                    ->orWhereRaw('LOWER(descricao) = ?', [mb_strtolower($formaNome, 'UTF-8')]);
+            })
+            ->value('id') ?? 0);
+
+        if ($formaId <= 0) {
+            return;
+        }
+
+        $this->formaSelecionadaId = $formaId;
+        $totalLiquido = $this->totalLiquido();
+
+        foreach ($this->meiosPagamento as $index => $meio) {
+            if ((int) ($meio['id'] ?? 0) !== $formaId) {
+                continue;
+            }
+
+            $this->meiosPagamento[$index]['valor'] = ErpMoney::formatBr($totalLiquido);
+            $this->selectedPagamentoIndex = $index;
+
+            break;
+        }
+
+        $this->valorPagamento = $this->formatMoney($this->valorRestante());
     }
 }

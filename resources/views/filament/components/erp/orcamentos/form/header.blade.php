@@ -30,8 +30,6 @@
                         type="text"
                         wire:model.live.debounce.250ms="clienteSearch"
                         wire:focus="openClienteLookup"
-                        wire:keydown.arrow-up.prevent="moveClienteSelection(-1)"
-                        wire:keydown.arrow-down.prevent="moveClienteSelection(1)"
                         wire:keydown.enter.prevent="handleClienteEnter($event.target.value)"
                         wire:keydown.escape.prevent="closeClienteLookup"
                         @disabled($readOnly)

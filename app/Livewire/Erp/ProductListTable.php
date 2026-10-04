@@ -26,6 +26,9 @@ class ProductListTable extends Component
 
     public string $localSearch = '';
 
+    /** @var list<string> */
+    public array $searchFieldsActive = [];
+
     public string $viewFilter = 'produtos';
 
     public int $perPage = 50;
@@ -42,6 +45,13 @@ class ProductListTable extends Component
 
         $this->viewFilter = $view;
         $this->searchColumn = $view === 'seriais' ? 'descricao' : $this->searchColumn;
+        if ($view !== 'seriais' && ! in_array($this->searchColumn, [
+            'codigo', 'referencia', 'codigo_barras', 'descricao', 'grupo',
+            'preco_venda', 'estoque', 'localizacao',
+        ], true)) {
+            $this->searchColumn = 'descricao';
+        }
+        $this->searchFieldsActive = [$this->searchColumn];
         $this->localSearch = '';
         $this->sortColumn = null;
         $this->sortDirection = 'asc';
@@ -58,8 +68,11 @@ class ProductListTable extends Component
                 if (parent) {
                     parent.set("viewFilter", view, false);
                     parent.set("searchColumn", searchColumn, false);
+                    parent.set("searchFieldsActive", [searchColumn], false);
+                    parent.set("searchFieldsQuery", "", false);
                     parent.set("localSearch", "", false);
                     try { parent.set("highlightedRecordId", null, false); } catch (e) {}
+                    parent.call("persistProductSearchFields");
                 }
                 try {
                     const url = new URL(window.location.href);
@@ -68,6 +81,8 @@ class ProductListTable extends Component
                     } else {
                         url.searchParams.set("view", view);
                     }
+                    url.searchParams.delete("campos");
+                    url.searchParams.delete("q");
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
             })()',
@@ -122,11 +137,13 @@ class ProductListTable extends Component
         string $viewFilter,
         ?int $perPage = null,
         bool $resetSort = false,
+        array $searchFieldsActive = [],
     ): void {
         $this->statusFilter = $statusFilter;
         $this->searchColumn = $searchColumn;
         $this->localSearch = $localSearch;
         $this->viewFilter = $viewFilter;
+        $this->searchFieldsActive = $searchFieldsActive;
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;
@@ -184,6 +201,7 @@ class ProductListTable extends Component
                 searchColumn: $this->searchColumn,
                 localSearch: $this->localSearch,
                 empresa: $this->currentEmpresa(),
+                searchFieldsActive: $this->searchFieldsActive,
             ))->build();
         }
 
@@ -193,6 +211,7 @@ class ProductListTable extends Component
             localSearch: $this->localSearch,
             empresa: $this->currentEmpresa(),
             applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
         ))->build();
     }
 

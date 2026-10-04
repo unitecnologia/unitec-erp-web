@@ -417,7 +417,7 @@ class ForcaVendasSyncService
                 'email' => $c->email,
                 'fone1' => $c->fone1,
                 'celular1' => $c->celular1,
-                'whatsapp' => $c->whatsapp,
+                'whatsapp' => $c->fone1,
                 'limite_credito' => (float) $c->limite_credito,
                 'dia_pgto' => $c->dia_pgto,
                 'forma_pagamento_id' => $c->forma_pagamento_id,
@@ -1309,6 +1309,24 @@ class ForcaVendasSyncService
     }
 
     /**
+     * O WhatsApp do cadastro passou a ser o fone1. App antigo ainda envia a chave whatsapp.
+     *
+     * @param  array<string, mixed>  $customer
+     */
+    private function fone1ComWhatsappLegado(array $customer): ?string
+    {
+        $fone1 = trim((string) ($customer['fone1'] ?? ''));
+
+        if ($fone1 !== '') {
+            return $fone1;
+        }
+
+        $whatsapp = trim((string) ($customer['whatsapp'] ?? ''));
+
+        return $whatsapp !== '' ? $whatsapp : null;
+    }
+
+    /**
      * @param  array<string, mixed>  $customer
      */
     private function findExistingCustomerByDocument(array $customer): ?Person
@@ -1370,9 +1388,8 @@ class ForcaVendasSyncService
             'uf' => $uf,
             'cep' => trim((string) ($customer['cep'] ?? '')) ?: null,
             'email' => trim((string) ($customer['email'] ?? '')) ?: null,
-            'fone1' => trim((string) ($customer['fone1'] ?? '')) ?: null,
+            'fone1' => $this->fone1ComWhatsappLegado($customer),
             'celular1' => trim((string) ($customer['celular1'] ?? '')) ?: null,
-            'whatsapp' => trim((string) ($customer['whatsapp'] ?? '')) ?: null,
             'limite_credito' => (float) ($customer['limite_credito'] ?? 0),
             'dia_pgto' => isset($customer['dia_pgto']) && $customer['dia_pgto'] !== null && $customer['dia_pgto'] !== ''
                 ? (int) $customer['dia_pgto']

@@ -111,6 +111,8 @@ class ListContasReceber extends ListRecords
         }
 
         $this->restoreClienteConfirmado();
+        $this->aplicarPeriodoPadraoReceber();
+        $this->rememberReceberFiltro();
     }
 
     public function mountInteractsWithTable(): void
@@ -195,11 +197,17 @@ class ListContasReceber extends ListRecords
             $this->formaFilter = $saved['formaFilter'];
         }
 
-        foreach (['periodoDe', 'periodoAte', 'periodoDeApplied', 'periodoAteApplied'] as $field) {
-            if (is_string($saved[$field] ?? null)) {
-                $this->{$field} = $saved[$field];
-            }
-        }
+    }
+
+    /**
+     * Início sempre em branco (desde o começo). Fim no último dia do mês corrente.
+     */
+    protected function aplicarPeriodoPadraoReceber(): void
+    {
+        $this->periodoDe = '';
+        $this->periodoDeApplied = '';
+        $this->periodoAte = ErpTimezone::toLocal()->endOfMonth()->toDateString();
+        $this->periodoAteApplied = $this->periodoAte;
     }
 
     protected function restoreClienteConfirmado(): void
@@ -330,6 +338,21 @@ class ListContasReceber extends ListRecords
     }
 
     #[Computed]
+    public function totalAtrasado(): float
+    {
+        return $this->listQueryBuilder()->sumSaldoAtrasado();
+    }
+
+    /**
+     * @return array{todos: int, a_receber: int, atrasadas: int, recebidas: int}
+     */
+    #[Computed]
+    public function contagensSituacao(): array
+    {
+        return $this->listQueryBuilder()->contarPorSituacao();
+    }
+
+    #[Computed]
     public function totalSelecionado(): float
     {
         $ids = collect($this->selecionadosParaBaixa)
@@ -430,7 +453,7 @@ class ListContasReceber extends ListRecords
 
     public function applyPeriodoFilter(string $de = '', string $ate = ''): void
     {
-        $this->periodoDe = trim($de);
+        $this->periodoDe = '';
         $this->periodoAte = trim($ate);
         $this->syncAppliedPeriodFilter();
     }
@@ -447,7 +470,8 @@ class ListContasReceber extends ListRecords
 
     protected function syncAppliedPeriodFilter(): void
     {
-        $this->periodoDeApplied = trim($this->periodoDe);
+        $this->periodoDe = '';
+        $this->periodoDeApplied = '';
         $this->periodoAteApplied = trim($this->periodoAte);
         $this->clearListSelection();
         $this->rememberReceberFiltro();
@@ -754,6 +778,7 @@ class ListContasReceber extends ListRecords
         $builder = $this->listQueryBuilder();
         $totalAReceber = $builder->sumSaldoFiltered();
         $totalRecebido = $builder->sumValorRecebidoFiltered();
+        $totalAtrasado = $builder->sumSaldoAtrasado();
 
         $this->dispatch(
             'erp-receber-list-refresh',
@@ -775,8 +800,9 @@ class ListContasReceber extends ListRecords
             $this->skipRender();
         }
 
-        $this->patchReceberFooterTotals($totalAReceber, $totalRecebido);
+        $this->patchReceberFooterTotals($totalAReceber, $totalRecebido, $totalAtrasado);
         $this->patchReceberFooterSelecionado();
+        $this->patchReceberSituacaoContagens();
     }
 
     protected function pushContaReceberListRefreshSelectionOnly(): void
@@ -801,16 +827,34 @@ class ListContasReceber extends ListRecords
         $this->patchReceberFooterSelecionado();
     }
 
-    protected function patchReceberFooterTotals(float $totalAReceber, float $totalRecebido): void
+    protected function patchReceberFooterTotals(float $totalAReceber, float $totalRecebido, float $totalAtrasado): void
     {
         $this->js(sprintf(
             '(() => {
                 const items = document.querySelectorAll(".erp-receber__totals .erp-receber__total-value");
+                const late = document.querySelector(".erp-receber__total-value--late");
                 if (items[0]) items[0].textContent = %s;
                 if (items[1]) items[1].textContent = %s;
+                if (late) late.textContent = %s;
             })()',
             json_encode('R$ '.number_format($totalAReceber, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode('R$ '.number_format($totalRecebido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalAtrasado, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+        ));
+    }
+
+    protected function patchReceberSituacaoContagens(): void
+    {
+        $this->js(sprintf(
+            '(() => {
+                const counts = %s;
+                document.querySelectorAll(".erp-receber__filter-chip-count").forEach((el) => {
+                    const key = el.getAttribute("data-situacao");
+                    if (!key || counts[key] === undefined) return;
+                    el.textContent = "(" + counts[key] + ")";
+                });
+            })()',
+            json_encode($this->contagensSituacao, JSON_UNESCAPED_UNICODE),
         ));
     }
 

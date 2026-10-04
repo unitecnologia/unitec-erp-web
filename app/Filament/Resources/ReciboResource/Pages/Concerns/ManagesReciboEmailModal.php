@@ -65,7 +65,7 @@ trait ManagesReciboEmailModal
         $pdf = $report->storePdfAttachment($recibo);
         $codigo = (string) $recibo->codigo;
         $person = $this->resolvePersonForRecibo($recibo);
-        $phoneRaw = $person?->celular1 ?: ($person?->whatsapp ?: '');
+        $phoneRaw = $person?->celular1 ?: ($person?->fone1 ?: '');
 
         $this->emailReciboId = $recibo->id;
         $this->emailTo = trim((string) ($person?->email ?? ''));

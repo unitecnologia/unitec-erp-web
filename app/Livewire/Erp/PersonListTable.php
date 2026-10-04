@@ -25,6 +25,9 @@ class PersonListTable extends Component
 
     public string $localSearch = '';
 
+    /** @var list<string> */
+    public array $searchFieldsActive = [];
+
     public int $perPage = 50;
 
     public ?string $sortColumn = null;
@@ -115,11 +118,13 @@ class PersonListTable extends Component
         string $localSearch,
         ?int $perPage = null,
         bool $resetSort = false,
+        array $searchFieldsActive = [],
     ): void {
         $this->statusFilter = $statusFilter;
         $this->tipoFilter = $tipoFilter;
         $this->searchColumn = $searchColumn;
         $this->localSearch = $localSearch;
+        $this->searchFieldsActive = $searchFieldsActive;
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;
@@ -161,6 +166,7 @@ class PersonListTable extends Component
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
         ))->buildForList();
 
         $this->applySort($query);

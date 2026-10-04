@@ -10,6 +10,17 @@ const ERP_ORC_FORM_ACTIONS = {
 };
 
 document.addEventListener('livewire:init', () => {
+    if (! window.__erpOrcPersistHook) {
+        window.__erpOrcPersistHook = true;
+        window.Livewire.hook('commit', ({ succeed, fail }) => {
+            const clear = () => {
+                window.__erpOrcPersistindo = false;
+            };
+            succeed(clear);
+            fail(clear);
+        });
+    }
+
     window.Livewire.on('erp-orcamento-focus-cliente', () => {
         focusOrcFormInput('orc-cliente', { selectAll: false });
     });
@@ -166,7 +177,109 @@ function initErpOrcamentosForm() {
     bindErpOrcamentosFormKeys();
     bindOrcClienteLookupClickOutside();
     bindOrcProdutoLookupFloating();
+    bindOrcLookupKeys();
     requestAnimationFrame(positionOrcProdutoLookup);
+}
+
+const ERP_ORC_LOOKUPS = [
+    {
+        inputId: 'orc-prod-barcode',
+        listSelector: '#orc-prod-sugestoes',
+        optionSelector: '[role="option"]',
+        activeClass: 'is-selected',
+        enterMethod: 'selectProdutoResult',
+        escapeMethod: 'closeProdutoLookup',
+    },
+    {
+        inputId: 'orc-cliente',
+        listSelector: '.erp-orcamentos-form-page .erp-orc-cliente-field .erp-orc-cliente-lookup',
+        optionSelector: '.erp-orc-cliente-lookup__row',
+        activeClass: 'erp-orc-cliente-lookup__row--active',
+        enterMethod: 'selectClienteResult',
+        escapeMethod: 'closeClienteLookup',
+    },
+];
+
+function bindOrcLookupKeys() {
+    if (window.__erpOrcLookupKeysBound) {
+        return;
+    }
+
+    window.__erpOrcLookupKeysBound = true;
+
+    document.addEventListener('keydown', (event) => {
+        if (! document.querySelector('.erp-orcamentos-form-page') || document.querySelector('.erp-os-form-page')) {
+            return;
+        }
+
+        const key = event.key;
+
+        if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Enter' && key !== 'Escape') {
+            return;
+        }
+
+        const lookup = ERP_ORC_LOOKUPS.find((item) => event.target?.id === item.inputId);
+
+        if (! lookup) {
+            return;
+        }
+
+        const list = document.querySelector(lookup.listSelector);
+
+        if (! list) {
+            return;
+        }
+
+        const options = list.classList.contains('erp-orc-cliente-lookup--empty')
+            ? []
+            : [...list.querySelectorAll(lookup.optionSelector)];
+
+        if (key === 'Escape') {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            getErpOrcamentosComponent()?.call(lookup.escapeMethod);
+
+            return;
+        }
+
+        if (options.length === 0) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        if (key === 'Enter') {
+            const current = options.findIndex((el) => el.classList.contains(lookup.activeClass));
+            getErpOrcamentosComponent()?.call(lookup.enterMethod, current < 0 ? 0 : current);
+
+            return;
+        }
+
+        moveOrcLookupHighlight(options, key, lookup.activeClass);
+    }, true);
+}
+
+function moveOrcLookupHighlight(options, key, activeClass) {
+    const current = options.findIndex((el) => el.classList.contains(activeClass));
+    let next = 0;
+
+    if (current >= 0) {
+        next = key === 'ArrowDown'
+            ? Math.min(options.length - 1, current + 1)
+            : Math.max(0, current - 1);
+    }
+
+    options.forEach((el, index) => {
+        const on = index === next;
+        el.classList.toggle(activeClass, on);
+
+        if (el.getAttribute('role') === 'option') {
+            el.setAttribute('aria-selected', on ? 'true' : 'false');
+        }
+    });
+
+    options[next].scrollIntoView({ block: 'nearest' });
 }
 
 function bindOrcClienteLookupClickOutside() {
@@ -355,6 +468,18 @@ function bindErpOrcamentosFormKeys() {
         if (method) {
             if (document.querySelector('.erp-form-overlay') && (event.key === 'F8' || event.key === 'F9')) {
                 return;
+            }
+
+            if (method === 'gravarOrcamento' || method === 'finalizarOrcamento') {
+                const gravarBtn = document.querySelector('.erp-orcamentos-form-page [data-erp-key="F2"]');
+
+                if (window.__erpOrcPersistindo || gravarBtn?.disabled) {
+                    event.preventDefault();
+
+                    return;
+                }
+
+                window.__erpOrcPersistindo = true;
             }
 
             event.preventDefault();

@@ -2607,7 +2607,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeClienteCodigo = (string) ($person->codigo ?? '');
         $this->nfeClienteNome = trim((string) ($person->nome_razao ?? ''));
         $this->nfeClienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
-        $this->nfeClienteWhatsapp = (string) ($person->whatsapp ?? $person->celular1 ?? '');
+        $this->nfeClienteWhatsapp = (string) ($person->fone1 ?? $person->celular1 ?? '');
         $this->nfeClienteEndereco = (string) ($person->endereco ?? '');
         $this->nfeClienteNumeroEnd = (string) ($person->numero ?? '');
         $this->nfeClienteBairro = (string) ($person->bairro ?? '');
@@ -2875,7 +2875,7 @@ trait ManagesNfeEmissaoModal
 
         $phoneRaw = $party instanceof Transportadora
             ? (string) ($party->whatsapp ?? '')
-            : (string) ($party?->celular1 ?: ($party?->whatsapp ?: ($party?->fone1 ?: '')));
+            : (string) ($party?->celular1 ?: ($party?->fone1 ?: ''));
         $phoneDigits = WhatsAppPhone::digitsOnly($phoneRaw);
 
         $this->nfeWhatsAppNfeId = $nfe->id;

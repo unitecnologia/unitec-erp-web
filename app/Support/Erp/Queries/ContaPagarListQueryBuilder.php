@@ -42,6 +42,7 @@ class ContaPagarListQueryBuilder
             "{$table}.emissao",
             "{$table}.documento",
             "{$table}.fornecedor_id",
+            "{$table}.compra_id",
             "{$table}.vencimento",
             "{$table}.valor",
             "{$table}.desconto",
@@ -51,7 +52,10 @@ class ContaPagarListQueryBuilder
             "{$table}.saldo",
         ]);
 
-        $query->with(['fornecedor:id,nome_razao']);
+        $query->with([
+            'fornecedor:id,nome_razao',
+            'compra:id,numero,numero_nota',
+        ]);
 
         if (! $this->applyDefaultOrder) {
             return $query;
@@ -70,19 +74,68 @@ class ContaPagarListQueryBuilder
         return (float) $this->buildFilteredQuery()->sum('valor_pago');
     }
 
+    public function sumSaldoAtrasado(): float
+    {
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $query = ContaPagar::query();
+        $this->applySearchFilters($query);
+
+        return (float) $query
+            ->where('saldo', '>', 0)
+            ->whereDate('vencimento', '<', $hoje)
+            ->sum('saldo');
+    }
+
+    /**
+     * Quantidade de títulos em cada situação, respeitando o filtro atual da tela.
+     *
+     * @return array{todos: int, a_pagar: int, atrasadas: int, pagas: int}
+     */
+    public function contarPorSituacao(): array
+    {
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $query = ContaPagar::query();
+        $this->applySearchFilters($query);
+
+        $row = $query->selectRaw(
+            'COUNT(*) as todos,
+             COALESCE(SUM(CASE WHEN saldo > 0 AND DATE(vencimento) >= ? THEN 1 ELSE 0 END), 0) as a_pagar,
+             COALESCE(SUM(CASE WHEN saldo > 0 AND DATE(vencimento) < ? THEN 1 ELSE 0 END), 0) as atrasadas,
+             COALESCE(SUM(CASE WHEN saldo <= 0 THEN 1 ELSE 0 END), 0) as pagas',
+            [$hoje, $hoje],
+        )->first();
+
+        return [
+            'todos' => (int) ($row->todos ?? 0),
+            'a_pagar' => (int) ($row->a_pagar ?? 0),
+            'atrasadas' => (int) ($row->atrasadas ?? 0),
+            'pagas' => (int) ($row->pagas ?? 0),
+        ];
+    }
+
     protected function buildFilteredQuery(): Builder
     {
         $query = ContaPagar::query();
+        $this->applySituacao($query);
+        $this->applySearchFilters($query);
 
+        return $query;
+    }
+
+    protected function applySituacao(Builder $query): void
+    {
         $hoje = ErpTimezone::toLocal()->toDateString();
 
         match ($this->situacaoFilter) {
             'a_pagar' => $query->where('saldo', '>', 0)->whereDate('vencimento', '>=', $hoje),
             'atrasadas' => $query->where('saldo', '>', 0)->whereDate('vencimento', '<', $hoje),
             'pagas' => $query->where('saldo', '<=', 0),
-            default => $query,
+            default => null,
         };
+    }
 
+    protected function applySearchFilters(Builder $query): void
+    {
         foreach ($this->normalizedSearchFieldsActive() as $column) {
             if ($this->isDateSearchColumn($column)) {
                 $this->applyLocalSearchDateRange($query, $column);
@@ -114,8 +167,6 @@ class ContaPagarListQueryBuilder
 
             $this->applyLocalSearchForColumn($query, $term, $column);
         }
-
-        return $query;
     }
 
     protected function applyDefaultOrder(Builder $query): Builder

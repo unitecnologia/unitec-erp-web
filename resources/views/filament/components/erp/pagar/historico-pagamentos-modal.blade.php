@@ -37,6 +37,7 @@
                                 <th style="padding:6px 8px;">Forma</th>
                                 <th style="padding:6px 8px;">Plano</th>
                                 <th style="padding:6px 8px;">Conta</th>
+                                <th style="padding:6px 8px;">Cheque</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -49,6 +50,7 @@
                                     <td style="padding:6px 8px;">{{ $row['forma'] }}</td>
                                     <td style="padding:6px 8px;">{{ $row['plano'] }}</td>
                                     <td style="padding:6px 8px;">{{ $row['conta'] }}</td>
+                                    <td style="padding:6px 8px;">{{ $row['cheque'] ?? '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

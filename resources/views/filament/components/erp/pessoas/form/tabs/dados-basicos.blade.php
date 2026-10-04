@@ -202,16 +202,14 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-fone1">Fone 1</label>
-        <input id="pcad-fone1" type="text" wire:model="data.fone1" data-mask="phone" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--phone">
+        <label class="erp-pcad-form__label" for="pcad-fone1">WhatsApp</label>
+        <input id="pcad-fone1" type="text" wire:model="data.fone1" data-mask="mobile-phone" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--phone">
+        @error('data.fone1')
+            <span class="erp-pcad-form__error">{{ $message }}</span>
+        @enderror
         <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-cel1">Celular 1</label>
         <input id="pcad-cel1" type="text" wire:model="data.celular1" data-mask="mobile-phone" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--phone">
         @error('data.celular1')
-            <span class="erp-pcad-form__error">{{ $message }}</span>
-        @enderror
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-whats">WhatsApp</label>
-        <input id="pcad-whats" type="text" wire:model="data.whatsapp" data-mask="mobile-phone" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--phone">
-        @error('data.whatsapp')
             <span class="erp-pcad-form__error">{{ $message }}</span>
         @enderror
     </div>

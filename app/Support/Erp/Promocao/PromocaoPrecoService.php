@@ -18,6 +18,18 @@ final class PromocaoPrecoService
      */
     public function precoVarejoAtivo(Product|int $product, ?int $empresaId = null, ?Carbon $data = null): ?float
     {
+        if ($product instanceof Product && $product->relationLoaded('precoPromocaoLote')) {
+            $precoLote = $product->getRelation('precoPromocaoLote');
+
+            if ($precoLote === null) {
+                return null;
+            }
+
+            $valorLote = (float) $precoLote;
+
+            return $valorLote > 0 ? round($valorLote, 2) : null;
+        }
+
         $productId = $product instanceof Product ? (int) $product->id : (int) $product;
         $empresaId ??= ErpContext::currentEmpresaId();
         $data ??= Carbon::today();

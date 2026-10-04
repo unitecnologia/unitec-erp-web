@@ -1723,3 +1723,35 @@
 .erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-selected .erp-orc-itens__delete-btn:hover {
     color: #fff;
 }
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-preco-alterado:not(.is-selected) td {
+    background: #f59e0b !important;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-preco-alterado:not(.is-selected) .erp-fv-tv__cell {
+    background: #f59e0b !important;
+    border-color: #d97706 !important;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-preco-alterado:hover:not(.is-selected) td,
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-preco-alterado:hover:not(.is-selected) .erp-fv-tv__cell {
+    background: #d97706 !important;
+}
+
+.erp-orc-itens--fv .erp-orc-itens__preco-alerta {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: #d97706;
+    line-height: 0;
+    cursor: help;
+}
+
+.erp-orc-itens--fv .erp-orc-itens__preco-alerta svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    display: block;
+}
+
+.erp-orc-itens--fv .erp-fv-tv__grid tbody tr.is-selected .erp-orc-itens__preco-alerta {
+    color: #fbbf24;
+}

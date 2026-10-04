@@ -18,6 +18,13 @@
         ];
 
     $pageSizeOptions = [25, 50, 100];
+    $activeSearchFields = $this->searchFieldsActive !== [] ? $this->searchFieldsActive : [$this->searchColumn];
+    $searchButtonLabel = implode(' + ', array_map(
+        fn (string $key): string => $searchFields[$key] ?? $key,
+        $activeSearchFields,
+    ));
+    $numericSearch = $activeSearchFields !== [] && array_diff($activeSearchFields, ['codigo']) === [];
+    $decimalSearch = $activeSearchFields !== [] && array_diff($activeSearchFields, ['preco_venda', 'estoque']) === [];
 @endphp
 
 <div
@@ -34,23 +41,20 @@
                 @include('filament.components.erp.shared.search-field-dropdown', [
                     'fields' => $searchFields,
                     'searchColumn' => $this->searchColumn,
+                    'markedFields' => $activeSearchFields,
+                    'buttonLabel' => $searchButtonLabel,
+                    'closeOnSelect' => false,
                 ])
                 <input
                     type="text"
-                    wire:model="localSearch"
-                    wire:keydown.enter="search"
-                    wire:key="produtos-local-search-{{ $this->searchColumn }}-{{ $this->viewFilter }}"
+                    wire:model.live.debounce.350ms="localSearch"
+                    wire:key="produtos-local-search-{{ implode('-', $activeSearchFields) }}-{{ $this->viewFilter }}"
                     class="erp-produtos__input erp-produtos__search-text"
                     placeholder="Digite para pesquisar"
                     autocomplete="off"
-                    @if ($this->searchColumn === 'codigo') inputmode="numeric" @endif
-                    @if (in_array($this->searchColumn, ['preco_venda', 'estoque'], true)) inputmode="decimal" @endif
+                    @if ($numericSearch) inputmode="numeric" @endif
+                    @if ($decimalSearch) inputmode="decimal" @endif
                 >
-            </div>
-
-            <div class="erp-produtos__search-actions">
-                <button type="button" wire:click="search" class="erp-produtos__btn">Pesquisa</button>
-                <button type="button" wire:click="clearSearch" class="erp-produtos__btn erp-produtos__btn--secondary">Limpar</button>
             </div>
 
             <div class="erp-produtos__page-size-group">
@@ -70,7 +74,7 @@
 
     <p class="erp-produtos__hint">
         @if ($isSeriais)
-            Pressione Enter ou clique em Pesquisa. Use as setas para navegar na lista.
+            Use as setas para navegar na lista.
         @else
             Clique na tecla [DELETE] para excluir Produto.
         @endif

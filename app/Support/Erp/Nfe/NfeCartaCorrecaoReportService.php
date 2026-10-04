@@ -141,7 +141,7 @@ final class NfeCartaCorrecaoReportService
         $person = $nfe->cliente;
         $nome = trim((string) ($person?->nome_razao ?? $person?->nome ?? ''));
         $email = trim((string) ($person?->email ?? $person?->email2 ?? ''));
-        $phoneDigits = preg_replace('/\D/', '', (string) ($person?->celular1 ?: ($person?->whatsapp ?: ($person?->celular2 ?? '')))) ?? '';
+        $phoneDigits = preg_replace('/\D/', '', (string) ($person?->celular1 ?: ($person?->fone1 ?: ($person?->celular2 ?? '')))) ?? '';
 
         return [
             'email' => $email,

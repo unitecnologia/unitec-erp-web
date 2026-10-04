@@ -193,14 +193,23 @@
 
 /* ── Grade compacta ─────────────────────────────────────────────── */
 
+.erp-pessoas-page .erp-list-grid-area,
+.erp-pessoas-page .fi-ta-ctn {
+    overflow-x: hidden !important;
+    max-width: 100%;
+}
+
 .erp-pessoas-page .fi-ta-ctn {
     margin: 0 0.65rem !important;
+    width: auto !important;
 }
 
 .erp-pessoas-page .fi-ta-table {
     border-collapse: collapse;
-    width: auto;
-    min-width: 100%;
+    table-layout: fixed;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
 }
 
 .erp-pessoas-page .fi-ta-header-cell {
@@ -210,7 +219,8 @@
     letter-spacing: 0.01em;
     color: var(--erp-text-on-brand, #fff) !important;
     background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%)) !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis;
     border-right: 1px solid rgb(255 255 255 / 40%) !important;
     border-bottom: 1px solid rgb(255 255 255 / 25%) !important;
     box-shadow: 0 2px 4px rgba(15, 52, 96, 0.2);
@@ -384,12 +394,20 @@
     line-height: 1.1;
 }
 
-/* ── Larguras de colunas ───────────────────────────────────────── */
+/* ── Larguras de colunas (somam 100% da tela) ─────────────────── */
+
+.erp-pessoas-page .fi-ta-header-cell,
+.erp-pessoas-page .fi-ta-row .fi-ta-cell {
+    min-width: 0 !important;
+    max-width: none;
+    overflow: hidden !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(1),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
-    width: 4.25rem;
-    max-width: 4.25rem;
+    width: 5%;
 }
 
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(1) {
@@ -398,31 +416,41 @@
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(2),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(2) {
-    width: auto;
-    min-width: 12rem;
+    width: 19%;
 }
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(3),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(3) {
-    width: calc(6.5rem + 6cm);
-    max-width: calc(8rem + 6cm);
+    width: 14%;
 }
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(4),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(4) {
-    width: 9rem;
-    max-width: 10rem;
+    width: 12%;
 }
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(5),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(5) {
-    width: 5rem;
-    max-width: 6rem;
+    width: 6%;
     padding-inline: 0.15rem !important;
 }
 
 .erp-pessoas-page .fi-ta-header-cell:nth-child(6),
 .erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(6) {
-    width: auto;
-    min-width: 10rem;
+    width: 18%;
+}
+
+.erp-pessoas-page .fi-ta-header-cell:nth-child(7),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(7) {
+    width: 10%;
+}
+
+.erp-pessoas-page .fi-ta-header-cell:nth-child(8),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(8) {
+    width: 9%;
+}
+
+.erp-pessoas-page .fi-ta-header-cell:nth-child(9),
+.erp-pessoas-page .fi-ta-row .fi-ta-cell:nth-child(9) {
+    width: 7%;
 }

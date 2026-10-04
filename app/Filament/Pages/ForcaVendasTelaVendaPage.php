@@ -3349,7 +3349,7 @@ class ForcaVendasTelaVendaPage extends Page
         $this->clienteCidade = (string) ($person->cidade_nome ?? '');
         $this->clienteUf = (string) ($person->uf ?? '');
         $this->clienteFone = (string) ($person->fone1 ?? $person->fone2 ?? '');
-        $this->clienteWhatsapp = (string) ($person->whatsapp ?? $person->celular1 ?? '');
+        $this->clienteWhatsapp = (string) ($person->fone1 ?? $person->celular1 ?? '');
         $this->clienteObservacoes = trim((string) ($person->observacoes ?? ''));
         $this->observacaoClienteModalOpen = false;
 

@@ -536,7 +536,6 @@ final class MonitorPedidosReport
             $foneCliente = (string) (
                 $cliente->fone1
                 ?: $cliente->celular1
-                ?: $cliente->whatsapp
                 ?: $cliente->fone2
                 ?: $cliente->celular2
                 ?: ''

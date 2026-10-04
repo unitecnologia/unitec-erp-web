@@ -101,6 +101,54 @@ class ContaReceberListQueryBuilder
         return (float) $this->buildFilteredQuery()->sum('valor_recebido');
     }
 
+    public function sumSaldoAtrasado(): float
+    {
+        $anterior = $this->situacaoFilter;
+        $this->situacaoFilter = 'todos';
+
+        try {
+            $hoje = ErpTimezone::toLocal()->toDateString();
+
+            return (float) $this->buildFilteredQuery()
+                ->where('saldo', '>', 0)
+                ->whereDate('vencimento', '<', $hoje)
+                ->sum('saldo');
+        } finally {
+            $this->situacaoFilter = $anterior;
+        }
+    }
+
+    /**
+     * Quantidade de títulos em cada situação, respeitando cliente, período, forma e busca.
+     *
+     * @return array{todos: int, a_receber: int, atrasadas: int, recebidas: int}
+     */
+    public function contarPorSituacao(): array
+    {
+        $anterior = $this->situacaoFilter;
+        $this->situacaoFilter = 'todos';
+
+        try {
+            $hoje = ErpTimezone::toLocal()->toDateString();
+            $row = $this->buildFilteredQuery()->selectRaw(
+                'COUNT(*) as todos,
+                 COALESCE(SUM(CASE WHEN saldo > 0 AND DATE(vencimento) >= ? THEN 1 ELSE 0 END), 0) as a_receber,
+                 COALESCE(SUM(CASE WHEN saldo > 0 AND DATE(vencimento) < ? THEN 1 ELSE 0 END), 0) as atrasadas,
+                 COALESCE(SUM(CASE WHEN saldo <= 0 THEN 1 ELSE 0 END), 0) as recebidas',
+                [$hoje, $hoje],
+            )->first();
+        } finally {
+            $this->situacaoFilter = $anterior;
+        }
+
+        return [
+            'todos' => (int) ($row->todos ?? 0),
+            'a_receber' => (int) ($row->a_receber ?? 0),
+            'atrasadas' => (int) ($row->atrasadas ?? 0),
+            'recebidas' => (int) ($row->recebidas ?? 0),
+        ];
+    }
+
     protected function buildFilteredQuery(): Builder
     {
         $query = ContaReceber::query();

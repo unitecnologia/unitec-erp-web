@@ -14,6 +14,7 @@ use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\VendasInternasOrder;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Orcamento\OrcamentoDescontoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -141,6 +142,7 @@ class NfeImportacaoService
                 'quantidade' => (float) ($raw['quantidade'] ?? 0),
                 'valor_unitario' => (float) ($raw['valor_unitario'] ?? 0),
                 'desconto' => (float) ($raw['desconto'] ?? 0),
+                'outros' => (float) ($raw['outros'] ?? 0),
                 'cfop' => filled($raw['cfop'] ?? null) ? (string) $raw['cfop'] : null,
             ];
         }
@@ -168,6 +170,7 @@ class NfeImportacaoService
                 'valor_unitario' => ErpMoney::formatBr((float) ($row['valor_unitario'] ?? 0), 3),
                 'unidade' => mb_strtoupper((string) ($row['unidade'] ?? $product?->unidade ?: 'UN'), 'UTF-8'),
                 'desconto' => ErpMoney::formatBr((float) ($row['desconto'] ?? 0), 2),
+                'outros' => ErpMoney::formatBr((float) ($row['outros'] ?? 0), 2),
             ];
         }
 
@@ -490,16 +493,25 @@ class NfeImportacaoService
      */
     protected function mapRawRowsOrcamento(Orcamento $orcamento): array
     {
-        return $orcamento->itens
+        $service = app(OrcamentoDescontoService::class);
+        $itens = $orcamento->itens
             ->filter(fn (OrcamentoItem $item): bool => (int) $item->product_id > 0)
-            ->map(fn (OrcamentoItem $item): array => [
-                'product_id' => (int) $item->product_id,
-                'quantidade' => (float) $item->quantidade,
-                'valor_unitario' => (float) $item->preco_unitario,
-                'descricao' => $item->descricao ?: ($item->product?->descricao ?? ''),
-                'desconto' => (float) ($item->desconto ?? 0),
-            ])
-            ->values()
+            ->values();
+        $cotas = $service->cotasDescontoGeral($itens, (float) ($orcamento->desconto_valor ?? 0));
+
+        return $itens
+            ->map(function (OrcamentoItem $item, int $index) use ($service, $cotas): array {
+                $partes = $service->partesDaLinha($item);
+
+                return [
+                    'product_id' => (int) $item->product_id,
+                    'quantidade' => (float) $item->quantidade,
+                    'valor_unitario' => (float) $item->preco_unitario,
+                    'descricao' => $item->descricao ?: ($item->product?->descricao ?? ''),
+                    'desconto' => round($partes['desconto'] + ($cotas[$index] ?? 0), 2),
+                    'outros' => $partes['acrescimo'],
+                ];
+            })
             ->all();
     }
 

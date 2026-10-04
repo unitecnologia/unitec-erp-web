@@ -15,6 +15,7 @@
     ];
 
     $situacaoAtual = filled($this->situacaoFilter) ? (string) $this->situacaoFilter : 'todos';
+    $contagensSituacao = $this->contagensSituacao;
     $formaAtual = filled($this->formaFilter) ? (string) $this->formaFilter : 'todos';
 @endphp
 
@@ -30,6 +31,12 @@
             <span class="erp-receber__total-label">TOTAL RECEBIDO |</span>
             <span class="erp-receber__total-value erp-receber__total-value--received">
                 R$ {{ number_format($this->totalRecebido, 2, ',', '.') }}
+            </span>
+        </div>
+        <div class="erp-receber__total-item">
+            <span class="erp-receber__total-label">TOTAL ATRASADO |</span>
+            <span class="erp-receber__total-value erp-receber__total-value--late">
+                R$ {{ number_format($this->totalAtrasado, 2, ',', '.') }}
             </span>
         </div>
         @if ($this->quantidadeSelecionada > 0)
@@ -62,7 +69,7 @@
                         :class="{ 'erp-receber__filter-chip--active': statusAtivo === @js($value) }"
                         :aria-pressed="statusAtivo === @js($value) ? 'true' : 'false'"
                         @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.conta-receber-list-table') || [])[0]; if (t) t.call('setSituacaoFilter', @js($value))"
-                    >{{ $label }}</button>
+                    >{{ $label }} <span class="erp-receber__filter-chip-count" data-situacao="{{ $value }}">({{ (int) ($contagensSituacao[$value] ?? 0) }})</span></button>
                 @endforeach
             </div>
         </div>

@@ -41,10 +41,14 @@ final class PdvProductPriceService
             return null;
         }
 
-        $item = ProductPriceTableItem::query()
-            ->where('product_id', $product->id)
-            ->where('price_table_id', $tableId)
-            ->first();
+        $item = $product->relationLoaded('priceTableItems')
+            ? $product->priceTableItems->first(
+                fn ($row): bool => (int) $row->price_table_id === (int) $tableId
+            )
+            : ProductPriceTableItem::query()
+                ->where('product_id', $product->id)
+                ->where('price_table_id', $tableId)
+                ->first();
 
         if (! $item) {
             return null;

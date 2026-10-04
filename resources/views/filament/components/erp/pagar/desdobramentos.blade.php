@@ -49,6 +49,7 @@
                                 <th class="is-num">Juros</th>
                                 <th class="is-num">Desconto</th>
                                 <th class="is-num">Valor Pago</th>
+                                <th>Meio de pagamento</th>
                                 <th>Cheque</th>
                             </tr>
                         </thead>
@@ -76,6 +77,7 @@
                                     <td class="is-num">{{ $row['juros'] }}</td>
                                     <td class="is-num">{{ $row['desconto'] }}</td>
                                     <td class="is-num">{{ $row['valor_pago'] }}</td>
+                                    <td>{{ $row['forma'] ?? '—' }}</td>
                                     <td>{{ $row['cheque'] }}</td>
                                 </tr>
                             @endforeach

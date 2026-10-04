@@ -70,21 +70,11 @@ trait ManagesContaPagarDesdobramentos
         }
 
         $conta = ContaPagar::query()
-            ->with(['fornecedor:id,nome_razao,apelido_fantasia', 'pagamentos'])
+            ->with(['fornecedor:id,nome_razao,apelido_fantasia', 'pagamentos.formaPagamento:id,descricao'])
             ->whereKey((int) $this->highlightedRecordId)
             ->first();
 
         if (! $conta) {
-            return;
-        }
-
-        if ((float) $conta->valor_pago <= 0 && $conta->pagamentos->isEmpty()) {
-            Notification::make()
-                ->title('Título sem baixa')
-                ->body('Desdobramentos só está disponível para títulos já pagos.')
-                ->warning()
-                ->send();
-
             return;
         }
 
@@ -114,7 +104,7 @@ trait ManagesContaPagarDesdobramentos
             'saldo' => '0,00',
         ];
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushContaPagarListRefresh(renderPage: true);
     }
 
     public function toggleDesdobramentoFlag(int $pagamentoId): void
@@ -192,7 +182,7 @@ trait ManagesContaPagarDesdobramentos
         $this->desdobramentoSelectedIds = [];
 
         $conta = ContaPagar::query()
-            ->with(['fornecedor:id,nome_razao,apelido_fantasia', 'pagamentos'])
+            ->with(['fornecedor:id,nome_razao,apelido_fantasia', 'pagamentos.formaPagamento:id,descricao'])
             ->whereKey((int) $this->desdobramentoContaId)
             ->first();
 
@@ -213,8 +203,6 @@ trait ManagesContaPagarDesdobramentos
 
         if (! $conta || $conta->pagamentos->isEmpty()) {
             $this->voltarParaTitulos();
-            $this->situacaoFilter = 'a_pagar';
-            $this->clearListSelection();
 
             return;
         }
@@ -256,6 +244,7 @@ trait ManagesContaPagarDesdobramentos
                 'juros' => ErpMoney::formatBr((float) $pagamento->juros),
                 'desconto' => ErpMoney::formatBr((float) $pagamento->desconto),
                 'valor_pago' => ErpMoney::formatBr((float) $pagamento->valor_pago),
+                'forma' => mb_strtoupper(trim((string) ($pagamento->formaPagamento?->descricao ?? '')), 'UTF-8') ?: '—',
                 'cheque' => trim((string) ($pagamento->numero_cheque ?? '')) ?: '—',
             ])
             ->all();

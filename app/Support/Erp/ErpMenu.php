@@ -188,6 +188,52 @@ class ErpMenu
     }
 
     /**
+     * Ícone do menu principal da tela aberta.
+     * Vale o atalho cujo endereço é o caminho atual ou um caminho interno dele
+     * (listagem, cadastro e edição do mesmo módulo). O prefixo mais longo ganha.
+     *
+     * @param  array<int, array<string, mixed>>|null  $shortcuts
+     */
+    public static function activeShortcutKey(?array $shortcuts = null): ?string
+    {
+        $currentPath = '/'.trim(request()->path(), '/');
+        $activeKey = null;
+        $activeLength = 0;
+
+        foreach ($shortcuts ?? static::shortcuts() as $shortcut) {
+            if (($shortcut['logout'] ?? false) || ! filled($shortcut['url'] ?? null)) {
+                continue;
+            }
+
+            $prefix = static::shortcutPathPrefix((string) $shortcut['url']);
+
+            if ($prefix === '' || ($currentPath !== $prefix && ! str_starts_with($currentPath, $prefix.'/'))) {
+                continue;
+            }
+
+            if (strlen($prefix) <= $activeLength) {
+                continue;
+            }
+
+            $activeKey = (string) $shortcut['key'];
+            $activeLength = strlen($prefix);
+        }
+
+        return $activeKey;
+    }
+
+    protected static function shortcutPathPrefix(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path) || $path === '') {
+            return '';
+        }
+
+        return '/'.trim($path, '/');
+    }
+
+    /**
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
      */

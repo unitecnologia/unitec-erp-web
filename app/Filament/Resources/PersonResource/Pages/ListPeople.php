@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PersonResource\Pages;
 
 use App\Filament\Concerns\EmbedsInPdvOverlay;
+use App\Filament\Concerns\InteractsWithErpDualSearchFields;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Concerns\ManagesErpSearchColumn;
@@ -23,6 +24,7 @@ use Livewire\Attributes\Url;
 class ListPeople extends ListRecords
 {
     use EmbedsInPdvOverlay;
+    use InteractsWithErpDualSearchFields;
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use ManagesErpSearchColumn;
@@ -48,6 +50,7 @@ class ListPeople extends ListRecords
         parent::mount();
 
         $this->erpRestoreSearchColumnFromSession();
+        $this->erpRestoreDualSearchFields($this->erpAllowedSearchColumns(), $this->erpDualSearchFieldsSessionKey());
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
         $this->tipoFilter = $this->normalizeTipoFilter($this->tipoFilter);
 
@@ -62,26 +65,21 @@ class ListPeople extends ListRecords
     public function setSearchColumn(string $column): void
     {
         $normalized = $this->erpNormalizeSearchColumn($column);
-        $changed = $normalized !== $this->searchColumn;
-        $hadSearch = filled($this->localSearch);
 
-        $this->searchColumn = $normalized;
-        session([$this->erpSearchColumnSessionKey() => $this->searchColumn]);
-
-        if (! $changed) {
-            $this->skipRender();
-
+        if (! $this->erpToggleDualSearchField($normalized, $this->erpAllowedSearchColumns(), $this->erpDualSearchFieldsSessionKey())) {
             return;
         }
+
+        session([$this->erpSearchColumnSessionKey() => $this->searchColumn]);
 
         $this->normalizeLocalSearchCase();
         $this->clearListSelection();
-
-        if (! $hadSearch) {
-            return;
-        }
-
         $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
+    }
+
+    protected function erpDualSearchFieldsSessionKey(): string
+    {
+        return $this->erpSearchColumnSessionKey().'_fields';
     }
 
     public function updatedLocalSearch(): void
@@ -270,14 +268,16 @@ class ListPeople extends ListRecords
         $tipoFilter = $this->tipoFilter;
         $searchColumn = $this->searchColumn;
         $localSearch = $this->localSearch;
+        $searchFieldsActive = $this->searchFieldsActive;
 
-        $countFor = static function (string $status) use ($tipoFilter, $searchColumn, $localSearch): int {
+        $countFor = static function (string $status) use ($tipoFilter, $searchColumn, $localSearch, $searchFieldsActive): int {
             return (new PersonListQueryBuilder(
                 statusFilter: $status,
                 tipoFilter: $tipoFilter,
                 searchColumn: $searchColumn,
                 localSearch: $localSearch,
                 applyDefaultOrder: false,
+                searchFieldsActive: $searchFieldsActive,
             ))->build()->count();
         };
 
@@ -307,7 +307,9 @@ class ListPeople extends ListRecords
             return;
         }
 
-        if (! in_array($this->searchColumn, ['nome_razao', 'apelido_fantasia', 'endereco'], true)) {
+        $columns = $this->searchFieldsActive !== [] ? $this->searchFieldsActive : [$this->searchColumn];
+
+        if (array_intersect($columns, ['nome_razao', 'apelido_fantasia', 'endereco']) === []) {
             return;
         }
 
@@ -318,6 +320,8 @@ class ListPeople extends ListRecords
     {
         $this->localSearch = '';
         $this->searchColumn = 'nome_razao';
+        $this->erpApplyDualSearchFields(['nome_razao'], $this->erpDualSearchFieldsSessionKey());
+        session([$this->erpSearchColumnSessionKey() => $this->searchColumn]);
         $this->clearListSelection();
         $this->pushPersonListRefresh(resetSort: true, skipParentRender: false);
     }
@@ -361,6 +365,7 @@ class ListPeople extends ListRecords
             localSearch: $this->localSearch,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
+            searchFieldsActive: $this->searchFieldsActive,
         )->to(PersonListTable::class);
 
         if ($skipParentRender) {
@@ -392,6 +397,7 @@ class ListPeople extends ListRecords
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
         ))->buildForList();
     }
 
@@ -476,6 +482,7 @@ class ListPeople extends ListRecords
             tipoFilter: $this->tipoFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
+            searchFieldsActive: $this->searchFieldsActive,
         );
 
         $params = array_filter(

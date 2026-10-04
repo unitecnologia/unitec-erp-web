@@ -95,6 +95,8 @@
                     type="date"
                     data-wire-field="periodoDe"
                     data-erp-date-wire="iso"
+                    data-erp-date-initial="{{ $this->periodoDe }}"
+                    value="{{ $this->periodoDe }}"
                     class="erp-receber__period-input erp-receber__period-from"
                 >
             </label>
@@ -104,6 +106,8 @@
                     type="date"
                     data-wire-field="periodoAte"
                     data-erp-date-wire="iso"
+                    data-erp-date-initial="{{ $this->periodoAte }}"
+                    value="{{ $this->periodoAte }}"
                     class="erp-receber__period-input"
                 >
             </label>

@@ -37,6 +37,15 @@ class ContaPagarListTable extends Component
 
     public string $sortDirection = 'asc';
 
+    /** @var list<int|string> */
+    public array $selecionadosParaBaixa = [];
+
+    #[On('erp-pagar-selection-sync')]
+    public function syncSelecao(array $selecionadosParaBaixa): void
+    {
+        $this->selecionadosParaBaixa = $selecionadosParaBaixa;
+    }
+
     #[On('erp-pagar-list-refresh')]
     public function refreshFromParent(
         string $situacaoFilter,
@@ -48,6 +57,7 @@ class ContaPagarListTable extends Component
         bool $skipFornecedorSearch = false,
         ?int $perPage = null,
         bool $resetSort = false,
+        array $selecionadosParaBaixa = [],
     ): void {
         $this->situacaoFilter = $situacaoFilter;
         $this->fornecedorFilter = $fornecedorFilter;
@@ -56,6 +66,7 @@ class ContaPagarListTable extends Component
         $this->localSearchDe = $localSearchDe;
         $this->localSearchAte = $localSearchAte;
         $this->skipFornecedorSearch = $skipFornecedorSearch;
+        $this->selecionadosParaBaixa = $selecionadosParaBaixa;
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;

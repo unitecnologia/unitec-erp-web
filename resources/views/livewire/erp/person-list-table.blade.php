@@ -6,6 +6,9 @@
         ['key' => 'cpf_cnpj', 'label' => 'CPF/CNPJ', 'sortable' => false, 'align' => 'start'],
         ['key' => 'rg_ie', 'label' => 'RG/IE', 'sortable' => false, 'align' => 'center'],
         ['key' => 'endereco_lista', 'label' => 'Endereço', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'bairro_lista', 'label' => 'Bairro', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'cidade_lista', 'label' => 'Cidade', 'sortable' => false, 'align' => 'start'],
+        ['key' => 'whatsapp_lista', 'label' => 'WhatsApp', 'sortable' => false, 'align' => 'start'],
     ];
 @endphp
 

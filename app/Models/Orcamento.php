@@ -222,7 +222,7 @@ class Orcamento extends Model
     {
         return filled($this->cliente_fone)
             ? (string) $this->cliente_fone
-            : (string) ($this->cliente?->fone1 ?? '');
+            : (string) ($this->cliente?->fone1 ?? $this->cliente?->fone2 ?? '');
     }
 
     public function clienteDisplayWhatsapp(): string
@@ -231,7 +231,7 @@ class Orcamento extends Model
             return (string) $this->cliente_whatsapp;
         }
 
-        return (string) ($this->cliente?->celular1 ?: ($this->cliente?->whatsapp ?? ''));
+        return (string) ($this->cliente?->fone1 ?? $this->cliente?->celular1 ?? '');
     }
 
     public function vendedor(): BelongsTo

@@ -286,7 +286,7 @@ trait ManagesContaReceberBoletoModal
         $conta = $boleto->contaReceber;
         $cliente = $conta?->cliente ?? $boleto->person;
         $clienteNome = trim((string) ($cliente?->nome_razao ?? $cliente?->nome ?? ''));
-        $phoneRaw = $cliente?->celular1 ?: ($cliente?->whatsapp ?: ($cliente?->fone1 ?: ''));
+        $phoneRaw = $cliente?->celular1 ?: ($cliente?->fone1 ?: '');
 
         $this->boletoEnviarId = (int) $boleto->id;
         $this->boletoEnviarEmail = trim((string) ($cliente?->email ?? ''));

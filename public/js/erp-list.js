@@ -275,7 +275,7 @@ function ensureKeyboardShortcutsBound() {
         }
 
         // Modal de lançamento / confirmação da NF-e e cadastro de Contador: atalhos da lista não devem rodar.
-        if (document.querySelector('.erp-nfe-lancamento-modal, .erp-nfse-lancamento-modal, .erp-nfe-item-delete-modal, .erp-contador-form-modal, .erp-pagar-form-modal, .erp-receber-form-modal, .erp-aviso-modal, .erp-devcompra-lancamento-modal, .erp-orc-email-modal.is-visible, .erp-orc-print-modal, .erp-contas-caixa-modal')) {
+        if (document.querySelector('.erp-nfe-lancamento-modal, .erp-nfse-lancamento-modal, .erp-nfe-item-delete-modal, .erp-contador-form-modal, .erp-pagar-form-modal, .erp-pagar-baixa-modal, .erp-pagar-confirm-modal, .erp-receber-form-modal, .erp-aviso-modal, .erp-devcompra-lancamento-modal, .erp-orc-email-modal.is-visible, .erp-orc-print-modal, .erp-contas-caixa-modal')) {
             return;
         }
 
