@@ -32,7 +32,7 @@ final class GestorExecutivoService
     /**
      * @return array<string, mixed>
      */
-    public function snapshot(?int $empresaId = null): array
+    public function snapshot(?int $empresaId = null, bool $comFinanceiro = true, bool $comVendas = true, bool $comAprovacoes = true): array
     {
         $empresaId = $empresaId ?: $this->empresaId();
         $empresaArg = $empresaId > 0 ? $empresaId : null;
@@ -40,23 +40,45 @@ final class GestorExecutivoService
         $ontem = $hoje->copy()->subDay();
         $inicioMes = $hoje->copy()->startOfMonth();
 
-        $fatHoje = ErpDashboardSalesMetrics::faturamentoDia($hoje, $empresaArg);
-        $fatOntem = ErpDashboardSalesMetrics::faturamentoDia($ontem, $empresaArg);
-        $fatMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $hoje, $empresaArg);
-        $varDia = ErpDashboardSalesMetrics::variacaoPercentual($fatHoje, $fatOntem);
+        $fatHoje = 0.0;
+        $fatOntem = 0.0;
+        $fatMes = 0.0;
+        $varDia = null;
+        if ($comVendas) {
+            $fatHoje = ErpDashboardSalesMetrics::faturamentoDia($hoje, $empresaArg);
+            $fatOntem = ErpDashboardSalesMetrics::faturamentoDia($ontem, $empresaArg);
+            $fatMes = ErpDashboardSalesMetrics::faturamentoPeriodo($inicioMes, $hoje, $empresaArg);
+            $varDia = ErpDashboardSalesMetrics::variacaoPercentual($fatHoje, $fatOntem);
+        }
 
-        $caixa = ErpFinanceiroMetricas::saldoCaixa(null, $empresaArg);
-        $receberHoje = (float) ErpFinanceiroMetricas::receberNoDia($hoje, $empresaArg)['valor'];
-        $pagarHoje = (float) ErpFinanceiroMetricas::pagarNoDia($hoje, $empresaArg)['valor'];
-        $receberVencido = (float) ErpFinanceiroMetricas::receberVencido($hoje, $empresaArg)['valor'];
-        $pagarVencido = (float) ErpFinanceiroMetricas::pagarVencido($hoje, $empresaArg)['valor'];
+        $caixa = 0.0;
+        $receberHoje = 0.0;
+        $pagarHoje = 0.0;
+        $receberVencido = 0.0;
+        $pagarVencido = 0.0;
+        if ($comFinanceiro) {
+            $caixa = ErpFinanceiroMetricas::saldoCaixa(null, $empresaArg);
+            $receberHoje = (float) ErpFinanceiroMetricas::receberNoDia($hoje, $empresaArg)['valor'];
+            $pagarHoje = (float) ErpFinanceiroMetricas::pagarNoDia($hoje, $empresaArg)['valor'];
+            $receberVencido = (float) ErpFinanceiroMetricas::receberVencido($hoje, $empresaArg)['valor'];
+            $pagarVencido = (float) ErpFinanceiroMetricas::pagarVencido($hoje, $empresaArg)['valor'];
+        }
 
-        $pedidosPendentes = $this->countPedidosPendentes($empresaId);
+        $pedidosPendentes = $comVendas ? $this->countPedidosPendentes($empresaId) : 0;
         $entregasPendentes = $this->countEntregasPendentes($empresaId);
         $estoqueBaixo = $this->countEstoqueBaixo($empresaId);
 
+        $saudeVazia = [
+            'percent' => 0.0,
+            'tone' => 'slate',
+            'label' => '',
+            'short' => '',
+            'message' => '',
+            'factors' => [],
+        ];
+
         try {
-            $saude = ErpDashboardGauges::saudeSnapshot(
+            $saude = ! $comFinanceiro ? $saudeVazia : ErpDashboardGauges::saudeSnapshot(
                 $empresaId > 0 ? $empresaId : null,
                 [
                     'saldo' => $caixa,
@@ -67,7 +89,7 @@ final class GestorExecutivoService
                 ],
             );
         } catch (Throwable) {
-            $saude = $this->saudeRapida(
+            $saude = ! $comFinanceiro ? $saudeVazia : $this->saudeRapida(
                 caixa: $caixa,
                 fatHoje: $fatHoje,
                 fatOntem: $fatOntem,
@@ -78,10 +100,12 @@ final class GestorExecutivoService
         }
 
         $metas = [];
-        try {
-            $metas = ErpDashboardGauges::buildVendedores($empresaId > 0 ? $empresaId : null);
-        } catch (Throwable) {
-            $metas = [];
+        if ($comVendas) {
+            try {
+                $metas = ErpDashboardGauges::buildVendedores($empresaId > 0 ? $empresaId : null);
+            } catch (Throwable) {
+                $metas = [];
+            }
         }
 
         $pulso = $this->montarPulso(
@@ -95,13 +119,18 @@ final class GestorExecutivoService
         );
 
         $aprovacoes = 0;
-        try {
-            $aprovacoes = app(GestorAprovacaoService::class)->countPendencias($empresaId);
-        } catch (Throwable) {
-            $aprovacoes = $pedidosPendentes;
+        if ($comAprovacoes) {
+            try {
+                $aprovacoes = app(GestorAprovacaoService::class)->countPendencias($empresaId);
+            } catch (Throwable) {
+                $aprovacoes = $pedidosPendentes;
+            }
         }
 
         return [
+            'mostrar_financeiro' => $comFinanceiro,
+            'mostrar_vendas' => $comVendas,
+            'mostrar_aprovacoes' => $comAprovacoes,
             'atualizado_em' => ErpFinanceiroMetricas::agoraLabelHora(),
             'saudacao' => $this->saudacao(),
             'faturamento_hoje' => $fatHoje,

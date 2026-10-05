@@ -42,7 +42,11 @@ class DashboardGestorPage extends Page
 
     public function refreshSnapshot(): void
     {
-        $this->snapshot = app(GestorExecutivoService::class)->snapshot();
+        $this->snapshot = app(GestorExecutivoService::class)->snapshot(
+            comFinanceiro: static::podeVerFinanceiroGestor(),
+            comVendas: static::podeVerVendasGestor(),
+            comAprovacoes: static::podeVerAprovacoesGestor(),
+        );
     }
 
     public function getHeading(): string|Htmlable|null

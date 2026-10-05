@@ -4,13 +4,13 @@ namespace App\Filament\Gestor\Pages;
 
 use App\Filament\Gestor\Concerns\InteractsWithGestorShell;
 use App\Models\Product;
-use App\Support\Erp\AjusteEstoqueService;
 use App\Support\Erp\BrDecimal;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Fiscal\NcmCatalogService;
 use App\Support\Erp\ProductEmpresaPrecoService;
+use App\Support\Erp\ProductEstoqueSaldoService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -108,10 +108,12 @@ class ProdutosGestorPage extends Page
 
         $empresaId = $this->empresaId();
         $precos = app(ProductEmpresaPrecoService::class);
+        $saldos = app(ProductEstoqueSaldoService::class);
         $starts = $q.'%';
         $word = '% '.$q.'%';
+        $estoquePorEmpresa = $empresaId > 0 && $saldos->suportaEstoquePorEmpresa($empresaId);
 
-        return Product::query()
+        $produtos = Product::query()
             ->where('ativo', true)
             ->where(function ($query) use ($q, $starts, $word): void {
                 $query->where('codigo', $q)
@@ -138,9 +140,16 @@ class ProdutosGestorPage extends Page
                 [$q, $starts, $starts, $starts, $word, $starts]
             )
             ->orderBy('descricao')
-            ->limit(40)
-            ->get(['id', 'codigo', 'descricao', 'estoque', 'preco_venda', 'grupo', 'validade'])
-            ->map(function (Product $product) use ($precos, $empresaId): array {
+            ->limit(40);
+        $produtos->select(['id', 'codigo', 'descricao', 'estoque', 'preco_venda', 'grupo', 'validade']);
+        if ($estoquePorEmpresa) {
+            $expr = $saldos->sqlEstoqueEmpresaExpression($saldos->estoqueIdParaEmpresa($empresaId));
+            $produtos->selectRaw("{$expr} as estoque_empresa_atual");
+        }
+
+        return $produtos
+            ->get()
+            ->map(function (Product $product) use ($precos, $empresaId, $estoquePorEmpresa): array {
                 $dias = $product->validadeDiasRestantes();
                 $status = $product->validadeStatus();
 
@@ -149,7 +158,7 @@ class ProdutosGestorPage extends Page
                     'codigo' => (string) ($product->codigo ?? ''),
                     'descricao' => (string) ($product->descricao ?? ''),
                     'grupo' => (string) ($product->grupo ?? ''),
-                    'estoque' => round((float) $product->estoque, 3),
+                    'estoque' => round((float) ($estoquePorEmpresa ? ($product->estoque_empresa_atual ?? 0) : $product->estoque), 3),
                     'preco_venda' => $precos->resolvePrecoVenda($product, $empresaId),
                     'validade' => $product->validade?->format('d/m/Y'),
                     'validade_status' => $status,
@@ -307,41 +316,19 @@ class ProdutosGestorPage extends Page
                         || abs($novoEspecial - (float) $atual['preco_especial']) >= 0.005;
 
                     if ($mudouPreco) {
+                        if ($empresaId <= 0) {
+                            throw new \InvalidArgumentException('Selecione a empresa para gravar o preço.');
+                        }
+
                         $prices = $atual;
                         $prices['preco_venda'] = $novoVenda;
                         $prices['preco_atacado'] = $novoAtacado;
                         $prices['preco_especial'] = $novoEspecial;
-
-                        if ($empresaId > 0) {
-                            $service->upsert($product, $empresaId, $prices);
-                        }
-
-                        $product->update([
-                            'preco_venda' => $novoVenda,
-                            'preco_atacado' => $novoAtacado,
-                            'preco_especial' => $novoEspecial,
-                        ]);
+                        $service->upsert($product, $empresaId, $prices);
 
                         $this->precoVenda = $this->formatMoney($novoVenda);
                         $this->precoAtacado = $this->formatMoney($novoAtacado);
                         $this->precoEspecial = $this->formatMoney($novoEspecial);
-                        $mudou = true;
-                    }
-                }
-
-                if ($this->canEditEstoque() && ErpAccess::can($user, 'ajuste_estoque.create')) {
-                    $novoEstoque = BrDecimal::parse($this->estoque, 3);
-                    $atualEstoque = round((float) $product->fresh()->estoque, 3);
-                    $delta = round($novoEstoque - $atualEstoque, 3);
-
-                    if (abs($delta) >= 0.0005) {
-                        app(AjusteEstoqueService::class)->criar(
-                            (int) $product->id,
-                            now()->toDateString(),
-                            $delta,
-                        );
-                        $this->estoque = $this->formatQty($novoEstoque);
-                        $this->atualizarSaldosEstoque((int) $product->id, $novoEstoque);
                         $mudou = true;
                     }
                 }
@@ -436,16 +423,14 @@ class ProdutosGestorPage extends Page
             || ErpAccess::currentCan('produtos.update');
     }
 
-    public function canEditEstoque(): bool
-    {
-        return ErpAccess::currentCan('ajuste_estoque.create');
-    }
-
     private function carregarProduto(Product $product): void
     {
         $empresaId = $this->empresaId();
         $prices = app(ProductEmpresaPrecoService::class)->resolve($product, $empresaId);
-        $fisico = round((float) $product->estoque, 3);
+        $fisico = round(app(ProductEstoqueSaldoService::class)->fisicoEmpresa(
+            (int) $product->id,
+            $empresaId > 0 ? $empresaId : null,
+        ), 3);
 
         $this->produtoId = (int) $product->id;
         $this->codigo = (string) ($product->codigo ?? '');

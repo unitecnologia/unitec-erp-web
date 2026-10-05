@@ -25,6 +25,7 @@ trait ManagesProductImageSearch
         $this->productImageSearchQuery = trim((string) ($this->data['descricao'] ?? ''));
         $this->clearProductImageSearchResults();
         $this->productImageSearchOpen = true;
+        $this->searchProductImagesOnline();
     }
 
     public function closeProductImageSearch(): void

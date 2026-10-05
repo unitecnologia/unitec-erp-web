@@ -35,10 +35,30 @@ final class ProductEstoqueSaldoService
 
     public function fisico(int $productId, ?int $estoqueId = null): float
     {
+        if ($estoqueId === null) {
+            return (float) (Product::query()->whereKey($productId)->value('estoque') ?? 0);
+        }
+
+        return $this->fisicoPorEstoques($productId, [$estoqueId])[$estoqueId] ?? 0.0;
+    }
+
+    /**
+     * Saldo físico de vários depósitos com uma leitura do produto e uma dos saldos.
+     *
+     * @param  list<int>  $estoqueIds
+     * @return array<int, float>
+     */
+    public function fisicoPorEstoques(int $productId, array $estoqueIds): array
+    {
+        $estoqueIds = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $estoqueIds)));
         $global = (float) (Product::query()->whereKey($productId)->value('estoque') ?? 0);
 
-        if ($estoqueId === null || ! $this->tabelaDisponivel()) {
-            return $global;
+        if ($estoqueIds === []) {
+            return [];
+        }
+
+        if (! $this->tabelaDisponivel()) {
+            return array_fill_keys($estoqueIds, $global);
         }
 
         /** @var array<int, float> $saldos */
@@ -49,9 +69,29 @@ final class ProductEstoqueSaldoService
             ->all();
 
         $principalId = $this->estoquePrincipalId();
-        $saldoDeposito = $saldos[$estoqueId] ?? null;
         $sumDepots = array_sum($saldos);
         $naoDistribuido = max(0.0, round($global - $sumDepots, 3));
+        $out = [];
+
+        foreach ($estoqueIds as $estoqueId) {
+            $out[$estoqueId] = $this->fisicoDeposito($estoqueId, $global, $saldos, $principalId, $sumDepots, $naoDistribuido);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int, float>  $saldos
+     */
+    private function fisicoDeposito(
+        int $estoqueId,
+        float $global,
+        array $saldos,
+        ?int $principalId,
+        float $sumDepots,
+        float $naoDistribuido,
+    ): float {
+        $saldoDeposito = $saldos[$estoqueId] ?? null;
 
         if ($saldoDeposito === null) {
             if ($sumDepots > 0) {

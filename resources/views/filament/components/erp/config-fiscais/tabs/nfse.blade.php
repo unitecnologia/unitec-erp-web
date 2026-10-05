@@ -53,13 +53,15 @@
 
             @if ($provedorNfse === 'ipm')
                 <div class="erp-config-fiscais-form__nfe-field">
-                    <label class="erp-pcad-form__label" for="cfg-nfse-ws-usuario">Usuário WebService</label>
+                    <label class="erp-pcad-form__label" for="cfg-nfse-ws-usuario">Usuário WebService (CNPJ da empresa)</label>
                     <input
                         id="cfg-nfse-ws-usuario"
                         type="text"
-                        wire:model="form.nfse_ws_usuario"
+                        value="{{ $this->form['nfse_ws_usuario'] ?? '' }}"
                         class="erp-pcad-form__input"
-                        maxlength="20"
+                        placeholder="CNPJ da empresa inválido"
+                        readonly
+                        tabindex="-1"
                         autocomplete="off"
                     >
                 </div>
@@ -105,6 +107,10 @@
                         spellcheck="false"
                     >
                 </div>
+
+                <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact erp-config-fiscais-form__nfe-field--span">
+                    No IPM, o ambiente Produção restrita envia em modo teste (EnvioTeste=1): a prefeitura valida o RPS e nenhuma NFS-e é emitida. Sem URL de homologação, o teste usa a URL de produção.
+                </p>
             @endif
         </div>
 

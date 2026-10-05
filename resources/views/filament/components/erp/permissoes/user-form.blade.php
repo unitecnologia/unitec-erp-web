@@ -48,6 +48,7 @@
                     acesso_app_unitec_os: 'Unitec OS',
                     acesso_app_entregas: 'Entregas',
                     acesso_app_gestao: 'Gestão',
+                    acesso_app_inventario: 'Inventário',
                 },
                 summary() {
                     const form = $wire.userForm || {};
@@ -87,6 +88,10 @@
                 <label class="erp-permissoes__apps-check">
                     <input type="checkbox" wire:model.live="userForm.acesso_app_gestao">
                     <span>Gestão</span>
+                </label>
+                <label class="erp-permissoes__apps-check">
+                    <input type="checkbox" wire:model.live="userForm.acesso_app_inventario">
+                    <span>Inventário</span>
                 </label>
             </div>
         </div>

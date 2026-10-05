@@ -14,8 +14,22 @@ trait ManagesProductImei
 
     public ?int $selectedImeiIndex = null;
 
+    public bool $productImeisHydrated = false;
+
+    protected function ensureProductImeisLoaded(): void
+    {
+        if ($this->productImeisHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductImeis($product);
+    }
+
     protected function loadProductImeis(?Product $product = null): void
     {
+        $this->productImeisHydrated = true;
+
         if (! $product) {
             $this->imeiRows = [];
             $this->selectedImeiIndex = null;
@@ -79,6 +93,10 @@ trait ManagesProductImei
         if (! ($product->usa_imei ?? false)) {
             $product->imeis()->delete();
 
+            return;
+        }
+
+        if (! $this->productImeisHydrated) {
             return;
         }
 

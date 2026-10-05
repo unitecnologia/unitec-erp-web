@@ -362,7 +362,7 @@ trait ErpOrdemServicoFormPage
 
         $this->aplicarExtrasVeiculo([]);
 
-        $espera = max(15, min(300, (int) ($empresa->param_consulta_placa_timeout ?? 10)) + 5);
+        $espera = max(15, min(300, (int) config('unitec.consulta_placa.timeout', 10)) + 5);
         $lock = Cache::lock('os-consulta-placa:'.$empresa->id.':'.$placa, $espera);
         if (! $lock->get()) {
             Notification::make()->title('A consulta desta placa já está em andamento.')->warning()->send();

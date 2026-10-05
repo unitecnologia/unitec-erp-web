@@ -82,6 +82,10 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
         Route::get('ping', [FvInfoController::class, 'ping']);
         Route::post('devices/register', [FvDeviceController::class, 'register']);
         Route::get('devices/status', [FvDeviceController::class, 'status']);
+        // Reset da base local: precisa funcionar antes do login (app recém-aberto).
+        Route::get('devices/reset', [FvDeviceController::class, 'resetStatus']);
+        Route::post('devices/reset/{reset}/concluir', [FvDeviceController::class, 'resetConcluir'])
+            ->where('reset', '[0-9a-fA-F-]{36}');
     });
 
     // Foto do produto (pública: Image.network não envia token).
@@ -104,8 +108,12 @@ Route::prefix('v1/forca-vendas')->group(function (): void {
         Route::post('auth/login', [FvAuthController::class, 'login']);
 
         Route::middleware('auth:sanctum')->group(function (): void {
-            Route::get('auth/me', [FvAuthController::class, 'me']);
+            // Logout fica fora do vínculo: sempre deve conseguir encerrar o token.
             Route::post('auth/logout', [FvAuthController::class, 'logout']);
+        });
+
+        Route::middleware(['auth:sanctum', 'forcavendas.device.user'])->group(function (): void {
+            Route::get('auth/me', [FvAuthController::class, 'me']);
             Route::get('dashboard', DashboardController::class);
             Route::get('comissao', ComissaoController::class);
             Route::get('orcamentos/{orcamento}', [OrcamentoController::class, 'show']);

@@ -25,6 +25,7 @@ class ProductListQueryBuilder
         public ?string $validadeAte = null,
         public bool $applyDefaultOrder = true,
         public array $searchFieldsActive = [],
+        public bool $deferReservaSum = false,
     ) {}
 
     public static function fromRequest(Request $request, ?Empresa $empresa = null): self
@@ -75,26 +76,27 @@ class ProductListQueryBuilder
 
         $query = Product::query();
         $productsTable = $query->getModel()->getTable();
-        $prefix = $query->getConnection()->getTablePrefix();
-        $reservasAlias = 'erp_reservas_sum';
-        $reservasAliasSql = $prefix.$reservasAlias;
 
-        // Reservas: 1 JOIN agregado (Laravel prefixa o alias do leftJoinSub).
-        $reservas = EstoqueReserva::query()
-            ->selectRaw('product_id, COALESCE(SUM(quantidade), 0) as estoque_reservado_sum')
-            ->where('status', EstoqueReserva::STATUS_ATIVA)
-            ->when($estoqueId !== null, fn (Builder $q): Builder => $q->where('estoque_id', $estoqueId))
-            ->groupBy('product_id');
+        // A grade pagina primeiro e soma reservas só dos IDs da página.
+        // O JOIN agregado varre todas as reservas em todo COUNT/SELECT da pesquisa.
+        if (! $this->deferReservaSum) {
+            $prefix = $query->getConnection()->getTablePrefix();
+            $reservasAlias = 'erp_reservas_sum';
+            $reservasAliasSql = $prefix.$reservasAlias;
 
-        $query->leftJoinSub($reservas, $reservasAlias, function ($join) use ($productsTable, $reservasAlias): void {
-            // Alias sem prefixo: o query builder prefixa sozinho no JOIN/ON.
-            $join->on("{$reservasAlias}.product_id", '=', "{$productsTable}.id");
-        })
-            ->addSelect("{$productsTable}.*")
-            ->addSelect(\Illuminate\Support\Facades\DB::raw(
-                // DB::raw NÃO recebe prefixo automático — usar alias já prefixado.
-                "COALESCE({$reservasAliasSql}.estoque_reservado_sum, 0) as estoque_reservado_sum"
-            ));
+            $query->leftJoinSub($this->reservaSumQuery($estoqueId), $reservasAlias, function ($join) use ($productsTable, $reservasAlias): void {
+                // Alias sem prefixo: o query builder prefixa sozinho no JOIN/ON.
+                $join->on("{$reservasAlias}.product_id", '=', "{$productsTable}.id");
+            })
+                ->addSelect("{$productsTable}.*")
+                ->addSelect(\Illuminate\Support\Facades\DB::raw(
+                    // DB::raw NÃO recebe prefixo automático — usar alias já prefixado.
+                    "COALESCE({$reservasAliasSql}.estoque_reservado_sum, 0) as estoque_reservado_sum"
+                ));
+        } else {
+            // addSelect do saldo substitui o * implícito se a query ainda não tem colunas.
+            $query->select("{$productsTable}.*");
+        }
 
         // empresaPrecos: só no ProductResource::table modifyQueryUsing — evita eager duplo.
 
@@ -103,6 +105,52 @@ class ProductListQueryBuilder
         }
 
         return $this->applyFiltersAndOrder($query, $estoqueService, $empresaId, $usaEstoqueEmpresa);
+    }
+
+    /**
+     * Soma de reservas ativas só dos produtos já paginados (não de todo o catálogo).
+     *
+     * @param  iterable<int, Product>  $products
+     */
+    public function hydrateReservaSums(iterable $products): void
+    {
+        $ids = [];
+
+        foreach ($products as $product) {
+            $id = (int) $product->getKey();
+
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        if ($ids === []) {
+            return;
+        }
+
+        $empresaId = $this->empresa !== null ? (int) $this->empresa->id : 0;
+        $estoqueService = app(ProductEstoqueSaldoService::class);
+        $estoqueId = $estoqueService->suportaEstoquePorEmpresa($empresaId > 0 ? $empresaId : null)
+            ? $estoqueService->estoqueIdParaEmpresa($empresaId)
+            : null;
+
+        $sums = $this->reservaSumQuery($estoqueId)
+            ->whereIn('product_id', $ids)
+            ->pluck('estoque_reservado_sum', 'product_id');
+
+        foreach ($products as $product) {
+            $id = (int) $product->getKey();
+            $product->setAttribute('estoque_reservado_sum', (float) ($sums[$id] ?? $sums[(string) $id] ?? 0));
+        }
+    }
+
+    protected function reservaSumQuery(?int $estoqueId): Builder
+    {
+        return EstoqueReserva::query()
+            ->selectRaw('product_id, COALESCE(SUM(quantidade), 0) as estoque_reservado_sum')
+            ->where('status', EstoqueReserva::STATUS_ATIVA)
+            ->when($estoqueId !== null, fn (Builder $q): Builder => $q->where('estoque_id', $estoqueId))
+            ->groupBy('product_id');
     }
 
     /**

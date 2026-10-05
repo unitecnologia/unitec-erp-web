@@ -15,6 +15,7 @@ final class NfseTransmissaoResultado
         public readonly bool $autorizada,
         public readonly array $erros,
         public readonly array $alertas,
+        public readonly bool $modoTeste = false,
     ) {}
 
     public function mensagemErros(): string

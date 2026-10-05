@@ -27,6 +27,7 @@ use Laravel\Sanctum\HasApiTokens;
     'acesso_app_unitec_os',
     'acesso_app_entregas',
     'acesso_app_gestao',
+    'acesso_app_inventario',
     'empresa_id',
     'is_admin',
     'ativo',
@@ -46,6 +47,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const APP_GESTAO = 'gestao';
 
+    public const APP_INVENTARIO = 'inventario';
+
     /** @var array<string, string> */
     public const APP_ACCESS_COLUMNS = [
         self::APP_FORCA_VENDAS => 'acesso_app_forca_vendas',
@@ -53,6 +56,7 @@ class User extends Authenticatable implements FilamentUser
         self::APP_UNITEC_OS => 'acesso_app_unitec_os',
         self::APP_ENTREGAS => 'acesso_app_entregas',
         self::APP_GESTAO => 'acesso_app_gestao',
+        self::APP_INVENTARIO => 'acesso_app_inventario',
     ];
 
     /** @use HasFactory<UserFactory> */
@@ -72,6 +76,7 @@ class User extends Authenticatable implements FilamentUser
             'acesso_app_unitec_os' => 'boolean',
             'acesso_app_entregas' => 'boolean',
             'acesso_app_gestao' => 'boolean',
+            'acesso_app_inventario' => 'boolean',
         ];
     }
 
@@ -92,7 +97,7 @@ class User extends Authenticatable implements FilamentUser
     public function scopeComAcessoApp($query, string $app)
     {
         $column = self::APP_ACCESS_COLUMNS[$app] ?? null;
-        if ($column === null || $app === self::APP_GESTAO) {
+        if ($column === null || $app === self::APP_GESTAO || $app === self::APP_INVENTARIO) {
             return $query->whereRaw('0 = 1');
         }
 
@@ -107,6 +112,10 @@ class User extends Authenticatable implements FilamentUser
     {
         if (! $this->ativo) {
             return false;
+        }
+
+        if ($panel->getId() === 'inventario') {
+            return \App\Support\Inventario\InventarioAcesso::podeEntrar($this);
         }
 
         if ($panel->getId() !== 'gestor') {

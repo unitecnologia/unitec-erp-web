@@ -63,9 +63,7 @@ trait ManagesProductFormUi
             $this->refreshEmpresaImpostoPadraoOnImpostosTab();
         }
 
-        if ($tab === 'lotes' && method_exists($this, 'loadProductLotes')) {
-            $this->loadProductLotes($this->record ?? null);
-        }
+        $this->ensureProductTabPayload($tab);
 
         $this->dispatch('erp-masks-refresh');
 
@@ -78,10 +76,6 @@ trait ManagesProductFormUi
     {
         if (in_array($key, ['is_combustivel', 'tem_info_nutricional', 'is_composicao', 'is_grade', 'usa_tab_preco', 'usa_imei', 'controla_lote_validade'], true)) {
             $this->syncActiveTabAfterParameterChange($key, (bool) $value);
-        }
-
-        if ($key === 'controla_lote_validade' && (bool) $value && method_exists($this, 'loadProductLotes')) {
-            $this->loadProductLotes($this->record ?? null);
         }
 
         if ($key === 'is_restaurante' && ! (bool) $value) {
@@ -138,6 +132,7 @@ trait ManagesProductFormUi
 
         if ($enabled && $tab) {
             $this->activeFormTab = $tab;
+            $this->ensureProductTabPayload($tab);
 
             return;
         }
@@ -146,6 +141,45 @@ trait ManagesProductFormUi
 
         if (! in_array($this->activeFormTab, $visibleKeys, true)) {
             $this->activeFormTab = $visibleKeys[0] ?? 'estoques';
+        }
+    }
+
+    /**
+     * Grade, composição, IMEI, lotes e histórico só são lidos quando a aba abre.
+     */
+    protected function ensureProductTabPayload(string $tab): void
+    {
+        $wasClean = method_exists($this, 'productFormHasUnsavedChanges')
+            && ! $this->productFormHasUnsavedChanges();
+
+        $this->loadProductTabPayload($tab);
+
+        // Linhas lidas agora não são alteração do usuário (confirmação de saída).
+        if ($wasClean && method_exists($this, 'captureProductFormBaseline')) {
+            $this->captureProductFormBaseline();
+        }
+    }
+
+    protected function loadProductTabPayload(string $tab): void
+    {
+        if ($tab === 'grade' && method_exists($this, 'ensureProductGradesLoaded')) {
+            $this->ensureProductGradesLoaded();
+        }
+
+        if ($tab === 'composicao' && method_exists($this, 'ensureProductCompositionsLoaded')) {
+            $this->ensureProductCompositionsLoaded();
+        }
+
+        if ($tab === 'imei' && method_exists($this, 'ensureProductImeisLoaded')) {
+            $this->ensureProductImeisLoaded();
+        }
+
+        if ($tab === 'ultimos_precos' && method_exists($this, 'ensureProductPriceHistoriesLoaded')) {
+            $this->ensureProductPriceHistoriesLoaded();
+        }
+
+        if ($tab === 'lotes' && method_exists($this, 'loadProductLotes')) {
+            $this->loadProductLotes($this->record ?? null);
         }
     }
 

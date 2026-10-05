@@ -8,6 +8,7 @@
             ])
 
             <nav class="gestor-menu" aria-label="Atalhos">
+                @if ($this->podeVerAprovacoesGestor())
                 <a class="gestor-menu__item" href="{{ $this->aprovacoesUrl() }}" wire:navigate>
                     <span class="gestor-menu__icon" data-icon="aprov"></span>
                     <span>
@@ -24,6 +25,17 @@
                         <span class="gestor-menu__badge">{{ $aprovacoesPendentes }}</span>
                     @endif
                 </a>
+                @endif
+
+                @if ($this->podeAbrirInventario())
+                <a class="gestor-menu__item" href="{{ url('/inventario') }}">
+                    <span class="gestor-menu__icon" data-icon="box"></span>
+                    <span>
+                        <strong>Inventário</strong>
+                        <small>Contagem física de estoque</small>
+                    </span>
+                </a>
+                @endif
 
                 <a class="gestor-menu__item" href="{{ $this->produtosUrl() }}" wire:navigate>
                     <span class="gestor-menu__icon" data-icon="box"></span>

@@ -24,7 +24,9 @@ use App\Support\Erp\Nfse\NfseNaoGravada;
 use App\Support\Erp\Nfse\NfseObra;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
+use App\Support\Erp\Nfse\Ipm\NfseIpmCliente;
 use App\Support\Erp\Nfse\Ipm\NfseIpmEmitirService;
+use App\Support\Erp\Nfse\NfseTransmissaoResultado;
 use App\Support\Erp\Nfse\NfseTransmitirService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -953,6 +955,12 @@ class NfsePage extends Page
             return;
         }
 
+        if ($resultado->modoTeste) {
+            $this->mostrarResultadoTesteIpm($resultado);
+
+            return;
+        }
+
         $this->nfseStatus = Nfse::STATUS_ABERTA;
         $ipm = $this->nfseProvedorIpm($resultado->nfse->empresa ?? ErpContext::currentEmpresa());
         $mensagem = $resultado->mensagemErros();
@@ -967,6 +975,24 @@ class NfsePage extends Page
             ! $ipm,
             $ipm ? 'Esta é uma mensagem do provedor IPM.' : null,
             $ipm ? 'Código IPM' : null,
+        );
+    }
+
+    protected function mostrarResultadoTesteIpm(NfseTransmissaoResultado $resultado): void
+    {
+        $this->nfseStatus = Nfse::STATUS_ABERTA;
+        $aceito = $resultado->erros === [];
+        $linhas = $aceito ? $resultado->alertas : [$resultado->mensagemErros()];
+        $linhas[] = 'Envio com EnvioTeste=1: nenhuma NFS-e foi emitida e a nota continua aberta.';
+        $codigo = $resultado->erros[0]['codigo'] ?? null;
+
+        $this->mostrarNfseFiscalErro(
+            $aceito ? 'MODO TESTE IPM: RPS ACEITO' : 'MODO TESTE IPM: RPS RECUSADO',
+            implode("\n", array_values(array_filter(array_map('strval', $linhas), fn (string $linha): bool => trim($linha) !== ''))),
+            is_string($codigo) && $codigo !== '' ? $codigo : null,
+            false,
+            'Esta é uma mensagem do provedor IPM.',
+            'Código IPM',
         );
     }
 
@@ -3039,17 +3065,15 @@ class NfsePage extends Page
             return 'Informe a série RPS da NFS-e.';
         }
 
-        if (trim((string) ($empresa->nfse_ws_usuario ?? '')) === '' || (string) ($empresa->nfse_ws_senha ?? '') === '') {
-            return 'Informe o usuário e a senha do WebService IPM.';
+        if ((string) ($empresa->nfse_ws_senha ?? '') === '') {
+            return 'Informe a senha do WebService IPM.';
         }
 
-        $ambiente = strtolower(trim((string) $empresa->nfse_ambiente));
-        $url = trim((string) ($ambiente === 'producao' ? $empresa->nfse_url_producao : $empresa->nfse_url_homologacao));
-
-        if ($url === '') {
-            return $ambiente === 'producao'
-                ? 'Informe a URL de produção do WebService IPM.'
-                : 'Informe a URL de homologação do WebService IPM.';
+        try {
+            app(NfseIpmCliente::class)->usuario($empresa);
+            app(NfseIpmCliente::class)->url($empresa);
+        } catch (NfseNaoTransmitida $exception) {
+            return $exception->getMessage();
         }
 
         if (trim((string) $empresa->im) === '') {
@@ -3076,6 +3100,10 @@ class NfsePage extends Page
 
             if (trim((string) ($linha['descricao'] ?? '')) === '' || strlen($nacional) !== 6 || $quantidade === null || bccomp($quantidade, '0', 3) !== 1) {
                 return 'Faltam dados fiscais do serviço.';
+            }
+
+            if (strlen(preg_replace('/\D/', '', (string) ($linha['c_nbs'] ?? '')) ?? '') !== 9) {
+                return 'Informe o código NBS do serviço com 9 dígitos.';
             }
 
             $obra = NfseObra::pendencia($linha['c_trib_nac'] ?? null, $linha, (string) ($linha['descricao'] ?? ''));

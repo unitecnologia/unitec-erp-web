@@ -50,7 +50,9 @@ final class ErpEmpresaScopeFilter
 
         $pdvTable = (new PdvVenda)->getTable();
 
-        if (ErpSchema::hasColumn($pdvTable, 'empresa_id')) {
+        // assumeMigrated() faz hasColumn() responder true sem consultar o banco.
+        // pdv_vendas não tem empresa_id; a empresa fica em pdv_caixa_sessoes.
+        if (ErpSchema::hasColumnActual($pdvTable, 'empresa_id')) {
             if (is_array($scope)) {
                 $ids = array_values(array_filter(array_map('intval', $scope)));
 
@@ -64,7 +66,7 @@ final class ErpEmpresaScopeFilter
             return;
         }
 
-        if (! ErpSchema::hasTable('pdv_caixa_sessoes') || ! ErpSchema::hasColumn('pdv_caixa_sessoes', 'empresa_id')) {
+        if (! ErpSchema::hasTable('pdv_caixa_sessoes') || ! ErpSchema::hasColumnActual('pdv_caixa_sessoes', 'empresa_id')) {
             return;
         }
 

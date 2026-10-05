@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\ForcaVendas;
 
 use App\Models\Empresa;
+use App\Models\ForcaVendasDevice;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,10 +38,24 @@ class InfoController
     public function users(Request $request): JsonResponse
     {
         $empresaId = $request->integer('empresa_id');
+        $device = $request->attributes->get('fv_device');
+        $vinculoUserId = $device instanceof ForcaVendasDevice && $device->user_id !== null
+            ? (int) $device->user_id
+            : null;
+
+        if ($vinculoUserId === null && $empresaId <= 0) {
+            return response()->json(['users' => [], 'vinculo_user_id' => null]);
+        }
 
         $users = User::query()
             ->comAcessoApp(User::APP_FORCA_VENDAS)
             ->when($empresaId > 0, fn ($q) => $q->where('empresa_id', $empresaId))
+            // Aparelho vinculado: a tela de login só oferece o vendedor do aparelho.
+            ->when($vinculoUserId !== null, fn ($q) => $q->whereKey($vinculoUserId))
+            // Aparelho livre: só quem é vendedor ativo (admin/caixa com a flag não aparecem).
+            ->when($vinculoUserId === null, fn ($q) => $q
+                ->whereNotNull('vendedor_id')
+                ->whereHas('vendedor', fn ($v) => $v->where('ativo', true)))
             ->orderBy('name')
             ->get(['id', 'name', 'empresa_id', 'vendedor_id'])
             ->map(fn (User $u): array => [
@@ -51,7 +66,10 @@ class InfoController
             ])
             ->all();
 
-        return response()->json(['users' => $users]);
+        return response()->json([
+            'users' => $users,
+            'vinculo_user_id' => $vinculoUserId,
+        ]);
     }
 
     public function ping(): JsonResponse

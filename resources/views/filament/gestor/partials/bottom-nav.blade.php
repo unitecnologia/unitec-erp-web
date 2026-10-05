@@ -1,5 +1,8 @@
 <nav class="gestor-nav" aria-label="Navegação principal">
     @foreach ($this->bottomNav() as $item)
+        @if (! ($item['visible'] ?? true))
+            @continue
+        @endif
         <a
             href="{{ $item['url'] }}"
             class="gestor-nav__item {{ $item['active'] ? 'is-active' : '' }}"

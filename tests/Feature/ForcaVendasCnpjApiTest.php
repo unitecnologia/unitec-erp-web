@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ForcaVendasDevice;
 use App\Models\User;
+use App\Models\Vendedor;
 use App\Support\Erp\CnpjLookupService;
 use Tests\Concerns\MigratesSqliteMemory;
 use Laravel\Sanctum\Sanctum;
@@ -16,13 +17,15 @@ class ForcaVendasCnpjApiTest extends TestCase
 
     public function test_consulta_cnpj_retorna_campos_para_o_app(): void
     {
+        $vendedor = Vendedor::query()->forceCreate(['codigo' => '1', 'nome' => 'VENDEDOR', 'ativo' => true]);
+        $user = User::factory()->create(['vendedor_id' => $vendedor->id]);
+
         $device = ForcaVendasDevice::query()->create([
             'device_uuid' => 'test-device-uuid',
             'device_name' => 'Teste',
             'status' => ForcaVendasDevice::STATUS_APROVADO,
+            'user_id' => $user->id,
         ]);
-
-        $user = User::factory()->create();
 
         Sanctum::actingAs($user);
 

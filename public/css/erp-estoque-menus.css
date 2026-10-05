@@ -1228,9 +1228,11 @@
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(4),
 .erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(4) { width: 12%; } /* Cód. Barras */
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(5),
-.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(5) { width: 50%; } /* Produto */
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(5) { width: 42%; } /* Produto */
 .erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(6),
 .erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(6) { width: 15%; } /* Qtd. Ajust. */
+.erp-ajustes-estoque-page .fi-ta-header-cell:nth-child(7),
+.erp-ajustes-estoque-page .fi-ta-row .fi-ta-cell:nth-child(7) { width: 8%; } /* Origem */
 
 /* Ajuste Estoque Por Grupo — standalone limpa: esconde ribbon de ícones/menus */
 .fi-body:has(.erp-ajusta-estoque-grupo-page) .erp-menu-bar,

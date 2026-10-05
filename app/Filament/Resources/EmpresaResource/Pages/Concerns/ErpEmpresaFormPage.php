@@ -552,7 +552,14 @@ trait ErpEmpresaFormPage
             $data['param_api_servicos_timeout'] = (int) $data['param_api_servicos_timeout'];
         }
 
-        unset($data['param_licenca_api_url'], $data['param_licenca_api_timeout']);
+        if (array_key_exists('param_api_servicos_url', $data)) {
+            $data['param_api_servicos_url'] = EmpresaParametros::normalizeCcgConsGtinUrl($data['param_api_servicos_url'] ?? null);
+        }
+
+        $data['param_api_servicos_serper_url'] = (string) config('unitec.imagens_serper.url', '');
+        $data['param_api_servicos_serper_key'] = (string) config('unitec.imagens_serper.key', '');
+
+        unset($data['param_licenca_api_url'], $data['param_licenca_api_timeout'], $data['param_licenca_api_habilitar']);
 
         if (array_key_exists('param_whatsapp_timeout', $data)) {
             if ($data['param_whatsapp_timeout'] === '' || $data['param_whatsapp_timeout'] === null) {
@@ -738,6 +745,8 @@ trait ErpEmpresaFormPage
 
         $this->hydratePortalContadorFormDefaults();
         $this->hydrateConsultaPlacaFormDefaults();
+        $this->hydrateSerperImagensFormDefaults();
+        $this->hydrateCcgConsultaFormDefaults();
         $this->safeFillEmpresaForm();
         $this->hydrateCloudflareCredentialsFromDefaults();
         $this->hydrateUpdateDownloadUrlFromDefault();
@@ -769,32 +778,31 @@ trait ErpEmpresaFormPage
         }
     }
 
-    protected function hydrateConsultaPlacaFormDefaults(): void
+    protected function hydrateSerperImagensFormDefaults(): void
     {
-        if (blank($this->data['param_consulta_placa_url'] ?? null)) {
-            $this->data['param_consulta_placa_url'] = (string) (EmpresaParametros::consultaPlacaFields()['param_consulta_placa_url']['default'] ?? '');
-        }
+        $this->data['param_api_servicos_serper_url'] = (string) config('unitec.imagens_serper.url', '');
+        $this->data['param_api_servicos_serper_key'] = (string) config('unitec.imagens_serper.key', '');
+    }
+
+    protected function hydrateCcgConsultaFormDefaults(): void
+    {
+        $this->data['param_api_servicos_url'] = EmpresaParametros::normalizeCcgConsGtinUrl($this->data['param_api_servicos_url'] ?? null);
 
         if (
-            ! array_key_exists('param_consulta_placa_timeout', $this->data)
-            || $this->data['param_consulta_placa_timeout'] === ''
-            || $this->data['param_consulta_placa_timeout'] === null
+            ! array_key_exists('param_api_servicos_timeout', $this->data)
+            || $this->data['param_api_servicos_timeout'] === ''
+            || $this->data['param_api_servicos_timeout'] === null
         ) {
-            $this->data['param_consulta_placa_timeout'] = 10;
+            $this->data['param_api_servicos_timeout'] = (int) (EmpresaParametros::apiServicosFields()['param_api_servicos_timeout']['default'] ?? 30);
         }
+    }
 
-        $token = '';
-        $record = property_exists($this, 'record') ? ($this->record ?? null) : null;
-
-        if ($record instanceof Empresa) {
-            try {
-                $token = trim((string) ($record->param_consulta_placa_token ?? ''));
-            } catch (\Throwable) {
-                $token = '';
-            }
-        }
-
-        $this->data['param_consulta_placa_token'] = $token;
+    protected function hydrateConsultaPlacaFormDefaults(): void
+    {
+        $this->data['param_consulta_placa_habilitar'] = (bool) config('unitec.consulta_placa.enabled', true);
+        $this->data['param_consulta_placa_url'] = (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.cc');
+        $this->data['param_consulta_placa_timeout'] = (int) config('unitec.consulta_placa.timeout', 10);
+        $this->data['param_consulta_placa_token'] = (string) config('unitec.consulta_placa.token', '');
     }
 
     protected function getEmpresaListRedirectUrl(): string

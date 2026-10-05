@@ -2,10 +2,15 @@
     @php $editando = $this->contaFormRecordId !== null; @endphp
     <div
         class="erp-pagar-form-modal"
-        x-data
+        x-data="{ saving: false }"
         x-on:keydown.window="
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.closeContaFormModal(); }
-            if ($event.key === 'F5') { $event.preventDefault(); $wire.salvarContaForm(); }
+            if ($event.key === 'F5') {
+                $event.preventDefault();
+                if (saving) return;
+                saving = true;
+                Promise.resolve($wire.salvarContaForm()).finally(() => { saving = false });
+            }
         "
     >
         <div class="erp-pagar-form-modal__backdrop" wire:click="closeContaFormModal"></div>
@@ -102,8 +107,12 @@
                 <button
                     type="button"
                     class="erp-pagar-form-modal__btn erp-pagar-form-modal__btn--save"
-                    wire:click="salvarContaForm"
-                    wire:loading.attr="disabled"
+                    x-bind:disabled="saving"
+                    x-on:click="
+                        if (saving) return;
+                        saving = true;
+                        Promise.resolve($wire.salvarContaForm()).finally(() => { saving = false });
+                    "
                 >
                     <kbd>F5</kbd> | Salvar
                 </button>

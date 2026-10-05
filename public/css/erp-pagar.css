@@ -1880,6 +1880,12 @@
     filter: brightness(1.05);
 }
 
+.erp-pagar-page .erp-pagar-form-modal__btn:disabled {
+    opacity: 0.65;
+    cursor: default;
+    filter: none;
+}
+
 .erp-pagar-page .erp-pagar-form-modal__btn--exit {
     border: 1px solid #94a3b8;
     background: #fff;

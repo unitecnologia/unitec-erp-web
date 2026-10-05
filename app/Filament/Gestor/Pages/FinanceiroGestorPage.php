@@ -3,10 +3,14 @@
 namespace App\Filament\Gestor\Pages;
 
 use App\Filament\Gestor\Concerns\InteractsWithGestorShell;
+use App\Models\ContaPagar;
+use App\Models\ContaReceber;
+use App\Models\PlanoConta;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
+use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use App\Support\Gestor\GestorFinanceiroService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -54,12 +58,15 @@ class FinanceiroGestorPage extends Page
 
     public static function canAccess(): bool
     {
-        return static::canAccessGestor();
+        return static::podeVerFinanceiroGestor();
     }
 
     public function mount(): void
     {
         $this->mountGestorShell();
+        if (! static::canAccess()) {
+            abort(403);
+        }
         $this->refreshFinanceiro();
     }
 
@@ -123,9 +130,7 @@ class FinanceiroGestorPage extends Page
         }
 
         return (bool) $user->is_admin
-            || ErpAccess::can($user, 'contas_pagar.baixa')
-            || ErpAccess::can($user, 'contas_pagar.update')
-            || ErpAccess::can($user, 'contas_pagar.access');
+            || ErpAccess::can($user, 'contas_pagar.baixa');
     }
 
     public function podeReceberTitulos(): bool
@@ -137,9 +142,7 @@ class FinanceiroGestorPage extends Page
         }
 
         return (bool) $user->is_admin
-            || ErpAccess::can($user, 'contas_receber.baixa')
-            || ErpAccess::can($user, 'contas_receber.update')
-            || ErpAccess::can($user, 'contas_receber.access');
+            || ErpAccess::can($user, 'contas_receber.baixa');
     }
 
     public function abrirPagamento(int $contaId): void
@@ -162,6 +165,26 @@ class FinanceiroGestorPage extends Page
         if ($isReceber ? ! $this->podeReceberTitulos() : ! $this->podePagarTitulos()) {
             Notification::make()
                 ->title($isReceber ? 'Sem permissão para receber títulos.' : 'Sem permissão para pagar títulos.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $modelo = $isReceber ? ContaReceber::class : ContaPagar::class;
+        if (! $this->tituloDaEmpresaAtual($modelo, $contaId)) {
+            Notification::make()
+                ->title('Título de outra empresa.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! $isReceber && $this->planoDebitoPadrao() === null) {
+            Notification::make()
+                ->title('Cadastre um plano de contas de débito')
+                ->body('A baixa de Contas a Pagar precisa de um plano de débito ativo.')
                 ->warning()
                 ->send();
 
@@ -242,6 +265,31 @@ class FinanceiroGestorPage extends Page
             return;
         }
 
+        $modelo = $isReceber ? ContaReceber::class : ContaPagar::class;
+        if (! $this->tituloDaEmpresaAtual($modelo, (int) $this->pagamentoContaId)) {
+            Notification::make()
+                ->title('Título de outra empresa.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $opcoes = [];
+        if (! $isReceber) {
+            $planoId = $this->planoDebitoPadrao();
+            if ($planoId === null) {
+                Notification::make()
+                    ->title('Cadastre um plano de contas de débito')
+                    ->body('A baixa de Contas a Pagar precisa de um plano de débito ativo.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+            $opcoes['plano_conta_id'] = $planoId;
+        }
+
         try {
             $resultado = $isReceber
                 ? app(ContaReceberBaixaService::class)->baixarMuitas(
@@ -251,6 +299,7 @@ class FinanceiroGestorPage extends Page
                 : app(ContaPagarBaixaService::class)->baixarUma(
                     (int) $this->pagamentoContaId,
                     (int) $this->pagamentoFormaId,
+                    $opcoes,
                 );
         } catch (InvalidArgumentException $e) {
             Notification::make()
@@ -308,5 +357,53 @@ class FinanceiroGestorPage extends Page
     public function getHeading(): string|Htmlable|null
     {
         return null;
+    }
+
+    /**
+     * @param  class-string<ContaReceber|ContaPagar>  $modelo
+     */
+    private function tituloDaEmpresaAtual(string $modelo, int $id): bool
+    {
+        $empresaId = $this->empresaIdAtiva();
+        if ($id <= 0 || $empresaId <= 0) {
+            return false;
+        }
+
+        $query = $modelo::query()->whereKey($id);
+        ErpFinanceiroMetricas::applyEmpresaColumn($query, (new $modelo)->getTable(), $empresaId);
+
+        return $query->exists();
+    }
+
+    /**
+     * Mesma ordem da tela de Contas a Pagar: código 1, senão descrição com FORNECEDOR, senão o primeiro débito ativo.
+     */
+    private function planoDebitoPadrao(): ?int
+    {
+        $planos = app(ContaPagarBaixaService::class)->planosDisponiveis();
+        if ($planos === []) {
+            return null;
+        }
+
+        $ids = array_map(fn (array $plano): int => (int) $plano['id'], $planos);
+        $porCodigo = (int) PlanoConta::query()
+            ->where('codigo', 1)
+            ->where('ativo', true)
+            ->where('dc', 'D')
+            ->value('id');
+
+        if ($porCodigo > 0 && in_array($porCodigo, $ids, true)) {
+            return $porCodigo;
+        }
+
+        foreach ($planos as $plano) {
+            $label = mb_strtoupper((string) ($plano['label'] ?? ''), 'UTF-8');
+            $id = (int) ($plano['id'] ?? 0);
+            if ($id > 0 && str_contains($label, 'FORNECEDOR')) {
+                return $id;
+            }
+        }
+
+        return (int) ($planos[0]['id'] ?? 0) ?: null;
     }
 }

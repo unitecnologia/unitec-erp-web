@@ -556,8 +556,12 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    width: auto;
+    width: 100%;
     gap: 0.55rem !important;
+}
+
+.erp-terminais-pcad__actions .erp-terminais-pcad__btn--end {
+    margin-left: auto;
 }
 
 .erp-terminais-form-page .erp-pcad-actions__btn[data-erp-key="F4"],

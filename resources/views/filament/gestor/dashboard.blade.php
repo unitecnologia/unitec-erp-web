@@ -16,6 +16,7 @@
             ])
 
             {{-- Saúde — diferencial --}}
+            @if ($s['mostrar_financeiro'] ?? true)
             <section class="gestor-hero gestor-hero--{{ $saude['tone'] ?? 'gray' }}" aria-label="Saúde da empresa">
                 <div
                     class="gestor-ring"
@@ -33,8 +34,10 @@
                     <p class="gestor-hero__msg">{{ $saude['message'] ?? '' }}</p>
                 </div>
             </section>
+            @endif
 
             {{-- Faturamento destaque --}}
+            @if ($s['mostrar_vendas'] ?? true)
             <section class="gestor-spotlight">
                 <div class="gestor-spotlight__card">
                     <p class="gestor-kicker">Faturamento hoje</p>
@@ -46,8 +49,9 @@
                     <p class="gestor-spotlight__value gestor-spotlight__value--sm">{{ $this->money((float) ($s['faturamento_mes'] ?? 0)) }}</p>
                 </div>
             </section>
+            @endif
 
-            @if (((int) ($s['aprovacoes_pendentes'] ?? 0)) > 0)
+            @if (($s['mostrar_aprovacoes'] ?? true) && ((int) ($s['aprovacoes_pendentes'] ?? 0)) > 0)
                 <a class="gestor-cta gestor-cta--aprov" href="{{ \App\Filament\Gestor\Pages\AprovacoesGestorPage::getUrl(panel: 'gestor') }}" wire:navigate>
                     {{ (int) $s['aprovacoes_pendentes'] }} aprovação(ões) aguardando →
                 </a>
@@ -55,6 +59,7 @@
 
             {{-- Grid KPIs --}}
             <section class="gestor-grid" aria-label="Indicadores">
+                @if ($s['mostrar_financeiro'] ?? true)
                 <article class="gestor-card">
                     <p class="gestor-kicker">Caixa</p>
                     <p class="gestor-card__value">{{ $this->money((float) ($s['caixa'] ?? 0)) }}</p>
@@ -67,10 +72,13 @@
                     <p class="gestor-kicker">Pagar hoje</p>
                     <p class="gestor-card__value">{{ $this->money((float) ($s['pagar_hoje'] ?? 0)) }}</p>
                 </article>
+                @endif
+                @if ($s['mostrar_vendas'] ?? true)
                 <article class="gestor-card {{ (($s['pedidos_pendentes'] ?? 0) > 0) ? 'gestor-card--alert' : '' }}">
                     <p class="gestor-kicker">Pedidos pend.</p>
                     <p class="gestor-card__value">{{ (int) ($s['pedidos_pendentes'] ?? 0) }}</p>
                 </article>
+                @endif
                 <article class="gestor-card {{ (($s['entregas_pendentes'] ?? 0) > 0) ? 'gestor-card--alert' : '' }}">
                     <p class="gestor-kicker">Entregas</p>
                     <p class="gestor-card__value">{{ (int) ($s['entregas_pendentes'] ?? 0) }}</p>
@@ -98,7 +106,7 @@
                 </ul>
             </section>
 
-            @if (! empty($s['metas_vendedores']))
+            @if (($s['mostrar_vendas'] ?? true) && ! empty($s['metas_vendedores']))
                 <section class="gestor-section">
                     <div class="gestor-section__head">
                         <h2>Metas dos vendedores</h2>

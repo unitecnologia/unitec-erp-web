@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\Concerns\ErpProductFormPage;
+use App\Models\Product;
 use App\Support\Erp\ErpScreen;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -30,13 +31,8 @@ class EditProduct extends EditRecord
         $this->hydrateNcmDescricaoFromCatalog(fillForm: false);
         $this->form->fill($this->data);
         $this->mountProductPhoto();
-        $this->loadProductGrades($this->record);
-        $this->loadProductCompositions($this->record);
         $this->loadProductPriceTableItems($this->record);
-        $this->loadProductPriceHistories($this->record);
-        $this->loadProductImeis($this->record);
-        $this->loadProductReservas($this->record);
-        $this->loadProductLotes($this->record);
+        $this->captureLastSavedProductPrices($this->record instanceof Product ? $this->record : null);
         $this->captureProductFormBaseline();
     }
 

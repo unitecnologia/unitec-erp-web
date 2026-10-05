@@ -21,8 +21,22 @@ trait ManagesProductComposicao
 
     public string $compositionPreco = '0,00';
 
+    public bool $productCompositionsHydrated = false;
+
+    protected function ensureProductCompositionsLoaded(): void
+    {
+        if ($this->productCompositionsHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductCompositions($product);
+    }
+
     protected function loadProductCompositions(?Product $product = null): void
     {
+        $this->productCompositionsHydrated = true;
+
         if (! $product) {
             $this->compositionRows = [];
             $this->selectedCompositionIndex = null;
@@ -187,6 +201,10 @@ trait ManagesProductComposicao
         if (! ($product->is_composicao ?? false)) {
             $product->compositions()->delete();
 
+            return;
+        }
+
+        if (! $this->productCompositionsHydrated) {
             return;
         }
 

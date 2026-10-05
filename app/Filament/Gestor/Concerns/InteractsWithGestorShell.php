@@ -3,9 +3,11 @@
 namespace App\Filament\Gestor\Concerns;
 
 use App\Models\Empresa;
+use App\Models\User;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Gestor\GestorExecutivoService;
+use App\Support\Inventario\InventarioAcesso;
 use Illuminate\Support\Facades\Auth;
 
 trait InteractsWithGestorShell
@@ -98,6 +100,13 @@ trait InteractsWithGestorShell
         $this->redirect(filament()->getLoginUrl());
     }
 
+    public function podeAbrirInventario(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && InventarioAcesso::podeEntrar($user);
+    }
+
     public function usuarioNome(): string
     {
         return (string) (Auth::user()?->name ?? '');
@@ -135,6 +144,7 @@ trait InteractsWithGestorShell
                 'icon' => 'fin',
                 'url' => \App\Filament\Gestor\Pages\FinanceiroGestorPage::getUrl(panel: 'gestor'),
                 'active' => $current === \App\Filament\Gestor\Pages\FinanceiroGestorPage::class,
+                'visible' => static::podeVerFinanceiroGestor(),
             ],
             [
                 'key' => 'vendas',
@@ -142,6 +152,7 @@ trait InteractsWithGestorShell
                 'icon' => 'vendas',
                 'url' => \App\Filament\Gestor\Pages\VendasGestorPage::getUrl(panel: 'gestor'),
                 'active' => $current === \App\Filament\Gestor\Pages\VendasGestorPage::class,
+                'visible' => static::podeVerVendasGestor(),
             ],
             [
                 'key' => 'estoque',
@@ -178,6 +189,43 @@ trait InteractsWithGestorShell
             || ErpAccess::can($user, 'ajusta_preco.access')
             || ErpAccess::can($user, 'ajuste_estoque.access')
             || (bool) $user->is_admin;
+    }
+
+    public static function podeVerFinanceiroGestor(): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null || ! static::canAccessGestor()) {
+            return false;
+        }
+
+        return ErpAccess::can($user, 'contas_receber.access')
+            || ErpAccess::can($user, 'contas_pagar.access')
+            || ErpAccess::can($user, 'caixa.access')
+            || ErpAccess::can($user, 'contas_caixa.access');
+    }
+
+    public static function podeVerVendasGestor(): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null || ! static::canAccessGestor()) {
+            return false;
+        }
+
+        return ErpAccess::can($user, 'vendas.access');
+    }
+
+    public static function podeVerAprovacoesGestor(): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null || ! static::canAccessGestor()) {
+            return false;
+        }
+
+        return ErpAccess::can($user, 'forca_vendas.access')
+            || ErpAccess::can($user, 'vendas.access');
     }
 
     public function money(float $value): string

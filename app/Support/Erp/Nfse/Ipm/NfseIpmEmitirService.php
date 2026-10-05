@@ -8,6 +8,7 @@ use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Erp\Nfse\NfseTransmissaoResultado;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class NfseIpmEmitirService
@@ -15,6 +16,8 @@ class NfseIpmEmitirService
     public function __construct(
         private readonly NfseIpmXmlGerador $xml = new NfseIpmXmlGerador,
         private readonly NfseIpmCliente $cliente = new NfseIpmCliente,
+        private readonly NfseIpmAssinador $assinador = new NfseIpmAssinador,
+        private readonly NfseIpmXmlValidador $validador = new NfseIpmXmlValidador,
     ) {}
 
     public function transmitir(Nfse $nfse): NfseTransmissaoResultado
@@ -30,12 +33,12 @@ class NfseIpmEmitirService
             throw new NfseNaoTransmitida('O provedor desta NFS-e não é IPM.');
         }
 
+        $teste = $this->cliente->modoTeste($empresa);
         $this->reservarEnvio($nfse);
-        $xml = '';
 
         try {
-            $xml = $this->xml->gerar($nfse);
-            $resposta = $this->cliente->enviar($empresa, $xml);
+            $xml = $this->xmlAssinado($nfse, $teste);
+            $resposta = $this->cliente->enviar($empresa, $xml, $teste);
         } catch (NfseNaoTransmitida $exception) {
             $this->liberarEnvio($nfse);
 
@@ -44,6 +47,10 @@ class NfseIpmEmitirService
             $this->liberarEnvio($nfse);
 
             throw new NfseNaoTransmitida('Não foi possível transmitir a NFS-e ao IPM.');
+        }
+
+        if ($teste || $resposta->modoTeste) {
+            return $this->resultadoTeste($nfse, $xml, $resposta);
         }
 
         if ($resposta->autorizada) {
@@ -63,7 +70,52 @@ class NfseIpmEmitirService
             ? $resposta->erros
             : [['codigo' => '', 'descricao' => 'O provedor IPM rejeitou a NFS-e.']];
 
-        return new NfseTransmissaoResultado($nfse, false, $erros, []);
+        return new NfseTransmissaoResultado($nfse, false, $erros, $resposta->alertas);
+    }
+
+    /**
+     * Gera, assina e valida no XSD oficial. Nada é transmitido se o XSD recusar.
+     */
+    public function xmlAssinado(Nfse $nfse, bool $envioTeste): string
+    {
+        $xml = $this->assinador->assinarNota($nfse, $this->xml->gerar($nfse, $envioTeste));
+        $erros = $this->validador->erros($xml);
+
+        if ($erros !== []) {
+            throw new NfseNaoTransmitida("O RPS não passou na validação do XSD oficial IPM:\n".implode("\n", array_slice($erros, 0, 5)));
+        }
+
+        return $xml;
+    }
+
+    /**
+     * EnvioTeste=1: a nota continua aberta, sem número/código de NFS-e e sem XML de retorno gravado nela.
+     * O RPS permanece reservado para a mesma nota e será reenviado na emissão real.
+     */
+    private function resultadoTeste(Nfse $nfse, string $xmlEnvio, NfseIpmResposta $resposta): NfseTransmissaoResultado
+    {
+        $this->liberarEnvio($nfse);
+        $this->arquivarTeste($nfse, $xmlEnvio, $resposta->xmlRetorno);
+        $nfse->refresh();
+
+        return new NfseTransmissaoResultado(
+            $nfse,
+            false,
+            $resposta->aceitaEmTeste ? [] : $resposta->erros,
+            $resposta->alertas,
+            true,
+        );
+    }
+
+    private function arquivarTeste(Nfse $nfse, string $xmlEnvio, string $xmlRetorno): void
+    {
+        try {
+            $base = 'nfse/ipm/teste/'.$nfse->empresa_id.'/'.$nfse->id.'-'.now()->format('Ymd-His');
+            Storage::disk('local')->put($base.'-envio.xml', $xmlEnvio);
+            Storage::disk('local')->put($base.'-retorno.xml', $xmlRetorno);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function registrarAutorizacao(Nfse $nfse, Empresa $empresa, string $xmlEnvio, NfseIpmResposta $resposta): Nfse

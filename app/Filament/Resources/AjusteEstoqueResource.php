@@ -64,6 +64,11 @@ class AjusteEstoqueResource extends Resource
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 3, ',', '.'))
                     ->alignEnd()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('origem')
+                    ->label('Origem')
+                    ->state(fn (AjusteEstoque $record): string => $record->origemLabel())
+                    ->alignCenter()
+                    ->weight(FontWeight::SemiBold),
             ])
             ->defaultSort('data', 'desc')
             ->striped()

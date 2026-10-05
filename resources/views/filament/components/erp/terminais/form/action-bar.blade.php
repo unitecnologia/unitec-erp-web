@@ -39,5 +39,13 @@
             </span>
             <span class="erp-pcad-actions__label"><kbd>ESC</kbd> | Sair</span>
         </button>
+        @if ($this->activeTerminalTab === 'aparelhos')
+            <button type="button" wire:click="abrirResetAparelhoSelecionado" class="erp-pcad-actions__btn erp-pcad-actions__btn--danger erp-terminais-pcad__btn--end" title="Autorizar reset da base local do aparelho selecionado (Força de Vendas)">
+                <span class="erp-pcad-actions__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3"/><path d="M16 16l5 5M21 16l-5 5"/></svg>
+                </span>
+                <span class="erp-pcad-actions__label">Autorizar Reset da Base</span>
+            </button>
+        @endif
     </div>
 </div>

@@ -37,7 +37,9 @@ class MaisGestorPage extends Page
     public function mount(): void
     {
         $this->mountGestorShell();
-        $this->aprovacoesPendentes = app(GestorAprovacaoService::class)->countPendencias();
+        $this->aprovacoesPendentes = static::podeVerAprovacoesGestor()
+            ? app(GestorAprovacaoService::class)->countPendencias()
+            : 0;
         $push = app(GestorPushService::class);
         $this->pushDisponivel = $push->isConfigured();
         $user = Auth::user();

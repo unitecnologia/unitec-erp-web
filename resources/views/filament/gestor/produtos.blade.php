@@ -121,12 +121,11 @@
                             </div>
                         </div>
 
-                        <label class="gestor-field" style="margin-top: 0.75rem; margin-bottom: 0;">
-                            <span class="gestor-field__label">Ajustar estoque físico</span>
-                            <input type="text" class="gestor-field__input" wire:model="estoque" inputmode="decimal" @disabled(! $this->canEditEstoque()) autocomplete="off">
-                        </label>
-                        <p class="gestor-note" style="margin-top: 0.45rem; margin-bottom: 0;">
+                        <p class="gestor-note" style="margin-top: 0.75rem; margin-bottom: 0;">
                             Reservado = pedidos FV pendentes. Disponível = físico − reservado.
+                            @if ($this->podeAbrirInventario())
+                                A contagem física fica no <a href="{{ url('/inventario') }}">Inventário</a>.
+                            @endif
                         </p>
                     </div>
 
@@ -135,7 +134,7 @@
                         class="gestor-save"
                         wire:click="salvar"
                         wire:loading.attr="disabled"
-                        @disabled(! $this->canEditCadastro() && ! $this->canEditPreco() && ! $this->canEditEstoque())
+                        @disabled(! $this->canEditCadastro() && ! $this->canEditPreco())
                     >
                         <span wire:loading.remove wire:target="salvar">Salvar alterações</span>
                         <span wire:loading wire:target="salvar">Salvando…</span>

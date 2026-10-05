@@ -176,6 +176,7 @@ trait ManagesUserFormModal
             'acesso_app_unitec_os' => filter_var($this->userForm['acesso_app_unitec_os'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'acesso_app_entregas' => filter_var($this->userForm['acesso_app_entregas'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'acesso_app_gestao' => filter_var($this->userForm['acesso_app_gestao'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'acesso_app_inventario' => filter_var($this->userForm['acesso_app_inventario'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
         ];
@@ -281,6 +282,7 @@ trait ManagesUserFormModal
             'acesso_app_unitec_os',
             'acesso_app_entregas',
             'acesso_app_gestao',
+            'acesso_app_inventario',
         ] as $field) {
             $form[$field] = filter_var($form[$field] ?? false, FILTER_VALIDATE_BOOLEAN);
         }
@@ -360,6 +362,7 @@ trait ManagesUserFormModal
             'acesso_app_unitec_os' => false,
             'acesso_app_entregas' => false,
             'acesso_app_gestao' => false,
+            'acesso_app_inventario' => false,
             'empresa_id' => (string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1),
             'empresas' => [(string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1)],
             'erp_profile_id' => '',
@@ -390,6 +393,7 @@ trait ManagesUserFormModal
             'acesso_app_unitec_os' => (bool) $record->acesso_app_unitec_os,
             'acesso_app_entregas' => (bool) $record->acesso_app_entregas,
             'acesso_app_gestao' => (bool) $record->acesso_app_gestao,
+            'acesso_app_inventario' => (bool) $record->acesso_app_inventario,
             'empresa_id' => (string) ($record->empresa_id ?? ''),
             'empresas' => $record->empresas->pluck('id')->map(fn ($id): string => (string) $id)->values()->all()
                 ?: array_values(array_filter([(string) ($record->empresa_id ?? '')])),

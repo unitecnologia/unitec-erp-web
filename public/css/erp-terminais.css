@@ -485,60 +485,91 @@
 
 .erp-terminais-aparelhos__table-wrap {
     overflow: auto;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
     background: #fff;
 }
 
 .erp-terminais-aparelhos__table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.78rem;
+    color: #1e293b;
 }
 
 .erp-terminais-aparelhos__table th,
 .erp-terminais-aparelhos__table td {
-    padding: 0.55rem 0.7rem;
-    border-bottom: 1px solid #eef2f7;
+    padding: 0.32rem 0.6rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #edf1f6;
     text-align: left;
     white-space: nowrap;
+    vertical-align: middle;
+    line-height: 1.25;
+}
+
+.erp-terminais-aparelhos__table th:last-child,
+.erp-terminais-aparelhos__table td:last-child {
+    border-right: 0;
+}
+
+.erp-terminais-aparelhos__table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
 .erp-terminais-aparelhos__table th {
     position: sticky;
     top: 0;
-    background: #f8fafc;
+    z-index: 1;
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
     color: #475569;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
+}
+
+.erp-terminais-aparelhos__table tbody tr:nth-child(even) td {
+    background: #f8fafc;
 }
 
 .erp-terminais-aparelhos__row {
     cursor: pointer;
 }
 
-.erp-terminais-aparelhos__row:hover {
-    background: #f8fafc;
+.erp-terminais-aparelhos__row:hover td {
+    background: #eef4ff !important;
 }
 
-.erp-terminais-aparelhos__row--selected {
-    background: #eff6ff !important;
+.erp-terminais-aparelhos__row.erp-terminais-aparelhos__row--selected td,
+.erp-terminais-aparelhos__row.erp-terminais-aparelhos__row--selected:hover td {
+    background: #bfdbfe !important;
+    border-bottom-color: #93c5fd;
+    border-right-color: #a5c8f5;
+    color: #0f172a;
+}
+
+.erp-terminais-aparelhos__table td:first-child {
+    font-weight: 600;
 }
 
 .erp-terminais-aparelhos__code {
     font-weight: 700;
     letter-spacing: 0.06em;
     color: #1d4ed8;
+    font-variant-numeric: tabular-nums;
 }
 
 .erp-terminais-aparelhos__badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.15rem 0.45rem;
+    padding: 0.08rem 0.42rem;
     border-radius: 999px;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
 }
 
@@ -557,8 +588,68 @@
     color: #b91c1c;
 }
 
+.erp-terminais-aparelhos__badge--reset {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #f59e0b;
+}
+
+.erp-terminais-aparelhos__reset-done {
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.erp-fv-reset-modal .erp-lookup-modal__window {
+    width: min(34rem, calc(100vw - 2rem));
+    max-width: 34rem;
+}
+
+.erp-fv-reset-modal__body {
+    display: grid;
+    gap: 0.75rem;
+    font-size: 0.82rem;
+    color: #334155;
+}
+
+.erp-fv-reset-modal__alert {
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.4rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-weight: 600;
+}
+
+.erp-fv-reset-modal__details {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.erp-fv-reset-modal__details > div {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 0.5rem;
+}
+
+.erp-fv-reset-modal__details dt {
+    color: #64748b;
+}
+
+.erp-fv-reset-modal__details dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.erp-fv-reset-modal__uuid {
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    word-break: break-all;
+}
+
 .erp-terminais-aparelhos__empty {
     text-align: center !important;
     color: #64748b;
-    padding: 1.5rem 0.75rem !important;
+    padding: 1rem 0.75rem !important;
 }

@@ -13,36 +13,84 @@ use Unitec\FiscalEngine\Util\SslTransportOptions;
 
 class NfseIpmCliente
 {
+    public const SOAP_ACTION_GERAR_NFSE = 'net.atende#GerarNfseEnvio';
+
+    /**
+     * A IPM não tem servidor de homologação: o teste usa a URL do município com EnvioTeste=1.
+     */
     public function url(Empresa $empresa): string
     {
-        $ambiente = strtolower(trim((string) $empresa->nfse_ambiente));
+        $producao = ! $this->modoTeste($empresa);
+        $url = trim((string) ($producao ? $empresa->nfse_url_producao : $empresa->nfse_url_homologacao));
 
-        if (! NfseSefinAmbiente::tryFrom($ambiente) instanceof NfseSefinAmbiente) {
+        if (! $producao && $url === '') {
+            $url = trim((string) $empresa->nfse_url_producao);
+        }
+
+        if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
+            throw new NfseNaoTransmitida('Informe a URL do WebService IPM do município.');
+        }
+
+        return preg_replace('/[?&]wsdl$/i', '', $url) ?? $url;
+    }
+
+    public function modoTeste(Empresa $empresa): bool
+    {
+        $ambiente = NfseSefinAmbiente::tryFrom(strtolower(trim((string) $empresa->nfse_ambiente)));
+
+        if (! $ambiente instanceof NfseSefinAmbiente) {
             throw new NfseNaoTransmitida('Selecione o ambiente da NFS-e.');
         }
 
-        $url = trim((string) ($ambiente === NfseSefinAmbiente::Producao->value
-            ? $empresa->nfse_url_producao
-            : $empresa->nfse_url_homologacao));
-
-        if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
-            throw new NfseNaoTransmitida(
-                $ambiente === NfseSefinAmbiente::Producao->value
-                    ? 'Informe a URL de produção do WebService IPM.'
-                    : 'Informe a URL de homologação do WebService IPM.',
-            );
-        }
-
-        return $url;
+        return $ambiente !== NfseSefinAmbiente::Producao;
     }
 
-    public function enviar(Empresa $empresa, string $xmlRps): NfseIpmResposta
+    /**
+     * Usuário da Basic Auth IPM: CNPJ da empresa, só dígitos. Null quando o CNPJ não é válido.
+     */
+    public static function usuarioDoCnpj(mixed $cnpj): ?string
     {
-        $usuario = trim((string) $empresa->nfse_ws_usuario);
+        $digitos = preg_replace('/\D/', '', (string) $cnpj) ?? '';
+
+        if (strlen($digitos) !== 14 || preg_match('/^(\d)\1{13}$/', $digitos) === 1) {
+            return null;
+        }
+
+        foreach ([12, 13] as $posicao) {
+            $soma = 0;
+
+            for ($i = 0, $peso = $posicao - 7; $i < $posicao; $i++) {
+                $soma += (int) $digitos[$i] * $peso;
+                $peso = $peso === 2 ? 9 : $peso - 1;
+            }
+
+            $resto = $soma % 11;
+
+            if ((int) $digitos[$posicao] !== ($resto < 2 ? 0 : 11 - $resto)) {
+                return null;
+            }
+        }
+
+        return $digitos;
+    }
+
+    public function usuario(Empresa $empresa): string
+    {
+        return self::usuarioDoCnpj($empresa->cnpj)
+            ?? throw new NfseNaoTransmitida('O CNPJ da empresa está ausente ou inválido. Corrija o cadastro da empresa para transmitir pelo IPM.');
+    }
+
+    public function enviar(Empresa $empresa, string $xmlRps, bool $envioTeste = false): NfseIpmResposta
+    {
+        $usuario = $this->usuario($empresa);
         $senha = (string) $empresa->nfse_ws_senha;
 
-        if ($usuario === '' || $senha === '') {
-            throw new NfseNaoTransmitida('Informe o usuário e a senha do WebService IPM.');
+        if ($senha === '') {
+            throw new NfseNaoTransmitida('Informe a senha do WebService IPM.');
+        }
+
+        if ($envioTeste !== str_contains($xmlRps, '<EnvioTeste>1</EnvioTeste>')) {
+            throw new NfseNaoTransmitida('O modo de envio do RPS não confere com o ambiente IPM configurado.');
         }
 
         $envelope = $this->envelope($xmlRps);
@@ -78,7 +126,7 @@ class NfseIpmCliente
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: text/xml; charset=utf-8',
                     'Accept: text/xml',
-                    'SOAPAction: "http://nfse.abrasf.org.br/GerarNfse"',
+                    'SOAPAction: "'.self::SOAP_ACTION_GERAR_NFSE.'"',
                     'Authorization: Basic '.base64_encode($usuario.':'.$senha),
                 ],
                 CURLOPT_TIMEOUT => 60,
@@ -115,7 +163,7 @@ class NfseIpmCliente
             throw new NfseNaoTransmitida('O WebService IPM não aceitou o usuário ou a senha.');
         }
 
-        $resposta = NfseIpmResposta::interpretar((string) $body);
+        $resposta = NfseIpmResposta::interpretar((string) $body, $envioTeste);
 
         if ($status >= 500 && ! $resposta->autorizada && $resposta->erros === []) {
             throw new NfseNaoTransmitida('O WebService IPM não respondeu a emissão.');
@@ -124,19 +172,16 @@ class NfseIpmCliente
         return $resposta;
     }
 
+    /**
+     * GerarNfseEnvio vai como elemento literal no Body (document/literal do WSDL net.atende), sem CDATA.
+     */
     public function envelope(string $xmlRps): string
     {
-        $cabecalho = '<?xml version="1.0" encoding="UTF-8"?>'
-            .'<cabecalho xmlns="'.NfseIpmXmlGerador::NS.'" versao="1.00"><versaoDados>2.04</versaoDados></cabecalho>';
-
         return '<?xml version="1.0" encoding="UTF-8"?>'
-            .'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:nfse="http://nfse.abrasf.org.br">'
+            .'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
             .'<soapenv:Header/>'
             .'<soapenv:Body>'
-            .'<nfse:GerarNfse>'
-            .'<nfseCabecMsg><![CDATA['.$cabecalho.']]></nfseCabecMsg>'
-            .'<nfseDadosMsg><![CDATA['.$this->cdata($xmlRps).']]></nfseDadosMsg>'
-            .'</nfse:GerarNfse>'
+            .$this->semDeclaracao($xmlRps)
             .'</soapenv:Body>'
             .'</soapenv:Envelope>';
     }
@@ -168,11 +213,10 @@ class NfseIpmCliente
         }
     }
 
-    private function cdata(string $xml): string
+    private function semDeclaracao(string $xml): string
     {
         $limpo = preg_replace('/^\xEF\xBB\xBF/', '', $xml) ?? $xml;
-        $limpo = preg_replace('/<\?xml[^?]*\?>/', '', $limpo) ?? $limpo;
 
-        return str_replace(']]>', ']]]]><![CDATA[>', trim($limpo));
+        return trim(preg_replace('/<\?xml[^?]*\?>/', '', $limpo) ?? $limpo);
     }
 }

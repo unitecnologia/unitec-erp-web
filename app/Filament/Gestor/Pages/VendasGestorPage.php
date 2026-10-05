@@ -27,12 +27,15 @@ class VendasGestorPage extends Page
 
     public static function canAccess(): bool
     {
-        return static::canAccessGestor();
+        return static::podeVerVendasGestor();
     }
 
     public function mount(): void
     {
         $this->mountGestorShell();
+        if (! static::canAccess()) {
+            abort(403);
+        }
         $service = app(GestorExecutivoService::class);
         $this->snapshot = $service->vendasSnapshot();
         $this->charts = $service->vendasCharts();

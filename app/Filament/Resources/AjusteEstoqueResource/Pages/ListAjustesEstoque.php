@@ -95,7 +95,7 @@ class ListAjustesEstoque extends ListRecords
 
     protected function getTableQuery(): Builder
     {
-        $query = parent::getTableQuery()->with(['product']);
+        $query = parent::getTableQuery()->with(['product'])->comOrigem();
 
         if (filled($this->periodoDeApplied)) {
             $query->whereDate('data', '>=', $this->periodoDeApplied);

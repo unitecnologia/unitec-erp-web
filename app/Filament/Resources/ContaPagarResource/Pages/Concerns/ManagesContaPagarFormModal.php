@@ -34,6 +34,8 @@ trait ManagesContaPagarFormModal
 
     public string $contaFormParcelas = '1';
 
+    public bool $contaFormSalvando = false;
+
     public function createConta(): void
     {
         if ($this->viewTab === 'desdobramentos') {
@@ -95,10 +97,26 @@ trait ManagesContaPagarFormModal
     {
         $this->contaFormModalOpen = false;
         $this->contaFormRecordId = null;
+        $this->contaFormSalvando = false;
         $this->resetErrorBag();
     }
 
     public function salvarContaForm(): void
+    {
+        if (! $this->contaFormModalOpen || $this->contaFormSalvando) {
+            return;
+        }
+
+        $this->contaFormSalvando = true;
+
+        try {
+            $this->persistirContaForm();
+        } finally {
+            $this->contaFormSalvando = false;
+        }
+    }
+
+    private function persistirContaForm(): void
     {
         $rules = [
             'contaFormEmissao' => ['required', 'date'],

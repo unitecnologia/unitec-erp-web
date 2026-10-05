@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\ForcaVendas;
 
 use App\Models\ForcaVendasDevice;
 use App\Models\User;
+use App\Support\ForcaVendas\ForcaVendasDeviceVinculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController
 {
+    public function __construct(private readonly ForcaVendasDeviceVinculo $vinculo)
+    {
+    }
+
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -64,6 +69,26 @@ class AuthController
             ]);
         }
 
+        $device = $request->attributes->get('fv_device');
+        $headerUuid = (string) $request->header('X-FV-Device', '');
+
+        if (! $device instanceof ForcaVendasDevice || ! hash_equals($headerUuid, (string) $data['device_uuid'])) {
+            return response()->json([
+                'message' => 'Aparelho não identificado.',
+                'code' => 'device_required',
+            ], 403);
+        }
+
+        // Vínculo fixo: aparelho livre grava este usuário; vinculado aceita só ele.
+        $recusa = $this->vinculo->vincularOuRecusar($device, $user);
+
+        if ($recusa !== null) {
+            return response()->json([
+                'message' => ForcaVendasDeviceVinculo::mensagem($recusa),
+                'code' => $recusa,
+            ], 403);
+        }
+
         $tokenName = 'fv:'.$data['device_uuid'];
 
         DB::transaction(function () use ($user, $tokenName): void {
@@ -72,23 +97,22 @@ class AuthController
 
         $token = $user->createToken($tokenName, ['forca-vendas']);
 
-        ForcaVendasDevice::query()->updateOrCreate(
-            ['device_uuid' => $data['device_uuid']],
-            [
-                'user_id' => $user->id,
-                'empresa_id' => $user->empresa_id,
-                'device_name' => $data['device_name'] ?? null,
-                'platform' => $data['platform'] ?? null,
-                'app_version' => $data['app_version'] ?? null,
-                'current_token_id' => $token->accessToken->getKey(),
-                'last_seen_at' => now(),
-                'revoked_at' => null,
-            ]
-        );
+        $device->forceFill([
+            'empresa_id' => $user->empresa_id,
+            'device_name' => $data['device_name'] ?? $device->device_name,
+            'platform' => $data['platform'] ?? $device->platform,
+            'app_version' => $data['app_version'] ?? $device->app_version,
+            'current_token_id' => $token->accessToken->getKey(),
+            'last_seen_at' => now(),
+            'revoked_at' => null,
+        ])->save();
 
         return response()->json([
             'token' => $token->plainTextToken,
             'user' => $this->userPayload($user),
+            'device' => [
+                'vinculo_user_id' => (int) $device->user_id,
+            ],
         ]);
     }
 

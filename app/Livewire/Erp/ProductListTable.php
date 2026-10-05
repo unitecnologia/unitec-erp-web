@@ -5,6 +5,7 @@ namespace App\Livewire\Erp;
 use App\Models\Empresa;
 use App\Models\Product;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Erp\ProductListLiveSearch;
 use App\Support\Erp\ProductListRowFormatter;
 use App\Support\Erp\Queries\ProductListQueryBuilder;
 use App\Support\Erp\Queries\ProductSerialListQueryBuilder;
@@ -37,6 +38,30 @@ class ProductListTable extends Component
 
     public string $sortDirection = 'asc';
 
+    protected ?Empresa $empresaMemo = null;
+
+    protected bool $empresaResolved = false;
+
+    /**
+     * $seq identifica o request no navegador para descartar resposta antiga.
+     */
+    public function applyLocalSearch(string $term, int $seq = 0): void
+    {
+        unset($seq);
+
+        if ($term === $this->localSearch) {
+            $this->skipRender();
+
+            return;
+        }
+
+        ProductListLiveSearch::put($term);
+        $this->localSearch = $term;
+        $this->sortColumn = null;
+        $this->sortDirection = 'asc';
+        $this->resetPage();
+    }
+
     public function setViewFilter(string $view): void
     {
         if (! in_array($view, ['produtos', 'seriais'], true)) {
@@ -53,6 +78,7 @@ class ProductListTable extends Component
         }
         $this->searchFieldsActive = [$this->searchColumn];
         $this->localSearch = '';
+        ProductListLiveSearch::put('');
         $this->sortColumn = null;
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -61,6 +87,7 @@ class ProductListTable extends Component
 
         $this->js(sprintf(
             '(() => {
+                if (window.__erpProdutosSearchSync) window.__erpProdutosSearchSync("");
                 const view = %s;
                 const searchColumn = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
@@ -180,37 +207,45 @@ class ProductListTable extends Component
 
     protected function records(): LengthAwarePaginator
     {
-        $query = $this->buildQuery();
-        $this->applySort($query);
-
-        $empresaId = (int) ($this->currentEmpresa()?->id ?? 0);
-
-        if ($empresaId > 0 && ! $this->isSeriaisView()) {
-            $query->with(['empresaPrecos' => static function ($precos) use ($empresaId): void {
-                $precos->where('empresa_id', $empresaId);
-            }]);
-        }
-
-        return $query->paginate($this->perPage);
-    }
-
-    protected function buildQuery(): Builder
-    {
         if ($this->isSeriaisView()) {
-            return (new ProductSerialListQueryBuilder(
-                searchColumn: $this->searchColumn,
-                localSearch: $this->localSearch,
-                empresa: $this->currentEmpresa(),
-                searchFieldsActive: $this->searchFieldsActive,
-            ))->build();
+            $query = $this->buildSerialQuery();
+            $this->applySort($query);
+
+            return $query->paginate($this->perPage);
         }
 
-        return (new ProductListQueryBuilder(
+        $builder = new ProductListQueryBuilder(
             statusFilter: $this->statusFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             empresa: $this->currentEmpresa(),
             applyDefaultOrder: false,
+            searchFieldsActive: $this->searchFieldsActive,
+            deferReservaSum: true,
+        );
+        $query = $builder->build();
+        $this->applySort($query);
+
+        $empresaId = (int) ($this->currentEmpresa()?->id ?? 0);
+
+        if ($empresaId > 0) {
+            $query->with(['empresaPrecos' => static function ($precos) use ($empresaId): void {
+                $precos->where('empresa_id', $empresaId);
+            }]);
+        }
+
+        $paginator = $query->paginate($this->perPage);
+        $builder->hydrateReservaSums($paginator->getCollection());
+
+        return $paginator;
+    }
+
+    protected function buildSerialQuery(): Builder
+    {
+        return (new ProductSerialListQueryBuilder(
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            empresa: $this->currentEmpresa(),
             searchFieldsActive: $this->searchFieldsActive,
         ))->build();
     }
@@ -291,8 +326,14 @@ class ProductListTable extends Component
 
     protected function currentEmpresa(): ?Empresa
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        if ($this->empresaResolved) {
+            return $this->empresaMemo;
+        }
 
-        return $empresaId ? Empresa::query()->find($empresaId) : null;
+        $this->empresaResolved = true;
+        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        $this->empresaMemo = $empresaId ? Empresa::query()->find($empresaId) : null;
+
+        return $this->empresaMemo;
     }
 }

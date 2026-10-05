@@ -18,6 +18,7 @@ class AjusteEstoqueListagemReport
             'produto' => 'PRODUTO',
             'referencia' => 'REFERÊNCIA',
             'qtd_ajust' => 'QTD. AJUST.',
+            'origem' => 'ORIGEM',
         ];
     }
 
@@ -26,7 +27,7 @@ class AjusteEstoqueListagemReport
      */
     public static function defaultColumns(): array
     {
-        return ['data', 'codigo', 'produto', 'qtd_ajust'];
+        return ['data', 'codigo', 'produto', 'qtd_ajust', 'origem'];
     }
 
     /**
@@ -51,6 +52,7 @@ class AjusteEstoqueListagemReport
             'produto' => (string) ($product?->descricao ?? ''),
             'referencia' => (string) ($product?->referencia ?? ''),
             'qtd_ajust' => number_format((float) $ajuste->qtd_ajust, 3, ',', '.'),
+            'origem' => $ajuste->origemLabel(),
             default => '',
         };
     }

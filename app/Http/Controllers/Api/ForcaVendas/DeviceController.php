@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\ForcaVendas;
 
 use App\Models\ForcaVendasDevice;
+use App\Models\ForcaVendasDeviceReset;
+use App\Support\ForcaVendas\ForcaVendasDeviceResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -105,6 +107,64 @@ class DeviceController
             'pairing_code' => $device->pairing_code,
             'device_name' => $device->device_name,
         ]);
+    }
+
+    /**
+     * Reset da base local autorizado pelo retaguarda (polling pelo app).
+     */
+    public function resetStatus(Request $request, ForcaVendasDeviceResetService $resets): JsonResponse
+    {
+        $uuid = $this->deviceUuidDaRequisicao($request);
+        $reset = $resets->pendente($uuid);
+
+        if ($reset === null) {
+            return response()->json(['pending' => false]);
+        }
+
+        return response()->json([
+            'pending' => true,
+            'reset_uuid' => $reset->uuid,
+            'authorized_at' => $reset->authorized_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * O app confirma que apagou a base local. Só o próprio aparelho conclui.
+     */
+    public function resetConcluir(Request $request, string $reset, ForcaVendasDeviceResetService $resets): JsonResponse
+    {
+        $request->validate([
+            'device_uuid' => ['nullable', 'string', 'max:100'],
+            'app_version' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $result = $resets->concluir(
+            $reset,
+            $this->deviceUuidDaRequisicao($request),
+            $request->input('app_version'),
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'message' => 'Reset não encontrado ou não pertence a este aparelho.',
+                'code' => 'reset_'.$result['erro'],
+            ], $result['erro'] === 'nao_encontrado' ? 404 : 409);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'status' => ForcaVendasDeviceReset::STATUS_CONCLUIDO,
+            'ja_concluido' => $result['ja_concluido'] ?? false,
+        ]);
+    }
+
+    private function deviceUuidDaRequisicao(Request $request): string
+    {
+        $header = trim((string) $request->header('X-FV-Device', ''));
+
+        return $header !== ''
+            ? $header
+            : trim((string) $request->input('device_uuid', $request->query('device_uuid', '')));
     }
 
     private function generateCode(): string

@@ -4,6 +4,11 @@ namespace App\Support\Erp;
 
 use App\Models\Empresa;
 use App\Models\Product;
+use App\Support\Erp\Ccg\CcgCertificadoResolver;
+use App\Support\Erp\Ccg\CcgConsGtinClient;
+use App\Support\Erp\Ccg\CcgConsultaException;
+use App\Support\Erp\Ccg\Gtin;
+use App\Support\Erp\License\LicencaHttpClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
@@ -17,20 +22,18 @@ class BarcodeLookupService
 
     private const DAILY_API_LIMIT = 10;
 
-    private const COSMOS_DAILY_LIMIT = 25;
-
     private const HTTP_USER_AGENT = 'UnitecERP/1.0 (barcode-lookup)';
 
-    private const COSMOS_USER_AGENT = 'Cosmos-API-Request';
-
-    private const COSMOS_GTIN_URL = 'https://api.cosmos.bluesoft.com.br/gtins/%s.json';
+    public function __construct(
+        private readonly CcgConsGtinClient $ccg = new CcgConsGtinClient(),
+    ) {}
 
     /**
      * @return array<string, mixed>
      */
     public function fetch(string $barcode, ?int $excludeProductId = null): array
     {
-        $barcode = preg_replace('/\D/', '', $barcode);
+        $barcode = Gtin::digits($barcode);
 
         if (strlen($barcode) < 8 || strlen($barcode) > 14) {
             throw new RuntimeException('Informe um código de barras válido (8 a 14 dígitos).');
@@ -42,10 +45,29 @@ class BarcodeLookupService
             return $internal;
         }
 
+        if (! Gtin::isAcceptedLength($barcode)) {
+            throw new RuntimeException('Informe um GTIN de 8, 12, 13 ou 14 dígitos.');
+        }
+
+        if (! Gtin::hasValidCheckDigit($barcode)) {
+            throw new CcgConsultaException(
+                '9491 – Rejeição: GTIN com dígito verificador inválido. A consulta não foi enviada à SVRS.',
+                CcgConsultaException::REJEICAO,
+            );
+        }
+
+        if (Gtin::isPrefixBrasil($barcode)) {
+            return Cache::remember(
+                'erp.barcode.ccg.' . $barcode,
+                now()->addDays(self::CACHE_TTL_DAYS),
+                fn (): array => $this->fetchFromCcg($barcode),
+            );
+        }
+
         return Cache::remember(
-            "erp.barcode.lookup.{$barcode}",
+            'erp.barcode.lookup.v2.' . $barcode,
             now()->addDays(self::CACHE_TTL_DAYS),
-            fn (): array => $this->fetchFromExternal($barcode),
+            fn (): array => $this->fetchFromInternational($barcode),
         );
     }
 
@@ -81,29 +103,52 @@ class BarcodeLookupService
     }
 
     /**
+     * Consulta síncrona ccgConsGTIN. Só entra aqui depois que o código foi confirmado na busca.
+     *
      * @return array<string, mixed>
      */
-    protected function fetchFromExternal(string $barcode): array
+    protected function fetchFromCcg(string $barcode): array
+    {
+        $empresa = $this->currentEmpresa();
+
+        if (! (bool) $empresa->param_api_servicos_habilitar) {
+            throw new CcgConsultaException(
+                'Busca Produto Auto está desabilitada. Ative em Configurações » Empresa » Busca Produto Auto.',
+                CcgConsultaException::INDISPONIVEL,
+            );
+        }
+
+        $certificate = CcgCertificadoResolver::resolve($empresa);
+        $consulta = $this->ccg->consultar(
+            $barcode,
+            $certificate,
+            EmpresaParametros::normalizeCcgConsGtinUrl($empresa->param_api_servicos_url ?? null),
+            $this->timeoutSeconds($empresa),
+        );
+
+        $ncm = $consulta->ncm;
+        $cest = $consulta->cests[0] ?? null;
+        $descricao = trim((string) $consulta->xProd);
+
+        $result = [
+            'source' => 'ccg',
+            'gtin' => $consulta->gtin ?? $barcode,
+            'tp_gtin' => $consulta->tpGtin,
+            'descricao' => $descricao !== '' ? Str::upper(Str::limit($descricao, 255, '')) : null,
+            'ncm' => $ncm,
+            'cest' => $cest,
+            'cests' => $consulta->cests,
+        ];
+
+        return $this->enrichNcmDescription($result);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function fetchFromInternational(string $barcode): array
     {
         $networkError = false;
-
-        if ($this->resolveCosmosToken() === null && $this->isBrazilianBarcode($barcode)) {
-            throw new RuntimeException('Configure o token Cosmos (Bluesoft) em Configurações » Empresa » Busca Produto Auto.');
-        }
-
-        $result = $this->tryFetchFromCosmos($barcode, $networkError);
-
-        if ($result !== null) {
-            return $this->enrichNcmDescription($result);
-        }
-
-        if ($this->isBrazilianBarcode($barcode)) {
-            if ($networkError) {
-                throw new RuntimeException('Não foi possível consultar o Cosmos (Bluesoft). Verifique a conexão e tente novamente.');
-            }
-
-            throw new RuntimeException('Código de barras não encontrado no Cosmos (Bluesoft).');
-        }
 
         $this->assertDailyApiQuota();
         $this->incrementDailyApiQuota();
@@ -127,9 +172,30 @@ class BarcodeLookupService
         throw new RuntimeException('Código de barras não encontrado nas fontes consultadas.');
     }
 
-    protected function isBrazilianBarcode(string $barcode): bool
+    protected function currentEmpresa(): Empresa
     {
-        return str_starts_with($barcode, '789');
+        $empresaId = (int) session('erp_empresa_id', auth()->user()?->empresa_id);
+        $empresa = $empresaId > 0 ? Empresa::query()->find($empresaId) : null;
+
+        if (! $empresa instanceof Empresa) {
+            throw new CcgConsultaException(
+                'Selecione a empresa antes de consultar o GTIN.',
+                CcgConsultaException::INDISPONIVEL,
+            );
+        }
+
+        return $empresa;
+    }
+
+    protected function timeoutSeconds(Empresa $empresa): int
+    {
+        $timeout = (int) ($empresa->param_api_servicos_timeout ?? 30);
+
+        if ($timeout < 1) {
+            return 30;
+        }
+
+        return min($timeout, 300);
     }
 
     /**
@@ -154,177 +220,11 @@ class BarcodeLookupService
     /**
      * @return array<string, mixed>|null
      */
-    protected function tryFetchFromCosmos(string $barcode, bool &$networkError): ?array
-    {
-        $token = $this->resolveCosmosToken();
-
-        if ($token === null) {
-            return null;
-        }
-
-        $this->assertCosmosDailyQuota();
-
-        try {
-            $response = Http::timeout(12)
-                ->acceptJson()
-                ->withHeaders([
-                    'X-Cosmos-Token' => $token,
-                    'User-Agent' => self::COSMOS_USER_AGENT,
-                ])
-                ->get(sprintf(self::COSMOS_GTIN_URL, $barcode));
-        } catch (ConnectionException) {
-            $networkError = true;
-
-            return null;
-        } catch (RequestException $exception) {
-            if ($exception->response?->status() === 401) {
-                throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » Busca Produto Auto.');
-            }
-
-            if ($exception->response?->status() === 429) {
-                throw new RuntimeException('Limite diário da API Cosmos (Bluesoft) atingido (' . self::COSMOS_DAILY_LIMIT . ' consultas). Tente amanhã ou cadastre manualmente.');
-            }
-
-            return null;
-        }
-
-        $this->incrementCosmosDailyQuota();
-
-        if ($response->status() === 401) {
-            throw new RuntimeException('Cosmos retornou 401. Verifique o token em Configurações » Empresa » Busca Produto Auto.');
-        }
-
-        if ($response->status() === 429) {
-            throw new RuntimeException('Limite diário da API Cosmos (Bluesoft) atingido (' . self::COSMOS_DAILY_LIMIT . ' consultas). Tente amanhã ou cadastre manualmente.');
-        }
-
-        if ($response->status() === 404) {
-            return null;
-        }
-
-        if (! $response->successful()) {
-            return null;
-        }
-
-        /** @var array<string, mixed>|null $payload */
-        $payload = $response->json();
-
-        if (! is_array($payload)) {
-            return null;
-        }
-
-        $descricao = trim((string) ($payload['description'] ?? ''));
-
-        if ($descricao === '') {
-            return null;
-        }
-
-        $ncm = '';
-        $ncmDescricao = '';
-        if (is_array($payload['ncm'] ?? null)) {
-            $ncm = preg_replace('/\D/', '', (string) ($payload['ncm']['code'] ?? ''));
-            $ncmDescricao = trim((string) ($payload['ncm']['full_description'] ?? $payload['ncm']['description'] ?? ''));
-        }
-
-        $cest = '';
-        if (is_array($payload['cest'] ?? null)) {
-            $cest = preg_replace('/\D/', '', (string) ($payload['cest']['code'] ?? ''));
-        }
-
-        $marca = '';
-        if (is_array($payload['brand'] ?? null)) {
-            $marca = trim((string) ($payload['brand']['name'] ?? ''));
-        }
-
-        $pesoKg = $this->resolveCosmosWeightKg($payload);
-
-        $precoVenda = 0.0;
-        if (isset($payload['avg_price'])) {
-            $precoVenda = (float) $payload['avg_price'];
-        } elseif (isset($payload['max_price'])) {
-            $precoVenda = (float) $payload['max_price'];
-        } elseif (isset($payload['price'])) {
-            $precoVenda = $this->parseCosmosPrice((string) $payload['price']);
-        }
-
-        $thumb = trim((string) ($payload['thumbnail'] ?? ''));
-        $fotoUrl = $thumb !== '' ? $thumb : null;
-
-        $result = [
-            'source' => 'cosmos',
-            'descricao' => Str::upper(Str::limit($descricao, 120, '')),
-            'ncm' => strlen($ncm) === 8 ? $ncm : null,
-            'cest' => strlen($cest) >= 7 ? substr($cest, 0, 7) : null,
-            'foto_url' => $fotoUrl,
-        ];
-
-        if ($pesoKg !== null && $pesoKg > 0) {
-            $result['peso_kg'] = $pesoKg;
-        }
-
-        if ($ncmDescricao !== '') {
-            $result['ncm_descricao'] = Str::upper(Str::limit($ncmDescricao, 120, ''));
-        }
-
-        if ($marca !== '') {
-            $result['marca'] = Str::upper(Str::limit($marca, 60, ''));
-        }
-
-        if ($precoVenda > 0) {
-            $result['preco_venda'] = $precoVenda;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    protected function resolveCosmosWeightKg(array $payload): ?float
-    {
-        foreach (['net_weight', 'gross_weight'] as $field) {
-            if (! isset($payload[$field])) {
-                continue;
-            }
-
-            $gramas = (float) $payload[$field];
-
-            if ($gramas <= 0) {
-                continue;
-            }
-
-            return round($gramas / 1000, 3);
-        }
-
-        return null;
-    }
-
-    protected function parseCosmosPrice(string $value): float
-    {
-        $txt = trim($value);
-        $txt = str_replace(['R$', ' '], '', $txt);
-        $txt = str_replace('.', '', $txt);
-        $txt = str_replace(',', '.', $txt);
-
-        return is_numeric($txt) ? (float) $txt : 0.0;
-    }
-
-    protected function resolveCosmosToken(): ?string
-    {
-        $empresaId = session('erp_empresa_id', auth()->user()?->empresa_id);
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
-        $token = trim((string) ($empresa?->param_api_servicos_token ?? ''));
-
-        return $token !== '' ? $token : null;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
     protected function tryFetchFromUpcItemDb(string $barcode, bool &$networkError): ?array
     {
         try {
-            $response = Http::timeout(20)
+            $response = Http::withOptions(LicencaHttpClient::options())
+                ->timeout(20)
                 ->acceptJson()
                 ->withHeaders([
                     'Content-Type' => 'application/json',
@@ -411,7 +311,8 @@ class BarcodeLookupService
     protected function requestOpenFoodFacts(string $host, string $barcode, bool &$networkError): ?array
     {
         try {
-            $response = Http::timeout(20)
+            $response = Http::withOptions(LicencaHttpClient::options())
+                ->timeout(20)
                 ->acceptJson()
                 ->withHeaders([
                     'User-Agent' => self::HTTP_USER_AGENT,
@@ -480,30 +381,6 @@ class BarcodeLookupService
         }
 
         return '';
-    }
-
-    protected function assertCosmosDailyQuota(): void
-    {
-        if ($this->cosmosDailyApiCalls() >= self::COSMOS_DAILY_LIMIT) {
-            throw new RuntimeException('Limite diário da API Cosmos (Bluesoft) atingido (' . self::COSMOS_DAILY_LIMIT . ' consultas). Tente amanhã ou cadastre manualmente.');
-        }
-    }
-
-    protected function incrementCosmosDailyQuota(): void
-    {
-        $key = $this->cosmosDailyApiCacheKey();
-        $count = (int) Cache::get($key, 0);
-        Cache::put($key, $count + 1, now()->endOfDay());
-    }
-
-    protected function cosmosDailyApiCalls(): int
-    {
-        return (int) Cache::get($this->cosmosDailyApiCacheKey(), 0);
-    }
-
-    protected function cosmosDailyApiCacheKey(): string
-    {
-        return 'erp.barcode.cosmos_api_calls.' . now()->toDateString();
     }
 
     protected function assertDailyApiQuota(): void

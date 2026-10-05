@@ -127,15 +127,23 @@ function bindRowSelection(page, config) {
             return;
         }
 
+        selectErpListRow(page, row);
+
+        const recordKey = getRecordKeyFromRow(row);
+        const editUrl = typeof pageConfig.editUrl === 'string' ? pageConfig.editUrl : '';
+
+        // Produtos: abre a edição na hora, sem esperar highlightRecord nem editProduct.
+        if (recordKey && editUrl.includes('__RECORD__')) {
+            window.location.assign(editUrl.split('__RECORD__').join(encodeURIComponent(recordKey)));
+
+            return;
+        }
+
         const component = getLivewireComponent(page);
 
         if (! component) {
             return;
         }
-
-        selectErpListRow(page, row);
-
-        const recordKey = getRecordKeyFromRow(row);
 
         if (recordKey) {
             Promise.resolve(component.call('highlightRecord', recordKey))

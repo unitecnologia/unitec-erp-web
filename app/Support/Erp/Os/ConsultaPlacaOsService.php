@@ -69,13 +69,13 @@ final class ConsultaPlacaOsService
     {
         $vazio = ['message' => null, 'token' => '', 'timeout' => 0, 'base' => ''];
 
-        if (! filter_var($empresa->param_consulta_placa_habilitar, FILTER_VALIDATE_BOOLEAN)) {
-            $vazio['message'] = 'A consulta por placa não está habilitada nesta empresa.';
+        if (! filter_var(config('unitec.consulta_placa.enabled', true), FILTER_VALIDATE_BOOLEAN)) {
+            $vazio['message'] = 'A consulta por placa não está habilitada.';
 
             return $vazio;
         }
 
-        $base = rtrim(trim((string) ($empresa->param_consulta_placa_url ?? '')), '/');
+        $base = rtrim(trim((string) config('unitec.consulta_placa.base_url', '')), '/');
         $sufixo = '/datasets/consulta_placa/queries';
         if (str_ends_with($base, $sufixo)) {
             $base = substr($base, 0, -strlen($sufixo));
@@ -87,11 +87,7 @@ final class ConsultaPlacaOsService
             return $vazio;
         }
 
-        try {
-            $token = trim((string) ($empresa->param_consulta_placa_token ?? ''));
-        } catch (\Throwable) {
-            $token = '';
-        }
+        $token = trim((string) config('unitec.consulta_placa.token', ''));
 
         if ($token === '') {
             $vazio['message'] = 'Informe a API Key da consulta por placa nos parâmetros da empresa.';
@@ -99,7 +95,7 @@ final class ConsultaPlacaOsService
             return $vazio;
         }
 
-        $timeout = (int) ($empresa->param_consulta_placa_timeout ?? 0);
+        $timeout = (int) config('unitec.consulta_placa.timeout', 0);
         if ($timeout < 1 || $timeout > 300) {
             $vazio['message'] = 'Informe o timeout da consulta por placa nos parâmetros da empresa.';
 

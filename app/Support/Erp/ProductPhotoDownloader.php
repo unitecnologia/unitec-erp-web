@@ -2,7 +2,7 @@
 
 namespace App\Support\Erp;
 
-use App\Models\Empresa;
+use App\Support\Erp\License\LicencaHttpClient;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +11,6 @@ use RuntimeException;
 
 final class ProductPhotoDownloader
 {
-    private const COSMOS_USER_AGENT = 'Cosmos-API-Request';
 
     /**
      * @return array{path: ?string, message: ?string}
@@ -29,9 +28,10 @@ final class ProductPhotoDownloader
 
         $lastStatus = null;
 
-        foreach ($this->requestHeaderSets($url) as $headers) {
+        foreach ($this->requestHeaderSets() as $headers) {
             try {
-                $response = Http::timeout(25)
+                $response = Http::withOptions(LicencaHttpClient::options())
+                    ->timeout(25)
                     ->withHeaders($headers)
                     ->get($url);
             } catch (\Throwable $exception) {
@@ -78,53 +78,12 @@ final class ProductPhotoDownloader
     /**
      * @return list<array<string, string>>
      */
-    private function requestHeaderSets(string $url): array
+    private function requestHeaderSets(): array
     {
-        $sets = [];
-
-        if ($this->isCosmosHost($url)) {
-            $token = $this->resolveCosmosToken();
-
-            if ($token !== null) {
-                $sets[] = [
-                    'X-Cosmos-Token' => $token,
-                    'User-Agent' => self::COSMOS_USER_AGENT,
-                    'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-                    'Referer' => 'https://cosmos.bluesoft.com.br/',
-                    'Origin' => 'https://cosmos.bluesoft.com.br',
-                ];
-            }
-
-            $sets[] = [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-                'Referer' => 'https://cosmos.bluesoft.com.br/',
-                'Origin' => 'https://cosmos.bluesoft.com.br',
-            ];
-        }
-
-        $sets[] = [
+        return [[
             'User-Agent' => 'Mozilla/5.0 (compatible; UnitecERP/1.0)',
             'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        ];
-
-        return $sets;
-    }
-
-    private function isCosmosHost(string $url): bool
-    {
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-
-        return str_contains($host, 'bluesoft.com.br');
-    }
-
-    private function resolveCosmosToken(): ?string
-    {
-        $empresaId = session('erp_empresa_id', auth()->user()?->empresa_id);
-        $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
-        $token = trim((string) ($empresa?->param_api_servicos_token ?? ''));
-
-        return $token !== '' ? $token : null;
+        ]];
     }
 
     private function storeResponseBody(Response $response, string $sourceUrl): ?string

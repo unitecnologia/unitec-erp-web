@@ -64,7 +64,7 @@ final class GestorAprovacaoService
 
             if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
                 $q->where(function ($builder) use ($empresaId): void {
-                    $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    $builder->where('empresa_id', $empresaId);
                 });
             }
 
@@ -86,7 +86,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -104,7 +104,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -122,7 +122,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -140,7 +140,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new EntregasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -167,6 +167,8 @@ final class GestorAprovacaoService
             throw new \RuntimeException('Pedido não está aguardando liberação financeira.');
         }
 
+        $this->exigirEmpresaAtual($order);
+
         (new ForcaVendasFaturamentoService())->liberarFinanceiro($order, Auth::user());
     }
 
@@ -178,12 +180,15 @@ final class GestorAprovacaoService
             throw new \RuntimeException('Pedido não está aguardando liberação financeira.');
         }
 
+        $this->exigirEmpresaAtual($order);
+
         (new ForcaVendasFaturamentoService())->cancelarPendente($order);
     }
 
     public function aprovarAparelho(string $origem, int $deviceId): void
     {
         $device = $this->findDevice($origem, $deviceId);
+        $this->exigirEmpresaDoAparelho($device);
 
         if ($device instanceof ForcaVendasDevice && $device->isApproved()) {
             throw new \RuntimeException('Aparelho já autorizado.');
@@ -236,6 +241,7 @@ final class GestorAprovacaoService
     public function rejeitarAparelho(string $origem, int $deviceId): void
     {
         $device = $this->findDevice($origem, $deviceId);
+        $this->exigirEmpresaDoAparelho($device);
 
         if ($device->current_token_id) {
             DB::table('personal_access_tokens')->where('id', $device->current_token_id)->delete();
@@ -280,6 +286,36 @@ final class GestorAprovacaoService
     }
 
     /**
+     * Aparelho pendente chega sem empresa: o celular se registra antes do login.
+     * A autorização grava a empresa da sessão. Se já houver empresa e for outra, bloqueia.
+     */
+    private function exigirEmpresaDoAparelho(object $device): void
+    {
+        if ((int) ($device->empresa_id ?? 0) <= 0) {
+            return;
+        }
+
+        $this->exigirEmpresaAtual($device);
+    }
+
+    private function exigirEmpresaAtual(object $registro): void
+    {
+        if (! method_exists($registro, 'getTable')) {
+            throw new \RuntimeException('Este registro não pertence à empresa atual.');
+        }
+
+        $table = $registro->getTable();
+        if (! ErpSchema::hasColumn($table, 'empresa_id')) {
+            return;
+        }
+
+        $empresaId = app(GestorExecutivoService::class)->empresaId();
+        if ($empresaId <= 0 || (int) ($registro->empresa_id ?? 0) !== $empresaId) {
+            throw new \RuntimeException('Este registro não pertence à empresa atual.');
+        }
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function listarPedidosPendentes(int $empresaId): array
@@ -298,7 +334,7 @@ final class GestorAprovacaoService
 
             if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasOrder)->getTable(), 'empresa_id')) {
                 $q->where(function ($builder) use ($empresaId): void {
-                    $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                    $builder->where('empresa_id', $empresaId);
                 });
             }
 
@@ -349,7 +385,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new ForcaVendasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -371,7 +407,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new VendasInternasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -393,7 +429,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new UnitecOsDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 
@@ -415,7 +451,7 @@ final class GestorAprovacaoService
 
                 if ($empresaId > 0 && ErpSchema::hasColumn((new EntregasDevice)->getTable(), 'empresa_id')) {
                     $q->where(function ($builder) use ($empresaId): void {
-                        $builder->where('empresa_id', $empresaId)->orWhereNull('empresa_id');
+                        $builder->where('empresa_id', $empresaId);
                     });
                 }
 

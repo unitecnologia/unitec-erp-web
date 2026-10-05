@@ -13,6 +13,8 @@ use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Mail\FiscalMailService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
+use App\Support\Erp\Nfse\Ipm\NfseIpmCliente;
+use App\Support\Erp\Nfse\Ipm\NfseIpmMunicipios;
 use App\Support\Erp\Nfse\NfseDpsNumeracaoRecusada;
 use App\Support\Erp\Nfse\NfseRegimeTributario;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
@@ -329,7 +331,7 @@ class ConfigFiscaisPage extends Page
                 'form.nfse_serie_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[A-Za-z0-9]{1,5}$/'],
                 'form.nfse_proximo_rps' => [$ipm ? 'required' : 'nullable', 'integer', 'min:1', 'max:'.NfseDpsSequencia::NUMERO_MAX],
                 'form.nfse_tipo_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[0-9]$/'],
-                'form.nfse_ws_usuario' => [$ipm ? 'required' : 'nullable', 'string', 'max:20'],
+                'form.nfse_ws_usuario' => ['nullable', 'string', 'max:20'],
                 'form.nfse_ws_senha' => ['nullable', 'string', 'max:120'],
                 'form.nfse_url_producao' => ['nullable', 'string', 'max:255', 'url'],
                 'form.nfse_url_homologacao' => ['nullable', 'string', 'max:255', 'url'],
@@ -353,7 +355,6 @@ class ConfigFiscaisPage extends Page
                 'form.nfse_proximo_rps.max' => 'Próximo Nº RPS inválido.',
                 'form.nfse_tipo_rps.required' => 'Informe o tipo do RPS.',
                 'form.nfse_tipo_rps.regex' => 'Tipo do RPS inválido. Use um dígito.',
-                'form.nfse_ws_usuario.required' => 'Informe o usuário do WebService.',
                 'form.nfse_ws_usuario.max' => 'Usuário do WebService inválido.',
                 'form.nfse_ws_senha.max' => 'Senha do WebService inválida.',
                 'form.nfse_url_producao.url' => 'URL de produção da NFS-e inválida.',
@@ -963,15 +964,14 @@ class ConfigFiscaisPage extends Page
             $this->form['nfse_proximo_rps'] = 1;
         }
 
-        if (trim((string) ($this->form['nfse_ws_usuario'] ?? '')) !== '') {
-            return;
-        }
+        $urlVazia = trim((string) ($this->form['nfse_url_producao'] ?? '')) === '';
+        $empresa = Empresa::query()->whereKey($this->resolveEmpresaId())->first(['cnpj', 'cidade_codigo']);
+        $this->form['nfse_ws_usuario'] = NfseIpmCliente::usuarioDoCnpj($empresa?->cnpj) ?? '';
 
-        $empresaId = $this->resolveEmpresaId();
-        $cnpj = preg_replace('/\D/', '', (string) (Empresa::query()->whereKey($empresaId)->value('cnpj') ?? '')) ?? '';
+        $endpoint = NfseIpmMunicipios::endpoint($empresa?->cidade_codigo);
 
-        if ($cnpj !== '') {
-            $this->form['nfse_ws_usuario'] = $cnpj;
+        if ($urlVazia && $endpoint !== null) {
+            $this->form['nfse_url_producao'] = $endpoint;
         }
     }
 

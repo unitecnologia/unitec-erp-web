@@ -47,7 +47,8 @@
                 ])
                 <input
                     type="text"
-                    wire:model.live.debounce.350ms="localSearch"
+                    data-erp-produtos-search
+                    value="{{ $this->localSearch }}"
                     wire:key="produtos-local-search-{{ implode('-', $activeSearchFields) }}-{{ $this->viewFilter }}"
                     class="erp-produtos__input erp-produtos__search-text"
                     placeholder="Digite para pesquisar"
@@ -83,4 +84,5 @@
     @include('filament.components.erp.list-scripts', [
         'config' => $this->getErpListKeyboardConfigForView(),
     ])
+    <script src="{{ asset('js/erp-produtos-search.js') }}?v={{ \App\Support\Erp\ErpAssetVersion::bundle() }}" defer data-navigate-track></script>
 </div>

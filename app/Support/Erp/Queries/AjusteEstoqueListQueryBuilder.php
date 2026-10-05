@@ -47,7 +47,7 @@ class AjusteEstoqueListQueryBuilder
 
     public function build(): Builder
     {
-        $query = AjusteEstoque::query()->with(['product']);
+        $query = AjusteEstoque::query()->with(['product'])->comOrigem();
 
         if ($this->informarPeriodo) {
             if (filled($this->periodoDe)) {

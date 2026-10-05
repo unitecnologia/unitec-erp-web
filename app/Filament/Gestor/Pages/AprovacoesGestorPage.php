@@ -33,12 +33,15 @@ class AprovacoesGestorPage extends Page
 
     public static function canAccess(): bool
     {
-        return static::canAccessGestor();
+        return static::podeVerAprovacoesGestor();
     }
 
     public function mount(): void
     {
         $this->mountGestorShell();
+        if (! static::canAccess()) {
+            abort(403);
+        }
         $this->refreshPendencias();
     }
 

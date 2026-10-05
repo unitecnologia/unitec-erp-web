@@ -51,6 +51,7 @@ class EnsureForcaVendasDeviceApproved
         }
 
         $device->forceFill(['last_seen_at' => now()])->save();
+        $request->attributes->set('fv_device', $device);
 
         return $next($request);
     }

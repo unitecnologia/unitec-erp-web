@@ -819,17 +819,37 @@ final class EmpresaParametros
         return $options;
     }
 
+    public static function normalizeCcgConsGtinUrl(mixed $url): string
+    {
+        $url = trim((string) $url);
+
+        if ($url === '' || self::isLegacyCosmosApiUrl($url)) {
+            return \App\Support\Erp\Ccg\CcgConsGtinEndpoints::URL;
+        }
+
+        return $url;
+    }
+
+    public static function isLegacyCosmosApiUrl(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $haystack = strtolower($url);
+
+        return str_contains($host, 'bluesoft.com.br')
+            || str_contains($haystack, 'cosmos.bluesoft')
+            || str_contains($haystack, 'api.cosmos');
+    }
+
     /**
      * @return array<string, array{label: string, default: int|float|string|null, type: string}>
      */
     public static function apiServicosFields(): array
     {
         return [
-            'param_api_servicos_url' => ['label' => 'URL da API', 'default' => '', 'type' => 'string'],
-            'param_api_servicos_usuario' => ['label' => 'Usuário', 'default' => '', 'type' => 'string'],
-            'param_api_servicos_senha' => ['label' => 'Senha', 'default' => '', 'type' => 'string'],
-            'param_api_servicos_token' => ['label' => 'Token / API Key', 'default' => '', 'type' => 'string'],
+            'param_api_servicos_url' => ['label' => 'URL da API', 'default' => \App\Support\Erp\Ccg\CcgConsGtinEndpoints::URL, 'type' => 'string'],
             'param_api_servicos_timeout' => ['label' => 'Timeout (segundos)', 'default' => 30, 'type' => 'integer'],
+            'param_api_servicos_serper_url' => ['label' => 'URL API Imagens', 'default' => 'https://google.serper.dev/images', 'type' => 'string'],
+            'param_api_servicos_serper_key' => ['label' => 'API Key Serper', 'default' => '', 'type' => 'string'],
         ];
     }
 
@@ -956,17 +976,17 @@ final class EmpresaParametros
         return [
             'param_consulta_placa_url' => [
                 'label' => 'URL da API',
-                'default' => 'https://api.verifica-online.com.br',
+                'default' => (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.cc'),
                 'type' => 'string',
             ],
             'param_consulta_placa_token' => [
                 'label' => 'Token / API Key',
-                'default' => '',
+                'default' => (string) config('unitec.consulta_placa.token', ''),
                 'type' => 'string',
             ],
             'param_consulta_placa_timeout' => [
                 'label' => 'Timeout',
-                'default' => 10,
+                'default' => (int) config('unitec.consulta_placa.timeout', 10),
                 'type' => 'integer',
             ],
         ];
@@ -980,7 +1000,7 @@ final class EmpresaParametros
         return [
             'param_consulta_placa_habilitar' => [
                 'label' => 'Habilitar consulta por placa',
-                'default' => false,
+                'default' => (bool) config('unitec.consulta_placa.enabled', true),
             ],
         ];
     }
@@ -1006,12 +1026,7 @@ final class EmpresaParametros
      */
     public static function licencaApiBooleanFields(): array
     {
-        return [
-            'param_licenca_api_habilitar' => [
-                'label' => 'Validar licença online (bloqueio pelo gerenciador)',
-                'default' => true,
-            ],
-        ];
+        return [];
     }
 
     /**

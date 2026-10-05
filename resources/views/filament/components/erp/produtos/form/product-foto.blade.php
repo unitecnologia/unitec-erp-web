@@ -52,6 +52,11 @@
             type="button"
             class="erp-pcad-form__btn"
             wire:click="openProductImageSearch"
-        >Pesquisar online</button>
+            wire:loading.attr="disabled"
+            wire:target="openProductImageSearch"
+        >
+            <span wire:loading.remove wire:target="openProductImageSearch">Pesquisar online</span>
+            <span wire:loading wire:target="openProductImageSearch">Pesquisando...</span>
+        </button>
     </div>
 </div>

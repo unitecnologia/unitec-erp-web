@@ -5,7 +5,6 @@
     $consultaPlacaFields = EmpresaParametros::consultaPlacaFields();
     $consultaPlacaBooleans = EmpresaParametros::consultaPlacaBooleanFields();
     $acessoRemotoFields = EmpresaParametros::acessoRemotoFields();
-    $licencaBooleans = EmpresaParametros::licencaApiBooleanFields();
 
     $cfStatus = is_array($this->cloudflaredStatus ?? null) ? $this->cloudflaredStatus : [];
     $cfOnline = (bool) ($cfStatus['online'] ?? false);
@@ -27,11 +26,21 @@
             @endforeach
         </div>
 
+        <p class="erp-empresas-parametros__hint erp-empresas-api-servicos__ccg">SEFAZ/SVRS – Consulta GTIN</p>
+
         <div class="erp-empresas-api-servicos__rows">
             <div class="erp-empresas-api-servicos__row erp-empresas-api-servicos__row--url-timeout">
                 <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
                     <label class="erp-pcad-form__label" for="param-param_api_servicos_url">URL da API</label>
-                    <input id="param-param_api_servicos_url" type="text" wire:model="data.param_api_servicos_url" class="erp-pcad-form__input erp-pcad-form__input--grow">
+                    <input
+                        id="param-param_api_servicos_url"
+                        type="text"
+                        wire:model="data.param_api_servicos_url"
+                        class="erp-pcad-form__input erp-pcad-form__input--grow"
+                        data-erp-preserve-case
+                        autocomplete="off"
+                        placeholder="{{ \App\Support\Erp\Ccg\CcgConsGtinEndpoints::URL }}"
+                    >
                 </div>
                 <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field erp-empresas-api-servicos__field--timeout">
                     <label class="erp-pcad-form__label" for="param-param_api_servicos_timeout">Timeout</label>
@@ -39,36 +48,59 @@
                 </div>
             </div>
 
-            <div class="erp-empresas-api-servicos__row erp-empresas-api-servicos__row--2">
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                    <label class="erp-pcad-form__label" for="param-param_api_servicos_usuario">Usuário</label>
-                    <input id="param-param_api_servicos_usuario" type="text" wire:model="data.param_api_servicos_usuario" class="erp-pcad-form__input erp-pcad-form__input--grow">
-                </div>
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                    <label class="erp-pcad-form__label" for="param-param_api_servicos_senha">Senha</label>
+            <h4 class="erp-empresas-parametros__section-title">Pesquisa de Imagens – Serper</h4>
+
+            <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
+                <label class="erp-pcad-form__label" for="param-param_api_servicos_serper_url">URL API Imagens</label>
+                <input
+                    id="param-param_api_servicos_serper_url"
+                    type="text"
+                    wire:model="data.param_api_servicos_serper_url"
+                    class="erp-pcad-form__input erp-pcad-form__input--grow"
+                    data-erp-preserve-case
+                    autocomplete="off"
+                    readonly
+                    title="Padrão Unitec para todas as empresas"
+                >
+            </div>
+
+            <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
+                <label class="erp-pcad-form__label" for="param-param_api_servicos_serper_key">API Key Serper</label>
+                <div class="erp-empresas-parametros__password" x-data="{ show: false }">
                     <input
-                        id="param-param_api_servicos_senha"
-                        type="password"
-                        wire:model="data.param_api_servicos_senha"
+                        id="param-param_api_servicos_serper_key"
+                        :type="show ? 'text' : 'password'"
+                        wire:model="data.param_api_servicos_serper_key"
                         class="erp-pcad-form__input erp-pcad-form__input--grow"
+                        data-erp-preserve-case
                         autocomplete="off"
+                        readonly
+                        title="Padrão Unitec para todas as empresas"
                         data-lpignore="true"
                         data-1p-ignore="true"
                         data-bwignore="true"
                         data-google-password-manager="ignore"
                     >
+                    <button
+                        type="button"
+                        class="erp-empresas-parametros__password-toggle"
+                        @click="show = ! show"
+                        :title="show ? 'Ocultar API key' : 'Mostrar API key'"
+                        :aria-label="show ? 'Ocultar API key' : 'Mostrar API key'"
+                        :class="{ 'is-visible': show }"
+                    >
+                        <svg class="erp-empresas-parametros__password-icon erp-empresas-parametros__password-icon--show" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <svg class="erp-empresas-parametros__password-icon erp-empresas-parametros__password-icon--hide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                    </button>
                 </div>
-            </div>
-
-            <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                <label class="erp-pcad-form__label" for="param-param_api_servicos_token">Token / API Key</label>
-                <input
-                    id="param-param_api_servicos_token"
-                    type="text"
-                    wire:model="data.param_api_servicos_token"
-                    class="erp-pcad-form__input erp-pcad-form__input--grow"
-                    placeholder="Token Cosmos (Bluesoft)"
-                >
             </div>
         </div>
     </section>
@@ -168,27 +200,26 @@
                             placeholder="mesavirada"
                         >
                     </div>
-                    <button
-                        type="button"
-                        class="erp-pcad-btn erp-pcad-btn--ghost erp-empresas-api-servicos__suggest"
-                        wire:click="sugerirSubdominioCloudflare"
-                        wire:loading.attr="disabled"
-                    >
-                        Sugerir
-                    </button>
-                </div>
-
-                <div class="erp-empresas-api-servicos__provision-actions">
-                    <button
-                        type="button"
-                        class="erp-pcad-form__btn erp-portal-contador-vinculo-panel__btn-primary"
-                        wire:click="ativarTunelCloudflare"
-                        wire:loading.attr="disabled"
-                        wire:target="ativarTunelCloudflare"
-                    >
-                        <span wire:loading.remove wire:target="ativarTunelCloudflare">Ativar túnel Cloudflare</span>
-                        <span wire:loading wire:target="ativarTunelCloudflare">Ativando…</span>
-                    </button>
+                    <div class="erp-empresas-api-servicos__subdomain-actions">
+                        <button
+                            type="button"
+                            class="erp-pcad-form__btn erp-empresas-api-servicos__suggest"
+                            wire:click="sugerirSubdominioCloudflare"
+                            wire:loading.attr="disabled"
+                        >
+                            Sugerir
+                        </button>
+                        <button
+                            type="button"
+                            class="erp-pcad-form__btn erp-portal-contador-vinculo-panel__btn-primary"
+                            wire:click="ativarTunelCloudflare"
+                            wire:loading.attr="disabled"
+                            wire:target="ativarTunelCloudflare"
+                        >
+                            <span wire:loading.remove wire:target="ativarTunelCloudflare">Ativar túnel Cloudflare</span>
+                            <span wire:loading wire:target="ativarTunelCloudflare">Ativando…</span>
+                        </button>
+                    </div>
                 </div>
 
                 @foreach ($acessoRemotoFields as $field => $meta)
@@ -205,6 +236,25 @@
                         >
                     </div>
                 @endforeach
+
+                @php
+                    $erpPublicUrl = rtrim(trim((string) ($this->data['param_erp_public_url'] ?? '')), '/');
+                    $inventarioPublicUrl = $erpPublicUrl !== '' ? $erpPublicUrl.'/inventario' : '';
+                @endphp
+                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
+                    <label class="erp-pcad-form__label" for="param-inventario-public-url">URL pública do Inventário</label>
+                    <input
+                        id="param-inventario-public-url"
+                        type="url"
+                        value="{{ $inventarioPublicUrl }}"
+                        class="erp-pcad-form__input erp-pcad-form__input--grow"
+                        data-erp-preserve-case
+                        readonly
+                        tabindex="-1"
+                        placeholder="https://sua-loja.unierp.uk/inventario"
+                        title="Mesmo endereço do ERP, no caminho /inventario"
+                    >
+                </div>
             </div>
 
             <div class="erp-empresas-api-servicos__status-row">
@@ -245,21 +295,6 @@
                 Acesso remoto desativado — túnel Cloudflare e URLs públicas não são usados nesta empresa.
             </p>
         @endif
-    </section>
-
-    <section class="erp-empresas-api-servicos__panel">
-        <h3 class="erp-empresas-api-servicos__panel-title">Licença do Sistema</h3>
-
-        <div class="erp-empresas-api-servicos__licenca">
-            <div class="erp-empresas-parametros__checks erp-empresas-parametros__checks--inline erp-empresas-api-servicos__checks">
-                @foreach ($licencaBooleans as $field => $meta)
-                    <label class="erp-pcad__check">
-                        <input type="checkbox" wire:model="data.{{ $field }}">
-                        <span>{{ $meta['label'] }}</span>
-                    </label>
-                @endforeach
-            </div>
-        </div>
     </section>
 
     <section class="erp-empresas-api-servicos__panel erp-empresas-api-servicos__panel--consulta-placa">

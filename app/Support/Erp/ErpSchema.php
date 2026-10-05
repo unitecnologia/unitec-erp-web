@@ -73,6 +73,23 @@ final class ErpSchema
         return isset(self::$columnMaps[$table][$column]);
     }
 
+    /**
+     * Igual a hasColumn, mas não acredita em assumeMigrated().
+     * O dashboard liga esse atalho para evitar information_schema em toda navegação;
+     * colunas que nem toda instalação tem (ex.: pdv_vendas.empresa_id) precisam da checagem real.
+     */
+    public static function hasColumnActual(string $table, string $column): bool
+    {
+        $previous = self::$assumeMigrated;
+        self::$assumeMigrated = false;
+
+        try {
+            return self::hasColumn($table, $column);
+        } finally {
+            self::$assumeMigrated = $previous;
+        }
+    }
+
     public static function flush(): void
     {
         self::$tables = [];

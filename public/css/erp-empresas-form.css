@@ -115,11 +115,11 @@
 .fi-body:has(.erp-empresas-form-page) .fi-main > * {
     display: flex;
     flex-direction: column;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     width: min(1180px, 97vw);
     max-width: min(1180px, 97vw);
-    height: min(820px, calc(100dvh - 5.2rem));
-    max-height: calc(100dvh - 5.2rem);
+    height: auto;
+    max-height: 100%;
     margin-left: auto;
     margin-right: auto;
     min-height: 0;
@@ -252,15 +252,14 @@
     padding-top: 0.2rem !important;
 }
 
-/* Topo (numéricos) + abas ficam FIXOS; só a área de campos da subaba rola.
-   O max-height por viewport é rede de segurança caso a cadeia de flex dos
-   contêineres pais não limite a altura — garante a rolagem e o rodapé visível. */
+/* Topo (numéricos) + abas ficam fixos; só a área de campos da subaba rola.
+   A altura vem do flex da janela, para o rodapé (Gravar / Sair) não ser cortado. */
 .erp-empresas-form-page .erp-pcad__workspace--parametros .erp-pcad__content {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
-    max-height: calc(100dvh - 13rem);
+    max-height: 100%;
     overflow: hidden;
 }
 
@@ -1623,6 +1622,12 @@
     flex: 0 0 auto;
 }
 
+.erp-empresas-api-servicos__ccg {
+    margin: 0 0 0.35rem;
+    font-weight: 600;
+    color: var(--erp-accent, #1d4ed8);
+}
+
 .erp-empresas-api-servicos__rows {
     display: flex;
     flex-direction: column;
@@ -1756,26 +1761,24 @@
     font-size: 0.72rem !important;
 }
 
-.erp-empresas-api-servicos__suggest {
-    align-self: end;
-    white-space: nowrap;
-    min-height: 1.45rem !important;
-    padding: 0.1rem 0.55rem !important;
-    font-size: 0.72rem !important;
-}
-
-.erp-empresas-api-servicos__provision-actions {
+.erp-empresas-api-servicos__subdomain-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.15rem 0 0.25rem;
-    padding-left: 10.25rem;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
 }
 
-.erp-empresas-api-servicos__provision-actions .erp-pcad-form__btn {
-    min-height: 1.55rem;
-    padding: 0.2rem 0.7rem;
-    font-size: 0.78rem;
+.erp-empresas-api-servicos__subdomain-actions .erp-pcad-form__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-height: 1.45rem;
+    height: 1.45rem;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.72rem;
+    line-height: 1;
+    box-sizing: border-box;
 }
 
 .erp-empresas-api-servicos__status-msg {

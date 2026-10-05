@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'erp.permission' => \App\Http\Middleware\EnsureErpPermission::class,
             'forcavendas.pairing' => \App\Http\Middleware\EnsureForcaVendasPairing::class,
             'forcavendas.device' => \App\Http\Middleware\EnsureForcaVendasDeviceApproved::class,
+            'forcavendas.device.user' => \App\Http\Middleware\EnsureForcaVendasDeviceUser::class,
             'vendasinternas.device' => \App\Http\Middleware\EnsureVendasInternasDeviceApproved::class,
             'unitecos.device' => \App\Http\Middleware\EnsureUnitecOsDeviceApproved::class,
             'entregas.device' => \App\Http\Middleware\EnsureEntregasDeviceApproved::class,

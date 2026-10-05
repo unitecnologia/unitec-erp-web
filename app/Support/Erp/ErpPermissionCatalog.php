@@ -110,6 +110,15 @@ class ErpPermissionCatalog
           'update' => 'Alterar',
         ],
       ],
+      'inventario' => [
+        'label' => 'Inventário',
+        'group' => 'Estoque',
+        'actions' => [
+          'access' => 'Acessar / consultar',
+          'contar' => 'Contar nos setores',
+          'finalizar' => 'Aplicar ajustes ao salvar',
+        ],
+      ],
       'compras' => [
         'label' => 'Compras',
         'group' => 'Compras',
@@ -654,6 +663,15 @@ class ErpPermissionCatalog
             'access' => 'ajuste_estoque.access',
             'actions' => [
               ['label' => 'Incluir', 'key' => 'ajuste_estoque.create'],
+            ],
+          ],
+          [
+            'label' => 'Inventário (contagem física)',
+            'module' => 'inventario',
+            'access' => 'inventario.access',
+            'actions' => [
+              ['label' => 'Contar nos setores', 'key' => 'inventario.contar'],
+              ['label' => 'Aplicar ajustes ao salvar', 'key' => 'inventario.finalizar'],
             ],
           ],
         ],

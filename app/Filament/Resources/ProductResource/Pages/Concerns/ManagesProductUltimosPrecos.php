@@ -19,8 +19,34 @@ trait ManagesProductUltimosPrecos
 
     public ?float $lastSavedPrecoCusto = null;
 
+    public bool $priceHistoryHydrated = false;
+
+    protected function captureLastSavedProductPrices(?Product $product): void
+    {
+        if (! $product) {
+            return;
+        }
+
+        $this->lastSavedPrecoVenda = (float) $product->preco_venda;
+        $this->lastSavedPrecoAtacado = (float) $product->preco_atacado;
+        $this->lastSavedPrecoEspecial = (float) $product->preco_especial;
+        $this->lastSavedPrecoCusto = (float) $product->preco_custo;
+    }
+
+    protected function ensureProductPriceHistoriesLoaded(): void
+    {
+        if ($this->priceHistoryHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductPriceHistories($product);
+    }
+
     protected function loadProductPriceHistories(?Product $product = null): void
     {
+        $this->priceHistoryHydrated = true;
+
         if (! $product) {
             $this->priceHistoryRows = [];
             $this->lastSavedPrecoVenda = null;
@@ -31,10 +57,7 @@ trait ManagesProductUltimosPrecos
             return;
         }
 
-        $this->lastSavedPrecoVenda = (float) $product->preco_venda;
-        $this->lastSavedPrecoAtacado = (float) $product->preco_atacado;
-        $this->lastSavedPrecoEspecial = (float) $product->preco_especial;
-        $this->lastSavedPrecoCusto = (float) $product->preco_custo;
+        $this->captureLastSavedProductPrices($product);
 
         $this->priceHistoryRows = $product->priceHistories()
             ->orderByDesc('registrado_em')

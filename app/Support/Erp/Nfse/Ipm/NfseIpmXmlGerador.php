@@ -6,17 +6,31 @@ use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\NfseItem;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
+use App\Support\Erp\Nfse\NfseObra;
 use DOMDocument;
 use DOMElement;
 
 /**
- * RPS no leiaute ABRASF 2.04 (GerarNfseEnvio), só com dados já gravados na NFS-e.
+ * GerarNfseEnvio na ordem do abrasf.xsd atual da IPM (ABRASF 2.04 + extensões), só com dados já gravados na NFS-e.
+ * Regras de alíquota/ISS/incidência: NTE 123/2025 v1.6, item 4.1. IBS/CBS não é gerado (não se aplica ao Simples).
  */
 class NfseIpmXmlGerador
 {
     public const NS = 'http://www.abrasf.org.br/nfse.xsd';
 
-    public function gerar(Nfse $nfse): string
+    /**
+     * Regime especial Nacional (empresas.nfse_reg_esp_trib) => tsRegimeEspecialTributacao ABRASF.
+     *
+     * @var array<string, string>
+     */
+    private const REGIME_ESPECIAL = [
+        '1' => '4',
+        '2' => '2',
+        '3' => '1',
+        '6' => '3',
+    ];
+
+    public function gerar(Nfse $nfse, bool $envioTeste = false): string
     {
         $nfse->loadMissing(['empresa', 'itens']);
         $empresa = $nfse->empresa;
@@ -31,6 +45,8 @@ class NfseIpmXmlGerador
             throw new NfseNaoTransmitida('Informe ao menos um serviço.');
         }
 
+        $this->exigirServicoUnico($nfse);
+
         $prestador = $this->digitos($empresa->cnpj);
 
         if (strlen($prestador) !== 14) {
@@ -43,16 +59,14 @@ class NfseIpmXmlGerador
             throw new NfseNaoTransmitida('Informe a inscrição municipal da empresa.');
         }
 
-        $itemLista = $this->itemLista((string) $item->c_trib_nac);
+        $numero = (int) $nfse->numero_dps;
 
-        if ($itemLista === null) {
-            throw new NfseNaoTransmitida('Informe o código de tributação nacional do serviço com 6 dígitos.');
+        if ($numero < 1) {
+            throw new NfseNaoTransmitida('A NFS-e ainda não tem número de RPS.');
         }
 
-        $municipio = $this->digitos($nfse->municipio_prestacao_codigo);
-
-        if (strlen($municipio) !== 7) {
-            throw new NfseNaoTransmitida('Falta o código IBGE do município da prestação.');
+        if ($nfse->competencia === null) {
+            throw new NfseNaoTransmitida('Informe a competência da NFS-e.');
         }
 
         $doc = new DOMDocument('1.0', 'UTF-8');
@@ -61,15 +75,19 @@ class NfseIpmXmlGerador
         $raiz = $doc->createElementNS(self::NS, 'GerarNfseEnvio');
         $doc->appendChild($raiz);
 
-        $rps = $doc->createElementNS(self::NS, 'Rps');
-        $inf = $doc->createElementNS(self::NS, 'InfDeclaracaoPrestacaoServico');
-        $inf->setAttribute('Id', 'rps'.$nfse->numero_dps);
-        $rps->appendChild($inf);
-        $raiz->appendChild($rps);
+        if ($envioTeste) {
+            $this->campo($doc, $raiz, 'EnvioTeste', '1');
+        }
 
-        $inf->appendChild($this->identificacaoRps($doc, $nfse, $empresa));
-        $this->campo($doc, $inf, 'Competencia', $nfse->competencia?->format('Y-m-d'));
-        $inf->appendChild($this->servico($doc, $nfse, $empresa, $item, $itemLista, $municipio));
+        $rps = $doc->createElementNS(self::NS, 'Rps');
+        $raiz->appendChild($rps);
+        $inf = $doc->createElementNS(self::NS, 'InfDeclaracaoPrestacaoServico');
+        $inf->setAttribute('Id', 'RPS_'.$numero);
+        $rps->appendChild($inf);
+
+        $inf->appendChild($this->identificacaoRps($doc, $nfse, $empresa, $numero));
+        $this->campo($doc, $inf, 'Competencia', $nfse->competencia->format('Y-m-d'));
+        $inf->appendChild($this->servico($doc, $nfse, $empresa, $item));
         $inf->appendChild($this->prestador($doc, $prestador, $im));
 
         $tomador = $this->tomador($doc, $nfse);
@@ -78,40 +96,73 @@ class NfseIpmXmlGerador
             $inf->appendChild($tomador);
         }
 
-        $regime = trim((string) $empresa->nfse_reg_esp_trib);
+        $construcao = $this->construcaoCivil($doc, $item);
 
-        if (preg_match('/^[1-6]$/', $regime) === 1) {
-            $this->campo($doc, $inf, 'RegimeEspecialTributacao', $regime);
+        if ($construcao !== null) {
+            $inf->appendChild($construcao);
         }
 
-        $this->campo($doc, $inf, 'OptanteSimplesNacional', $this->optanteSimples($empresa));
+        $this->campo($doc, $inf, 'RegimeEspecialTributacao', $this->regimeEspecial($empresa));
+        $this->campo($doc, $inf, 'OptanteSimplesNacional', $this->optanteSimples($empresa) ? '1' : '2');
         $this->campo($doc, $inf, 'IncentivoFiscal', '2');
 
         return $doc->saveXML() ?: '';
     }
 
-    private function identificacaoRps(DOMDocument $doc, Nfse $nfse, Empresa $empresa): DOMElement
+    private function identificacaoRps(DOMDocument $doc, Nfse $nfse, Empresa $empresa, int $numero): DOMElement
     {
+        $serie = trim((string) $nfse->serie_dps);
+
+        if ($serie === '' || mb_strlen($serie) > 5) {
+            throw new NfseNaoTransmitida('Informe a série do RPS com até 5 caracteres.');
+        }
+
+        $tipo = trim((string) ($empresa->nfse_tipo_rps ?? '')) ?: '1';
+
+        if (! in_array($tipo, ['1', '2', '3'], true)) {
+            throw new NfseNaoTransmitida('O tipo do RPS deve ser 1, 2 ou 3.');
+        }
+
         $bloco = $doc->createElementNS(self::NS, 'Rps');
         $id = $doc->createElementNS(self::NS, 'IdentificacaoRps');
-        $tipo = trim((string) ($empresa->nfse_tipo_rps ?? ''));
-        $this->campo($doc, $id, 'Numero', (string) $nfse->numero_dps);
-        $this->campo($doc, $id, 'Serie', trim((string) $nfse->serie_dps));
-        $this->campo($doc, $id, 'Tipo', $tipo !== '' ? $tipo : '1');
+        $this->campo($doc, $id, 'Numero', (string) $numero);
+        $this->campo($doc, $id, 'Serie', $serie);
+        $this->campo($doc, $id, 'Tipo', $tipo);
         $bloco->appendChild($id);
-        $this->campo($doc, $bloco, 'DataEmissao', $nfse->data_emissao?->format('Y-m-d'));
+        $this->campo($doc, $bloco, 'DataEmissao', ($nfse->data_emissao ?? now())->format('Y-m-d'));
         $this->campo($doc, $bloco, 'Status', '1');
 
         return $bloco;
     }
 
-    private function servico(DOMDocument $doc, Nfse $nfse, Empresa $empresa, NfseItem $item, string $itemLista, string $municipio): DOMElement
+    private function servico(DOMDocument $doc, Nfse $nfse, Empresa $empresa, NfseItem $item): DOMElement
     {
+        $itemLista = $this->itemLista((string) $item->c_trib_nac);
+
+        if ($itemLista === null) {
+            throw new NfseNaoTransmitida('Informe o código de tributação nacional do serviço com 6 dígitos.');
+        }
+
+        $nbs = $this->digitos($item->c_nbs);
+
+        if (strlen($nbs) !== 9) {
+            throw new NfseNaoTransmitida('Informe o código NBS do serviço com 9 dígitos.');
+        }
+
+        $municipio = $this->digitos($nfse->municipio_prestacao_codigo);
+
+        if (strlen($municipio) !== 7) {
+            throw new NfseNaoTransmitida('Falta o código IBGE do município da prestação.');
+        }
+
+        $exigibilidade = $this->exigibilidade((string) $nfse->trib_issqn);
+        $retido = in_array((string) $nfse->tp_ret_issqn, ['2', '3'], true);
+        $incidencia = in_array($exigibilidade, ['1', '3', '5', '6', '7'], true) ? $municipio : null;
+        $this->exigirIssCalculadoPeloMunicipio($empresa, $exigibilidade, $retido, $incidencia);
+
         $servico = $doc->createElementNS(self::NS, 'Servico');
         $valores = $doc->createElementNS(self::NS, 'Valores');
         $this->campo($doc, $valores, 'ValorServicos', $this->decimal($nfse->valor_servicos));
-        $this->campo($doc, $valores, 'ValorDeducoes', '0.00');
-        $this->campo($doc, $valores, 'ValorIss', $this->decimal($nfse->iss));
         $desconto = $this->decimal($nfse->desconto);
 
         if (bccomp($desconto, '0', 2) === 1) {
@@ -119,7 +170,7 @@ class NfseIpmXmlGerador
         }
 
         $servico->appendChild($valores);
-        $this->campo($doc, $servico, 'IssRetido', $this->issRetido((string) $nfse->tp_ret_issqn));
+        $this->campo($doc, $servico, 'IssRetido', $retido ? '1' : '2');
         $this->campo($doc, $servico, 'ResponsavelRetencao', $this->responsavelRetencao((string) $nfse->tp_ret_issqn));
         $this->campo($doc, $servico, 'ItemListaServico', $itemLista);
 
@@ -129,20 +180,36 @@ class NfseIpmXmlGerador
             $this->campo($doc, $servico, 'CodigoCnae', $cnae);
         }
 
-        $municipal = trim((string) $item->c_trib_mun);
+        $this->campo($doc, $servico, 'CodigoTributacaoMunicipio', mb_substr(trim((string) $item->c_trib_mun), 0, 20));
+        $this->campo($doc, $servico, 'CodigoNbs', $nbs);
+        $this->campo($doc, $servico, 'Discriminacao', $this->discriminacao($nfse));
+        $this->campo($doc, $servico, 'CodigoMunicipio', $municipio);
+        $this->campo($doc, $servico, 'ExigibilidadeISS', $exigibilidade);
+        $this->campo($doc, $servico, 'MunicipioIncidencia', $incidencia);
 
-        if ($municipal !== '') {
-            $this->campo($doc, $servico, 'CodigoTributacaoMunicipio', $municipal);
+        $obra = $this->obra($doc, $item, $municipio);
+
+        if ($obra !== null) {
+            $servico->appendChild($obra);
         }
 
-        $descricao = $this->discriminacao($nfse);
-
-        $this->campo($doc, $servico, 'Discriminacao', $descricao);
-        $this->campo($doc, $servico, 'CodigoMunicipio', $municipio);
-        $this->campo($doc, $servico, 'ExigibilidadeISS', $this->exigibilidade((string) $nfse->trib_issqn));
-        $this->campo($doc, $servico, 'MunicipioIncidencia', $municipio);
-
         return $servico;
+    }
+
+    /**
+     * Alíquota e ValorIss só podem ir quando o contribuinte os informa (NTE 4.1); o ERP ainda não guarda alíquota de ISS.
+     */
+    private function exigirIssCalculadoPeloMunicipio(Empresa $empresa, string $exigibilidade, bool $retido, ?string $incidencia): void
+    {
+        if ($this->optanteSimples($empresa) && $retido) {
+            throw new NfseNaoTransmitida('No IPM, ISS retido de empresa do Simples Nacional exige a alíquota do Simples, que ainda não é enviada pelo ERP.');
+        }
+
+        $sede = $this->digitos($empresa->cidade_codigo);
+
+        if ($exigibilidade === '1' && $incidencia !== null && strlen($sede) === 7 && $incidencia !== $sede) {
+            throw new NfseNaoTransmitida('No IPM, ISS devido fora do município do prestador exige alíquota e valor do ISS, que ainda não são enviados pelo ERP.');
+        }
     }
 
     private function prestador(DOMDocument $doc, string $cnpj, string $im): DOMElement
@@ -160,14 +227,19 @@ class NfseIpmXmlGerador
     {
         $nome = trim((string) $nfse->tomador_nome);
         $documento = $this->digitos($nfse->tomador_cpf_cnpj);
+        $identificado = strlen($documento) === 11 || strlen($documento) === 14;
 
-        if ($nome === '' && strlen($documento) !== 11 && strlen($documento) !== 14) {
+        if ($nome === '' && ! $identificado) {
             return null;
         }
 
-        $tomador = $doc->createElementNS(self::NS, 'Tomador');
+        if ($nome === '') {
+            throw new NfseNaoTransmitida('Informe o nome do tomador.');
+        }
 
-        if (strlen($documento) === 11 || strlen($documento) === 14) {
+        $tomador = $doc->createElementNS(self::NS, 'TomadorServico');
+
+        if ($identificado) {
             $identificacao = $doc->createElementNS(self::NS, 'IdentificacaoTomador');
             $cpfCnpj = $doc->createElementNS(self::NS, 'CpfCnpj');
             $this->campo($doc, $cpfCnpj, strlen($documento) === 14 ? 'Cnpj' : 'Cpf', $documento);
@@ -175,49 +247,132 @@ class NfseIpmXmlGerador
             $tomador->appendChild($identificacao);
         }
 
-        $this->campo($doc, $tomador, 'RazaoSocial', $nome !== '' ? $nome : null);
+        $this->campo($doc, $tomador, 'RazaoSocial', mb_substr($nome, 0, 150));
 
-        $endereco = $this->endereco($doc, $nfse);
+        $endereco = $this->endereco($doc, $nfse, $identificado);
 
         if ($endereco !== null) {
             $tomador->appendChild($endereco);
         }
 
-        $email = trim((string) $nfse->tomador_email);
-        $this->campo($doc, $tomador, 'Email', $email !== '' ? $email : null);
+        $contato = $this->contato($doc, $nfse);
+
+        if ($contato !== null) {
+            $tomador->appendChild($contato);
+        }
 
         return $tomador;
     }
 
-    private function endereco(DOMDocument $doc, Nfse $nfse): ?DOMElement
+    private function endereco(DOMDocument $doc, Nfse $nfse, bool $obrigatorio): ?DOMElement
     {
-        $municipio = $this->digitos($nfse->tomador_cidade_codigo);
         $logradouro = trim((string) $nfse->tomador_endereco);
+        $bairro = trim((string) $nfse->tomador_bairro);
+        $municipio = $this->digitos($nfse->tomador_cidade_codigo);
+        $uf = strtoupper(trim((string) $nfse->tomador_uf));
+        $cep = $this->digitos($nfse->tomador_cep);
 
-        if (strlen($municipio) !== 7 || $logradouro === '') {
+        if ($logradouro === '' && $bairro === '' && $cep === '' && ! $obrigatorio) {
             return null;
         }
 
+        if ($logradouro === '' || $bairro === '' || strlen($municipio) !== 7 || strlen($uf) !== 2 || strlen($cep) !== 8) {
+            throw new NfseNaoTransmitida('Complete o endereço do tomador: logradouro, bairro, município, UF e CEP com 8 dígitos.');
+        }
+
         $endereco = $doc->createElementNS(self::NS, 'Endereco');
-        $this->campo($doc, $endereco, 'Endereco', $logradouro);
-        $this->campo($doc, $endereco, 'Numero', trim((string) $nfse->tomador_numero) ?: 'S/N');
-        $this->campo($doc, $endereco, 'Bairro', trim((string) $nfse->tomador_bairro) ?: null);
-
-        $cep = $this->digitos($nfse->tomador_cep);
-
-        if (strlen($cep) === 8) {
-            $this->campo($doc, $endereco, 'Cep', $cep);
-        }
-
+        $this->campo($doc, $endereco, 'Endereco', mb_substr($logradouro, 0, 255));
+        $this->campo($doc, $endereco, 'Numero', mb_substr(trim((string) $nfse->tomador_numero) ?: 'S/N', 0, 60));
+        $this->campo($doc, $endereco, 'Bairro', mb_substr($bairro, 0, 60));
         $this->campo($doc, $endereco, 'CodigoMunicipio', $municipio);
-
-        $uf = strtoupper(trim((string) $nfse->tomador_uf));
-
-        if (strlen($uf) === 2) {
-            $this->campo($doc, $endereco, 'Uf', $uf);
-        }
+        $this->campo($doc, $endereco, 'Uf', $uf);
+        $this->campo($doc, $endereco, 'Cep', $cep);
 
         return $endereco;
+    }
+
+    private function contato(DOMDocument $doc, Nfse $nfse): ?DOMElement
+    {
+        $telefone = substr($this->digitos($nfse->tomador_telefone), 0, 20);
+        $email = trim((string) $nfse->tomador_email);
+        $email = $email !== '' && mb_strlen($email) <= 80 ? $email : '';
+
+        if ($telefone === '' && $email === '') {
+            return null;
+        }
+
+        $contato = $doc->createElementNS(self::NS, 'Contato');
+        $this->campo($doc, $contato, 'Telefone', $telefone);
+        $this->campo($doc, $contato, 'Email', $email);
+
+        return $contato;
+    }
+
+    private function obra(DOMDocument $doc, NfseItem $item, string $municipio): ?DOMElement
+    {
+        $grupo = $this->grupoObra($item);
+
+        if ($grupo === null || $grupo['tipo'] !== 'end') {
+            return null;
+        }
+
+        $end = $grupo['end'];
+        $obra = $doc->createElementNS(self::NS, 'Obra');
+        $this->campo($doc, $obra, 'Cep', $end['CEP']);
+        $this->campo($doc, $obra, 'CodigoMunicipio', $municipio);
+        $this->campo($doc, $obra, 'Endereco', $end['xLgr']);
+        $this->campo($doc, $obra, 'Bairro', $end['xBairro']);
+        $this->campo($doc, $obra, 'Numero', $end['nro']);
+        $this->campo($doc, $obra, 'Complemento', $end['xCpl'] !== null ? mb_substr($end['xCpl'], 0, 60) : null);
+
+        return $obra;
+    }
+
+    private function construcaoCivil(DOMDocument $doc, NfseItem $item): ?DOMElement
+    {
+        $grupo = $this->grupoObra($item);
+
+        if ($grupo === null || $grupo['tipo'] !== 'cObra') {
+            return null;
+        }
+
+        $construcao = $doc->createElementNS(self::NS, 'ConstrucaoCivil');
+        $this->campo($doc, $construcao, 'CodigoObra', $grupo['cObra']);
+
+        return $construcao;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function grupoObra(NfseItem $item): ?array
+    {
+        if (! NfseObra::exige($item->c_trib_nac)) {
+            return null;
+        }
+
+        $grupo = NfseObra::paraXml($item->c_trib_nac, $item->getAttributes());
+
+        if ($grupo === null) {
+            throw new NfseNaoTransmitida('Informe os dados da obra do serviço.');
+        }
+
+        if ($grupo['tipo'] === 'cCIB') {
+            throw new NfseNaoTransmitida('O IPM não recebe o CIB da obra. Informe o código CNO/CEI ou o endereço da obra.');
+        }
+
+        return $grupo;
+    }
+
+    private function exigirServicoUnico(Nfse $nfse): void
+    {
+        $codigos = $nfse->itens
+            ->map(fn (NfseItem $item): string => $this->digitos($item->c_trib_nac).'|'.$this->digitos($item->c_nbs).'|'.trim((string) $item->c_trib_mun))
+            ->unique();
+
+        if ($codigos->count() > 1) {
+            throw new NfseNaoTransmitida('No IPM, cada NFS-e aceita um único código de serviço. Emita uma nota para cada código de tributação/NBS.');
+        }
     }
 
     private function discriminacao(Nfse $nfse): string
@@ -225,7 +380,7 @@ class NfseIpmXmlGerador
         $partes = [];
 
         foreach ($nfse->itens as $item) {
-            $texto = trim((string) $item->descricao);
+            $texto = trim(preg_replace('/\s+/u', ' ', (string) $item->descricao) ?? '');
 
             if ($texto !== '') {
                 $partes[] = $texto;
@@ -241,14 +396,18 @@ class NfseIpmXmlGerador
         return mb_substr($descricao, 0, 2000);
     }
 
-    private function optanteSimples(Empresa $empresa): string
+    private function regimeEspecial(Empresa $empresa): ?string
     {
-        return in_array(strtolower(trim((string) $empresa->regime_tributario)), ['simples', 'mei'], true) ? '1' : '2';
+        if (strtolower(trim((string) $empresa->regime_tributario)) === 'mei') {
+            return '5';
+        }
+
+        return self::REGIME_ESPECIAL[trim((string) $empresa->nfse_reg_esp_trib)] ?? null;
     }
 
-    private function issRetido(string $retencao): string
+    private function optanteSimples(Empresa $empresa): bool
     {
-        return in_array($retencao, ['2', '3'], true) ? '1' : '2';
+        return in_array(strtolower(trim((string) $empresa->regime_tributario)), ['simples', 'mei'], true);
     }
 
     private function responsavelRetencao(string $retencao): ?string
@@ -270,15 +429,18 @@ class NfseIpmXmlGerador
         };
     }
 
+    /**
+     * Subitem LC 116 com desdobro nacional (99.99.99), exigido pela NTE (L1099/L1103).
+     */
     private function itemLista(string $codigo): ?string
     {
         $digitos = $this->digitos($codigo);
 
-        if (strlen($digitos) < 4) {
+        if (strlen($digitos) !== 6) {
             return null;
         }
 
-        return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2);
+        return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2).'.'.substr($digitos, 4, 2);
     }
 
     private function decimal(mixed $valor): string
@@ -305,6 +467,8 @@ class NfseIpmXmlGerador
             return;
         }
 
-        $pai->appendChild($doc->createElementNS(self::NS, $nome, $texto));
+        $elemento = $doc->createElementNS(self::NS, $nome);
+        $elemento->appendChild($doc->createTextNode($texto));
+        $pai->appendChild($elemento);
     }
 }

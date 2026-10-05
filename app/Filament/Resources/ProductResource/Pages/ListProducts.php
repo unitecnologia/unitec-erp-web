@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ProductCloneService;
+use App\Support\Erp\ProductListLiveSearch;
 use App\Support\Erp\ProductDeletionGuard;
 use App\Support\Erp\Queries\ProductListQueryBuilder;
 use App\Support\Erp\Queries\ProductSerialListQueryBuilder;
@@ -72,6 +73,7 @@ class ListProducts extends ListRecords
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
 
         ErpScreen::set($this->isSeriaisView() ? 'Seriais' : 'Produtos');
+        ProductListLiveSearch::put($this->localSearch);
     }
 
     /**
@@ -267,12 +269,24 @@ class ListProducts extends ListRecords
         };
     }
 
+    protected function productListDirectEditUrl(): ?string
+    {
+        if ($this->isSeriaisView() || ! $this->erpCan('produtos.update')) {
+            return null;
+        }
+
+        return $this->urlWithPdvEmbed(
+            ProductResource::getUrl('edit', ['record' => '__RECORD__'])
+        );
+    }
+
     protected function customErpListKeyboardConfig(): array
     {
         return [
             'searchInput' => '.erp-produtos__search-text',
             'create' => 'createProduct',
             'edit' => 'editProduct',
+            'editUrl' => $this->productListDirectEditUrl(),
             'delete' => 'deleteProduct',
             'extraKeys' => [
                 'F4' => ['method' => 'printProducts'],
@@ -293,6 +307,7 @@ class ListProducts extends ListRecords
         $this->erpApplyDualSearchFields([$this->searchColumn], $this->productSearchFieldsSessionKey());
         session([$this->productSearchColumnSessionKey() => $this->searchColumn]);
         $this->localSearch = '';
+        ProductListLiveSearch::put('');
         $this->clearListSelection();
         $this->pushProductListRefresh(resetSort: true);
 
@@ -317,6 +332,7 @@ class ListProducts extends ListRecords
      */
     public function productStatusCounts(): array
     {
+        $this->pullListSearch();
         $empresa = $this->currentEmpresa();
         $searchColumn = $this->searchColumn;
         $localSearch = $this->localSearch;
@@ -330,6 +346,7 @@ class ListProducts extends ListRecords
                 empresa: $empresa,
                 applyDefaultOrder: false,
                 searchFieldsActive: $searchFieldsActive,
+                deferReservaSum: true,
             ))->build()->count();
         };
 
@@ -353,6 +370,7 @@ class ListProducts extends ListRecords
 
     public function updatedLocalSearch(): void
     {
+        ProductListLiveSearch::put($this->localSearch);
         $this->clearListSelection();
         $this->pushProductListRefresh(resetSort: true);
     }
@@ -365,6 +383,7 @@ class ListProducts extends ListRecords
     public function clearSearch(): void
     {
         $this->localSearch = '';
+        ProductListLiveSearch::put('');
         $this->searchColumn = 'descricao';
         $this->erpApplyDualSearchFields(['descricao'], $this->productSearchFieldsSessionKey());
         session([$this->productSearchColumnSessionKey() => $this->searchColumn]);
@@ -403,6 +422,8 @@ class ListProducts extends ListRecords
 
     protected function pushProductListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
     {
+        $this->pullListSearch();
+
         $this->dispatch(
             'erp-product-list-refresh',
             statusFilter: $this->statusFilter,
@@ -441,6 +462,8 @@ class ListProducts extends ListRecords
 
     protected function getTableQuery(): Builder
     {
+        $this->pullListSearch();
+
         if ($this->isSeriaisView()) {
             return (new ProductSerialListQueryBuilder(
                 searchColumn: $this->searchColumn,
@@ -460,6 +483,15 @@ class ListProducts extends ListRecords
         ))->build();
     }
 
+    protected function pullListSearch(): void
+    {
+        $synced = ProductListLiveSearch::get();
+
+        if ($synced !== null) {
+            $this->localSearch = $synced;
+        }
+    }
+
     protected function currentEmpresa(): ?Empresa
     {
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
@@ -469,6 +501,8 @@ class ListProducts extends ListRecords
 
     public function content(Schema $schema): Schema
     {
+        $this->pullListSearch();
+
         return $schema
             ->gap(false)
             ->components([
@@ -643,6 +677,8 @@ class ListProducts extends ListRecords
 
             return;
         }
+
+        $this->pullListSearch();
 
         $builder = new ProductListQueryBuilder(
             statusFilter: $this->statusFilter,

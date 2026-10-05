@@ -902,12 +902,6 @@ class LicencaRemotaService
 
     private function resolveEnabled(): bool
     {
-        $empresa = ErpContext::currentEmpresa();
-
-        if ($empresa !== null && array_key_exists('param_licenca_api_habilitar', $empresa->getAttributes())) {
-            return (bool) $empresa->param_licenca_api_habilitar;
-        }
-
         $enabled = config('unitec.licenca_api.enabled', true);
 
         if (is_string($enabled)) {

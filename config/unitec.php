@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.229',
+    'versao' => '6.4.1.232',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -23,6 +23,27 @@ return [
     */
     'portal_bkp' => [
         'token' => 'alencar@1234',
+    ],
+
+    /*
+    | Consulta de veículo por placa (Verifica Online).
+    | Igual para todas as instalações: não depende do cadastro de cada empresa.
+    */
+    'consulta_placa' => [
+        'enabled' => true,
+        'base_url' => 'https://api.verifica-online.cc',
+        'timeout' => 10,
+        'token' => 'voa_86f6e59e302456ee17ac7f514e7d433ee972bcf6ba08b24aa921751c597c03e2',
+    ],
+
+    /*
+    | Pesquisa de imagens de produto (Serper).
+    | Igual para todas as instalações: não depende do cadastro de cada empresa.
+    */
+    'imagens_serper' => [
+        'url' => 'https://google.serper.dev/images',
+        'key' => 'e35fb260dfabd7d210870b966b01ed675d07f8b5',
+        'timeout' => 30,
     ],
 
     /*

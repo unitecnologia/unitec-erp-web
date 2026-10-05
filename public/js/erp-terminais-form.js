@@ -55,6 +55,17 @@ function bindErpTerminaisFormKeys() {
             return;
         }
 
+        if (document.querySelector('.erp-fv-reset-modal')) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                component.call('cancelarResetAparelho');
+            } else if (['F2', 'F4', 'F5', 'F10'].includes(event.key)) {
+                event.preventDefault();
+            }
+
+            return;
+        }
+
         if (event.key === 'F2') {
             if (document.querySelector('.erp-terminais-aparelhos')) {
                 event.preventDefault();

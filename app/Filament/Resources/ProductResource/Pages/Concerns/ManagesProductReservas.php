@@ -4,7 +4,6 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 
 use App\Models\Estoque;
 use App\Models\Product;
-use App\Models\ProductEstoqueSaldo;
 use App\Models\User;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\EstoqueReservaService;
@@ -70,16 +69,21 @@ trait ManagesProductReservas
             ?->id
             ?? $estoques->first()?->id;
 
-        $saldos = $this->productEstoqueSaldosByEstoqueId();
         $saldosService = app(ProductEstoqueSaldoService::class);
         $productId = (int) ($this->record?->id ?? $this->data['id'] ?? 0);
+        $fisicos = $productId > 0
+            ? $saldosService->fisicoPorEstoques(
+                $productId,
+                $estoques->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            )
+            : [];
 
         return $estoques
             ->values()
-            ->map(function (Estoque $estoque) use ($atualFallback, $reservado, $principalId, $saldosService, $productId): array {
+            ->map(function (Estoque $estoque) use ($atualFallback, $reservado, $principalId, $productId, $fisicos): array {
                 $isPrincipal = (int) $estoque->id === (int) $principalId;
                 $atual = $productId > 0
-                    ? $saldosService->fisico($productId, (int) $estoque->id)
+                    ? (float) ($fisicos[(int) $estoque->id] ?? 0)
                     : ($isPrincipal ? $atualFallback : 0.0);
                 $reservadoPosicao = $isPrincipal ? $reservado : 0.0;
                 $disponivel = $atual - $reservadoPosicao;
@@ -98,30 +102,6 @@ trait ManagesProductReservas
                     'previsto' => $this->formatBrDecimal(0, 3),
                 ];
             })
-            ->all();
-    }
-
-    /**
-     * @return array<int, float>
-     */
-    protected function productEstoqueSaldosByEstoqueId(): array
-    {
-        if (! Schema::hasTable('product_estoque_saldos')) {
-            return [];
-        }
-
-        $productId = (int) ($this->record?->id
-            ?? $this->data['id']
-            ?? 0);
-
-        if ($productId <= 0) {
-            return [];
-        }
-
-        return ProductEstoqueSaldo::query()
-            ->where('product_id', $productId)
-            ->pluck('quantidade', 'estoque_id')
-            ->map(fn ($q): float => (float) $q)
             ->all();
     }
 

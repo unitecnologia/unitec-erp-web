@@ -14,8 +14,22 @@ trait ManagesProductGrade
 
     public ?int $selectedGradeIndex = null;
 
+    public bool $productGradesHydrated = false;
+
+    protected function ensureProductGradesLoaded(): void
+    {
+        if ($this->productGradesHydrated) {
+            return;
+        }
+
+        $product = ($this->record ?? null) instanceof Product ? $this->record : null;
+        $this->loadProductGrades($product);
+    }
+
     protected function loadProductGrades(?Product $product = null): void
     {
+        $this->productGradesHydrated = true;
+
         if (! $product) {
             $this->gradeRows = [];
             $this->selectedGradeIndex = null;
@@ -87,6 +101,10 @@ trait ManagesProductGrade
         if (! ($product->is_grade ?? false)) {
             $product->grades()->delete();
 
+            return;
+        }
+
+        if (! $this->productGradesHydrated) {
             return;
         }
 

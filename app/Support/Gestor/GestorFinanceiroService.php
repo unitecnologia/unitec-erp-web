@@ -10,6 +10,7 @@ use App\Support\Erp\Dashboard\ErpDashboardGauges;
 use App\Support\Erp\Dashboard\ErpDashboardSalesMetrics;
 use App\Support\Erp\Financeiro\ErpFinanceiroMetricas;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use App\Support\Erp\ErpSchema;
 use Throwable;
@@ -195,7 +196,9 @@ final class GestorFinanceiroService
 
             $totais = ContaReceber::query()
                 ->where('forma', ContaReceber::FORMA_CARTAO)
-                ->where('saldo', '>', 0)
+                ->where('saldo', '>', 0);
+            $this->aplicarEmpresa($totais, new ContaReceber);
+            $totais = $totais
                 ->selectRaw('COUNT(*) as qtd')
                 ->selectRaw('COALESCE(SUM(saldo), 0) as valor')
                 ->selectRaw(
@@ -215,9 +218,11 @@ final class GestorFinanceiroService
 
             $bandeiras = [];
             if ($qtd > 0) {
-                $bandeiras = ContaReceber::query()
+                $bandeirasQuery = ContaReceber::query()
                     ->where('forma', ContaReceber::FORMA_CARTAO)
-                    ->where('saldo', '>', 0)
+                    ->where('saldo', '>', 0);
+                $this->aplicarEmpresa($bandeirasQuery, new ContaReceber);
+                $bandeiras = $bandeirasQuery
                     ->selectRaw("{$bandeiraExpr} as nome")
                     ->selectRaw('COUNT(*) as qtd')
                     ->selectRaw('COALESCE(SUM(saldo), 0) as valor')
@@ -233,10 +238,11 @@ final class GestorFinanceiroService
                     ->all();
             }
 
-            $vendidoHoje = round((float) ContaReceber::query()
+            $vendidoQuery = ContaReceber::query()
                 ->where('forma', ContaReceber::FORMA_CARTAO)
-                ->whereDate('emissao', $hojeStr)
-                ->sum('valor'), 2);
+                ->whereDate('emissao', $hojeStr);
+            $this->aplicarEmpresa($vendidoQuery, new ContaReceber);
+            $vendidoHoje = round((float) $vendidoQuery->sum('valor'), 2);
 
             return [
                 'qtd' => $qtd,
@@ -299,10 +305,13 @@ final class GestorFinanceiroService
                 return [];
             }
 
-            return ContaReceber::query()
+            $cartoes = ContaReceber::query()
                 ->with('cliente:id,nome_razao')
                 ->where('forma', ContaReceber::FORMA_CARTAO)
-                ->where('saldo', '>', 0)
+                ->where('saldo', '>', 0);
+            $this->aplicarEmpresa($cartoes, new ContaReceber);
+
+            return $cartoes
                 ->orderBy('vencimento')
                 ->limit($limit)
                 ->get()
@@ -518,10 +527,12 @@ final class GestorFinanceiroService
                 return [];
             }
 
-            $rows = ContaReceber::query()
+            $abertos = ContaReceber::query()
                 ->select('cliente_id', DB::raw('SUM(saldo) as aberto'))
                 ->where('saldo', '>', 0)
-                ->whereNotNull('cliente_id')
+                ->whereNotNull('cliente_id');
+            $this->aplicarEmpresa($abertos, new ContaReceber);
+            $rows = $abertos
                 ->groupBy('cliente_id')
                 ->havingRaw('SUM(saldo) > 0')
                 ->get();
@@ -583,10 +594,12 @@ final class GestorFinanceiroService
                 return ['qtd' => 0, 'valor' => 0.0];
             }
 
-            $rows = ContaReceber::query()
+            $abertos = ContaReceber::query()
                 ->select('cliente_id', DB::raw('SUM(saldo) as aberto'))
                 ->where('saldo', '>', 0)
-                ->whereNotNull('cliente_id')
+                ->whereNotNull('cliente_id');
+            $this->aplicarEmpresa($abertos, new ContaReceber);
+            $rows = $abertos
                 ->groupBy('cliente_id')
                 ->havingRaw('SUM(saldo) > 0')
                 ->get();
@@ -667,7 +680,7 @@ final class GestorFinanceiroService
                 return [];
             }
 
-            $rows = ContaReceber::query()
+            $inadimplentes = ContaReceber::query()
                 ->select([
                     'cliente_id',
                     DB::raw('SUM(saldo) as valor'),
@@ -676,7 +689,9 @@ final class GestorFinanceiroService
                 ])
                 ->where('saldo', '>', 0)
                 ->whereDate('vencimento', '<', $hoje->toDateString())
-                ->whereNotNull('cliente_id')
+                ->whereNotNull('cliente_id');
+            $this->aplicarEmpresa($inadimplentes, new ContaReceber);
+            $rows = $inadimplentes
                 ->groupBy('cliente_id')
                 ->orderByDesc('valor')
                 ->limit($limit)
@@ -727,6 +742,7 @@ final class GestorFinanceiroService
             ->whereDate('vencimento', '<=', $to->toDateString())
             ->orderBy('vencimento')
             ->limit($limit);
+        $this->aplicarEmpresa($q, new ContaReceber);
 
         if ($from) {
             $q->whereDate('vencimento', '>=', $from->toDateString());
@@ -763,6 +779,7 @@ final class GestorFinanceiroService
             ->whereDate('vencimento', '<=', $to->toDateString())
             ->orderBy('vencimento')
             ->limit($limit);
+        $this->aplicarEmpresa($q, new ContaPagar);
 
         if ($from) {
             $q->whereDate('vencimento', '>=', $from->toDateString());
@@ -879,5 +896,19 @@ final class GestorFinanceiroService
         }
 
         return array_slice($itens, 0, 6);
+    }
+
+    /**
+     * Mesmo escopo dos cards: ErpFinanceiroMetricas::applyEmpresaColumn.
+     */
+    private function aplicarEmpresa(Builder $query, ContaReceber|ContaPagar $modelo): void
+    {
+        $empresaId = app(GestorExecutivoService::class)->empresaId();
+
+        ErpFinanceiroMetricas::applyEmpresaColumn(
+            $query,
+            $modelo->getTable(),
+            $empresaId > 0 ? $empresaId : null,
+        );
     }
 }
