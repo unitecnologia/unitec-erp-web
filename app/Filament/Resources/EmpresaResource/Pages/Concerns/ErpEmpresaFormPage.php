@@ -800,7 +800,7 @@ trait ErpEmpresaFormPage
     protected function hydrateConsultaPlacaFormDefaults(): void
     {
         $this->data['param_consulta_placa_habilitar'] = (bool) config('unitec.consulta_placa.enabled', true);
-        $this->data['param_consulta_placa_url'] = (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.cc');
+        $this->data['param_consulta_placa_url'] = (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.com.br');
         $this->data['param_consulta_placa_timeout'] = (int) config('unitec.consulta_placa.timeout', 10);
         $this->data['param_consulta_placa_token'] = (string) config('unitec.consulta_placa.token', '');
     }

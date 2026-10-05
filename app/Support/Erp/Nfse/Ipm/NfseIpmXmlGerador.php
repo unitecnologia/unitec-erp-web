@@ -30,6 +30,18 @@ class NfseIpmXmlGerador
         '6' => '3',
     ];
 
+    /**
+     * Subitens LC 116/2003 cujo ISS não é devido no estabelecimento do prestador (art. 3º, incisos II a XXV),
+     * além dos itens 12 (exceto 12.13) e 20. Para eles a incidência segue o município informado na NFS-e;
+     * nos demais, o município do prestador.
+     *
+     * @var list<string>
+     */
+    private const INCIDENCIA_FORA_DO_PRESTADOR = [
+        '0305', '0422', '0423', '0509', '0702', '0704', '0705', '0709', '0710', '0711', '0712', '0716', '0717',
+        '0718', '0719', '1004', '1101', '1102', '1104', '1105', '1501', '1509', '1601', '1602', '1705', '1710',
+    ];
+
     public function gerar(Nfse $nfse, bool $envioTeste = false): string
     {
         $nfse->loadMissing(['empresa', 'itens']);
@@ -157,7 +169,9 @@ class NfseIpmXmlGerador
 
         $exigibilidade = $this->exigibilidade((string) $nfse->trib_issqn);
         $retido = in_array((string) $nfse->tp_ret_issqn, ['2', '3'], true);
-        $incidencia = in_array($exigibilidade, ['1', '3', '5', '6', '7'], true) ? $municipio : null;
+        $incidencia = in_array($exigibilidade, ['1', '3', '5', '6', '7'], true)
+            ? $this->municipioIncidencia($empresa, (string) $item->c_trib_nac, $municipio)
+            : null;
         $this->exigirIssCalculadoPeloMunicipio($empresa, $exigibilidade, $retido, $incidencia);
 
         $servico = $doc->createElementNS(self::NS, 'Servico');
@@ -194,6 +208,17 @@ class NfseIpmXmlGerador
         }
 
         return $servico;
+    }
+
+    private function municipioIncidencia(Empresa $empresa, string $cTribNac, string $prestacao): string
+    {
+        $sede = $this->digitos($empresa->cidade_codigo);
+        $subitem = substr($this->digitos($cTribNac), 0, 4);
+        $foraDoPrestador = in_array($subitem, self::INCIDENCIA_FORA_DO_PRESTADOR, true)
+            || (str_starts_with($subitem, '12') && $subitem !== '1213')
+            || str_starts_with($subitem, '20');
+
+        return $foraDoPrestador || strlen($sede) !== 7 ? $prestacao : $sede;
     }
 
     /**

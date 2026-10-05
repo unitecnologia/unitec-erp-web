@@ -11,7 +11,8 @@ function initErpConfigFiscais() {
 }
 
 function bindErpConfigFiscaisPasswordToggles() {
-    if (window.__erpConfigFiscaisPasswordToggleBound) {
+    // erp-shell.js já alterna [data-erp-password-toggle]; um segundo handler desfaz o clique.
+    if (window.__erpConfigFiscaisPasswordToggleBound || window.__erpPasswordToggleBound) {
         return;
     }
 

@@ -563,6 +563,17 @@
     padding-right: 2.6rem;
 }
 
+.erp-config-fiscais-form__nfe-field .erp-config-fiscais-form__password-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+}
+
+.erp-config-fiscais-form__nfe-field .erp-config-fiscais-form__password-input {
+    min-height: 0;
+}
+
 .erp-config-fiscais-form__password-toggle {
     position: absolute;
     top: 50%;

@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.233',
+    'versao' => '6.4.1.234',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -31,7 +31,7 @@ return [
     */
     'consulta_placa' => [
         'enabled' => true,
-        'base_url' => 'https://api.verifica-online.cc',
+        'base_url' => 'https://api.verifica-online.com.br',
         'timeout' => 10,
         'token' => 'voa_86f6e59e302456ee17ac7f514e7d433ee972bcf6ba08b24aa921751c597c03e2',
     ],

@@ -976,7 +976,7 @@ final class EmpresaParametros
         return [
             'param_consulta_placa_url' => [
                 'label' => 'URL da API',
-                'default' => (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.cc'),
+                'default' => (string) config('unitec.consulta_placa.base_url', 'https://api.verifica-online.com.br'),
                 'type' => 'string',
             ],
             'param_consulta_placa_token' => [
