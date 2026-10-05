@@ -2,8 +2,10 @@
 
 namespace App\Support\Erp;
 
+use App\Support\Erp\License\LicencaHttpClient;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
@@ -113,10 +115,15 @@ final class ProductImageSearchDownloader
                 'path' => $stored['path'],
                 'message' => null,
             ];
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
             if ($state['tooLarge']) {
                 return $this->reject('Imagem acima de 2 MB.');
             }
+
+            Log::warning('Download da imagem pesquisada falhou.', [
+                'url' => mb_substr($url, 0, 500),
+                'exception' => $exception->getMessage(),
+            ]);
 
             return $this->reject('Não foi possível baixar a imagem.');
         } finally {
@@ -262,7 +269,7 @@ final class ProductImageSearchDownloader
         try {
             return Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
                 ->timeout(self::TIMEOUT_SECONDS)
-                ->withOptions([
+                ->withOptions(LicencaHttpClient::options([
                     'allow_redirects' => false,
                     'http_errors' => false,
                     'on_headers' => function ($response) use (&$state): void {
@@ -275,7 +282,7 @@ final class ProductImageSearchDownloader
                         }
                     },
                     'curl' => $curl,
-                ])
+                ]))
                 ->withHeaders([
                     'Accept' => 'image/jpeg,image/png,image/webp,image/gif',
                     'User-Agent' => 'UnitecERP-ImageSearch/1.0',
