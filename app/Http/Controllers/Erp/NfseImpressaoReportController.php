@@ -40,6 +40,6 @@ class NfseImpressaoReportController
                 ->download($nome);
         }
 
-        return view($view, $data);
+        return view($view, $data + ['tela' => true]);
     }
 }

@@ -283,6 +283,7 @@ final class EmpresaParametros
             'nfse_serie_rps' => ['label' => 'Série RPS', 'default' => '', 'type' => 'string'],
             'nfse_proximo_rps' => ['label' => 'Próximo Nº RPS', 'default' => '', 'type' => 'string'],
             'nfse_tipo_rps' => ['label' => 'Tipo RPS', 'default' => '1', 'type' => 'string'],
+            'nfse_aliquota_iss' => ['label' => 'Alíquota ISS (%)', 'default' => '', 'type' => 'string'],
             'nfse_ws_usuario' => ['label' => 'Usuário WebService', 'default' => '', 'type' => 'string'],
             'nfse_ws_senha' => ['label' => 'Senha WebService', 'default' => '', 'type' => 'string'],
             'nfse_url_producao' => ['label' => 'URL Produção', 'default' => '', 'type' => 'string'],

@@ -27,6 +27,7 @@ class NfseIpmModoTesteTest extends TestCase
     {
         parent::setUp();
         Storage::fake('local');
+        $this->travelTo('2026-10-05 10:00:00');
     }
 
     public function test_envio_teste_aceito_mantem_a_nota_aberta_e_sem_numero_de_nfse(): void
@@ -201,6 +202,7 @@ class NfseIpmModoTesteTest extends TestCase
             'municipio_prestacao_codigo' => '4101804',
             'trib_issqn' => '1',
             'tp_ret_issqn' => '1',
+            'aliquota_iss' => '2.00',
             'valor_servicos' => '100.00',
             'desconto' => '0.00',
             'iss' => '0.00',

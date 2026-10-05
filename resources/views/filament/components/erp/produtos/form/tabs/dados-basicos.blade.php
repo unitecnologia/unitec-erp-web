@@ -389,6 +389,18 @@
                         title="Indicador da operação, opcional"
                     >
                 </div>
+                <div class="erp-produtos-form__cell">
+                    <label for="pprod-servico-issqn">ISSQN %</label>
+                    <input
+                        id="pprod-servico-issqn"
+                        type="text"
+                        wire:model="data.issqn"
+                        data-mask="percent-br"
+                        autocomplete="off"
+                        class="erp-pcad-form__input"
+                        title="Alíquota do ISS do serviço; usada na NFS-e quando a alíquota da configuração fiscal estiver vazia"
+                    >
+                </div>
             </div>
         </section>
     @endif

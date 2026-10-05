@@ -87,6 +87,10 @@ trait ManagesProductFormUi
             $this->data['valor_grande'] = $this->formatBrDecimal(0, 4);
         }
 
+        if ($key === 'is_servico' && (bool) $value) {
+            $this->data = $this->aplicarIssqnPadraoServico($this->data ?? []);
+        }
+
         if ($key === 'is_remedio' && ! (bool) $value) {
             $this->data['aplicacao'] = null;
             $this->data['principio_ativo_id'] = null;

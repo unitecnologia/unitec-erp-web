@@ -4,10 +4,12 @@ namespace App\Support\Erp\Os;
 
 use App\Models\Empresa;
 use App\Models\OsVeiculo;
+use App\Support\Erp\License\LicencaHttpClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -124,6 +126,10 @@ final class ConsultaPlacaOsService
                 ->post($endpoint, ['plate' => $placa]);
         } catch (ConnectionException $exception) {
             $this->falhaPorTimeout = $this->ehTimeout($exception);
+
+            Log::warning('Consulta de placa falhou na conexão.', [
+                'exception' => $exception->getMessage(),
+            ]);
 
             if ($podeRepetir) {
                 return $this->enviar($endpoint, $token, $placa, $idempotency, $timeout, false);
@@ -315,7 +321,7 @@ final class ConsultaPlacaOsService
         return Http::withToken($token)
             ->acceptJson()
             ->asJson()
-            ->withOptions(['allow_redirects' => false])
+            ->withOptions(LicencaHttpClient::options(['allow_redirects' => false]))
             ->connectTimeout(min(10, max(1, $timeout)))
             ->timeout(max(1, $timeout));
     }

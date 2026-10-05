@@ -58,8 +58,13 @@ final class NfseIpmImpressaoViewData
         $valorServicos = self::numero($nfse->valor_servicos);
         $desconto = self::numero($nfse->desconto);
         $deducao = self::numero(self::tag($xmlNfse, 'ValorDeducoes') ?? self::tag($xmlDps, 'ValorDeducoes') ?? '0');
-        $iss = self::numero($nfse->iss);
+        $issOficial = self::tagPai($xmlNfse, 'ValorIss', ['ValoresNfse']);
+        $iss = self::numero($issOficial ?? $nfse->iss);
         $base = max(0, round($valorServicos - $desconto - $deducao, 2));
+        $baseOficial = self::tagPai($xmlNfse, 'BaseCalculo', ['ValoresNfse']);
+        if ($baseOficial !== null) {
+            $base = self::numero($baseOficial);
+        }
         $retido = in_array(trim((string) $nfse->tp_ret_issqn), ['2', '3'], true);
         $issRetido = $retido ? $iss : 0.0;
 
@@ -76,10 +81,12 @@ final class NfseIpmImpressaoViewData
             $nfse->chave,
             self::tag($xmlNfse, 'CodigoVerificacao'),
         ]);
+        $outrasOficial = trim((string) (self::tag($xmlNfse, 'OutrasInformacoes') ?? ''));
         $chaveAcesso = self::primeiroTexto([
             $nfse->chave_acesso,
             self::tag($xmlNfse, 'ChaveAcesso'),
             self::tag($xmlNfse, 'ChaveAcessoNfse'),
+            preg_match('/Chave de Acesso NFS-e Nacional:\s*(\d{50})/i', $outrasOficial, $chave) === 1 ? $chave[1] : null,
         ]);
         $numero = self::primeiroTexto([
             $nfse->numero_nfse,
@@ -92,6 +99,9 @@ final class NfseIpmImpressaoViewData
         $prestadorCodigo = self::digitos($empresa?->cidade_codigo);
         $mesmoMunicipio = ($prestadorCodigo !== '' && $prestadorCodigo === $localCodigo)
             || ($localNome !== '' && self::igual($localNome, (string) ($empresa?->cidade ?? '')));
+
+        $municipioLocal = NfseIpmMunicipios::danfse($localCodigo);
+        $municipioPrestador = NfseIpmMunicipios::danfse($prestadorCodigo);
 
         $consulta = self::urlConsulta($empresa, $nfse, $identificador, $xmlNfse);
         $qrConteudo = $consulta ?? ($identificador !== '' ? preg_replace('/\s+/', '', $identificador) : null);
@@ -106,13 +116,19 @@ final class NfseIpmImpressaoViewData
             ? self::formatarCnae($cnae)
             : self::texto($item?->c_trib_mun, self::NAO_INFORMADO);
 
-        $aliquotaNumerica = self::tag($xmlNfse, 'Aliquota') ?? self::tag($xmlDps, 'Aliquota');
-        $aliquota = $simples
+        $aliquotaNumerica = self::tagPai($xmlNfse, 'Aliquota', ['ValoresNfse'])
+            ?? self::tag($xmlNfse, 'Aliquota')
+            ?? self::tag($xmlDps, 'Aliquota');
+        $semAliquota = $simples && self::numero($aliquotaNumerica) <= 0;
+        $aliquota = $semAliquota
             ? 'SIMPLES NACIONAL'
             : self::aliquota($aliquotaNumerica, $iss, $base);
 
-        $textoIss = $simples ? 'SIMPLES NACIONAL' : self::moeda($iss);
-        $textoBase = $simples ? 'SIMPLES NACIONAL' : self::moeda($base);
+        $textoIss = $semAliquota ? 'SIMPLES NACIONAL' : self::moeda($iss);
+        $textoBase = $semAliquota ? 'SIMPLES NACIONAL' : self::moeda($base);
+        $localExibido = $municipioLocal['siafi'] ?? $localCodigo;
+        $cei = trim((string) (self::tag($xmlNfse, 'CodigoObra') ?? self::tag($xmlDps, 'CodigoObra') ?? ''));
+        $serie = trim((string) ($nfse->serie_dps ?: ($empresa?->nfse_serie_rps ?? '')));
 
         return [
             'nfse' => $nfse,
@@ -125,12 +141,15 @@ final class NfseIpmImpressaoViewData
                 'homologacao' => trim((string) $nfse->tipo_ambiente) === '2',
                 'cancelada' => $nfse->status === Nfse::STATUS_CANCELADA,
                 'substituida' => $nfse->status === Nfse::STATUS_SUBSTITUIDA,
-                'prestador' => self::prestador($empresa),
+                'prestador' => self::prestador($empresa, $municipioPrestador),
+                'serie' => $serie !== '' ? $serie : 'NFS-e',
                 'numero' => $numero !== '' ? $numero : '-',
                 'situacao' => self::situacao($nfse),
                 'tipo' => self::tipo($empresa, $xmlDps, $xmlNfse),
                 'qr_data_uri' => is_string($qrConteudo) && $qrConteudo !== '' ? self::qr($qrConteudo) : null,
+                'consulta_url' => $consulta,
                 'identificador' => $identificador !== '' ? self::grupos($identificador) : '-',
+                'codigo_barras' => $identificador !== '' ? NfseIpmCodigoBarras::pngDataUri($identificador) : null,
                 'chave_acesso' => $chaveAcesso !== '' ? $chaveAcesso : '-',
                 'fato_gerador' => self::dataCurta($nfse->data_emissao) !== '-'
                     ? self::dataCurta($nfse->data_emissao)
@@ -139,8 +158,8 @@ final class NfseIpmImpressaoViewData
                     ?? self::dataHora(self::tag($xmlNfse, 'DataEmissao'))
                     ?? self::dataCurta($nfse->data_emissao),
                 'tomador' => self::tomador($nfse, $pessoa),
-                'servico_codigo' => $codigoServico !== '' ? $codigoServico : '-',
-                'local_codigo' => $localCodigo !== '' ? $localCodigo : ($localNome !== '' ? $localNome : '-'),
+                'servico_codigo' => $codigoServico !== '' ? (ltrim($codigoServico, '0') ?: $codigoServico) : '-',
+                'local_codigo' => $localExibido !== '' ? $localExibido : ($localNome !== '' ? $localNome : '-'),
                 'aliquota' => $aliquota,
                 'valor_servico' => self::moeda($valorServicos),
                 'desconto_incondicional' => self::moeda($desconto),
@@ -162,11 +181,16 @@ final class NfseIpmImpressaoViewData
                 'total_federais' => self::moeda($federais),
                 'desconto_condicional' => self::moeda($descCondicional),
                 'valor_liquido' => self::moeda($nfse->total),
-                'lc116' => self::linhaLc($codigoServico, $lc),
+                'cei' => $cei,
+                'lc116' => self::linhaLc(ltrim($codigoServico, '0') ?: $codigoServico, $lc),
                 'atividade' => $atividade,
-                'legenda_local' => self::legendaLocal($localCodigo, $localNome, $localUf),
-                'outras' => self::outras($empresa, $codigoServico, $mesmoMunicipio, $localNome, $localUf, $simples, $valorServicos, $nbs, $consulta, $xmlNfse),
+                'legenda_local' => $municipioLocal !== null
+                    ? $municipioLocal['siafi'].' - '.$municipioLocal['nome']
+                    : self::legendaLocal($localCodigo, $localNome, $localUf),
+                'tributacao' => self::tributacao(ltrim($codigoServico, '0') ?: $codigoServico, $mesmoMunicipio, $localNome, $localUf, $municipioLocal),
+                'outras' => self::outras($empresa, $nfse, $municipioPrestador, $mesmoMunicipio, $simples, $retido, $valorServicos, $pis, $cofins, $nbs !== '' ? $nbs : $codigoServico, $consulta, $outrasOficial),
                 'observacoes' => self::observacoes($nfse),
+                'responsavel' => self::texto($empresa?->razao_social ?: $empresa?->nome, ''),
             ],
         ];
     }
@@ -207,9 +231,10 @@ final class NfseIpmImpressaoViewData
     }
 
     /**
+     * @param  array{siafi: string, nome: string, secretaria: string, texto_simples: string, vencimento_iss_dia: int}|null  $municipio
      * @return array<string, string>
      */
-    private static function prestador(?Empresa $empresa): array
+    private static function prestador(?Empresa $empresa, ?array $municipio): array
     {
         if (! $empresa instanceof Empresa) {
             return [
@@ -224,6 +249,7 @@ final class NfseIpmImpressaoViewData
                 'telefone' => self::NAO_INFORMADO,
                 'celular' => self::NAO_INFORMADO,
                 'prefeitura' => '',
+                'secretaria' => '',
                 'estado' => '',
             ];
         }
@@ -238,9 +264,10 @@ final class NfseIpmImpressaoViewData
             $endereco = trim($endereco.' - '.trim((string) $empresa->complemento), ' -');
         }
 
-        $cidade = trim((string) $empresa->cidade);
+        $cidade = $municipio['nome'] ?? trim((string) $empresa->cidade);
         $uf = strtoupper(trim((string) $empresa->uf));
         $estado = self::estado($uf);
+        $telefone = self::telefone($empresa->telefone);
 
         return [
             'nome' => self::texto($empresa->razao_social ?: $empresa->nome ?: $empresa->fantasia, '-'),
@@ -251,9 +278,11 @@ final class NfseIpmImpressaoViewData
             'im' => trim((string) $empresa->im),
             'ie' => trim((string) $empresa->ie),
             'email' => self::texto($empresa->email, self::NAO_INFORMADO),
-            'telefone' => self::telefone($empresa->telefone),
-            'celular' => self::NAO_INFORMADO,
+            'telefone' => $telefone,
+            'celular' => $telefone,
+            'brasao' => self::brasao($empresa->cidade_codigo),
             'prefeitura' => $cidade !== '' ? mb_strtoupper($cidade, 'UTF-8') : '',
+            'secretaria' => $municipio['secretaria'] ?? '',
             'estado' => $estado,
         ];
     }
@@ -295,6 +324,18 @@ final class NfseIpmImpressaoViewData
             'telefone' => $telefone !== '' ? self::telefone($telefone) : self::NAO_INFORMADO,
             'email' => $email !== '' ? $email : self::NAO_INFORMADO,
         ];
+    }
+
+    private static function brasao(mixed $codigoIbge): ?string
+    {
+        $codigo = self::digitos($codigoIbge);
+        $arquivo = resource_path('images/nfse-ipm/'.$codigo.'.png');
+
+        if ($codigo === '' || ! is_file($arquivo)) {
+            return null;
+        }
+
+        return 'data:image/png;base64,'.base64_encode((string) file_get_contents($arquivo));
     }
 
     private static function situacao(Nfse $nfse): string
@@ -411,57 +452,88 @@ final class NfseIpmImpressaoViewData
         return $texto !== '' ? $texto : self::NAO_INFORMADO;
     }
 
+    /**
+     * @param  array{siafi: string, nome: string, secretaria: string, texto_simples: string, vencimento_iss_dia: int}|null  $municipioLocal
+     */
+    private static function tributacao(string $codigoServico, bool $mesmoMunicipio, string $localNome, string $localUf, ?array $municipioLocal): string
+    {
+        if ($codigoServico === '') {
+            return '';
+        }
+
+        if ($mesmoMunicipio) {
+            return '('.$codigoServico.') Serviço tributado no município do prestador';
+        }
+
+        $lugar = $municipioLocal['nome'] ?? $localNome;
+        if ($lugar === '') {
+            return '';
+        }
+
+        return '('.$codigoServico.') Serviço tributado em '.($localUf !== '' ? $lugar.' - '.$localUf : $lugar);
+    }
+
+    /**
+     * Parágrafos de "Outras Informações", separados por linha em branco, na ordem do DANFSe da IPM.
+     *
+     * @param  array{siafi: string, nome: string, secretaria: string, texto_simples: string, vencimento_iss_dia: int}|null  $municipio
+     */
     private static function outras(
         ?Empresa $empresa,
-        string $codigoServico,
+        Nfse $nfse,
+        ?array $municipio,
         bool $mesmoMunicipio,
-        string $localNome,
-        string $localUf,
         bool $simples,
+        bool $retido,
         float $base,
-        string $nbs,
+        float $pis,
+        float $cofins,
+        string $codigoIbpt,
         ?string $consulta,
-        ?DOMDocument $xmlNfse,
+        string $oficial,
     ): string {
-        $oficial = trim((string) (self::tag($xmlNfse, 'OutrasInformacoes') ?? ''));
-        $linhas = [];
+        $paragrafos = [];
 
-        if ($oficial !== '') {
-            $linhas[] = $oficial;
-        } else {
-            if ($codigoServico !== '') {
-                if ($mesmoMunicipio) {
-                    $linhas[] = '('.$codigoServico.') Serviço tributado no município do prestador';
-                } elseif ($localNome !== '') {
-                    $lugar = $localUf !== '' ? $localNome.' - '.$localUf : $localNome;
-                    $linhas[] = '('.$codigoServico.') Serviço tributado em '.$lugar;
-                }
-            }
-
-            if ($simples) {
-                $linhas[] = strtolower(trim((string) ($empresa?->regime_tributario ?? ''))) === 'mei'
-                    ? 'Contribuinte enquadrado como MEI.'
-                    : 'Contribuinte enquadrado no Simples Nacional.';
-            }
-
-            $regime = trim((string) ($empresa?->nfse_reg_esp_trib ?? ''));
-            $rotuloRegime = NfseRegimeTributario::regimesEspeciais()[$regime] ?? '';
-            if ($rotuloRegime !== '' && $regime !== '0') {
-                $linhas[] = 'Regime especial de tributação: '.$rotuloRegime.'.';
-            }
-
-            $ibpt = self::tributosAproximados($nbs !== '' ? $nbs : $codigoServico, $base);
-            if ($ibpt !== null) {
-                $linhas[] = $ibpt;
-            }
+        if ($simples) {
+            $paragrafos[] = strtolower(trim((string) ($empresa?->regime_tributario ?? ''))) === 'mei'
+                ? 'Contribuinte enquadrado como MEI.'
+                : ($municipio['texto_simples'] ?? 'Contribuinte enquadrado no Simples Nacional.');
         }
 
-        if ($consulta !== null && ! str_contains(implode("\n", $linhas), $consulta)) {
-            $linhas[] = 'A veracidade das informações declaradas na NFS-e pode ser consultada no site:';
-            $linhas[] = $consulta;
+        $regime = trim((string) ($empresa?->nfse_reg_esp_trib ?? ''));
+        $rotuloRegime = NfseRegimeTributario::regimesEspeciais()[$regime] ?? '';
+        if ($rotuloRegime !== '' && $regime !== '0') {
+            $paragrafos[] = 'Regime especial de tributação: '.$rotuloRegime.'.';
         }
 
-        return $linhas !== [] ? implode("\n", $linhas) : self::NAO_INFORMADO;
+        $restoOficial = trim((string) preg_replace(['#https?://\S+#', '/Chave de Acesso NFS-e Nacional:\s*\d{50}/i'], '', $oficial));
+        if ($restoOficial !== '') {
+            $paragrafos[] = $restoOficial;
+        }
+
+        if ($consulta !== null) {
+            $paragrafos[] = "A veracidade das informações declaradas na NFS-e podem ser consultadas no site:\n".$consulta;
+        }
+
+        $dia = $municipio['vencimento_iss_dia'] ?? null;
+        if ($dia !== null && $mesmoMunicipio && ! $retido && trim((string) $nfse->trib_issqn) === '1' && $nfse->competencia !== null) {
+            $vencimento = $nfse->competencia->copy()->startOfMonth()->addMonthNoOverflow()->day($dia);
+            $paragrafos[] = 'A data de vencimento do ISS quando o mesmo for devido no município do Prestador: '.$vencimento->format('d/m/Y');
+        }
+
+        $ibpt = self::tributosAproximados($codigoIbpt, $base);
+        if ($ibpt !== null) {
+            $paragrafos[] = $ibpt;
+        }
+
+        $paragrafos[] = "Valor do PIS Devido: R$".self::moeda($pis)."\nValor do COFINS Devido: R$".self::moeda($cofins);
+
+        $observacoes = self::observacoes($nfse);
+        if ($observacoes !== self::NAO_INFORMADO) {
+            $paragrafos[] = 'Observações: '.$observacoes;
+        }
+
+        return implode("\n\n", $paragrafos);
     }
 
     private static function tributosAproximados(string $codigo, float $base): ?string
@@ -480,13 +552,13 @@ final class NfseIpmImpressaoViewData
             return null;
         }
 
-        $fonte = trim((string) ($calc['fonte'] ?? 'IBPT'));
+        $fonte = mb_strtoupper(trim((string) ($calc['fonte'] ?? 'IBPT')), 'UTF-8');
         if ($fonte === '') {
             $fonte = 'IBPT';
         }
 
         return sprintf(
-            'Valor aproximado dos tributos: Federais R$ %s (%s%%), Estaduais R$ %s (%s%%), Municipais R$ %s (%s%%), com base na Lei 12.741/2012. Fonte: %s.',
+            'Valor aproximado dos tributos: Federais R$%s (%s%%), Estaduais R$%s (%s%%), Municipais R$%s (%s%%), com base na Lei 12.741/2012 e no Decreto 8.264/2014 - FONTE %s',
             self::moeda((float) ($calc['trib_fed'] ?? 0)),
             self::percentual((float) ($calc['aliq_federal'] ?? 0)),
             self::moeda((float) ($calc['trib_est'] ?? 0)),
@@ -550,14 +622,22 @@ final class NfseIpmImpressaoViewData
                 $valor *= 100;
             }
 
-            return self::percentual($valor);
+            return self::aliquotaTexto($valor);
         }
 
         if ($base > 0 && $iss > 0) {
-            return self::percentual($iss / $base * 100);
+            return self::aliquotaTexto($iss / $base * 100);
         }
 
-        return '0,00';
+        return self::aliquotaTexto(0);
+    }
+
+    private static function aliquotaTexto(float $valor): string
+    {
+        $texto = rtrim(number_format($valor, 4, '.', ''), '0');
+        [$inteiro, $decimais] = explode('.', $texto) + [1 => ''];
+
+        return $inteiro.'.'.str_pad($decimais, 2, '0').'%';
     }
 
     private static function qr(string $conteudo): ?string

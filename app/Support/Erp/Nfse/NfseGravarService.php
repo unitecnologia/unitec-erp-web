@@ -35,6 +35,7 @@ class NfseGravarService
      *     municipio_prestacao_uf: ?string,
      *     trib_issqn: string,
      *     tp_ret_issqn: string,
+     *     aliquota_iss?: ?string,
      *     valor_servicos: string,
      *     desconto: string,
      *     iss: string,
@@ -79,6 +80,17 @@ class NfseGravarService
                 if ($nfse->status !== Nfse::STATUS_ABERTA) {
                     throw new NfseNaoGravada('Só é possível alterar NFS-e aberta.');
                 }
+
+                $empresa = Empresa::query()->whereKey($empresaId)->first();
+
+                if (
+                    $empresa instanceof Empresa
+                    && strtolower(trim((string) $empresa->nfse_provedor)) === 'ipm'
+                    && $nfse->numero_nfse === null
+                    && strtoupper(trim((string) $nfse->serie_dps)) !== strtoupper(trim((string) $empresa->nfse_serie_rps))
+                ) {
+                    [$nfse->serie_dps, $nfse->numero_dps] = $this->reservarNumeroIpm($empresa);
+                }
             }
 
             $nfse->fill([
@@ -107,6 +119,7 @@ class NfseGravarService
                 'municipio_prestacao_uf' => $cabecalho['municipio_prestacao_uf'],
                 'trib_issqn' => $cabecalho['trib_issqn'],
                 'tp_ret_issqn' => $cabecalho['tp_ret_issqn'],
+                'aliquota_iss' => $cabecalho['aliquota_iss'] ?? null,
                 'valor_servicos' => $cabecalho['valor_servicos'],
                 'desconto' => $cabecalho['desconto'] ?? '0.00',
                 'iss' => '0.00',

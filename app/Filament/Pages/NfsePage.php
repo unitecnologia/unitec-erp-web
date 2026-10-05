@@ -176,6 +176,8 @@ class NfsePage extends Page
 
     public string $nfseTpRetIssqn = Nfse::TP_RET_ISSQN_NAO_RETIDO;
 
+    public string $nfseAliquotaIss = '';
+
     public string $nfseMunicipioCodigo = '';
 
     public string $nfseMunicipioNome = '';
@@ -558,6 +560,7 @@ class NfsePage extends Page
                 'c_ind_op' => $produto->c_ind_op,
                 'os_id' => (int) $ordem->id,
             ];
+            $this->sugerirAliquotaIssDoProduto((int) $produto->id);
         }
 
         $this->nfseServicoSeq = $seq;
@@ -1247,6 +1250,7 @@ class NfsePage extends Page
         $this->nfseDataEmissao = $hoje->toDateString();
         $this->nfseTribIssqn = Nfse::TRIB_ISSQN_TRIBUTAVEL;
         $this->nfseTpRetIssqn = Nfse::TP_RET_ISSQN_NAO_RETIDO;
+        $this->nfseAliquotaIss = $this->aliquotaIssPadraoEmpresa();
     }
 
     public function updatedNfseMunicipioNome(string $value): void
@@ -2175,6 +2179,7 @@ class NfsePage extends Page
             'total_decimal' => $total,
             'c_trib_nac' => $this->textoFiscalNfse($this->nfseServicoCtribNac),
         ]);
+        $this->sugerirAliquotaIssDoProduto($this->nfseServicoId);
         $this->nfseServicos = array_values($this->nfseServicos);
         $this->nfseServicoLinhaIndex = 0;
 
@@ -3057,6 +3062,80 @@ class NfsePage extends Page
         return strtolower(trim((string) ($empresa?->nfse_provedor ?? ''))) === 'ipm';
     }
 
+    #[Computed]
+    public function nfseAliquotaIssEditavel(): bool
+    {
+        return $this->nfseProvedorIpm(ErpContext::currentEmpresa());
+    }
+
+    /**
+     * @return array{aliquota: string, base: string, valor: string}
+     */
+    public function nfseResumoIss(): array
+    {
+        $base = '0.00';
+
+        foreach ($this->nfseServicos as $linha) {
+            $total = $this->nfseNormalizarDecimal($linha['total_decimal'] ?? null, 2);
+
+            if ($total !== null) {
+                $base = $this->nfseSomarDecimal($base, $total);
+            }
+        }
+
+        $aliquota = $this->nfseNormalizarDecimal($this->nfseAliquotaIss, 2) ?? '0.00';
+        $valor = $this->nfseArredondarDecimal(bcdiv(bcmul($base, $aliquota, 6), '100', 6), 2);
+
+        return [
+            'aliquota' => $this->nfseFormatarDecimal($aliquota, 2),
+            'base' => $this->nfseFormatarDecimal($base, 2),
+            'valor' => $this->nfseFormatarDecimal($valor, 2),
+        ];
+    }
+
+    protected function aliquotaIssNfseParaGravar(): ?string
+    {
+        if (trim($this->nfseAliquotaIss) === '') {
+            return null;
+        }
+
+        $aliquota = $this->nfseNormalizarDecimal($this->nfseAliquotaIss, 2);
+
+        if ($aliquota === null || $this->nfseCompararDecimal($aliquota, '0', 2) < 0 || $this->nfseCompararDecimal($aliquota, '99.99', 2) > 0) {
+            throw new NfseNaoGravada('Alíquota do ISS inválida. Informe um percentual entre 0,00 e 99,99.');
+        }
+
+        return $this->nfseCompararDecimal($aliquota, '0', 2) === 0 ? null : $aliquota;
+    }
+
+    protected function aliquotaIssPadraoEmpresa(): string
+    {
+        if (! $this->nfseAliquotaIssEditavel) {
+            return '';
+        }
+
+        $aliquota = $this->nfseNormalizarDecimal(ErpContext::currentEmpresa()?->nfse_aliquota_iss, 2);
+
+        return $aliquota !== null && $this->nfseCompararDecimal($aliquota, '0', 2) > 0
+            ? $this->nfseFormatarDecimal($aliquota, 2)
+            : '';
+    }
+
+    protected function sugerirAliquotaIssDoProduto(?int $productId): void
+    {
+        $atual = trim($this->nfseAliquotaIss);
+
+        if (($atual !== '' && $atual !== $this->aliquotaIssPadraoEmpresa()) || $productId === null || $productId < 1 || ! $this->nfseAliquotaIssEditavel) {
+            return;
+        }
+
+        $issqn = $this->nfseNormalizarDecimal(Product::query()->whereKey($productId)->value('issqn'), 2);
+
+        if ($issqn !== null && $this->nfseCompararDecimal($issqn, '0', 2) > 0) {
+            $this->nfseAliquotaIss = $this->nfseFormatarDecimal($issqn, 2);
+        }
+    }
+
     protected function motivoBloqueioTransmissaoIpm(Empresa $empresa): ?string
     {
         $serie = trim((string) ($empresa->nfse_serie_rps ?? ''));
@@ -3266,6 +3345,7 @@ class NfsePage extends Page
                 'municipio_prestacao_uf' => $municipio['uf'],
                 'trib_issqn' => $this->codigoIssqnNfse($this->nfseTribIssqn, Nfse::tributacoesIssqn(), 'Informe a tributação do ISSQN.'),
                 'tp_ret_issqn' => $this->codigoIssqnNfse($this->nfseTpRetIssqn, Nfse::retencoesIssqn(), 'Informe a retenção do ISSQN.'),
+                'aliquota_iss' => $this->aliquotaIssNfseParaGravar(),
                 'valor_servicos' => $somaBrutos,
                 'desconto' => $somaDescontos,
                 'iss' => '0.00',
@@ -3341,6 +3421,10 @@ class NfsePage extends Page
         $this->aplicarNfseMunicipioGravado($nfse);
         $this->nfseTribIssqn = $this->codigoIssqnGravado($nfse->trib_issqn, Nfse::tributacoesIssqn(), Nfse::TRIB_ISSQN_TRIBUTAVEL);
         $this->nfseTpRetIssqn = $this->codigoIssqnGravado($nfse->tp_ret_issqn, Nfse::retencoesIssqn(), Nfse::TP_RET_ISSQN_NAO_RETIDO);
+        $aliquotaIss = $this->nfseNormalizarDecimal($nfse->aliquota_iss, 2);
+        $this->nfseAliquotaIss = $aliquotaIss !== null
+            ? $this->nfseFormatarDecimal($aliquotaIss, 2)
+            : ($nfse->status === Nfse::STATUS_ABERTA ? $this->aliquotaIssPadraoEmpresa() : '');
         $this->nfseServicos = [];
         $seq = 0;
 

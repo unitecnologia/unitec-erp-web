@@ -7,6 +7,7 @@ use App\Models\VendasParametro;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Fiscal\NfceFiscalCertificateResolver;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 use Unitec\FiscalEngine\Util\CaBundleResolver;
 use Unitec\FiscalEngine\Util\SslTransportOptions;
@@ -29,6 +30,12 @@ class NfseIpmCliente
 
         if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
             throw new NfseNaoTransmitida('Informe a URL do WebService IPM do município.');
+        }
+
+        $oficial = NfseIpmMunicipios::endpoint($empresa->cidade_codigo);
+
+        if ($oficial !== null && strcasecmp((string) parse_url($url, PHP_URL_HOST), (string) parse_url($oficial, PHP_URL_HOST)) !== 0) {
+            throw new NfseNaoTransmitida('A URL do WebService IPM não é a do município do prestador. Use '.$oficial.' nas configurações fiscais.');
         }
 
         return preg_replace('/[?&]wsdl$/i', '', $url) ?? $url;
@@ -112,7 +119,9 @@ class NfseIpmCliente
 
         try {
             CaBundleResolver::setProjectRoot(base_path());
-            $ch = curl_init($this->url($empresa));
+            $url = $this->url($empresa);
+            $wwwAuthenticate = null;
+            $ch = curl_init($url);
 
             if ($ch === false) {
                 throw new NfseNaoTransmitida('Não foi possível abrir a conexão com o WebService IPM.');
@@ -129,6 +138,13 @@ class NfseIpmCliente
                     'SOAPAction: "'.self::SOAP_ACTION_GERAR_NFSE.'"',
                     'Authorization: Basic '.base64_encode($usuario.':'.$senha),
                 ],
+                CURLOPT_HEADERFUNCTION => function ($ch, string $linha) use (&$wwwAuthenticate): int {
+                    if (stripos($linha, 'WWW-Authenticate:') === 0) {
+                        $wwwAuthenticate = trim(substr($linha, 17));
+                    }
+
+                    return strlen($linha);
+                },
                 CURLOPT_TIMEOUT => 60,
                 CURLOPT_CONNECTTIMEOUT => 20,
             ] + SslTransportOptions::curlOptions();
@@ -160,7 +176,15 @@ class NfseIpmCliente
         }
 
         if ($status === 401 || $status === 403) {
-            throw new NfseNaoTransmitida('O WebService IPM não aceitou o usuário ou a senha.');
+            Log::warning('NFS-e IPM recusou a autenticação.', [
+                'status' => $status,
+                'url' => $url,
+                'usuario' => substr($usuario, 0, 2).str_repeat('*', 8).substr($usuario, -4),
+                'www_authenticate' => $wwwAuthenticate,
+                'corpo' => mb_substr((string) $body, 0, 2000),
+            ]);
+
+            throw new NfseNaoTransmitida('O WebService IPM não aceitou o usuário ou a senha (HTTP '.$status.').');
         }
 
         $resposta = NfseIpmResposta::interpretar((string) $body, $envioTeste);
@@ -174,14 +198,33 @@ class NfseIpmCliente
 
     /**
      * GerarNfseEnvio vai como elemento literal no Body (document/literal do WSDL net.atende), sem CDATA.
+     * O servidor IPM recoloca o xmlns ABRASF no GerarNfseEnvio antes do XSD; se ele já vier, a IPM falha com
+     * "Attribute xmlns redefined". Por isso, como nos exemplos oficiais, o namespace vai só no InfDeclaracaoPrestacaoServico.
      */
     public function envelope(string $xmlRps): string
     {
+        $corpo = preg_replace(
+            '#^<GerarNfseEnvio xmlns="'.preg_quote(NfseIpmXmlGerador::NS, '#').'">#',
+            '<GerarNfseEnvio>',
+            $this->semDeclaracao($xmlRps),
+            1,
+            $semNamespace,
+        ) ?? $this->semDeclaracao($xmlRps);
+
+        if ($semNamespace === 1) {
+            $corpo = preg_replace(
+                '#<InfDeclaracaoPrestacaoServico(?![^>]*\sxmlns=)#',
+                '<InfDeclaracaoPrestacaoServico xmlns="'.NfseIpmXmlGerador::NS.'"',
+                $corpo,
+                1,
+            ) ?? $corpo;
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'
             .'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
             .'<soapenv:Header/>'
             .'<soapenv:Body>'
-            .$this->semDeclaracao($xmlRps)
+            .$corpo
             .'</soapenv:Body>'
             .'</soapenv:Envelope>';
     }

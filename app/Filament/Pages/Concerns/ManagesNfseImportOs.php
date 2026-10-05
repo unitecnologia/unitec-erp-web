@@ -501,6 +501,7 @@ trait ManagesNfseImportOs
                 'c_ind_op' => $produto->c_ind_op,
                 'os_id' => (int) $ordem->id,
             ];
+            $this->sugerirAliquotaIssDoProduto((int) $produto->id);
         }
 
         return $linhas;

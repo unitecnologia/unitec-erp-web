@@ -164,7 +164,22 @@
                     maxlength="1"
                     autocomplete="off"
                 >
+
+                <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="cfg-nfse-aliquota-iss">Alíquota ISS %</label>
+                <input
+                    id="cfg-nfse-aliquota-iss"
+                    type="text"
+                    inputmode="decimal"
+                    wire:model="form.nfse_aliquota_iss"
+                    class="erp-pcad-form__input erp-pcad-form__input--dps"
+                    maxlength="5"
+                    placeholder="0,00"
+                    autocomplete="off"
+                >
             </div>
+            <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact">
+                Alíquota ISS %: no Simples Nacional, use o percentual de ISS da faixa atual do PGDAS-D (o WebService IPM aceita 2 casas decimais). Ela vem preenchida em cada NFS-e nova e pode ser alterada na nota.
+            </p>
         @else
             <div class="erp-config-fiscais-form__nfse-num-row">
                 <label class="erp-pcad-form__label" for="cfg-nfse-serie-dps">Série DPS</label>

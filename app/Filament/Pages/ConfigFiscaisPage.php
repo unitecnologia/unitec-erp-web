@@ -287,6 +287,7 @@ class ConfigFiscaisPage extends Page
         $this->form['nfse_serie_dps'] = trim((string) ($this->form['nfse_serie_dps'] ?? ''));
         $this->form['nfse_serie_rps'] = trim((string) ($this->form['nfse_serie_rps'] ?? ''));
         $this->form['nfse_tipo_rps'] = trim((string) ($this->form['nfse_tipo_rps'] ?? ''));
+        $this->form['nfse_aliquota_iss'] = str_replace(',', '.', trim((string) ($this->form['nfse_aliquota_iss'] ?? '')));
         $this->form['nfse_ws_usuario'] = trim((string) ($this->form['nfse_ws_usuario'] ?? ''));
         $this->form['nfse_url_producao'] = trim((string) ($this->form['nfse_url_producao'] ?? ''));
         $this->form['nfse_url_homologacao'] = trim((string) ($this->form['nfse_url_homologacao'] ?? ''));
@@ -331,6 +332,7 @@ class ConfigFiscaisPage extends Page
                 'form.nfse_serie_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[A-Za-z0-9]{1,5}$/'],
                 'form.nfse_proximo_rps' => [$ipm ? 'required' : 'nullable', 'integer', 'min:1', 'max:'.NfseDpsSequencia::NUMERO_MAX],
                 'form.nfse_tipo_rps' => [$ipm ? 'required' : 'nullable', 'regex:/^[0-9]$/'],
+                'form.nfse_aliquota_iss' => ['nullable', 'regex:/^\d{1,2}(\.\d{1,2})?$/'],
                 'form.nfse_ws_usuario' => ['nullable', 'string', 'max:20'],
                 'form.nfse_ws_senha' => ['nullable', 'string', 'max:120'],
                 'form.nfse_url_producao' => ['nullable', 'string', 'max:255', 'url'],
@@ -355,6 +357,7 @@ class ConfigFiscaisPage extends Page
                 'form.nfse_proximo_rps.max' => 'Próximo Nº RPS inválido.',
                 'form.nfse_tipo_rps.required' => 'Informe o tipo do RPS.',
                 'form.nfse_tipo_rps.regex' => 'Tipo do RPS inválido. Use um dígito.',
+                'form.nfse_aliquota_iss.regex' => 'Alíquota do ISS inválida. Use um percentual entre 0,01 e 99,99, com até 2 casas decimais.',
                 'form.nfse_ws_usuario.max' => 'Usuário do WebService inválido.',
                 'form.nfse_ws_senha.max' => 'Senha do WebService inválida.',
                 'form.nfse_url_producao.url' => 'URL de produção da NFS-e inválida.',
@@ -915,6 +918,8 @@ class ConfigFiscaisPage extends Page
         $proximoRps = (int) ($empresa?->nfse_proximo_rps ?? 0);
         $this->form['nfse_proximo_rps'] = $proximoRps > 0 ? $proximoRps : 1;
         $this->form['nfse_tipo_rps'] = trim((string) ($empresa?->nfse_tipo_rps ?? '')) ?: '1';
+        $aliquotaIss = (float) ($empresa?->nfse_aliquota_iss ?? 0);
+        $this->form['nfse_aliquota_iss'] = $aliquotaIss > 0 ? number_format($aliquotaIss, 2, ',', '') : '';
         $this->form['nfse_ws_usuario'] = trim((string) ($empresa?->nfse_ws_usuario ?? ''));
         $this->form['nfse_ws_senha'] = (string) ($empresa?->nfse_ws_senha ?? '');
         $this->form['nfse_url_producao'] = trim((string) ($empresa?->nfse_url_producao ?? ''));
@@ -934,6 +939,7 @@ class ConfigFiscaisPage extends Page
             'nfse_serie_rps' => $this->codigoNfseOuNulo($this->form['nfse_serie_rps'] ?? null),
             'nfse_proximo_rps' => $proximoRps > 0 ? $proximoRps : null,
             'nfse_tipo_rps' => $this->codigoNfseOuNulo($this->form['nfse_tipo_rps'] ?? null) ?? '1',
+            'nfse_aliquota_iss' => $this->aliquotaIssNfseOuNulo($this->form['nfse_aliquota_iss'] ?? null),
             'nfse_ws_usuario' => $this->codigoNfseOuNulo($this->form['nfse_ws_usuario'] ?? null),
             'nfse_ws_senha' => $this->codigoNfseOuNulo($this->form['nfse_ws_senha'] ?? null),
             'nfse_url_producao' => $this->codigoNfseOuNulo($this->form['nfse_url_producao'] ?? null),
@@ -995,6 +1001,17 @@ class ConfigFiscaisPage extends Page
     protected function codigoNfse(mixed $valor): string
     {
         return trim((string) $valor);
+    }
+
+    protected function aliquotaIssNfseOuNulo(mixed $valor): ?string
+    {
+        $texto = str_replace(',', '.', trim((string) $valor));
+
+        if (preg_match('/^\d{1,2}(\.\d{1,2})?$/', $texto) !== 1 || (float) $texto <= 0) {
+            return null;
+        }
+
+        return number_format((float) $texto, 2, '.', '');
     }
 
     protected function codigoNfseOuNulo(mixed $valor): ?string

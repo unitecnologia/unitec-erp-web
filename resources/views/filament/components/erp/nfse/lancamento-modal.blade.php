@@ -599,20 +599,50 @@
                             </select>
                         </div>
                     </div>
-                    <div class="erp-nfe-lancamento-modal__form-row">
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <span class="erp-nfe-lancamento-modal__form-label">Alíquota</span>
-                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
+                    @if ($this->nfseAliquotaIssEditavel)
+                        @php
+                            $resumoIss = $this->nfseResumoIss();
+                        @endphp
+                        <div class="erp-nfe-lancamento-modal__form-row">
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <label class="erp-nfe-lancamento-modal__form-label" for="nfse-aliquota-iss">Alíquota ISS %</label>
+                                <input
+                                    id="nfse-aliquota-iss"
+                                    type="text"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0,00"
+                                    wire:model.blur="nfseAliquotaIss"
+                                    class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--sm"
+                                    @disabled($this->nfseSomenteLeitura())
+                                >
+                            </div>
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <span class="erp-nfe-lancamento-modal__form-label">Base de cálculo</span>
+                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">{{ $resumoIss['base'] }}</span>
+                            </div>
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <span class="erp-nfe-lancamento-modal__form-label">Valor ISS</span>
+                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">{{ $resumoIss['valor'] }}</span>
+                            </div>
                         </div>
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <span class="erp-nfe-lancamento-modal__form-label">Base de cálculo</span>
-                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
+                        <p class="erp-nfe-lancamento-modal__form-label">Simples Nacional: informe a alíquota do ISS da sua faixa do PGDAS-D. Demais regimes: informe só quando o ISS for devido fora do município do prestador.</p>
+                    @else
+                        <div class="erp-nfe-lancamento-modal__form-row">
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <span class="erp-nfe-lancamento-modal__form-label">Alíquota</span>
+                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
+                            </div>
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <span class="erp-nfe-lancamento-modal__form-label">Base de cálculo</span>
+                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
+                            </div>
+                            <div class="erp-nfe-lancamento-modal__form-group">
+                                <span class="erp-nfe-lancamento-modal__form-label">Valor ISS</span>
+                                <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
+                            </div>
                         </div>
-                        <div class="erp-nfe-lancamento-modal__form-group">
-                            <span class="erp-nfe-lancamento-modal__form-label">Valor ISS</span>
-                            <span class="erp-nfe-lancamento-modal__form-input erp-nfe-lancamento-modal__form-input--info erp-nfe-lancamento-modal__form-input--sm">0,00</span>
-                        </div>
-                    </div>
+                    @endif
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs" x-show="detailTab === 'observacoes'" x-cloak>

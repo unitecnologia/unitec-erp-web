@@ -451,7 +451,28 @@ trait ErpProductFormPage
             }
         }
 
-        return $this->ensureLocalizacaoFormKeys($data);
+        return $this->ensureLocalizacaoFormKeys($this->aplicarIssqnPadraoServico($data));
+    }
+
+    /**
+     * Serviço sem ISSQN % próprio herda a alíquota de ISS das Configurações Fiscais › NFS-e da empresa.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function aplicarIssqnPadraoServico(array $data): array
+    {
+        if (empty($data['is_servico']) || $this->parseBrDecimal($data['issqn'] ?? 0, 2) > 0) {
+            return $data;
+        }
+
+        $padrao = (float) ($this->currentEmpresa()?->nfse_aliquota_iss ?? 0);
+
+        if ($padrao > 0) {
+            $data['issqn'] = $this->formatBrDecimal($padrao, 2);
+        }
+
+        return $data;
     }
 
     protected function formatIsoDateForInput(mixed $value): ?string

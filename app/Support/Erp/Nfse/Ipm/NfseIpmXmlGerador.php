@@ -91,14 +91,15 @@ class NfseIpmXmlGerador
             $this->campo($doc, $raiz, 'EnvioTeste', '1');
         }
 
+        // Como nos exemplos oficiais da IPM, a identificação do RPS não é enviada: a IPM numera a NFS-e
+        // e recusa séries de RPS não autorizadas (E97).
         $rps = $doc->createElementNS(self::NS, 'Rps');
         $raiz->appendChild($rps);
         $inf = $doc->createElementNS(self::NS, 'InfDeclaracaoPrestacaoServico');
         $inf->setAttribute('Id', 'RPS_'.$numero);
         $rps->appendChild($inf);
 
-        $inf->appendChild($this->identificacaoRps($doc, $nfse, $empresa, $numero));
-        $this->campo($doc, $inf, 'Competencia', $nfse->competencia->format('Y-m-d'));
+        $this->campo($doc, $inf, 'Competencia', $this->competencia($nfse));
         $inf->appendChild($this->servico($doc, $nfse, $empresa, $item));
         $inf->appendChild($this->prestador($doc, $prestador, $im));
 
@@ -121,30 +122,23 @@ class NfseIpmXmlGerador
         return $doc->saveXML() ?: '';
     }
 
-    private function identificacaoRps(DOMDocument $doc, Nfse $nfse, Empresa $empresa, int $numero): DOMElement
+    /**
+     * Sem RPS no XML, a IPM recusa competência anterior à data de emissão (L1028).
+     */
+    private function competencia(Nfse $nfse): string
     {
-        $serie = trim((string) $nfse->serie_dps);
+        $hoje = now('America/Sao_Paulo')->startOfDay();
+        $competencia = $nfse->competencia->copy()->startOfDay();
 
-        if ($serie === '' || mb_strlen($serie) > 5) {
-            throw new NfseNaoTransmitida('Informe a série do RPS com até 5 caracteres.');
+        if ($competencia->format('Y-m') === $hoje->format('Y-m')) {
+            return $competencia->max($hoje)->format('Y-m-d');
         }
 
-        $tipo = trim((string) ($empresa->nfse_tipo_rps ?? '')) ?: '1';
-
-        if (! in_array($tipo, ['1', '2', '3'], true)) {
-            throw new NfseNaoTransmitida('O tipo do RPS deve ser 1, 2 ou 3.');
+        if ($competencia->lessThan($hoje)) {
+            throw new NfseNaoTransmitida('A IPM não aceita competência retroativa ('.$competencia->format('m/Y').'). Ajuste a competência para o mês atual.');
         }
 
-        $bloco = $doc->createElementNS(self::NS, 'Rps');
-        $id = $doc->createElementNS(self::NS, 'IdentificacaoRps');
-        $this->campo($doc, $id, 'Numero', (string) $numero);
-        $this->campo($doc, $id, 'Serie', $serie);
-        $this->campo($doc, $id, 'Tipo', $tipo);
-        $bloco->appendChild($id);
-        $this->campo($doc, $bloco, 'DataEmissao', ($nfse->data_emissao ?? now())->format('Y-m-d'));
-        $this->campo($doc, $bloco, 'Status', '1');
-
-        return $bloco;
+        return $competencia->format('Y-m-d');
     }
 
     private function servico(DOMDocument $doc, Nfse $nfse, Empresa $empresa, NfseItem $item): DOMElement
@@ -172,12 +166,17 @@ class NfseIpmXmlGerador
         $incidencia = in_array($exigibilidade, ['1', '3', '5', '6', '7'], true)
             ? $this->municipioIncidencia($empresa, (string) $item->c_trib_nac, $municipio)
             : null;
-        $this->exigirIssCalculadoPeloMunicipio($empresa, $exigibilidade, $retido, $incidencia);
+        $issInformado = $this->issInformadoPeloContribuinte($empresa, $nfse, $exigibilidade, $incidencia);
 
         $servico = $doc->createElementNS(self::NS, 'Servico');
         $valores = $doc->createElementNS(self::NS, 'Valores');
         $this->campo($doc, $valores, 'ValorServicos', $this->decimal($nfse->valor_servicos));
         $desconto = $this->decimal($nfse->desconto);
+
+        if ($issInformado !== null) {
+            $this->campo($doc, $valores, 'ValorIss', $issInformado['valor']);
+            $this->campo($doc, $valores, 'Aliquota', $issInformado['aliquota']);
+        }
 
         if (bccomp($desconto, '0', 2) === 1) {
             $this->campo($doc, $valores, 'DescontoIncondicionado', $desconto);
@@ -222,19 +221,42 @@ class NfseIpmXmlGerador
     }
 
     /**
-     * Alíquota e ValorIss só podem ir quando o contribuinte os informa (NTE 4.1); o ERP ainda não guarda alíquota de ISS.
+     * Alíquota e ValorIss só podem ir quando o contribuinte os informa (NTE 4.1: Simples Nacional ou ISS devido fora
+     * do município do prestador); fora desses casos o IPM rejeita a alíquota.
+     *
+     * @return array{aliquota: string, valor: string}|null
      */
-    private function exigirIssCalculadoPeloMunicipio(Empresa $empresa, string $exigibilidade, bool $retido, ?string $incidencia): void
+    private function issInformadoPeloContribuinte(Empresa $empresa, Nfse $nfse, string $exigibilidade, ?string $incidencia): ?array
     {
-        if ($this->optanteSimples($empresa) && $retido) {
-            throw new NfseNaoTransmitida('No IPM, ISS retido de empresa do Simples Nacional exige a alíquota do Simples, que ainda não é enviada pelo ERP.');
+        if ($exigibilidade !== '1') {
+            return null;
         }
 
         $sede = $this->digitos($empresa->cidade_codigo);
+        $simples = $this->optanteSimples($empresa);
+        $foraDoPrestador = $incidencia !== null && strlen($sede) === 7 && $incidencia !== $sede;
 
-        if ($exigibilidade === '1' && $incidencia !== null && strlen($sede) === 7 && $incidencia !== $sede) {
-            throw new NfseNaoTransmitida('No IPM, ISS devido fora do município do prestador exige alíquota e valor do ISS, que ainda não são enviados pelo ERP.');
+        if (! $simples && ! $foraDoPrestador) {
+            return null;
         }
+
+        $aliquota = $this->decimal($nfse->aliquota_iss);
+
+        if (bccomp($aliquota, '0', 2) !== 1 || bccomp($aliquota, '99.99', 2) === 1) {
+            throw new NfseNaoTransmitida($simples
+                ? 'No IPM, empresa do Simples Nacional deve informar a alíquota do ISS do Simples (faixa do PGDAS-D). Informe a alíquota na aba ISS da NFS-e.'
+                : 'No IPM, ISS devido fora do município do prestador exige a alíquota do ISS do município de incidência. Informe a alíquota na aba ISS da NFS-e.');
+        }
+
+        $base = bcsub($this->decimal($nfse->valor_servicos), $this->decimal($nfse->desconto), 2);
+
+        if (bccomp($base, '0', 2) !== 1) {
+            throw new NfseNaoTransmitida('A base de cálculo do ISS deve ser maior que zero.');
+        }
+
+        $valor = bcadd(bcdiv(bcmul($base, $aliquota, 6), '100', 6), '0.005', 2);
+
+        return ['aliquota' => $aliquota, 'valor' => $valor];
     }
 
     private function prestador(DOMDocument $doc, string $cnpj, string $im): DOMElement

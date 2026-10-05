@@ -50,11 +50,12 @@ class NfseIpmImpressaoTest extends TestCase
         $this->assertStringContainsString('OFICINA TESTE LTDA', $html);
         $this->assertStringContainsString('CLIENTE TESTE', $html);
         $this->assertStringContainsString('Número da NFS-e', $html);
-        $this->assertStringContainsString('Tomador do Serviço', $html);
-        $this->assertStringContainsString('Descrição dos Serviços Prestados', $html);
-        $this->assertStringContainsString('Chave de acesso da NFS-e', $html);
+        $this->assertStringContainsString('TOMADOR DO SERVIÇO', $html);
+        $this->assertStringContainsString('DESCRIÇÃO DOS SERVIÇOS PRESTADOS', $html);
+        $this->assertStringContainsString('Chave de Acesso NFS-e Nacional', $html);
+        $this->assertStringContainsString('Série NE', $html);
         $this->assertStringContainsString('Outras Informações', $html);
-        $this->assertStringContainsString('Observações', $html);
+        $this->assertStringContainsString('Valor do PIS Devido: R$0,00', $html);
         $this->assertStringNotContainsString('2.180,00', $html);
         $this->assertStringNotContainsString('PATRICIA', $html);
         $this->assertStringNotContainsString('42032041254644503000129', $html);
@@ -79,10 +80,33 @@ class NfseIpmImpressaoTest extends TestCase
 
         $ipm = NfseIpmImpressaoViewData::for($nota)['ipm'];
 
-        $this->assertSame('5,00', $ipm['aliquota']);
+        $this->assertSame('5.00%', $ipm['aliquota']);
         $this->assertSame('5,00', $ipm['valor_iss']);
         $this->assertSame('5,00', $ipm['issqn']);
         $this->assertStringNotContainsString('SIMPLES NACIONAL', $ipm['aliquota'].$ipm['valor_iss'].$ipm['issqn'].$ipm['base_calculo']);
+    }
+
+    public function test_retorno_ipm_de_araucaria_usa_valores_oficiais_e_codigo_siafi(): void
+    {
+        $nota = $this->nota();
+        $nota->empresa->setAttribute('cidade_codigo', '4101804');
+        $nota->setAttribute('municipio_prestacao_codigo', '4101804');
+        $nota->setAttribute('status', Nfse::STATUS_AUTORIZADA);
+        $nota->setAttribute('xml_nfse', '<GerarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>73</Numero>'
+            .'<CodigoVerificacao>7435051026171551660536920682026107398905</CodigoVerificacao>'
+            .'<OutrasInformacoes>https://araucaria.atende.net/consulta/7435051026171551660536920682026107398905 Chave de Acesso NFS-e Nacional: 41018041253692068000145000000000007326100000000019</OutrasInformacoes>'
+            .'<ValoresNfse><BaseCalculo>100.00</BaseCalculo><Aliquota>4.17</Aliquota><ValorIss>4.17</ValorIss></ValoresNfse>'
+            .'</InfNfse></Nfse></CompNfse></ListaNfse></GerarNfseResposta>');
+
+        $ipm = NfseIpmImpressaoViewData::for($nota)['ipm'];
+
+        $this->assertSame('41018041253692068000145000000000007326100000000019', $ipm['chave_acesso']);
+        $this->assertSame('4.17%', $ipm['aliquota']);
+        $this->assertSame('4,17', $ipm['valor_iss']);
+        $this->assertSame('7435', $ipm['local_codigo']);
+        $this->assertSame('7435 - Araucária', $ipm['legenda_local']);
+        $this->assertSame('SECRETARIA MUNICIPAL DE FINANÇAS', $ipm['prestador']['secretaria']);
+        $this->assertNotNull($ipm['codigo_barras']);
     }
 
     public function test_lc116_desconhece_codigo_sem_inventar_texto(): void

@@ -44,6 +44,6 @@ class NfseEspelhoReportController
                 ->stream($filename);
         }
 
-        return view($view, $data);
+        return view($view, $data + ['tela' => true]);
     }
 }

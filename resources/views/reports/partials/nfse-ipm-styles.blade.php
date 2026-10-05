@@ -1,16 +1,37 @@
+@php
+    $fonteIpm = str_replace('\\', '/', resource_path('fonts/carlito'));
+    // O dompdf grava o cache da fonte em storage/fonts e falha se a pasta não existir.
+    if (! is_dir(storage_path('fonts'))) {
+        @mkdir(storage_path('fonts'), 0775, true);
+    }
+@endphp
 <style>
-    @page {
-        margin: 7mm;
-        size: A4 portrait;
+    @font-face {
+        font-family: 'IpmCarlito';
+        src: url('{{ $fonteIpm }}/Carlito-Regular.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
     }
 
-    html, body {
+    @font-face {
+        font-family: 'IpmCarlito';
+        src: url('{{ $fonteIpm }}/Carlito-Bold.ttf') format('truetype');
+        font-weight: bold;
+        font-style: normal;
+    }
+
+    @page {
+        margin: 9mm 10mm;
+    }
+
+    body {
         margin: 0;
         padding: 0;
         color: #000;
         background: #fff;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: Calibri, 'IpmCarlito', Carlito, Arial, Helvetica, sans-serif;
         font-size: 7.5pt;
+        line-height: 1.1;
     }
 
     .ipm {
@@ -22,146 +43,133 @@
     .ipm td {
         border: 1px solid #000;
         vertical-align: top;
-        padding: 2px 3px;
+        padding: 1px 3px;
+        word-wrap: break-word;
     }
 
     .ipm + .ipm {
         margin-top: -1px;
     }
 
-    .ipm__lbl {
-        display: block;
-        font-size: 6pt;
+    .ipm--interna td {
+        border-width: 0 0 0 1px;
+    }
+
+    .ipm--interna td:first-child {
+        border-left: 0;
+    }
+
+    .ipm__sem-pad {
+        padding: 0 !important;
+    }
+
+    .ipm__prestador {
+        padding: 3px 4px !important;
+        line-height: 1.32;
+    }
+
+    .ipm__forte {
         font-weight: 700;
-        line-height: 1.15;
-        margin-bottom: 1px;
-    }
-
-    .ipm__val {
-        display: block;
-        font-size: 8pt;
-        font-weight: 700;
-        line-height: 1.2;
-        word-wrap: break-word;
-    }
-
-    .ipm__txt {
-        font-size: 7.5pt;
-        font-weight: 400;
-        line-height: 1.25;
-    }
-
-    .ipm__razao {
-        font-size: 11pt;
-        font-weight: 700;
-        line-height: 1.15;
-        margin-bottom: 2px;
-        text-transform: uppercase;
-    }
-
-    .ipm__linha {
-        font-size: 7.5pt;
-        line-height: 1.3;
-    }
-
-    .ipm__num {
-        display: block;
-        font-size: 14pt;
-        font-weight: 700;
-        text-align: center;
-        line-height: 1.1;
-        padding: 2px 0 1px;
-    }
-
-    .ipm__sit {
-        display: block;
-        font-size: 9pt;
-        font-weight: 700;
-        text-align: center;
-        padding: 2px 0;
     }
 
     .ipm__centro {
         text-align: center;
     }
 
+    .ipm__meio {
+        vertical-align: middle !important;
+    }
+
     .ipm__qr {
         text-align: center;
-        vertical-align: middle;
+        vertical-align: middle !important;
     }
 
     .ipm__qr img {
-        width: 22mm;
-        height: 22mm;
+        width: 19mm;
+        height: 19mm;
         display: block;
-        margin: 1px auto 0;
+        margin: 2px auto 3px;
+    }
+
+    .ipm__qr a {
+        color: #1a0dab;
+        text-decoration: underline;
+    }
+
+    .ipm__titulo {
+        text-align: center;
+        font-size: 12pt;
+        font-weight: 700;
+        padding: 1px 3px !important;
     }
 
     .ipm__pref {
+        vertical-align: middle !important;
+        font-size: 9pt;
+        line-height: 1.3;
+        padding: 0 3px !important;
+    }
+
+    .ipm__pref-tabela {
+        border-collapse: collapse;
+    }
+
+    .ipm__pref-tabela td {
+        border: 0;
+        padding: 0;
+        vertical-align: middle;
+    }
+
+    .ipm__brasao {
+        width: 15mm;
+        padding-left: 2mm !important;
+    }
+
+    .ipm__brasao img {
+        width: 11mm;
+        height: 14.6mm;
+        display: block;
+    }
+
+    .ipm__ident {
+        line-height: 1.2;
+        padding: 2px 3px !important;
+    }
+
+    .ipm__barras {
+        height: 9mm;
+        margin: 1px 0 2px;
         text-align: center;
-        font-weight: 700;
-        line-height: 1.35;
-        padding: 4px 3px;
     }
 
-    .ipm__pref-titulo {
-        font-size: 8.5pt;
-    }
-
-    .ipm__pref-linha {
-        font-size: 8pt;
-        text-transform: uppercase;
+    .ipm__barras img {
+        width: 74mm;
+        height: 9mm;
     }
 
     .ipm__sec {
-        background: #efefef;
+        text-align: center;
         font-size: 8pt;
-        font-weight: 700;
+        padding: 2px 4px !important;
+    }
+
+    .ipm__cab {
+        line-height: 1.15;
+    }
+
+    .ipm__par {
+        margin: 0 0 7px;
+    }
+
+    .ipm__par:last-child {
+        margin-bottom: 0;
+    }
+
+    .ipm__rodape {
         text-align: center;
-        letter-spacing: 0.2px;
-        padding: 2px 4px;
-        text-transform: uppercase;
-    }
-
-    .ipm__id {
-        font-family: "Courier New", Courier, monospace;
-        font-size: 8.5pt;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-        word-break: break-all;
-    }
-
-    .ipm__chave {
-        font-family: "Courier New", Courier, monospace;
-        font-size: 8pt;
-        font-weight: 700;
-        word-break: break-all;
-    }
-
-    .ipm__tot {
-        text-align: center;
-        padding: 1px 1px 2px;
-    }
-
-    .ipm__tot .ipm__lbl {
-        font-size: 5pt;
-        font-weight: 700;
-        text-align: center;
-    }
-
-    .ipm__tot .ipm__val {
-        font-size: 6.5pt;
-        text-align: center;
-    }
-
-    .ipm__bloco {
         font-size: 7pt;
-        line-height: 1.3;
-        font-weight: 400;
-    }
-
-    .ipm__bloco strong {
-        font-weight: 700;
+        margin-top: 2px;
     }
 
     .ipm__aviso {
@@ -201,7 +209,12 @@
         padding: 6px 12px;
     }
 
+    .ipm-tela {
+        padding: 14px 22px;
+    }
+
     @media print {
         .ipm__acoes { display: none !important; }
+        .ipm-tela { padding: 0; }
     }
 </style>

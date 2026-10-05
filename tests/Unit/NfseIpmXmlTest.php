@@ -25,6 +25,12 @@ class NfseIpmXmlTest extends TestCase
 
     private static ?Certificate $certificado = null;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->travelTo('2026-09-28 10:00:00');
+    }
+
     public function test_rps_assinado_valida_no_xsd_oficial_ipm(): void
     {
         $xml = $this->assinado($this->nota());
@@ -37,9 +43,9 @@ class NfseIpmXmlTest extends TestCase
         $xml = app(NfseIpmXmlGerador::class)->gerar($this->nota());
 
         $this->assertStringContainsString('<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd"><Rps><InfDeclaracaoPrestacaoServico Id="RPS_1">', $xml);
-        $this->assertStringContainsString('<Rps><IdentificacaoRps><Numero>1</Numero><Serie>NE</Serie><Tipo>1</Tipo></IdentificacaoRps><DataEmissao>2026-09-28</DataEmissao><Status>1</Status></Rps>', $xml);
-        $this->assertStringContainsString('<Competencia>2026-09-01</Competencia>', $xml);
-        $this->assertStringContainsString('<Valores><ValorServicos>100.00</ValorServicos></Valores><IssRetido>2</IssRetido>', $xml);
+        $this->assertStringContainsString('<InfDeclaracaoPrestacaoServico Id="RPS_1"><Competencia>2026-09-28</Competencia>', $xml);
+        $this->assertStringNotContainsString('<IdentificacaoRps>', $xml);
+        $this->assertStringContainsString('<Valores><ValorServicos>100.00</ValorServicos><ValorIss>2.00</ValorIss><Aliquota>2.00</Aliquota></Valores><IssRetido>2</IssRetido>', $xml);
         $this->assertStringContainsString('<ItemListaServico>14.01.01</ItemListaServico>', $xml);
         $this->assertStringContainsString('<CodigoCnae>4520001</CodigoCnae>', $xml);
         $this->assertStringContainsString('<CodigoNbs>120013110</CodigoNbs>', $xml);
@@ -49,8 +55,6 @@ class NfseIpmXmlTest extends TestCase
         $this->assertStringContainsString('<Endereco><Endereco>RUA TESTE</Endereco><Numero>10</Numero><Bairro>CENTRO</Bairro><CodigoMunicipio>4101804</CodigoMunicipio><Uf>PR</Uf><Cep>83702000</Cep></Endereco>', $xml);
         $this->assertStringContainsString('<Contato><Telefone>41999990000</Telefone><Email>cliente@teste.com</Email></Contato>', $xml);
         $this->assertStringContainsString('<OptanteSimplesNacional>1</OptanteSimplesNacional><IncentivoFiscal>2</IncentivoFiscal></InfDeclaracaoPrestacaoServico>', $xml);
-        $this->assertStringNotContainsString('<Aliquota>', $xml);
-        $this->assertStringNotContainsString('<ValorIss>', $xml);
         $this->assertStringNotContainsString('<RegimeEspecialTributacao>', $xml);
         $this->assertStringNotContainsString('IBSCBS', $xml);
         $this->assertStringNotContainsString('EnvioTeste', $xml);
@@ -166,8 +170,12 @@ class NfseIpmXmlTest extends TestCase
     public static function bloqueios(): array
     {
         return [
-            'simples com iss retido' => [fn (Nfse $nota) => $nota->setAttribute('tp_ret_issqn', '2'), 'alíquota do Simples'],
-            'incidência fora do município' => [fn (Nfse $nota) => $nota->setAttribute('municipio_prestacao_codigo', '4106902'), 'fora do município'],
+            'simples sem alíquota' => [fn (Nfse $nota) => $nota->setAttribute('aliquota_iss', null), 'alíquota do ISS do Simples'],
+            'incidência fora do município sem alíquota' => [function (Nfse $nota): void {
+                $nota->empresa->setAttribute('regime_tributario', 'normal');
+                $nota->setAttribute('aliquota_iss', null);
+                $nota->setAttribute('municipio_prestacao_codigo', '4106902');
+            }, 'fora do município'],
             'sem NBS' => [fn (Nfse $nota) => $nota->itens->first()->setAttribute('c_nbs', null), 'NBS'],
             'endereço do tomador incompleto' => [fn (Nfse $nota) => $nota->setAttribute('tomador_bairro', ''), 'endereço do tomador'],
             'serviços com códigos diferentes' => [fn (Nfse $nota) => $nota->itens->push(new NfseItem(['descricao' => 'OUTRO', 'c_trib_nac' => '170101', 'c_nbs' => '120013110'])), 'único código'],
@@ -191,7 +199,7 @@ class NfseIpmXmlTest extends TestCase
         $xml = app(NfseIpmXmlGerador::class)->gerar($this->nota(), true);
         $envelope = app(NfseIpmCliente::class)->envelope($xml);
 
-        $this->assertStringStartsWith('<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body><GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd"><EnvioTeste>1</EnvioTeste>', $envelope);
+        $this->assertStringStartsWith('<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body><GerarNfseEnvio><EnvioTeste>1</EnvioTeste><Rps><InfDeclaracaoPrestacaoServico xmlns="http://www.abrasf.org.br/nfse.xsd" Id="RPS_1">', $envelope);
         $this->assertStringEndsWith('</GerarNfseEnvio></soapenv:Body></soapenv:Envelope>', $envelope);
         $this->assertSame(1, substr_count($envelope, '<?xml'));
         $this->assertStringNotContainsString('CDATA', $envelope);
@@ -416,6 +424,7 @@ class NfseIpmXmlTest extends TestCase
             'municipio_prestacao_codigo' => '4101804',
             'trib_issqn' => '1',
             'tp_ret_issqn' => '1',
+            'aliquota_iss' => '2.00',
             'valor_servicos' => '100.00',
             'desconto' => '0.00',
             'iss' => '0.00',
