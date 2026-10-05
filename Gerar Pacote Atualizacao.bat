@@ -8,7 +8,7 @@ echo   Gerar pacote Unitec-ERP-Update.zip
 echo ========================================
 echo.
 
-powershell.exe -Sta -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\criar-pacote-update.ps1" -SkipComposer
+powershell.exe -Sta -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\criar-pacote-update.ps1"
 
 if errorlevel 1 (
     echo.

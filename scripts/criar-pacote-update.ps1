@@ -112,6 +112,65 @@ function Write-UnitecSha256File {
     }
 }
 
+# composer do PATH; senao tools\composer.phar (gitignored, fora do ZIP: tools/ e excluido no UpdateMode)
+# rodando no tools\php\php.exe, baixado da fonte oficial na primeira vez.
+function Resolve-UnitecComposer {
+    $global = Get-Command composer -ErrorAction SilentlyContinue
+    if ($global) {
+        return @($global.Source)
+    }
+
+    $phpExe = Join-Path $ProjectRoot 'tools\php\php.exe'
+    if (-not (Test-Path $phpExe)) {
+        throw 'composer nao esta no PATH e tools\php\php.exe nao existe.'
+    }
+
+    $phar = Join-Path $ProjectRoot 'tools\composer.phar'
+    if (-not (Test-Path $phar)) {
+        Write-Host '>> composer.phar ausente: baixando de getcomposer.org para tools\' -ForegroundColor Yellow
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $tmp = $phar + '.download'
+        $url = 'https://getcomposer.org/download/latest-stable/composer.phar'
+        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+        $esperado = ((Invoke-WebRequest -Uri ($url + '.sha256') -UseBasicParsing).Content.Trim() -split '\s+')[0].ToLowerInvariant()
+        $obtido = (Get-FileHash -Path $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($esperado -ne $obtido) {
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+            throw 'composer.phar baixado com SHA256 diferente do oficial.'
+        }
+        Move-Item $tmp $phar -Force
+    }
+
+    return @($phpExe, $phar)
+}
+
+function Invoke-UnitecComposer([string[]]$ComposerArgs) {
+    $cmd = Resolve-UnitecComposer
+    $exe = $cmd[0]
+    $prefix = @($cmd | Select-Object -Skip 1)
+    & $exe @prefix @ComposerArgs | Out-Host
+    return $LASTEXITCODE
+}
+
+$script:RestaurarComposerDev = $false
+
+function Restore-UnitecComposerDev {
+    if (-not $script:RestaurarComposerDev) {
+        return
+    }
+    $script:RestaurarComposerDev = $false
+    Write-Host '>> Restaurando dependencias de desenvolvimento (composer install)' -ForegroundColor White
+    $code = Invoke-UnitecComposer @('install', '--no-interaction')
+    if ($code -ne 0) {
+        Write-Host '>> AVISO: falha ao restaurar dependencias DEV. Rode composer install manualmente.' -ForegroundColor Yellow
+    }
+}
+
+trap {
+    Restore-UnitecComposerDev
+    break
+}
+
 Set-Location $ProjectRoot
 Write-Title 'Gerar pacote de atualizacao (ZIP unico FULL)'
 
@@ -121,8 +180,9 @@ if ($Full) {
 
 if (-not $SkipComposer) {
     Write-Host '>> composer install --no-dev' -ForegroundColor White
-    & composer install --no-dev --optimize-autoloader --no-interaction
-    if ($LASTEXITCODE -ne 0) { throw 'composer install falhou.' }
+    $script:RestaurarComposerDev = $true
+    $code = Invoke-UnitecComposer @('install', '--no-dev', '--optimize-autoloader', '--no-interaction')
+    if ($code -ne 0) { throw 'composer install falhou.' }
 } else {
     Write-Host '>> composer ignorado (-SkipComposer)' -ForegroundColor Yellow
 }
@@ -354,6 +414,8 @@ Publicacao:
 "@
 
 Set-Content -Path $ReadmePath -Value $readme -Encoding UTF8
+
+Restore-UnitecComposerDev
 
 Write-Title 'Pacote ZIP pronto'
 Write-Host ''
