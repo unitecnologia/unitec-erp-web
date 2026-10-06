@@ -4,6 +4,7 @@ document.addEventListener('livewire:navigated', initErpOsForm);
 const ERP_OS_FORM_ACTIONS = {
     F2: 'gravarOs',
     F3: 'finalizarOs',
+    F4: 'abrirImportarOrcamentoOs',
     F6: 'openPrintModal',
     F8: 'openProdutosCadastro',
     F9: 'openPessoasCadastro',
@@ -293,6 +294,45 @@ function bindErpOsFormKeys() {
 
         if (! component) {
             return;
+        }
+
+        if (document.querySelector('.erp-os-form-page .erp-os-import-orc-modal')) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                component.call('fecharImportarOrcamentoOs');
+
+                return;
+            }
+
+            if (event.key === 'Enter' || event.key === 'F5') {
+                const alvo = event.target;
+                const digitandoFiltro = alvo instanceof HTMLInputElement
+                    && (alvo.id === 'erp-os-import-orc-numero' || alvo.id === 'erp-os-import-orc-cliente');
+
+                if (event.key === 'Enter' && digitandoFiltro) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                component.call('confirmarImportarOrcamentoOs');
+
+                return;
+            }
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                component.call('moveOsImportOrcamentoSelection', event.key === 'ArrowDown' ? 1 : -1);
+
+                return;
+            }
+
+            if (event.key.startsWith('F')) {
+                event.preventDefault();
+
+                return;
+            }
         }
 
         if (event.key === 'Escape' && document.querySelector('.erp-os-form-page .erp-orc-print-modal')) {

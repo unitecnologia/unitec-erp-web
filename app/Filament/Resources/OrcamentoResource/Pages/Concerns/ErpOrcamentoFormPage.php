@@ -3,17 +3,20 @@
 namespace App\Filament\Resources\OrcamentoResource\Pages\Concerns;
 
 use App\Filament\Concerns\InteractsWithErpFormReturnUrl;
+use App\Filament\Resources\OrdemServicoResource\Pages\Concerns\ManagesEquipamentoVeiculo;
 use App\Filament\Resources\OrcamentoResource;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
 use App\Models\FormaPagamento;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
+use App\Models\OsVeiculo;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductGrade;
 use App\Models\Vendedor;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\EmpresaModulos;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpFormReturnUrl;
 use App\Support\Erp\ErpMoney;
@@ -39,7 +42,12 @@ use RuntimeException;
 trait ErpOrcamentoFormPage
 {
     use InteractsWithErpFormReturnUrl;
+    use ManagesEquipamentoVeiculo;
     use ManagesOrcamentoPrecoDivergencia;
+
+    public ?int $osVeiculoId = null;
+
+    public bool $equipamentoModalOpen = false;
 
     public string $activeFormTab = 'itens';
 
@@ -407,6 +415,19 @@ trait ErpOrcamentoFormPage
         $this->formaPagamento = mb_strtoupper((string) ($orcamento->forma_pagamento ?? ''), 'UTF-8');
         $this->validadeDias = (string) ($orcamento->validade_dias ?? 0);
         $this->observacoes = (string) ($orcamento->observacoes ?? '');
+        $this->osVeiculoId = $orcamento->os_veiculo_id ? (int) $orcamento->os_veiculo_id : null;
+        $this->numeroSerie = (string) ($orcamento->numero_serie ?? '');
+        $this->descricao = mb_strtoupper((string) ($orcamento->descricao ?? ''), 'UTF-8');
+        $this->descricao2 = mb_strtoupper((string) ($orcamento->descricao2 ?? ''), 'UTF-8');
+        $this->modelo = mb_strtoupper((string) ($orcamento->modelo ?? ''), 'UTF-8');
+        $this->ano = (string) ($orcamento->ano ?? '');
+        $this->placa = mb_strtoupper((string) ($orcamento->placa ?? ''), 'UTF-8');
+        $this->km = (string) ($orcamento->km ?? '');
+        $this->corVeiculo = mb_strtoupper((string) ($orcamento->cor_veiculo ?? ''), 'UTF-8');
+        $this->chassiVeiculo = mb_strtoupper((string) ($orcamento->chassi_veiculo ?? ''), 'UTF-8');
+        $placaLocal = OsVeiculo::normalizarPlaca($this->placa);
+        $this->placaLocalResolvida = OsVeiculo::placaValida($placaLocal) ? $placaLocal : '';
+        $this->carregarExtrasVeiculoLocal();
         $this->syncClienteObservacoes($cliente);
 
         $this->itens = $orcamento->itens
@@ -931,6 +952,56 @@ trait ErpOrcamentoFormPage
 
         $this->clienteCodigo = (string) $person->codigo;
         $this->clienteObservacoes = trim((string) ($person->observacoes ?? ''));
+    }
+
+    public function orcamentoMostraEquipamento(): bool
+    {
+        return EmpresaModulos::empresaPrestadorServicos(ErpContext::currentEmpresa());
+    }
+
+    public function abrirEquipamentoOrcamento(): void
+    {
+        if (! $this->orcamentoMostraEquipamento()) {
+            return;
+        }
+
+        $this->carregarExtrasVeiculoLocal();
+        $this->equipamentoModalOpen = true;
+        $this->dispatch('erp-orc-focus-equip');
+    }
+
+    public function fecharEquipamentoOrcamento(bool $forcar = false): void
+    {
+        if (! $forcar && $this->equipamentoLookupOpen) {
+            $this->closeEquipamentoLookup();
+
+            return;
+        }
+
+        $this->closeEquipamentoLookup();
+        $this->equipamentoModalOpen = false;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function atributosEquipamentoOrcamento(): array
+    {
+        $veiculo = $this->salvarEquipamentoDaOs((int) (ErpContext::currentEmpresaId() ?? 0));
+        $this->osVeiculoId = $veiculo?->getKey() !== null ? (int) $veiculo->getKey() : null;
+
+        return [
+            'os_veiculo_id' => $this->osVeiculoId,
+            'numero_serie' => trim($this->numeroSerie) ?: null,
+            'descricao' => mb_strtoupper(trim($this->descricao), 'UTF-8') ?: null,
+            'descricao2' => mb_strtoupper(trim($this->descricao2), 'UTF-8') ?: null,
+            'modelo' => mb_strtoupper(trim($this->modelo), 'UTF-8') ?: null,
+            'ano' => trim($this->ano) ?: null,
+            'placa' => mb_strtoupper(trim($this->placa), 'UTF-8') ?: null,
+            'km' => trim($this->km) !== '' ? trim($this->km) : null,
+            'cor_veiculo' => mb_strtoupper(trim($this->corVeiculo), 'UTF-8') ?: null,
+            'chassi_veiculo' => mb_strtoupper(trim($this->chassiVeiculo), 'UTF-8') ?: null,
+        ];
     }
 
     public function abrirObservacaoOrcamento(): void
@@ -2617,6 +2688,7 @@ trait ErpOrcamentoFormPage
                     'forma_pagamento' => mb_strtoupper(trim($this->formaPagamento), 'UTF-8') ?: null,
                     'validade_dias' => max(0, (int) $this->validadeDias),
                     'observacoes' => trim($this->observacoes) ?: null,
+                    ...$this->atributosEquipamentoOrcamento(),
                     'total' => $total,
                     'status' => $finalizar ? Orcamento::STATUS_FECHADO : Orcamento::STATUS_ABERTO,
                 ];
@@ -2814,6 +2886,12 @@ trait ErpOrcamentoFormPage
 
     public function handleOrcamentoFormEscape(): void
     {
+        if ($this->equipamentoModalOpen) {
+            $this->fecharEquipamentoOrcamento();
+
+            return;
+        }
+
         if ($this->observacaoOrcamentoModalOpen) {
             $this->fecharObservacaoOrcamento();
 

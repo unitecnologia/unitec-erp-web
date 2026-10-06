@@ -32,6 +32,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'forma_pagamento',
     'validade_dias',
     'observacoes',
+    'os_veiculo_id',
+    'numero_serie',
+    'descricao',
+    'descricao2',
+    'modelo',
+    'ano',
+    'placa',
+    'km',
+    'cor_veiculo',
+    'chassi_veiculo',
     'total',
     'status',
     'plataforma',
@@ -158,6 +168,11 @@ class Orcamento extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'cliente_id');
+    }
+
+    public function osVeiculo(): BelongsTo
+    {
+        return $this->belongsTo(OsVeiculo::class, 'os_veiculo_id');
     }
 
     public function clienteDisplayNome(): string

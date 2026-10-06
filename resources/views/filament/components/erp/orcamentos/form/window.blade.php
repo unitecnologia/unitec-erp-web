@@ -33,6 +33,7 @@
         setTimeout(focusEl, 150);
     })"
     x-on:erp-orc-focus-obs.window="$nextTick(() => { const el = document.getElementById('erp-orc-obs-orcamento'); el?.focus(); })"
+    x-on:erp-orc-focus-equip.window="$nextTick(() => { const el = document.getElementById('os-placa'); el?.focus(); el?.select?.(); })"
     x-on:orc-focus-barcode.window="$nextTick(() => { const el = document.getElementById('orc-prod-barcode'); el?.focus(); el?.select?.(); })"
     x-on:orc-focus-qtd.window="$nextTick(() => { const el = document.getElementById('orc-prod-qtd'); el?.focus(); el?.select?.(); })"
     x-on:orc-focus-preco.window="$nextTick(() => { const el = document.getElementById('orc-prod-preco'); el?.focus(); el?.select?.(); })"
@@ -71,6 +72,7 @@
     @endif
 
     @include('filament.components.erp.orcamentos.form.observacoes-modal')
+    @include('filament.components.erp.orcamentos.form.equipamento-modal')
     @include('filament.components.erp.orcamentos.form.post-save-prompt')
     @include('filament.components.erp.orcamentos.form.item-delete-confirm')
     @include('filament.components.erp.orcamentos.form.desconto-item')

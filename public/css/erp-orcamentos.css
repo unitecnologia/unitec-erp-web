@@ -734,9 +734,9 @@
 .erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell-cliente_nome,
 .erp-orcamentos-page.erp-os-page .fi-ta-cell-cliente_nome {
-    width: auto !important;
-    min-width: 8rem !important;
-    max-width: 12rem !important;
+    width: 8.5rem !important;
+    min-width: 7rem !important;
+    max-width: 9rem !important;
 }
 
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(7),
@@ -753,9 +753,9 @@
 .erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(8),
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell-descricao,
 .erp-orcamentos-page.erp-os-page .fi-ta-cell-descricao {
-    width: 10rem !important;
-    min-width: 8.5rem !important;
-    max-width: 12rem !important;
+    width: 14rem !important;
+    min-width: 12rem !important;
+    max-width: 16rem !important;
 }
 
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(9),

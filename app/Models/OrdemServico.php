@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'data_inicio', 'hora_inicio', 'previsao_entrega',
     'data_termino', 'hora_termino', 'data_entrega', 'hora_entrega', 'data_emissao',
     'proxima_revisao', 'avisar_revisao',
-    'cliente_id', 'atendente_id', 'usuario_id', 'produto_id',
+    'cliente_id', 'orcamento_id', 'atendente_id', 'usuario_id', 'produto_id',
     'documento', 'nome', 'fone1', 'fone2', 'endereco', 'bairro', 'cidade', 'uf',
     'numero_serie', 'descricao', 'descricao2', 'modelo', 'marca', 'ano', 'placa', 'km',
     'modelo_veiculo', 'categoria_veiculo', 'marca_veiculo', 'ano_veiculo', 'cor_veiculo',
@@ -113,6 +113,11 @@ class OrdemServico extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'cliente_id');
+    }
+
+    public function orcamento(): BelongsTo
+    {
+        return $this->belongsTo(Orcamento::class, 'orcamento_id');
     }
 
     public function atendente(): BelongsTo

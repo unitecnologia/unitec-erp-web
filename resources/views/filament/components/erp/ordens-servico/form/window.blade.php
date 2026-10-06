@@ -36,5 +36,6 @@
 
 @include('filament.components.erp.ordens-servico.preview-overlay')
 @include('filament.components.erp.ordens-servico.print-modal')
+@include('filament.components.erp.ordens-servico.form.importar-orcamento')
 @include('filament.components.erp.ordens-servico.form.faturamento-modal')
 @include('filament.components.erp.boleto-pos-documento')

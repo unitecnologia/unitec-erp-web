@@ -4,6 +4,7 @@ document.addEventListener('livewire:navigated', initErpOrcamentosForm);
 const ERP_ORC_FORM_ACTIONS = {
     F2: 'gravarOrcamento',
     F3: 'finalizarOrcamento',
+    F4: 'abrirEquipamentoOrcamento',
     F8: 'openProdutosCadastro',
     F9: 'openPessoasCadastro',
     Escape: 'handleOrcamentoFormEscape',
@@ -411,7 +412,7 @@ function bindErpOrcamentosFormKeys() {
         event.preventDefault();
         event.stopPropagation();
 
-        if (document.querySelector('.erp-orc-obs-modal, .erp-orc-post-save-modal, .erp-orc-item-delete-modal, .erp-form-overlay, .erp-fv-tv-desconto')) {
+        if (document.querySelector('.erp-orc-equip-modal, .erp-orc-obs-modal, .erp-orc-post-save-modal, .erp-orc-item-delete-modal, .erp-form-overlay, .erp-fv-tv-desconto')) {
             return;
         }
 
@@ -432,6 +433,15 @@ function bindErpOrcamentosFormKeys() {
         const component = getErpOrcamentosComponent();
 
         if (! component) {
+            return;
+        }
+
+        if (document.querySelector('.erp-orc-equip-modal')) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                component.call('fecharEquipamentoOrcamento');
+            }
+
             return;
         }
 
@@ -466,7 +476,11 @@ function bindErpOrcamentosFormKeys() {
         const method = ERP_ORC_FORM_ACTIONS[event.key];
 
         if (method) {
-            if (document.querySelector('.erp-form-overlay') && (event.key === 'F8' || event.key === 'F9')) {
+            if (document.querySelector('.erp-form-overlay') && (event.key === 'F4' || event.key === 'F8' || event.key === 'F9')) {
+                return;
+            }
+
+            if (method === 'abrirEquipamentoOrcamento' && ! document.querySelector('.erp-orcamentos-form-page [data-erp-key="F4"]')) {
                 return;
             }
 

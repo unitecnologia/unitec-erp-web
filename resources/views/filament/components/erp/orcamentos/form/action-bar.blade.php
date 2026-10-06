@@ -38,6 +38,19 @@
             <span class="erp-pcad-actions__label"><kbd>F9</kbd> | Pessoas</span>
         </button>
     @endunless
+    @if ($this->orcamentoMostraEquipamento())
+        <button type="button" wire:click="abrirEquipamentoOrcamento" class="erp-pcad-actions__btn erp-orc-actions__equip" data-erp-key="F4">
+            <span class="erp-fv-tv-btn__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 16V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10"/>
+                    <path d="M15 8h3l3 4v4h-6"/>
+                    <circle cx="7" cy="16" r="2"/>
+                    <circle cx="17" cy="16" r="2"/>
+                </svg>
+            </span>
+            <span class="erp-pcad-actions__label"><kbd>F4</kbd> | Equipamento</span>
+        </button>
+    @endif
     <button type="button" wire:click="abrirObservacaoOrcamento" class="erp-pcad-actions__btn erp-orc-actions__obs" title="Observação do orçamento">
         <span class="erp-fv-tv-btn__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
