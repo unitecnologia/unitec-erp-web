@@ -286,7 +286,7 @@ final class BoletoEnvioService
         }
 
         if (preg_match('/^PDV-(\d+)$/', $documento, $m)) {
-            $pdv = PdvVenda::query()->where('numero', (int) $m[1])->first();
+            $pdv = PdvVenda::query()->comercial()->where('numero', (int) $m[1])->first();
             if ($pdv) {
                 $pdvIds[] = (int) $pdv->id;
                 if ($pdv->venda_id) {

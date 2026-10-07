@@ -200,7 +200,8 @@ final class FinalizarDevolucaoVendaService
 
     private function devolverEstoque(DevolucaoVenda $devolucao, Venda $venda): void
     {
-        $pdvItens = $venda->pdvVenda?->itens ?? collect();
+        $pdvVenda = $venda->pdvVenda;
+        $pdvItens = $pdvVenda !== null && ! $pdvVenda->isRegularizacaoFiscal() ? $pdvVenda->itens : collect();
 
         foreach ($devolucao->itens as $item) {
             if (! $item->product_id) {
@@ -398,7 +399,7 @@ final class FinalizarDevolucaoVendaService
 
         $pdv = $venda->pdvVenda;
 
-        if ($pdv?->numero) {
+        if ($pdv?->numero && ! $pdv->isRegularizacaoFiscal()) {
             $docs[] = 'PDV-'.str_pad((string) $pdv->numero, 6, '0', STR_PAD_LEFT);
         }
 

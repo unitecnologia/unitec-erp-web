@@ -97,7 +97,7 @@ class VendaListQueryBuilder
         $query->with([
             'cliente:id,nome_razao',
             'vendedor:id,nome',
-            'pdvVenda:id,venda_id,numero',
+            'pdvVenda:id,venda_id,numero,origem',
             'pdvVenda.nfce:id,pdv_venda_id,numero,serie',
             'nfes:id,venda_id,numero,serie,modelo,status',
             'entrega:id,venda_id,status',
@@ -395,7 +395,7 @@ class VendaListQueryBuilder
                     $q->where('plataforma', Venda::PLATAFORMA_PDV);
                 }
 
-                $q->orWhereHas('pdvVenda');
+                $q->orWhereHas('pdvVenda', fn (Builder $pdv): Builder => $pdv->comercial());
             }),
             default => $query
                 ->when($hasPlataformaColumn, fn (Builder $q): Builder => $q->where(
@@ -404,7 +404,7 @@ class VendaListQueryBuilder
                         ->orWhereNull('plataforma'),
                 ))
                 ->whereDoesntHave('forcaVendasOrder')
-                ->whereDoesntHave('pdvVenda'),
+                ->whereDoesntHave('pdvVenda', fn (Builder $pdv): Builder => $pdv->comercial()),
         };
     }
 

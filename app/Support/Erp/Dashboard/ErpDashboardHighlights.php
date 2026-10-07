@@ -89,6 +89,7 @@ final class ErpDashboardHighlights
 
         if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
+                ->comercial()
                 ->where('situacao', '!=', 'C')
                 ->where(function ($query) use ($inicio, $fim): void {
                     static::scopePdvPeriodo($query, $inicio, $fim);
@@ -234,6 +235,7 @@ final class ErpDashboardHighlights
 
         if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
+                ->comercial()
                 ->selectRaw('person_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
                 ->whereNotNull('person_id')
@@ -301,6 +303,7 @@ final class ErpDashboardHighlights
 
         if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $q = PdvVenda::query()
+                ->comercial()
                 ->selectRaw('vendedor_id, SUM(total) as total')
                 ->where('situacao', '!=', 'C')
                 ->whereNotNull('vendedor_id')

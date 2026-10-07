@@ -120,9 +120,12 @@ trait ManagesNfceFiscalActions
         $this->resetTable();
 
         $protocolo = $result->protocoloCancelamento;
-        $body = filled($protocolo)
-            ? 'Protocolo: '.$protocolo.' — venda estornada (estoque, financeiro e logística).'
-            : 'NFC-e cancelada e venda estornada.';
+        $body = match (true) {
+            $result->somenteFiscal => (filled($protocolo) ? 'Protocolo: '.$protocolo.' — ' : '')
+                .'NFC-e de regularização cancelada. A venda original não foi alterada e volta para a Regularização (F9).',
+            filled($protocolo) => 'Protocolo: '.$protocolo.' — venda estornada (estoque, financeiro e logística).',
+            default => 'NFC-e cancelada e venda estornada.',
+        };
 
         Notification::make()
             ->title('NFC-e cancelada com sucesso.')

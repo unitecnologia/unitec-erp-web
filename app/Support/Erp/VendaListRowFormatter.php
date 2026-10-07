@@ -96,7 +96,10 @@ final class VendaListRowFormatter
 
     private function formatDav(Venda $record): string
     {
-        $pdvNumero = $record->pdvVenda?->numero;
+        $pdvVenda = $record->pdvVenda;
+        $pdvNumero = $pdvVenda !== null && ! $pdvVenda->isRegularizacaoFiscal()
+            ? $pdvVenda->numero
+            : null;
 
         if ($pdvNumero !== null && $pdvNumero !== '') {
             return str_pad((string) $pdvNumero, 6, '0', STR_PAD_LEFT);

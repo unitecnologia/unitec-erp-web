@@ -3,6 +3,7 @@
 namespace App\Support\Fiscal;
 
 use App\Models\Empresa;
+use App\Models\Nfe;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\VendasParametro;
@@ -20,6 +21,33 @@ final class PdvNfceTransmissaoService
      * @param  (callable(int, string): void)|null  $onProgress
      */
     public function transmitir(PdvVendaNfce $nfce, Empresa $empresa, ?callable $onProgress = null): PdvVendaNfce
+    {
+        $vendaId = (int) (PdvVenda::query()->whereKey($nfce->pdv_venda_id)->value('venda_id') ?? 0);
+
+        if ($vendaId <= 0) {
+            return $this->transmitirSemTrava($nfce, $empresa, $onProgress);
+        }
+
+        return VendaFiscalLock::executar($vendaId, function () use ($nfce, $empresa, $onProgress, $vendaId): PdvVendaNfce {
+            $nfce->refresh();
+
+            $temNfe = Nfe::query()
+                ->where('venda_id', $vendaId)
+                ->whereIn('status', [Nfe::STATUS_TRANSMITIDA, Nfe::STATUS_CONTINGENCIA])
+                ->exists();
+
+            if ($temNfe) {
+                throw new FiscalEngineException('A venda vinculada já possui NF-e transmitida. Não é possível transmitir a NFC-e.');
+            }
+
+            return $this->transmitirSemTrava($nfce, $empresa, $onProgress);
+        });
+    }
+
+    /**
+     * @param  (callable(int, string): void)|null  $onProgress
+     */
+    private function transmitirSemTrava(PdvVendaNfce $nfce, Empresa $empresa, ?callable $onProgress = null): PdvVendaNfce
     {
         if ($nfce->simulada) {
             throw new FiscalEngineException('NFC-e simulada não pode ser transmitida à SEFAZ.');

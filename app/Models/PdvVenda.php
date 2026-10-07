@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PdvVenda extends Model
 {
+    /**
+     * Registro só fiscal (sem caixa, estoque ou financeiro) criado pela Regularização Fiscal
+     * para emitir NFC-e de venda que não nasceu no PDV.
+     */
+    public const ORIGEM_REGULARIZACAO_FISCAL = 'regularizacao_fiscal';
+
     protected $table = 'pdv_vendas';
 
     protected $fillable = [
@@ -100,6 +107,22 @@ class PdvVenda extends Model
     public function vendedor(): BelongsTo
     {
         return $this->belongsTo(Vendedor::class);
+    }
+
+    public function isRegularizacaoFiscal(): bool
+    {
+        return (string) ($this->origem ?? '') === self::ORIGEM_REGULARIZACAO_FISCAL;
+    }
+
+    /**
+     * Vendas reais do PDV (exclui registros só fiscais da regularização).
+     */
+    public function scopeComercial(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q): void {
+            $q->whereNull($q->qualifyColumn('origem'))
+                ->orWhere($q->qualifyColumn('origem'), '!=', self::ORIGEM_REGULARIZACAO_FISCAL);
+        });
     }
 
     public static function nextNumero(int $sessaoId): int

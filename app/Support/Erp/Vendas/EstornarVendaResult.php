@@ -10,5 +10,6 @@ final class EstornarVendaResult
         public readonly ?string $protocoloCancelamento = null,
         public readonly bool $alreadyCancelled = false,
         public readonly string $plataforma = 'erp',
+        public readonly bool $somenteFiscal = false,
     ) {}
 }

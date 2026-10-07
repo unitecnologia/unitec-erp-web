@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedString;
 use App\Support\Erp\EmpresaParametros;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -123,7 +124,7 @@ class Empresa extends Model
 
         $casts['param_api_servicos_timeout'] = 'integer';
         $casts['param_consulta_placa_timeout'] = 'integer';
-        $casts['param_consulta_placa_token'] = 'encrypted';
+        $casts['param_consulta_placa_token'] = SafeEncryptedString::class;
         $casts['param_licenca_api_timeout'] = 'integer';
         $casts['param_whatsapp_timeout'] = 'integer';
         $casts['param_whatsapp_gateway_port'] = 'integer';

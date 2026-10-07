@@ -6,6 +6,7 @@ use App\Models\CompraItem;
 use App\Models\NfeItem;
 use App\Models\Nfse;
 use App\Models\OrdemServico;
+use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\Product;
 use App\Models\Venda;
@@ -274,6 +275,7 @@ class ProductCardexService
             ->where('i.product_id', $productId)
             ->whereIn('v.venda_id', $vendaIds)
             ->whereNotNull('v.venda_id')
+            ->where(fn ($q) => $q->whereNull('v.origem')->orWhere('v.origem', '!=', PdvVenda::ORIGEM_REGULARIZACAO_FISCAL))
             ->select('v.venda_id as venda_id')
             ->addSelect('i.id as origem_id')
             ->selectRaw("'pdv' as origem")

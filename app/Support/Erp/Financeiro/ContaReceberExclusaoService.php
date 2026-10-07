@@ -84,7 +84,7 @@ final class ContaReceberExclusaoService
             }
 
             if (preg_match('/^PDV-(\d+)$/', $documento, $matches)) {
-                return PdvVenda::query()->where('numero', (int) $matches[1])->exists()
+                return PdvVenda::query()->comercial()->where('numero', (int) $matches[1])->exists()
                     ? 'pdv'
                     : null;
             }
@@ -109,7 +109,7 @@ final class ContaReceberExclusaoService
         $historico = mb_strtoupper(trim((string) ($conta->historico ?? '')), 'UTF-8');
 
         if (preg_match('/VENDA\s+PDV\s*#?\s*(\d+)/', $historico, $matches)) {
-            return PdvVenda::query()->where('numero', (int) $matches[1])->exists()
+            return PdvVenda::query()->comercial()->where('numero', (int) $matches[1])->exists()
                 ? 'pdv'
                 : null;
         }

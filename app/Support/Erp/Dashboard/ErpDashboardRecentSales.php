@@ -40,6 +40,7 @@ final class ErpDashboardRecentSales
 
         if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
             $pdvQuery = PdvVenda::query()
+                ->comercial()
                 ->with('person:id,nome_razao')
                 ->where('situacao', '!=', 'C')
                 ->orderByDesc('fechado_em')

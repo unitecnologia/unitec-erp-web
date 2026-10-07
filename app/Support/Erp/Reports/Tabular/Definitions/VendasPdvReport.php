@@ -58,6 +58,7 @@ class VendasPdvReport extends AbstractTabularReport
         $columns = $this->resolveColumns($request->query('cols'));
 
         $rows = PdvVenda::query()
+            ->comercial()
             ->with(['person', 'user', 'vendedor'])
             ->whereBetween(DB::raw('DATE(COALESCE(fechado_em, created_at))'), [$de->toDateString(), $ate->toDateString()])
             ->where(function ($q): void {

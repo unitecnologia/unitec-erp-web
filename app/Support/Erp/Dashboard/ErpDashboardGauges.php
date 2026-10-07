@@ -231,6 +231,7 @@ final class ErpDashboardGauges
         try {
             if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $rows = PdvVenda::query()
+                    ->comercial()
                     ->selectRaw('vendedor_id, SUM(total) as total')
                     ->whereIn('vendedor_id', $vendedorIds)
                     ->where('situacao', '!=', 'C')
@@ -1026,6 +1027,7 @@ final class ErpDashboardGauges
         try {
             if (ErpSchema::hasTable((new PdvVenda)->getTable())) {
                 $pdvQuery = PdvVenda::query()
+                    ->comercial()
                     ->where('situacao', '!=', 'C')
                     ->where(function ($query) use ($inicio, $fim): void {
                         $query->where(function ($fechamento) use ($inicio, $fim): void {

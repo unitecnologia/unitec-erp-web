@@ -25,6 +25,28 @@ final class NfeEmissionService
      */
     public function transmitir(Nfe $nfe, Empresa $empresa, ?callable $onProgress = null): Nfe
     {
+        $vendaId = (int) ($nfe->venda_id ?? 0);
+
+        if ($vendaId <= 0) {
+            return $this->transmitirSemTrava($nfe, $empresa, $onProgress);
+        }
+
+        return VendaFiscalLock::executar($vendaId, function () use ($nfe, $empresa, $onProgress, $vendaId): Nfe {
+            $nfe->refresh();
+
+            if (VendaFiscalLock::vendaTemNfceValida($vendaId)) {
+                throw new FiscalEngineException('A venda vinculada já possui NFC-e autorizada/contingência. Cancele a NFC-e antes de emitir NF-e.');
+            }
+
+            return $this->transmitirSemTrava($nfe, $empresa, $onProgress);
+        });
+    }
+
+    /**
+     * @param  (callable(int, string): void)|null  $onProgress
+     */
+    private function transmitirSemTrava(Nfe $nfe, Empresa $empresa, ?callable $onProgress = null): Nfe
+    {
         if ($nfe->status !== Nfe::STATUS_ABERTA) {
             throw new FiscalEngineException('Somente NF-e aberta pode ser transmitida.');
         }

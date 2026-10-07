@@ -144,6 +144,7 @@ final class ContaReceberDetalheService
         if (preg_match('/^PDV-(\d+)$/', $documento, $matches)) {
             $numeroPdv = (int) $matches[1];
             $pdv = PdvVenda::query()
+                ->comercial()
                 ->with(['itens.product', 'person', 'venda.itens.product', 'pagamentos'])
                 ->where('numero', $numeroPdv)
                 ->first();

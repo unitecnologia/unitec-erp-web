@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 class ListNfces extends ListRecords
@@ -58,6 +59,8 @@ class ListNfces extends ListRecords
     public string $chaveFilter = '';
 
     public string $chaveFilterApplied = '';
+
+    public bool $nfceRegularizacaoOpen = false;
 
     public function mount(): void
     {
@@ -129,7 +132,7 @@ class ListNfces extends ListRecords
                 'F6' => ['method' => 'imprimirNfce'],
                 'F7' => ['method' => 'printNfceRelatorio'],
                 'F8' => ['method' => 'openNfceClienteEmailModal'],
-                'F9' => ['method' => 'modulePending', 'params' => ['Agrupar']],
+                'F9' => ['method' => 'openNfceRegularizacao'],
                 'F11' => ['method' => 'openNfceContadorEmailModal'],
             ],
         ];
@@ -321,7 +324,23 @@ class ListNfces extends ListRecords
                 View::make('filament.components.erp.nfce.fiscal-progress'),
                 View::make('filament.components.erp.nfce.email-contador-modal'),
                 View::make('filament.components.erp.nfce.email-cliente-modal'),
+                View::make('filament.components.erp.nfce.regularizacao-host'),
             ]);
+    }
+
+    public function openNfceRegularizacao(): void
+    {
+        $this->nfceRegularizacaoOpen = true;
+    }
+
+    #[On('erp-nfce-regularizacao-fechar')]
+    public function closeNfceRegularizacao(bool $houveEmissao = false): void
+    {
+        $this->nfceRegularizacaoOpen = false;
+
+        if ($houveEmissao) {
+            $this->resetTable();
+        }
     }
 
     public function setStatusFilter(string $filter): void

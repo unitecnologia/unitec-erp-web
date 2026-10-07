@@ -194,10 +194,10 @@ class Venda extends Model
     public function temOrigemPdv(): bool
     {
         if ($this->relationLoaded('pdvVenda')) {
-            return $this->pdvVenda !== null;
+            return $this->pdvVenda !== null && ! $this->pdvVenda->isRegularizacaoFiscal();
         }
 
-        return $this->pdvVenda()->exists();
+        return $this->pdvVenda()->comercial()->exists();
     }
 
     /**

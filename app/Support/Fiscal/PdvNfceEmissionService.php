@@ -9,6 +9,7 @@ use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\TerminalResolver;
+use Carbon\CarbonInterface;
 use Unitec\FiscalEngine\Dto\EmitirNfceRequest;
 use Unitec\FiscalEngine\Dto\EmitirNfceResponse;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
@@ -24,6 +25,8 @@ final class PdvNfceEmissionService
 
     /**
      * @param  (callable(int, string): void)|null  $onProgress
+     * @param  CarbonInterface|null  $dataEmissao  dhEmi; padrão = fechamento da venda
+     * @param  bool  $permitirContingencia  false: SEFAZ indisponível vira erro (sem NFC-e offline)
      */
     public function emitir(
         PdvVenda $venda,
@@ -31,6 +34,8 @@ final class PdvNfceEmissionService
         VendasParametro $parametros,
         string $operacao,
         ?callable $onProgress = null,
+        ?CarbonInterface $dataEmissao = null,
+        bool $permitirContingencia = true,
     ): PdvVendaNfce {
         CaBundleResolver::setProjectRoot(base_path());
 
@@ -49,6 +54,7 @@ final class PdvNfceEmissionService
             $operacao,
             $numeroNfce,
             serieNfce: $serieNfce,
+            dataEmissao: $dataEmissao,
         );
 
         $prepared = null;
@@ -74,9 +80,9 @@ final class PdvNfceEmissionService
 
             FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_AUTORIZACAO, 'nfce');
 
-            return $this->persistirAutorizada($venda, $empresa, $operacao, $response, $parametros);
+            return $this->persistirAutorizada($venda, $empresa, $operacao, $response, $parametros, $dataEmissao);
         } catch (FiscalEngineException $exception) {
-            if (NfceFiscalComunicacao::isIndisponivel($exception)) {
+            if ($permitirContingencia && NfceFiscalComunicacao::isIndisponivel($exception)) {
                 return $this->emitirContingencia(
                     venda: $venda,
                     empresa: $empresa,
@@ -98,6 +104,7 @@ final class PdvNfceEmissionService
                     $prepared,
                     $parametros,
                     $exception,
+                    $dataEmissao,
                 );
             }
 
@@ -226,6 +233,7 @@ final class PdvNfceEmissionService
         string $operacao,
         EmitirNfceResponse $response,
         VendasParametro $parametros,
+        ?CarbonInterface $dataEmissao = null,
     ): PdvVendaNfce {
         $ambiente = NfceFiscalCertificateResolver::ambienteNfce($parametros);
 
@@ -245,7 +253,7 @@ final class PdvNfceEmissionService
             'simulada' => false,
             'qr_code_conteudo' => $response->qrCodeUrl,
             'xml' => $response->xml,
-            'autorizada_em' => $venda->fechado_em ?? now(),
+            'autorizada_em' => $dataEmissao ?? $venda->fechado_em ?? now(),
         ]);
 
         (new ContadorCloudPortalHookService())->onNfceAutorizada($nfce, $empresa);
@@ -264,6 +272,7 @@ final class PdvNfceEmissionService
         array $prepared,
         VendasParametro $parametros,
         FiscalEngineException $exception,
+        ?CarbonInterface $dataEmissao = null,
     ): PdvVendaNfce {
         $ambiente = NfceFiscalCertificateResolver::ambienteNfce($parametros);
         $motivo = trim(
@@ -290,7 +299,7 @@ final class PdvNfceEmissionService
             'qr_code_conteudo' => $prepared['qrUrl'],
             'xml' => $prepared['nfeXml'],
             'motivo_rejeicao' => $motivo,
-            'autorizada_em' => $venda->fechado_em ?? now(),
+            'autorizada_em' => $dataEmissao ?? $venda->fechado_em ?? now(),
         ]);
     }
 

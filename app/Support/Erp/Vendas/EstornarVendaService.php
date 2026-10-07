@@ -105,7 +105,7 @@ final class EstornarVendaService
             return $this->estornarForcaVendas($venda, $motivo, $origem, $aoAvancar);
         }
 
-        if ($venda->pdvVenda !== null) {
+        if ($venda->pdvVenda !== null && ! $venda->pdvVenda->isRegularizacaoFiscal()) {
             return $this->estornarPdv(
                 $venda->pdvVenda,
                 $venda,
@@ -148,6 +148,10 @@ final class EstornarVendaService
                 alreadyCancelled: true,
                 plataforma: Venda::PLATAFORMA_PDV,
             );
+        }
+
+        if ($pdvVenda->isRegularizacaoFiscal()) {
+            return $this->cancelarNfceRegularizacao($pdvVenda, $motivo, $origem, $empresa);
         }
 
         $venda = $pdvVenda->venda;
@@ -611,6 +615,56 @@ final class EstornarVendaService
         }
 
         return null;
+    }
+
+    /**
+     * NFC-e de regularização: a venda comercial pertence à origem (Tela de Venda, Força de Vendas…).
+     * Cancela só o documento fiscal; a venda volta para a pendência de regularização.
+     *
+     * @throws DomainException
+     * @throws FiscalEngineException
+     */
+    private function cancelarNfceRegularizacao(
+        PdvVenda $pdvVenda,
+        string $motivo,
+        string $origem,
+        ?Empresa $empresa,
+    ): EstornarVendaResult {
+        $nfce = $pdvVenda->nfce;
+
+        if ($nfce === null) {
+            throw new DomainException('NFC-e não encontrada para esta venda.');
+        }
+
+        $empresa ??= $this->resolveEmpresa($nfce);
+
+        if ($empresa === null) {
+            throw new DomainException('Empresa não configurada para cancelamento fiscal.');
+        }
+
+        $nfce = $this->nfceCancelamentoService->cancelar($pdvVenda, $empresa, $motivo);
+        $protocolo = filled($nfce->protocolo_cancelamento) ? (string) $nfce->protocolo_cancelamento : null;
+        $venda = $pdvVenda->venda_id ? Venda::query()->find($pdvVenda->venda_id) : null;
+
+        if ($venda !== null) {
+            $this->registrarLog(
+                $venda,
+                $pdvVenda,
+                $motivo,
+                $origem,
+                $protocolo,
+                'ok',
+                'Cancelamento só fiscal (NFC-e de regularização). Venda, estoque e financeiro mantidos.',
+            );
+        }
+
+        return new EstornarVendaResult(
+            vendaId: (int) ($pdvVenda->venda_id ?? 0),
+            pdvVendaId: (int) $pdvVenda->id,
+            protocoloCancelamento: $protocolo,
+            plataforma: (string) ($venda?->plataforma ?? Venda::PLATAFORMA_ERP),
+            somenteFiscal: true,
+        );
     }
 
     private function numeroVendaAmigavel(Venda $venda, ?PdvVenda $pdvVenda = null): string

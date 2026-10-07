@@ -33,6 +33,7 @@ final class PdvNfceFiscalPayloadBuilder
         ?string $justificativaContingencia = null,
         ?\DateTimeInterface $dataContingencia = null,
         ?int $serieNfce = null,
+        ?\Carbon\CarbonInterface $dataEmissao = null,
     ): EmitirNfceRequest {
         $this->validarPreRequisitos($empresa, $parametros, $operacao);
 
@@ -49,7 +50,7 @@ final class PdvNfceFiscalPayloadBuilder
         $cNf = $cNfFixo ?? random_int(1, 99999999);
         // O banco conserva o instante em UTC; o XML fiscal exige data/hora local
         // e offset do estabelecimento para dhEmi/chave de acesso.
-        $emissao = ErpTimezone::toLocal($venda->fechado_em ?? now());
+        $emissao = ErpTimezone::toLocal($dataEmissao ?? $venda->fechado_em ?? now());
         $justificativa = $tpEmis === 9
             ? NfceContingenciaJustificativa::normalize($justificativaContingencia)
             : null;

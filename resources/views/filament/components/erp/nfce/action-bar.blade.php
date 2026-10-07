@@ -41,9 +41,15 @@
         <span class="erp-nfe-actions__icon">✉</span>
         <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Email</span>
     </button>
-    <button type="button" class="erp-nfe-actions__btn" disabled title="Em breve">
+    <button
+        type="button"
+        wire:click="openNfceRegularizacao"
+        class="erp-nfe-actions__btn"
+        data-erp-key="F9"
+        title="Regularização Fiscal — Vendas sem NFC-e/NF-e"
+    >
         <span class="erp-nfe-actions__icon">🗂</span>
-        <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Agrupar</span>
+        <span class="erp-nfe-actions__label"><kbd>F9</kbd> | Regularizar</span>
     </button>
     <button type="button" wire:click="openNfceContadorEmailModal" class="erp-nfe-actions__btn" data-erp-key="F11">
         <span class="erp-nfe-actions__icon">📄</span>

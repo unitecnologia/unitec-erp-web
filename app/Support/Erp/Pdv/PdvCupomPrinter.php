@@ -9,6 +9,7 @@ final class PdvCupomPrinter
     public static function findPdvVendaIdForVenda(int $vendaId): ?int
     {
         $id = PdvVenda::query()
+            ->comercial()
             ->where('venda_id', $vendaId)
             ->where('situacao', '!=', 'C')
             ->value('id');

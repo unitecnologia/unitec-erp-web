@@ -162,6 +162,9 @@ final class VendasPorFormaPagamentoAggregator
             ->whereDate('vendas.data', '>=', $de)
             ->whereDate('vendas.data', '<=', $ate)
             ->whereNotNull('pdv_vendas.venda_id')
+            ->where(function ($o): void {
+                $o->whereNull('pdv_vendas.origem')->orWhere('pdv_vendas.origem', '!=', PdvVenda::ORIGEM_REGULARIZACAO_FISCAL);
+            })
             ->where('pdv_venda_pagamentos.valor', '>', 0);
 
         ErpEmpresaScopeFilter::applyColumn($query, 'vendas', $empresaScope);
@@ -221,7 +224,10 @@ final class VendasPorFormaPagamentoAggregator
                 $exists->selectRaw('1')
                     ->from('pdv_vendas')
                     ->join('pdv_venda_pagamentos', 'pdv_venda_pagamentos.pdv_venda_id', '=', 'pdv_vendas.id')
-                    ->whereColumn('pdv_vendas.venda_id', 'vendas.id');
+                    ->whereColumn('pdv_vendas.venda_id', 'vendas.id')
+                    ->where(function ($o): void {
+                        $o->whereNull('pdv_vendas.origem')->orWhere('pdv_vendas.origem', '!=', PdvVenda::ORIGEM_REGULARIZACAO_FISCAL);
+                    });
             });
         }
 

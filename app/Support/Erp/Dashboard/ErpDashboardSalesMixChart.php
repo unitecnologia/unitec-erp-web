@@ -68,6 +68,7 @@ final class ErpDashboardSalesMixChart
         }
 
         $q = PdvVenda::query()
+            ->comercial()
             ->where('situacao', '!=', 'C')
             ->where(function ($query) use ($from, $to): void {
                 $query->where(function ($fechamento) use ($from, $to): void {

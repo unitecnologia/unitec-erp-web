@@ -142,7 +142,7 @@ final class ExpedicaoService
             return Entrega::ORIGEM_VI;
         }
 
-        if (PdvVenda::query()->where('venda_id', $venda->id)->exists()) {
+        if (PdvVenda::query()->comercial()->where('venda_id', $venda->id)->exists()) {
             return Entrega::ORIGEM_PDV;
         }
 
