@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'ordem_servico_id', 'codigo_legado', 'funcionario_id', 'product_id', 'usuario_id', 'empresa_id',
-    'tipo', 'situacao', 'discriminacao',
+    'tipo', 'situacao', 'discriminacao', 'servico_prestado',
     'data_inicio', 'hora_inicio', 'data_termino', 'hora_termino',
     'qtd', 'preco', 'desconto', 'acrescimo', 'total',
     'cor', 'tamanho', 'detalhe', 'nome', 'numero', 'grade_legado',

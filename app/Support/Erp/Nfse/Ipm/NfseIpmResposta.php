@@ -14,6 +14,14 @@ final class NfseIpmResposta
     public const CODIGO_MODO_TESTE = 'L1079';
 
     /**
+     * @var array<string, string>
+     */
+    private const DICAS = [
+        'L1024' => 'No ERP: preencha "Cód. municipal" no cadastro do serviço (Produtos › Serviço) com o código da atividade do portal IPM (Escrita Fiscal › Consultas › Atividade) e transmita de novo.',
+        'L1003' => 'No ERP: confira o "Cód. municipal" e o "Cód. tributação nacional" do serviço. Eles devem corresponder a uma atividade do portal IPM (Escrita Fiscal › Consultas › Atividade); se a atividade não estiver vinculada ao subitem da lista, a prefeitura precisa autorizar.',
+    ];
+
+    /**
      * @param  list<array{codigo: string, descricao: string}>  $erros
      * @param  list<string>  $alertas
      */
@@ -195,6 +203,10 @@ final class NfseIpmResposta
             $mensagem = self::filho($no, 'Mensagem');
             $correcao = self::filho($no, 'Correcao');
             $descricao = trim($mensagem.($correcao !== '' ? ' '.$correcao : ''));
+
+            if (! $alertas && isset(self::DICAS[$codigo])) {
+                $descricao = trim($descricao.' '.self::DICAS[$codigo]);
+            }
 
             if ($codigo === '' && $descricao === '') {
                 continue;

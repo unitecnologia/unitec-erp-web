@@ -205,16 +205,15 @@ class NfseDpsXmlGerador
      */
     private function servico(DOMDocument $doc, array $dps): ?DOMElement
     {
-        $servicos = $dps['servicos'] ?? [];
+        $item = $this->servicoUnico($dps['servicos'] ?? []);
 
-        if (! is_array($servicos) || count($servicos) !== 1 || ! is_array($servicos[0])) {
+        if ($item === null) {
             return null;
         }
 
-        $item = $servicos[0];
         $municipio = $this->digitos($dps['municipio_prestacao']['codigo'] ?? null, 7);
         $nacional = $this->digitos($item['cTribNac'] ?? null, 6);
-        $descricao = $this->texto($item['descricao'] ?? null);
+        $descricao = $this->descricaoServico($item['descricao'] ?? null, $dps['discriminacao'] ?? null);
 
         if ($municipio === null && $nacional === null && $descricao === null) {
             return null;
@@ -244,6 +243,88 @@ class NfseDpsXmlGerador
         }
 
         return $serv->childNodes->length > 0 ? $serv : null;
+    }
+
+    /**
+     * A DPS tem um único cServ: vários itens só viram um serviço se tiverem os mesmos códigos e nenhum for obra.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function servicoUnico(mixed $servicos): ?array
+    {
+        if (! is_array($servicos) || $servicos === []) {
+            return null;
+        }
+
+        $servicos = array_values($servicos);
+
+        foreach ($servicos as $servico) {
+            if (! is_array($servico)) {
+                return null;
+            }
+        }
+
+        if (count($servicos) === 1) {
+            return $servicos[0];
+        }
+
+        if (self::codigosDistintos($servicos) > 1) {
+            return null;
+        }
+
+        foreach ($servicos as $servico) {
+            if (isset($servico['obra'])) {
+                return null;
+            }
+        }
+
+        $descricoes = array_values(array_filter(array_map(
+            fn (array $servico): ?string => $this->texto($servico['descricao'] ?? null),
+            $servicos,
+        )));
+
+        return [...$servicos[0], 'descricao' => $descricoes === [] ? null : implode(' | ', $descricoes)];
+    }
+
+    /**
+     * @param  iterable<array<string, mixed>>  $servicos
+     */
+    public static function codigosDistintos(iterable $servicos): int
+    {
+        $codigos = [];
+
+        foreach ($servicos as $servico) {
+            $codigos[] = implode('|', [
+                preg_replace('/\D/', '', (string) ($servico['cTribNac'] ?? '')),
+                preg_replace('/\D/', '', (string) ($servico['cNBS'] ?? '')),
+                preg_replace('/\D/', '', (string) ($servico['cTribMun'] ?? '')),
+                trim((string) ($servico['cIndOp'] ?? '')),
+            ]);
+        }
+
+        return count(array_unique($codigos));
+    }
+
+    /**
+     * xDescServ (TSDesc2000) só aceita caracteres de espaço a ÿ: sem quebra de linha e até 2000 caracteres.
+     */
+    private function descricaoServico(mixed $descricao, mixed $discriminacao): ?string
+    {
+        $partes = array_values(array_filter([
+            $this->texto($descricao),
+            $this->texto($discriminacao),
+        ]));
+
+        if ($partes === []) {
+            return null;
+        }
+
+        $texto = preg_replace('/\s*\R+\s*/u', ' | ', implode("\n", $partes)) ?? '';
+        $texto = strtr($texto, ['—' => '-', '–' => '-', '“' => '"', '”' => '"', '‘' => "'", '’' => "'", '…' => '...']);
+        $texto = preg_replace('/[^\x{20}-\x{FF}]/u', '', $texto) ?? '';
+        $texto = trim(preg_replace('/ {2,}/', ' ', $texto) ?? '');
+
+        return $texto === '' ? null : mb_substr($texto, 0, 2000);
     }
 
     /**
@@ -320,9 +401,29 @@ class NfseDpsXmlGerador
         $prestado = $doc->createElementNS(self::NS, 'vServPrest');
         $this->campo($doc, $prestado, 'vServ', $servico);
         $no->appendChild($prestado);
+        $this->anexarDesconto($doc, $no, $valores);
         $this->anexarTrib($doc, $no, $valores);
 
         return $no;
+    }
+
+    /**
+     * TCVDescCondIncond: vServ continua bruto e o desconto da nota (itens + geral) vai como incondicionado;
+     * a Sefin calcula a base do ISSQN como vServ - vDescIncond.
+     *
+     * @param  array<string, mixed>  $valores
+     */
+    private function anexarDesconto(DOMDocument $doc, DOMElement $valoresNo, array $valores): void
+    {
+        $desconto = $this->texto($valores['desconto'] ?? null);
+
+        if ($desconto === null || ! is_numeric($desconto) || bccomp($desconto, '0', 2) !== 1) {
+            return;
+        }
+
+        $grupo = $doc->createElementNS(self::NS, 'vDescCondIncond');
+        $this->campo($doc, $grupo, 'vDescIncond', bcadd($desconto, '0', 2));
+        $valoresNo->appendChild($grupo);
     }
 
     /**

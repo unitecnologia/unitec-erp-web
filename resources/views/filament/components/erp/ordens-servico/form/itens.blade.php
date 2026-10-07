@@ -219,12 +219,16 @@
                                         title="{{ $item['discriminacao'] ?? '' }}"
                                     >{{ $item['discriminacao'] ?? '' }}</div>
                                     @if ($this->activeItemTab === 'servicos' && ! $readOnly)
+                                        @php($temServicoPrestado = trim((string) ($item['servico_prestado'] ?? '')) !== '')
                                         <button
                                             type="button"
-                                            class="erp-os-itens__desc-edit"
-                                            wire:click.stop="abrirModalServicoPrestado"
-                                            title="Serviços prestados (impressão / app)"
-                                            aria-label="Editar serviços prestados"
+                                            @class([
+                                                'erp-os-itens__desc-edit',
+                                                'erp-os-itens__desc-edit--filled' => $temServicoPrestado,
+                                            ])
+                                            wire:click.stop="abrirModalServicoPrestado({{ $index }})"
+                                            title="{{ $temServicoPrestado ? $item['servico_prestado'] : 'Descrever o serviço prestado' }}"
+                                            aria-label="Descrever o serviço prestado"
                                         >
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                                                 <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/>

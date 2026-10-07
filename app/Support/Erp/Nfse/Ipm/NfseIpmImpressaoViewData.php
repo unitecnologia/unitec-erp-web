@@ -4,10 +4,12 @@ namespace App\Support\Erp\Nfse\Ipm;
 
 use App\Models\Empresa;
 use App\Models\Nfse;
+use App\Models\NfseCodigoMunicipal;
 use App\Models\NfseItem;
 use App\Models\Person;
 use App\Support\Erp\Fiscal\IbptLookupService;
 use App\Support\Erp\Nfse\NfseImpressao;
+use App\Support\Erp\Nfse\NfsePagamentosOs;
 use App\Support\Erp\Nfse\NfseRegimeTributario;
 use BaconQrCode\Renderer\GDLibRenderer;
 use BaconQrCode\Writer;
@@ -55,8 +57,14 @@ final class NfseIpmImpressaoViewData
         $codigoServico = self::digitos($item?->c_trib_nac);
         $nbs = self::digitos($item?->c_nbs);
         $simples = self::optanteSimples($empresa);
-        $valorServicos = self::numero($nfse->valor_servicos);
-        $desconto = self::numero($nfse->desconto);
+        $valorXml = self::tag($xmlNfse, 'ValorServicos') ?? self::tag($xmlDps, 'ValorServicos');
+        if ($valorXml !== null) {
+            $valorServicos = self::numero($valorXml);
+            $desconto = self::numero(self::tag($xmlNfse, 'DescontoIncondicionado') ?? self::tag($xmlDps, 'DescontoIncondicionado'));
+        } else {
+            $valorServicos = self::numero(NfseIpmXmlGerador::valorServicosLiquido($nfse));
+            $desconto = 0.0;
+        }
         $deducao = self::numero(self::tag($xmlNfse, 'ValorDeducoes') ?? self::tag($xmlDps, 'ValorDeducoes') ?? '0');
         $issOficial = self::tagPai($xmlNfse, 'ValorIss', ['ValoresNfse']);
         $iss = self::numero($issOficial ?? $nfse->iss);
@@ -135,8 +143,11 @@ final class NfseIpmImpressaoViewData
             'autoPrint' => $autoPrint,
             'embedded' => $embedded,
             'espelho' => false,
-            'impressao_view' => NfseImpressao::VIEW_IPM,
+            'impressao_view' => $nfse->status === Nfse::STATUS_CANCELADA
+                ? NfseImpressao::VIEW_IPM_CANCELAMENTO
+                : NfseImpressao::VIEW_IPM,
             'ipm' => [
+                'cancelamento' => self::cancelamento($nfse),
                 'espelho' => false,
                 'homologacao' => trim((string) $nfse->tipo_ambiente) === '2',
                 'cancelada' => $nfse->status === Nfse::STATUS_CANCELADA,
@@ -168,6 +179,7 @@ final class NfseIpmImpressaoViewData
                 'natureza' => self::natureza((string) $nfse->trib_issqn),
                 'nbs' => self::linhaNbs($nbs, $nbsDescricao),
                 'descricao' => self::descricoes($nfse),
+                'pagamentos' => self::pagamentos($nfse),
                 'valor_total' => self::moeda($valorServicos),
                 'base_calculo' => $textoBase,
                 'issqn' => $textoIss,
@@ -184,12 +196,14 @@ final class NfseIpmImpressaoViewData
                 'cei' => $cei,
                 'lc116' => self::linhaLc(ltrim($codigoServico, '0') ?: $codigoServico, $lc),
                 'atividade' => $atividade,
+                'atividade_municipal' => self::linhaAtividadeMunicipal(
+                    self::tag($xmlNfse, 'CodigoTributacaoMunicipio') ?? self::tag($xmlDps, 'CodigoTributacaoMunicipio') ?? $item?->c_trib_mun,
+                ),
                 'legenda_local' => $municipioLocal !== null
                     ? $municipioLocal['siafi'].' - '.$municipioLocal['nome']
                     : self::legendaLocal($localCodigo, $localNome, $localUf),
                 'tributacao' => self::tributacao(ltrim($codigoServico, '0') ?: $codigoServico, $mesmoMunicipio, $localNome, $localUf, $municipioLocal),
                 'outras' => self::outras($empresa, $nfse, $municipioPrestador, $mesmoMunicipio, $simples, $retido, $valorServicos, $pis, $cofins, $nbs !== '' ? $nbs : $codigoServico, $consulta, $outrasOficial),
-                'observacoes' => self::observacoes($nfse),
                 'responsavel' => self::texto($empresa?->razao_social ?: $empresa?->nome, ''),
             ],
         ];
@@ -385,13 +399,50 @@ final class NfseIpmImpressaoViewData
             if (! $item instanceof NfseItem) {
                 continue;
             }
-            $texto = trim((string) $item->descricao);
+            $texto = trim($item->descricaoComServicoPrestado());
             if ($texto !== '') {
                 $partes[] = $texto;
             }
         }
 
+        $complemento = trim((string) $nfse->discriminacao);
+        if ($complemento !== '') {
+            $partes[] = $complemento;
+        }
+
         return $partes !== [] ? implode("\n", $partes) : self::NAO_INFORMADO;
+    }
+
+    /**
+     * @return array{usuario: string, data_hora: string, motivo: string}|null
+     */
+    private static function cancelamento(Nfse $nfse): ?array
+    {
+        if ($nfse->status !== Nfse::STATUS_CANCELADA) {
+            return null;
+        }
+
+        $codigo = trim((string) ($nfse->cancelamento_codigo ?? ''));
+
+        return [
+            'usuario' => self::texto($nfse->cancelada_por, '-'),
+            'data_hora' => $nfse->cancelada_em instanceof \DateTimeInterface
+                ? \App\Support\Erp\ErpTimezone::toLocal($nfse->cancelada_em)->format('d/m/Y H:i')
+                : '-',
+            'motivo' => Nfse::motivosCancelamento()[$codigo] ?? '-',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function pagamentos(Nfse $nfse): array
+    {
+        try {
+            return NfsePagamentosOs::linhasImpressao($nfse);
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     private static function linhaLc(string $codigo, ?string $descricao): string
@@ -401,6 +452,19 @@ final class NfseIpmImpressaoViewData
         }
 
         return $descricao !== null && $descricao !== '' ? $codigo.' - '.$descricao : $codigo;
+    }
+
+    private static function linhaAtividadeMunicipal(?string $codigo): ?string
+    {
+        $codigo = NfseCodigoMunicipal::normalizarCodigo((string) $codigo);
+
+        if ($codigo === '') {
+            return null;
+        }
+
+        $descricao = trim((string) NfseCodigoMunicipal::query()->where('codigo', $codigo)->value('descricao'));
+
+        return $descricao !== '' ? $codigo.' - '.$descricao : $codigo;
     }
 
     private static function linhaNbs(string $nbs, ?string $descricao): string
@@ -433,23 +497,6 @@ final class NfseIpmImpressaoViewData
         }
 
         return $lugar !== '' ? $lugar : self::NAO_INFORMADO;
-    }
-
-    private static function observacoes(Nfse $nfse): string
-    {
-        if (! filled($nfse->ordem_servico_id)) {
-            return self::NAO_INFORMADO;
-        }
-
-        try {
-            $nfse->loadMissing('ordemServico');
-        } catch (Throwable) {
-            return self::NAO_INFORMADO;
-        }
-
-        $texto = trim((string) ($nfse->ordemServico?->observacoes ?? ''));
-
-        return $texto !== '' ? $texto : self::NAO_INFORMADO;
     }
 
     /**
@@ -528,11 +575,6 @@ final class NfseIpmImpressaoViewData
 
         $paragrafos[] = "Valor do PIS Devido: R$".self::moeda($pis)."\nValor do COFINS Devido: R$".self::moeda($cofins);
 
-        $observacoes = self::observacoes($nfse);
-        if ($observacoes !== self::NAO_INFORMADO) {
-            $paragrafos[] = 'Observações: '.$observacoes;
-        }
-
         return implode("\n\n", $paragrafos);
     }
 
@@ -576,7 +618,9 @@ final class NfseIpmImpressaoViewData
         }
 
         try {
-            $item = app(IbptLookupService::class)->findByNcm($nbs);
+            $item = strlen(self::digitos($nbs)) === 9
+                ? app(IbptLookupService::class)->findByNbs($nbs)
+                : app(IbptLookupService::class)->findByNcm($nbs);
         } catch (Throwable) {
             return null;
         }

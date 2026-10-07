@@ -14,6 +14,7 @@ use App\Support\Erp\WhatsApp\WhatsAppPhone;
 use App\Support\Erp\WhatsApp\WhatsAppSender;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -40,9 +41,12 @@ trait ManagesOrdemServicoEmailModal
 
     public string $emailMessage = '';
 
-    public ?string $emailSelectedAttachmentId = null;
-
-    /** @var list<array{id: string, name: string, path: string, display: string, owned?: bool}> */
+    /**
+     * Anexos deste envio. Locked: o × apaga a cópia temporária pelo `path`, que não pode vir do navegador.
+     *
+     * @var list<array{id: string, name: string, path: string, display: string, owned?: bool}>
+     */
+    #[Locked]
     public array $emailAttachments = [];
 
     public ?TemporaryUploadedFile $emailExtraUpload = null;
@@ -121,7 +125,6 @@ trait ManagesOrdemServicoEmailModal
 
         $this->emailOrdemId = $ordem->id;
         $this->emailAttachments = [];
-        $this->emailSelectedAttachmentId = null;
         $this->emailExtraUpload = null;
         $this->emailAttachmentsLoading = true;
         $this->emailModalOpen = true;
@@ -208,7 +211,6 @@ trait ManagesOrdemServicoEmailModal
             },
             $anexos,
         );
-        $this->emailSelectedAttachmentId = $this->emailAttachments[0]['id'] ?? null;
 
         if ($this->emailEnvioModo !== 'tecnica') {
             $this->emailSubject = $report->defaultEmailSubject($numero, $labels);
@@ -226,7 +228,6 @@ trait ManagesOrdemServicoEmailModal
         $this->emailSubject = '';
         $this->emailMessage = '';
         $this->emailExtraUpload = null;
-        $this->emailSelectedAttachmentId = null;
         $this->cleanupEmailAttachments();
         $this->js('window.__erpOsHideEmailModalShell && window.__erpOsHideEmailModalShell()');
     }
@@ -238,21 +239,6 @@ trait ManagesOrdemServicoEmailModal
         if ($clean !== $value) {
             $this->emailMessage = $clean;
         }
-    }
-
-    public function selectEmailAttachment(string $attachmentId): void
-    {
-        $this->emailSelectedAttachmentId = $attachmentId;
-    }
-
-    public function removeSelectedEmailAttachment(): void
-    {
-        if (blank($this->emailSelectedAttachmentId)) {
-            return;
-        }
-
-        $this->removeEmailAttachment($this->emailSelectedAttachmentId);
-        $this->emailSelectedAttachmentId = $this->emailAttachments[0]['id'] ?? null;
     }
 
     public function updatedEmailExtraUpload(): void
@@ -277,6 +263,10 @@ trait ManagesOrdemServicoEmailModal
 
     public function removeEmailAttachment(string $attachmentId): void
     {
+        if ($this->emailEnvioModo === 'tecnica') {
+            return;
+        }
+
         $remaining = [];
 
         foreach ($this->emailAttachments as $attachment) {
@@ -292,10 +282,6 @@ trait ManagesOrdemServicoEmailModal
         }
 
         $this->emailAttachments = $remaining;
-
-        if ($this->emailSelectedAttachmentId === $attachmentId) {
-            $this->emailSelectedAttachmentId = $this->emailAttachments[0]['id'] ?? null;
-        }
     }
 
     #[On('send-os-email')]

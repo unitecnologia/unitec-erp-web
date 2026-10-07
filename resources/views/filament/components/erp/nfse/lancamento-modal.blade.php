@@ -12,6 +12,7 @@
         @if ($this->nfseId && ! $this->nfseSomenteLeitura())
             wire:keydown.f3.window.prevent="transmitirNfse"
         @endif
+        x-on:erp-nfse-focus-equip.window="$nextTick(() => setTimeout(() => { const el = document.getElementById('os-placa'); if (! el) return; el.removeAttribute('readonly'); el.focus(); el.select?.(); }, 40))"
         x-data="{ mainTab: 'servicos', detailTab: 'totais' }"
         x-init="$nextTick(() => { setTimeout(() => { const el = document.getElementById('nfse-tomador-busca'); if (!el) return; el.focus(); el.select?.(); }, 40); })"
         @keydown.window="
@@ -38,8 +39,23 @@
             aria-labelledby="erp-nfse-lancamento-title"
         >
             <div class="erp-lookup-modal__titlebar erp-nfe-lancamento-modal__titlebar">
-                <span id="erp-nfse-lancamento-title">Emissão de NFS-e</span>
+                @php
+                    $nfseOsTitulo = $this->nfseOsNumerosImportadas();
+                @endphp
+                <span id="erp-nfse-lancamento-title">
+                    Emissão de NFS-e
+                    @if ($nfseOsTitulo !== [])
+                        <span class="erp-nfse-titulo-os">OS nº {{ implode(', ', $nfseOsTitulo) }}</span>
+                    @endif
+                </span>
                 <div class="erp-nfe-lancamento-modal__titlebar-badges">
+                    @php
+                        $nfseAmbiente = $this->nfseAmbienteBadge();
+                    @endphp
+                    <div
+                        class="erp-nfe-lancamento-modal__status-box erp-nfe-lancamento-modal__status-box--titlebar erp-nfe-lancamento-modal__status-box--{{ $nfseAmbiente['tipo'] }}"
+                        title="{{ $nfseAmbiente['dica'] }}"
+                    >{{ $nfseAmbiente['rotulo'] }}</div>
                     <div class="erp-nfe-lancamento-modal__status-box erp-nfe-lancamento-modal__status-box--titlebar">{{ $this->nfseStatusLabel() }}</div>
                 </div>
                 <button
@@ -388,9 +404,38 @@
                                                 {{ $linha['codigo'] }}
                                             </div>
                                         </td>
+                                        @php
+                                            $servicoPrestado = trim((string) ($linha['servico_prestado'] ?? ''));
+                                            $prestadoTravado = $this->nfseServicoPrestadoSomenteLeitura($index);
+                                        @endphp
                                         <td class="erp-nfse-servicos-grid__desc">
-                                            <div class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--readonly erp-nfe-lancamento-modal__cell-input--desc" title="{{ $linha['descricao'] }}">
-                                                {{ $linha['descricao'] }}
+                                            <div class="erp-nfse-servicos-grid__desc-cell">
+                                                <div class="erp-nfe-lancamento-modal__cell-input erp-nfe-lancamento-modal__cell-input--readonly erp-nfe-lancamento-modal__cell-input--desc" title="{{ $linha['descricao'] }}">
+                                                    {{ $linha['descricao'] }}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    @class([
+                                                        'erp-nfse-servicos-grid__desc-edit',
+                                                        'erp-nfse-servicos-grid__desc-edit--filled' => $servicoPrestado !== '',
+                                                        'erp-nfse-servicos-grid__desc-edit--locked' => $prestadoTravado,
+                                                    ])
+                                                    wire:click.stop="abrirNfseServicoPrestado({{ $index }})"
+                                                    title="{{ $servicoPrestado !== '' ? $servicoPrestado : ($prestadoTravado ? 'Sem serviço prestado' : 'Descrever o serviço prestado') }}"
+                                                    aria-label="{{ $prestadoTravado ? 'Ver serviço prestado' : 'Descrever o serviço prestado' }}"
+                                                >
+                                                    @if ($prestadoTravado)
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/>
+                                                            <circle cx="12" cy="12" r="3"/>
+                                                        </svg>
+                                                    @else
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                            <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/>
+                                                            <path d="M13.5 6.5l3 3"/>
+                                                        </svg>
+                                                    @endif
+                                                </button>
                                             </div>
                                         </td>
                                         <td>
@@ -527,22 +572,38 @@
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__panel" x-show="mainTab === 'pagamento'" x-cloak>
+                    @php
+                        $nfsePagamentosOs = $this->nfsePagamentosOs;
+                    @endphp
                     <div class="erp-lookup-modal__grid-wrap erp-nfe-lancamento-modal__grid-wrap">
-                        <table class="erp-lookup-modal__grid erp-nfe-lancamento-modal__grid">
+                        <table class="erp-lookup-modal__grid erp-nfe-lancamento-modal__grid erp-nfse-pagamentos-grid">
                             <thead>
                                 <tr>
+                                    <th>OS</th>
+                                    <th>Forma de pagamento</th>
                                     <th>Parcela</th>
                                     <th>Vencimento</th>
-                                    <th class="erp-nfe-lancamento-modal__num">Valor</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td colspan="3" class="erp-lookup-modal__empty">Nenhuma parcela.</td>
-                                </tr>
+                                @forelse ($nfsePagamentosOs['linhas'] as $pagamento)
+                                    <tr class="erp-nfe-lancamento-modal__row">
+                                        <td>{{ $pagamento['os'] }}</td>
+                                        <td>{{ $pagamento['forma'] }}</td>
+                                        <td>{{ $pagamento['parcela'] }}</td>
+                                        <td>{{ $pagamento['vencimento'] }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="erp-lookup-modal__empty">Nenhuma parcela.</td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
+                    @foreach ($nfsePagamentosOs['avisos'] as $aviso)
+                        <p class="erp-nfse-pagamentos-aviso">{{ $aviso }}</p>
+                    @endforeach
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__section-tabs erp-nfe-lancamento-modal__section-tabs--detail" role="tablist" aria-label="Abas de detalhes">
@@ -550,6 +611,24 @@
                     <button type="button" role="tab" class="erp-nfe-tab-btn erp-nfe-lancamento-modal__section-tab" :class="{ 'erp-nfe-tab-btn--active': detailTab === 'discriminacao', 'erp-nfe-lancamento-modal__section-tab--active': detailTab === 'discriminacao' }" :aria-selected="detailTab === 'discriminacao' ? 'true' : 'false'" @click="detailTab = 'discriminacao'">Discriminação</button>
                     <button type="button" role="tab" class="erp-nfe-tab-btn erp-nfe-lancamento-modal__section-tab" :class="{ 'erp-nfe-tab-btn--active': detailTab === 'iss', 'erp-nfe-lancamento-modal__section-tab--active': detailTab === 'iss' }" :aria-selected="detailTab === 'iss' ? 'true' : 'false'" @click="detailTab = 'iss'">ISS</button>
                     <button type="button" role="tab" class="erp-nfe-tab-btn erp-nfe-lancamento-modal__section-tab" :class="{ 'erp-nfe-tab-btn--active': detailTab === 'observacoes', 'erp-nfe-lancamento-modal__section-tab--active': detailTab === 'observacoes' }" :aria-selected="detailTab === 'observacoes' ? 'true' : 'false'" @click="detailTab = 'observacoes'">Observações</button>
+                    @if ($this->nfseMostraEquipamento())
+                        <button
+                            type="button"
+                            @class([
+                                'erp-nfe-tab-btn erp-nfe-lancamento-modal__section-tab erp-nfse-equip-tab',
+                                'erp-nfse-equip-tab--preenchido' => $this->nfseTemEquipamento(),
+                            ])
+                            wire:click="abrirNfseEquipamento"
+                            title="Equipamento / veículo (mesmo cadastro da OS)"
+                        >
+                            Equipamento
+                            @if (filled(trim($this->placa)))
+                                <span class="erp-nfse-equip-tab__placa">{{ mb_strtoupper(trim($this->placa), 'UTF-8') }}</span>
+                            @elseif (filled(trim($this->descricao)))
+                                <span class="erp-nfse-equip-tab__placa">{{ \Illuminate\Support\Str::limit(trim($this->descricao), 24) }}</span>
+                            @endif
+                        </button>
+                    @endif
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--totais" x-show="detailTab === 'totais'" x-cloak>
@@ -577,7 +656,15 @@
 
                 <div class="erp-nfe-lancamento-modal__detail-panel erp-nfe-lancamento-modal__detail-panel--obs" x-show="detailTab === 'discriminacao'" x-cloak>
                     <label class="erp-nfe-lancamento-modal__form-label" for="nfse-discriminacao">Discriminação dos serviços</label>
-                    <textarea id="nfse-discriminacao" class="erp-nfe-lancamento-modal__textarea" rows="3" readonly tabindex="-1" aria-readonly="true"></textarea>
+                    <textarea
+                        id="nfse-discriminacao"
+                        class="erp-nfe-lancamento-modal__textarea"
+                        rows="3"
+                        maxlength="1500"
+                        autocomplete="off"
+                        wire:model="nfseDiscriminacao"
+                        @disabled($this->nfseSomenteLeitura())
+                    ></textarea>
                 </div>
 
                 <div class="erp-nfe-lancamento-modal__detail-panel" x-show="detailTab === 'iss'" x-cloak>
@@ -769,5 +856,7 @@
         @endif
 
         @include('filament.components.erp.nfse.lancamento-desconto-item')
+        @include('filament.components.erp.nfse.servico-prestado-modal')
+        @include('filament.components.erp.nfse.equipamento-modal')
     </div>
 @endif

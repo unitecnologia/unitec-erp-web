@@ -10,19 +10,22 @@
 
         <div class="erp-pdv-modal__window erp-os-servico-prestado-modal__window">
             <header class="erp-pdv-modal__header">
-                <h2 id="erp-os-servico-prestado-title">Serviços prestados</h2>
+                <h2 id="erp-os-servico-prestado-title">Serviço prestado</h2>
             </header>
 
             <div class="erp-pdv-modal__body">
                 <p class="erp-os-servico-prestado-modal__hint">
-                    Mesmo texto da impressão da OS e do campo enviado pelo app (serviço realizado).
+                    <strong>{{ $this->servicoPrestadoItemDescricao }}</strong><br>
+                    Sai na impressão da OS abaixo deste serviço e na discriminação da NFS-e.
                 </p>
                 <textarea
                     id="os-servico-prestado-modal-text"
-                    wire:model="laudo"
+                    wire:model="servicoPrestadoTexto"
+                    data-erp-uppercase
+                    x-init="window.ErpUppercase?.bindInput($el); $nextTick(() => { $el.removeAttribute('readonly'); $el.focus(); })"
                     class="erp-os-form-textarea erp-os-servico-prestado-modal__textarea"
                     rows="10"
-                    maxlength="10000"
+                    maxlength="2000"
                     placeholder="Descreva o serviço prestado..."
                 ></textarea>
             </div>

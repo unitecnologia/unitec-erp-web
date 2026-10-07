@@ -14,6 +14,24 @@ use Illuminate\Support\Facades\DB;
 class NfseGravarService
 {
     /**
+     * Mesmo snapshot de equipamento gravado no orçamento (veículo em os_veiculos).
+     *
+     * @var list<string>
+     */
+    private const CAMPOS_EQUIPAMENTO = [
+        'os_veiculo_id',
+        'numero_serie',
+        'descricao',
+        'descricao2',
+        'modelo',
+        'ano',
+        'placa',
+        'km',
+        'cor_veiculo',
+        'chassi_veiculo',
+    ];
+
+    /**
      * @param  array{
      *     tomador_id: int,
      *     tomador_nome: string,
@@ -36,6 +54,7 @@ class NfseGravarService
      *     trib_issqn: string,
      *     tp_ret_issqn: string,
      *     aliquota_iss?: ?string,
+     *     discriminacao?: ?string,
      *     valor_servicos: string,
      *     desconto: string,
      *     iss: string,
@@ -43,8 +62,10 @@ class NfseGravarService
      * }  $cabecalho
      * @param  list<array{
      *     product_id: ?int,
+     *     ordem_servico_id?: ?int,
      *     codigo: string,
      *     descricao: string,
+     *     servico_prestado?: ?string,
      *     unidade: ?string,
      *     quantidade: string,
      *     valor: string,
@@ -120,11 +141,17 @@ class NfseGravarService
                 'trib_issqn' => $cabecalho['trib_issqn'],
                 'tp_ret_issqn' => $cabecalho['tp_ret_issqn'],
                 'aliquota_iss' => $cabecalho['aliquota_iss'] ?? null,
+                'discriminacao' => $cabecalho['discriminacao'] ?? null,
                 'valor_servicos' => $cabecalho['valor_servicos'],
                 'desconto' => $cabecalho['desconto'] ?? '0.00',
                 'iss' => '0.00',
                 'total' => $cabecalho['total'],
             ]);
+
+            if (isset($cabecalho['equipamento']) && is_array($cabecalho['equipamento'])) {
+                $nfse->fill(array_intersect_key($cabecalho['equipamento'], array_flip(self::CAMPOS_EQUIPAMENTO)));
+            }
+
             $nfse->save();
 
             $nfse->itens()->delete();
@@ -149,10 +176,12 @@ class NfseGravarService
                 }
 
                 $nfse->itens()->create([
+                    'ordem_servico_id' => (int) ($item['ordem_servico_id'] ?? 0) > 0 ? (int) $item['ordem_servico_id'] : null,
                     'product_id' => $productId,
                     'ordem' => $indice + 1,
                     'codigo' => $item['codigo'],
                     'descricao' => $item['descricao'],
+                    'servico_prestado' => $this->textoFiscal($item['servico_prestado'] ?? null),
                     'unidade' => $item['unidade'],
                     'quantidade' => $item['quantidade'],
                     'valor' => $item['valor'],

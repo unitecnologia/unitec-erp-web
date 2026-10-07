@@ -2,9 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\OrdemServicoResource\Pages\Concerns\ManagesEquipamentoVeiculo;
 use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\OrdemServico;
+use App\Models\OsVeiculo;
+use App\Support\Erp\EmpresaModulos;
 use App\Models\Person;
 use App\Models\Product;
 use App\Support\Erp\CepLookupService;
@@ -19,6 +22,7 @@ use App\Support\Erp\MunicipioLookupService;
 use App\Support\Erp\Nfse\Ipm\NfseIpmImpressaoViewData;
 use App\Support\Erp\Nfse\NfseImpressao;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
+use App\Support\Erp\Nfse\NfseOsDiscriminacao;
 use App\Support\Erp\Nfse\NfseGravarService;
 use App\Support\Erp\Nfse\NfseNaoGravada;
 use App\Support\Erp\Nfse\NfseObra;
@@ -28,6 +32,7 @@ use App\Support\Erp\Nfse\Ipm\NfseIpmCliente;
 use App\Support\Erp\Nfse\Ipm\NfseIpmEmitirService;
 use App\Support\Erp\Nfse\NfseTransmissaoResultado;
 use App\Support\Erp\Nfse\NfseTransmitirService;
+use App\Support\Erp\Os\OrdemServicoRetorno;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -40,13 +45,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Js;
 use RuntimeException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 
 class NfsePage extends Page
 {
+    use Concerns\ManagesNfseCancelamento;
     use Concerns\ManagesNfseContadorEmail;
     use Concerns\ManagesNfseEspelhoModal;
     use Concerns\ManagesNfseImportOs;
+    use ManagesEquipamentoVeiculo;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
@@ -87,9 +95,13 @@ class NfsePage extends Page
 
     public ?int $nfseFiscalSucessoId = null;
 
-    public ?int $nfseFiscalSucessoOsId = null;
+    /** OS de origem quando a página foi aberta pela lista de OS (F7). */
+    #[Locked]
+    public ?int $nfseRetornoOsId = null;
 
-    public bool $nfseFiscalSucessoPodeGerarNfe = false;
+    /** Só depois de NFS-e autorizada desta OS o fechamento volta para a lista de OS. */
+    #[Locked]
+    public bool $nfseRetornoOsPronto = false;
 
     public ?string $nfseFiscalErroTitulo = null;
 
@@ -178,6 +190,12 @@ class NfsePage extends Page
 
     public string $nfseAliquotaIss = '';
 
+    public string $nfseDiscriminacao = '';
+
+    public ?int $osVeiculoId = null;
+
+    public bool $nfseEquipamentoModalOpen = false;
+
     public string $nfseMunicipioCodigo = '';
 
     public string $nfseMunicipioNome = '';
@@ -216,6 +234,10 @@ class NfsePage extends Page
     public string $nfseServicoCtribNac = '';
 
     public bool $nfseDescontoModalOpen = false;
+
+    public ?int $nfseServicoPrestadoIndex = null;
+
+    public string $nfseServicoPrestadoTexto = '';
 
     public ?string $nfseServicoAjusteAlvo = null;
 
@@ -280,8 +302,23 @@ class NfsePage extends Page
         $osId = (int) request()->query('os', 0);
 
         if ($osId > 0) {
+            if (OrdemServicoRetorno::solicitadoNaRequisicao()) {
+                $this->nfseRetornoOsId = $osId;
+            }
+
             $this->abrirNfseDaOrdemServico($osId);
         }
+    }
+
+    private function voltarParaOsAposEmissao(): bool
+    {
+        if (! $this->nfseRetornoOsPronto || ! $this->nfseRetornoOsId) {
+            return false;
+        }
+
+        $this->redirect(OrdemServicoRetorno::urlLista((int) $this->nfseRetornoOsId), navigate: false);
+
+        return true;
     }
 
     public function getHeading(): string|Htmlable|null
@@ -329,6 +366,7 @@ class NfsePage extends Page
                 View::make('filament.components.erp.nfse.espelho-modal'),
                 View::make('filament.components.erp.nfse.fiscal-overlays'),
                 View::make('filament.components.erp.nfse.enviar-modal'),
+                View::make('filament.components.erp.nfse.cancelar-modal'),
                 View::make('filament.components.erp.nfse.danfse-modal'),
                 View::make('filament.components.erp.nfse.email-contador-modal'),
             ]);
@@ -508,16 +546,17 @@ class NfsePage extends Page
             return;
         }
 
-        $existente = Nfse::query()
-            ->when($empresaId !== null, fn ($query) => $query->where('empresa_id', $empresaId))
-            ->where('ordem_servico_id', $ordem->id)
-            ->orderByDesc('id')
-            ->first();
+        $existente = NfseFromOrdemServico::nfseValida((int) $ordem->id, $empresaId);
 
         if ($existente !== null) {
             $this->resetNfseModalForm();
             $this->preencherNfseMunicipioDaEmpresa();
             $this->aplicarNfseGravada($existente);
+
+            if (! $this->nfseSomenteLeitura() && trim($this->nfseDiscriminacao) === '') {
+                $this->nfseDiscriminacao = NfseOsDiscriminacao::texto($ordem);
+            }
+
             $this->nfseModalOpen = true;
 
             return;
@@ -526,48 +565,14 @@ class NfsePage extends Page
         $this->resetNfseModalForm();
         $this->preencherNfseMunicipioDaEmpresa();
         $this->aplicarNfseTomadorSugestao($this->mapearNfseTomador($ordem->cliente));
-        $this->nfseServicos = [];
-        $seq = 0;
-
-        foreach (NfseFromOrdemServico::servicos($ordem) as $item) {
-            $produto = $item->product;
-
-            if ($produto === null) {
-                continue;
-            }
-
-            $quantidade = NfseFromOrdemServico::quantidade($item) ?? '0.000';
-            $valor = NfseFromOrdemServico::valor($item) ?? '0.00';
-            $total = $this->nfseMultiplicarDecimal($quantidade, $valor);
-            $seq++;
-
-            $this->nfseServicos[] = [
-                'key' => 'nfse-os-'.$ordem->id.'-'.$item->id,
-                'rev' => 0,
-                'product_id' => (int) $produto->id,
-                'codigo' => (string) ($produto->codigo ?? ''),
-                'descricao' => NfseFromOrdemServico::descricao($item),
-                'unidade' => (string) ($produto->unidade ?? ''),
-                'quantidade' => $this->nfseFormatarDecimal($quantidade, 3),
-                'valor' => $this->nfseFormatarDecimal($valor, 2),
-                'desconto' => '0,00',
-                'acrescimo' => '0,00',
-                'total' => $this->nfseFormatarDecimal($total, 2),
-                'total_decimal' => $total,
-                'c_trib_nac' => $produto->c_trib_nac,
-                'c_nbs' => $produto->c_nbs,
-                'c_trib_mun' => $produto->c_trib_mun,
-                'c_ind_op' => $produto->c_ind_op,
-                'os_id' => (int) $ordem->id,
-            ];
-            $this->sugerirAliquotaIssDoProduto((int) $produto->id);
-        }
-
-        $this->nfseServicoSeq = $seq;
+        $this->nfseServicos = $this->montarLinhasServicoDaOs($ordem);
+        $this->nfseServicoSeq = count($this->nfseServicos);
+        $this->nfseDiscriminacao = NfseOsDiscriminacao::texto($ordem);
         $this->nfseServicoLinhaIndex = $this->nfseServicos === [] ? null : 0;
         $this->nfseOsOrigemId = (int) $ordem->id;
         $laudo = trim((string) ($ordem->laudo ?? ''));
         $this->nfseOsLaudoPreservado = $laudo;
+        $this->aplicarEquipamentoDaOsNfse($ordem);
         $this->nfseModalOpen = true;
     }
 
@@ -642,14 +647,6 @@ class NfsePage extends Page
             return;
         }
 
-        if ($this->nfseAmbienteAtual() === NfseSefinAmbiente::Producao) {
-            $this->dispatch('erp-nfse-hide-fiscal-progress');
-            $this->nfseConfirmarProducao = true;
-            $this->js('window.__erpNfseShowOverlay && window.__erpNfseShowOverlay("erp-nfse-fiscal-confirma")');
-
-            return;
-        }
-
         $this->executarTransmissaoNfse();
     }
 
@@ -678,9 +675,13 @@ class NfsePage extends Page
     {
         $this->nfseFiscalSucessoDetalhe = null;
         $this->nfseFiscalSucessoId = null;
-        $this->nfseFiscalSucessoOsId = null;
-        $this->nfseFiscalSucessoPodeGerarNfe = false;
         $this->js("document.getElementById('erp-nfse-fiscal-sucesso')?.style.setProperty('display','none')");
+    }
+
+    public function sairNfseFiscalSucesso(): void
+    {
+        $this->closeNfseFiscalSucesso();
+        $this->voltarParaOsAposEmissao();
     }
 
     public function closeNfseFiscalErro(): void
@@ -696,7 +697,7 @@ class NfsePage extends Page
 
     public function imprimirNfseAutorizada(): void
     {
-        $nfse = $this->nfseAutorizadaParaCompartilhar();
+        $nfse = $this->nfseAutorizadaParaCompartilhar(permitirCancelada: true);
 
         if ($nfse === null) {
             return;
@@ -708,38 +709,15 @@ class NfsePage extends Page
         // Overlay de sucesso (z-index alto) não pode cobrir o DANFSe.
         if (filled($this->nfseFiscalSucessoDetalhe)) {
             $this->nfseFiscalSucessoDetalhe = null;
-            $this->nfseFiscalSucessoOsId = null;
-            $this->nfseFiscalSucessoPodeGerarNfe = false;
             $this->js("document.getElementById('erp-nfse-fiscal-sucesso')?.style.setProperty('display','none')");
         }
-    }
-
-    public function gerarNfeDasPecasOs(): void
-    {
-        $osId = (int) ($this->nfseFiscalSucessoOsId ?? 0);
-
-        if ($osId <= 0 || ! $this->nfseFiscalSucessoPodeGerarNfe) {
-            Notification::make()
-                ->title('Esta NFS-e não possui peças da OS para gerar NF-e.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfe.access')) {
-            return;
-        }
-
-        $url = \App\Filament\Resources\NfeResource::getUrl('index').'?ordem_servico_id='.$osId;
-
-        $this->redirect($url, navigate: false);
     }
 
     public function closeNfseDanfseModal(): void
     {
         $this->nfseDanfseModalOpen = false;
         $this->nfseDanfseModalId = null;
+        $this->voltarParaOsAposEmissao();
     }
 
     public function downloadNfseDanfsePdf(): void
@@ -1037,8 +1015,147 @@ class NfsePage extends Page
         return Nfse::statusLabels()[$this->nfseStatus] ?? 'Aberta';
     }
 
+    public function nfseMostraEquipamento(): bool
+    {
+        return EmpresaModulos::empresaPrestadorServicos(ErpContext::currentEmpresa());
+    }
+
+    public function abrirNfseEquipamento(): void
+    {
+        if (! $this->nfseModalOpen || ! $this->nfseMostraEquipamento()) {
+            return;
+        }
+
+        $this->carregarExtrasVeiculoLocal();
+        $this->nfseEquipamentoModalOpen = true;
+        $this->dispatch('erp-nfse-focus-equip');
+    }
+
+    public function fecharNfseEquipamento(bool $forcar = false): void
+    {
+        if (! $forcar && $this->equipamentoLookupOpen) {
+            $this->closeEquipamentoLookup();
+
+            return;
+        }
+
+        $this->closeEquipamentoLookup();
+        $this->nfseEquipamentoModalOpen = false;
+    }
+
+    public function nfseTemEquipamento(): bool
+    {
+        return filled(trim($this->placa)) || filled(trim($this->descricao)) || filled(trim($this->numeroSerie));
+    }
+
+    protected function equipamentoSomenteLeitura(): bool
+    {
+        return $this->nfseSomenteLeitura();
+    }
+
+    protected function limparEquipamentoNfse(): void
+    {
+        $this->closeEquipamentoLookup();
+        $this->nfseEquipamentoModalOpen = false;
+        $this->osVeiculoId = null;
+        $this->numeroSerie = '';
+        $this->descricao = '';
+        $this->descricao2 = '';
+        $this->modelo = '';
+        $this->ano = '';
+        $this->placa = '';
+        $this->placaLocalResolvida = '';
+        $this->km = '';
+        $this->corVeiculo = '';
+        $this->chassiVeiculo = '';
+        $this->aplicarExtrasVeiculo([]);
+    }
+
+    protected function aplicarEquipamentoGravadoNfse(Nfse $nfse): void
+    {
+        $temSnapshot = $nfse->os_veiculo_id !== null
+            || filled($nfse->placa)
+            || filled($nfse->descricao)
+            || filled($nfse->numero_serie);
+
+        if (! $temSnapshot) {
+            $ordem = $nfse->ordem_servico_id ? OrdemServico::query()->find($nfse->ordem_servico_id) : null;
+
+            if ($ordem instanceof OrdemServico) {
+                $this->aplicarEquipamentoDaOsNfse($ordem);
+            }
+
+            return;
+        }
+
+        $this->osVeiculoId = $nfse->os_veiculo_id ? (int) $nfse->os_veiculo_id : null;
+        $this->numeroSerie = (string) ($nfse->numero_serie ?? '');
+        $this->descricao = mb_strtoupper((string) ($nfse->descricao ?? ''), 'UTF-8');
+        $this->descricao2 = mb_strtoupper((string) ($nfse->descricao2 ?? ''), 'UTF-8');
+        $this->modelo = mb_strtoupper((string) ($nfse->modelo ?? ''), 'UTF-8');
+        $this->ano = (string) ($nfse->ano ?? '');
+        $this->placa = mb_strtoupper((string) ($nfse->placa ?? ''), 'UTF-8');
+        $this->km = (string) ($nfse->km ?? '');
+        $this->corVeiculo = mb_strtoupper((string) ($nfse->cor_veiculo ?? ''), 'UTF-8');
+        $this->chassiVeiculo = mb_strtoupper((string) ($nfse->chassi_veiculo ?? ''), 'UTF-8');
+        $placaLocal = OsVeiculo::normalizarPlaca($this->placa);
+        $this->placaLocalResolvida = OsVeiculo::placaValida($placaLocal) ? $placaLocal : '';
+        $this->carregarExtrasVeiculoLocal();
+    }
+
+    /**
+     * Equipamento da OS importada; não sobrescreve o que já foi informado na nota.
+     */
+    protected function aplicarEquipamentoDaOsNfse(OrdemServico $ordem): void
+    {
+        if ($this->nfseTemEquipamento()) {
+            return;
+        }
+
+        $this->aplicarEquipamentoImportado(null, [
+            'numero_serie' => (string) ($ordem->numero_serie ?? ''),
+            'descricao' => (string) ($ordem->descricao ?? ''),
+            'descricao2' => (string) ($ordem->descricao2 ?? ''),
+            'modelo' => (string) ($ordem->modelo ?? ''),
+            'ano' => (string) ($ordem->ano ?? ''),
+            'placa' => (string) ($ordem->placa ?? ''),
+            'km' => (string) ($ordem->km ?? ''),
+            'cor' => (string) ($ordem->cor_veiculo ?? ''),
+            'chassi' => (string) ($ordem->chassi_veiculo ?? ''),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function atributosEquipamentoNfse(): array
+    {
+        $veiculo = $this->salvarEquipamentoDaOs((int) (ErpContext::currentEmpresaId() ?? 0));
+        $this->osVeiculoId = $veiculo?->getKey() !== null ? (int) $veiculo->getKey() : null;
+        $km = preg_replace('/\D/', '', $this->km) ?? '';
+
+        return [
+            'os_veiculo_id' => $this->osVeiculoId,
+            'numero_serie' => mb_substr(trim($this->numeroSerie), 0, 60, 'UTF-8') ?: null,
+            'descricao' => mb_substr(mb_strtoupper(trim($this->descricao), 'UTF-8'), 0, 150, 'UTF-8') ?: null,
+            'descricao2' => mb_substr(mb_strtoupper(trim($this->descricao2), 'UTF-8'), 0, 150, 'UTF-8') ?: null,
+            'modelo' => mb_substr(mb_strtoupper(trim($this->modelo), 'UTF-8'), 0, 80, 'UTF-8') ?: null,
+            'ano' => mb_substr(trim($this->ano), 0, 10, 'UTF-8') ?: null,
+            'placa' => mb_substr(mb_strtoupper(trim($this->placa), 'UTF-8'), 0, 15, 'UTF-8') ?: null,
+            'km' => $km !== '' ? (int) $km : null,
+            'cor_veiculo' => mb_substr(mb_strtoupper(trim($this->corVeiculo), 'UTF-8'), 0, 40, 'UTF-8') ?: null,
+            'chassi_veiculo' => mb_substr(mb_strtoupper(trim($this->chassiVeiculo), 'UTF-8'), 0, 40, 'UTF-8') ?: null,
+        ];
+    }
+
     public function closeNfseModal(): void
     {
+        if ($this->nfseEquipamentoModalOpen) {
+            $this->fecharNfseEquipamento();
+
+            return;
+        }
+
         if (filled($this->nfseFiscalErroTitulo)) {
             $this->closeNfseFiscalErro();
 
@@ -1052,7 +1169,7 @@ class NfsePage extends Page
         }
 
         if (filled($this->nfseFiscalSucessoDetalhe)) {
-            $this->closeNfseFiscalSucesso();
+            $this->sairNfseFiscalSucesso();
 
             return;
         }
@@ -1071,6 +1188,12 @@ class NfsePage extends Page
 
         if ($this->nfseDescontoModalOpen) {
             $this->fecharNfseModalDescontoItem();
+
+            return;
+        }
+
+        if ($this->nfseServicoPrestadoIndex !== null) {
+            $this->fecharNfseServicoPrestado();
 
             return;
         }
@@ -1242,6 +1365,7 @@ class NfsePage extends Page
         $this->nfseServicos = [];
         $this->nfseServicoLinhaIndex = null;
         $this->nfseServicoExcluirIndex = null;
+        $this->fecharNfseServicoPrestado();
         $this->nfseServicoSeq = 0;
         $this->limparNfseMunicipio();
         $this->nfseOsOrigemId = null;
@@ -1251,6 +1375,8 @@ class NfsePage extends Page
         $this->nfseTribIssqn = Nfse::TRIB_ISSQN_TRIBUTAVEL;
         $this->nfseTpRetIssqn = Nfse::TP_RET_ISSQN_NAO_RETIDO;
         $this->nfseAliquotaIss = $this->aliquotaIssPadraoEmpresa();
+        $this->nfseDiscriminacao = '';
+        $this->limparEquipamentoNfse();
     }
 
     public function updatedNfseMunicipioNome(string $value): void
@@ -2170,6 +2296,7 @@ class NfsePage extends Page
             'product_id' => $this->nfseServicoId,
             'codigo' => $this->nfseServicoCodigo,
             'descricao' => $this->nfseServicoDescricao,
+            'servico_prestado' => '',
             'unidade' => $this->nfseServicoUnidade,
             'quantidade' => $this->nfseFormatarDecimal($qtd, 3),
             'valor' => $this->nfseFormatarDecimal($preco, 2),
@@ -2185,6 +2312,49 @@ class NfsePage extends Page
 
         $this->limparNfseServicoPendente();
         $this->nfseFocarCampo('nfse-servico-busca');
+    }
+
+    public function abrirNfseServicoPrestado(int $index): void
+    {
+        if (! isset($this->nfseServicos[$index])) {
+            return;
+        }
+
+        $this->nfseServicoLinhaIndex = $index;
+        $this->nfseServicoPrestadoIndex = $index;
+        $this->nfseServicoPrestadoTexto = (string) ($this->nfseServicos[$index]['servico_prestado'] ?? '');
+    }
+
+    public function confirmarNfseServicoPrestado(): void
+    {
+        $index = $this->nfseServicoPrestadoIndex;
+
+        if ($index !== null && isset($this->nfseServicos[$index]) && ! $this->nfseServicoPrestadoSomenteLeitura($index)) {
+            $this->nfseServicos[$index]['servico_prestado'] = mb_strtoupper(trim($this->nfseServicoPrestadoTexto), 'UTF-8');
+        }
+
+        $this->fecharNfseServicoPrestado();
+    }
+
+    public function fecharNfseServicoPrestado(): void
+    {
+        $this->nfseServicoPrestadoIndex = null;
+        $this->nfseServicoPrestadoTexto = '';
+    }
+
+    /**
+     * Serviço importado de OS: o texto vem da OS e só pode ser alterado lá.
+     */
+    public function nfseServicoPrestadoSomenteLeitura(int $index): bool
+    {
+        if ($this->nfseSomenteLeitura()) {
+            return true;
+        }
+
+        $linha = $this->nfseServicos[$index] ?? [];
+
+        return (int) ($linha['os_id'] ?? 0) > 0
+            || str_starts_with((string) ($linha['key'] ?? ''), 'nfse-os-');
     }
 
     public function selecionarNfseServicoLinha(int $index): void
@@ -2738,11 +2908,6 @@ class NfsePage extends Page
         $this->nfseModalOpen = true;
     }
 
-    public function cancelarNfse(): void
-    {
-        $this->modulePending('Cancelar NFS-e');
-    }
-
     public function imprimirNfse(): void
     {
         $this->nfseFiscalSucessoId = $this->highlightedRecordId;
@@ -2823,22 +2988,15 @@ class NfsePage extends Page
         }
 
         $osId = (int) ($nfse->ordem_servico_id ?? $this->nfseOsOrigemId ?? 0);
-        $ordem = $osId > 0
-            ? OrdemServico::query()->with(['itens'])->find($osId)
-            : null;
 
         $this->nfseFiscalSucessoId = (int) $nfse->id;
-        $this->nfseFiscalSucessoOsId = $ordem !== null ? (int) $ordem->id : null;
-        $this->nfseFiscalSucessoPodeGerarNfe = $ordem !== null
-            && ErpAccess::currentCan('nfe.access')
-            && \App\Support\Erp\Nfe\NfeOrdemServicoService::osTemPecasParaNfe($ordem);
+        $this->nfseRetornoOsPronto = $this->nfseRetornoOsId !== null
+            && $osId > 0
+            && $osId === (int) $this->nfseRetornoOsId;
         $this->nfseFiscalSucessoDetalhe = $detalhe;
         $this->js(
             'window.__erpNfseShowSucesso && window.__erpNfseShowSucesso('
-            .Js::from([
-                'detalhe' => $detalhe,
-                'podeGerarNfe' => $this->nfseFiscalSucessoPodeGerarNfe,
-            ])
+            .Js::from(['detalhe' => $detalhe])
             .')'
         );
     }
@@ -2882,7 +3040,7 @@ class NfsePage extends Page
         $this->mostrarNfseFiscalErro('NÃO FOI POSSÍVEL TRANSMITIR A NFS-E', 'Esta DPS já foi autorizada e não pode ser transmitida novamente.');
     }
 
-    protected function nfseAutorizadaParaCompartilhar(): ?Nfse
+    protected function nfseAutorizadaParaCompartilhar(bool $permitirCancelada = false): ?Nfse
     {
         $id = $this->nfseDanfseModalId ?: $this->nfseFiscalSucessoId ?: $this->highlightedRecordId;
         $empresaId = ErpContext::currentEmpresaId();
@@ -2897,7 +3055,17 @@ class NfsePage extends Page
             return null;
         }
 
-        if ($nfse->status !== Nfse::STATUS_AUTORIZADA || blank($nfse->xml_nfse)) {
+        $protocoloCancelamento = $permitirCancelada
+            && $nfse->status === Nfse::STATUS_CANCELADA
+            && NfseIpmImpressaoViewData::aplica($nfse);
+
+        if ($nfse->status === Nfse::STATUS_CANCELADA && ! $protocoloCancelamento) {
+            $this->mostrarNfseFiscalErro('NFS-E CANCELADA', 'Esta NFS-e foi cancelada e não pode ser enviada.');
+
+            return null;
+        }
+
+        if ((! $protocoloCancelamento && $nfse->status !== Nfse::STATUS_AUTORIZADA) || blank($nfse->xml_nfse)) {
             $this->mostrarNfseFiscalErro('NFS-E AINDA NÃO AUTORIZADA', 'Imprimir e enviar ficam disponíveis depois que a nota for autorizada.');
 
             return null;
@@ -3203,6 +3371,30 @@ class NfsePage extends Page
         return null;
     }
 
+    /**
+     * Ambiente exibido no topo do modal: o gravado na nota transmitida; senão o configurado na empresa.
+     *
+     * @return array{rotulo: string, tipo: string, dica: string}
+     */
+    public function nfseAmbienteBadge(): array
+    {
+        $tpAmb = '';
+
+        if ($this->nfseId !== null && $this->nfseStatus !== Nfse::STATUS_ABERTA) {
+            $tpAmb = trim((string) Nfse::query()->whereKey($this->nfseId)->value('tipo_ambiente'));
+        }
+
+        if ($tpAmb === '') {
+            $tpAmb = $this->nfseAmbienteAtual()?->tpAmb() ?? '';
+        }
+
+        return match ($tpAmb) {
+            '1' => ['rotulo' => 'PRODUÇÃO', 'tipo' => 'producao', 'dica' => 'Ambiente de Produção: a NFS-e tem validade fiscal.'],
+            '2' => ['rotulo' => 'HOMOLOGAÇÃO', 'tipo' => 'homologacao', 'dica' => 'Ambiente de Homologação (testes): a NFS-e não tem validade fiscal.'],
+            default => ['rotulo' => 'SEM AMBIENTE', 'tipo' => 'sem-ambiente', 'dica' => 'Ambiente da NFS-e não configurado nos parâmetros fiscais da empresa.'],
+        };
+    }
+
     protected function nfseAmbienteAtual(): ?NfseSefinAmbiente
     {
         $empresa = ErpContext::currentEmpresa();
@@ -3287,10 +3479,14 @@ class NfsePage extends Page
             $productId = (int) ($linha['product_id'] ?? 0);
             $brutoComAcre = $this->nfseSomarDecimal($this->nfseMultiplicarDecimal($quantidade, $valor), $acrescimo);
 
+            $osId = (int) ($linha['os_id'] ?? 0);
+
             $itens[] = [
                 'product_id' => $productId > 0 ? $productId : null,
+                'ordem_servico_id' => $osId > 0 ? $osId : null,
                 'codigo' => $codigo,
                 'descricao' => $descricao,
+                'servico_prestado' => mb_strtoupper(trim((string) ($linha['servico_prestado'] ?? '')), 'UTF-8') ?: null,
                 'unidade' => $unidade !== '' ? $unidade : null,
                 'quantidade' => $quantidade,
                 'valor' => $valor,
@@ -3320,6 +3516,12 @@ class NfsePage extends Page
             throw new NfseNaoGravada('Informe ao menos um serviço.');
         }
 
+        $motivoOs = $this->motivoBloqueioOsDaNfse((int) $this->nfseTomadorId);
+
+        if ($motivoOs !== null) {
+            throw new NfseNaoGravada($motivoOs);
+        }
+
         $municipio = $this->municipioPrestacaoParaGravar();
         $uf = mb_strtoupper(trim($this->nfseTomadorUf), 'UTF-8');
 
@@ -3346,11 +3548,13 @@ class NfsePage extends Page
                 'trib_issqn' => $this->codigoIssqnNfse($this->nfseTribIssqn, Nfse::tributacoesIssqn(), 'Informe a tributação do ISSQN.'),
                 'tp_ret_issqn' => $this->codigoIssqnNfse($this->nfseTpRetIssqn, Nfse::retencoesIssqn(), 'Informe a retenção do ISSQN.'),
                 'aliquota_iss' => $this->aliquotaIssNfseParaGravar(),
+                'discriminacao' => $this->textoNfseOuNulo($this->nfseDiscriminacao, 1500),
                 'valor_servicos' => $somaBrutos,
                 'desconto' => $somaDescontos,
                 'iss' => '0.00',
                 'total' => $somaTotais,
                 'ordem_servico_id' => $this->resolverOrdemServicoOrigemId(),
+                'equipamento' => $this->nfseMostraEquipamento() ? $this->atributosEquipamentoNfse() : null,
             ],
             'itens' => $itens,
         ];
@@ -3358,18 +3562,14 @@ class NfsePage extends Page
 
     protected function resolverOrdemServicoOrigemId(): ?int
     {
-        if ($this->nfseOsOrigemId !== null && (int) $this->nfseOsOrigemId > 0) {
-            return (int) $this->nfseOsOrigemId;
+        $osIds = $this->nfseOsIdsDasLinhas();
+        $origem = $this->nfseOsOrigemId !== null && (int) $this->nfseOsOrigemId > 0 ? (int) $this->nfseOsOrigemId : null;
+
+        if ($origem !== null && ($osIds === [] || in_array($origem, $osIds, true))) {
+            return $origem;
         }
 
-        foreach ($this->nfseServicos as $linha) {
-            $osId = (int) ($linha['os_id'] ?? 0);
-            if ($osId > 0) {
-                return $osId;
-            }
-        }
-
-        return null;
+        return $osIds === [] ? null : $osIds[array_key_last($osIds)];
     }
 
     protected function vincularNfseAOrdemServico(Nfse $nfse): void
@@ -3425,6 +3625,8 @@ class NfsePage extends Page
         $this->nfseAliquotaIss = $aliquotaIss !== null
             ? $this->nfseFormatarDecimal($aliquotaIss, 2)
             : ($nfse->status === Nfse::STATUS_ABERTA ? $this->aliquotaIssPadraoEmpresa() : '');
+        $this->nfseDiscriminacao = (string) ($nfse->discriminacao ?? '');
+        $this->aplicarEquipamentoGravadoNfse($nfse);
         $this->nfseServicos = [];
         $seq = 0;
 
@@ -3450,6 +3652,7 @@ class NfsePage extends Page
                 'product_id' => $item->product_id !== null ? (int) $item->product_id : null,
                 'codigo' => (string) $item->codigo,
                 'descricao' => (string) $item->descricao,
+                'servico_prestado' => (string) ($item->servico_prestado ?? ''),
                 'unidade' => (string) ($item->unidade ?? ''),
                 'quantidade' => $this->nfseFormatarDecimal($quantidade, 3),
                 'valor' => $this->nfseFormatarDecimal($valor, 2),
@@ -3461,6 +3664,7 @@ class NfsePage extends Page
                 'c_nbs' => $item->c_nbs,
                 'c_trib_mun' => $item->c_trib_mun,
                 'c_ind_op' => $item->c_ind_op,
+                'os_id' => $item->ordem_servico_id !== null ? (int) $item->ordem_servico_id : null,
                 'obra_tipo' => $item->obra_tipo,
                 'obra_insc_imob_fisc' => $item->obra_insc_imob_fisc,
                 'obra_c_obra' => $item->obra_c_obra,

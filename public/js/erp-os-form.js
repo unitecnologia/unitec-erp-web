@@ -290,6 +290,14 @@ function bindErpOsFormKeys() {
             return;
         }
 
+        const ctrlD = event.ctrlKey && ! event.altKey && ! event.metaKey
+            && (event.key === 'd' || event.key === 'D' || event.code === 'KeyD');
+
+        // Chrome abre "Adicionar favorito" no Ctrl+D mesmo com foco em input ou modal aberto.
+        if (ctrlD) {
+            event.preventDefault();
+        }
+
         const component = getErpOsComponent();
 
         if (! component) {
@@ -564,16 +572,13 @@ function bindErpOsFormKeys() {
             return;
         }
 
-        if (event.ctrlKey && (event.key === 'd' || event.key === 'D')) {
+        if (ctrlD) {
+            event.stopPropagation();
+
             if (document.querySelector('.erp-fv-tv-desconto') || document.querySelector('.erp-form-overlay') || document.querySelector('.erp-os-fin')) {
                 return;
             }
 
-            if (isOsEditableTarget(event.target)) {
-                return;
-            }
-
-            event.preventDefault();
             component.call('abrirModalDescontoItem');
         }
     }, true);

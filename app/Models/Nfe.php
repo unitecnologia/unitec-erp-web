@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'venda_id',
     'pdv_venda_id',
     'devolucao_compra_id',
+    'ordem_servico_id',
     'chave',
     'chave_nfe_referenciada',
     'protocolo',
@@ -227,6 +228,11 @@ class Nfe extends Model
     public function devolucaoCompra(): BelongsTo
     {
         return $this->belongsTo(DevolucaoCompra::class, 'devolucao_compra_id');
+    }
+
+    public function ordemServico(): BelongsTo
+    {
+        return $this->belongsTo(OrdemServico::class, 'ordem_servico_id');
     }
 
     public function itens(): HasMany

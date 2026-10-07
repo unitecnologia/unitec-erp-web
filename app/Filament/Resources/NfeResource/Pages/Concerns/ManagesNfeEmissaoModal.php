@@ -24,6 +24,7 @@ use App\Support\Erp\Nfe\NfeCalculoService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfe\NfeEspelhoReportService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
+use App\Support\Erp\Os\OrdemServicoRetorno;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
 use App\Support\Erp\WhatsApp\WhatsAppPhone;
@@ -36,6 +37,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 trait ManagesNfeEmissaoModal
 {
@@ -89,6 +91,14 @@ trait ManagesNfeEmissaoModal
     public ?string $nfeFiscalSucessoDetalhe = null;
 
     public ?int $nfeFiscalSucessoNfeId = null;
+
+    /** OS de origem quando a página foi aberta pela lista de OS (F10 | NF-e Peças). */
+    #[Locked]
+    public ?int $nfeRetornoOsId = null;
+
+    /** Só depois de NF-e autorizada desta OS o "Sair" volta para a lista de OS. */
+    #[Locked]
+    public bool $nfeRetornoOsPronto = false;
 
     public ?string $nfeFiscalInfoTitulo = null;
 
@@ -179,6 +189,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalVendaId = null;
         $this->nfeModalPdvVendaId = null;
         $this->nfeModalDevolucaoCompraId = null;
+        $this->nfeModalOrdemServicoId = null;
         $this->syncNfeModalAmbiente($params);
         $this->nfeModalMainTab = 'itens';
         $this->nfeModalDetailTab = 'totais';
@@ -238,6 +249,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalVendaId = null;
         $this->nfeModalPdvVendaId = null;
         $this->nfeModalDevolucaoCompraId = null;
+        $this->nfeModalOrdemServicoId = null;
         $this->nfeModalEmpresaEmitenteId = null;
         $this->nfeModalHomologacao = false;
         $this->nfeModalMainTab = 'itens';
@@ -529,6 +541,7 @@ trait ManagesNfeEmissaoModal
                 'venda_id' => $this->nfeModalVendaId ?: null,
                 'pdv_venda_id' => $this->nfeModalPdvVendaId ?: null,
                 'devolucao_compra_id' => $this->nfeModalDevolucaoCompraId ?: null,
+                'ordem_servico_id' => $this->nfeModalOrdemServicoId ?: null,
                 'cfop' => $calculated['cfop'],
                 'finalidade' => $this->mapFinalidade($this->nfeForm['finalidade'] ?? 'normal'),
                 'movimento' => ($this->nfeForm['movimento'] ?? 'saida') === 'entrada' ? '0' : '1',
@@ -1950,6 +1963,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalVendaId = $nfe->venda_id ? (int) $nfe->venda_id : null;
         $this->nfeModalPdvVendaId = $nfe->pdv_venda_id ? (int) $nfe->pdv_venda_id : null;
         $this->nfeModalDevolucaoCompraId = $nfe->devolucao_compra_id ? (int) $nfe->devolucao_compra_id : null;
+        $this->nfeModalOrdemServicoId = $nfe->ordem_servico_id ? (int) $nfe->ordem_servico_id : null;
         // Mantém o pin alinhado à empresa persistida (re-save não volta para a sessão/Matriz).
         $this->nfeModalEmpresaEmitenteId = $nfe->empresa_id ? (int) $nfe->empresa_id : null;
         $this->syncNfeModalAmbiente(
@@ -2712,6 +2726,10 @@ trait ManagesNfeEmissaoModal
     {
         $this->closeNfeFiscalSucessoOverlay();
         $this->closeNfeModal();
+
+        if ($this->nfeRetornoOsPronto && $this->nfeRetornoOsId) {
+            $this->redirect(OrdemServicoRetorno::urlLista((int) $this->nfeRetornoOsId), navigate: false);
+        }
     }
 
     public function printNfeDanfe(): void
@@ -3102,6 +3120,8 @@ trait ManagesNfeEmissaoModal
             ? "Nota {$numero} — Protocolo: {$protocolo}"
             : "Nota {$numero} autorizada pela SEFAZ.";
         $this->nfeFiscalSucessoNfeId = $nfe->id;
+        $this->nfeRetornoOsPronto = $this->nfeRetornoOsId !== null
+            && (int) ($nfe->ordem_servico_id ?? 0) === (int) $this->nfeRetornoOsId;
 
         $this->dispatch('erp-nfe-focus-fiscal-sucesso');
         $this->js(

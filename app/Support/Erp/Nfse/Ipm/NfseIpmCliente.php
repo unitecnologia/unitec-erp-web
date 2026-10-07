@@ -16,6 +16,8 @@ class NfseIpmCliente
 {
     public const SOAP_ACTION_GERAR_NFSE = 'net.atende#GerarNfseEnvio';
 
+    public const SOAP_ACTION_CANCELAR_NFSE = 'net.atende#CancelarNfseEnvio';
+
     /**
      * A IPM não tem servidor de homologação: o teste usa a URL do município com EnvioTeste=1.
      */
@@ -89,6 +91,65 @@ class NfseIpmCliente
 
     public function enviar(Empresa $empresa, string $xmlRps, bool $envioTeste = false): NfseIpmResposta
     {
+        if ($envioTeste !== str_contains($xmlRps, '<EnvioTeste>1</EnvioTeste>')) {
+            throw new NfseNaoTransmitida('O modo de envio do RPS não confere com o ambiente IPM configurado.');
+        }
+
+        [$body, $status] = $this->postar($empresa, $this->envelope($xmlRps), self::SOAP_ACTION_GERAR_NFSE);
+
+        $resposta = NfseIpmResposta::interpretar($body, $envioTeste);
+
+        if ($status >= 500 && ! $resposta->autorizada && $resposta->erros === []) {
+            throw new NfseNaoTransmitida('O WebService IPM não respondeu a emissão.');
+        }
+
+        return $resposta;
+    }
+
+    public function cancelar(Empresa $empresa, string $xmlPedido): NfseIpmCancelamentoResposta
+    {
+        [$body] = $this->postar($empresa, $this->envelopeCancelamento($xmlPedido), self::SOAP_ACTION_CANCELAR_NFSE);
+
+        return NfseIpmCancelamentoResposta::interpretar($body);
+    }
+
+    /**
+     * Mesmo ajuste de namespace do GerarNfseEnvio: xmlns só no InfPedidoCancelamento.
+     */
+    public function envelopeCancelamento(string $xmlPedido): string
+    {
+        $corpo = $this->semDeclaracao($xmlPedido);
+        $corpo = preg_replace(
+            '#^<CancelarNfseEnvio xmlns="'.preg_quote(NfseIpmXmlGerador::NS, '#').'">#',
+            '<CancelarNfseEnvio>',
+            $corpo,
+            1,
+            $semNamespace,
+        ) ?? $corpo;
+
+        if ($semNamespace === 1) {
+            $corpo = preg_replace(
+                '#<InfPedidoCancelamento(?![^>]*\sxmlns=)#',
+                '<InfPedidoCancelamento xmlns="'.NfseIpmXmlGerador::NS.'"',
+                $corpo,
+                1,
+            ) ?? $corpo;
+        }
+
+        return '<?xml version="1.0" encoding="UTF-8"?>'
+            .'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
+            .'<soapenv:Header/>'
+            .'<soapenv:Body>'
+            .$corpo
+            .'</soapenv:Body>'
+            .'</soapenv:Envelope>';
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private function postar(Empresa $empresa, string $envelope, string $soapAction): array
+    {
         $usuario = $this->usuario($empresa);
         $senha = (string) $empresa->nfse_ws_senha;
 
@@ -96,11 +157,6 @@ class NfseIpmCliente
             throw new NfseNaoTransmitida('Informe a senha do WebService IPM.');
         }
 
-        if ($envioTeste !== str_contains($xmlRps, '<EnvioTeste>1</EnvioTeste>')) {
-            throw new NfseNaoTransmitida('O modo de envio do RPS não confere com o ambiente IPM configurado.');
-        }
-
-        $envelope = $this->envelope($xmlRps);
         $certificado = $this->certificado($empresa);
         $certPath = null;
         $keyPath = null;
@@ -135,7 +191,7 @@ class NfseIpmCliente
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: text/xml; charset=utf-8',
                     'Accept: text/xml',
-                    'SOAPAction: "'.self::SOAP_ACTION_GERAR_NFSE.'"',
+                    'SOAPAction: "'.$soapAction.'"',
                     'Authorization: Basic '.base64_encode($usuario.':'.$senha),
                 ],
                 CURLOPT_HEADERFUNCTION => function ($ch, string $linha) use (&$wwwAuthenticate): int {
@@ -172,7 +228,7 @@ class NfseIpmCliente
         }
 
         if ($body === false || $status === 0) {
-            throw new NfseNaoTransmitida($erroCurl !== '' ? 'Não foi possível transmitir a NFS-e ao IPM.' : 'Não foi possível transmitir a NFS-e ao IPM.');
+            throw new NfseNaoTransmitida('Não foi possível comunicar com o WebService IPM.');
         }
 
         if ($status === 401 || $status === 403) {
@@ -187,13 +243,7 @@ class NfseIpmCliente
             throw new NfseNaoTransmitida('O WebService IPM não aceitou o usuário ou a senha (HTTP '.$status.').');
         }
 
-        $resposta = NfseIpmResposta::interpretar((string) $body, $envioTeste);
-
-        if ($status >= 500 && ! $resposta->autorizada && $resposta->erros === []) {
-            throw new NfseNaoTransmitida('O WebService IPM não respondeu a emissão.');
-        }
-
-        return $resposta;
+        return [(string) $body, $status];
     }
 
     /**

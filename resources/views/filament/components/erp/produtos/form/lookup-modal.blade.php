@@ -7,7 +7,7 @@
         @class([
             'erp-lookup-modal',
             'erp-lookup-modal--'.$lookup['type'] => filled($lookup['type'] ?? null),
-            'erp-lookup-modal--compact' => in_array($lookup['type'] ?? null, ['grupo', 'marca', 'unidade'], true),
+            'erp-lookup-modal--compact' => in_array($lookup['type'] ?? null, ['grupo', 'marca', 'unidade', 'trib_mun'], true),
         ])
         wire:keydown.escape="handleLookupEscape"
     >

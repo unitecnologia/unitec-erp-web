@@ -173,7 +173,12 @@
                                                 @forelse (($this->osEspelho['servicos'] ?? []) as $item)
                                                     <tr>
                                                         <td>{{ $item['codigo'] }}</td>
-                                                        <td>{{ $item['descricao'] }}</td>
+                                                        <td>
+                                                            {{ $item['descricao'] }}
+                                                            @if (($item['servico_prestado'] ?? '') !== '')
+                                                                <div class="erp-os-espelho-modal__item-obs">{!! nl2br(e($item['servico_prestado'])) !!}</div>
+                                                            @endif
+                                                        </td>
                                                         <td>{{ $item['tecnico'] }}</td>
                                                         <td class="num">{{ $item['qtd'] }}</td>
                                                         <td class="num">{{ $item['preco'] }}</td>

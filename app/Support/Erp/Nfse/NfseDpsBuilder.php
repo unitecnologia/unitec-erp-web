@@ -19,6 +19,7 @@ class NfseDpsBuilder
      *     tomador: array<string, mixed>,
      *     municipio_prestacao: array{codigo: ?string, nome: ?string, uf: ?string},
      *     servicos: list<array<string, mixed>>,
+     *     discriminacao: ?string,
      *     valores: array{valor_servicos: string, desconto: string, iss: string, total: string, trib_issqn: ?string, tp_ret_issqn: ?string, ind_tot_trib: string}
      * }
      */
@@ -34,6 +35,12 @@ class NfseDpsBuilder
 
         if (! $empresa instanceof Empresa) {
             throw new NfseDpsNaoMontada('Empresa da NFS-e não encontrada.');
+        }
+
+        $liquido = bcsub($this->decimal($nfse->valor_servicos), $this->decimal($nfse->desconto), 2);
+
+        if (bccomp($liquido, '0', 2) === -1 || bccomp($liquido, $this->decimal($nfse->total), 2) !== 0) {
+            throw new NfseDpsNaoMontada('O valor dos serviços menos o desconto não confere com o total da NFS-e. Grave a nota novamente.');
         }
 
         return [
@@ -58,6 +65,7 @@ class NfseDpsBuilder
                 ->map(fn (NfseItem $item): array => $this->servico($item))
                 ->values()
                 ->all(),
+            'discriminacao' => $this->texto($nfse->discriminacao),
             'valores' => [
                 'valor_servicos' => $this->decimal($nfse->valor_servicos),
                 'desconto' => $this->decimal($nfse->desconto),
@@ -133,7 +141,7 @@ class NfseDpsBuilder
     {
         $servico = [
             'codigo' => $this->texto($item->codigo),
-            'descricao' => $this->texto($item->descricao),
+            'descricao' => $this->texto($item->descricaoComServicoPrestado()),
             'unidade' => $this->texto($item->unidade),
             'quantidade' => $this->decimal($item->quantidade, 3),
             'valor' => $this->decimal($item->valor),

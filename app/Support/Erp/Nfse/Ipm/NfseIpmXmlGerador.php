@@ -123,6 +123,69 @@ class NfseIpmXmlGerador
     }
 
     /**
+     * CancelarNfseEnvio (abrasf.xsd IPM): identificação da NFS-e autorizada + código do motivo.
+     */
+    public function gerarCancelamento(Nfse $nfse, string $codigo): string
+    {
+        $nfse->loadMissing('empresa');
+        $empresa = $nfse->empresa;
+
+        if (! $empresa instanceof Empresa) {
+            throw new NfseNaoTransmitida('Empresa da NFS-e não encontrada.');
+        }
+
+        if (! array_key_exists($codigo, Nfse::motivosCancelamento())) {
+            throw new NfseNaoTransmitida('Selecione o motivo do cancelamento.');
+        }
+
+        $numero = $this->digitos($nfse->numero_nfse);
+
+        if ($numero === '') {
+            throw new NfseNaoTransmitida('A NFS-e não tem número da prefeitura para cancelar.');
+        }
+
+        $cnpj = $this->digitos($empresa->cnpj);
+
+        if (strlen($cnpj) !== 14) {
+            throw new NfseNaoTransmitida('Informe o CNPJ da empresa.');
+        }
+
+        $municipio = $this->digitos($empresa->cidade_codigo);
+
+        if (strlen($municipio) !== 7) {
+            throw new NfseNaoTransmitida('Informe o código IBGE da cidade da empresa.');
+        }
+
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $doc->formatOutput = false;
+
+        $raiz = $doc->createElementNS(self::NS, 'CancelarNfseEnvio');
+        $doc->appendChild($raiz);
+        $pedido = $doc->createElementNS(self::NS, 'Pedido');
+        $raiz->appendChild($pedido);
+        $inf = $doc->createElementNS(self::NS, 'InfPedidoCancelamento');
+        $inf->setAttribute('Id', 'CANC_'.$numero);
+        $pedido->appendChild($inf);
+
+        $identificacao = $doc->createElementNS(self::NS, 'IdentificacaoNfse');
+        $inf->appendChild($identificacao);
+        $this->campo($doc, $identificacao, 'Numero', $numero);
+        $documento = $doc->createElementNS(self::NS, 'CpfCnpj');
+        $this->campo($doc, $documento, 'Cnpj', $cnpj);
+        $identificacao->appendChild($documento);
+        $im = trim((string) $empresa->im);
+
+        if ($im !== '') {
+            $this->campo($doc, $identificacao, 'InscricaoMunicipal', $im);
+        }
+
+        $this->campo($doc, $identificacao, 'CodigoMunicipio', $municipio);
+        $this->campo($doc, $inf, 'CodigoCancelamento', $codigo);
+
+        return $doc->saveXML() ?: '';
+    }
+
+    /**
      * Sem RPS no XML, a IPM recusa competência anterior à data de emissão (L1028).
      */
     private function competencia(Nfse $nfse): string
@@ -170,16 +233,12 @@ class NfseIpmXmlGerador
 
         $servico = $doc->createElementNS(self::NS, 'Servico');
         $valores = $doc->createElementNS(self::NS, 'Valores');
-        $this->campo($doc, $valores, 'ValorServicos', $this->decimal($nfse->valor_servicos));
-        $desconto = $this->decimal($nfse->desconto);
+        // Municípios IPM recusam DescontoIncondicionado (L1078): o desconto vai abatido do valor dos serviços.
+        $this->campo($doc, $valores, 'ValorServicos', self::valorServicosLiquido($nfse));
 
         if ($issInformado !== null) {
             $this->campo($doc, $valores, 'ValorIss', $issInformado['valor']);
             $this->campo($doc, $valores, 'Aliquota', $issInformado['aliquota']);
-        }
-
-        if (bccomp($desconto, '0', 2) === 1) {
-            $this->campo($doc, $valores, 'DescontoIncondicionado', $desconto);
         }
 
         $servico->appendChild($valores);
@@ -187,13 +246,18 @@ class NfseIpmXmlGerador
         $this->campo($doc, $servico, 'ResponsavelRetencao', $this->responsavelRetencao((string) $nfse->tp_ret_issqn));
         $this->campo($doc, $servico, 'ItemListaServico', $itemLista);
 
+        $tributacaoMunicipio = mb_substr(trim((string) $item->c_trib_mun), 0, 20);
         $cnae = $this->digitos($empresa->cnae);
+
+        if ($tributacaoMunicipio === '' && strlen($cnae) !== 7) {
+            throw new NfseNaoTransmitida('Informe o "Cód. municipal" do serviço (Produtos › Serviço) com o código da atividade do portal IPM (Escrita Fiscal › Consultas › Atividade). Sem ele a IPM recusa a nota (L1024/L1003).');
+        }
 
         if (strlen($cnae) === 7) {
             $this->campo($doc, $servico, 'CodigoCnae', $cnae);
         }
 
-        $this->campo($doc, $servico, 'CodigoTributacaoMunicipio', mb_substr(trim((string) $item->c_trib_mun), 0, 20));
+        $this->campo($doc, $servico, 'CodigoTributacaoMunicipio', $tributacaoMunicipio);
         $this->campo($doc, $servico, 'CodigoNbs', $nbs);
         $this->campo($doc, $servico, 'Discriminacao', $this->discriminacao($nfse));
         $this->campo($doc, $servico, 'CodigoMunicipio', $municipio);
@@ -248,7 +312,7 @@ class NfseIpmXmlGerador
                 : 'No IPM, ISS devido fora do município do prestador exige a alíquota do ISS do município de incidência. Informe a alíquota na aba ISS da NFS-e.');
         }
 
-        $base = bcsub($this->decimal($nfse->valor_servicos), $this->decimal($nfse->desconto), 2);
+        $base = self::valorServicosLiquido($nfse);
 
         if (bccomp($base, '0', 2) !== 1) {
             throw new NfseNaoTransmitida('A base de cálculo do ISS deve ser maior que zero.');
@@ -427,7 +491,7 @@ class NfseIpmXmlGerador
         $partes = [];
 
         foreach ($nfse->itens as $item) {
-            $texto = trim(preg_replace('/\s+/u', ' ', (string) $item->descricao) ?? '');
+            $texto = trim(preg_replace('/\s+/u', ' ', $item->descricaoComServicoPrestado()) ?? '');
 
             if ($texto !== '') {
                 $partes[] = $texto;
@@ -435,6 +499,11 @@ class NfseIpmXmlGerador
         }
 
         $descricao = implode(' | ', $partes);
+        $complemento = trim((string) $nfse->discriminacao);
+
+        if ($complemento !== '') {
+            $descricao = trim($descricao."\n".$complemento);
+        }
 
         if ($descricao === '') {
             throw new NfseNaoTransmitida('Informe a descrição do serviço.');
@@ -488,6 +557,19 @@ class NfseIpmXmlGerador
         }
 
         return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2).'.'.substr($digitos, 4, 2);
+    }
+
+    public static function valorServicosLiquido(Nfse $nfse): string
+    {
+        $numero = static function (mixed $valor): string {
+            $texto = str_replace(',', '.', trim((string) $valor));
+
+            return $texto !== '' && is_numeric($texto) ? number_format((float) $texto, 2, '.', '') : '0.00';
+        };
+
+        $liquido = bcsub($numero($nfse->valor_servicos), $numero($nfse->desconto), 2);
+
+        return bccomp($liquido, '0', 2) === 1 ? $liquido : '0.00';
     }
 
     private function decimal(mixed $valor): string

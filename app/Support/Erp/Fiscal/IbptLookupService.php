@@ -72,6 +72,35 @@ final class IbptLookupService
     }
 
     /**
+     * NBS (9 dígitos). A tabela IBPT só traz parte dos desdobros: sem o código exato, usa o pai (1.2001.31.10 → 1.2001.31.00).
+     */
+    public function findByNbs(string $nbs): ?FiscalIbptItem
+    {
+        $nbs = preg_replace('/\D/', '', $nbs) ?? '';
+
+        if (strlen($nbs) !== 9) {
+            return null;
+        }
+
+        $today = Carbon::today()->toDateString();
+
+        foreach (array_unique([$nbs, substr($nbs, 0, 7).'00', substr($nbs, 0, 5).'0000']) as $codigo) {
+            $item = FiscalIbptItem::query()
+                ->where('ncm', $codigo)
+                ->orderByRaw('CASE WHEN (vigencia_inicio IS NULL OR vigencia_inicio <= ?) AND (vigencia_fim IS NULL OR vigencia_fim >= ?) THEN 0 ELSE 1 END', [$today, $today])
+                ->orderByDesc('vigencia_inicio')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($item) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array{
      *     encontrado: bool,
      *     ncm: string,
@@ -107,7 +136,8 @@ final class IbptLookupService
             'versao' => '',
         ];
 
-        $item = $this->findByNcm($ncm, $exTipi);
+        $codigo = preg_replace('/\D/', '', $ncm) ?? '';
+        $item = strlen($codigo) === 9 ? $this->findByNbs($codigo) : $this->findByNcm($ncm, $exTipi);
 
         if (! $item) {
             return $empty;

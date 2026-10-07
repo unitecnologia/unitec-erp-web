@@ -4,6 +4,8 @@
     $danfseSrc = $danfseVisivel
         ? route('erp.reports.nfse-impressao', ['nfse' => $this->nfseDanfseModalId, 'embed' => 1])
         : 'about:blank';
+    $danfseCancelada = $danfseVisivel
+        && \App\Models\Nfse::query()->whereKey($this->nfseDanfseModalId)->value('status') === \App\Models\Nfse::STATUS_CANCELADA;
 @endphp
 <div
     id="erp-nfse-danfse-modal"
@@ -22,7 +24,7 @@
 
     <div class="erp-lookup-modal__window erp-nfe-espelho-modal__window">
         <div class="erp-lookup-modal__titlebar erp-nfe-espelho-modal__titlebar">
-            <span id="erp-nfse-danfse-title">DANFSe — NFS-e</span>
+            <span id="erp-nfse-danfse-title">{{ $danfseCancelada ? 'Protocolo de cancelamento — NFS-e' : 'DANFSe — NFS-e' }}</span>
             <button type="button" class="erp-lookup-modal__close" wire:click="closeNfseDanfseModal" title="Fechar">✕</button>
         </div>
 

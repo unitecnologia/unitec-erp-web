@@ -150,23 +150,103 @@ class OrdemServico extends Model
         return $this->hasOne(Nfse::class, 'ordem_servico_id')->latestOfMany();
     }
 
+    public function nfseAutorizada(): HasOne
+    {
+        return $this->hasOne(Nfse::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('status', Nfse::STATUS_AUTORIZADA));
+    }
+
+    /**
+     * Serviço desta OS importado numa NFS-e autorizada cujo cabeçalho aponta para outra OS do mesmo cliente.
+     */
+    public function nfseItemAutorizado(): HasOne
+    {
+        return $this->hasOne(NfseItem::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->whereHas(
+                'nfse',
+                fn ($nfse) => $nfse->where('status', Nfse::STATUS_AUTORIZADA),
+            ));
+    }
+
+    /**
+     * Desconto de itens + desconto geral (peças e serviços). `vl_desc_*` não serve aqui:
+     * no web guarda só o desconto geral, no app guarda a soma dos itens.
+     */
+    public function descontoTotalLista(): float
+    {
+        $bruto = (float) ($this->subtotal_pecas ?? 0) + (float) ($this->subtotal_servicos ?? 0);
+        $liquido = (float) ($this->total_produtos ?? 0) + (float) ($this->total_servicos ?? 0);
+
+        return max(0.0, round($bruto - $liquido, 2));
+    }
+
+    /**
+     * Só NFS-e autorizada: nota aberta (só DPS), cancelada ou substituída não aparece na lista.
+     */
     public function nfseNumeroLista(): string
     {
-        $nfse = $this->relationLoaded('nfse') ? $this->nfse : $this->nfse()->first();
+        $numero = trim((string) ($this->nfseAutorizadaVinculada()?->numero_nfse ?? ''));
+
+        return $numero !== '' ? $numero : '—';
+    }
+
+    public function possuiNfseAutorizada(): bool
+    {
+        return $this->nfseAutorizadaVinculada() !== null;
+    }
+
+    /** NFS-e autorizada pelo cabeçalho (esta OS) ou por serviço desta OS importado em NFS-e de outra OS. */
+    public function nfseAutorizadaVinculada(): ?Nfse
+    {
+        $nfse = $this->relationLoaded('nfseAutorizada') ? $this->nfseAutorizada : $this->nfseAutorizada()->first();
 
         if ($nfse === null) {
-            return '—';
+            $item = $this->relationLoaded('nfseItemAutorizado') ? $this->nfseItemAutorizado : $this->nfseItemAutorizado()->first();
+            $nfse = $item?->nfse;
         }
 
-        $numero = trim((string) ($nfse->numero_nfse ?? ''));
+        return $nfse;
+    }
 
-        if ($numero !== '') {
-            return $numero;
-        }
+    /** NF-e das peças com validade fiscal: bloqueia nova emissão (F10) e é reaberta em vez de duplicada. */
+    public const NFE_PECAS_EMITIDA_STATUS = [Nfe::STATUS_TRANSMITIDA, Nfe::STATUS_CONTINGENCIA, Nfe::STATUS_DUPLICIDADE];
 
-        $dps = trim((string) ($nfse->numero_dps ?? ''));
+    public function nfePecasEmitida(): HasOne
+    {
+        return $this->hasOne(Nfe::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->whereIn('status', self::NFE_PECAS_EMITIDA_STATUS));
+    }
 
-        return $dps !== '' ? $dps : '—';
+    public function possuiNfePecasEmitida(): bool
+    {
+        $nfe = $this->relationLoaded('nfePecasEmitida') ? $this->nfePecasEmitida : $this->nfePecasEmitida()->first();
+
+        return $nfe !== null;
+    }
+
+    public function nfeAutorizada(): HasOne
+    {
+        return $this->hasOne(Nfe::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('status', Nfe::STATUS_TRANSMITIDA));
+    }
+
+    /**
+     * Só NF-e autorizada (peças da OS).
+     */
+    public function nfeNumeroLista(): string
+    {
+        $nfe = $this->relationLoaded('nfeAutorizada') ? $this->nfeAutorizada : $this->nfeAutorizada()->first();
+        $numero = ltrim(trim((string) ($nfe?->numero ?? '')), '0');
+
+        return $numero !== '' ? $numero : '—';
+    }
+
+    /**
+     * NFC-e ainda não tem vínculo com a OS (PDV "F4 — Importar Ordem de Serviço" pendente).
+     */
+    public function nfceNumeroLista(): string
+    {
+        return '—';
     }
 
     /**

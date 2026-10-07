@@ -1,0 +1,470 @@
+/* Lista de Ordens de Serviço — carregado depois de erp-orcamentos.css (base visual da grade).
+
+   Cada coluna é identificada por classe explícita (OrdemServicoResource::colunaOs):
+   erp-os-col (todas) + erp-os-col-<nome>. Nada aqui depende da posição da coluna.
+
+   erp-orcamentos.css define larguras/alinhamentos de Orçamentos por :nth-child(1..11).
+   Como a OS usa .erp-orcamentos-page, esses valores caem nas colunas da OS que estiverem
+   naquelas posições; por isso cada coluna abaixo redefine TODAS as propriedades que aquelas
+   regras tocam (largura, min/max, padding, overflow, white-space e o alinhamento interno),
+   com especificidade maior. */
+
+/* ── Base de cada coluna da OS (neutraliza o que vem por posição) ───────────── */
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col {
+    overflow: visible !important;
+    white-space: nowrap !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col .fi-ta-col {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    flex-wrap: nowrap;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col .fi-ta-col .fi-ta-text {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col .fi-ta-text-item {
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Alinhamento interno: centro */
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(
+    .erp-os-col-numero,
+    .erp-os-col-nfse,
+    .erp-os-col-nfe,
+    .erp-os-col-nfce,
+    .erp-os-col-data,
+    .erp-os-col-hora-abertura,
+    .erp-os-col-hora-fechamento,
+    .erp-os-col-placa,
+    .erp-os-col-envio,
+    .erp-os-col-situacao,
+    .erp-os-col-espelho
+) .fi-ta-col,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(
+    .erp-os-col-numero,
+    .erp-os-col-nfse,
+    .erp-os-col-nfe,
+    .erp-os-col-nfce,
+    .erp-os-col-data,
+    .erp-os-col-hora-abertura,
+    .erp-os-col-hora-fechamento,
+    .erp-os-col-placa,
+    .erp-os-col-envio,
+    .erp-os-col-situacao,
+    .erp-os-col-espelho
+) .fi-ta-col .fi-ta-text {
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+/* Alinhamento interno: esquerda */
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(
+    .erp-os-col-cliente,
+    .erp-os-col-atendente,
+    .erp-os-col-equipamento,
+    .erp-os-col-meio-pagamento,
+    .erp-os-col-desconto,
+    .erp-os-col-total
+) .fi-ta-col,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(
+    .erp-os-col-cliente,
+    .erp-os-col-atendente,
+    .erp-os-col-equipamento,
+    .erp-os-col-meio-pagamento,
+    .erp-os-col-desconto,
+    .erp-os-col-total
+) .fi-ta-col .fi-ta-text {
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+/* ── Larguras por coluna ────────────────────────────────────────────────────── */
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-numero,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-numero {
+    width: 4.25rem !important;
+    min-width: 0 !important;
+    max-width: 4.25rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-numero {
+    padding-left: 0.45rem !important;
+    padding-right: 0.18rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-numero {
+    padding-inline: 0.12rem !important;
+}
+
+/* NFS-e, NF-e e NFC-e: estreitas, do tamanho do título */
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:is(.erp-os-col-nfse, .erp-os-col-nfe, .erp-os-col-nfce),
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-nfse, .erp-os-col-nfe, .erp-os-col-nfce) {
+    width: 3.6rem !important;
+    min-width: 3.4rem !important;
+    max-width: 4rem !important;
+    padding-inline: 0.15rem !important;
+    text-align: center;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-data,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-data {
+    width: 5.85rem !important;
+    min-width: 5.5rem !important;
+    max-width: 6.25rem !important;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:is(.erp-os-col-hora-abertura, .erp-os-col-hora-fechamento),
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-hora-abertura, .erp-os-col-hora-fechamento) {
+    width: 3.85rem !important;
+    min-width: 3.6rem !important;
+    max-width: 4.1rem !important;
+    padding-inline: 0.1rem !important;
+    text-align: center;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-cliente,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-cliente {
+    width: 21rem !important;
+    min-width: 17rem !important;
+    max-width: 22rem !important;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-atendente,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-atendente {
+    width: 7.5rem !important;
+    min-width: 7rem !important;
+    max-width: 8rem !important;
+    padding-inline: 0.2rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-equipamento,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-equipamento {
+    width: 14rem !important;
+    min-width: 12rem !important;
+    max-width: 16rem !important;
+    padding-inline: 0.12rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-placa,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-placa {
+    width: 5rem !important;
+    min-width: 4.75rem !important;
+    max-width: 5.25rem !important;
+    padding-inline: 0.2rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-meio-pagamento,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-meio-pagamento {
+    width: 7rem !important;
+    min-width: 6.5rem !important;
+    max-width: 7.5rem !important;
+    padding-inline: 0.2rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-envio,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-envio {
+    width: 3.1rem !important;
+    min-width: 2.9rem !important;
+    max-width: 3.4rem !important;
+    padding-inline: 0.1rem !important;
+    text-align: center;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-situacao,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-situacao {
+    width: 6.5rem !important;
+    min-width: 6.25rem !important;
+    max-width: 6.75rem !important;
+    padding-inline: 0.15rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-situacao {
+    overflow: visible !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-situacao .fi-ta-col {
+    overflow: visible !important;
+    flex-wrap: nowrap;
+    gap: 0.15rem;
+}
+
+/* "Faturar" ao lado de ABERTA precisa caber na coluna estreita. */
+.erp-orcamentos-page.erp-os-page .fi-ta-cell.erp-os-col-situacao .erp-os__status-chip--faturar {
+    margin-left: 0;
+    padding-inline: 0.2rem;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:is(.erp-os-col-desconto, .erp-os-col-total),
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-desconto, .erp-os-col-total) {
+    width: 5.85rem !important;
+    min-width: 5.85rem !important;
+    max-width: 6.25rem !important;
+    padding-inline: 0.18rem 0.22rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-total,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-total {
+    width: 7rem !important;
+    min-width: 7rem !important;
+    max-width: 7.5rem !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-desconto, .erp-os-col-total) .fi-ta-col {
+    overflow: hidden !important;
+}
+
+/* O valor ocupa o espaço livre da célula (em Orçamentos fica fixo em 7ch). */
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-desconto, .erp-os-col-total) .erp-orc-total-cell__amount {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-desconto, .erp-os-col-total) .fi-ta-col .fi-ta-text {
+    max-width: 100% !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-desconto, .erp-os-col-total) .fi-ta-text-item {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-espelho,
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-espelho {
+    width: 1.45rem !important;
+    min-width: 1.45rem !important;
+    max-width: 1.45rem !important;
+    padding-inline: 0 !important;
+}
+
+.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell.erp-os-col-espelho .fi-ta-col {
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* ── Conteúdo das células da OS ─────────────────────────────────────────────── */
+
+.erp-os-page .erp-os-envio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.erp-os-page .erp-os-envio--email {
+    color: #2563eb;
+}
+
+.erp-os-page .erp-os-envio--whats {
+    color: #16a34a;
+}
+
+.erp-os-page .erp-os-envio--vazio {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.erp-os-page .erp-os-espelho-modal__item-obs {
+    margin-top: 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #475569;
+    white-space: normal;
+}
+
+.erp-os-page .erp-orc-total-cell--vazio {
+    justify-content: flex-end;
+    color: var(--erp-text-muted, #94a3b8);
+}
+
+.erp-os-page .fi-ta-row.erp-row-selected .erp-orc-total-cell--vazio {
+    color: #fff;
+}
+
+/* F9 — Enviar OS + documentos: anexos em chips com × (retira só deste envio) */
+.erp-os-page .erp-orc-envio-modal .erp-nfe-whatsapp-modal__attachments {
+    gap: 0.3rem;
+}
+
+.erp-os-anexo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    max-width: 100%;
+    height: 1.6rem;
+    padding: 0 0.2rem 0 0.55rem;
+    border: 1px solid #86efac;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.erp-os-anexo-chip__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-os-anexo-chip__remove {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #15803d;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background var(--erp-transition, 0.15s ease), color var(--erp-transition, 0.15s ease);
+}
+
+.erp-os-anexo-chip__remove:hover,
+.erp-os-anexo-chip__remove:focus-visible {
+    background: #fee2e2;
+    color: #dc2626;
+    outline: none;
+}
+
+.erp-os-anexo-chip__remove:disabled {
+    opacity: 0.4;
+    cursor: wait;
+}
+
+/* F6 — Documentos para imprimir (OS + notas fiscais vinculadas) */
+.erp-orcamentos-page.erp-os-page .erp-os-print-docs .erp-lookup-modal__window {
+    width: min(24rem, calc(100vw - 2rem));
+}
+
+.erp-os-print-docs__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem;
+}
+
+.erp-os-print-docs__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.erp-os-print-docs__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+}
+
+.erp-os-print-docs__check {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--erp-text, #0f172a);
+    cursor: pointer;
+}
+
+.erp-os-print-docs__check input {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    accent-color: var(--erp-brand-primary, #1e5a9e);
+    cursor: pointer;
+}
+
+.erp-os-print-docs__modelo {
+    display: inline-flex;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.erp-os-print-docs__modelo label {
+    padding: 0.18rem 0.6rem;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+.erp-os-print-docs__modelo label.is-active {
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+}
+
+.erp-os-print-docs__modelo input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.erp-os-print-docs__actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.erp-os-print-docs__actions .erp-orc-print-modal__option {
+    flex: 1 1 0;
+}
+
+.erp-os-print-docs__btn--print {
+    background: linear-gradient(180deg, var(--erp-brand-primary, #1e5a9e) 0%, var(--erp-brand-primary-dark, #0f3460) 100%);
+    border-color: var(--erp-brand-primary-dark, #0f3460);
+    color: #fff;
+}
+
+.erp-os-print-docs__btn--print:hover {
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+}

@@ -365,16 +365,29 @@
                     >
                 </div>
                 <div class="erp-produtos-form__cell">
-                    <label for="pprod-c-trib-mun">Cód. municipal</label>
-                    <input
-                        id="pprod-c-trib-mun"
-                        type="text"
-                        wire:model="data.c_trib_mun"
-                        maxlength="20"
-                        autocomplete="off"
-                        class="erp-pcad-form__input"
-                        title="Código de Tributação Municipal, opcional"
-                    >
+                    <label for="pprod-c-trib-mun">F2 | Cód. municipal</label>
+                    <div class="erp-produtos-form__control erp-produtos-form__control--lookup">
+                        <input
+                            id="pprod-c-trib-mun"
+                            type="text"
+                            wire:model="data.c_trib_mun"
+                            maxlength="20"
+                            autocomplete="off"
+                            class="erp-pcad-form__input"
+                            title="Código de Tributação Municipal (F2 para pesquisar ou cadastrar)"
+                        >
+                        <button
+                            type="button"
+                            data-erp-open-lookup="trib_mun"
+                            class="erp-pcad-form__btn erp-pcad-form__btn--icon"
+                            title="Cadastrar / gerenciar códigos municipais"
+                            aria-label="Cadastrar código municipal"
+                        >
+                            <span class="erp-pcad-form__btn-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                            </span>
+                        </button>
+                    </div>
                 </div>
                 <div class="erp-produtos-form__cell">
                     <label for="pprod-c-ind-op">Indicador da operação</label>

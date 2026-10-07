@@ -30,6 +30,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
 use App\Support\Erp\Nfe\NfeOrdemServicoService;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
+use App\Support\Erp\Os\OrdemServicoRetorno;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -132,6 +133,10 @@ class ListNfes extends ListRecords
 
         $ordemServicoId = (int) request()->query('ordem_servico_id', 0);
         if ($ordemServicoId > 0) {
+            if (OrdemServicoRetorno::solicitadoNaRequisicao()) {
+                $this->nfeRetornoOsId = $ordemServicoId;
+            }
+
             $this->abrirNfeDeOrdemServico($ordemServicoId);
         }
     }
@@ -548,11 +553,35 @@ class ListNfes extends ListRecords
             return;
         }
 
+        $existente = Nfe::query()
+            ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda'])
+            ->where('ordem_servico_id', $ordem->id)
+            ->whereIn('status', OrdemServico::NFE_PECAS_EMITIDA_STATUS)
+            ->when($empresaId, fn (Builder $query, int $id) => $query->where('empresa_id', $id))
+            ->latest('id')
+            ->first();
+
+        if ($existente) {
+            $this->highlightedRecordId = (int) $existente->id;
+            $this->loadNfeIntoModal($existente);
+
+            Notification::make()
+                ->title('Esta OS já possui NF-e das peças (nº '.ltrim((string) $existente->numero, '0').').')
+                ->body($existente->status === Nfe::STATUS_DUPLICIDADE
+                    ? 'A nota está em duplicidade e pode já estar autorizada na SEFAZ. Consulte/resolva esta nota antes de emitir outra.'
+                    : 'A nota existente foi aberta. Para emitir outra, cancele esta primeiro.')
+                ->info()
+                ->send();
+
+            return;
+        }
+
         try {
             $payload = app(NfeOrdemServicoService::class)->montarPayload($ordem);
 
             $this->createNfe();
 
+            $this->nfeModalOrdemServicoId = (int) $payload['ordem_servico_id'];
             $this->nfeForm['cliente_id'] = (string) $payload['cliente_id'];
             $this->updatedNfeFormClienteId();
             $this->nfeForm['finalidade'] = $payload['finalidade'];

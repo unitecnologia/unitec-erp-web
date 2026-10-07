@@ -127,6 +127,7 @@ final class OrdemServicoReportData
         $row = [
             'codigo' => trim((string) ($item->product?->codigo ?? $item->codigo_legado ?? '')),
             'descricao' => $descricao !== '' ? mb_strtoupper($descricao, 'UTF-8') : '—',
+            'servico_prestado' => trim((string) ($item->servico_prestado ?? '')),
             'qtd' => self::qtd($item->qtd),
             'unitario' => self::money($item->preco),
             'desconto' => self::moneyOpcional($item->desconto),

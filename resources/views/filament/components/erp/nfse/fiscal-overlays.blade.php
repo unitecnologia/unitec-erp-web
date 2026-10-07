@@ -40,15 +40,7 @@
         <div class="erp-nfe-fiscal-overlay__actions erp-nfe-fiscal-overlay__actions--cce">
             <button type="button" class="erp-nfe-fiscal-overlay__btn erp-nfe-fiscal-overlay__btn--print" id="erp-nfse-sucesso-imprimir" wire:click="imprimirNfseAutorizada">Imprimir</button>
             <button type="button" class="erp-nfe-fiscal-overlay__btn erp-nfe-fiscal-overlay__btn--email" wire:click="abrirNfseEnviar">Enviar</button>
-            @if ($this->nfseFiscalSucessoPodeGerarNfe)
-                <button
-                    type="button"
-                    class="erp-nfe-fiscal-overlay__btn erp-nfe-fiscal-overlay__btn--nfe"
-                    id="erp-nfse-sucesso-gerar-nfe"
-                    wire:click="gerarNfeDasPecasOs"
-                >Gerar NF-e</button>
-            @endif
-            <button type="button" class="erp-nfe-fiscal-overlay__btn erp-nfe-fiscal-overlay__btn--exit" wire:click="closeNfseFiscalSucesso">Sair</button>
+            <button type="button" class="erp-nfe-fiscal-overlay__btn erp-nfe-fiscal-overlay__btn--exit" wire:click="sairNfseFiscalSucesso">Sair</button>
         </div>
         <p class="erp-nfe-fiscal-overlay__hint">A nota já consta como autorizada na SEFIN.</p>
     </div>
@@ -91,10 +83,6 @@
         const overlay = document.getElementById('erp-nfse-fiscal-sucesso');
         const detalhe = overlay && overlay.querySelector('.erp-nfe-fiscal-overlay__codigo');
         if (detalhe && payload && payload.detalhe) detalhe.textContent = payload.detalhe;
-        const gerar = document.getElementById('erp-nfse-sucesso-gerar-nfe');
-        if (gerar) {
-            gerar.style.display = payload && payload.podeGerarNfe ? '' : 'none';
-        }
         window.__erpNfseShowOverlay('erp-nfse-fiscal-sucesso');
         document.getElementById('erp-nfse-sucesso-imprimir')?.focus();
     };

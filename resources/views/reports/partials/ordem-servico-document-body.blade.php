@@ -138,13 +138,24 @@
                         </thead>
                         <tbody>
                             @foreach ($servicos as $item)
+                                @php($servicoPrestado = trim((string) ($item['servico_prestado'] ?? '')))
                                 <tr>
                                     @if ($tecnica)
                                         <td class="center">{{ $item['qtd'] }}</td>
-                                        <td>{{ $item['descricao'] }}</td>
+                                        <td>
+                                            {{ $item['descricao'] }}
+                                            @if ($servicoPrestado !== '')
+                                                <div style="margin-top: 1px; font-size: 90%; font-weight: normal;">{!! nl2br(e($servicoPrestado)) !!}</div>
+                                            @endif
+                                        </td>
                                     @else
                                         <td>{{ $item['codigo'] !== '' ? $item['codigo'] : '—' }}</td>
-                                        <td>{{ $item['descricao'] }}</td>
+                                        <td>
+                                            {{ $item['descricao'] }}
+                                            @if ($servicoPrestado !== '')
+                                                <div style="margin-top: 1px; font-size: 90%; font-weight: normal;">{!! nl2br(e($servicoPrestado)) !!}</div>
+                                            @endif
+                                        </td>
                                         <td class="center">{{ $item['qtd'] }}</td>
                                         <td class="num">{{ $item['unitario'] }}</td>
                                         <td class="num">{{ $item['desconto'] }}</td>

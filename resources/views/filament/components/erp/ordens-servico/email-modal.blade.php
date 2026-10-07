@@ -108,16 +108,20 @@
                             Preparando {{ $envioTecnica ? 'OS Técnica' : 'anexos (OS, NFS-e, NF-e, boleto)' }}…
                         </span>
                         @forelse ($this->emailAttachments as $attachment)
-                            <button
-                                type="button"
-                                wire:click="selectEmailAttachment(@js($attachment['id']))"
-                                @class([
-                                    'erp-nfe-whatsapp-modal__attachment',
-                                    'is-selected' => $this->emailSelectedAttachmentId === $attachment['id'],
-                                ])
-                            >
-                                {{ $attachment['display'] }}
-                            </button>
+                            <span class="erp-os-anexo-chip" wire:key="os-anexo-{{ $attachment['id'] }}" title="{{ $attachment['display'] }}">
+                                <span class="erp-os-anexo-chip__label">{{ $attachment['display'] }}</span>
+                                @unless ($envioTecnica)
+                                <button
+                                    type="button"
+                                    class="erp-os-anexo-chip__remove"
+                                    wire:click="removeEmailAttachment(@js($attachment['id']))"
+                                    wire:loading.attr="disabled"
+                                    wire:target="sendOrdemServicoEmail,sendOrdemServicoWhatsApp"
+                                    title="Retirar deste envio"
+                                    aria-label="Retirar {{ $attachment['display'] }} deste envio"
+                                >×</button>
+                                @endunless
+                            </span>
                         @empty
                             <span class="erp-nfe-whatsapp-modal__attachments-empty" data-erp-os-anexos-empty>
                                 Nenhum anexo.
@@ -138,15 +142,6 @@
                             @disabled($this->emailAttachmentsLoading)
                         >
                     </label>
-                    <button
-                        type="button"
-                        wire:click="removeSelectedEmailAttachment"
-                        class="erp-orc-email-modal__mini-btn erp-orc-email-modal__mini-btn--danger"
-                        @disabled($this->emailAttachmentsLoading || blank($this->emailSelectedAttachmentId))
-                    >
-                        <span aria-hidden="true">✕</span>
-                        Excluir anexo
-                    </button>
                 </div>
                 @endunless
 
@@ -158,7 +153,7 @@
                     @if ($envioTecnica)
                         Anexa somente a OS Técnica (sem valores). Informe o WhatsApp do mecânico nesta tela; o número não é gravado no cadastro nem na OS.
                     @else
-                        Anexa automaticamente OS, NFS-e, NF-e e boleto quando existirem.
+                        Anexa automaticamente OS, NFS-e, NF-e e boleto quando existirem; use o × para tirar um anexo só deste envio.
                         Pode enviar por e-mail e depois por WhatsApp sem fechar esta tela.
                     @endif
                 </p>

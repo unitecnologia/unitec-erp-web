@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.235',
+    'versao' => '6.4.1.236',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*

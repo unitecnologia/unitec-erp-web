@@ -7,7 +7,7 @@
         </div>
         <div class="erp-os-form-group erp-os-form-group--grow">
             <label class="erp-os-form-label" for="os-laudo">Serviços prestados</label>
-            <textarea id="os-laudo" wire:model="laudo" @disabled($readOnly) class="erp-os-form-textarea"></textarea>
+            <textarea id="os-laudo" wire:model="laudo" data-erp-uppercase x-init="window.ErpUppercase?.bindInput($el)" @disabled($readOnly) class="erp-os-form-textarea"></textarea>
         </div>
     </div>
 </div>

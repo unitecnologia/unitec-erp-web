@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -57,6 +58,17 @@ class Nfse extends Model
         'trib_issqn',
         'tp_ret_issqn',
         'aliquota_iss',
+        'discriminacao',
+        'os_veiculo_id',
+        'numero_serie',
+        'descricao',
+        'descricao2',
+        'modelo',
+        'ano',
+        'placa',
+        'km',
+        'cor_veiculo',
+        'chassi_veiculo',
         'serie_dps',
         'numero_dps',
         'numero_nfse',
@@ -76,7 +88,27 @@ class Nfse extends Model
         'iss',
         'total',
         'status',
+        'cancelamento_codigo',
+        'cancelada_em',
+        'cancelada_por',
+        'xml_cancelamento',
     ];
+
+    /**
+     * Motivos do pedido de cancelamento (tsCodigoCancelamentoNfse ABRASF).
+     *
+     * @return array<string, string>
+     */
+    public static function motivosCancelamento(): array
+    {
+        return [
+            '1' => 'Erro na emissão',
+            '2' => 'Serviço não prestado',
+            '3' => 'Erro de assinatura',
+            '4' => 'Duplicidade da nota',
+            '5' => 'Erro de processamento',
+        ];
+    }
 
     /**
      * @return array<string, string>
@@ -134,6 +166,11 @@ class Nfse extends Model
         return $this->belongsTo(OrdemServico::class, 'ordem_servico_id');
     }
 
+    public function osVeiculo(): BelongsTo
+    {
+        return $this->belongsTo(OsVeiculo::class, 'os_veiculo_id');
+    }
+
     public function tomador(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'tomador_id');
@@ -142,6 +179,17 @@ class Nfse extends Model
     public function itens(): HasMany
     {
         return $this->hasMany(NfseItem::class)->orderBy('ordem');
+    }
+
+    /**
+     * Nota ligada à OS pelo cabeçalho ou por algum serviço importado dela.
+     */
+    public function scopeDaOrdemServico(Builder $query, int $ordemId): Builder
+    {
+        return $query->where(function (Builder $query) use ($ordemId): void {
+            $query->where('ordem_servico_id', $ordemId)
+                ->orWhereHas('itens', fn (Builder $itens) => $itens->where('ordem_servico_id', $ordemId));
+        });
     }
 
     protected function casts(): array
@@ -157,6 +205,7 @@ class Nfse extends Model
             'total' => 'decimal:2',
             'alertas' => 'array',
             'transmitindo_em' => 'datetime',
+            'cancelada_em' => 'datetime',
         ];
     }
 }

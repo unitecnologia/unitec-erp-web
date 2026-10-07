@@ -60,6 +60,7 @@
                         wire:model.live.debounce.300ms="itemAjusteValor"
                         wire:keydown.enter.prevent="confirmarItemAjuste"
                         wire:keydown.escape.prevent="fecharModalDescontoItem"
+                        x-init="$nextTick(() => { $el.removeAttribute('readonly'); $el.focus(); $el.select(); })"
                         class="erp-pdv-modal__input erp-pdv-desconto__valor-input"
                         inputmode="decimal"
                         autocomplete="off"

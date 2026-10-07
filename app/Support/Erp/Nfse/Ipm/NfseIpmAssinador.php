@@ -37,18 +37,56 @@ class NfseIpmAssinador
             throw new NfseNaoTransmitida('Elemento Rps não encontrado para a assinatura do RPS IPM.');
         }
 
+        $prestador = $doc->getElementsByTagName('Prestador')->item(0);
+        $this->confirmarCnpj(
+            $prestador instanceof DOMElement ? ($prestador->getElementsByTagName('Cnpj')->item(0)?->textContent ?? '') : '',
+            $certificate->certificatePem,
+        );
+        $this->assinarElemento($doc, $inf, $rps, $certificate);
+
+        $xmlAssinado = $doc->saveXML() ?: '';
+        $this->validar($xmlAssinado);
+
+        return $xmlAssinado;
+    }
+
+    /**
+     * Pedido de cancelamento: mesma assinatura, referenciando InfPedidoCancelamento e dentro de Pedido.
+     */
+    public function assinarCancelamento(Nfse $nfse, string $xml): string
+    {
+        return $this->assinarPedidoCancelamento($xml, $this->certificadoDaNota($nfse));
+    }
+
+    public function assinarPedidoCancelamento(string $xml, Certificate $certificate): string
+    {
+        $doc = $this->carregar($xml);
+        $inf = $doc->getElementsByTagName('InfPedidoCancelamento')->item(0);
+        $pedido = $inf?->parentNode;
+
+        if (! $inf instanceof DOMElement || ! $pedido instanceof DOMElement || $pedido->localName !== 'Pedido') {
+            throw new NfseNaoTransmitida('Pedido de cancelamento inválido para assinatura.');
+        }
+
+        $this->confirmarCnpj($inf->getElementsByTagName('Cnpj')->item(0)?->textContent ?? '', $certificate->certificatePem);
+        $this->assinarElemento($doc, $inf, $pedido, $certificate);
+        $this->verificarAssinatura($inf, $pedido);
+
+        return $doc->saveXML() ?: '';
+    }
+
+    private function assinarElemento(DOMDocument $doc, DOMElement $inf, DOMElement $pai, Certificate $certificate): void
+    {
         $id = trim($inf->getAttribute('Id'));
 
         if ($id === '') {
-            throw new NfseNaoTransmitida('Atributo Id de InfDeclaracaoPrestacaoServico ausente para a assinatura.');
+            throw new NfseNaoTransmitida('Atributo Id de '.$inf->localName.' ausente para a assinatura.');
         }
-
-        $this->confirmarEmitente($doc, $certificate->certificatePem);
 
         $digest = base64_encode(hash('sha1', $inf->C14N(false, false), true));
 
         $signature = $doc->createElementNS(self::DSIG_NS, 'Signature');
-        $rps->appendChild($signature);
+        $pai->appendChild($signature);
 
         $signedInfo = $doc->createElementNS(self::DSIG_NS, 'SignedInfo');
         $signature->appendChild($signedInfo);
@@ -93,11 +131,6 @@ class NfseIpmAssinador
         $x509 = $doc->createElementNS(self::DSIG_NS, 'X509Data');
         $keyInfo->appendChild($x509);
         $x509->appendChild($doc->createElementNS(self::DSIG_NS, 'X509Certificate', $this->certificadoDer($certificate->certificatePem)));
-
-        $xmlAssinado = $doc->saveXML() ?: '';
-        $this->validar($xmlAssinado);
-
-        return $xmlAssinado;
     }
 
     public function validar(string $xml): void
@@ -108,6 +141,23 @@ class NfseIpmAssinador
 
         if (! $signature instanceof DOMElement || $signature->parentNode !== $inf->parentNode) {
             throw new NfseNaoTransmitida('A assinatura do RPS IPM deve ficar dentro de Rps.');
+        }
+
+        $this->verificarAssinatura($inf, $signature->parentNode);
+    }
+
+    private function verificarAssinatura(DOMElement $inf, DOMElement $pai): void
+    {
+        $signature = null;
+
+        foreach ($pai->childNodes as $filho) {
+            if ($filho instanceof DOMElement && $filho->localName === 'Signature' && $filho->namespaceURI === self::DSIG_NS) {
+                $signature = $filho;
+            }
+        }
+
+        if (! $signature instanceof DOMElement) {
+            throw new NfseNaoTransmitida('Assinatura digital não encontrada.');
         }
 
         $reference = $signature->getElementsByTagNameNS(self::DSIG_NS, 'Reference')->item(0);
@@ -156,12 +206,9 @@ class NfseIpmAssinador
         }
     }
 
-    private function confirmarEmitente(DOMDocument $doc, string $certificadoPem): void
+    private function confirmarCnpj(string $cnpj, string $certificadoPem): void
     {
-        $prestador = $doc->getElementsByTagName('Prestador')->item(0);
-        $cnpj = $prestador instanceof DOMElement
-            ? (preg_replace('/\D/', '', $prestador->getElementsByTagName('Cnpj')->item(0)?->textContent ?? '') ?? '')
-            : '';
+        $cnpj = preg_replace('/\D/', '', $cnpj) ?? '';
         $titular = $this->cnpjTitular($certificadoPem);
 
         if ($cnpj === '' || $titular === '' || substr($cnpj, 0, 8) !== substr($titular, 0, 8)) {

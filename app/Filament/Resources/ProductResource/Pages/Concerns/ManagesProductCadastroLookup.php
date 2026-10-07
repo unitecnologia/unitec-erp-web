@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ProductResource\Pages\Concerns;
 use App\Models\Grupo;
 use App\Models\Marca;
 use App\Models\Ncm;
+use App\Models\NfseCodigoMunicipal;
 use App\Models\Product;
 use App\Models\Unidade;
 use App\Support\Erp\Fiscal\NcmCatalogService;
@@ -275,6 +276,22 @@ trait ManagesProductCadastroLookup
                 continue;
             }
 
+            if ($this->lookupType === 'trib_mun' && $field === 'codigo') {
+                $payload[$field] = mb_substr(NfseCodigoMunicipal::normalizarCodigo($value), 0, 20);
+                $this->lookupForm[$field] = $payload[$field];
+
+                if ($payload[$field] === '') {
+                    Notification::make()
+                        ->title('Informe o código com letras ou números.')
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+
+                continue;
+            }
+
             $payload[$field] = Str::upper($value);
             $this->lookupForm[$field] = $payload[$field];
         }
@@ -344,6 +361,16 @@ trait ManagesProductCadastroLookup
 
         if ($applyNcmToProduct && $ncmCodigo !== '') {
             $this->applyNcmToProductForm($ncmCodigo, $ncmDescricao);
+            $this->closeProductLookup();
+        }
+
+        if ($this->lookupType === 'trib_mun' && $wasCreating) {
+            $this->data['c_trib_mun'] = $uniqueValue;
+
+            if (isset($this->form) && method_exists($this->form, 'fill')) {
+                $this->form->fill($this->data);
+            }
+
             $this->closeProductLookup();
         }
 
@@ -579,6 +606,19 @@ trait ManagesProductCadastroLookup
                     'ncm_descricao' => 'descricao',
                 ],
                 'model' => Ncm::class,
+                'columns' => [
+                    'codigo' => 'Código',
+                    'descricao' => 'Descrição',
+                ],
+                'searchColumns' => ['codigo', 'descricao'],
+                'defaultSearchColumn' => 'codigo',
+                'formFields' => ['codigo', 'descricao'],
+            ],
+            'trib_mun' => [
+                'title' => 'Código de tributação municipal',
+                'targetField' => 'c_trib_mun',
+                'valueColumn' => 'codigo',
+                'model' => NfseCodigoMunicipal::class,
                 'columns' => [
                     'codigo' => 'Código',
                     'descricao' => 'Descrição',

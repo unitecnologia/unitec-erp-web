@@ -14,10 +14,12 @@ class NfseItem extends Model
      */
     protected $fillable = [
         'nfse_id',
+        'ordem_servico_id',
         'product_id',
         'ordem',
         'codigo',
         'descricao',
+        'servico_prestado',
         'unidade',
         'quantidade',
         'valor',
@@ -42,9 +44,29 @@ class NfseItem extends Model
         return $this->belongsTo(Nfse::class);
     }
 
+    public function ordemServico(): BelongsTo
+    {
+        return $this->belongsTo(OrdemServico::class, 'ordem_servico_id');
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Descrição que vai para o XML e para a impressão: serviço + serviço prestado da linha.
+     */
+    public function descricaoComServicoPrestado(): string
+    {
+        $descricao = trim((string) $this->descricao);
+        $prestado = trim(preg_replace('/\s+/u', ' ', (string) $this->servico_prestado) ?? '');
+
+        if ($prestado === '') {
+            return $descricao;
+        }
+
+        return $descricao !== '' ? $descricao.': '.$prestado : $prestado;
     }
 
     protected function casts(): array

@@ -150,7 +150,9 @@ trait ErpOrdemServicoFormPage
 
     public bool $servicoPrestadoModalOpen = false;
 
-    public string $laudoModalSnapshot = '';
+    public ?int $servicoPrestadoIndex = null;
+
+    public string $servicoPrestadoTexto = '';
 
     public ?string $itemAjusteAlvo = null;
 
@@ -597,6 +599,7 @@ trait ErpOrdemServicoFormPage
             'product_id' => $item->product_id,
             'product_codigo' => $item->product?->codigo ?? '',
             'discriminacao' => mb_strtoupper((string) ($item->discriminacao ?? $item->product?->descricao ?? ''), 'UTF-8'),
+            'servico_prestado' => (string) ($item->servico_prestado ?? ''),
             'qtd' => ErpMoney::formatBr((float) $item->qtd, 3),
             'preco' => ErpMoney::formatBr((float) $item->preco),
             'desconto' => ErpMoney::formatBr((float) ($item->desconto ?? 0)),
@@ -1840,13 +1843,14 @@ trait ErpOrdemServicoFormPage
         $this->itemAjusteAlvo = null;
     }
 
-    public function abrirModalServicoPrestado(): void
+    public function abrirModalServicoPrestado(int $index): void
     {
-        if ($this->osReadOnly()) {
+        if ($this->osReadOnly() || ($this->itens[$index]['tipo'] ?? null) !== 'S') {
             return;
         }
 
-        $this->laudoModalSnapshot = $this->laudo;
+        $this->servicoPrestadoIndex = $index;
+        $this->servicoPrestadoTexto = (string) ($this->itens[$index]['servico_prestado'] ?? '');
         $this->servicoPrestadoModalOpen = true;
         $this->dispatch('erp-os-focus-servico-prestado');
     }
@@ -1854,18 +1858,31 @@ trait ErpOrdemServicoFormPage
     public function fecharModalServicoPrestado(): void
     {
         $this->servicoPrestadoModalOpen = false;
+        $this->servicoPrestadoIndex = null;
+        $this->servicoPrestadoTexto = '';
     }
 
     public function cancelarModalServicoPrestado(): void
     {
-        $this->laudo = $this->laudoModalSnapshot;
         $this->fecharModalServicoPrestado();
     }
 
     public function confirmarModalServicoPrestado(): void
     {
-        $this->laudo = trim($this->laudo);
+        $index = $this->servicoPrestadoIndex;
+
+        if ($index !== null && isset($this->itens[$index])) {
+            $this->itens[$index]['servico_prestado'] = mb_strtoupper(trim($this->servicoPrestadoTexto), 'UTF-8');
+        }
+
         $this->fecharModalServicoPrestado();
+    }
+
+    public function getServicoPrestadoItemDescricaoProperty(): string
+    {
+        $index = $this->servicoPrestadoIndex;
+
+        return $index !== null ? (string) ($this->itens[$index]['discriminacao'] ?? '') : '';
     }
 
     public function setItemAjusteTipo(string $tipo): void
@@ -2058,6 +2075,7 @@ trait ErpOrdemServicoFormPage
             'product_id' => $product->id,
             'product_codigo' => $product->codigo,
             'discriminacao' => mb_strtoupper($product->descricao, 'UTF-8'),
+            'servico_prestado' => '',
             'qtd' => ErpMoney::formatBr($qtd, 3),
             'preco' => ErpMoney::formatBr($preco),
             'acrescimo' => ErpMoney::formatBr(max(0, $acrescimo)),
@@ -2543,7 +2561,7 @@ trait ErpOrdemServicoFormPage
                     'chassi_veiculo' => mb_strtoupper(trim($this->chassiVeiculo), 'UTF-8') ?: null,
                     'problema' => trim($this->problema) ?: null,
                     'observacoes' => trim($this->observacoes) ?: null,
-                    'laudo' => trim($this->laudo) ?: null,
+                    'laudo' => mb_strtoupper(trim($this->laudo), 'UTF-8') ?: null,
                     'subtotal' => round($subPecas + $subServicos, 2),
                     'subtotal_pecas' => $subPecas,
                     'subtotal_servicos' => $subServicos,
@@ -2590,6 +2608,9 @@ trait ErpOrdemServicoFormPage
                         'funcionario_id' => filled($row['funcionario_id'] ?? null) ? (int) $row['funcionario_id'] : null,
                         'tipo' => ($row['tipo'] ?? 'P') === 'S' ? 'S' : 'P',
                         'discriminacao' => mb_strtoupper((string) ($row['discriminacao'] ?? ''), 'UTF-8') ?: null,
+                        'servico_prestado' => ($row['tipo'] ?? 'P') === 'S'
+                            ? (mb_strtoupper(trim((string) ($row['servico_prestado'] ?? '')), 'UTF-8') ?: null)
+                            : null,
                         'qtd' => ErpMoney::parseBr($row['qtd'] ?? 0, 3),
                         'preco' => ErpMoney::parseBr($row['preco'] ?? 0),
                         'desconto' => ErpMoney::parseBr($row['desconto'] ?? 0),

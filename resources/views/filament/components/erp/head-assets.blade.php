@@ -27,6 +27,9 @@
 @if (ErpPageAssets::resourceSegment() === 'nfse')
     <script src="{{ asset('js/erp-nfse-lancamento.js') }}?v={{ $version }}" defer></script>
 @endif
+@if (ErpPageAssets::resourceSegment() === 'ordens-servico')
+    <script src="{{ asset('js/erp-print-fila.js') }}?v={{ $version }}-v1" defer></script>
+@endif
 
 @if (ErpPageAssets::resourceSegment() === 'notas-fornecedores')
     <script src="{{ asset('js/erp-notas-fornecedores.js') }}?v={{ $version }}-v2" defer></script>

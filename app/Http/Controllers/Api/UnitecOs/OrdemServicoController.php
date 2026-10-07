@@ -531,8 +531,18 @@ class OrdemServicoController
             }
 
             if (array_key_exists('servicos', $data)) {
+                // O app não envia o texto por serviço (lançado no web): reaplica pelo produto/descrição.
+                $servicoPrestado = $os->itens()
+                    ->where('tipo', 'S')
+                    ->whereNotNull('servico_prestado')
+                    ->get(['product_id', 'discriminacao', 'servico_prestado'])
+                    ->mapWithKeys(static fn ($item): array => [
+                        ($item->product_id ? 'p'.$item->product_id : 'd'.mb_strtoupper((string) $item->discriminacao, 'UTF-8')) => $item->servico_prestado,
+                    ])
+                    ->all();
+
                 $os->itens()->where('tipo', 'S')->delete();
-                self::gravarItensCatalogo($os, $user, $vendedorId, (array) $data['servicos'], 'S', permitirPrecoManual: true);
+                self::gravarItensCatalogo($os, $user, $vendedorId, (array) $data['servicos'], 'S', permitirPrecoManual: true, servicoPrestado: $servicoPrestado);
             }
 
             if (array_key_exists('pecas', $data) || array_key_exists('servicos', $data)) {
@@ -611,6 +621,7 @@ class OrdemServicoController
 
     /**
      * @param  list<mixed>  $itens
+     * @param  array<string, string>  $servicoPrestado  chave "p{product_id}" ou "d{DESCRIÇÃO}"
      */
     private static function gravarItensCatalogo(
         OrdemServico $os,
@@ -619,6 +630,7 @@ class OrdemServicoController
         array $itens,
         string $tipo,
         bool $permitirPrecoManual,
+        array $servicoPrestado = [],
     ): void {
         foreach ($itens as $item) {
             $productId = null;
@@ -678,6 +690,7 @@ class OrdemServicoController
                 'product_id' => $productId,
                 'tipo' => $tipo,
                 'discriminacao' => $nome,
+                'servico_prestado' => $servicoPrestado[$productId ? 'p'.$productId : 'd'.$nome] ?? null,
                 'nome' => $nome,
                 'qtd' => $qtd,
                 'preco' => $preco,

@@ -2,11 +2,15 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Models\Nfse;
+use App\Models\NfseItem;
 use App\Models\OrdemServico;
 use App\Models\Person;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
+use App\Support\Erp\Nfse\NfseOsDiscriminacao;
+use App\Support\Erp\Nfse\NfsePagamentosOs;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
 
@@ -341,18 +345,13 @@ trait ManagesNfseImportOs
 
         /** @var Collection<int, OrdemServico> $ordens */
         $ordens = $query->get();
+        $comNfse = $this->nfseOsIdsComNotaValida($ordens->pluck('id')->map(fn ($id): int => (int) $id)->all());
 
         $this->nfseImportOsResults = $ordens
-            ->map(function (OrdemServico $ordem): ?array {
-                $motivo = NfseFromOrdemServico::motivoBloqueio($ordem);
+            ->map(function (OrdemServico $ordem) use ($comNfse): ?array {
+                $motivo = $this->motivoBloqueioImportacaoOs($ordem, $comNfse);
                 $servicos = NfseFromOrdemServico::servicos($ordem);
-                $total = '0.00';
-
-                foreach ($servicos as $item) {
-                    $qtd = NfseFromOrdemServico::quantidade($item) ?? '0.000';
-                    $valor = NfseFromOrdemServico::valor($item) ?? '0.00';
-                    $total = bcadd($total, bcmul($qtd, $valor, 8), 2);
-                }
+                $total = NfseFromOrdemServico::totalLiquido($ordem);
 
                 /** @var Person|null $cliente */
                 $cliente = $ordem->cliente;
@@ -405,7 +404,7 @@ trait ManagesNfseImportOs
             return;
         }
 
-        $motivo = NfseFromOrdemServico::motivoBloqueio($ordem);
+        $motivo = $this->motivoBloqueioImportacaoOs($ordem);
 
         if ($motivo !== null) {
             Notification::make()->title($motivo)->warning()->send();
@@ -453,7 +452,15 @@ trait ManagesNfseImportOs
             $this->nfseOsLaudoPreservado = $laudo;
         }
 
-        $this->nfseOsOrigemId = $osId;
+        $this->nfseDiscriminacao = NfseOsDiscriminacao::anexar($this->nfseDiscriminacao, $ordem);
+
+        $origem = (int) ($this->nfseOsOrigemId ?? 0);
+
+        if ($origem < 1 || ! in_array($origem, $this->nfseOsIdsDasLinhas(), true)) {
+            $this->nfseOsOrigemId = $osId;
+        }
+
+        $this->aplicarEquipamentoDaOsNfse($ordem);
         $this->closeNfseImportOs();
 
         Notification::make()
@@ -470,16 +477,14 @@ trait ManagesNfseImportOs
     {
         $linhas = [];
 
-        foreach (NfseFromOrdemServico::servicos($ordem) as $item) {
+        foreach (NfseFromOrdemServico::linhas($ordem) as $linha) {
+            $item = $linha['item'];
             $produto = $item->product;
 
             if ($produto === null || ! $produto->is_servico) {
                 continue;
             }
 
-            $quantidade = NfseFromOrdemServico::quantidade($item) ?? '0.000';
-            $valor = NfseFromOrdemServico::valor($item) ?? '0.00';
-            $total = $this->nfseMultiplicarDecimal($quantidade, $valor);
             $this->nfseServicoSeq++;
 
             $linhas[] = [
@@ -488,13 +493,14 @@ trait ManagesNfseImportOs
                 'product_id' => (int) $produto->id,
                 'codigo' => (string) ($produto->codigo ?? ''),
                 'descricao' => NfseFromOrdemServico::descricao($item),
+                'servico_prestado' => trim((string) ($item->servico_prestado ?? '')),
                 'unidade' => (string) ($produto->unidade ?? ''),
-                'quantidade' => $this->nfseFormatarDecimal($quantidade, 3),
-                'valor' => $this->nfseFormatarDecimal($valor, 2),
-                'desconto' => '0,00',
-                'acrescimo' => '0,00',
-                'total' => $this->nfseFormatarDecimal($total, 2),
-                'total_decimal' => $total,
+                'quantidade' => $this->nfseFormatarDecimal($linha['quantidade'], 3),
+                'valor' => $this->nfseFormatarDecimal($linha['valor'], 2),
+                'desconto' => $this->nfseFormatarDecimal($linha['desconto'], 2),
+                'acrescimo' => $this->nfseFormatarDecimal($linha['acrescimo'], 2),
+                'total' => $this->nfseFormatarDecimal($linha['total'], 2),
+                'total_decimal' => $linha['total'],
                 'c_trib_nac' => $produto->c_trib_nac,
                 'c_nbs' => $produto->c_nbs,
                 'c_trib_mun' => $produto->c_trib_mun,
@@ -505,6 +511,180 @@ trait ManagesNfseImportOs
         }
 
         return $linhas;
+    }
+
+    /**
+     * @param  array<int, Nfse>|null  $notasPorOs  já consultadas em lote (busca); null consulta só esta OS
+     */
+    protected function motivoBloqueioImportacaoOs(OrdemServico $ordem, ?array $notasPorOs = null): ?string
+    {
+        $motivo = NfseFromOrdemServico::motivoBloqueio($ordem);
+
+        if ($motivo !== null) {
+            return $motivo;
+        }
+
+        $numeroOs = (string) ($ordem->numero ?: $ordem->id);
+        $notaValida = $notasPorOs !== null
+            ? ($notasPorOs[(int) $ordem->id] ?? null)
+            : ($this->nfseOsIdsComNotaValida([(int) $ordem->id])[(int) $ordem->id] ?? null);
+
+        if ($notaValida !== null) {
+            return 'A OS nº '.$numeroOs.' já tem NFS-e '.$this->nfseDescricaoNotaOs($notaValida).'.';
+        }
+
+        if ($this->nfseTomadorId !== null && (int) $this->nfseTomadorId !== (int) $ordem->cliente_id) {
+            return 'A OS nº '.$numeroOs.' é de outro cliente. Só é possível importar OS do tomador desta NFS-e.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Revalida no F2 as OS da nota: mesmo cliente do tomador e sem outra NFS-e válida.
+     */
+    protected function motivoBloqueioOsDaNfse(int $tomadorId): ?string
+    {
+        $osIds = $this->nfseOsIdsDasLinhas();
+
+        if ($osIds === []) {
+            return null;
+        }
+
+        $ordens = OrdemServico::query()->whereIn('id', $osIds)->get(['id', 'numero', 'cliente_id']);
+
+        foreach ($ordens as $ordem) {
+            if ((int) $ordem->cliente_id !== $tomadorId) {
+                return 'A OS nº '.($ordem->numero ?: $ordem->id).' é de outro cliente. Os serviços de OS precisam ser do tomador da NFS-e.';
+            }
+        }
+
+        $outras = $this->nfseOsIdsComNotaValida($osIds);
+
+        foreach ($ordens as $ordem) {
+            $nota = $outras[(int) $ordem->id] ?? null;
+
+            if ($nota !== null) {
+                return 'A OS nº '.($ordem->numero ?: $ordem->id).' já tem NFS-e '.$this->nfseDescricaoNotaOs($nota).'.';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Pagamento registrado no faturamento das OS desta nota (só leitura).
+     *
+     * @return array{linhas: list<array{os: string, forma: string, parcela: string, vencimento: string, valor: string}>, avisos: list<string>}
+     */
+    public function getNfsePagamentosOsProperty(): array
+    {
+        return NfsePagamentosOs::porOsIds($this->nfseOsIdsDasLinhas());
+    }
+
+    /**
+     * Número das OS importadas na nota, para o título do modal.
+     *
+     * @return list<string>
+     */
+    public function nfseOsNumerosImportadas(): array
+    {
+        $osIds = $this->nfseOsIdsDasLinhas();
+
+        if ($osIds === []) {
+            return [];
+        }
+
+        return OrdemServico::query()
+            ->whereIn('id', $osIds)
+            ->orderBy('numero')
+            ->get(['id', 'numero'])
+            ->map(fn (OrdemServico $ordem): string => (string) ($ordem->numero ?: $ordem->id))
+            ->all();
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function nfseOsIdsDasLinhas(): array
+    {
+        $ids = [];
+
+        foreach ($this->nfseServicos as $linha) {
+            $osId = (int) ($linha['os_id'] ?? 0);
+
+            if ($osId < 1 && preg_match('/^nfse-os-(\d+)-/', (string) ($linha['key'] ?? ''), $match) === 1) {
+                $osId = (int) $match[1];
+            }
+
+            if ($osId > 0 && ! in_array($osId, $ids, true)) {
+                $ids[] = $osId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * NFS-e válida de cada OS (fora a nota aberta na tela), em duas consultas.
+     *
+     * @param  list<int>  $osIds
+     * @return array<int, Nfse>
+     */
+    protected function nfseOsIdsComNotaValida(array $osIds): array
+    {
+        if ($osIds === []) {
+            return [];
+        }
+
+        $empresaId = ErpContext::currentEmpresaId();
+        $ignorar = $this->nfseIdAtualParaOs();
+        $base = fn () => Nfse::query()
+            ->when($empresaId !== null, fn ($query) => $query->where('empresa_id', $empresaId))
+            ->when($ignorar !== null, fn ($query) => $query->whereKeyNot($ignorar))
+            ->whereNotIn('status', NfseFromOrdemServico::NFSE_SEM_VALIDADE);
+
+        $notas = [];
+
+        foreach ($base()->whereIn('ordem_servico_id', $osIds)->orderBy('id')->get() as $nota) {
+            $notas[(int) $nota->ordem_servico_id] = $nota;
+        }
+
+        $porItem = NfseItem::query()
+            ->whereIn('ordem_servico_id', $osIds)
+            ->whereIn('nfse_id', $base()->select('id'))
+            ->orderBy('nfse_id')
+            ->get(['nfse_id', 'ordem_servico_id']);
+
+        if ($porItem->isNotEmpty()) {
+            $porId = $base()->whereKey($porItem->pluck('nfse_id')->unique()->all())->get()->keyBy('id');
+
+            foreach ($porItem as $item) {
+                $nota = $porId->get((int) $item->nfse_id);
+
+                if ($nota !== null) {
+                    $notas[(int) $item->ordem_servico_id] ??= $nota;
+                }
+            }
+        }
+
+        return $notas;
+    }
+
+    protected function nfseIdAtualParaOs(): ?int
+    {
+        return $this->nfseId !== null && (int) $this->nfseId > 0 ? (int) $this->nfseId : null;
+    }
+
+    protected function nfseDescricaoNotaOs(Nfse $nota): string
+    {
+        $numero = trim((string) ($nota->numero_nfse ?? ''));
+
+        if ($numero !== '') {
+            return 'nº '.$numero;
+        }
+
+        return '(DPS nº '.$nota->numero_dps.', '.mb_strtolower($nota->statusLabel(), 'UTF-8').')';
     }
 
     protected function nfseOsJaImportada(int $osId): bool

@@ -272,6 +272,10 @@
     background: rgb(255 255 255 / 22%);
 }
 
+.erp-nfe-page.erp-nfse-page .erp-nfse-lancamento-modal .erp-nfe-lancamento-modal__window {
+    width: min(calc(98rem + 5cm), calc(100vw - 3rem));
+}
+
 .erp-nfe-page.erp-nfse-page .erp-nfse-lancamento-modal #erp-nfse-lancamento-title {
     flex: 1 1 auto;
     min-width: 0;
@@ -562,6 +566,275 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-cell {
+    display: flex;
+    align-items: stretch;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-cell .erp-nfe-lancamento-modal__cell-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-edit {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    padding: 0;
+    border: 1px solid #8fa8c8;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #fff 0%, #eef4fb 100%);
+    color: #1e5a9e;
+    cursor: pointer;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-edit svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-edit:hover {
+    border-color: #2563eb;
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-edit--filled {
+    border-color: #16a34a;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #15803d;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__desc-edit--locked:not(.erp-nfse-servicos-grid__desc-edit--filled) {
+    color: #64748b;
+    border-color: #cbd5e1;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-cancelar-modal {
+    z-index: 400;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal .erp-nfse-cancelar-modal__window {
+    width: min(32rem, calc(100vw - 2rem)) !important;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal .erp-lookup-modal__titlebar {
+    background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__resumo {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem 0.75rem;
+    margin: 0 0 0.85rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__resumo dt {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__resumo dd {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__resumo-tomador {
+    grid-column: span 2;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__label {
+    margin: 0 0 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__motivos {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__motivo {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__motivo:hover {
+    border-color: #94a3b8;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__motivo.is-selected {
+    border-color: #dc2626;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__motivo input {
+    accent-color: #dc2626;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__aviso {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__footer {
+    gap: 0.5rem;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__confirmar {
+    min-width: 9rem;
+    min-height: 2.1rem;
+    padding: 0.35rem 1rem;
+    border: 1px solid #b91c1c;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-nfe-page .erp-nfse-cancelar-modal__confirmar:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-titulo-os {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.6rem;
+    padding: 0.05rem 0.55rem;
+    border: 1px solid rgb(255 255 255 / 45%);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 16%);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfe-lancamento-modal__status-box--producao {
+    border-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
+    min-width: 6.6rem;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfe-lancamento-modal__status-box--sem-ambiente {
+    border-color: #ef4444;
+    background: #fef2f2;
+    color: #991b1b;
+    min-width: 6.6rem;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-pagamentos-grid td {
+    padding: 0.3rem 0.5rem;
+    font-weight: 600;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-pagamentos-aviso {
+    margin: 0.4rem 0.2rem 0;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.erp-nfe-page.erp-nfse-page .erp-nfse-servico-prestado-modal {
+    z-index: 400;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal .erp-nfse-servico-prestado-modal__window {
+    width: min(36rem, calc(100vw - 2rem)) !important;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__servico {
+    margin: 0 0 0.15rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__footer {
+    gap: 0.5rem;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__cancelar {
+    min-width: 6rem;
+    min-height: 2.1rem;
+    padding: 0.35rem 1rem;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__cancelar:hover {
+    background: #f1f5f9;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__hint {
+    margin: 0 0 0.45rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #475569;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__hint strong {
+    color: #0f172a;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__textarea {
+    display: block;
+    width: 100%;
+    min-height: 9rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    resize: vertical;
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 18%);
+}
+
+.erp-nfe-page .erp-nfse-servico-prestado-modal__textarea--readonly {
+    background: #f1f5f9;
+    color: #334155;
+    cursor: default;
 }
 
 .erp-nfe-page.erp-nfse-page .erp-nfse-servicos-grid__total {

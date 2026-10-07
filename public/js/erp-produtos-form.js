@@ -7,6 +7,7 @@ const ERP_PRODUCT_LOOKUP_FIELDS = {
     'pprod-unidade': 'unidade',
     'pprod-ncm': 'ncm',
     'pprod-ncm-desc': 'ncm',
+    'pprod-c-trib-mun': 'trib_mun',
 };
 
 /** Próximo campo a focar após morph do Livewire (Enter na precificação). */

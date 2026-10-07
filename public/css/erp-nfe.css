@@ -4759,6 +4759,50 @@
     z-index: 320;
 }
 
+/* erp-form-ui.css força fundo branco com !important em todo .erp-pcad-actions__btn. */
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn {
+    min-width: 7.5rem !important;
+    padding-inline: 0.85rem !important;
+    border: 1px solid #1e3a8a !important;
+    background: linear-gradient(180deg, #3b82f6 0%, #1e5a9e 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(30, 90, 158, 0.3) !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
+    border-color: #1e3a8a !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn--danger {
+    min-width: 11rem !important;
+    border-color: #991b1b !important;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%) !important;
+    box-shadow: 0 2px 8px rgba(185, 28, 28, 0.32) !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn--danger:hover:not(:disabled) {
+    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
+    border-color: #991b1b !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn .erp-pcad-actions__icon,
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn .erp-pcad-actions__label {
+    color: #fff !important;
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+.erp-nfe-page .erp-nfe-cancel-modal .erp-pcad-actions__btn .erp-pcad-actions__label {
+    font-weight: 700 !important;
+}
+
 .erp-nfe-page .erp-nfe-cce-modal {
     z-index: 320;
 }

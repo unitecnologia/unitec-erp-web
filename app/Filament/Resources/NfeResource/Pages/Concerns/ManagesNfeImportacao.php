@@ -47,6 +47,8 @@ trait ManagesNfeImportacao
     /** Vínculo com devolução de compra — impede baixa duplicada de estoque na NF-e. */
     public ?int $nfeModalDevolucaoCompraId = null;
 
+    public ?int $nfeModalOrdemServicoId = null;
+
     public function importNfeModal(): void
     {
         if (! $this->nfeModalOpen || $this->nfeImportMenuOpen || $this->nfeImportListOpen) {

@@ -680,218 +680,7 @@
     overflow: hidden;
 }
 
-/* OS — larguras próprias (não herdar as do orçamento)
-   1 Nº | 2 NFS-e | 3 Data | 4 H.Aber. | 5 H.Fech. | 6 Cliente | 7 Atendente
-   8 Equipamento | 9 Placa | 10 Meio de Pag. | 11 Env. | 12 Situação | 13 Total | 14 Espelho */
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(2),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(2),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-nfse\.numero_nfse,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-nfse\.numero_nfse {
-    width: 5.25rem !important;
-    min-width: 5rem !important;
-    max-width: 5.75rem !important;
-    padding-inline: 0.15rem !important;
-    white-space: nowrap;
-    text-align: center;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(3),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(3),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-data_inicio,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-data_inicio {
-    width: 5.85rem !important;
-    min-width: 5.5rem !important;
-    max-width: 6.25rem !important;
-    padding-inline: 0.15rem !important;
-    white-space: nowrap;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(4),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(4),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-hora_inicio,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-hora_inicio {
-    width: 3.85rem !important;
-    min-width: 3.6rem !important;
-    max-width: 4.1rem !important;
-    padding-inline: 0.1rem !important;
-    white-space: nowrap;
-    text-align: center;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(5),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(5),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-hora_termino,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-hora_termino {
-    width: 3.85rem !important;
-    min-width: 3.6rem !important;
-    max-width: 4.1rem !important;
-    padding-inline: 0.1rem !important;
-    white-space: nowrap;
-    text-align: center;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(6),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(6),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-cliente_nome,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-cliente_nome {
-    width: 8.5rem !important;
-    min-width: 7rem !important;
-    max-width: 9rem !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(7),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(7),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-atendente\.nome,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-atendente\.nome {
-    width: 9rem !important;
-    min-width: 8.5rem !important;
-    max-width: 10rem !important;
-    padding-inline: 0.2rem !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(8),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(8),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-descricao,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-descricao {
-    width: 14rem !important;
-    min-width: 12rem !important;
-    max-width: 16rem !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(9),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(9),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-placa,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-placa {
-    width: 5.75rem !important;
-    min-width: 5.5rem !important;
-    max-width: 6.25rem !important;
-    padding-inline: 0.2rem !important;
-    white-space: nowrap;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(10),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(10),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-meio_pagamento,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-meio_pagamento {
-    width: 8.5rem !important;
-    min-width: 7rem !important;
-    max-width: 10rem !important;
-    padding-inline: 0.2rem !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(11),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(11),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-envio,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-envio {
-    width: 3.1rem !important;
-    min-width: 2.9rem !important;
-    max-width: 3.4rem !important;
-    padding-inline: 0.1rem !important;
-    white-space: nowrap;
-    text-align: center;
-}
-
-.erp-os-page .erp-os-envio {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    line-height: 1;
-}
-
-.erp-os-page .erp-os-envio--email {
-    color: #2563eb;
-}
-
-.erp-os-page .erp-os-envio--whats {
-    color: #16a34a;
-}
-
-.erp-os-page .erp-os-envio--vazio {
-    color: #94a3b8;
-    font-weight: 600;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(12),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(12),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-situacao,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-situacao {
-    width: 9.5rem !important;
-    min-width: 9rem !important;
-    max-width: 11rem !important;
-    padding-inline: 0.25rem !important;
-    overflow: visible !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(12) .fi-ta-col,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-situacao .fi-ta-col {
-    overflow: visible !important;
-    flex-wrap: wrap;
-    gap: 0.2rem;
-    justify-content: center !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(13),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(13),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-total_geral,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-total_geral {
-    width: 5.85rem !important;
-    min-width: 5.85rem !important;
-    max-width: 6.25rem !important;
-    padding-inline: 0.18rem 0.22rem !important;
-    overflow: hidden !important;
-    white-space: nowrap !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(13) .fi-ta-col,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-total_geral .fi-ta-col {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    overflow: hidden !important;
-    justify-content: flex-start !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(13) .fi-ta-col .fi-ta-text,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-total_geral .fi-ta-col .fi-ta-text {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    overflow: hidden !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(13) .fi-ta-text-item,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-total_geral .fi-ta-text-item {
-    overflow: hidden !important;
-    width: 100%;
-    max-width: 100% !important;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell:nth-child(14),
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(14),
-.erp-orcamentos-page.erp-os-page .fi-ta-header-cell-ver_espelho,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-ver_espelho {
-    width: 1.45rem !important;
-    min-width: 1.45rem !important;
-    max-width: 1.45rem !important;
-    padding-inline: 0 !important;
-    overflow: hidden;
-}
-
-.erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:nth-child(14) .fi-ta-col,
-.erp-orcamentos-page.erp-os-page .fi-ta-cell-ver_espelho .fi-ta-col {
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    justify-content: center !important;
-}
+/* OS: larguras/alinhamento das colunas e conteúdo das células ficam em erp-ordens-servico.css (classes erp-os-col-*). */
 
 /* Espelho da OS — consulta profissional (olho) */
 .erp-os-page .erp-os-espelho-modal__window.erp-orc-view-modal__window,
@@ -2393,5 +2182,117 @@
     border-color: #0f3460;
     background: #1e5a9e;
     color: #fff;
+}
+
+/* Confirmação Cancelar / Reabrir OS (mesmo visual da confirmação de Compras) */
+.erp-os-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 860;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.erp-os-confirm-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.erp-os-confirm-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, calc(100vw - 2rem));
+    border: 1px solid #7f96b3;
+    border-radius: 12px;
+    background: #f8fafc;
+    box-shadow: 0 22px 56px rgba(15, 40, 71, 0.42);
+    overflow: hidden;
+}
+
+.erp-os-confirm-modal__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(180deg, #1e5a9e 0%, #0f3460 100%);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.erp-os-confirm-modal__close {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-os-confirm-modal__close:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.erp-os-confirm-modal__body {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1.15rem 1.1rem 0.75rem;
+}
+
+.erp-os-confirm-modal__icon {
+    flex: 0 0 auto;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.erp-os-confirm-modal__message {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.erp-os-confirm-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    padding: 0.65rem 1.1rem 1rem;
+}
+
+.erp-os-confirm-modal__btn {
+    min-width: 5.4rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-os-confirm-modal__btn--yes {
+    border: 1px solid #1d4ed8;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.erp-os-confirm-modal__btn--no {
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #0f172a;
 }
 

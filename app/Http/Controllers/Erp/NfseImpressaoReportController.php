@@ -15,7 +15,7 @@ class NfseImpressaoReportController
     public function __invoke(Request $request, Nfse $nfse): View|Response
     {
         abort_unless(Auth::check(), 403);
-        abort_unless($nfse->status === Nfse::STATUS_AUTORIZADA && filled($nfse->xml_nfse), 404);
+        abort_unless(in_array($nfse->status, [Nfse::STATUS_AUTORIZADA, Nfse::STATUS_CANCELADA], true) && filled($nfse->xml_nfse), 404);
 
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
 
@@ -33,7 +33,11 @@ class NfseImpressaoReportController
 
         if ($request->boolean('pdf')) {
             $numero = preg_replace('/\D+/', '', (string) ($nfse->numero_nfse ?: $nfse->numero_dps)) ?: (string) $nfse->id;
-            $nome = ($view === NfseImpressao::VIEW_IPM ? 'NFSe-' : 'DANFSe-').$numero.'.pdf';
+            $nome = match ($view) {
+                NfseImpressao::VIEW_IPM => 'NFSe-',
+                NfseImpressao::VIEW_IPM_CANCELAMENTO => 'Cancelamento-NFSe-',
+                default => 'DANFSe-',
+            }.$numero.'.pdf';
 
             return Pdf::loadView($view, $data)
                 ->setPaper('a4', 'portrait')

@@ -61,50 +61,83 @@ class OrdemServicoResource extends Resource
 
                         return $record->codigo_legado ? (string) $record->codigo_legado : '—';
                     })
+                    ->extraHeaderAttributes(self::colunaOs('numero'))
+                    ->extraCellAttributes(self::colunaOs('numero'))
                     ->weight(FontWeight::SemiBold),
-                TextColumn::make('nfse.numero_nfse')
+                TextColumn::make('nfseAutorizada.numero_nfse')
                     ->label('NFS-e')
                     ->state(fn (OrdemServico $record): string => $record->nfseNumeroLista())
                     ->alignCenter()
-                    ->width('5.25rem')
                     ->placeholder('—')
+                    ->extraHeaderAttributes(self::colunaOs('nfse'))
+                    ->extraCellAttributes(self::colunaOs('nfse'))
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('nfeAutorizada.numero')
+                    ->label('NF-e')
+                    ->state(fn (OrdemServico $record): string => $record->nfeNumeroLista())
+                    ->alignCenter()
+                    ->placeholder('—')
+                    ->extraHeaderAttributes(self::colunaOs('nfe'))
+                    ->extraCellAttributes(self::colunaOs('nfe'))
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('nfce_numero')
+                    ->label('NFC-e')
+                    ->state(fn (OrdemServico $record): string => $record->nfceNumeroLista())
+                    ->alignCenter()
+                    ->placeholder('—')
+                    ->extraHeaderAttributes(self::colunaOs('nfce'))
+                    ->extraCellAttributes(self::colunaOs('nfce'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('data_inicio')
                     ->label('Data')
                     ->date('d/m/Y')
                     ->sortable()
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('data'))
+                    ->extraCellAttributes(self::colunaOs('data'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('hora_inicio')
                     ->label('H.Aber.')
                     ->state(fn (OrdemServico $record): string => $record->horaInicioExibicao() ?? '—')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('hora-abertura'))
+                    ->extraCellAttributes(self::colunaOs('hora-abertura'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('hora_termino')
                     ->label('H.Fech.')
                     ->state(fn (OrdemServico $record): string => $record->horaTerminoExibicao() ?? '—')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('hora-fechamento'))
+                    ->extraCellAttributes(self::colunaOs('hora-fechamento'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente_nome')
                     ->label('Cliente')
                     ->state(fn (OrdemServico $record): string => mb_strtoupper($record->clienteNome(), 'UTF-8'))
                     ->wrap(false)
+                    ->extraHeaderAttributes(self::colunaOs('cliente'))
+                    ->extraCellAttributes(self::colunaOs('cliente'))
                     ->weight(FontWeight::Bold),
                 TextColumn::make('atendente.nome')
                     ->label('Atendente')
                     ->placeholder('—')
                     ->wrap(false)
+                    ->extraHeaderAttributes(self::colunaOs('atendente'))
+                    ->extraCellAttributes(self::colunaOs('atendente'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('descricao')
                     ->label('Equipamento')
                     ->placeholder('—')
                     ->limit(40)
                     ->tooltip(fn (OrdemServico $record): ?string => $record->descricao)
+                    ->extraHeaderAttributes(self::colunaOs('equipamento'))
+                    ->extraCellAttributes(self::colunaOs('equipamento'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('placa')
                     ->label('Placa')
                     ->placeholder('—')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('placa'))
+                    ->extraCellAttributes(self::colunaOs('placa'))
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('meio_pagamento')
                     ->label('Meio de Pag.')
@@ -112,27 +145,42 @@ class OrdemServicoResource extends Resource
                     ->placeholder('—')
                     ->wrap(false)
                     ->tooltip(fn (OrdemServico $record): ?string => ($t = $record->meioPagamentoLista()) !== '—' ? $t : null)
+                    ->extraHeaderAttributes(self::colunaOs('meio-pagamento'))
+                    ->extraCellAttributes(self::colunaOs('meio-pagamento'))
                     ->weight(FontWeight::SemiBold),
                 ViewColumn::make('envio')
                     ->label('Env.')
                     ->view('filament.components.erp.ordens-servico.columns.envio')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('envio'))
+                    ->extraCellAttributes(self::colunaOs('envio'))
                     ->disabledClick(),
                 ViewColumn::make('situacao')
                     ->label('Situação')
                     ->view('filament.components.erp.ordens-servico.columns.status')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('situacao'))
+                    ->extraCellAttributes(self::colunaOs('situacao'))
+                    ->disabledClick(),
+                ViewColumn::make('desconto_total')
+                    ->label('Desconto')
+                    ->view('filament.components.erp.ordens-servico.columns.desconto')
+                    ->extraHeaderAttributes(self::colunaOs('desconto'))
+                    ->extraCellAttributes(self::colunaOs('desconto'))
                     ->disabledClick(),
                 ViewColumn::make('total_geral')
                     ->label('Total')
                     ->view('filament.components.erp.ordens-servico.columns.total')
+                    ->extraHeaderAttributes(self::colunaOs('total'))
+                    ->extraCellAttributes(self::colunaOs('total'))
                     ->disabledClick(),
                 ViewColumn::make('ver_espelho')
                     ->label('')
                     ->state(fn (): bool => true)
-                    ->width('1.35rem')
                     ->view('filament.components.erp.ordens-servico.columns.ver-espelho')
                     ->alignCenter()
+                    ->extraHeaderAttributes(self::colunaOs('espelho'))
+                    ->extraCellAttributes(self::colunaOs('espelho'))
                     ->disabledClick(),
             ])
             ->defaultSort('data_inicio', 'desc')
@@ -143,6 +191,16 @@ class OrdemServicoResource extends Resource
             ->recordActions([])
             ->toolbarActions([])
             ->emptyStateHeading('Nenhuma ordem de serviço encontrada');
+    }
+
+    /**
+     * Largura/alinhamento da coluna vêm de erp-ordens-servico.css por esta classe, nunca pela posição.
+     *
+     * @return array{class: string}
+     */
+    private static function colunaOs(string $nome): array
+    {
+        return ['class' => 'erp-os-col erp-os-col-'.$nome];
     }
 
     public static function getPages(): array

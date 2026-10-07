@@ -14,6 +14,8 @@ final class NfseImpressao
 
     public const VIEW_IPM = 'reports.nfse-ipm-impressao';
 
+    public const VIEW_IPM_CANCELAMENTO = 'reports.nfse-ipm-cancelamento';
+
     /**
      * @return array<string, mixed>
      */

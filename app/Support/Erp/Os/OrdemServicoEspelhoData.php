@@ -224,6 +224,7 @@ final class OrdemServicoEspelhoData
             return [
                 'codigo' => (string) ($item->product?->codigo ?? $item->codigo_legado ?? '—'),
                 'descricao' => $descricao !== '' ? mb_strtoupper($descricao, 'UTF-8') : '—',
+                'servico_prestado' => trim((string) ($item->servico_prestado ?? '')),
                 'tecnico' => mb_strtoupper((string) ($item->funcionario?->nome ?? '—'), 'UTF-8'),
                 'qtd' => ErpMoney::formatBr((float) $item->qtd, 3),
                 'preco' => ErpMoney::formatBr((float) $item->preco),

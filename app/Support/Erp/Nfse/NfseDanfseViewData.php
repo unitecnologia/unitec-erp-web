@@ -162,7 +162,7 @@ final class NfseDanfseViewData
     {
         $primeiro = $itens->first();
         $descricoes = $itens
-            ->map(static fn (NfseItem $item) => trim((string) $item->descricao))
+            ->map(static fn (NfseItem $item) => trim($item->descricaoComServicoPrestado()))
             ->filter()
             ->values()
             ->all();

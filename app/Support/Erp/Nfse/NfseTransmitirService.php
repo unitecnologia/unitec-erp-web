@@ -172,6 +172,17 @@ class NfseTransmitirService
             }
         }
 
+        $codigos = NfseDpsXmlGerador::codigosDistintos($itens->map(fn ($item): array => [
+            'cTribNac' => $item->c_trib_nac,
+            'cNBS' => $item->c_nbs,
+            'cTribMun' => $item->c_trib_mun,
+            'cIndOp' => $item->c_ind_op,
+        ])->all());
+
+        if ($codigos > 1) {
+            throw new NfseNaoTransmitida('No padrão Nacional cada NFS-e aceita um único código de serviço. Emita uma nota para cada código de tributação/NBS.');
+        }
+
         if (! $this->certificadoValido($empresa)) {
             throw new NfseNaoTransmitida('Certificado da empresa inválido ou vencido.');
         }

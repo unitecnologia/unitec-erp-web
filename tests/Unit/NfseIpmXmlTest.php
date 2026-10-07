@@ -5,13 +5,16 @@ namespace Tests\Unit;
 use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\NfseItem;
+use App\Models\OrdemServico;
 use App\Support\Erp\Nfse\Ipm\NfseIpmAssinador;
+use App\Support\Erp\Nfse\Ipm\NfseIpmCancelamentoResposta;
 use App\Support\Erp\Nfse\Ipm\NfseIpmCliente;
 use App\Support\Erp\Nfse\Ipm\NfseIpmMunicipios;
 use App\Support\Erp\Nfse\Ipm\NfseIpmResposta;
 use App\Support\Erp\Nfse\Ipm\NfseIpmXmlGerador;
 use App\Support\Erp\Nfse\Ipm\NfseIpmXmlValidador;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
+use App\Support\Erp\Nfse\NfseOsDiscriminacao;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -61,6 +64,87 @@ class NfseIpmXmlTest extends TestCase
         $this->assertStringNotContainsString('<Tomador>', $xml);
     }
 
+    public function test_desconto_vai_abatido_do_valor_dos_servicos_sem_desconto_incondicionado(): void
+    {
+        $nota = $this->nota();
+        $nota->setAttribute('desconto', '20.00');
+        $nota->setAttribute('total', '80.00');
+
+        $xml = app(NfseIpmXmlGerador::class)->gerar($nota);
+
+        $this->assertStringContainsString('<Valores><ValorServicos>80.00</ValorServicos><ValorIss>1.60</ValorIss><Aliquota>2.00</Aliquota></Valores>', $xml);
+        $this->assertStringNotContainsString('DescontoIncondicionado', $xml);
+    }
+
+    public function test_pedido_de_cancelamento_assinado_valida_no_xsd_oficial(): void
+    {
+        $nota = $this->nota();
+        $nota->setAttribute('status', Nfse::STATUS_AUTORIZADA);
+        $nota->setAttribute('numero_nfse', '8');
+
+        $xml = app(NfseIpmXmlGerador::class)->gerarCancelamento($nota, '1');
+
+        $this->assertStringContainsString(
+            '<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd"><Pedido><InfPedidoCancelamento Id="CANC_8"><IdentificacaoNfse><Numero>8</Numero><CpfCnpj><Cnpj>54644503000129</Cnpj></CpfCnpj><InscricaoMunicipal>230780</InscricaoMunicipal><CodigoMunicipio>4101804</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>1</CodigoCancelamento></InfPedidoCancelamento>',
+            $xml,
+        );
+
+        $assinado = app(NfseIpmAssinador::class)->assinarPedidoCancelamento($xml, $this->certificado());
+        $doc = new DOMDocument;
+        $doc->loadXML($assinado);
+        $signature = $doc->getElementsByTagNameNS(self::DSIG, 'Signature')->item(0);
+
+        $this->assertSame([], app(NfseIpmXmlValidador::class)->erros($assinado));
+        $this->assertSame('Pedido', $signature?->parentNode?->localName);
+        $this->assertStringContainsString('URI="#CANC_8"', $assinado);
+
+        $envelope = app(NfseIpmCliente::class)->envelopeCancelamento($assinado);
+        $this->assertStringContainsString('<soapenv:Body><CancelarNfseEnvio><Pedido><InfPedidoCancelamento xmlns="http://www.abrasf.org.br/nfse.xsd" Id="CANC_8">', $envelope);
+    }
+
+    public function test_cancelamento_recusa_motivo_invalido_e_nota_sem_numero(): void
+    {
+        $nota = $this->nota();
+        $nota->setAttribute('numero_nfse', '8');
+
+        try {
+            app(NfseIpmXmlGerador::class)->gerarCancelamento($nota, '9');
+            $this->fail('Motivo inválido deveria ser recusado.');
+        } catch (NfseNaoTransmitida $exception) {
+            $this->assertStringContainsString('motivo', $exception->getMessage());
+        }
+
+        $nota->setAttribute('numero_nfse', null);
+        $this->expectException(NfseNaoTransmitida::class);
+        app(NfseIpmXmlGerador::class)->gerarCancelamento($nota, '1');
+    }
+
+    public function test_resposta_do_cancelamento_confirmada_recusada_e_ja_cancelada(): void
+    {
+        $confirmada = NfseIpmCancelamentoResposta::interpretar(
+            '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>'
+            .'<CancelarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><RetCancelamento><NfseCancelamento><Confirmacao Id="C1">'
+            .'<Pedido><InfPedidoCancelamento Id="CANC_8"><IdentificacaoNfse><Numero>8</Numero></IdentificacaoNfse><CodigoCancelamento>1</CodigoCancelamento></InfPedidoCancelamento></Pedido>'
+            .'<DataHora>2026-10-06T21:30:00</DataHora></Confirmacao></NfseCancelamento></RetCancelamento></CancelarNfseResposta>'
+            .'</soap:Body></soap:Envelope>'
+        );
+        $this->assertTrue($confirmada->cancelada);
+        $this->assertSame('2026-10-06T21:30:00', $confirmada->dataHora);
+        $this->assertSame([], $confirmada->erros);
+
+        $recusada = NfseIpmCancelamentoResposta::interpretar(
+            '<CancelarNfseResposta><ListaMensagemRetorno><MensagemRetorno><Codigo>L999</Codigo><Mensagem>Prazo de cancelamento expirado.</Mensagem></MensagemRetorno></ListaMensagemRetorno></CancelarNfseResposta>'
+        );
+        $this->assertFalse($recusada->cancelada);
+        $this->assertSame([['codigo' => 'L999', 'descricao' => 'Prazo de cancelamento expirado.']], $recusada->erros);
+
+        $jaCancelada = NfseIpmCancelamentoResposta::interpretar(
+            '<ListaMensagemRetorno><MensagemRetorno><Codigo>E79</Codigo><Mensagem>Esta NFS-e já está cancelada.</Mensagem></MensagemRetorno></ListaMensagemRetorno>'
+        );
+        $this->assertTrue($jaCancelada->cancelada);
+        $this->assertTrue($jaCancelada->jaCancelada);
+    }
+
     public function test_modo_teste_envia_envio_teste_1_antes_do_rps(): void
     {
         $xml = $this->assinado($this->nota(), true);
@@ -107,6 +191,64 @@ class NfseIpmXmlTest extends TestCase
         $this->expectException(NfseNaoTransmitida::class);
         $this->expectExceptionMessage('não pertence ao CNPJ do prestador');
         app(NfseIpmAssinador::class)->assinar($xml, $outro);
+    }
+
+    public function test_codigo_municipal_vai_junto_com_cnae_da_empresa(): void
+    {
+        $xml = $this->assinado($this->nota(['c_trib_mun' => '452000100']));
+
+        $this->assertStringContainsString('<ItemListaServico>14.01.01</ItemListaServico><CodigoCnae>4520001</CodigoCnae><CodigoTributacaoMunicipio>452000100</CodigoTributacaoMunicipio><CodigoNbs>', $xml);
+        $this->assertSame([], app(NfseIpmXmlValidador::class)->erros($xml));
+    }
+
+    public function test_discriminacao_da_nota_vai_abaixo_da_descricao_do_servico(): void
+    {
+        $nota = $this->nota();
+        $nota->setAttribute('discriminacao', 'PLACA ABC1D23 - CAMBIO AUTOMATICO');
+        $xml = $this->assinado($nota);
+
+        $this->assertStringContainsString("<Discriminacao>TROCA DE OLEO DE CAMBIO\nPLACA ABC1D23 - CAMBIO AUTOMATICO</Discriminacao>", $xml);
+        $this->assertSame([], app(NfseIpmXmlValidador::class)->erros($xml));
+    }
+
+    public function test_bloco_da_os_vai_no_xml_assinado_uma_vez_e_valida_no_xsd(): void
+    {
+        $os = new OrdemServico([
+            'numero' => '6',
+            'descricao' => 'FIAT FIORINO',
+            'placa' => 'lzk6311',
+            'problema' => 'Câmbio raspando a 2ª marcha',
+            'laudo' => 'Embreagem gasta; trocado kit completo',
+        ]);
+        $nota = $this->nota();
+        $nota->setRelation('itens', collect([
+            new NfseItem(['descricao' => 'MAO DE OBRA', 'c_trib_nac' => '140101', 'c_nbs' => '120013110']),
+            new NfseItem(['descricao' => 'PROGRAMACAO', 'c_trib_nac' => '140101', 'c_nbs' => '120013110']),
+        ]));
+        $nota->setAttribute('discriminacao', NfseOsDiscriminacao::texto($os));
+        $xml = $this->assinado($nota);
+
+        $this->assertStringContainsString(
+            "<Discriminacao>MAO DE OBRA | PROGRAMACAO\nOS nº 6\nEquipamento/Veículo: FIAT FIORINO | Placa: LZK6311\nProblema: Câmbio raspando a 2ª marcha\nLaudo: Embreagem gasta; trocado kit completo</Discriminacao>",
+            $xml,
+        );
+        $this->assertSame(1, substr_count($xml, 'OS nº 6'));
+        $this->assertSame([], app(NfseIpmXmlValidador::class)->erros($xml));
+    }
+
+    public function test_rejeicao_de_atividade_indica_o_campo_do_erp(): void
+    {
+        $resposta = NfseIpmResposta::interpretar(<<<'XML'
+            <GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd">
+                <ListaMensagemRetorno>
+                    <MensagemRetorno><Codigo>L1024</Codigo><Mensagem>O município não utiliza código Cnae padrão.</Mensagem></MensagemRetorno>
+                    <MensagemRetorno><Codigo>L1003</Codigo><Mensagem>A atividade informada não está vinculada à lista de serviço.</Mensagem></MensagemRetorno>
+                </ListaMensagemRetorno>
+            </GerarNfseResposta>
+            XML);
+
+        $this->assertStringContainsString('"Cód. municipal"', $resposta->erros[0]['descricao']);
+        $this->assertStringContainsString('"Cód. tributação nacional"', $resposta->erros[1]['descricao']);
     }
 
     public function test_nao_incidencia_omite_municipio_de_incidencia(): void
@@ -179,6 +321,7 @@ class NfseIpmXmlTest extends TestCase
             'sem NBS' => [fn (Nfse $nota) => $nota->itens->first()->setAttribute('c_nbs', null), 'NBS'],
             'endereço do tomador incompleto' => [fn (Nfse $nota) => $nota->setAttribute('tomador_bairro', ''), 'endereço do tomador'],
             'serviços com códigos diferentes' => [fn (Nfse $nota) => $nota->itens->push(new NfseItem(['descricao' => 'OUTRO', 'c_trib_nac' => '170101', 'c_nbs' => '120013110'])), 'único código'],
+            'sem código municipal e sem CNAE' => [fn (Nfse $nota) => $nota->empresa->setAttribute('cnae', null), 'Cód. municipal'],
             'código nacional incompleto' => [fn (Nfse $nota) => $nota->itens->first()->setAttribute('c_trib_nac', '1401'), '6 dígitos'],
         ];
     }
