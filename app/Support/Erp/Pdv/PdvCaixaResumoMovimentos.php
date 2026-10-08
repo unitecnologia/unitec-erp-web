@@ -36,7 +36,7 @@ final class PdvCaixaResumoMovimentos
     }
 
     /**
-     * @return list<array{historico: string, entrada: float, saida: float}>
+     * @return list<array{historico: string, entrada: float, saida: float, grupo: string}>
      */
     public static function fromSessao(PdvCaixaSessao $sessao): array
     {
@@ -99,6 +99,7 @@ final class PdvCaixaResumoMovimentos
                 'historico' => 'ABERTURA DE CAIXA',
                 'entrada' => $aberturaEntrada,
                 'saida' => $aberturaSaida,
+                'grupo' => 'abertura',
             ];
         }
 
@@ -113,6 +114,7 @@ final class PdvCaixaResumoMovimentos
                 'historico' => $forma,
                 'entrada' => $totais['entrada'],
                 'saida' => $totais['saida'],
+                'grupo' => 'forma',
             ];
         }
 
@@ -122,6 +124,7 @@ final class PdvCaixaResumoMovimentos
                 'historico' => $label,
                 'entrada' => $totais['entrada'],
                 'saida' => $totais['saida'],
+                'grupo' => 'sangria',
             ];
         }
 
@@ -131,6 +134,7 @@ final class PdvCaixaResumoMovimentos
                 'historico' => $label,
                 'entrada' => $totais['entrada'],
                 'saida' => $totais['saida'],
+                'grupo' => 'suprimento',
             ];
         }
 
@@ -138,7 +142,8 @@ final class PdvCaixaResumoMovimentos
     }
 
     /**
-     * Soma pagamentos de todas as vendas da sessão (finalizadas = entrada, canceladas = saída).
+     * Soma pagamentos das vendas da sessão: toda venda (finalizada ou cancelada) entra;
+     * a cancelada também sai, na sessão onde o estorno foi registrado — igual ao caixa físico.
      *
      * @param  array<string, array{entrada: float, saida: float}>  $porForma
      */
@@ -148,17 +153,61 @@ final class PdvCaixaResumoMovimentos
             return;
         }
 
-        $vendaIds = PdvVenda::query()
+        $vendasSessao = PdvVenda::query()
             ->where('pdv_caixa_sessao_id', $sessaoId)
             ->whereIn('situacao', ['F', 'C'])
             ->pluck('situacao', 'id');
 
-        if ($vendaIds->isEmpty()) {
+        $canceladasSessao = $vendasSessao
+            ->filter(static fn ($situacao): bool => (string) $situacao === 'C')
+            ->keys()
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        /** @var array<int, int> $sessaoDoEstorno pdv_venda_id => sessão do 1º movimento de estorno */
+        $sessaoDoEstorno = [];
+
+        if ($canceladasSessao !== []) {
+            PdvCaixaMovimento::query()
+                ->where('tipo', 'estorno')
+                ->whereIn('pdv_venda_id', $canceladasSessao)
+                ->orderBy('id')
+                ->get(['pdv_venda_id', 'pdv_caixa_sessao_id'])
+                ->each(function (PdvCaixaMovimento $mov) use (&$sessaoDoEstorno): void {
+                    $sessaoDoEstorno[(int) $mov->pdv_venda_id] ??= (int) $mov->pdv_caixa_sessao_id;
+                });
+        }
+
+        $estornosDeOutrasSessoes = PdvCaixaMovimento::query()
+            ->where('pdv_caixa_sessao_id', $sessaoId)
+            ->where('tipo', 'estorno')
+            ->whereNotNull('pdv_venda_id')
+            ->whereNotIn('pdv_venda_id', $vendasSessao->keys()->all() ?: [0])
+            ->distinct()
+            ->pluck('pdv_venda_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        if ($estornosDeOutrasSessoes !== []) {
+            $estornosDeOutrasSessoes = PdvVenda::query()
+                ->whereIn('id', $estornosDeOutrasSessoes)
+                ->where('situacao', 'C')
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+        }
+
+        $ids = array_values(array_unique(array_merge(
+            $vendasSessao->keys()->map(static fn ($id): int => (int) $id)->all(),
+            $estornosDeOutrasSessoes,
+        )));
+
+        if ($ids === []) {
             return;
         }
 
         $pagamentos = PdvVendaPagamento::query()
-            ->whereIn('pdv_venda_id', $vendaIds->keys()->all())
+            ->whereIn('pdv_venda_id', $ids)
             ->get(['pdv_venda_id', 'forma', 'valor']);
 
         foreach ($pagamentos as $pagamento) {
@@ -169,11 +218,18 @@ final class PdvCaixaResumoMovimentos
                 continue;
             }
 
-            $situacao = (string) ($vendaIds[$pagamento->pdv_venda_id] ?? '');
+            $vendaId = (int) $pagamento->pdv_venda_id;
+            $situacao = (string) ($vendasSessao[$vendaId] ?? '');
 
-            if ($situacao === 'F') {
+            if ($situacao === 'F' || $situacao === 'C') {
                 self::somar($porForma, $forma, $valor, 0.0);
-            } elseif ($situacao === 'C') {
+            }
+
+            $saiNestaSessao = $situacao === 'C'
+                ? ($sessaoDoEstorno[$vendaId] ?? $sessaoId) === $sessaoId
+                : in_array($vendaId, $estornosDeOutrasSessoes, true);
+
+            if ($saiNestaSessao) {
                 self::somar($porForma, $forma, 0.0, $valor);
             }
         }

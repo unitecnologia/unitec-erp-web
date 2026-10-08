@@ -18,6 +18,8 @@ class WhatsAppSender
 
     public const TIPO_NFE = 'nfe';
 
+    public const TIPO_NFCE = 'nfce';
+
     public const TIPO_NFE_CONTADOR = 'nfe_contador';
 
     public const TIPO_NFCE_CONTADOR = 'nfce_contador';
@@ -258,6 +260,13 @@ class WhatsAppSender
             return [
                 'ok' => false,
                 'message' => 'Envio de NF-e por WhatsApp está desabilitado em Empresa → Parâmetros → WhatsApp. Use e-mail ou ative “Permitir envio de NF-e”.',
+            ];
+        }
+
+        if ($tipo === self::TIPO_NFCE && ! $config->enviarNfe) {
+            return [
+                'ok' => false,
+                'message' => 'Envio de NFC-e por WhatsApp está desabilitado em Empresa → Parâmetros → WhatsApp. Use e-mail ou ative “Permitir envio de NF-e”.',
             ];
         }
 

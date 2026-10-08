@@ -288,11 +288,11 @@ class ListProducts extends ListRecords
             'edit' => 'editProduct',
             'editUrl' => $this->productListDirectEditUrl(),
             'delete' => 'deleteProduct',
-            'extraKeys' => [
-                'F4' => ['method' => 'printProducts'],
-                'F7' => ['method' => 'openProductCardex'],
+            'extraKeys' => array_filter([
+                'F4' => $this->embedsInPdv ? null : ['method' => 'printProducts'],
+                'F7' => $this->embedsInPdv ? null : ['method' => 'openProductCardex'],
                 'F8' => ['method' => 'duplicateProduct'],
-            ],
+            ]),
         ];
     }
 

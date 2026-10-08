@@ -72,6 +72,7 @@ trait ManagesProductMovimentacoes
             'm.saldo_anterior',
             'm.saldo_atual',
             'm.origem_tipo',
+            'm.origem_id',
             'm.origem_numero',
             'u.name as usuario_nome',
         ];
@@ -92,7 +93,21 @@ trait ManagesProductMovimentacoes
 
         $this->productMovimentacoes = [];
 
+        $nfcePorOrigem = $hasDocFiscal
+            ? \App\Support\Erp\EstoqueMovimentacaoDocumento::nfcePorOrigem(
+                $rows->filter(fn ($row): bool => trim((string) ($row->doc_fiscal_numero ?? '')) === '')
+            )
+            : [];
+
         foreach ($rows as $row) {
+            if ($hasDocFiscal && trim((string) ($row->doc_fiscal_numero ?? '')) === '') {
+                $fallback = $nfcePorOrigem[(string) $row->origem_tipo.':'.(int) $row->origem_id] ?? null;
+                if ($fallback !== null) {
+                    $row->doc_fiscal_tipo = $fallback['docFiscalTipo'];
+                    $row->doc_fiscal_numero = $fallback['docFiscalNumero'];
+                }
+            }
+
             $qtd = (string) ($row->quantidade ?? '0');
             $usuarioNome = trim((string) ($row->usuario_nome ?? ''));
             $documento = EstoqueMovimentacao::documentoLabel(

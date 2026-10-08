@@ -6,9 +6,12 @@ use App\Models\ContaReceber;
 use App\Models\PdvVenda;
 use App\Models\Person;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\ErpSchema;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 final class PdvVendaFinanceiroService
 {
@@ -83,6 +86,7 @@ final class PdvVendaFinanceiroService
             ] : null;
 
             $criadas = array_merge($criadas, $this->criarParcelas(
+                pdvVendaId: (int) $venda->id,
                 personId: $personId,
                 contaForma: $contaForma,
                 formaLabel: $forma,
@@ -122,6 +126,7 @@ final class PdvVendaFinanceiroService
      * @return list<ContaReceber>
      */
     private function criarParcelas(
+        int $pdvVendaId,
         int $personId,
         string $contaForma,
         string $formaLabel,
@@ -137,6 +142,7 @@ final class PdvVendaFinanceiroService
         $n = count($dias);
         $parcelaBase = floor($total / $n * 100) / 100;
         $criadas = [];
+        $vinculo = $this->temVinculoPdvVenda() ? ['pdv_venda_id' => $pdvVendaId] : [];
 
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
@@ -184,6 +190,7 @@ final class PdvVendaFinanceiroService
                 'cartao_bandeira' => $canhoto['bandeira'] ?? null,
                 'cartao_parcela' => $canhoto !== null ? $parcelaLabel : null,
                 'numero_cheque' => $numeroCheque !== '' ? mb_substr($numeroCheque, 0, 40) : null,
+                ...$vinculo,
                 ...ContaReceberJurosCarteira::atributosParaCreate($contaForma, $empresaId),
             ]);
         }
@@ -204,14 +211,11 @@ final class PdvVendaFinanceiroService
             return $bloqueio;
         }
 
-        $documento = $this->documentoContasReceberPdv($venda);
+        $ids = $this->localizarContasReceber($venda)['contas']->modelKeys();
 
-        ContaReceber::query()
-            ->where(function ($q) use ($documento): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'/%');
-            })
-            ->delete();
+        if ($ids !== []) {
+            ContaReceber::query()->whereKey($ids)->delete();
+        }
 
         return null;
     }
@@ -222,17 +226,16 @@ final class PdvVendaFinanceiroService
      */
     public function motivoBloqueioEstornoContasReceber(PdvVenda $venda): ?string
     {
-        $documento = $this->documentoContasReceberPdv($venda);
-
-        $contas = ContaReceber::query()
-            ->where(function ($q) use ($documento): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'/%');
-            })
-            ->get();
+        ['contas' => $contas, 'ambiguo' => $ambiguo] = $this->localizarContasReceber($venda);
 
         if ($contas->isEmpty()) {
             return null;
+        }
+
+        if ($ambiguo) {
+            return 'Não foi possível identificar com segurança os títulos a receber desta venda: o documento '
+                .$this->documentoContasReceberPdv($venda)
+                .' também pertence a outra venda do mesmo período. Estorne os títulos manualmente em Contas a Receber.';
         }
 
         foreach ($contas as $conta) {
@@ -242,6 +245,97 @@ final class PdvVendaFinanceiroService
         }
 
         return null;
+    }
+
+    /**
+     * Títulos da venda pelo vínculo pdv_venda_id + empresa. O documento PDV-NNNNNN se repete entre
+     * sessões de caixa; para títulos antigos sem vínculo, só aceita os da mesma empresa criados junto
+     * com a venda e marca como ambíguo se houver outra venda de mesmo número no mesmo período.
+     *
+     * @return array{contas: Collection<int, ContaReceber>, ambiguo: bool}
+     */
+    public function localizarContasReceber(PdvVenda $venda): array
+    {
+        $venda->loadMissing('sessao');
+        $empresaId = $venda->sessao?->empresa_id !== null ? (int) $venda->sessao->empresa_id : null;
+        $temVinculo = $this->temVinculoPdvVenda();
+
+        if ($temVinculo) {
+            $vinculadas = $this->escopoEmpresa(
+                ContaReceber::query()->where('pdv_venda_id', (int) $venda->id),
+                $empresaId,
+            )->get();
+
+            if ($vinculadas->isNotEmpty()) {
+                return ['contas' => $vinculadas, 'ambiguo' => false];
+            }
+        }
+
+        $momentos = array_values(array_filter([$venda->fechado_em, $venda->created_at]));
+
+        if ($momentos === []) {
+            return ['contas' => new Collection(), 'ambiguo' => false];
+        }
+
+        $documento = $this->documentoContasReceberPdv($venda);
+
+        $legado = $this->escopoEmpresa(ContaReceber::query(), $empresaId)
+            ->where(function (Builder $q) use ($documento): void {
+                $q->where('documento', $documento)
+                    ->orWhere('documento', 'like', $documento.'/%');
+            })
+            ->when($temVinculo, fn (Builder $q): Builder => $q->whereNull('pdv_venda_id'))
+            ->where(fn (Builder $q): Builder => $this->dentroDaJanela($q, 'created_at', $momentos, 10))
+            ->get();
+
+        if ($legado->isEmpty()) {
+            return ['contas' => $legado, 'ambiguo' => false];
+        }
+
+        $outraVenda = PdvVenda::query()
+            ->whereKeyNot($venda->id)
+            ->where('numero', $venda->numero)
+            ->when(
+                $empresaId !== null,
+                fn (Builder $q): Builder => $q->whereHas('sessao', fn (Builder $s): Builder => $s->where('empresa_id', $empresaId)),
+                fn (Builder $q): Builder => $q->where(fn (Builder $w): Builder => $w
+                    ->whereDoesntHave('sessao')
+                    ->orWhereHas('sessao', fn (Builder $s): Builder => $s->whereNull('empresa_id'))),
+            )
+            ->where(function (Builder $q) use ($momentos): void {
+                $this->dentroDaJanela($q, 'fechado_em', $momentos, 20);
+                $this->dentroDaJanela($q, 'created_at', $momentos, 20);
+            })
+            ->exists();
+
+        return ['contas' => $legado, 'ambiguo' => $outraVenda];
+    }
+
+    /**
+     * @param  list<mixed>  $momentos
+     */
+    private function dentroDaJanela(Builder $query, string $coluna, array $momentos, int $minutos): Builder
+    {
+        foreach ($momentos as $momento) {
+            $query->orWhereBetween($coluna, [
+                Carbon::parse($momento)->subMinutes($minutos),
+                Carbon::parse($momento)->addMinutes($minutos),
+            ]);
+        }
+
+        return $query;
+    }
+
+    private function escopoEmpresa(Builder $query, ?int $empresaId): Builder
+    {
+        return $empresaId !== null
+            ? $query->where('empresa_id', $empresaId)
+            : $query->whereNull('empresa_id');
+    }
+
+    private function temVinculoPdvVenda(): bool
+    {
+        return ErpSchema::hasColumnActual('contas_receber', 'pdv_venda_id');
     }
 
     private function documentoContasReceberPdv(PdvVenda $venda): string

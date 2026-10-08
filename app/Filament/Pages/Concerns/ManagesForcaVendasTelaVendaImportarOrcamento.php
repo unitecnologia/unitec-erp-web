@@ -7,6 +7,7 @@ use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 
@@ -86,8 +87,7 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
         $term = trim($this->fvImportarOrcamentoSearch);
         $like = $term !== '' ? '%'.$term.'%' : null;
 
-        $query = Orcamento::query()
-            ->visivelNaListaOrcamentos()
+        $query = OrcamentoFaturamentoGuard::aplicarNaoFaturados(Orcamento::query()->visivelNaListaOrcamentos())
             ->with(['cliente:id,nome_razao,codigo'])
             ->where('status', Orcamento::STATUS_FECHADO)
             ->orderByDesc('data')
@@ -152,6 +152,15 @@ trait ManagesForcaVendasTelaVendaImportarOrcamento
 
         if (! $orcamento || $orcamento->status !== Orcamento::STATUS_FECHADO) {
             Notification::make()->title('Orçamento indisponível para importação.')->warning()->send();
+            $this->refreshFvImportarOrcamentoResults();
+
+            return;
+        }
+
+        $motivoFaturado = OrcamentoFaturamentoGuard::motivoFaturado($orcamentoId);
+
+        if ($motivoFaturado !== null) {
+            Notification::make()->title('Orçamento indisponível para importação.')->body($motivoFaturado)->warning()->send();
             $this->refreshFvImportarOrcamentoResults();
 
             return;

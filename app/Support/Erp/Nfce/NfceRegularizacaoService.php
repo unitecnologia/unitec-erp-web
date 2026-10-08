@@ -14,6 +14,7 @@ use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\VendasParametro;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\DocumentoBrasileiroValidator;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpSchema;
 use App\Support\Erp\ErpTimezone;
@@ -51,10 +52,9 @@ final class NfceRegularizacaoService
 
     private const ESPERA_TRAVA_SEGUNDOS = 2;
 
-    /** NFC-e anteriores que nunca valeram como documento e podem ser substituídas. */
-    private const STATUS_NFCE_SUBSTITUIVEIS = [
-        PdvVendaNfce::STATUS_REJEITADA,
-        'duplicidade',
+    /** NFC-e encerradas em registro de regularização: o registro é desvinculado (preservado) e outro é criado. */
+    private const STATUS_NFCE_ENCERRADAS = [
+        PdvVendaNfce::STATUS_CANCELADA,
         'inutilizada',
     ];
 
@@ -78,24 +78,83 @@ final class NfceRegularizacaoService
     /**
      * Validação antes da transmissão (sem SEFAZ). null = apta.
      */
-    public function validar(int $vendaId, ?int $empresaId): ?string
+    public function validar(int $vendaId, ?int $empresaId, bool $consumidorInformado = false): ?string
     {
         $venda = Venda::query()
             ->select(['id', 'numero', 'status', 'empresa_id', 'total', 'data', 'cliente_id'])
             ->find($vendaId);
 
-        return $this->motivoBloqueioVenda($venda, $empresaId);
+        return $this->motivoBloqueioVenda($venda, $empresaId, $consumidorInformado);
     }
 
     /**
+     * Consumidor informado na grade (cliente da base ou nome + CPF digitados).
+     * Lista vazia = consumidor não identificado. NFC-e não aceita CNPJ.
+     *
+     * @param  array<string, mixed>  $dados
+     * @return array{person_id: int|null, nome: string, cpf: string}
+     *
+     * @throws DomainException
+     */
+    public static function normalizarConsumidor(array $dados): array
+    {
+        $personId = (int) ($dados['person_id'] ?? 0);
+        $nome = mb_substr(mb_strtoupper(trim(preg_replace('/\s+/', ' ', (string) ($dados['nome'] ?? '')) ?? ''), 'UTF-8'), 0, 60, 'UTF-8');
+        $cpf = DocumentoBrasileiroValidator::digits((string) ($dados['cpf'] ?? ''));
+
+        if (strlen($cpf) === 14) {
+            throw new DomainException('NFC-e não aceita CNPJ. Para pessoa jurídica emita NF-e.');
+        }
+
+        if ($mensagem = DocumentoBrasileiroValidator::mensagemCpf($cpf)) {
+            throw new DomainException($mensagem);
+        }
+
+        $person = $personId > 0
+            ? Person::query()->whereKey($personId)->first(['id', 'codigo', 'nome_razao', 'apelido_fantasia', 'cpf_cnpj'])
+            : null;
+
+        if ($personId > 0 && $person === null) {
+            throw new DomainException('Cliente não encontrado no cadastro.');
+        }
+
+        if ($person !== null && Person::isCodigoConsumidorFinal($person->codigo !== null ? (string) $person->codigo : null)) {
+            $person = null;
+        }
+
+        if ($person !== null) {
+            $documento = DocumentoBrasileiroValidator::digits((string) $person->cpf_cnpj);
+
+            if (strlen($documento) === 14) {
+                throw new DomainException('Cliente com CNPJ: NFC-e não aceita CNPJ. Emita NF-e.');
+            }
+
+            if ($cpf === '' && DocumentoBrasileiroValidator::isValidCpf($documento)) {
+                $cpf = $documento;
+            }
+
+            if ($nome === '') {
+                $nome = mb_substr(mb_strtoupper(trim((string) ($person->nome_razao ?: $person->apelido_fantasia)), 'UTF-8'), 0, 60, 'UTF-8');
+            }
+        }
+
+        if ($cpf === '' && ($nome !== '' || $person !== null)) {
+            throw new DomainException('Informe o CPF do consumidor (NFC-e não identifica só pelo nome).');
+        }
+
+        return ['person_id' => $person?->id ? (int) $person->id : null, 'nome' => $nome, 'cpf' => $cpf];
+    }
+
+    /**
+     * @param  array{person_id: int|null, nome: string, cpf: string}|null  $consumidor  null = mantém o cliente da venda
      * @return array{status: string, mensagem: string, nfce_numero: int|null}
      */
-    public function emitir(int $vendaId, Empresa $empresa): array
+    public function emitir(int $vendaId, Empresa $empresa, ?array $consumidor = null): array
     {
         try {
             return VendaFiscalLock::executar(
                 $vendaId,
-                fn (): array => $this->emitirComTrava($vendaId, $empresa),
+                fn (): array => $this->emitirComTrava($vendaId, $empresa, $consumidor),
                 self::ESPERA_TRAVA_SEGUNDOS,
             );
         } catch (FiscalEngineException $exception) {
@@ -104,13 +163,14 @@ final class NfceRegularizacaoService
     }
 
     /**
+     * @param  array{person_id: int|null, nome: string, cpf: string}|null  $consumidor
      * @return array{status: string, mensagem: string, nfce_numero: int|null}
      */
-    private function emitirComTrava(int $vendaId, Empresa $empresa): array
+    private function emitirComTrava(int $vendaId, Empresa $empresa, ?array $consumidor): array
     {
         try {
             // Trecho crítico curto: revalida no banco e prepara o registro fiscal. Sem SEFAZ aqui.
-            $pdvVendaId = DB::transaction(fn (): int => $this->prepararVendaFiscal($vendaId, (int) $empresa->id));
+            $pdvVendaId = DB::transaction(fn (): int => $this->prepararVendaFiscal($vendaId, (int) $empresa->id, $consumidor));
 
             $venda = Venda::query()->select(['id', 'numero', 'data'])->find($vendaId);
             $pdvVenda = PdvVenda::query()
@@ -177,11 +237,11 @@ final class NfceRegularizacaoService
      *
      * @throws DomainException
      */
-    private function prepararVendaFiscal(int $vendaId, int $empresaId): int
+    private function prepararVendaFiscal(int $vendaId, int $empresaId, ?array $consumidor = null): int
     {
         $venda = Venda::query()->whereKey($vendaId)->lockForUpdate()->first();
 
-        if ($motivo = $this->motivoBloqueioVenda($venda, $empresaId)) {
+        if ($motivo = $this->motivoBloqueioVenda($venda, $empresaId, $consumidor !== null)) {
             throw new DomainException($motivo);
         }
 
@@ -197,30 +257,53 @@ final class NfceRegularizacaoService
         if ($alvo !== null) {
             $nfce = PdvVendaNfce::query()->where('pdv_venda_id', $alvo->id)->lockForUpdate()->first();
 
-            if ($nfce !== null) {
+            // Nunca exclui NFC-e: registro, XML e chave permanecem como histórico fiscal.
+            if ($nfce !== null && ! $this->isSimulada($nfce)) {
                 $status = (string) $nfce->status;
 
-                if (in_array($status, self::STATUS_NFCE_SUBSTITUIVEIS, true) || $this->isSimulada($nfce)) {
-                    $nfce->delete();
-                } elseif ($status === PdvVendaNfce::STATUS_CANCELADA && $alvo->isRegularizacaoFiscal()) {
-                    // Mantém a NFC-e cancelada (XML/protocolo) no registro antigo, desvinculado da venda.
+                if (in_array($status, self::STATUS_NFCE_ENCERRADAS, true) && $alvo->isRegularizacaoFiscal()) {
+                    // Mantém a NFC-e encerrada (XML/protocolo) no registro antigo, desvinculado da venda.
                     $alvo->forceFill([
                         'venda_id' => null,
                         'situacao' => 'C',
-                        'observacoes' => 'Regularização cancelada da venda nº '.$venda->numero.'.',
+                        'observacoes' => 'Regularização '.($status === PdvVendaNfce::STATUS_CANCELADA ? 'cancelada' : 'inutilizada')
+                            .' da venda nº '.$venda->numero.' (NFC-e nº '.$nfce->numero.').',
                     ])->save();
                     $alvo = null;
-                } elseif ($status === PdvVendaNfce::STATUS_PENDENTE) {
-                    throw new DomainException('NFC-e gravada aguardando transmissão. Transmita pela aba Gravados (F5).');
-                } elseif ($status === PdvVendaNfce::STATUS_CANCELADA) {
-                    throw new DomainException('Venda PDV com NFC-e cancelada. Use NF-e ou estorne a venda no PDV.');
                 } else {
-                    throw new DomainException('Já existe NFC-e ('.$status.') vinculada a esta venda.');
+                    throw new DomainException($this->mensagemNfceExistente($nfce));
                 }
             }
         }
 
-        return (int) ($alvo ?? $this->criarVendaFiscal($venda))->id;
+        $alvo ??= $this->criarVendaFiscal($venda);
+
+        if ($consumidor !== null) {
+            $this->aplicarConsumidor($alvo, $consumidor);
+        }
+
+        return (int) $alvo->id;
+    }
+
+    /**
+     * Identificação do consumidor só no registro fiscal (pdv_vendas); a venda original não é alterada.
+     *
+     * @param  array{person_id: int|null, nome: string, cpf: string}  $consumidor
+     */
+    private function aplicarConsumidor(PdvVenda $pdvVenda, array $consumidor): void
+    {
+        $dados = ['cpf_nota' => $consumidor['cpf'] !== '' ? $consumidor['cpf'] : null];
+
+        // Venda real do PDV mantém o cliente do caixa; só troca quando outro cliente da base foi escolhido.
+        if ($pdvVenda->isRegularizacaoFiscal() || $consumidor['person_id'] !== null) {
+            $dados['person_id'] = $consumidor['person_id'];
+        }
+
+        if (ErpSchema::hasColumn('pdv_vendas', 'nome_nota')) {
+            $dados['nome_nota'] = $consumidor['cpf'] !== '' && $consumidor['nome'] !== '' ? $consumidor['nome'] : null;
+        }
+
+        $pdvVenda->forceFill($dados)->save();
     }
 
     /** NFC-e não identifica destinatário CNPJ: venda para pessoa jurídica requer NF-e. */
@@ -245,13 +328,33 @@ final class NfceRegularizacaoService
             ));
     }
 
+    /** Situação fiscal anterior que precisa ser resolvida na tela NFC-e antes de qualquer nova emissão. */
+    private function mensagemNfceExistente(PdvVendaNfce $nfce): string
+    {
+        $numero = 'NFC-e nº '.($nfce->numero ?: '—');
+
+        return match ((string) $nfce->status) {
+            PdvVendaNfce::STATUS_PENDENTE => $numero.' gravada com situação não confirmada na SEFAZ. Consulte (F4) ou transmita (F5) na aba Gravados; não será criada outra NFC-e.',
+            PdvVendaNfce::STATUS_REJEITADA => $numero.' rejeitada. Corrija e transmita (F5) na aba Denegado da tela NFC-e; não será criada outra NFC-e.',
+            PdvVendaNfce::STATUS_DUPLICIDADE => $numero.' em duplicidade (539). Resolva (F5) na aba Duplicidade da tela NFC-e; não será criada outra NFC-e.',
+            PdvVendaNfce::STATUS_DENEGADA => $numero.' com uso denegado pela SEFAZ (aba Denegado). Regularize o cadastro; não será criada outra NFC-e automaticamente.',
+            PdvVendaNfce::STATUS_CONTINGENCIA => $numero.' em contingência. Transmita (F5) na tela NFC-e.',
+            PdvVendaNfce::STATUS_CANCELADA => 'Venda PDV com NFC-e cancelada. Use NF-e ou estorne a venda no PDV.',
+            'inutilizada' => 'Venda PDV com NFC-e inutilizada. Emita NF-e para esta venda.',
+            default => 'Já existe NFC-e ('.$nfce->status.') vinculada a esta venda.',
+        };
+    }
+
     /** Cupom simulado nunca foi à SEFAZ: não é documento fiscal e não impede a emissão real. */
     private function isSimulada(PdvVendaNfce $nfce): bool
     {
         return (bool) $nfce->simulada || (string) $nfce->status === PdvVendaNfce::STATUS_SIMULADA;
     }
 
-    private function motivoBloqueioVenda(?Venda $venda, ?int $empresaId): ?string
+    /**
+     * @param  bool  $consumidorInformado  consumidor trocado na grade (já validado como CPF): ignora o CNPJ do cliente original
+     */
+    private function motivoBloqueioVenda(?Venda $venda, ?int $empresaId, bool $consumidorInformado = false): ?string
     {
         if ($venda === null) {
             return 'Venda não encontrada.';
@@ -292,7 +395,7 @@ final class NfceRegularizacaoService
 
         $pdvReal = PdvVenda::query()->comercial()->where('venda_id', $venda->id)->first(['id', 'situacao', 'person_id', 'cpf_nota']);
 
-        if ($this->clienteTemCnpj($venda, $pdvReal)) {
+        if (! $consumidorInformado && $this->clienteTemCnpj($venda, $pdvReal)) {
             return NfceRegularizacaoQuery::LABEL_REQUER_NFE.': cliente com CNPJ. Emita NF-e para esta venda.';
         }
 
@@ -305,6 +408,22 @@ final class NfceRegularizacaoService
 
         if (in_array(PdvVendaNfce::STATUS_PENDENTE, $nfceStatus, true)) {
             return 'NFC-e gravada aguardando transmissão. Transmita pela aba Gravados (F5); não será criada outra NFC-e.';
+        }
+
+        if (in_array(PdvVendaNfce::STATUS_DUPLICIDADE, $nfceStatus, true)) {
+            return 'NFC-e em duplicidade (539). Resolva (F5) na aba Duplicidade da tela NFC-e; não será criada outra NFC-e.';
+        }
+
+        if (in_array(PdvVendaNfce::STATUS_DENEGADA, $nfceStatus, true)) {
+            return 'NFC-e com uso denegado pela SEFAZ (aba Denegado). Regularize o cadastro antes de emitir outro documento.';
+        }
+
+        if (in_array(PdvVendaNfce::STATUS_REJEITADA, $nfceStatus, true)) {
+            return 'NFC-e rejeitada. Corrija e transmita (F5) na aba Denegado da tela NFC-e; não será criada outra NFC-e.';
+        }
+
+        if (in_array(PdvVendaNfce::STATUS_CONTINGENCIA, $nfceStatus, true)) {
+            return 'NFC-e em contingência. Transmita (F5) na tela NFC-e.';
         }
 
         if ($pdvReal !== null) {
@@ -650,8 +769,10 @@ final class NfceRegularizacaoService
         }
 
         $proximo = 2;
-        if (preg_match('/CHNFE:(\d{44})/i', $exception->getMessage(), $matches) === 1) {
+        $serie = null;
+        if (preg_match('/CHNFE:\s*(\d{44})/i', $exception->getMessage().' '.$exception->sefazMotivo, $matches) === 1) {
             $proximo = ((int) substr($matches[1], 25, 9)) + 1;
+            $serie = ((int) substr($matches[1], 22, 3)) ?: null;
         }
 
         try {
@@ -659,6 +780,7 @@ final class NfceRegularizacaoService
                 TerminalResolver::make()->current(),
                 $proximo,
                 VendasParametro::forEmpresa((int) $empresa->id),
+                $serie,
             );
         } catch (Throwable) {
         }

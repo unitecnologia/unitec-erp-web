@@ -12,6 +12,8 @@ use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceRelatorio;
 use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -21,8 +23,10 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema as DbSchema;
 use Livewire\Attributes\Computed;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
@@ -111,7 +115,7 @@ class ListNfces extends ListRecords
             'cancelar' => 'uma NFC-e autorizada para cancelar',
             'recuperar' => 'uma NFC-e para consultar na SEFAZ',
             'transmitir' => 'uma ou mais NFC-e em contingência para transmitir',
-            'email' => 'uma NFC-e na lista para enviar por e-mail',
+            'enviar' => 'uma NFC-e autorizada para enviar',
             'edit' => "{$entity} na lista",
             'delete' => "{$entity} para excluir",
             default => $entity,
@@ -121,9 +125,14 @@ class ListNfces extends ListRecords
     protected function customErpListKeyboardConfig(): array
     {
         return [
-            'searchInput' => '.erp-nfe__search-text, .erp-nfe__chave-input',
+            // Pesquisa só pelo campo: sem tecla de foco (o padrão F6 conflitava com Imprimir).
+            'searchInput' => null,
+            'searchFocusKey' => false,
             'create' => 'modulePending',
             'edit' => 'imprimirNfce',
+            'delete' => null,
+            'singleFlight' => true,
+            'blockingSelector' => '.erp-nfce-fiscal-modal, .erp-nfe-danfe-email-modal, .erp-orc-email-modal, [data-erp-sefaz-progress].is-visible',
             'extraKeys' => [
                 'F2' => ['method' => 'cancelarNfce'],
                 'F3' => ['method' => 'inutilizarNfce'],
@@ -131,7 +140,7 @@ class ListNfces extends ListRecords
                 'F5' => ['method' => 'transmitirNfce'],
                 'F6' => ['method' => 'imprimirNfce'],
                 'F7' => ['method' => 'printNfceRelatorio'],
-                'F8' => ['method' => 'openNfceClienteEmailModal'],
+                'F8' => ['method' => 'openNfceEnviarModal'],
                 'F9' => ['method' => 'openNfceRegularizacao'],
                 'F11' => ['method' => 'openNfceContadorEmailModal'],
             ],
@@ -179,20 +188,11 @@ class ListNfces extends ListRecords
                 'pdvVenda.person',
             ]);
 
-        $empresaId = $this->empresaIdAtiva();
-        if ($empresaId) {
-            $query->where(function (Builder $outer) use ($empresaId): void {
-                $outer->where('empresa_id', $empresaId)
-                    ->orWhere(function (Builder $inner) use ($empresaId): void {
-                        $inner->whereNull('empresa_id')
-                            ->whereHas('pdvVenda.sessao', fn (Builder $sessao): Builder => $sessao
-                                ->where('empresa_id', $empresaId));
-                    });
-            });
-        }
+        NfceEmpresaEscopo::aplicar($query, $this->empresaIdAtiva());
 
         $statuses = PdvVendaNfce::statusesForTab($this->statusFilter);
         $query->whereIn('status', $statuses);
+        PdvVendaNfce::excluirSimuladasForaTransmitidos($query, $this->statusFilter);
 
         if (filled($this->periodoDeApplied)) {
             $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
@@ -251,9 +251,34 @@ class ListNfces extends ListRecords
 
     protected function empresaIdAtiva(): ?int
     {
-        $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
+        return NfceEmpresaEscopo::empresaIdAtiva();
+    }
 
-        return $empresaId ? (int) $empresaId : null;
+    /**
+     * Permissão no backend para comandos da tela (Livewire aceita chamada direta de métodos públicos).
+     */
+    protected function nfcePodeExecutar(?string $permissao = null): bool
+    {
+        if (! $this->erpAuthorizeOrNotify('nfce.access')) {
+            return false;
+        }
+
+        return $permissao === null || $this->erpAuthorizeOrNotify($permissao);
+    }
+
+    /**
+     * @param  list<string>  $with
+     */
+    protected function findNfceNoEscopo(?int $id, array $with = []): ?PdvVendaNfce
+    {
+        return NfceEmpresaEscopo::find($id, $this->empresaIdAtiva(), $with);
+    }
+
+    public function highlightRecord(int | string $recordId): void
+    {
+        $id = (int) $recordId;
+        $this->highlightedRecordId = NfceEmpresaEscopo::filtrarIds([$id], $this->empresaIdAtiva()) !== [] ? $id : null;
+        $this->skipRender();
     }
 
     #[Computed]
@@ -298,6 +323,76 @@ class ListNfces extends ListRecords
             ->sum('pv_total.total');
     }
 
+    /**
+     * Faixas inutilizadas na SEFAZ (inclusive números que nunca viraram documento).
+     *
+     * @return list<array<string, mixed>>
+     */
+    #[Computed]
+    public function nfceInutilizacoesFaixas(): array
+    {
+        if ($this->statusFilter !== PdvVendaNfce::TAB_INUTILIZADOS) {
+            return [];
+        }
+
+        $empresaId = $this->empresaIdAtiva();
+
+        if (! $empresaId || ! DbSchema::hasTable('nfce_inutilizacoes')) {
+            return [];
+        }
+
+        $query = DB::table('nfce_inutilizacoes as i')
+            ->leftJoin('users as u', 'u.id', '=', 'i.user_id')
+            ->where('i.empresa_id', $empresaId)
+            ->where('i.modelo', \App\Support\Fiscal\NfceNumeracao::MODELO)
+            ->select([
+                'i.id', 'i.serie', 'i.ambiente', 'i.numero_inicial', 'i.numero_final', 'i.protocolo',
+                'i.status_codigo', 'i.justificativa', 'i.created_at', 'u.name as usuario',
+            ])
+            ->selectRaw(sprintf(
+                "CASE WHEN %1\$s IS NULL OR %1\$s = '' THEN 0 ELSE 1 END as tem_xml",
+                DB::getQueryGrammar()->wrap('i.xml'),
+            ))
+            ->orderByDesc('i.created_at')
+            ->orderByDesc('i.id');
+
+        if (filled($this->periodoDeApplied)) {
+            $query->whereDate('i.created_at', '>=', $this->periodoDeApplied);
+        }
+
+        if (filled($this->periodoAteApplied)) {
+            $query->whereDate('i.created_at', '<=', $this->periodoAteApplied);
+        }
+
+        return $query->limit(200)->get()->map(fn ($row): array => (array) $row)->all();
+    }
+
+    public function baixarXmlInutilizacao(int $id): ?StreamedResponse
+    {
+        if (! $this->nfcePodeExecutar()) {
+            return null;
+        }
+
+        $empresaId = $this->empresaIdAtiva();
+
+        $row = $empresaId && DbSchema::hasTable('nfce_inutilizacoes')
+            ? DB::table('nfce_inutilizacoes')->where('id', $id)->where('empresa_id', $empresaId)->first()
+            : null;
+
+        if (! $row || blank($row->xml)) {
+            Notification::make()->title('XML da inutilização não disponível.')->warning()->send();
+
+            return null;
+        }
+
+        $nome = sprintf('inut-nfce-s%d-%d-%d.xml', (int) $row->serie, (int) $row->numero_inicial, (int) $row->numero_final);
+        $xml = (string) $row->xml;
+
+        return response()->streamDownload(function () use ($xml): void {
+            echo $xml;
+        }, $nome, ['Content-Type' => 'application/xml']);
+    }
+
     #[Computed]
     public function highlightedChave(): string
     {
@@ -305,7 +400,7 @@ class ListNfces extends ListRecords
             return '';
         }
 
-        $record = PdvVendaNfce::query()->find($this->highlightedRecordId);
+        $record = $this->findNfceNoEscopo((int) $this->highlightedRecordId);
 
         return (string) ($record?->chave ?? '');
     }
@@ -318,18 +413,23 @@ class ListNfces extends ListRecords
                 View::make('filament.components.erp.nfce.screen'),
                 EmbeddedTable::make()
                     ->columnSpanFull(),
+                View::make('filament.components.erp.nfce.inutilizacoes-faixas'),
                 View::make('filament.components.erp.nfce.footer-total'),
                 View::make('filament.components.erp.nfce.action-bar'),
                 View::make('filament.components.erp.nfce.fiscal-modals'),
                 View::make('filament.components.erp.nfce.fiscal-progress'),
                 View::make('filament.components.erp.nfce.email-contador-modal'),
-                View::make('filament.components.erp.nfce.email-cliente-modal'),
+                View::make('filament.components.erp.nfce.enviar-modal'),
                 View::make('filament.components.erp.nfce.regularizacao-host'),
             ]);
     }
 
     public function openNfceRegularizacao(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $this->nfceRegularizacaoOpen = true;
     }
 
@@ -391,17 +491,31 @@ class ListNfces extends ListRecords
 
     public function imprimirNfce(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $id = $this->highlightedRecordIdOrNotify('imprimir');
         if (! $id) {
             return;
         }
 
-        $nfce = PdvVendaNfce::query()->with('pdvVenda')->find($id);
+        $nfce = $this->findNfceNoEscopo($id, ['pdvVenda']);
         $vendaId = $nfce?->pdv_venda_id;
 
         if (! $vendaId) {
             Notification::make()
                 ->title('NFC-e sem venda vinculada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (($bloqueio = NfceImpressaoFiscal::motivoBloqueio($nfce)) !== null) {
+            Notification::make()
+                ->title('Impressão fiscal bloqueada.')
+                ->body($bloqueio)
                 ->warning()
                 ->send();
 

@@ -35,9 +35,33 @@ final class NfceCancelamentoProtocoloCupomPrintDocument implements PrintDocument
         ]);
     }
 
+    public function a4Url(bool $autoPrint = false): string
+    {
+        return route('erp.reports.nfce-cancelamento-protocolo', [
+            'venda' => $this->venda->id,
+            'auto' => $autoPrint ? 1 : 0,
+            'a4' => 1,
+        ]);
+    }
+
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
+
+        if ($target->impressoraA4()) {
+            return [
+                'document' => $this->key(),
+                'url' => $this->a4Url(autoPrint: true),
+                'mode' => 'browser',
+                'copias' => 1,
+                'printer' => $target->printerName,
+                'tipo' => $target->tipoImpressora,
+                'vendaId' => (int) $this->venda->id,
+                'escposUrl' => null,
+                'printInFrame' => true,
+            ];
+        }
+
         $mode = $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 

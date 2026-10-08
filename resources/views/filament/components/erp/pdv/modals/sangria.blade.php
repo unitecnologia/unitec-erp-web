@@ -28,15 +28,6 @@
                             @endforeach
                         </select>
                     </label>
-
-                    <label class="erp-pdv-form__field erp-pdv-form__field--full">
-                        <span>Destino do Lançamento</span>
-                        <select wire:model="sangriaForm.destino" class="erp-pdv-form__select">
-                            @foreach ($this->sangriaDestinoOptions as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </label>
                 </div>
             </div>
 

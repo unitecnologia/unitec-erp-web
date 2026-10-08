@@ -49,7 +49,7 @@ class ErpPageAssets
         'parcelas-portal' => ['css/erp-parcelas-portal.css'],
         'licenca-bloqueada' => ['css/erp-licenca-bloqueada.css'],
         'balanca' => ['css/erp-balanca.css', 'css/erp-form-ui.css'],
-        'nfce' => ['css/erp-nfe.css', 'css/erp-form-ui.css', 'css/erp-nfce-regularizacao.css'],
+        'nfce' => ['css/erp-nfe.css', 'css/erp-form-ui.css', 'css/erp-nfce-regularizacao.css', 'css/erp-pdv.css', 'css/erp-sefaz-progress.css'],
         'nfe' => ['css/erp-nfe.css', 'css/erp-pdv.css'],
         'nfse' => ['css/erp-nfe.css', 'css/erp-nfse.css', 'css/erp-equipamento-modal.css'],
         'cfops' => ['css/erp-estoque-menus.css', 'css/erp-cfop.css'],

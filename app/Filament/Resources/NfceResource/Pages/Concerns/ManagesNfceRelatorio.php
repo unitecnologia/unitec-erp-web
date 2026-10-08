@@ -9,6 +9,10 @@ trait ManagesNfceRelatorio
 {
     public function printNfceRelatorio(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $empresaId = session('erp_empresa_id', Auth::user()?->empresa_id);
 
         $builder = new NfceListQueryBuilder(

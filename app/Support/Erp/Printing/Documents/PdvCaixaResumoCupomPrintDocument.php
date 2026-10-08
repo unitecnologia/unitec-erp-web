@@ -37,9 +37,34 @@ final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
         ]);
     }
 
+    public function a4Url(bool $autoPrint = false): string
+    {
+        return route('erp.reports.pdv-resumo-caixa', array_filter([
+            'sessao' => $this->sessao->id,
+            'dinheiro' => $this->dinheiroInformado > 0 ? number_format($this->dinheiroInformado, 2, '.', '') : null,
+            'auto' => $autoPrint ? 1 : 0,
+            'a4' => 1,
+        ], static fn ($v): bool => $v !== null));
+    }
+
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
+
+        if ($target->impressoraA4()) {
+            return [
+                'document' => $this->key(),
+                'url' => $this->a4Url(autoPrint: true),
+                'mode' => 'browser',
+                'copias' => 1,
+                'printer' => $target->printerName,
+                'tipo' => $target->tipoImpressora,
+                'sessaoId' => (int) $this->sessao->id,
+                'escposUrl' => null,
+                'printInFrame' => true,
+            ];
+        }
+
         $mode = $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 

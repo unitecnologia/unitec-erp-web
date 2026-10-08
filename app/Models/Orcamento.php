@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -257,6 +258,11 @@ class Orcamento extends Model
     public function itens(): HasMany
     {
         return $this->hasMany(OrcamentoItem::class);
+    }
+
+    public function nfes(): BelongsToMany
+    {
+        return $this->belongsToMany(Nfe::class, 'nfe_orcamentos')->withTimestamps();
     }
 
     public function forcaVendasOrder(): HasOne

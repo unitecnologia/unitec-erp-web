@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Erp;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
+use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceSimuladaService;
 use Illuminate\Http\Request;
@@ -24,12 +26,8 @@ class NfceCupomReportController
         $empresaId = session('erp_empresa_id', $user->empresa_id);
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : $user->empresa;
 
-        if ($venda->sessao && filled($venda->sessao->empresa_id)) {
-            abort_unless(
-                (int) $venda->sessao->empresa_id === (int) ($empresaId ?? $user->empresa_id),
-                403,
-            );
-        }
+        NfceEmpresaEscopo::abortSeVendaForaDaEmpresa($venda, $empresaId ? (int) $empresaId : null);
+        NfceImpressaoFiscal::abortSeBloqueada($venda);
 
         $operacao = (string) ($venda->nfce_operacao ?? PdvFinalizarOperacao::NFCE_TRANSMITIR);
 

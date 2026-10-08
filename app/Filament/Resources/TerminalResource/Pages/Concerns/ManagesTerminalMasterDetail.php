@@ -583,7 +583,7 @@ trait ManagesTerminalMasterDetail
             'ip' => $resolver->resolveClientIp(),
             'velocidade' => 9600,
             'nvias' => 1,
-            'serie' => '1',
+            'serie' => null,
             'numeracao_inicial' => 1,
             'tipo_impressora' => '0',
             'tipo_fechamento' => '0',

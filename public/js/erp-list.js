@@ -295,6 +295,21 @@ function ensureKeyboardShortcutsBound() {
             return;
         }
 
+        if (config.blockingSelector && document.querySelector(config.blockingSelector)) {
+            // Modal da tela trata as próprias teclas; só evita F5 recarregar / F-keys do navegador.
+            if (/^F([1-9]|1[01])$/.test(event.key)) {
+                event.preventDefault();
+            }
+
+            return;
+        }
+
+        if (config.singleFlight && event.repeat && /^F\d{1,2}$|^Delete$/.test(event.key)) {
+            event.preventDefault();
+
+            return;
+        }
+
         if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
             const searchFocusKey = config.searchFocusKey ?? 'F6';
 
@@ -356,6 +371,27 @@ function ensureKeyboardShortcutsBound() {
         // Abre o shell do envio na hora (antes do roundtrip Livewire).
         if (method === 'openEmailModal' && typeof window.__erpOsShowEmailModalShell === 'function') {
             window.__erpOsShowEmailModalShell();
+        }
+
+        if (config.singleFlight) {
+            const inFlight = (window.__erpListInFlight ??= new Set());
+
+            if (inFlight.has(method)) {
+                return;
+            }
+
+            inFlight.add(method);
+            const release = () => inFlight.delete(method);
+
+            try {
+                Promise.resolve(extra?.params ? component.call(method, ...extra.params) : component.call(method))
+                    .then(release, release);
+            } catch (error) {
+                release();
+                throw error;
+            }
+
+            return;
         }
 
         if (extra?.params) {

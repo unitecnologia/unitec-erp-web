@@ -17,7 +17,6 @@
         <label class="erp-caixa__account-label">
             Selecione Conta
             <select wire:model.live="contaFilter" class="erp-caixa__select erp-caixa__account-select">
-                <option value="todas">&lt;todas as contas&gt;</option>
                 @foreach ($this->contasOptions as $id => $nome)
                     <option value="{{ $id }}">{{ $nome }}</option>
                 @endforeach

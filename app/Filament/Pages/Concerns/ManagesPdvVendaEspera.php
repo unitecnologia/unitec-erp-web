@@ -7,6 +7,7 @@ use App\Models\PdvVendaEspera;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvCaixaEsperaDescarteLog;
+use App\Support\Erp\Pdv\PdvImportReserva;
 use App\Support\Erp\Pdv\PdvVendaEsperaService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -56,6 +57,8 @@ trait ManagesPdvVendaEspera
                 'venda_id' => session('erp.pdv.venda_id'),
                 'cliente_id' => session('erp.pdv.import_cliente_id'),
                 'cliente_nome' => session('erp.pdv.import_cliente_nome'),
+                'desconto_venda' => session('erp.pdv.import_desconto_venda'),
+                'acrescimo_venda' => session('erp.pdv.import_acrescimo_venda'),
             ],
             'vendedor' => [
                 'id' => $this->vendedorId,
@@ -81,8 +84,8 @@ trait ManagesPdvVendaEspera
             'snapshot' => $service->encode($service->buildSnapshot($itens, $contexto)),
         ]);
 
-        // Só limpa o cupom depois que a espera foi persistida.
-        $this->limparCupom();
+        // Só limpa o cupom depois que a espera foi persistida. Documento importado segue reservado.
+        $this->limparCupom(liberarImportacao: false);
         $this->dispatch('erp-pdv-focus-search');
 
         Notification::make()
@@ -242,11 +245,14 @@ trait ManagesPdvVendaEspera
 
         $contexto = is_array($snapshot['contexto'] ?? null) ? $snapshot['contexto'] : [];
         $import = is_array($contexto['import'] ?? null) ? $contexto['import'] : [];
+        $avisoReserva = $this->renovarReservaImportadaDaEspera($import);
         session([
             'erp.pdv.orcamento_id' => $import['orcamento_id'] ?? null,
             'erp.pdv.venda_id' => $import['venda_id'] ?? null,
             'erp.pdv.import_cliente_id' => $import['cliente_id'] ?? null,
             'erp.pdv.import_cliente_nome' => $import['cliente_nome'] ?? null,
+            'erp.pdv.import_desconto_venda' => $import['desconto_venda'] ?? null,
+            'erp.pdv.import_acrescimo_venda' => $import['acrescimo_venda'] ?? null,
             'erp.pdv.price_table_id' => $contexto['price_table_id'] ?? null,
             'erp.pdv.cupom_iniciado_em' => $contexto['cupom_iniciado_em']
                 ?? ($espera->created_at?->toIso8601String()),
@@ -273,6 +279,34 @@ trait ManagesPdvVendaEspera
             ->body(sprintf('%d item(ns) — R$ %s', count($itens), ErpMoney::formatBr($this->cupomTotalValor())))
             ->success()
             ->send();
+
+        if ($avisoReserva !== null) {
+            Notification::make()
+                ->title('Atenção: documento importado')
+                ->body($avisoReserva.' A finalização será bloqueada se ele já tiver sido faturado.')
+                ->warning()
+                ->persistent()
+                ->send();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $import
+     */
+    protected function renovarReservaImportadaDaEspera(array $import): ?string
+    {
+        $avisos = [];
+
+        foreach ([
+            PdvImportReserva::ORCAMENTO => (int) ($import['orcamento_id'] ?? 0),
+            PdvImportReserva::PEDIDO => (int) ($import['venda_id'] ?? 0),
+        ] as $tipo => $id) {
+            if ($id > 0 && ($erro = $this->reservarDocumentoImportado($tipo, $id)) !== null) {
+                $avisos[] = $erro;
+            }
+        }
+
+        return $avisos === [] ? null : implode(' ', $avisos);
     }
 
     public function requestExcluirVendaEmEspera(): void
@@ -330,8 +364,17 @@ trait ManagesPdvVendaEspera
             return;
         }
 
+        $snapshot = app(PdvVendaEsperaService::class)->decode($espera);
+        $contexto = is_array($snapshot['contexto'] ?? null) ? $snapshot['contexto'] : [];
+        $import = is_array($contexto['import'] ?? null) ? $contexto['import'] : [];
+
         (new PdvCaixaEsperaDescarteLog())->registrar($sessao, $espera, $motivo);
         $espera->delete();
+
+        $this->liberarDocumentosImportados(
+            (int) ($import['orcamento_id'] ?? 0),
+            (int) ($import['venda_id'] ?? 0),
+        );
 
         $this->vendaEsperaMotivoDescarte = '';
         $this->selectedVendaEsperaIndex = null;

@@ -31,17 +31,13 @@
                         <span>Tipo de Contas</span>
                         <select wire:model="sangriaForm.tipo_conta" class="erp-pdv-form__select">
                             <option value=""></option>
-                            @foreach ($this->tipoContaOptions as $option)
-                                <option value="{{ $option }}">{{ $option }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-
-                    <label class="erp-pdv-form__field erp-pdv-form__field--full">
-                        <span>Destino do Lançamento</span>
-                        <select wire:model="sangriaForm.destino" class="erp-pdv-form__select">
-                            @foreach ($this->sangriaDestinoOptions as $option)
-                                <option value="{{ $option }}">{{ $option }}</option>
+                            @php
+                                $sangriaFormas = method_exists($this, 'getSangriaTipoContaOptionsProperty')
+                                    ? $this->sangriaTipoContaOptions
+                                    : ['DINHEIRO' => 'DINHEIRO', 'CHEQUE' => 'CHEQUE'];
+                            @endphp
+                            @foreach ($sangriaFormas as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
                     </label>

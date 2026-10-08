@@ -4,6 +4,7 @@ namespace App\Support\Erp\Printing\Documents;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Fiscal\IbptLookupService;
 use App\Support\Erp\Pdv\PdvDavCupomLayout;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceSimuladaService;
@@ -40,9 +41,35 @@ final class NfceCupomPrintDocument implements PrintDocument
         ]);
     }
 
+    public function a4Url(bool $autoPrint = false, int $copies = 1): string
+    {
+        return route('erp.reports.nfce-danfe-a4', [
+            'venda' => $this->venda->id,
+            'auto' => $autoPrint ? 1 : 0,
+            'copias' => max(1, min(3, $copies)),
+        ]);
+    }
+
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
+
+        if ($target->impressoraA4()) {
+            return [
+                'document' => $this->key(),
+                'url' => $target->nfceA4()
+                    ? $this->a4Url(autoPrint: true, copies: $copies)
+                    : $this->htmlUrl(autoPrint: true, copies: $copies),
+                'mode' => 'browser',
+                'copias' => $copies,
+                'printer' => $target->printerName,
+                'tipo' => $target->tipoImpressora,
+                'vendaId' => (int) $this->venda->id,
+                'escposUrl' => null,
+                'printInFrame' => $target->nfceA4(),
+            ];
+        }
+
         $mode = $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 
@@ -270,18 +297,22 @@ final class NfceCupomPrintDocument implements PrintDocument
         $p->setFont(Printer::FONT_A);
         $p->textRaw(str_repeat('-', 48)."\n");
 
-        $textoIbpt = trim((string) ($data['textoIbpt'] ?? ''));
-        if ($textoIbpt !== '') {
-            $p->textRaw(EscPosCharset::encode($textoIbpt)."\n");
-        } elseif ((float) ($data['vTotTrib'] ?? 0) > 0) {
-            $p->textRaw(EscPosCharset::encode(sprintf(
-                'Trib. aprox. Fed. R$ %s Est. R$ %s Mun. R$ %s (Lei 12.741/2012 - IBPT)',
-                number_format((float) ($data['tribFed'] ?? 0), 2, ',', ''),
-                number_format((float) ($data['tribEst'] ?? 0), 2, ',', ''),
-                number_format((float) ($data['tribMun'] ?? 0), 2, ',', ''),
-            ))."\n");
-        } else {
-            $p->textRaw(EscPosCharset::encode('Tributos aprox. conforme Lei 12.741/2012 - IBPT.')."\n");
+        $linhasIbpt = $data['linhasIbpt'] ?? null;
+        if (! is_array($linhasIbpt) || $linhasIbpt === []) {
+            $linhasIbpt = app(IbptLookupService::class)->linhasBobina([
+                'trib_fed' => (float) ($data['tribFed'] ?? 0),
+                'trib_est' => (float) ($data['tribEst'] ?? 0),
+                'trib_mun' => (float) ($data['tribMun'] ?? 0),
+                'v_tot_trib' => (float) ($data['vTotTrib'] ?? 0),
+                'fonte' => 'IBPT',
+            ], PdvDavCupomLayout::WIDTH);
+        }
+        foreach ($linhasIbpt as $linhaIbpt) {
+            $linhaIbpt = trim((string) $linhaIbpt);
+            if ($linhaIbpt === '') {
+                continue;
+            }
+            $p->textRaw(EscPosCharset::encode($linhaIbpt)."\n");
         }
 
         $p->setJustification(Printer::JUSTIFY_CENTER);

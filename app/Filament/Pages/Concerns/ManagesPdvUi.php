@@ -5,7 +5,6 @@ namespace App\Filament\Pages\Concerns;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
-use App\Models\CaixaConta;
 use App\Support\Erp\CloudflaredStatus;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
@@ -68,7 +67,6 @@ trait ManagesPdvUi
         'historico' => '',
         'valor' => '0,00',
         'tipo_conta' => '',
-        'destino' => '',
     ];
 
     /** @var array<string, string> */
@@ -164,47 +162,6 @@ trait ManagesPdvUi
         return $options;
     }
 
-    /**
-     * Destinos da sangria: apenas subcaixas ativas.
-     *
-     * @return array<string, string> id => "codigo — NOME"
-     */
-    public function getSangriaDestinoOptionsProperty(): array
-    {
-        return CaixaConta::query()
-            ->where('ativo', true)
-            ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
-            ->orderBy('codigo')
-            ->get(['id', 'codigo', 'nome'])
-            ->mapWithKeys(fn (CaixaConta $conta): array => [
-                (string) $conta->id => $this->sangriaDestinoLabel($conta),
-            ])
-            ->all();
-    }
-
-    protected function sangriaDestinoLabel(CaixaConta $conta): string
-    {
-        return trim((string) $conta->codigo).' — '.mb_strtoupper((string) $conta->nome, 'UTF-8');
-    }
-
-    /**
-     * @param  array<string, string>  $destinos
-     */
-    protected function defaultSangriaDestinoId(array $destinos): string
-    {
-        if ($destinos === []) {
-            return '';
-        }
-
-        $geralId = (string) CaixaConta::ensureCaixaGeral()->id;
-
-        if (isset($destinos[$geralId])) {
-            return $geralId;
-        }
-
-        return (string) array_key_first($destinos);
-    }
-
     protected function prepareSangriaFormOnOpen(): void
     {
         $formas = $this->sangriaTipoContaOptions;
@@ -224,13 +181,6 @@ trait ManagesPdvUi
                     ? 'DINHEIRO'
                     : (string) array_key_first($formas);
             }
-        }
-
-        $destinos = $this->sangriaDestinoOptions;
-        $destinoAtual = (string) ($this->sangriaForm['destino'] ?? '');
-
-        if ($destinoAtual === '' || ! isset($destinos[$destinoAtual])) {
-            $this->sangriaForm['destino'] = $this->defaultSangriaDestinoId($destinos);
         }
 
         if ($this->sangriaForm['valor'] === '' || $this->sangriaForm['valor'] === null) {

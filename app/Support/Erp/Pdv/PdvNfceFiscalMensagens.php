@@ -33,7 +33,8 @@ final class PdvNfceFiscalMensagens
                     ? 'Este número/série já foi autorizado anteriormente com outra chave. '
                         . 'O sistema avançou a numeração desta NF-e — transmita novamente.'
                     : 'Este número/série já foi autorizado anteriormente com outra chave. '
-                        . 'O sistema avançou a numeração — tente finalizar a venda novamente.',
+                        . 'O sistema avançou a numeração. A venda ficou gravada: transmita na tela NFC-e (F5), '
+                        . 'que emitirá com novo número.',
                 'modal' => false,
             ],
             default => [

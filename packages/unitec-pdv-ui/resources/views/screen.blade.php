@@ -46,6 +46,26 @@
     </div>
 @endif
 
+@if ($this->pdvConfirmImprimirResumoCaixa ?? false)
+    <div class="erp-pdv-modal erp-pdv-modal--centered erp-pdv-imprimir-resumo-caixa" role="dialog" aria-modal="true" aria-labelledby="erp-pdv-imprimir-resumo-caixa-title">
+        <div class="erp-pdv-modal__backdrop" wire:click="confirmImprimirResumoCaixa(false)"></div>
+        <div class="erp-pdv-modal__window erp-pdv-modal__window--small">
+            <header class="erp-pdv-modal__header">
+                <h2 id="erp-pdv-imprimir-resumo-caixa-title">Caixa fechado</h2>
+            </header>
+            <div class="erp-pdv-modal__body">
+                <p class="erp-pdv-modal__confirm-text">
+                    Deseja imprimir o resumo do fechamento do caixa?
+                </p>
+            </div>
+            <footer class="erp-pdv-modal__footer">
+                <button type="button" wire:click="confirmImprimirResumoCaixa(true)" wire:loading.attr="disabled" class="erp-pdv-modal__btn" id="erp-pdv-imprimir-resumo-caixa-sim"><kbd>S</kbd> Sim</button>
+                <button type="button" wire:click="confirmImprimirResumoCaixa(false)" wire:loading.attr="disabled" class="erp-pdv-modal__btn erp-pdv-modal__btn--primary" id="erp-pdv-imprimir-resumo-caixa-nao"><kbd>N</kbd> Não</button>
+            </footer>
+        </div>
+    </div>
+@endif
+
 @includeWhen($modal === 'excluir_item', 'pdvui::modals.excluir-item')
 @includeWhen($this->pdvConfirmCancelarVenda ?? false, 'pdvui::modals.cancelar-venda')
 @includeWhen($modal === 'vendedor', 'pdvui::modals.vendedor')

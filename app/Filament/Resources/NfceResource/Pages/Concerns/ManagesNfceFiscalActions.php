@@ -4,10 +4,13 @@ namespace App\Filament\Resources\NfceResource\Pages\Concerns;
 
 use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
+use App\Models\VendasParametro;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\Fiscal\NfceNumeracao;
 use App\Support\Fiscal\PdvNfceConsultaService;
 use App\Support\Fiscal\PdvNfceInutilizacaoService;
 use App\Support\Fiscal\PdvNfceTransmissaoService;
@@ -32,9 +35,11 @@ trait ManagesNfceFiscalActions
 
     public string $nfceInutilizarJustificativa = '';
 
+    public string $nfceInutilizarOrigem = '';
+
     public function cancelarNfce(): void
     {
-        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfce.cancel')) {
+        if (! $this->nfcePodeExecutar('nfce.cancel')) {
             return;
         }
 
@@ -43,7 +48,7 @@ trait ManagesNfceFiscalActions
             return;
         }
 
-        $nfce = PdvVendaNfce::query()->with('pdvVenda')->find($id);
+        $nfce = $this->findNfceNoEscopo($id, ['pdvVenda']);
 
         if (! $nfce) {
             $this->notifyNfceWarning('NFC-e não encontrada.');
@@ -75,12 +80,12 @@ trait ManagesNfceFiscalActions
 
     public function confirmCancelarNfce(): void
     {
-        if (method_exists($this, 'erpAuthorizeOrNotify') && ! $this->erpAuthorizeOrNotify('nfce.cancel')) {
+        if (! $this->nfcePodeExecutar('nfce.cancel')) {
             return;
         }
 
         $id = $this->highlightedRecordId;
-        $nfce = $id ? PdvVendaNfce::query()->with('pdvVenda')->find($id) : null;
+        $nfce = $this->findNfceNoEscopo($id ? (int) $id : null, ['pdvVenda']);
         $venda = $nfce?->pdvVenda;
         $empresa = $this->resolveNfceEmpresa($nfce);
         $motivo = PdvEstornoMotivo::normalize($this->nfceCancelJustificativa);
@@ -127,6 +132,8 @@ trait ManagesNfceFiscalActions
             default => 'NFC-e cancelada e venda estornada.',
         };
 
+        $this->sinalizarSefazConcluido();
+
         Notification::make()
             ->title('NFC-e cancelada com sucesso.')
             ->body($body)
@@ -140,6 +147,10 @@ trait ManagesNfceFiscalActions
 
     public function recuperarNfce(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $ids = $this->resolveNfceIdsParaTransmitir();
 
         if ($ids === []) {
@@ -153,16 +164,18 @@ trait ManagesNfceFiscalActions
         $erros = 0;
         $primeiraMensagemErro = null;
         $primeiraExcecaoFiscal = null;
+        $primeiraEtapaErro = null;
         $ultimoStatus = null;
         $ultimoMotivo = null;
 
         foreach ($ids as $id) {
-            $nfce = PdvVendaNfce::query()->find($id);
+            $nfce = $this->findNfceNoEscopo($id);
             $empresa = $this->resolveNfceEmpresa($nfce);
 
             if (! $nfce || ! $empresa) {
                 $erros++;
                 $primeiraMensagemErro ??= 'Não foi possível localizar a NFC-e para consulta.';
+                $primeiraEtapaErro ??= 'validacao';
 
                 continue;
             }
@@ -184,6 +197,7 @@ trait ManagesNfceFiscalActions
                 }
 
                 $primeiraMensagemErro ??= $mensagem;
+                $primeiraEtapaErro ??= $this->etapaDaFalhaFiscal($exception);
 
                 if ($exception instanceof FiscalEngineException) {
                     $primeiraExcecaoFiscal ??= $exception;
@@ -207,9 +221,18 @@ trait ManagesNfceFiscalActions
         }
 
         if ($ok === 0) {
-            $this->notifyNfceWarning($primeiraMensagemErro ?: 'Nenhuma NFC-e foi consultada na SEFAZ.');
+            $this->notifyNfceWarning($primeiraMensagemErro ?: 'Nenhuma NFC-e foi consultada na SEFAZ.', $primeiraEtapaErro ?? 'sefaz');
 
             return;
+        }
+
+        if ($erros === 0) {
+            $this->sinalizarSefazConcluido();
+        } else {
+            $this->sinalizarSefazFalha(
+                "{$ok} consultada(s), {$erros} com erro.".(filled($primeiraMensagemErro) ? ' '.$primeiraMensagemErro : ''),
+                $primeiraEtapaErro ?? 'sefaz',
+            );
         }
 
         if ($ok === 1 && $erros === 0) {
@@ -246,6 +269,10 @@ trait ManagesNfceFiscalActions
 
     public function transmitirNfce(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $ids = $this->resolveNfceIdsParaTransmitir();
 
         if ($ids === []) {
@@ -268,16 +295,20 @@ trait ManagesNfceFiscalActions
         $ultimoProtocolo = null;
         $primeiraExcecaoFiscal = null;
         $primeiraMensagemErro = null;
+        $primeiraEtapaErro = null;
 
         foreach ($ids as $id) {
-            $nfce = PdvVendaNfce::query()->find($id);
+            $nfce = $this->findNfceNoEscopo($id);
 
             if (! $nfce) {
                 $erros++;
                 $primeiraMensagemErro ??= 'NFC-e não encontrada.';
+                $primeiraEtapaErro ??= 'validacao';
 
                 continue;
             }
+
+            $atualizadaEm = $nfce->updated_at;
 
             try {
                 $nfce = $service->transmitir($nfce, $empresa);
@@ -295,6 +326,7 @@ trait ManagesNfceFiscalActions
                 }
 
                 $primeiraMensagemErro ??= $mensagem;
+                $primeiraEtapaErro ??= $this->etapaDaFalhaFiscal($exception);
 
                 if ($exception instanceof FiscalEngineException) {
                     $primeiraExcecaoFiscal ??= $exception;
@@ -308,9 +340,14 @@ trait ManagesNfceFiscalActions
                 ]);
 
                 try {
-                    $nfce->forceFill([
-                        'motivo_rejeicao' => mb_substr($mensagem, 0, 2000, 'UTF-8'),
-                    ])->save();
+                    $nfce->refresh();
+
+                    // O serviço já gravou status/motivo fiscal (ex.: chave citada na 539): não sobrescrever.
+                    if ($nfce->updated_at == $atualizadaEm) {
+                        $nfce->forceFill([
+                            'motivo_rejeicao' => mb_substr($mensagem, 0, 2000, 'UTF-8'),
+                        ])->save();
+                    }
                 } catch (Throwable) {
                 }
             }
@@ -325,19 +362,101 @@ trait ManagesNfceFiscalActions
         }
 
         $this->notifyNfceTransmitirResumo($transmitidas, $erros, $ultimoProtocolo, $primeiraMensagemErro);
+
+        if ($transmitidas > 0 && $erros === 0) {
+            $this->sinalizarSefazConcluido();
+        } else {
+            $this->sinalizarSefazFalha(
+                ($transmitidas > 0 ? "{$transmitidas} transmitida(s), {$erros} com erro. " : '')
+                    .($primeiraMensagemErro ?: 'Nenhuma NFC-e foi transmitida.'),
+                $primeiraEtapaErro ?? 'sefaz',
+            );
+        }
     }
 
     public function inutilizarNfce(): void
     {
+        if (! $this->nfcePodeExecutar('nfce.cancel')) {
+            return;
+        }
+
         $this->nfceInutilizarSerie = '1';
         $this->nfceInutilizarNumeroIni = '';
         $this->nfceInutilizarNumeroFim = '';
         $this->nfceInutilizarJustificativa = '';
+        $this->nfceInutilizarOrigem = '';
+
+        $marcadas = NfceEmpresaEscopo::filtrarIds($this->nfceSelecionadosTransmitir, $this->empresaIdAtiva());
+
+        if (count($marcadas) > 1) {
+            $this->nfceInutilizarOrigem = count($marcadas).' NFC-e marcadas — informe a faixa manualmente.';
+            $this->nfceFiscalModal = 'inutilizar';
+
+            return;
+        }
+
+        $id = $marcadas[0] ?? ($this->highlightedRecordId ? (int) $this->highlightedRecordId : null);
+        $nfce = $id ? $this->findNfceNoEscopo((int) $id) : null;
+
+        if ($nfce) {
+            $motivo = $this->motivoNfceNaoInutilizavel($nfce);
+
+            if ($motivo !== null) {
+                $this->notifyNfceWarning($motivo);
+
+                return;
+            }
+
+            $numero = (string) (int) $nfce->numero;
+            $this->nfceInutilizarSerie = (string) NfceNumeracao::serieInt($nfce->serie);
+            $this->nfceInutilizarNumeroIni = $numero;
+            $this->nfceInutilizarNumeroFim = $numero;
+            $this->nfceInutilizarOrigem = 'Preenchido com a NFC-e nº '.$numero.' selecionada.';
+        }
+
         $this->nfceFiscalModal = 'inutilizar';
+    }
+
+    /** Motivo local para não inutilizar o número desta NFC-e (null = pode seguir para a SEFAZ). */
+    protected function motivoNfceNaoInutilizavel(PdvVendaNfce $nfce): ?string
+    {
+        $rotulo = 'NFC-e nº '.((int) $nfce->numero ?: '—');
+
+        if ($nfce->simulada) {
+            return $rotulo.' '.NfceNumeracao::motivoStatusNaoInutilizavel(PdvVendaNfce::STATUS_SIMULADA).'.';
+        }
+
+        $motivo = NfceNumeracao::motivoStatusNaoInutilizavel((string) $nfce->status);
+
+        if ($motivo !== null) {
+            return $rotulo.' '.$motivo.'.';
+        }
+
+        if ((int) $nfce->numero < 1) {
+            return $rotulo.' não possui número fiscal para inutilizar.';
+        }
+
+        $empresa = $this->resolveNfceEmpresa($nfce);
+
+        if ($empresa && filled($nfce->ambiente)) {
+            $ambienteAtual = NfceNumeracao::ambiente(VendasParametro::forEmpresa((int) $empresa->id));
+
+            if ((int) $nfce->ambiente !== $ambienteAtual) {
+                $nome = fn (int $a): string => $a === 1 ? 'produção' : 'homologação';
+
+                return $rotulo.' foi emitida em '.$nome((int) $nfce->ambiente).' e o ambiente fiscal atual é '.$nome($ambienteAtual).'.';
+            }
+        }
+
+        return null;
     }
 
     public function confirmInutilizarNfce(): void
     {
+        if (! $this->nfcePodeExecutar('nfce.cancel')) {
+            return;
+        }
+
         $empresa = $this->resolveNfceEmpresa();
 
         if (! $empresa) {
@@ -350,6 +469,20 @@ trait ManagesNfceFiscalActions
         $serie = (int) ltrim($this->nfceInutilizarSerie, '0') ?: 1;
         $numeroIni = (int) $this->nfceInutilizarNumeroIni;
         $numeroFim = (int) ($this->nfceInutilizarNumeroFim !== '' ? $this->nfceInutilizarNumeroFim : $this->nfceInutilizarNumeroIni);
+
+        try {
+            NfceNumeracao::verificarFaixaInutilizavel(
+                (int) $empresa->id,
+                $serie,
+                VendasParametro::forEmpresa((int) $empresa->id),
+                $numeroIni,
+                $numeroFim,
+            );
+        } catch (FiscalEngineException $exception) {
+            $this->notifyNfceWarning($exception->getMessage());
+
+            return;
+        }
 
         try {
             $response = (new PdvNfceInutilizacaoService())->inutilizar(
@@ -366,6 +499,7 @@ trait ManagesNfceFiscalActions
         }
 
         $this->closeNfceFiscalModal();
+        $this->sinalizarSefazConcluido();
 
         Notification::make()
             ->title('Numeração inutilizada com sucesso.')
@@ -385,6 +519,7 @@ trait ManagesNfceFiscalActions
         $this->nfceFiscalModal = null;
         $this->nfceCancelJustificativa = '';
         $this->nfceInutilizarJustificativa = '';
+        $this->nfceInutilizarOrigem = '';
     }
 
     protected function resolveNfceEmpresa(?PdvVendaNfce $nfce = null): ?Empresa
@@ -404,8 +539,55 @@ trait ManagesNfceFiscalActions
             : null;
     }
 
-    protected function notifyNfceWarning(string $message): void
+    /** Indicador SEFAZ (erp-sefaz-progress.js): sem este sinal a resposta é tratada como falha. */
+    protected function sinalizarSefazConcluido(): void
     {
+        $this->dispatch('erp-sefaz-resultado', ok: true);
+    }
+
+    /**
+     * Falha para o indicador SEFAZ: mensagem real e etapa onde parou (chaves de nfce/fiscal-progress).
+     *
+     * @param  'validacao'|'assinatura'|'sefaz'|'pos'  $etapa
+     */
+    protected function sinalizarSefazFalha(string $mensagem, string $etapa = 'sefaz'): void
+    {
+        $this->dispatch(
+            'erp-sefaz-resultado',
+            ok: false,
+            etapa: $etapa,
+            mensagem: mb_substr(trim($mensagem), 0, 600, 'UTF-8'),
+        );
+    }
+
+    /** Em que etapa a exceção fiscal parou (retorno da SEFAZ, certificado/assinatura ou checagem local). */
+    protected function etapaDaFalhaFiscal(Throwable $exception): string
+    {
+        if (! $exception instanceof FiscalEngineException) {
+            return 'sefaz';
+        }
+
+        $mensagem = mb_strtolower($exception->getMessage(), 'UTF-8');
+
+        if (filled($exception->sefazCodigo ?? null) || preg_match('/\[cstat\s+\d+\]/', $mensagem) === 1) {
+            return 'sefaz';
+        }
+
+        if (preg_match('/certificad|assinat|\.pfx|senha do certificado/u', $mensagem) === 1) {
+            return 'assinatura';
+        }
+
+        if (preg_match('/bloquead|inválid|invalid|informe |selecione|faixa|já pertence|justificativa|não encontrad|máximo/u', $mensagem) === 1) {
+            return 'validacao';
+        }
+
+        return 'sefaz';
+    }
+
+    protected function notifyNfceWarning(string $message, string $etapa = 'validacao'): void
+    {
+        $this->sinalizarSefazFalha($message, $etapa);
+
         Notification::make()
             ->title($message)
             ->warning()
@@ -415,6 +597,11 @@ trait ManagesNfceFiscalActions
     protected function notifyNfceFiscalError(FiscalEngineException $exception): void
     {
         $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+
+        $this->sinalizarSefazFalha(
+            trim($resolvido['titulo'].($resolvido['corpo'] !== null ? ' — '.$resolvido['corpo'] : '')),
+            $this->etapaDaFalhaFiscal($exception),
+        );
 
         $notification = Notification::make()
             ->title($resolvido['titulo'])

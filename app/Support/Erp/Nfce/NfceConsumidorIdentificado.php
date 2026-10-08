@@ -67,6 +67,21 @@ final class NfceConsumidorIdentificado
         return $nome !== '' ? $nome : null;
     }
 
+    /**
+     * Nome informado na nota (Regularização Fiscal) tem prioridade; depois o cadastro.
+     * O nome da nota só vale junto com o CPF (NFC-e não identifica consumidor só por nome).
+     */
+    public static function nomeDaVenda(PdvVenda $venda, ?Person $person = null): ?string
+    {
+        $nota = trim((string) ($venda->getAttribute('nome_nota') ?? ''));
+
+        if ($nota !== '' && self::cpfDigits($venda->cpf_nota) !== '') {
+            return $nota;
+        }
+
+        return self::nome($person ?? self::resolvePerson($venda));
+    }
+
     public static function endereco(?Person $person): ?string
     {
         if (! self::ehClienteIdentificado($person)) {

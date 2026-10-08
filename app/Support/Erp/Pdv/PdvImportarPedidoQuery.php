@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Pdv;
 
+use App\Models\PixCobranca;
 use App\Models\Terminal;
 use App\Models\Venda;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,6 +27,8 @@ class PdvImportarPedidoQuery
             ->whereHas('itens')
             ->orderByDesc('data')
             ->orderByDesc('id');
+
+        self::aplicarSomentePendentes($query);
 
         if ($this->somenteSemDocumentoFiscal) {
             $query->semDocumentoFiscalEmitido();
@@ -66,15 +69,49 @@ class PdvImportarPedidoQuery
     }
 
     /**
+     * Pedido pendente: somente ABERTO (gravado/fechado já é venda efetivada, com estoque
+     * e financeiro; cancelado fica fora), sem faturamento e sem pagamento concluído:
+     * - não originado do próprio PDV (espelho de venda);
+     * - não gerado por faturamento do Força de Vendas (venda vinculada a um DAV);
+     * - sem cobrança PIX paga.
+     * Documento fiscal e venda PDV vinculada são filtrados em build()/applyFiltroTerminal().
+     */
+    public static function aplicarSomentePendentes(Builder $query): void
+    {
+        $query->where('status', Venda::STATUS_ABERTO);
+
+        if (Schema::hasColumn('vendas', 'plataforma')) {
+            $query->where(function (Builder $q): void {
+                $q->whereNull('plataforma')->orWhere('plataforma', '!=', Venda::PLATAFORMA_PDV);
+            });
+        }
+
+        if (Schema::hasTable('forca_vendas_orders')) {
+            $query->whereDoesntHave('forcaVendasOrder');
+        }
+
+        if (Schema::hasTable('pix_cobrancas') && Schema::hasColumn('pix_cobrancas', 'venda_id')) {
+            $query->whereNotExists(function ($sub): void {
+                $sub->selectRaw('1')
+                    ->from('pix_cobrancas')
+                    ->whereColumn('pix_cobrancas.venda_id', 'vendas.id')
+                    ->where('pix_cobrancas.status', PixCobranca::STATUS_PAGO);
+            });
+        }
+    }
+
+    /**
      * API offline: pedidos do ERP (sem pdv_vendas) + deste terminal.
      * Exclui pedidos já vinculados a outro PDV/caixa.
-     * Sem terminal (PDV online Filament): não aplica o filtro.
+     * Sem terminal (PDV online Filament): só pedidos sem venda PDV vinculada.
      */
     private function applyFiltroTerminal(Builder $query): void
     {
         $terminal = $this->terminal;
 
         if ($terminal === null) {
+            $query->whereDoesntHave('pdvVenda');
+
             return;
         }
 

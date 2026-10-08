@@ -6,6 +6,7 @@ use App\Models\ContaReceber;
 use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\PixCobranca;
+use App\Models\PlanoConta;
 use App\Support\Erp\Boleto\Api\BoletoApi;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
@@ -331,6 +332,13 @@ class PixCobrancaService
         // PIX de título: baixa o CR e gera entrada no Livro Caixa (paridade FV).
         $data = ($cobranca->pago_em ?? now())->toDateString();
         $documento = (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id));
+        $plano = $conta->plano_conta_id
+            ? PlanoConta::query()
+                ->whereKey((int) $conta->plano_conta_id)
+                ->where('ativo', true)
+                ->where('dc', 'C')
+                ->first(['id', 'descricao'])
+            : null;
 
         app(ContaReceberBaixaService::class)->registrarEntradaCaixa(
             valor: $valorBaixa,
@@ -338,6 +346,9 @@ class PixCobrancaService
             documento: $documento,
             historico: 'Recebimento PIX #'.($conta->numero ?: $conta->id),
             caixaContaId: $this->resolveCaixaContaIdPix($cobranca),
+            empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+            planoContaId: $plano?->id ? (int) $plano->id : null,
+            planoNome: $plano ? mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120) : null,
         );
     }
 

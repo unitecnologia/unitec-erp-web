@@ -186,6 +186,8 @@ final class PdvStockService
                 origemTipo: $movimentacao->origemTipo,
                 origemId: $movimentacao->origemId,
                 origemNumero: $movimentacao->origemNumero,
+                docFiscalTipo: $movimentacao->docFiscalTipo,
+                docFiscalNumero: $movimentacao->docFiscalNumero,
                 usuarioId: $movimentacao->usuarioId,
                 observacao: $movimentacao->observacao,
             );
@@ -213,6 +215,8 @@ final class PdvStockService
                 origemTipo: $movimentacao->origemTipo,
                 origemId: $movimentacao->origemId,
                 origemNumero: $movimentacao->origemNumero,
+                docFiscalTipo: $movimentacao->docFiscalTipo,
+                docFiscalNumero: $movimentacao->docFiscalNumero,
                 usuarioId: $movimentacao->usuarioId,
                 observacao: $movimentacao->observacao,
             );

@@ -15,6 +15,7 @@ use App\Models\VendaItem;
 use App\Models\VendasInternasOrder;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Orcamento\OrcamentoDescontoService;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -182,9 +183,8 @@ class NfeImportacaoService
      */
     protected function listarOrcamentos(string $numero, string $cliente, ?string $dataDe, ?string $dataAte, int $limit): array
     {
-        $query = Orcamento::query()
+        $query = OrcamentoFaturamentoGuard::aplicarNaoFaturados(Orcamento::query())
             ->with('cliente')
-            ->whereNotIn('status', [Orcamento::STATUS_CANCELADO, Orcamento::STATUS_IMPORTADO])
             ->orderByDesc('numero');
 
         $this->applyNumeroFilter($query, 'numero', $numero);
@@ -737,9 +737,10 @@ class NfeImportacaoService
             ];
         }
 
+        $documento = $tipo === NfeImportacaoTipo::ORCAMENTO ? ['orçamento', 'orçamentos'] : ['pedido', 'pedidos'];
         $obsContribuinte = match (true) {
-            count($numeros) > 1 => 'Importado dos pedidos nº ' . $listaNumeros . '.',
-            count($numeros) === 1 => 'Importado do pedido nº ' . $listaNumeros . '.',
+            count($numeros) > 1 => 'Importado dos ' . $documento[1] . ' nº ' . $listaNumeros . '.',
+            count($numeros) === 1 => 'Importado do ' . $documento[0] . ' nº ' . $listaNumeros . '.',
             default => '',
         };
 
@@ -747,11 +748,19 @@ class NfeImportacaoService
             $obsContribuinte = trim($obsContribuinte . ' ' . implode(' ', $obsExtras));
         }
 
+        $orcamentoIds = $tipo === NfeImportacaoTipo::ORCAMENTO
+            ? array_values(array_unique(array_filter(array_map(
+                static fn (array $d): int => (int) ($d['document_id'] ?? 0),
+                $detalhes,
+            ))))
+            : [];
+
         return [
             'cliente_id' => $clienteId,
             'numero_pedido' => $listaNumeros !== '' ? $listaNumeros : null,
             'venda_id' => $vendaId,
             'pdv_venda_id' => $pdvVendaId,
+            'orcamento_ids' => $orcamentoIds,
             'movimento' => $movimento,
             'forma_pgto' => $formaPgto,
             'meio_pgto' => $meioPgto,

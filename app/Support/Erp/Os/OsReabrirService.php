@@ -316,6 +316,8 @@ final class OsReabrirService
                 historico: 'ESTORNO '.($historico !== '' ? $historico : 'OS '.$os->numero),
                 caixaContaId: $ref->caixa_conta_id ? (int) $ref->caixa_conta_id : null,
                 empresaId: $ref->empresa_id ? (int) $ref->empresa_id : $empresaId,
+                planoContaId: $ref->plano_conta_id ? (int) $ref->plano_conta_id : null,
+                planoNome: filled($ref->plano_contas) ? (string) $ref->plano_contas : null,
             );
 
             $estornado += $liquido;

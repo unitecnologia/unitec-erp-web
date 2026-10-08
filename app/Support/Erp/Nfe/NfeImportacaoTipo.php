@@ -29,6 +29,7 @@ final class NfeImportacaoTipo
             ['tipo' => self::DEV_VENDA, 'label' => 'Dev. Venda', 'hotkey' => 'F4', 'implemented' => false],
             ['tipo' => self::OS, 'label' => 'O. S.', 'hotkey' => 'F5', 'implemented' => false],
             ['tipo' => self::NFCE, 'label' => 'NFCe', 'hotkey' => 'F6', 'implemented' => true],
+            ['tipo' => self::ORCAMENTO, 'label' => 'Orçamento', 'hotkey' => 'F7', 'implemented' => true],
         ];
     }
 
@@ -62,6 +63,7 @@ final class NfeImportacaoTipo
             'F4' => self::DEV_VENDA,
             'F5' => self::OS,
             'F6' => self::NFCE,
+            'F7' => self::ORCAMENTO,
         ];
 
         return $map[$key] ?? null;

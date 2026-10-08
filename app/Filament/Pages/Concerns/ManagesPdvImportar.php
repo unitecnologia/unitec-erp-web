@@ -2,16 +2,29 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Livewire\Erp\PdvHotPath;
 use App\Models\Orcamento;
 use App\Models\Product;
 use App\Models\Venda;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Orcamento\OrcamentoDescontoService;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use App\Support\Erp\Pdv\PdvImportarPedidoQuery;
+use App\Support\Erp\Pdv\PdvImportReserva;
+use App\Support\VendasInternas\VendasInternasPdvHookService;
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+/**
+ * Importar no PDV: Pedido (F2), Orçamento (F3) e OS (F4, ainda não implementada).
+ *
+ * A importação só monta o cupom e reserva o documento para esta sessão de caixa
+ * (PdvImportReserva). Estoque, financeiro e status do documento só mudam na
+ * finalização da venda, que revalida o documento com lock de linha.
+ */
 trait ManagesPdvImportar
 {
     public const IMPORTAR_PEDIDO = 'pedido';
@@ -20,7 +33,11 @@ trait ManagesPdvImportar
 
     public const IMPORTAR_ORDEM_SERVICO = 'ordem_servico';
 
-    public const IMPORTAR_PRE_VENDA = 'pre_venda';
+    /**
+     * Orçamento é exceção ao filtro "somente aberto" (pedido/OS): qualquer status vale,
+     * exceto já faturado (importado) ou cancelado. Ver orcamentosImportaveisQuery().
+     */
+    public const ORCAMENTO_STATUS_BLOQUEADOS = OrcamentoFaturamentoGuard::STATUS_BLOQUEADOS;
 
     public string $importarSearch = '';
 
@@ -53,7 +70,6 @@ trait ManagesPdvImportar
             ['key' => self::IMPORTAR_PEDIDO, 'fn' => 'F2', 'label' => 'Pedido'],
             ['key' => self::IMPORTAR_ORCAMENTO, 'fn' => 'F3', 'label' => 'Orçamento'],
             ['key' => self::IMPORTAR_ORDEM_SERVICO, 'fn' => 'F4', 'label' => 'Ordem de Serviço'],
-            ['key' => self::IMPORTAR_PRE_VENDA, 'fn' => 'F5', 'label' => 'Pré-Venda'],
         ];
     }
 
@@ -63,7 +79,6 @@ trait ManagesPdvImportar
             self::IMPORTAR_PEDIDO => 'F2 — Importar Pedido',
             self::IMPORTAR_ORCAMENTO => 'F3 — Importar Orçamento',
             self::IMPORTAR_ORDEM_SERVICO => 'F4 — Importar Ordem de Serviço',
-            self::IMPORTAR_PRE_VENDA => 'F5 — Importar Pré-Venda',
             default => 'Importar',
         };
     }
@@ -122,19 +137,25 @@ trait ManagesPdvImportar
             self::IMPORTAR_PEDIDO,
             self::IMPORTAR_ORCAMENTO,
             self::IMPORTAR_ORDEM_SERVICO,
-            self::IMPORTAR_PRE_VENDA,
         ], true)) {
+            return;
+        }
+
+        if ($tipo === self::IMPORTAR_ORDEM_SERVICO) {
+            // Ainda não implementada: só avisa, sem abrir lista nem alterar o cupom.
+            // Ao implementar: listar somente OS ABERTAS (aberta/andamento), sem faturamento
+            // (OsFaturamentoService) nem pagamento concluído; reserva + lock na finalização.
+            $this->modulePending('Importar Ordem de Serviço');
+
+            return;
+        }
+
+        if (! $this->assertPodeImportar()) {
             return;
         }
 
         if ($tipo === self::IMPORTAR_PEDIDO) {
             $this->openImportarPedidoModal();
-
-            return;
-        }
-
-        if ($tipo === self::IMPORTAR_ORDEM_SERVICO) {
-            $this->modulePending('Importar Ordem de Serviço');
 
             return;
         }
@@ -222,31 +243,22 @@ trait ManagesPdvImportar
             return;
         }
 
-        if ($this->importarPedidoResults[$index]['cancelado'] ?? false) {
-            $this->notifyPdvError('Pedido cancelado não pode ser importado.');
-
+        if (! $this->assertPodeImportar()) {
             return;
         }
 
         $vendaId = (int) ($this->importarPedidoResults[$index]['venda_id'] ?? 0);
-        $venda = Venda::query()
+        $venda = (new PdvImportarPedidoQuery())->build()
             ->with(['itens.product', 'cliente', 'vendedor'])
-            ->find($vendaId);
+            ->whereKey($vendaId)
+            ->first();
 
-        if (! $venda || $venda->tipo !== Venda::TIPO_PEDIDO) {
-            $this->notifyPdvError('Pedido indisponível para importação.');
-
-            return;
-        }
-
-        if ($venda->status === Venda::STATUS_CANCELADO) {
-            $this->notifyPdvError('Pedido cancelado não pode ser importado.');
-
-            return;
-        }
-
-        if (! Venda::query()->whereKey($venda->id)->semDocumentoFiscalEmitido()->exists()) {
-            $this->notifyPdvError('Pedido já possui documento fiscal emitido.');
+        if (! $venda) {
+            $this->notifyPdvError(
+                'Pedido indisponível para importação.',
+                'Já faturado, cancelado, com documento fiscal ou vinculado a outra venda.',
+            );
+            $this->refreshImportarPedidoResults();
 
             return;
         }
@@ -257,91 +269,64 @@ trait ManagesPdvImportar
             return;
         }
 
-        $validator = $this->pdvItemValidator();
-        $importados = 0;
-        $ignorados = [];
-
-        foreach ($venda->itens as $item) {
-            $product = $item->product;
-
-            if (! $product || ! $product->ativo) {
-                $ignorados[] = $product?->descricao ?? 'Item inválido';
-
-                continue;
-            }
-
-            if ($product->usa_imei) {
-                $ignorados[] = $product->descricao . ' (IMEI)';
-
-                continue;
-            }
-
-            if ($product->is_grade) {
-                $ignorados[] = $product->descricao . ' (grade)';
-
-                continue;
-            }
-
-            $quantidade = (float) $item->quantidade;
-            $preco = (float) $item->valor_item;
-            $descricao = mb_strtoupper($product->descricao, 'UTF-8');
-
-            if ($msg = $validator->validaQuantidade($quantidade)) {
-                $ignorados[] = $descricao;
-
-                continue;
-            }
-
-            if ($msg = $validator->validaEstoque($product, $quantidade, null)) {
-                $ignorados[] = $descricao;
-
-                continue;
-            }
-
-            $this->addProductToCupom($product, $quantidade, $preco, null, null, $descricao);
-            $importados++;
-        }
-
-        if ($importados === 0) {
-            $this->notifyPdvError('Nenhum item pôde ser importado.');
+        if ($erro = $this->reservarDocumentoImportado(PdvImportReserva::PEDIDO, (int) $venda->id)) {
+            $this->notifyPdvError('Pedido em uso.', $erro);
 
             return;
         }
 
-        $cliente = $venda->cliente;
-        $clienteNome = mb_strtoupper($cliente?->nome_razao ?? 'CONSUMIDOR FINAL', 'UTF-8');
+        try {
+            $linhas = [];
 
-        session([
-            'erp.pdv.venda_id' => $venda->id,
-            'erp.pdv.import_cliente_id' => $cliente?->id,
-            'erp.pdv.import_cliente_nome' => $clienteNome,
-        ]);
+            foreach ($venda->itens as $item) {
+                $quantidade = (float) $item->quantidade;
+                $preco = (float) $item->valor_item;
+                $total = (float) $item->total > 0 ? (float) $item->total : round($quantidade * $preco, 2);
 
-        if ($venda->vendedor) {
-            $this->applyImportVendedor($venda->vendedor);
-        } elseif (filled($venda->vendedor_nome)) {
-            $this->vendedor = mb_strtoupper((string) $venda->vendedor_nome, 'UTF-8');
-            $this->vendedorId = $venda->vendedor_id;
-            $this->persistVendedorToSession();
+                $linhas[] = [
+                    'product' => $item->product,
+                    'grade_id' => null,
+                    'quantidade' => $quantidade,
+                    'preco_bruto' => $preco,
+                    'total' => $total,
+                    'descricao' => $item->product?->descricao ?? 'Item inválido',
+                    'exige_grade' => true,
+                ];
+            }
+
+            $resultado = $this->carregarItensImportados($linhas, (float) $venda->total);
+
+            if ($resultado['importados'] === 0) {
+                $this->desfazerImportacao(PdvImportReserva::PEDIDO, (int) $venda->id);
+                $this->notifyPdvError('Nenhum item pôde ser importado.', $this->resumoIgnorados($resultado['ignorados']));
+
+                return;
+            }
+
+            $cliente = $venda->cliente;
+
+            session([
+                'erp.pdv.venda_id' => $venda->id,
+                'erp.pdv.import_cliente_id' => $cliente?->id,
+                'erp.pdv.import_cliente_nome' => mb_strtoupper($cliente?->nome_razao ?? 'CONSUMIDOR FINAL', 'UTF-8'),
+                'erp.pdv.import_desconto_venda' => $resultado['desconto'],
+                'erp.pdv.import_acrescimo_venda' => $resultado['acrescimo'],
+            ]);
+
+            if ($venda->vendedor) {
+                $this->applyImportVendedor($venda->vendedor);
+            } elseif (filled($venda->vendedor_nome)) {
+                $this->vendedor = mb_strtoupper((string) $venda->vendedor_nome, 'UTF-8');
+                $this->vendedorId = $venda->vendedor_id;
+                $this->persistVendedorToSession();
+            }
+        } catch (\Throwable $e) {
+            $this->falhaImportacao(PdvImportReserva::PEDIDO, (int) $venda->id, $e);
+
+            return;
         }
 
-        $this->persistCupomToSession();
-        $this->importarTipo = null;
-        $this->closePdvModal();
-
-        $notification = Notification::make()
-            ->title('Pedido importado.')
-            ->body("{$importados} item(ns) carregado(s).");
-
-        if ($ignorados !== []) {
-            $notification->body(
-                "{$importados} item(ns) carregado(s). Ignorados: " . implode(', ', array_slice($ignorados, 0, 3))
-                . (count($ignorados) > 3 ? '...' : ''),
-            );
-        }
-
-        $notification->success()->send();
-        $this->dispatch('erp-pdv-focus-search');
+        $this->concluirImportacao('Pedido Nº '.$venda->numero.' importado.', $resultado);
     }
 
     protected function parseImportarPedidoDate(string $value): ?string
@@ -381,7 +366,7 @@ trait ManagesPdvImportar
 
     protected function assertPodeImportar(): bool
     {
-        if (! $this->caixaAberto) {
+        if (! $this->caixaAberto || ! $this->caixaSessaoId) {
             $this->notifyPdvError('Caixa fechado.');
 
             return false;
@@ -412,10 +397,8 @@ trait ManagesPdvImportar
         $term = trim($this->importarSearch);
         $like = $term !== '' ? '%' . $term . '%' : null;
 
-        $query = Orcamento::query()
-            ->visivelNaListaOrcamentos()
+        $query = $this->orcamentosImportaveisQuery()
             ->with(['cliente:id,nome_razao,codigo'])
-            ->where('status', Orcamento::STATUS_ABERTO)
             ->orderByDesc('data')
             ->orderByDesc('id');
 
@@ -470,13 +453,22 @@ trait ManagesPdvImportar
             return;
         }
 
-        $orcamentoId = (int) ($this->importarResults[$index]['orcamento_id'] ?? 0);
-        $orcamento = Orcamento::query()
-            ->with(['itens.product', 'itens.grade', 'cliente', 'vendedor'])
-            ->find($orcamentoId);
+        if (! $this->assertPodeImportar()) {
+            return;
+        }
 
-        if (! $orcamento || $orcamento->status !== Orcamento::STATUS_ABERTO) {
-            $this->notifyPdvError('Orçamento indisponível para importação.');
+        $orcamentoId = (int) ($this->importarResults[$index]['orcamento_id'] ?? 0);
+        $orcamento = $this->orcamentosImportaveisQuery()
+            ->with(['itens.product', 'itens.grade', 'cliente', 'vendedor'])
+            ->whereKey($orcamentoId)
+            ->first();
+
+        if (! $orcamento) {
+            $this->notifyPdvError(
+                'Orçamento indisponível para importação.',
+                'Já faturado (PDV, OS ou importado em outra venda) ou cancelado.',
+            );
+            $this->refreshImportarResults();
 
             return;
         }
@@ -487,109 +479,66 @@ trait ManagesPdvImportar
             return;
         }
 
-        $validator = $this->pdvItemValidator();
-        $importados = 0;
-        $ignorados = [];
-
-        foreach ($orcamento->itens as $item) {
-            $product = $item->product;
-
-            if (! $product || ! $product->ativo) {
-                $ignorados[] = $item->descricao ?? 'Item inválido';
-
-                continue;
-            }
-
-            if ($product->usa_imei) {
-                $ignorados[] = $product->descricao . ' (IMEI)';
-
-                continue;
-            }
-
-            if ($product->is_grade && ! $item->product_grade_id) {
-                $ignorados[] = $product->descricao . ' (grade)';
-
-                continue;
-            }
-
-            $quantidade = (float) $item->quantidade;
-            $preco = (float) $item->preco_unitario;
-            $gradeId = $item->product_grade_id ? (int) $item->product_grade_id : null;
-            $descricao = $item->descricao
-                ?? ($item->grade
-                    ? $product->descricao . ' - ' . $item->grade->descricao
-                    : $product->descricao);
-
-            if ($msg = $validator->validaQuantidade($quantidade)) {
-                $ignorados[] = $descricao;
-
-                continue;
-            }
-
-            if ($msg = $validator->validaEstoque($product, $quantidade, $gradeId)) {
-                $ignorados[] = $descricao;
-
-                continue;
-            }
-
-            $this->addProductToCupom(
-                $product,
-                $quantidade,
-                $preco,
-                $gradeId,
-                null,
-                mb_strtoupper($descricao, 'UTF-8'),
-            );
-            $importados++;
-        }
-
-        if ($importados === 0) {
-            $this->notifyPdvError('Nenhum item pôde ser importado.');
+        if ($erro = $this->reservarDocumentoImportado(PdvImportReserva::ORCAMENTO, (int) $orcamento->id)) {
+            $this->notifyPdvError('Orçamento em uso.', $erro);
 
             return;
         }
 
-        DB::transaction(function () use ($orcamento): void {
-            $orcamento->update(['status' => Orcamento::STATUS_IMPORTADO]);
-        });
+        try {
+            $descontos = app(OrcamentoDescontoService::class);
+            $linhas = [];
 
-        (new \App\Support\VendasInternas\VendasInternasPdvHookService())->onOrcamentoImportado((int) $orcamento->id);
+            foreach ($orcamento->itens as $item) {
+                $product = $item->product;
+                $descricao = $item->descricao
+                    ?? ($product && $item->grade
+                        ? $product->descricao . ' - ' . $item->grade->descricao
+                        : ($product?->descricao ?? 'Item inválido'));
 
-        $cliente = $orcamento->cliente;
-        $clienteNome = mb_strtoupper($cliente?->nome_razao ?? 'CONSUMIDOR FINAL', 'UTF-8');
+                $linhas[] = [
+                    'product' => $product,
+                    'grade_id' => $item->product_grade_id ? (int) $item->product_grade_id : null,
+                    'quantidade' => (float) $item->quantidade,
+                    'preco_bruto' => (float) $item->preco_unitario,
+                    'total' => $descontos->partesDaLinha($item)['total'],
+                    'descricao' => $descricao,
+                    'exige_grade' => false,
+                ];
+            }
 
-        session([
-            'erp.pdv.orcamento_id' => $orcamento->id,
-            'erp.pdv.import_cliente_id' => $cliente?->id,
-            'erp.pdv.import_cliente_nome' => $clienteNome,
-        ]);
+            $resultado = $this->carregarItensImportados($linhas, (float) $orcamento->total);
 
-        if ($orcamento->vendedor) {
-            $this->applyImportVendedor($orcamento->vendedor);
+            if ($resultado['importados'] === 0) {
+                $this->desfazerImportacao(PdvImportReserva::ORCAMENTO, (int) $orcamento->id);
+                $this->notifyPdvError('Nenhum item pôde ser importado.', $this->resumoIgnorados($resultado['ignorados']));
+
+                return;
+            }
+
+            $cliente = $orcamento->cliente;
+
+            session([
+                'erp.pdv.orcamento_id' => $orcamento->id,
+                'erp.pdv.import_cliente_id' => $cliente?->id,
+                'erp.pdv.import_cliente_nome' => mb_strtoupper($cliente?->nome_razao ?? 'CONSUMIDOR FINAL', 'UTF-8'),
+                'erp.pdv.import_desconto_venda' => $resultado['desconto'],
+                'erp.pdv.import_acrescimo_venda' => $resultado['acrescimo'],
+            ]);
+
+            // Status do orçamento só muda na finalização; aqui só sinaliza "no caixa" ao Vendas Internas.
+            (new VendasInternasPdvHookService())->onOrcamentoImportado((int) $orcamento->id);
+
+            if ($orcamento->vendedor) {
+                $this->applyImportVendedor($orcamento->vendedor);
+            }
+        } catch (\Throwable $e) {
+            $this->falhaImportacao(PdvImportReserva::ORCAMENTO, (int) $orcamento->id, $e);
+
+            return;
         }
 
-        $tipoImportado = $this->importarTipo;
-
-        $this->persistCupomToSession();
-        $this->importarTipo = null;
-        $this->closePdvModal();
-
-        $notification = Notification::make()
-            ->title(match ($tipoImportado) {
-                self::IMPORTAR_PRE_VENDA => 'Pré-venda importada.',
-                default => 'Orçamento importado.',
-            })
-            ->body("{$importados} item(ns) carregado(s).");
-
-        if ($ignorados !== []) {
-            $notification->body(
-                "{$importados} item(ns) carregado(s). Ignorados: " . implode(', ', array_slice($ignorados, 0, 3))
-                . (count($ignorados) > 3 ? '...' : ''),
-            );
-        }
-
-        $notification->success()->send();
-        $this->dispatch('erp-pdv-focus-search');
+        $this->concluirImportacao('Orçamento Nº '.$orcamento->numero.' importado.', $resultado);
     }
 
     protected function applyImportVendedor(Vendedor $vendedor): void
@@ -620,13 +569,289 @@ trait ManagesPdvImportar
         $this->dispatch('erp-pdv-focus-search');
     }
 
-    protected function clearImportSession(): void
+    /**
+     * Monta o cupom com preço e descontos do documento, no formato do PDV:
+     * desconto/acréscimo do item são unitários e embutidos no preço (como o Ctrl+Q);
+     * o desconto geral do documento (proporcional aos itens importados) e o ajuste de
+     * centavos do arredondamento viram desconto/acréscimo da venda na finalização.
+     *
+     * @param  list<array{product: ?Product, grade_id: ?int, quantidade: float, preco_bruto: float, total: float, descricao: string, exige_grade: bool}>  $linhas
+     * @return array{importados: int, ignorados: list<string>, desconto: float, acrescimo: float}
+     */
+    protected function carregarItensImportados(array $linhas, float $totalDocumento): array
     {
+        $validator = $this->pdvItemValidator();
+        $ignorados = [];
+        $somaDocumento = 0.0;
+        $somaImportada = 0.0;
+        $somaCupom = 0.0;
+        $importados = 0;
+
+        foreach ($linhas as $linha) {
+            $somaDocumento += round(max(0, $linha['total']), 2);
+        }
+
+        foreach ($linhas as $linha) {
+            $product = $linha['product'];
+            $descricao = mb_strtoupper((string) $linha['descricao'], 'UTF-8');
+            $quantidade = round((float) $linha['quantidade'], 3);
+            $gradeId = $linha['grade_id'];
+
+            $motivo = match (true) {
+                ! $product => 'produto não encontrado',
+                ! $product->ativo => 'inativo',
+                (bool) $product->usa_imei => 'IMEI',
+                $product->is_grade && ($linha['exige_grade'] || ! $gradeId) => 'grade',
+                default => null,
+            };
+
+            if ($motivo === null && $validator->validaQuantidade($quantidade)) {
+                $motivo = 'quantidade inválida';
+            }
+
+            if ($motivo === null && $validator->validaEstoque($product, $quantidade, $gradeId)) {
+                $motivo = 'sem estoque';
+            }
+
+            $totalLinha = round(max(0, $linha['total']), 2);
+            $precoLiquido = $quantidade > 0 ? round($totalLinha / $quantidade, 2) : 0.0;
+
+            if ($motivo === null && $precoLiquido <= 0) {
+                $motivo = 'preço zerado';
+            }
+
+            if ($motivo !== null) {
+                $ignorados[] = $descricao.' ('.$motivo.')';
+
+                continue;
+            }
+
+            $precoBruto = round(max(0, $linha['preco_bruto']), 2);
+            $totalCupom = round($quantidade * $precoLiquido, 2);
+            $delta = round($precoLiquido - $precoBruto, 2);
+
+            $this->cupomItens[] = [
+                'product_id' => $product->id,
+                'product_grade_id' => $gradeId,
+                'product_serial_id' => null,
+                'codigo' => $product->codigo,
+                'codigo_barras' => $product->codigo_barras ?? '',
+                'descricao' => $descricao,
+                'unidade' => $product->unidade ?: 'UN',
+                'quantidade' => $quantidade,
+                'preco' => $precoLiquido,
+                'preco_base' => $precoBruto > 0 ? $precoBruto : $precoLiquido,
+                'desconto' => $precoBruto > 0 && $delta < 0 ? abs($delta) : 0.0,
+                'acrescimo' => $precoBruto > 0 && $delta > 0 ? $delta : 0.0,
+                'total' => $totalCupom,
+            ];
+
+            $somaImportada += $totalLinha;
+            $somaCupom += $totalCupom;
+            $importados++;
+        }
+
+        if ($importados > 0) {
+            $this->marcarCupomIniciadoSeNecessario();
+        }
+
+        $geral = $totalDocumento > 0 ? round($somaDocumento - $totalDocumento, 2) : 0.0;
+        $geralProporcional = $somaDocumento > 0 ? $geral * ($somaImportada / $somaDocumento) : 0.0;
+        $alvo = round($somaImportada - $geralProporcional, 2);
+        $ajuste = $importados > 0 ? round($somaCupom - $alvo, 2) : 0.0;
+
+        return [
+            'importados' => $importados,
+            'ignorados' => $ignorados,
+            'desconto' => $ajuste > 0 ? $ajuste : 0.0,
+            'acrescimo' => $ajuste < 0 ? abs($ajuste) : 0.0,
+        ];
+    }
+
+    /**
+     * @param  array{importados: int, ignorados: list<string>, desconto: float, acrescimo: float}  $resultado
+     */
+    protected function concluirImportacao(string $titulo, array $resultado): void
+    {
+        $this->persistCupomToSession();
+        $this->importarTipo = null;
+        $this->closePdvModal();
+
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
+
+        $body = $resultado['importados'].' item(ns) carregado(s).';
+
+        if ($resultado['desconto'] > 0) {
+            $body .= ' Desconto da venda: R$ '.ErpMoney::formatBr($resultado['desconto']).'.';
+        } elseif ($resultado['acrescimo'] > 0) {
+            $body .= ' Acréscimo da venda: R$ '.ErpMoney::formatBr($resultado['acrescimo']).'.';
+        }
+
+        if ($resultado['ignorados'] !== []) {
+            $body .= ' Ignorados: '.$this->resumoIgnorados($resultado['ignorados']);
+        }
+
+        $notification = Notification::make()->title($titulo)->body($body);
+
+        if ($resultado['ignorados'] !== []) {
+            $notification->warning()->persistent();
+        } else {
+            $notification->success();
+        }
+
+        $notification->send();
+        $this->dispatch('erp-pdv-focus-search');
+    }
+
+    /**
+     * @param  list<string>  $ignorados
+     */
+    protected function resumoIgnorados(array $ignorados): string
+    {
+        if ($ignorados === []) {
+            return '';
+        }
+
+        return implode(', ', array_slice($ignorados, 0, 5)).(count($ignorados) > 5 ? '...' : '');
+    }
+
+    protected function reservarDocumentoImportado(string $tipo, int $id): ?string
+    {
+        $operador = (string) (Auth::user()?->name ?? 'OPERADOR');
+
+        return PdvImportReserva::reservar($tipo, $id, (int) $this->caixaSessaoId, $operador);
+    }
+
+    protected function desfazerImportacao(string $tipo, int $id): void
+    {
+        $this->cupomItens = [];
+        $this->selectedCupomIndex = null;
+        session()->forget('erp.pdv.cupom');
+        $this->forgetCupomIniciadoEm();
+        $this->clearImportSession();
+        PdvImportReserva::liberar($tipo, $id, (int) $this->caixaSessaoId);
+    }
+
+    protected function falhaImportacao(string $tipo, int $id, \Throwable $e): void
+    {
+        Log::error('PDV importar: falha ao importar documento.', [
+            'tipo' => $tipo,
+            'id' => $id,
+            'message' => $e->getMessage(),
+        ]);
+
+        $this->desfazerImportacao($tipo, $id);
+        $this->notifyPdvError('Não foi possível importar.', $e->getMessage());
+    }
+
+    /**
+     * Na finalização (dentro da transação): trava o orçamento e confirma que ainda
+     * pode virar venda. Outra venda que já o faturou bloqueia esta.
+     */
+    protected function travarOrcamentoImportado(int $orcamentoId): Orcamento
+    {
+        $orcamento = Orcamento::query()->whereKey($orcamentoId)->lockForUpdate()->first();
+        $importavel = $orcamento !== null
+            && $this->orcamentosImportaveisQuery()->whereKey($orcamentoId)->exists();
+
+        if (! $importavel) {
+            $motivo = OrcamentoFaturamentoGuard::motivoFaturado($orcamentoId)
+                ?? 'O orçamento importado já foi faturado ou cancelado em outra venda.';
+
+            throw new \RuntimeException($motivo.' Cancele o cupom (F6).');
+        }
+
+        return $orcamento;
+    }
+
+    /**
+     * Orçamentos que ainda podem virar venda no PDV, sem filtro de status aberto,
+     * mas bloqueando faturamento duplicado (PDV, OS ou NF-e válida — ver OrcamentoFaturamentoGuard).
+     *
+     * @return Builder<Orcamento>
+     */
+    protected function orcamentosImportaveisQuery(): Builder
+    {
+        return OrcamentoFaturamentoGuard::aplicarNaoFaturados(
+            Orcamento::query()->visivelNaListaOrcamentos(),
+        );
+    }
+
+    /**
+     * Na finalização (dentro da transação): trava o pedido e confirma que segue pendente.
+     */
+    protected function travarPedidoImportado(int $vendaId): Venda
+    {
+        $pedido = Venda::query()->whereKey($vendaId)->lockForUpdate()->first();
+        $pendente = $pedido !== null
+            && (new PdvImportarPedidoQuery())->build()->whereKey($vendaId)->exists();
+
+        if (! $pendente) {
+            throw new \RuntimeException(
+                'O pedido importado já foi faturado, cancelado ou vinculado a outra venda. Cancele o cupom (F6).'
+            );
+        }
+
+        return $pedido;
+    }
+
+    protected function importDescontoVenda(): float
+    {
+        return round(max(0, (float) session('erp.pdv.import_desconto_venda', 0)), 2);
+    }
+
+    protected function importAcrescimoVenda(): float
+    {
+        return round(max(0, (float) session('erp.pdv.import_acrescimo_venda', 0)), 2);
+    }
+
+    /**
+     * @param  bool  $liberar  false ao suspender em espera: a reserva continua com a sessão.
+     */
+    protected function clearImportSession(bool $liberar = true): void
+    {
+        if ($liberar) {
+            $this->liberarDocumentosImportados(
+                (int) session('erp.pdv.orcamento_id', 0),
+                (int) session('erp.pdv.venda_id', 0),
+            );
+        }
+
         session()->forget([
             'erp.pdv.orcamento_id',
             'erp.pdv.venda_id',
             'erp.pdv.import_cliente_id',
             'erp.pdv.import_cliente_nome',
+            'erp.pdv.import_desconto_venda',
+            'erp.pdv.import_acrescimo_venda',
         ]);
+    }
+
+    /**
+     * Libera reservas desta sessão. Após venda finalizada o orçamento já está importado
+     * e o Vendas Internas já está pago, então nada é revertido.
+     */
+    protected function liberarDocumentosImportados(int $orcamentoId, int $vendaId): void
+    {
+        $sessaoId = (int) $this->caixaSessaoId;
+
+        try {
+            if ($orcamentoId > 0) {
+                PdvImportReserva::liberar(PdvImportReserva::ORCAMENTO, $orcamentoId, $sessaoId);
+                (new VendasInternasPdvHookService())->onOrcamentoLiberado($orcamentoId);
+            }
+
+            if ($vendaId > 0) {
+                PdvImportReserva::liberar(PdvImportReserva::PEDIDO, $vendaId, $sessaoId);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('PDV importar: falha ao liberar documento importado.', [
+                'orcamento_id' => $orcamentoId,
+                'venda_id' => $vendaId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 }

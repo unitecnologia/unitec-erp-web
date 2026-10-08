@@ -3855,6 +3855,13 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         }
     }
 
+    if (event.key === 'F2' && document.getElementById('erp-pdv-resumo-title')) {
+        event.preventDefault();
+        component.call('imprimirResumoCaixaAtual');
+
+        return;
+    }
+
     if (isFormModal) {
         if (event.key === 'F10') {
             const sangriaModal = document.getElementById('erp-pdv-sangria-title');
@@ -3893,7 +3900,6 @@ function handlePdvListModalKeydown(event, component) {
             F2: 'pedido',
             F3: 'orcamento',
             F4: 'ordem_servico',
-            F5: 'pre_venda',
         };
 
         if (fnMap[event.key]) {

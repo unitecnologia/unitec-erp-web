@@ -4,6 +4,7 @@ namespace App\Support\Erp\Pdv;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Fiscal\IbptLookupService;
 use Carbon\CarbonInterface;
 
 /**
@@ -159,6 +160,10 @@ final class PdvDavCupomLayout
             );
         }
 
+        $lines[] = self::line(self::dash($w));
+        foreach (app(IbptLookupService::class)->linhasBobinaDosItens($venda->itens, $w) as $linhaIbpt) {
+            $lines[] = self::line($linhaIbpt);
+        }
         $lines[] = self::line(self::dash($w));
         $lines[] = self::line(self::center('DOCUMENTO NAO FISCAL', $w), bold: true, center: true);
         $lines[] = self::line(self::center('!!DAV DEVE SER FINALIZADO!!', $w), bold: true, center: true);

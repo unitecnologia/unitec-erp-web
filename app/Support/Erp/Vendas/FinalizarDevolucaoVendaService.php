@@ -19,6 +19,7 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\Pdv\PdvStockService;
+use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -320,15 +321,19 @@ final class FinalizarDevolucaoVendaService
             return $resto;
         }
 
+        $pdvContaIds = $this->contasPdvDaVenda($venda, $aplicar);
         $docs = $this->documentosDaVenda($venda);
 
-        if ($docs === []) {
+        if ($pdvContaIds === [] && $docs === []) {
             return $resto;
         }
 
         $query = ContaReceber::query()
             ->where('cliente_id', $venda->cliente_id)
-            ->where(function ($q) use ($docs): void {
+            ->where(function ($q) use ($docs, $pdvContaIds): void {
+                if ($pdvContaIds !== []) {
+                    $q->orWhereIn('id', $pdvContaIds);
+                }
                 foreach ($docs as $doc) {
                     $q->orWhere('documento', $doc)
                         ->orWhere('documento', 'like', $doc.'/%');
@@ -391,17 +396,42 @@ final class FinalizarDevolucaoVendaService
     }
 
     /**
+     * Títulos PDV pelo vínculo exato da venda/empresa. Ambíguo: bloqueia a finalização
+     * e, na prévia, não abate títulos (o valor todo fica como resto).
+     *
+     * @return list<int>
+     */
+    private function contasPdvDaVenda(Venda $venda, bool $aplicar): array
+    {
+        $pdv = $venda->pdvVenda;
+
+        if (! $pdv?->numero || $pdv->isRegularizacaoFiscal()) {
+            return [];
+        }
+
+        ['contas' => $contas, 'ambiguo' => $ambiguo] = (new PdvVendaFinanceiroService())->localizarContasReceber($pdv);
+
+        if ($ambiguo) {
+            if ($aplicar) {
+                throw new DomainException(
+                    'Não foi possível identificar com segurança os títulos a receber da venda PDV #'
+                    .str_pad((string) $pdv->numero, 6, '0', STR_PAD_LEFT)
+                    .': o documento também pertence a outra venda do mesmo período. Ajuste os títulos em Contas a Receber.'
+                );
+            }
+
+            return [];
+        }
+
+        return $contas->modelKeys();
+    }
+
+    /**
      * @return list<string>
      */
     private function documentosDaVenda(Venda $venda): array
     {
         $docs = [];
-
-        $pdv = $venda->pdvVenda;
-
-        if ($pdv?->numero && ! $pdv->isRegularizacaoFiscal()) {
-            $docs[] = 'PDV-'.str_pad((string) $pdv->numero, 6, '0', STR_PAD_LEFT);
-        }
 
         $order = $venda->forcaVendasOrder;
 

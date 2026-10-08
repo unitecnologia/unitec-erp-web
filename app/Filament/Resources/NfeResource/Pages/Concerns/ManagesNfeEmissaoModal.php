@@ -24,6 +24,7 @@ use App\Support\Erp\Nfe\NfeCalculoService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfe\NfeEspelhoReportService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use App\Support\Erp\Os\OrdemServicoRetorno;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\WhatsApp\WhatsAppMessageHelper;
@@ -190,6 +191,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalPdvVendaId = null;
         $this->nfeModalDevolucaoCompraId = null;
         $this->nfeModalOrdemServicoId = null;
+        $this->nfeModalOrcamentoIds = [];
         $this->syncNfeModalAmbiente($params);
         $this->nfeModalMainTab = 'itens';
         $this->nfeModalDetailTab = 'totais';
@@ -250,6 +252,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalPdvVendaId = null;
         $this->nfeModalDevolucaoCompraId = null;
         $this->nfeModalOrdemServicoId = null;
+        $this->nfeModalOrcamentoIds = [];
         $this->nfeModalEmpresaEmitenteId = null;
         $this->nfeModalHomologacao = false;
         $this->nfeModalMainTab = 'itens';
@@ -705,6 +708,13 @@ trait ManagesNfeEmissaoModal
                 ]);
             }
 
+            if (OrcamentoFaturamentoGuard::temVinculoNfe()) {
+                $nfe->orcamentos()->sync(array_values(array_filter(
+                    array_map('intval', $this->nfeModalOrcamentoIds),
+                    static fn (int $id): bool => $id > 0,
+                )));
+            }
+
             $savedId = $nfe->id;
             $this->nfeModalStatus = 'ABERTA';
         });
@@ -887,6 +897,20 @@ trait ManagesNfeEmissaoModal
             return;
         }
 
+        $motivoOrcamento = $this->motivoOrcamentoJaFaturadoNfe($nfe);
+
+        if ($motivoOrcamento !== null) {
+            Notification::make()
+                ->title('Transmissão bloqueada: faturamento duplicado.')
+                ->body($motivoOrcamento . ' Remova a importação deste orçamento ou cancele o outro faturamento.')
+                ->danger()
+                ->persistent()
+                ->send();
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
+
+            return;
+        }
+
         try {
             $nfe = app(NfeEmissionService::class)->transmitir($nfe, $empresa);
             $this->loadNfeIntoModal($nfe);
@@ -902,6 +926,26 @@ trait ManagesNfeEmissaoModal
         } finally {
             $this->dispatch('erp-nfe-hide-fiscal-progress');
         }
+    }
+
+    /**
+     * Orçamento vinculado já faturado por PDV, OS ou outra NF-e válida (esta NF-e é ignorada).
+     */
+    protected function motivoOrcamentoJaFaturadoNfe(Nfe $nfe): ?string
+    {
+        if (! OrcamentoFaturamentoGuard::temVinculoNfe()) {
+            return null;
+        }
+
+        foreach ($nfe->orcamentos()->pluck('orcamentos.id') as $orcamentoId) {
+            $motivo = OrcamentoFaturamentoGuard::motivoFaturado((int) $orcamentoId, (int) $nfe->id);
+
+            if ($motivo !== null) {
+                return $motivo;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1964,6 +2008,9 @@ trait ManagesNfeEmissaoModal
         $this->nfeModalPdvVendaId = $nfe->pdv_venda_id ? (int) $nfe->pdv_venda_id : null;
         $this->nfeModalDevolucaoCompraId = $nfe->devolucao_compra_id ? (int) $nfe->devolucao_compra_id : null;
         $this->nfeModalOrdemServicoId = $nfe->ordem_servico_id ? (int) $nfe->ordem_servico_id : null;
+        $this->nfeModalOrcamentoIds = OrcamentoFaturamentoGuard::temVinculoNfe()
+            ? $nfe->orcamentos()->pluck('orcamentos.id')->map(fn ($id): int => (int) $id)->values()->all()
+            : [];
         // Mantém o pin alinhado à empresa persistida (re-save não volta para a sessão/Matriz).
         $this->nfeModalEmpresaEmitenteId = $nfe->empresa_id ? (int) $nfe->empresa_id : null;
         $this->syncNfeModalAmbiente(

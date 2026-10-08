@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Concerns;
 
 use App\Livewire\Erp\PdvHotPath;
+use App\Models\Orcamento;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaItem;
 use App\Models\PdvVendaPagamento;
@@ -264,8 +265,8 @@ trait ManagesPdvVenda
             'dividir_por' => '1',
             'cpf_nota' => '',
             'informacoes_adicionais' => '',
-            'desconto_venda' => '0,00',
-            'acrescimo_venda' => '0,00',
+            'desconto_venda' => ErpMoney::formatBr($this->importDescontoVenda()),
+            'acrescimo_venda' => ErpMoney::formatBr($this->importAcrescimoVenda()),
         ];
         $this->finalizarAba = 'totais';
         $this->finalizarConfirmSair = false;
@@ -772,7 +773,10 @@ trait ManagesPdvVenda
         session(['erp.pdv.cupom' => $this->cupomItens]);
     }
 
-    protected function limparCupom(): void
+    /**
+     * @param  bool  $liberarImportacao  false ao suspender em espera (documento importado segue reservado).
+     */
+    protected function limparCupom(bool $liberarImportacao = true): void
     {
         $this->cupomItens = [];
         $this->selectedCupomIndex = null;
@@ -785,7 +789,7 @@ trait ManagesPdvVenda
         $this->pdvPreviewProductName = null;
         session()->forget('erp.pdv.cupom');
         $this->forgetCupomIniciadoEm();
-        $this->clearImportSession();
+        $this->clearImportSession($liberarImportacao);
 
         if ($this->pdvHotPathEnabled ?? false) {
             $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
@@ -2616,6 +2620,10 @@ trait ManagesPdvVenda
             $docSaida = 'PDV-' . str_pad((string) $numero, 6, '0', STR_PAD_LEFT);
             $stockService = new \App\Support\Erp\Pdv\PdvStockService();
             $orcamentoId = session('erp.pdv.orcamento_id');
+            $pedidoOrigemId = (int) session('erp.pdv.venda_id', 0);
+            // Documento importado: lock de linha + revalidação impede faturar duas vezes.
+            $orcamentoImportado = filled($orcamentoId) ? $this->travarOrcamentoImportado((int) $orcamentoId) : null;
+            $pedidoOrigem = $pedidoOrigemId > 0 ? $this->travarPedidoImportado($pedidoOrigemId) : null;
             $personId = $this->finalizarClienteId;
             if ($personId === null && $cpfNota !== '') {
                 $resolvido = \App\Support\Erp\Nfce\NfceConsumidorIdentificado::findByCpf($cpfNota);
@@ -2740,7 +2748,9 @@ trait ManagesPdvVenda
             );
 
             $venda->load('itens');
-            $retaguardaVenda = (new \App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService())->espelhar($venda);
+            $retaguardaVenda = (new \App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService())->espelhar($venda, $pedidoOrigem);
+
+            $orcamentoImportado?->update(['status' => Orcamento::STATUS_IMPORTADO]);
 
             if (filled($orcamentoId)) {
                 (new \App\Support\VendasInternas\VendasInternasPdvHookService())
@@ -3032,14 +3042,17 @@ trait ManagesPdvVenda
         }
 
         $proximo = 2;
-        if (preg_match('/CHNFE:(\d{44})/i', $exception->getMessage(), $matches) === 1) {
+        $serie = null;
+        if (preg_match('/CHNFE:\s*(\d{44})/i', $exception->getMessage().' '.$exception->sefazMotivo, $matches) === 1) {
             $proximo = ((int) substr($matches[1], 25, 9)) + 1;
+            $serie = ((int) substr($matches[1], 22, 3)) ?: null;
         }
 
         NfceTerminalSequencia::ensureNumeroPeloMenos(
             TerminalResolver::make()->current(),
             $proximo,
             VendasParametro::forEmpresa($empresaId),
+            $serie,
         );
     }
 }

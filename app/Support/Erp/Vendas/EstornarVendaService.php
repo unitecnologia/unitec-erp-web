@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\Venda;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\EstoqueMovimentacaoContext;
+use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Pdv\PdvCaixaMovimentoService;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvStockService;
@@ -277,6 +278,7 @@ final class EstornarVendaService
                 throw new DomainException('Esta venda já está cancelada.');
             }
 
+            $this->assertVinculoPdvRetaguarda($pdvLocked, $vendaLocked);
             $this->assertSemDevolucaoQueBloqueiaEstorno($vendaLocked);
 
             $erroFinanceiro = $this->financeiroService->motivoBloqueioEstornoContasReceber($pdvLocked);
@@ -313,9 +315,11 @@ final class EstornarVendaService
                     throw new DomainException('Venda de retaguarda não encontrada para estorno.');
                 }
 
+                $this->assertVinculoPdvRetaguarda($pdvLocked, $vendaLocked);
                 $this->assertSemDevolucaoQueBloqueiaEstorno($vendaLocked);
 
-                $pdvLocked->loadMissing(['itens', 'pagamentos']);
+                $pdvLocked->loadMissing(['itens', 'pagamentos', 'nfce']);
+                $docFiscal = EstoqueMovimentacaoDocumento::fromPdvVenda($pdvLocked);
 
                 $erroFinanceiro = $this->financeiroService->estornarContasReceber($pdvLocked);
 
@@ -350,6 +354,8 @@ final class EstornarVendaService
                                 origemTipo: 'venda',
                                 origemId: (int) $vendaLocked->id,
                                 origemNumero: $this->numeroVendaAmigavel($vendaLocked, $pdvLocked),
+                                docFiscalTipo: $docFiscal['docFiscalTipo'] ?? null,
+                                docFiscalNumero: $docFiscal['docFiscalNumero'] ?? null,
                             ),
                         );
                     }
@@ -596,6 +602,13 @@ final class EstornarVendaService
                 : null;
         }
 
+        if ($nfce->status === PdvVendaNfce::STATUS_PENDENTE && filled($nfce->chave) && ! $nfce->simulada) {
+            throw new DomainException(
+                'NFC-e nº '.($nfce->numero ?: '—').' está com situação pendente na SEFAZ (pode ter sido autorizada). '
+                .'Consulte (F4) ou transmita (F5) na tela NFC-e antes de estornar a venda.'
+            );
+        }
+
         if ($nfce->status === PdvVendaNfce::STATUS_AUTORIZADA || $nfce->simulada) {
             $empresa ??= $this->resolveEmpresa($nfce);
 
@@ -665,6 +678,33 @@ final class EstornarVendaService
             plataforma: (string) ($venda?->plataforma ?? Venda::PLATAFORMA_ERP),
             somenteFiscal: true,
         );
+    }
+
+    /**
+     * O estorno só pode atingir a venda de retaguarda espelhada desta venda PDV.
+     *
+     * @throws DomainException
+     */
+    private function assertVinculoPdvRetaguarda(PdvVenda $pdvVenda, Venda $venda): void
+    {
+        if ((int) ($pdvVenda->venda_id ?? 0) !== (int) $venda->id) {
+            throw new DomainException(
+                'Vínculo inconsistente: a venda PDV #'.$pdvVenda->numero
+                .' não pertence à venda de retaguarda nº '.($venda->numero ?? $venda->id).'. Estorno bloqueado.'
+            );
+        }
+
+        $outra = PdvVenda::query()
+            ->where('venda_id', (int) $venda->id)
+            ->whereKeyNot((int) $pdvVenda->id)
+            ->value('numero');
+
+        if ($outra !== null) {
+            throw new DomainException(
+                'Vínculo inconsistente: a venda de retaguarda nº '.($venda->numero ?? $venda->id)
+                .' também está vinculada à venda PDV #'.$outra.'. Estorno bloqueado.'
+            );
+        }
     }
 
     private function numeroVendaAmigavel(Venda $venda, ?PdvVenda $pdvVenda = null): string

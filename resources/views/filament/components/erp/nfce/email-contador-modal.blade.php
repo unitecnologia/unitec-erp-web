@@ -8,7 +8,7 @@
 
         <div class="erp-lookup-modal__window" role="dialog" aria-modal="true" aria-labelledby="erp-nfce-contador-email-title">
             <div class="erp-lookup-modal__titlebar">
-                <span id="erp-nfce-contador-email-title">Enviar Email</span>
+                <span id="erp-nfce-contador-email-title">Enviar ao Contador</span>
                 <button
                     type="button"
                     class="erp-lookup-modal__close"

@@ -4,6 +4,7 @@ namespace App\Support\Erp;
 
 use App\Models\PlanoConta;
 use App\Models\Empresa;
+use App\Support\ContadorCloud\ContadorCloudHttpHelper;
 
 final class EmpresaParametros
 {
@@ -1058,6 +1059,11 @@ final class EmpresaParametros
             'param_whatsapp_enviar_cobranca' => ['label' => 'Permitir envio de cobranças', 'default' => true],
             'param_whatsapp_enviar_nfe' => ['label' => 'Permitir envio de NF-e', 'default' => true],
         ];
+    }
+
+    public static function defaultPortalContadorUrl(): string
+    {
+        return ContadorCloudHttpHelper::resolvePortalBaseUrl();
     }
 
     /**

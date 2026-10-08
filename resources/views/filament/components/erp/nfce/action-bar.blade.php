@@ -37,9 +37,15 @@
         <span class="erp-nfe-actions__icon">📊</span>
         <span class="erp-nfe-actions__label"><kbd>F7</kbd> | Relatório</span>
     </button>
-    <button type="button" wire:click="openNfceClienteEmailModal" class="erp-nfe-actions__btn" data-erp-key="F8">
+    <button
+        type="button"
+        wire:click="openNfceEnviarModal"
+        class="erp-nfe-actions__btn"
+        data-erp-key="F8"
+        title="Enviar NFC-e por e-mail ou WhatsApp"
+    >
         <span class="erp-nfe-actions__icon">✉</span>
-        <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Email</span>
+        <span class="erp-nfe-actions__label"><kbd>F8</kbd> | Enviar</span>
     </button>
     <button
         type="button"
@@ -53,7 +59,7 @@
     </button>
     <button type="button" wire:click="openNfceContadorEmailModal" class="erp-nfe-actions__btn" data-erp-key="F11">
         <span class="erp-nfe-actions__icon">📄</span>
-        <span class="erp-nfe-actions__label"><kbd>F11</kbd> | Gerar PDF</span>
+        <span class="erp-nfe-actions__label"><kbd>F11</kbd> | Enviar Contador</span>
     </button>
     <button type="button" wire:click="refreshTable" class="erp-nfe-actions__btn">
         <span class="erp-nfe-actions__icon">↻</span>

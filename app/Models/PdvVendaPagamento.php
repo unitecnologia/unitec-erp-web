@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
+use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -125,14 +126,13 @@ class PdvVendaPagamento extends Model
             return null;
         }
 
-        $documento = 'PDV-'.str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
+        ['contas' => $contas, 'ambiguo' => $ambiguo] = (new PdvVendaFinanceiroService())->localizarContasReceber($venda);
 
-        $n = ContaReceber::query()
-            ->where(function ($q) use ($documento): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'/%');
-            })
-            ->count();
+        if ($ambiguo) {
+            return null;
+        }
+
+        $n = $contas->count();
 
         return $n > 1 ? $n.'x' : null;
     }

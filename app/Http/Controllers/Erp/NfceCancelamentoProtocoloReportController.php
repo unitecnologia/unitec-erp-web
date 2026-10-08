@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Erp;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use App\Support\Erp\Pdv\PdvNfceCancelamentoProtocoloService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,10 +32,18 @@ class NfceCancelamentoProtocoloReportController
         $empresaId = session('erp_empresa_id', $user->empresa_id);
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : $user->empresa;
 
-        if ($venda->sessao && filled($venda->sessao->empresa_id)) {
-            abort_unless(
-                (int) $venda->sessao->empresa_id === (int) ($empresaId ?? $user->empresa_id),
-                403,
+        NfceEmpresaEscopo::abortSeVendaForaDaEmpresa($venda, $empresaId ? (int) $empresaId : null);
+
+        if ($request->boolean('a4')) {
+            return view(
+                'reports.nfce-cancelamento-protocolo-a4',
+                $service->buildA4ViewData(
+                    venda: $venda,
+                    empresa: $empresa,
+                    usuario: (string) $user->name,
+                    autoPrint: $request->boolean('auto'),
+                    embed: $request->boolean('embed'),
+                ),
             );
         }
 

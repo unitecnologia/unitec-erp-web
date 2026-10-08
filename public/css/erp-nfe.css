@@ -1155,29 +1155,32 @@
 }
 
 .erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn:disabled {
-    opacity: 0.45;
+    opacity: 0.55;
     cursor: not-allowed;
+    transform: none;
 }
 
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--danger {
-    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
-    border-color: #fca5a5;
-    color: #fff;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--danger:hover:not(:disabled) {
-    background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
-    border-color: #fca5a5;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--primary {
-    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key="F5"],
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key="F5"]:disabled {
+    background: linear-gradient(180deg, var(--erp-brand-accent-soft, #16a34a) 0%, var(--erp-brand-accent, #15803d) 100%);
     border-color: #86efac;
-    color: #fff;
+    color: var(--erp-text-inverse, #fff);
 }
 
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--primary:hover:not(:disabled) {
-    background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key="F5"]:hover:not(:disabled) {
+    background: linear-gradient(180deg, #22c55e 0%, var(--erp-brand-accent-soft, #16a34a) 100%);
+    border-color: #86efac;
+}
+
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key="Escape"] {
+    background: linear-gradient(180deg, #ef4444 0%, var(--erp-action-danger-dark, #b91c1c) 100%);
+    border-color: #fca5a5;
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key="Escape"]:hover {
+    background: linear-gradient(180deg, #f87171 0%, var(--erp-action-danger, #dc2626) 100%);
+    border-color: #fca5a5;
 }
 
 .erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__icon {
@@ -1195,15 +1198,24 @@
 }
 
 .erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__label {
-    font-size: 0.68rem;
+    font-size: 0.78rem;
     text-align: center;
     line-height: 1.15;
     font-weight: 700;
 }
 
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--danger .erp-pcad-actions__label,
-.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn--primary .erp-pcad-actions__label {
-    color: #fff;
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key] .erp-pcad-actions__label,
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key] .erp-pcad-actions__label kbd,
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__btn[data-erp-key] .erp-pcad-actions__icon {
+    color: var(--erp-text-inverse, #fff);
+}
+
+.erp-nfe-page .erp-nfce-fiscal-modal .erp-pcad-actions__label kbd {
+    padding: 0.06rem 0.3rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
 }
 
 .erp-nfe-page .erp-nfce-fiscal-modal__hint {
@@ -4348,88 +4360,6 @@
     outline: none;
 }
 
-/* Overlay de progresso — F5 transmitir contingência/pendentes */
-.erp-nfe-page .erp-nfce-fiscal-progress {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 130;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress.is-visible {
-    display: flex;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.42);
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__panel {
-    position: relative;
-    width: min(22rem, 100%);
-    padding: 1.1rem 1.25rem 1rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__status {
-    margin: 0 0 0.85rem;
-    font-size: 0.92rem;
-    font-weight: 700;
-    line-height: 1.35;
-    color: #0f172a;
-    text-align: center;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__track {
-    height: 0.65rem;
-    margin-bottom: 0.55rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 999px;
-    overflow: hidden;
-    background: #e2e8f0;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__bar {
-    width: 8%;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
-    animation: erp-nfce-fiscal-indeterminate 1.6s ease-in-out infinite;
-}
-
-.erp-nfe-page .erp-nfce-fiscal-progress__hint {
-    margin: 0;
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: #64748b;
-    text-align: center;
-}
-
-@keyframes erp-nfce-fiscal-indeterminate {
-    0% {
-        width: 8%;
-        margin-left: 0;
-    }
-
-    50% {
-        width: 72%;
-        margin-left: 14%;
-    }
-
-    100% {
-        width: 8%;
-        margin-left: 92%;
-    }
-}
-
 /* ── NF-e emissão — progresso e erro fiscal (modal) ───────────── */
 
 .erp-nfe-page .erp-nfe-fiscal-progress {
@@ -6802,4 +6732,98 @@
 .erp-doc-pref__num {
     min-width: 0;
     font-weight: 400;
+}
+
+.erp-nfce-page .erp-nfce-inut {
+    margin-top: 0.5rem;
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-md);
+    box-shadow: var(--erp-shadow-sm);
+    font-family: var(--erp-font);
+}
+
+.erp-nfce-page .erp-nfce-inut__header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-nfce-page .erp-nfce-inut__title {
+    margin: 0;
+    font-size: var(--erp-font-size-sm, 0.8125rem);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+}
+
+.erp-nfce-page .erp-nfce-inut__hint,
+.erp-nfce-page .erp-nfce-inut__empty {
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-nfce-page .erp-nfce-inut__empty {
+    margin: 0;
+    padding: 0.75rem;
+}
+
+.erp-nfce-page .erp-nfce-inut__scroll {
+    max-height: 220px;
+    overflow: auto;
+}
+
+.erp-nfce-page .erp-nfce-inut__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text);
+}
+
+.erp-nfce-page .erp-nfce-inut__table th,
+.erp-nfce-page .erp-nfce-inut__table td {
+    padding: 0.35rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--erp-border-light, #e2e8f0);
+}
+
+.erp-nfce-page .erp-nfce-inut__table th {
+    position: sticky;
+    top: 0;
+    background: var(--erp-bg-muted, #f1f5f9);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+}
+
+.erp-nfce-page .erp-nfce-inut__table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nfce-page .erp-nfce-inut__just {
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfce-page .erp-nfce-inut__acao {
+    text-align: right;
+}
+
+.erp-nfce-page .erp-nfce-inut__xml {
+    padding: 0.15rem 0.6rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    background: #fff;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm);
+    cursor: pointer;
+}
+
+.erp-nfce-page .erp-nfce-inut__xml:hover {
+    background: var(--erp-bg-muted, #f1f5f9);
 }

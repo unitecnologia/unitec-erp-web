@@ -14,6 +14,15 @@ final class VendasInternasPdvHookService
             ->update(['situacao' => VendasInternasOrder::SITUACAO_NO_CAIXA]);
     }
 
+    /** Cupom cancelado/descartado sem venda: o pedido volta a aguardar o caixa. */
+    public function onOrcamentoLiberado(int $orcamentoId): void
+    {
+        VendasInternasOrder::query()
+            ->where('orcamento_id', $orcamentoId)
+            ->where('situacao', VendasInternasOrder::SITUACAO_NO_CAIXA)
+            ->update(['situacao' => VendasInternasOrder::SITUACAO_AGUARDANDO]);
+    }
+
     public function onVendaPdvFinalizada(?int $orcamentoId, int $vendaId): void
     {
         if ($orcamentoId === null || $orcamentoId <= 0) {

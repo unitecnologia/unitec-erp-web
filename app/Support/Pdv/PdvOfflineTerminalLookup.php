@@ -4,6 +4,7 @@ namespace App\Support\Pdv;
 
 use App\Models\Terminal;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Resolve o caixa do PDV offline (PDV1, "1"…) sem comparar numero_logico
@@ -20,6 +21,13 @@ final class PdvOfflineTerminalLookup
         }
 
         $query = Terminal::query()->where('empresa_id', $empresaId);
+
+        // Celular de app (Força de Vendas etc.) nunca é caixa NFC-e — evita casar "5" com o id do aparelho.
+        if (Schema::hasColumn('terminais', 'categoria_licenca')) {
+            $query->where(function (Builder $q): void {
+                $q->whereNull('categoria_licenca')->orWhere('categoria_licenca', '!=', 'telefone');
+            });
+        }
 
         if ($somenteAtivo) {
             $query->where(function (Builder $q): void {
@@ -39,8 +47,14 @@ final class PdvOfflineTerminalLookup
                 return $byNome;
             }
 
+            // ERP1 (PDV web) e PDV1 podem ter o mesmo nº lógico: o PDV offline tem preferência.
             $byNumero = (clone $query)
                 ->where('numero_logico_terminal', $numero)
+                ->when(
+                    Schema::hasColumn('terminais', 'origens_dispositivo'),
+                    fn (Builder $q) => $q->orderByRaw("CASE WHEN origens_dispositivo LIKE '%pdv_offline%' THEN 0 ELSE 1 END")
+                )
+                ->orderBy('id')
                 ->first();
 
             if ($byNumero !== null) {

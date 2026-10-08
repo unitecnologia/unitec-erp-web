@@ -30,6 +30,13 @@ class NfceResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    private const ABAS_COM_SITUACAO = [
+        PdvVendaNfce::TAB_GRAVADOS,
+        PdvVendaNfce::TAB_DUPLICIDADE,
+        PdvVendaNfce::TAB_INUTILIZADOS,
+        PdvVendaNfce::TAB_DENEGADO,
+    ];
+
     public static function canAccess(): bool
     {
         return ErpAccess::currentCan('nfce.access');
@@ -132,6 +139,19 @@ class NfceResource extends Resource
                     ->label('Nº Dav')
                     ->alignCenter()
                     ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
+                    ->weight(FontWeight::SemiBold),
+                TextColumn::make('motivo_rejeicao')
+                    ->label('Situação SEFAZ')
+                    ->visible(fn ($livewire): bool => in_array((string) ($livewire->statusFilter ?? ''), self::ABAS_COM_SITUACAO, true))
+                    ->getStateUsing(fn (PdvVendaNfce $record): string => $record->situacaoSefazLabel()
+                        .(filled($record->motivo_rejeicao) ? ' — '.trim((string) $record->motivo_rejeicao) : ''))
+                    ->limit(90)
+                    ->tooltip(fn (PdvVendaNfce $record): ?string => filled($record->motivo_rejeicao) ? trim((string) $record->motivo_rejeicao) : null)
+                    ->color(fn (PdvVendaNfce $record): ?string => in_array((string) $record->status, [
+                        PdvVendaNfce::STATUS_REJEITADA,
+                        PdvVendaNfce::STATUS_DENEGADA,
+                        PdvVendaNfce::STATUS_DUPLICIDADE,
+                    ], true) ? 'danger' : null)
                     ->weight(FontWeight::SemiBold),
             ])
             ->defaultSort('numero', 'desc')

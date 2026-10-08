@@ -21,11 +21,13 @@ class CaixaListQueryBuilder
         public bool $applyDefaultOrder = true,
     ) {}
 
+    private ?bool $contaPdv = null;
+
     public function buildForList(): Builder
     {
         $table = (new CaixaLancamento)->getTable();
 
-        $query = $this->buildFilteredQuery()->select([
+        $columns = [
             "{$table}.id",
             "{$table}.codigo",
             "{$table}.emissao",
@@ -35,7 +37,19 @@ class CaixaListQueryBuilder
             "{$table}.caixa_conta_id",
             "{$table}.entrada",
             "{$table}.saida",
-        ]);
+        ];
+
+        if ($this->isContaPdv()) {
+            array_push(
+                $columns,
+                "{$table}.plano_conta_id",
+                "{$table}.pdv_sessao_id",
+                "{$table}.pdv_operador",
+                "{$table}.pdv_terminal",
+            );
+        }
+
+        $query = $this->buildFilteredQuery()->select($columns);
 
         $query->with(['conta:id,nome']);
 
@@ -89,12 +103,55 @@ class CaixaListQueryBuilder
 
     protected function buildBaseScopeQuery(): Builder
     {
+        if ($this->isContaPdv()) {
+            $query = CaixaLancamento::query()->fromSub(
+                (new CaixaPdvMovimentacaoQuery((int) $this->contaFilter))->build(),
+                (new CaixaLancamento)->getTable(),
+            );
+
+            $query->where(fn (Builder $valores): Builder => $valores
+                ->where('entrada', '<>', 0)
+                ->orWhere('saida', '<>', 0));
+
+            $this->applyEmpresaScope($query);
+
+            return $query;
+        }
+
         $query = CaixaLancamento::query();
 
         $this->applyEmpresaScope($query);
         $this->applyContaFilter($query);
 
         return $query;
+    }
+
+    /**
+     * Conta tipo PDV: movimentação da sessão PDV + lançamentos da conta (leitura).
+     */
+    public function isContaPdv(): bool
+    {
+        if ($this->contaPdv === null) {
+            $this->contaPdv = is_numeric($this->contaFilter)
+                && CaixaPdvMovimentacaoQuery::isContaPdv((int) $this->contaFilter);
+        }
+
+        return $this->contaPdv;
+    }
+
+    /**
+     * Ordem padrão da grade. No caixa PDV a ordem é cronológica (data/hora do movimento),
+     * já que os movimentos da sessão não têm código do Livro Caixa.
+     */
+    public function applyListDefaultOrder(Builder $query, string $direction = 'desc'): Builder
+    {
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+
+        if ($this->isContaPdv()) {
+            return $query->orderBy('ordem', $direction)->orderBy('id', $direction);
+        }
+
+        return $query->orderBy('codigo', $direction);
     }
 
     protected function applyEmpresaScope(Builder $query): void
@@ -121,9 +178,7 @@ class CaixaListQueryBuilder
 
     protected function applyDefaultOrder(Builder $query): Builder
     {
-        $direction = $this->orderDirection === 'asc' ? 'asc' : 'desc';
-
-        return $query->orderBy('codigo', $direction);
+        return $this->applyListDefaultOrder($query, $this->orderDirection);
     }
 
     /**

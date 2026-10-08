@@ -7,6 +7,7 @@
         wire:keydown.f4.prevent="openNfeImportListFromHotkey('F4')"
         wire:keydown.f5.prevent="openNfeImportListFromHotkey('F5')"
         wire:keydown.f6.prevent="openNfeImportListFromHotkey('F6')"
+        wire:keydown.f7.prevent="openNfeImportListFromHotkey('F7')"
     >
         <div class="erp-lookup-modal__backdrop" wire:click="closeNfeImportMenu"></div>
 

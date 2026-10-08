@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Support\Erp\EstoqueMovimentacaoDocumento;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
@@ -235,6 +237,11 @@ class Nfe extends Model
         return $this->belongsTo(OrdemServico::class, 'ordem_servico_id');
     }
 
+    public function orcamentos(): BelongsToMany
+    {
+        return $this->belongsToMany(Orcamento::class, 'nfe_orcamentos')->withTimestamps();
+    }
+
     public function itens(): HasMany
     {
         return $this->hasMany(NfeItem::class)->orderBy('item');
@@ -266,6 +273,8 @@ class Nfe extends Model
             if (filled($nfe->devolucao_compra_id) && filled($nfe->numero)) {
                 EstoqueMovimentacaoDocumento::sincronizarNfeDevolucaoCompra($nfe);
             }
+
+            OrcamentoFaturamentoGuard::sincronizarComNfe($nfe);
         });
     }
 

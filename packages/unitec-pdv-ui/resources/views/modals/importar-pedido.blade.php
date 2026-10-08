@@ -58,7 +58,7 @@
                         <kbd>F9</kbd> Pesquisar
                     </button>
                 </div>
-                <p class="erp-pdv-importar-pedido__hint">Pedidos cancelados são exibidos em vermelho.</p>
+                <p class="erp-pdv-importar-pedido__hint">Somente pedidos pendentes: sem faturamento, cancelamento ou documento fiscal.</p>
                 <div class="erp-pdv-modal__grid-scroll erp-pdv-importar-pedido__grid-scroll">
                     <table class="erp-pdv__grid erp-pdv-modal__grid">
                         <thead>

@@ -6,6 +6,7 @@ use App\Models\Empresa;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeImportacaoService;
 use App\Support\Erp\Nfe\NfeImportacaoTipo;
+use App\Support\Erp\Orcamento\OrcamentoFaturamentoGuard;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Carbon;
 
@@ -48,6 +49,9 @@ trait ManagesNfeImportacao
     public ?int $nfeModalDevolucaoCompraId = null;
 
     public ?int $nfeModalOrdemServicoId = null;
+
+    /** @var list<int> Orçamentos importados nesta NF-e — vínculo em nfe_orcamentos contra faturamento duplicado. */
+    public array $nfeModalOrcamentoIds = [];
 
     public function importNfeModal(): void
     {
@@ -309,6 +313,33 @@ trait ManagesNfeImportacao
             return;
         }
 
+        if ($this->nfeImportTipo === NfeImportacaoTipo::ORCAMENTO) {
+            if (! OrcamentoFaturamentoGuard::temVinculoNfe()) {
+                Notification::make()
+                    ->title('Importação de orçamento indisponível.')
+                    ->body('Atualize o banco de dados do sistema para habilitar o vínculo NF-e ↔ orçamento.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            foreach ($documentIds as $orcamentoId) {
+                $motivo = OrcamentoFaturamentoGuard::motivoFaturado($orcamentoId, $this->nfeModalRecordId);
+
+                if ($motivo !== null) {
+                    Notification::make()
+                        ->title('Importação bloqueada.')
+                        ->body($motivo)
+                        ->warning()
+                        ->send();
+                    $this->refreshNfeImportResults();
+
+                    return;
+                }
+            }
+        }
+
         $empresaId = $this->resolveEmpresaId();
         $empresa = $empresaId ? Empresa::query()->find($empresaId) : null;
 
@@ -343,6 +374,13 @@ trait ManagesNfeImportacao
             $pdvVendaId = (int) ($payload['pdv_venda_id'] ?? 0);
             $this->nfeModalVendaId = $vendaId > 0 ? $vendaId : $this->nfeModalVendaId;
             $this->nfeModalPdvVendaId = $pdvVendaId > 0 ? $pdvVendaId : $this->nfeModalPdvVendaId;
+        }
+
+        if ($this->nfeImportTipo === NfeImportacaoTipo::ORCAMENTO) {
+            $this->nfeModalOrcamentoIds = array_values(array_unique(array_merge(
+                $this->nfeModalOrcamentoIds,
+                array_map('intval', $payload['orcamento_ids'] ?? []),
+            )));
         }
 
         if ($this->nfeImportTipo === NfeImportacaoTipo::DEV_COMPRA) {

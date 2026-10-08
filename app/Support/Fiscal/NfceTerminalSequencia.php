@@ -8,8 +8,10 @@ use App\Models\VendasParametro;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Série e próximo número NFC-e por caixa (aba PDVs Offline).
- * O incremento usa conexão separada para sobreviver ao rollback da venda (539).
+ * Série NFC-e por caixa (aba PDVs Offline). O número vem do contador único por
+ * empresa/série/ambiente (NfceNumeracao); o caminho por terminal só vale enquanto a
+ * migration do contador não foi aplicada. O incremento usa conexão separada para
+ * sobreviver ao rollback da venda (539).
  */
 final class NfceTerminalSequencia
 {
@@ -57,7 +59,10 @@ final class NfceTerminalSequencia
         return (int) ltrim(self::serieEfetiva($terminal, $parametros), '0') ?: 1;
     }
 
-    public static function ultimoNumero(int $empresaId, ?string $serie): ?int
+    /**
+     * @param  int|null  $ambiente  1 = produção, 2 = homologação (PdvVendaNfce); null = todos (legado)
+     */
+    public static function ultimoNumero(int $empresaId, ?string $serie, ?int $ambiente = null): ?int
     {
         if ($empresaId <= 0) {
             return null;
@@ -66,6 +71,7 @@ final class NfceTerminalSequencia
         $ultimo = PdvVendaNfce::query()
             ->where('empresa_id', $empresaId)
             ->whereIn('serie', self::seriesEquivalentes($serie))
+            ->when($ambiente !== null, fn ($q) => $q->where('ambiente', $ambiente)->where(fn ($s) => $s->where('simulada', false)->orWhereNull('simulada')))
             ->max('numero');
 
         if ($ultimo === null) {
@@ -75,10 +81,28 @@ final class NfceTerminalSequencia
         return (int) $ultimo;
     }
 
+    /**
+     * Menor número que o caixa pode usar na série/ambiente configurados (exibição, carga do PDV
+     * offline, validação do ajuste manual). Com o contador único: maior entre o contador e tudo
+     * que já foi usado (NFC-e gravadas e livro) no ambiente atual; contadores antigos do terminal
+     * só pesam enquanto a série ainda não tem contador (já incluídos em NfceNumeracao::proximo).
+     */
     public static function proximoPiso(?Terminal $terminal, ?VendasParametro $parametros): int
     {
         $empresaId = (int) ($terminal?->empresa_id ?: $parametros?->empresa_id ?: 0);
         $serie = self::serieEfetiva($terminal, $parametros);
+
+        if ($empresaId > 0 && $parametros !== null && NfceNumeracao::disponivel()) {
+            $serieInt = self::serieEfetivaInt($terminal, $parametros);
+            $ambiente = NfceNumeracao::ambiente($parametros);
+
+            return max(
+                NfceNumeracao::proximo($empresaId, $serieInt, $parametros),
+                NfceNumeracao::ultimoUsado($empresaId, $serieInt, $ambiente) + 1,
+                (self::ultimoNumero($empresaId, $serie, $ambiente) ?? 0) + 1,
+            );
+        }
+
         $ultimo = $empresaId > 0 ? self::ultimoNumero($empresaId, $serie) : null;
         $pisoUltimo = $ultimo !== null ? $ultimo + 1 : 1;
         $armazenado = max(1, (int) ($terminal?->numeracao_inicial ?: 1));
@@ -93,6 +117,25 @@ final class NfceTerminalSequencia
 
     public static function consume(?Terminal $terminal, VendasParametro $parametros): int
     {
+        $empresaId = (int) ($terminal?->empresa_id ?: $parametros->empresa_id);
+
+        if ($empresaId > 0 && NfceNumeracao::disponivel()) {
+            $temTerminal = $terminal !== null && $terminal->exists && $terminal->getKey() !== null;
+            $serie = self::serieEfetivaInt($terminal, $parametros);
+            $numero = NfceNumeracao::consumir($empresaId, $serie, $parametros, $temTerminal ? (int) $terminal->getKey() : null);
+
+            if ($temTerminal && (int) ($terminal->numeracao_inicial ?? 0) <= $numero) {
+                $terminal->setAttribute('numeracao_inicial', $numero + 1);
+                $terminal->setAttribute('usar_numero_inicial', true);
+            }
+
+            if (self::mesmaSerie((string) $serie, (string) $parametros->serie) && (int) ($parametros->numero ?? 0) <= $numero) {
+                $parametros->setAttribute('numero', $numero + 1);
+            }
+
+            return $numero;
+        }
+
         if ($terminal === null || ! $terminal->exists || $terminal->getKey() === null) {
             return $parametros->consumeNumero();
         }
@@ -126,7 +169,15 @@ final class NfceTerminalSequencia
                 $empresaNumero = max(1, (int) ($paramsRow->numero ?: 1));
             }
 
-            $atual = max($armazenado, $pisoUltimo, $empresaNumero);
+            // Outros caixas na mesma série (lidos após a trava dos parâmetros, que serializa a empresa).
+            $outrosCaixas = 1;
+            foreach (Terminal::on($connection)->where('empresa_id', $empresaId)->whereKeyNot($terminalId)->get(['id', 'empresa_id', 'serie', 'numeracao_inicial']) as $outro) {
+                if (self::mesmaSerie(self::serieEfetiva($outro, $paramsRow), $serie)) {
+                    $outrosCaixas = max($outrosCaixas, (int) ($outro->numeracao_inicial ?: 1));
+                }
+            }
+
+            $atual = max($armazenado, $pisoUltimo, $empresaNumero, $outrosCaixas);
             $proximo = $atual + 1;
 
             $row->newQuery()
@@ -155,9 +206,29 @@ final class NfceTerminalSequencia
         return $numero;
     }
 
-    public static function ensureNumeroPeloMenos(?Terminal $terminal, int $minimo, ?VendasParametro $parametros): void
+    /**
+     * @param  int|null  $serie  série do número conflitante (ex.: chave citada na 539); padrão = série do caixa
+     */
+    public static function ensureNumeroPeloMenos(?Terminal $terminal, int $minimo, ?VendasParametro $parametros, ?int $serie = null): void
     {
         $minimo = max(1, $minimo);
+        $empresaId = (int) ($terminal?->empresa_id ?: $parametros?->empresa_id ?: 0);
+
+        if ($parametros !== null && $empresaId > 0 && NfceNumeracao::disponivel()) {
+            $temTerminal = $terminal !== null && $terminal->exists && $terminal->getKey() !== null;
+            $serieTerminal = self::serieEfetivaInt($terminal, $parametros);
+            $serie ??= $serieTerminal;
+
+            NfceNumeracao::garantirPeloMenos(
+                $empresaId,
+                $serie,
+                $parametros,
+                $minimo,
+                $temTerminal && $serie === $serieTerminal ? (int) $terminal->getKey() : null,
+            );
+
+            return;
+        }
 
         if ($terminal === null || ! $terminal->exists || $terminal->getKey() === null) {
             $parametros?->ensureNumeroPeloMenos($minimo);
@@ -215,7 +286,7 @@ final class NfceTerminalSequencia
         }
     }
 
-    private static function sequenciaConnectionName(): string
+    public static function sequenciaConnectionName(): string
     {
         $default = (string) config('database.default');
         $driver = (string) config("database.connections.{$default}.driver");

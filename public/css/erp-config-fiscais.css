@@ -946,6 +946,67 @@
     white-space: nowrap;
 }
 
+.erp-config-fiscais-form__caixa-tipo {
+    display: block;
+    color: #64748b;
+    font-size: 0.64rem;
+    font-weight: 500;
+}
+
+.erp-config-fiscais-form__nfce-row--alerta td {
+    background: #fffbeb;
+}
+
+.erp-config-fiscais-form__nfce-row-alerta td {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.erp-config-fiscais-form__series-actions {
+    justify-content: flex-end;
+    margin-top: 0.55rem;
+}
+
+.erp-config-fiscais-form__series-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--erp-brand-primary-dark, #0f3460);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 52, 96, 0.25);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erp-config-fiscais-form__series-btn:hover {
+    background: var(--erp-brand-primary-dark, #0f3460);
+    box-shadow: 0 2px 6px rgba(15, 52, 96, 0.3);
+}
+
+.erp-config-fiscais-form__series-btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+.erp-config-fiscais-form__series-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.erp-config-fiscais-form__series-btn-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
 .erp-config-fiscais-form__nfce-grid-token {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 0.68rem;

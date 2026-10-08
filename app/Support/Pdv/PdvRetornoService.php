@@ -2,7 +2,6 @@
 
 namespace App\Support\Pdv;
 
-use App\Models\ContaReceber;
 use App\Models\Empresa;
 use App\Models\ForcaVendasOrder;
 use App\Models\PdvCaixaSessao;
@@ -16,6 +15,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\Nfce\NfceTentativaHistorico;
 use App\Support\Erp\Pdv\PdvCaixaMovimentoService;
 use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
@@ -23,6 +24,7 @@ use App\Support\Erp\Pdv\PdvStockService;
 use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
 use App\Support\Erp\Pdv\PdvVendaRetaguardaMirrorService;
 use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\Fiscal\NfceNumeracao;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -322,14 +324,59 @@ class PdvRetornoService
         $existente = PdvVendaNfce::query()->where('pdv_venda_id', $pdvVenda->id)->first();
 
         if ($existente !== null) {
+            // Reenvio do PDV offline não rebaixa nota já resolvida no ERP (ex.: contingência transmitida no F5).
+            $finais = [PdvVendaNfce::STATUS_AUTORIZADA, PdvVendaNfce::STATUS_CANCELADA];
+            if (in_array((string) $existente->status, $finais, true) && ! in_array((string) $attrs['status'], $finais, true)) {
+                return;
+            }
+
+            if (filled($existente->chave) && $existente->chave !== $attrs['chave']) {
+                NfceTentativaHistorico::arquivar($existente, 'Substituída pelo retorno do PDV offline (chave '.($attrs['chave'] ?? '—').')');
+            }
+
             $existente->fill($attrs)->save();
+            $this->registrarNumeroOffline($existente);
 
             return;
         }
 
-        PdvVendaNfce::query()->create($attrs + [
+        $nfceCriada = PdvVendaNfce::query()->create($attrs + [
             'pdv_venda_id' => $pdvVenda->id,
         ]);
+        $this->registrarNumeroOffline($nfceCriada);
+    }
+
+    /** Número emitido no PDV offline entra no livro: o contador do ERP passa a pulá-lo. */
+    private function registrarNumeroOffline(PdvVendaNfce $nfce): void
+    {
+        $conflito = NfceNumeracao::vincular($nfce, NfceNumeracao::ORIGEM_OFFLINE);
+
+        if ($conflito === null) {
+            return;
+        }
+
+        Log::warning('PDV offline: NFC-e com número já usado por outro documento.', [
+            'nfce_id' => $nfce->id,
+            'conflito_nfce_id' => $conflito,
+            'serie' => $nfce->serie,
+            'numero' => $nfce->numero,
+        ]);
+
+        try {
+            app(ErpOperacaoLogService::class)->registrar(
+                operacao: 'NFCE_NUMERO_CONFLITO_OFFLINE',
+                resumo: 'NFC-e nº '.$nfce->numero.' série '.$nfce->serie.' do PDV offline usa número já registrado para a NFC-e id '.$conflito.'.',
+                resultado: 'erro',
+                origem: 'pdv_offline',
+                documentoTipo: 'pdv_venda_nfce',
+                documentoId: (int) $nfce->id,
+                documentoNumero: (string) $nfce->numero,
+                detalhes: ['conflito_nfce_id' => $conflito, 'chave' => $nfce->chave],
+                empresaId: $nfce->empresa_id ? (int) $nfce->empresa_id : null,
+            );
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -447,16 +494,25 @@ class PdvRetornoService
         );
     }
 
+    /**
+     * Ambíguo conta como "já tem": não gera título possivelmente duplicado sem conferência manual.
+     */
     private function jaTemContasReceber(PdvVenda $venda): bool
     {
-        $documento = 'PDV-'.str_pad((string) $venda->numero, 6, '0', STR_PAD_LEFT);
+        ['contas' => $contas, 'ambiguo' => $ambiguo] = (new PdvVendaFinanceiroService())->localizarContasReceber($venda);
 
-        return ContaReceber::query()
-            ->where(function ($q) use ($documento): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'/%');
-            })
-            ->exists();
+        if ($contas->isEmpty()) {
+            return false;
+        }
+
+        if ($ambiguo) {
+            Log::warning('PDV retorno: títulos a receber ambíguos; complemento não gerado.', [
+                'pdv_venda_id' => $venda->id,
+                'numero' => $venda->numero,
+            ]);
+        }
+
+        return true;
     }
 
     private function semAcento(string $value): string

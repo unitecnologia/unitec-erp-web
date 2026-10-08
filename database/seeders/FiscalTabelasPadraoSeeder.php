@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\FiscalClassificacaoTributaria;
 use App\Models\FiscalIbptItem;
+use App\Support\Erp\Fiscal\IbptTabelaPadrao;
 use App\Support\Erp\Fiscal\NcmCatalogService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -96,76 +97,15 @@ class FiscalTabelasPadraoSeeder extends Seeder
             return;
         }
 
-        $gzPath = database_path('data/fiscal/ibpt_itens.jsonl.gz');
-        $plainPath = database_path('data/fiscal/ibpt_itens.jsonl');
+        $total = IbptTabelaPadrao::carregarSeVazia();
 
-        $contents = null;
-
-        if (is_file($gzPath)) {
-            $raw = file_get_contents($gzPath);
-            $contents = $raw === false ? null : @gzdecode($raw);
-        } elseif (is_file($plainPath)) {
-            $contents = file_get_contents($plainPath);
-        }
-
-        if (! is_string($contents) || trim($contents) === '') {
-            $this->command?->warn('Arquivo padrão IBPT não encontrado em database/data/fiscal.');
+        if ($total === 0) {
+            $this->command?->warn('Arquivo padrão IBPT não encontrado ou sem linhas válidas em database/data/fiscal.');
 
             return;
         }
 
-        $now = now();
-        $payload = [];
-        $lines = preg_split("/\r\n|\n|\r/", $contents) ?: [];
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if ($line === '') {
-                continue;
-            }
-
-            $row = json_decode($line, true);
-
-            if (! is_array($row) || blank($row['ncm'] ?? null)) {
-                continue;
-            }
-
-            $payload[] = [
-                'ncm' => (string) $row['ncm'],
-                'ex_tipi' => $row['ex_tipi'] ?? null,
-                'tipo' => $row['tipo'] ?? null,
-                'descricao' => isset($row['descricao']) ? mb_substr((string) $row['descricao'], 0, 500) : null,
-                'aliq_nacional' => (float) ($row['aliq_nacional'] ?? 0),
-                'aliq_importado' => (float) ($row['aliq_importado'] ?? 0),
-                'aliq_estadual' => (float) ($row['aliq_estadual'] ?? 0),
-                'aliq_municipal' => (float) ($row['aliq_municipal'] ?? 0),
-                'vigencia_inicio' => $row['vigencia_inicio'] ?? null,
-                'vigencia_fim' => $row['vigencia_fim'] ?? null,
-                'chave' => $row['chave'] ?? null,
-                'versao' => $row['versao'] ?? null,
-                'fonte' => $row['fonte'] ?? null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        if ($payload === []) {
-            $this->command?->warn('Arquivo padrão IBPT sem linhas válidas.');
-
-            return;
-        }
-
-        DB::transaction(function () use ($payload): void {
-            FiscalIbptItem::query()->delete();
-
-            foreach (array_chunk($payload, 500) as $chunk) {
-                FiscalIbptItem::query()->insert($chunk);
-            }
-        });
-
-        $this->command?->info('IBPT padrão: '.count($payload).' registro(s).');
-        $this->ensureNcmsFromIbpt();
+        $this->command?->info('IBPT padrão: '.$total.' registro(s).');
     }
 
     /**

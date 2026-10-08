@@ -22,18 +22,6 @@ class NfceRelatorioReportController extends Controller
         $empresa = $this->currentEmpresa();
         $builder = NfceListQueryBuilder::fromRequest($request);
 
-        if (! $builder->empresaId && $empresa) {
-            $builder = new NfceListQueryBuilder(
-                statusFilter: $builder->statusFilter,
-                searchColumn: $builder->searchColumn,
-                localSearch: $builder->localSearch,
-                periodoDe: $builder->periodoDe,
-                periodoAte: $builder->periodoAte,
-                chaveFilter: $builder->chaveFilter,
-                empresaId: (int) $empresa->id,
-            );
-        }
-
         $nfces = $builder->build()->get();
         [$empresaEnderecoLinha1, $empresaEnderecoLinha2] = $this->formatEmpresaEnderecoLinhas($empresa);
 

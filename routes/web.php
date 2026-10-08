@@ -134,6 +134,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/reports/nfce-cupom/{venda}', NfceCupomReportController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.reports.nfce-cupom');
+    Route::get('/admin/reports/nfce-danfe-a4/{venda}', \App\Http\Controllers\Erp\NfceDanfeA4ReportController::class)
+        ->middleware('erp.permission:vendas.reprint_cupom')
+        ->name('erp.reports.nfce-danfe-a4');
     Route::get('/admin/print/nfce-escpos/{venda}', NfceEscPosPrintController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.print.nfce-escpos');

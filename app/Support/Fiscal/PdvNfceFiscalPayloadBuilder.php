@@ -328,12 +328,12 @@ final class PdvNfceFiscalPayloadBuilder
         }
 
         $person = NfceConsumidorIdentificado::resolvePerson($venda);
-        $nome = NfceConsumidorIdentificado::nome($person);
+        $nome = NfceConsumidorIdentificado::nomeDaVenda($venda, $person);
 
-        if ($person === null || $nome === null) {
+        if ($person === null || NfceConsumidorIdentificado::nome($person) === null) {
             return new DestinatarioDto(
                 cpf: $cpf,
-                nome: 'CONSUMIDOR',
+                nome: $nome ?? 'CONSUMIDOR',
             );
         }
 

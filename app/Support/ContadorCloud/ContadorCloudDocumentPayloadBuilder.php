@@ -139,7 +139,7 @@ final class ContadorCloudDocumentPayloadBuilder
         $nfce->loadMissing('pdvVenda.person');
         $venda = $nfce->pdvVenda;
         $consumidor = $venda ? NfceConsumidorIdentificado::resolvePerson($venda) : null;
-        $nomeParceiro = NfceConsumidorIdentificado::nome($consumidor) ?: 'CONSUMIDOR';
+        $nomeParceiro = ($venda ? NfceConsumidorIdentificado::nomeDaVenda($venda, $consumidor) : null) ?: 'CONSUMIDOR';
         $tpEmis = (int) ltrim((string) ($nfce->tipo_emissao ?: '1'), '0') ?: 1;
         $emContingencia = $nfce->status === PdvVendaNfce::STATUS_CONTINGENCIA || $evento === self::EVENTO_CONTINGENCIA;
 

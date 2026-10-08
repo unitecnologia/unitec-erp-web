@@ -276,20 +276,13 @@
         @endif
 
         <div class="meta" style="margin-top: 6px;">
-            @if (! empty($textoIbpt))
-                <div class="meta meta--left">{{ $textoIbpt }}</div>
-            @elseif (($vTotTrib ?? 0) > 0)
-                <div class="meta meta--left">
-                    Trib. aprox. Fed. R$ {{ number_format((float) ($tribFed ?? 0), 2, ',', '.') }}
-                    · Est. R$ {{ number_format((float) ($tribEst ?? 0), 2, ',', '.') }}
-                    · Mun. R$ {{ number_format((float) ($tribMun ?? 0), 2, ',', '.') }}
-                    (Lei 12.741/2012 — IBPT)
-                </div>
-            @else
+            @forelse (($linhasIbpt ?? []) as $linhaIbpt)
+                <div class="meta meta--left">{{ $linhaIbpt }}</div>
+            @empty
                 <div class="meta meta--left">Tributos aprox. conforme Lei 12.741/2012 — IBPT.</div>
-            @endif
+            @endforelse
             @unless ($simulada ?? true)
-                <div>Consulte em sat.sef.sc.gov.br/nfce/consulta</div>
+                <div>Consulte pela chave de acesso</div>
             @endunless
             <div>Impresso em {{ $printedAt->format('d/m/Y H:i:s') }}</div>
             <div style="margin-top: 4px; font-weight: 800; text-transform: uppercase;">DESENVOLVIDO POR UNITECNOLOGIA SISTEMAS LTDA</div>

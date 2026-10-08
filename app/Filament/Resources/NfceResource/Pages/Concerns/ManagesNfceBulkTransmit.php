@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\NfceResource\Pages\Concerns;
 
 use App\Models\PdvVendaNfce;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use Filament\Notifications\Notification;
 
 trait ManagesNfceBulkTransmit
@@ -12,6 +13,10 @@ trait ManagesNfceBulkTransmit
 
     public function toggleNfceTransmitirSelecionado(int $id): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $key = (string) $id;
 
         if (in_array($key, $this->nfceSelecionadosTransmitir, true)) {
@@ -23,11 +28,19 @@ trait ManagesNfceBulkTransmit
             return;
         }
 
+        if (NfceEmpresaEscopo::filtrarIds([$id], $this->empresaIdAtiva()) === []) {
+            return;
+        }
+
         $this->nfceSelecionadosTransmitir[] = $key;
     }
 
     public function marcarDesmarcarNfcesContingencia(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $ids = $this->nfceContingenciaIdsNoFiltro();
 
         if ($ids === []) {
@@ -81,16 +94,11 @@ trait ManagesNfceBulkTransmit
      */
     protected function resolveNfceIdsParaTransmitir(): array
     {
-        $selected = array_values(array_filter(array_map(
-            fn ($id): int => (int) $id,
-            $this->nfceSelecionadosTransmitir,
-        )));
+        $selected = $this->nfceSelecionadosTransmitir !== []
+            ? $this->nfceSelecionadosTransmitir
+            : ($this->highlightedRecordId ? [(int) $this->highlightedRecordId] : []);
 
-        if ($selected !== []) {
-            return $selected;
-        }
-
-        return $this->highlightedRecordId ? [(int) $this->highlightedRecordId] : [];
+        return NfceEmpresaEscopo::filtrarIds($selected, $this->empresaIdAtiva());
     }
 
     protected function notifyNfceTransmitirResumo(

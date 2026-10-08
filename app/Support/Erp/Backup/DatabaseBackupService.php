@@ -144,6 +144,7 @@ final class DatabaseBackupService
             }
 
             $size = is_file($targetPath) ? (int) filesize($targetPath) : 0;
+            $fiscalPath = $size > 0 ? $this->copyFiscalArchive($destination, $stamp, $prefix) : null;
 
             if ($size <= 0) {
                 @unlink($targetPath);
@@ -177,6 +178,10 @@ final class DatabaseBackupService
                 $message .= ' Inclui cópia do .env.';
             } else {
                 $message .= ' Aviso: .env não encontrado para copiar.';
+            }
+
+            if ($fiscalPath !== null) {
+                $message .= ' Inclui arquivo fiscal (histórico NFC-e).';
             }
 
             if ($removed > 0) {
@@ -223,6 +228,49 @@ final class DatabaseBackupService
             return is_file($targetPath) ? $targetPath : null;
         } catch (Throwable $e) {
             report($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * Compacta storage/app/fiscal (histórico de tentativas NFC-e, inutilizações sem tabela) ao lado
+     * do dump, com o mesmo carimbo. Falha aqui não invalida o backup do banco.
+     */
+    protected function copyFiscalArchive(string $destination, string $stamp, string $prefix = self::FILE_PREFIX): ?string
+    {
+        $source = storage_path('app/fiscal');
+
+        if (! is_dir($source) || ! class_exists(\ZipArchive::class)) {
+            return null;
+        }
+
+        $targetPath = rtrim($destination, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$prefix.$stamp.'.fiscal.zip';
+
+        try {
+            $files = File::allFiles($source);
+
+            if ($files === []) {
+                return null;
+            }
+
+            $zip = new \ZipArchive();
+
+            if ($zip->open($targetPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                return null;
+            }
+
+            foreach ($files as $file) {
+                $relative = 'fiscal/'.str_replace('\\', '/', $file->getRelativePathname());
+                $zip->addFile($file->getPathname(), $relative);
+            }
+
+            $zip->close();
+
+            return is_file($targetPath) ? $targetPath : null;
+        } catch (Throwable $e) {
+            report($e);
+            @unlink($targetPath);
 
             return null;
         }
@@ -853,6 +901,20 @@ final class DatabaseBackupService
                     'path' => $path,
                     'message' => $e->getMessage(),
                 ]);
+            }
+
+            // Pacote fiscal companheiro do mesmo carimbo (não falha o backup).
+            $fiscalPath = preg_replace('/\.sql$/i', '.fiscal.zip', $path) ?? '';
+
+            if ($fiscalPath !== '' && is_file($fiscalPath)) {
+                try {
+                    File::delete($fiscalPath);
+                } catch (Throwable $e) {
+                    Log::warning('erp.backup.rotation.delete_fiscal_failed', [
+                        'file' => basename($fiscalPath),
+                        'message' => $e->getMessage(),
+                    ]);
+                }
             }
 
             // Remove .env companheiro do mesmo carimbo, se existir (não falha o backup).

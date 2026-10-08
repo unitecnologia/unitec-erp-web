@@ -213,30 +213,60 @@
 
 .erp-nfce-reg__table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     color: #0f172a;
 }
+
+.erp-nfce-reg__w-check { width: 2.5rem; }
+.erp-nfce-reg__w-origem { width: 5.5rem; }
+.erp-nfce-reg__w-numero { width: 6.5rem; }
+.erp-nfce-reg__w-data { width: 6.5rem; }
+.erp-nfce-reg__w-doc { width: 10rem; }
+.erp-nfce-reg__w-caixa { width: 6rem; }
+.erp-nfce-reg__w-vendedor { width: 9rem; }
+.erp-nfce-reg__w-pagamento { width: 9rem; }
+.erp-nfce-reg__w-valor { width: 7rem; }
+.erp-nfce-reg__w-situacao { width: 10.5rem; }
+.erp-nfce-reg__w-dias { width: 3.75rem; }
 
 .erp-nfce-reg__table thead th {
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 0.45rem 0.55rem;
-    border-bottom: 1px solid #e2e8f0;
+    height: 2.1rem;
+    padding: 0 0.65rem;
+    border-bottom: 2px solid #cbd5e1;
     background: #f1f5f9;
-    color: #475569;
-    font-size: 0.7rem;
-    font-weight: 600;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 700;
     text-align: left;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfce-reg__table thead th + th,
+.erp-nfce-reg__table tbody td + td {
+    border-left: 1px solid #eef2f7;
 }
 
 .erp-nfce-reg__table tbody td {
-    padding: 0.38rem 0.55rem;
-    border-bottom: 1px solid #f1f5f9;
+    height: 2.15rem;
+    padding: 0 0.65rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    vertical-align: middle;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-nfce-reg__table tbody tr:nth-child(even) td {
+    background: #f8fafc;
 }
 
 .erp-nfce-reg__table tbody tr[data-reg-row] {
@@ -244,15 +274,129 @@
 }
 
 .erp-nfce-reg__table tbody tr[data-reg-row]:hover td {
-    background: #f8fafc;
+    background: #eef4fb;
 }
 
-.erp-nfce-reg__table tbody tr.is-selected td {
-    background: #eff6ff;
+.erp-nfce-reg__table tbody tr.is-selected td,
+.erp-nfce-reg__table tbody tr.is-selected:nth-child(even) td {
+    background: #60a5fa;
+    border-bottom-color: #3b82f6;
+    color: #0f172a;
+}
+
+.erp-nfce-reg__table tbody tr.is-selected td + td {
+    border-left-color: rgb(255 255 255 / 28%);
 }
 
 .erp-nfce-reg__table tbody tr.is-selected:hover td {
-    background: #dbeafe;
+    background: #4f97f5;
+}
+
+.erp-nfce-reg__table tbody tr.is-selected .erp-nfce-reg__money-cur {
+    color: #1e3a8a;
+}
+
+.erp-nfce-reg__table tbody tr.is-selected .erp-nfce-reg__status--pending {
+    color: #0b2a6b;
+}
+
+.erp-nfce-reg__center {
+    text-align: center !important;
+}
+
+/* Cliente / CPF editáveis */
+.erp-nfce-reg__table tbody td.erp-nfce-reg__edit-cell {
+    padding: 0 0.3rem;
+    cursor: text;
+}
+
+.erp-nfce-reg__cell-input {
+    display: block;
+    width: 100%;
+    height: 1.65rem;
+    padding: 0 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-transform: uppercase;
+    outline: none;
+    transition: border-color 0.12s, background-color 0.12s, box-shadow 0.12s;
+}
+
+.erp-nfce-reg__cell-input::placeholder {
+    color: #64748b;
+    opacity: 1;
+}
+
+tr:hover .erp-nfce-reg__cell-input:not(:disabled) {
+    border-color: #cbd5e1;
+    background: rgb(255 255 255 / 70%);
+}
+
+.erp-nfce-reg__cell-input:focus {
+    border-color: #1e5a9e !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgb(30 90 158 / 15%);
+}
+
+.erp-nfce-reg__cell-input.is-invalid {
+    border-color: #dc2626 !important;
+    background: #fef2f2 !important;
+    color: #991b1b;
+}
+
+.erp-nfce-reg__table tbody tr.is-selected .erp-nfce-reg__cell-input::placeholder {
+    color: #1e3a8a;
+}
+
+.erp-nfce-reg__suggest {
+    position: fixed;
+    z-index: 80;
+    max-height: 16rem;
+    margin: 0;
+    padding: 0.25rem;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 12px 28px rgb(15 23 42 / 18%);
+    font-size: 0.8rem;
+}
+
+.erp-nfce-reg__suggest li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.35rem;
+    cursor: pointer;
+}
+
+.erp-nfce-reg__suggest li.is-active {
+    background: #e0ecfb;
+}
+
+.erp-nfce-reg__suggest-nome {
+    overflow: hidden;
+    color: #0f172a;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-nfce-reg__suggest-doc {
+    flex: none;
+    color: #64748b;
+}
+
+.erp-nfce-reg__suggest li.erp-nfce-reg__suggest-empty {
+    color: #64748b;
+    cursor: default;
+    white-space: normal;
 }
 
 .erp-nfce-reg__table tbody tr.is-blocked td {
@@ -286,9 +430,24 @@
 }
 
 .erp-nfce-reg__ellipsis {
-    max-width: 13rem;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.erp-nfce-reg__table td.erp-nfce-reg__num {
+    font-weight: 600;
+}
+
+.erp-nfce-reg__money {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.erp-nfce-reg__money-cur {
+    color: #64748b;
+    font-weight: 500;
 }
 
 .erp-nfce-reg__empty {
@@ -431,13 +590,111 @@
     color: #93c5fd;
 }
 
-.erp-nfce-regularizacao-modal .erp-pcad-actions__btn--primary {
-    min-width: 9.5rem;
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.35rem;
+    height: 2.15rem !important;
+    min-width: 0 !important;
+    padding: 0 0.85rem !important;
+    border: 1px solid #94a3b8 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    cursor: pointer;
 }
 
-.erp-nfce-regularizacao-modal kbd {
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__icon,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    font-size: 0.85rem !important;
+    line-height: 1 !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__label,
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__label kbd,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__label,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action .erp-pcad-actions__label kbd {
+    color: inherit !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action kbd,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action kbd {
+    padding: 0.05rem 0.28rem;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
     font-family: inherit;
     font-size: inherit;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit {
+    border-color: #1e5a9e !important;
+    background: #1e5a9e !important;
+    color: #fff !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit:hover:not(:disabled),
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit:hover:not(:disabled) {
+    background: #174a85 !important;
+    border-color: #174a85 !important;
+    color: #fff !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--close,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--close {
+    border-color: #b91c1c !important;
+    background: #dc2626 !important;
+    color: #fff !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--close:hover:not(:disabled),
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--close:hover:not(:disabled) {
+    background: #b91c1c !important;
+    border-color: #991b1b !important;
+    color: #fff !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action:hover:not(:disabled):not(.erp-nfce-reg__action--emit):not(.erp-nfce-reg__action--close),
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action:hover:not(:disabled):not(.erp-nfce-reg__action--emit):not(.erp-nfce-reg__action--close) {
+    border-color: #1e5a9e !important;
+    color: #1e5a9e !important;
+    background: #fff !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action:disabled,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action:disabled {
+    opacity: 1 !important;
+    cursor: not-allowed;
+    border-color: #cbd5e1 !important;
+    background: #e2e8f0 !important;
+    color: #64748b !important;
+}
+
+.erp-nfe-page .erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit:disabled,
+.erp-nfce-regularizacao-modal .erp-nfce-reg__actions .erp-nfce-reg__action--emit:disabled {
+    border-color: #93c5fd !important;
+    background: #93c5fd !important;
+    color: #fff !important;
 }
 
 /* Progresso */

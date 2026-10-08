@@ -42,8 +42,7 @@ class ListCaixa extends ListRecords
     #[Url(as: 'campo')]
     public string $searchColumn = 'documento';
 
-    #[Url(as: 'conta')]
-    public string $contaFilter = 'todas';
+    public string $contaFilter = '';
 
     public string $periodoDe = '';
 
@@ -77,6 +76,8 @@ class ListCaixa extends ListRecords
         }
 
         ErpScreen::set('Caixa');
+
+        $this->contaFilter = $this->contaCaixaGeralId();
 
         // Sessões PDV fechadas antes da correção: gera o lançamento faltante no Livro Caixa.
         app(PdvCaixaFechamentoService::class)->backfillSessoesRecentes();
@@ -206,8 +207,20 @@ class ListCaixa extends ListRecords
             ->send();
     }
 
+    /**
+     * A tela sempre abre no CAIXA GERAL; não existe visão "todas as contas".
+     */
+    protected function contaCaixaGeralId(): string
+    {
+        return (string) CaixaConta::ensureCaixaGeral()->id;
+    }
+
     public function updatedContaFilter(): void
     {
+        if (! array_key_exists((int) $this->contaFilter, $this->contasOptions)) {
+            $this->contaFilter = $this->contaCaixaGeralId();
+        }
+
         $this->clearListSelection();
         $this->pushCaixaListRefresh();
     }
@@ -421,6 +434,12 @@ class ListCaixa extends ListRecords
         $recordId = $this->highlightedRecordIdOrNotify('delete');
 
         if (! $recordId) {
+            return;
+        }
+
+        if ((int) $recordId < 0) {
+            $this->caixaAttentionMessage = 'Este movimento pertence à sessão do caixa PDV e não pode ser excluído por aqui. Cancele a venda, sangria ou suprimento pelo próprio PDV.';
+
             return;
         }
 

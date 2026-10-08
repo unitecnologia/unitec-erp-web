@@ -11,7 +11,7 @@
             <span class="erp-produtos-actions__label"><kbd>F3</kbd> | Alterar</span>
         </button>
     @endif
-    @if (erp_can('produtos.print'))
+    @if (! $this->embedsInPdv && erp_can('produtos.print'))
         <button type="button" wire:click="printProducts" class="erp-produtos-actions__btn" data-erp-key="F4">
             <span class="erp-produtos-actions__icon">🖨</span>
             <span class="erp-produtos-actions__label"><kbd>F4</kbd> | Imprimir</span>
@@ -21,7 +21,7 @@
         <span class="erp-produtos-actions__icon">↻</span>
         <span class="erp-produtos-actions__label"><kbd>F5</kbd> | Atualizar</span>
     </button>
-    @if (erp_can('produtos.cardex'))
+    @if (! $this->embedsInPdv && erp_can('produtos.cardex'))
         <button type="button" wire:click="openProductCardex" class="erp-produtos-actions__btn" data-erp-key="F7">
             <span class="erp-produtos-actions__icon">📋</span>
             <span class="erp-produtos-actions__label"><kbd>F7</kbd> | Histórico</span>

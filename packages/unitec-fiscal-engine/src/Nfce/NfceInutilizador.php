@@ -93,7 +93,7 @@ final class NfceInutilizador
         $protocolo = $infInut instanceof \DOMElement
             ? $this->childValue($infInut, 'nProt')
             : '';
-        $retInutNfe = $dom->getElementsByTagName('inutNFe')->item(0);
+        $retInutNfe = $dom->getElementsByTagName('retInutNFe')->item(0);
         $retInutNfeXml = $retInutNfe ? ($dom->saveXML($retInutNfe) ?: '') : '';
 
         return [

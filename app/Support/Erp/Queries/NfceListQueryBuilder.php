@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Queries;
 
 use App\Models\PdvVendaNfce;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,9 @@ class NfceListQueryBuilder
         public ?int $empresaId = null,
     ) {}
 
+    /**
+     * Empresa vem sempre da sessão do usuário — nunca da URL.
+     */
     public static function fromRequest(Request $request): self
     {
         return new self(
@@ -27,7 +31,7 @@ class NfceListQueryBuilder
             periodoDe: (string) $request->query('de', ''),
             periodoAte: (string) $request->query('ate', ''),
             chaveFilter: trim((string) $request->query('chave', '')),
-            empresaId: is_numeric($request->query('empresa')) ? (int) $request->query('empresa') : null,
+            empresaId: NfceEmpresaEscopo::empresaIdAtiva(),
         );
     }
 
@@ -43,19 +47,10 @@ class NfceListQueryBuilder
                 'pdvVenda.person',
             ]);
 
-        if ($this->empresaId) {
-            $empresaId = $this->empresaId;
-            $query->where(function (Builder $outer) use ($empresaId): void {
-                $outer->where('empresa_id', $empresaId)
-                    ->orWhere(function (Builder $inner) use ($empresaId): void {
-                        $inner->whereNull('empresa_id')
-                            ->whereHas('pdvVenda.sessao', fn (Builder $sessao): Builder => $sessao
-                                ->where('empresa_id', $empresaId));
-                    });
-            });
-        }
+        NfceEmpresaEscopo::aplicar($query, $this->empresaId);
 
         $query->whereIn('status', PdvVendaNfce::statusesForTab($this->statusFilter));
+        PdvVendaNfce::excluirSimuladasForaTransmitidos($query, $this->statusFilter);
 
         if (filled($this->periodoDe)) {
             $query->whereHas('pdvVenda', fn (Builder $venda): Builder => $venda
@@ -126,7 +121,6 @@ class NfceListQueryBuilder
             'chave' => $this->chaveFilter,
             'campo' => $this->searchColumn,
             'q' => $this->localSearch,
-            'empresa' => $this->empresaId,
         ];
     }
 }

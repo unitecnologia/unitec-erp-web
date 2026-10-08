@@ -77,7 +77,7 @@ final class PdvNfceSimuladaService
             'dataEmissao' => $emissao->format('d/m/Y'),
             'horaEmissao' => $emissao->format('H:i:s'),
             'emitente' => $this->buildEmitente($empresa),
-            'consumidorNome' => NfceConsumidorIdentificado::nome($consumidor),
+            'consumidorNome' => NfceConsumidorIdentificado::nomeDaVenda($venda, $consumidor),
             'consumidorEndereco' => NfceConsumidorIdentificado::endereco($consumidor),
             'cpfNota' => NfceConsumidorIdentificado::cpfFormatado($venda),
             'numeroPdv' => $numeroPdv,
@@ -85,6 +85,7 @@ final class PdvNfceSimuladaService
             'vendedorNome' => $vendedorNome !== '' ? $vendedorNome : null,
             'obsNfce' => trim((string) ($empresa?->obs_nfce ?? '')),
             'textoIbpt' => $ibpt['texto'],
+            'linhasIbpt' => $ibpt['linhas'],
             'mensagensLegaisNfce' => $this->mensagensLegaisNfce($empresa),
             'mensagemCreditoDanfeNfce' => $this->mensagemCreditoDanfeNfce($empresa),
             'tribFed' => $ibpt['trib_fed'],
@@ -137,7 +138,7 @@ final class PdvNfceSimuladaService
     }
 
     /**
-     * @return array{texto: string, trib_fed: float, trib_est: float, trib_mun: float, v_tot_trib: float}
+     * @return array{texto: string, linhas: list<string>, trib_fed: float, trib_est: float, trib_mun: float, v_tot_trib: float}
      */
     private function calcularIbptDaVenda(PdvVenda $venda): array
     {
@@ -161,6 +162,7 @@ final class PdvNfceSimuladaService
 
         return [
             'texto' => $lookup->formatarTextoLei12741($agg),
+            'linhas' => $lookup->linhasBobina($agg, PdvDavCupomLayout::WIDTH),
             'trib_fed' => (float) $agg['trib_fed'],
             'trib_est' => (float) $agg['trib_est'],
             'trib_mun' => (float) $agg['trib_mun'],

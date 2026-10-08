@@ -9,6 +9,7 @@ use App\Models\EstoqueMovimentacao;
 use App\Models\FormaPagamento;
 use App\Models\OrdemServico;
 use App\Models\Product;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
@@ -225,6 +226,7 @@ final class OsFaturamentoService
         $label = mb_strtoupper(trim((string) $forma->descricao), 'UTF-8');
         $historico = 'OS '.$os->numero.' ('.$label.')';
         $valorFloat = (float) $valor;
+        $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
 
         if (FormaPagamentoDestino::semLancamento($movimento)) {
             if ($this->formaAvistaSemMovimentoVaiParaCaixa($forma)) {
@@ -235,6 +237,8 @@ final class OsFaturamentoService
                     historico: $historico,
                     caixaContaId: $forma->conta_destino_id ? (int) $forma->conta_destino_id : $caixaGeral,
                     empresaId: $empresaId,
+                    planoContaId: $planoVenda['id'] ?? null,
+                    planoNome: $planoVenda['nome'] ?? null,
                 );
             }
 
@@ -249,6 +253,8 @@ final class OsFaturamentoService
                 historico: $historico,
                 caixaContaId: $forma->conta_destino_id ? (int) $forma->conta_destino_id : $caixaGeral,
                 empresaId: $empresaId,
+                planoContaId: $planoVenda['id'] ?? null,
+                planoNome: $planoVenda['nome'] ?? null,
             );
 
             return [];

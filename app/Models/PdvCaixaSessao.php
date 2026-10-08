@@ -14,6 +14,7 @@ class PdvCaixaSessao extends Model
         'user_id',
         'empresa_id',
         'terminal_id',
+        'caixa_conta_id',
         'valor_abertura',
         'valor_fechamento',
         'aberto_em',
@@ -47,6 +48,11 @@ class PdvCaixaSessao extends Model
     public function terminal(): BelongsTo
     {
         return $this->belongsTo(Terminal::class);
+    }
+
+    public function caixaConta(): BelongsTo
+    {
+        return $this->belongsTo(CaixaConta::class, 'caixa_conta_id');
     }
 
     public function movimentos(): HasMany

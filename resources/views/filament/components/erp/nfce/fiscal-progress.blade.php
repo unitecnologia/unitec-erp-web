@@ -1,22 +1,42 @@
-<div
-    class="erp-nfce-fiscal-progress"
-    wire:loading.class="is-visible"
-    wire:target="transmitirNfce"
-    aria-live="polite"
-    aria-busy="true"
-    role="status"
->
-    <div class="erp-nfce-fiscal-progress__backdrop" aria-hidden="true"></div>
+@php
+    $sefazJs = 'js/erp-sefaz-progress.js';
+    $sefazJsVersion = @filemtime(public_path($sefazJs)) ?: \App\Support\Erp\ErpAssetVersion::bundle();
 
-    <div class="erp-nfce-fiscal-progress__panel">
-        <p class="erp-nfce-fiscal-progress__status">
-            Transmitindo NFC-e à SEFAZ…
-        </p>
+    // Chave da etapa = "etapa" enviada pelo servidor na falha (ManagesNfceFiscalActions::sinalizarSefazFalha).
+    $operacoes = [
+        'confirmCancelarNfce' => ['Cancelando NFC-e', [
+            'validacao' => 'Validando cancelamento',
+            'assinatura' => 'Assinando evento de cancelamento',
+            'sefaz' => 'Enviando à SEFAZ (aguardando resposta)',
+            'pos' => 'Estornando a venda',
+        ]],
+        'confirmInutilizarNfce' => ['Inutilizando numeração NFC-e', [
+            'validacao' => 'Validando faixa de numeração',
+            'assinatura' => 'Assinando pedido de inutilização',
+            'sefaz' => 'Enviando à SEFAZ (aguardando resposta)',
+            'pos' => 'Registrando protocolo',
+        ]],
+        'recuperarNfce' => ['Consultando NFC-e na SEFAZ', [
+            'validacao' => 'Conectando à SEFAZ',
+            'sefaz' => 'Consultando situação da NFC-e (aguardando resposta)',
+            'pos' => 'Atualizando registro',
+        ]],
+        'transmitirNfce' => ['Transmitindo NFC-e', [
+            'validacao' => 'Validando dados da NFC-e',
+            'assinatura' => 'Assinando digitalmente',
+            'sefaz' => 'Enviando à SEFAZ (aguardando resposta)',
+            'pos' => 'Processando autorização',
+        ]],
+    ];
+@endphp
+<div class="erp-nfce-sefaz-progress-host" wire:ignore>
+    <script src="{{ asset($sefazJs) }}?v={{ $sefazJsVersion }}" defer data-navigate-track></script>
 
-        <div class="erp-nfce-fiscal-progress__track" aria-hidden="true">
-            <div class="erp-nfce-fiscal-progress__bar"></div>
-        </div>
-
-        <p class="erp-nfce-fiscal-progress__hint">Aguarde, não feche esta tela.</p>
-    </div>
+    @foreach ($operacoes as $metodo => [$titulo, $etapas])
+        @include('pdvui::fiscal-progress', [
+            'fiscalProgressOperacao' => $metodo,
+            'fiscalProgressTitulo' => $titulo,
+            'fiscalProgressEtapas' => $etapas,
+        ])
+    @endforeach
 </div>

@@ -46,11 +46,7 @@
                             @empty
                                 <tr class="erp-pdv__grid-empty">
                                     <td colspan="4">
-                                        @if ($this->importarTipo === 'pre_venda')
-                                            Nenhuma pré-venda aberta encontrada.
-                                        @else
-                                            Nenhum orçamento aberto encontrado.
-                                        @endif
+                                        Nenhum orçamento disponível para importação.
                                     </td>
                                 </tr>
                             @endforelse

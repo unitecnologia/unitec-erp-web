@@ -4,12 +4,18 @@ namespace App\Support\Erp\Nfce;
 
 use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
+use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudConfig;
+use App\Support\Erp\Queries\NfceListQueryBuilder;
 use App\Support\Erp\Reports\NfceRelatorioReportService;
+use App\Support\Fiscal\NfceNumeracao;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use ZipArchive;
 
@@ -26,6 +32,7 @@ class NfceContadorPacoteService
      *     competencia: string,
      *     totalNotas: int,
      *     totalXml: int,
+     *     totalInutilizacoes: int,
      *     periodo: array{de: string, ate: string, label: string, labelShort: string}
      * }
      */
@@ -49,13 +56,17 @@ class NfceContadorPacoteService
 
         $xmlCount = $this->exportXmlFiles($nfces, $xmlDir, $config->enviarCanceladas);
 
+        $inutilizacoes = $this->inutilizacoesForCompetencia($empresa, $competencia);
+        $this->exportInutilizacaoXmlFiles($inutilizacoes, $xmlDir);
+
         $reportData = $this->relatorioReportService->buildViewData(
             empresa: $empresa,
-            nfces: $nfces,
+            nfces: $this->relatorioNfcesForCompetencia($empresa, $competencia),
             statusFilter: PdvVendaNfce::TAB_TRANSMITIDOS,
             periodoDe: $periodo['de'],
             periodoAte: $periodo['ate'],
         );
+        $reportData['inutilizacoesRows'] = $this->inutilizacoesReportRows($inutilizacoes);
 
         $reportFileName = 'relatorio-nfce-'.$competencia.'.pdf';
         $report = $this->relatorioReportService->storePdf($reportData, $reportFileName);
@@ -86,6 +97,7 @@ class NfceContadorPacoteService
             'competencia' => $competencia,
             'totalNotas' => $nfces->count(),
             'totalXml' => $xmlCount,
+            'totalInutilizacoes' => $inutilizacoes->count(),
             'periodo' => $periodo,
         ];
     }
@@ -158,6 +170,31 @@ class NfceContadorPacoteService
             ->get();
     }
 
+    /**
+     * Mesmas notas do F7 (aba Transmitidos, período = 1º ao último dia da competência, empresa da sessão),
+     * sem cupons simulados — não têm valor fiscal nem XML para o contador.
+     *
+     * @return EloquentCollection<int, PdvVendaNfce>
+     */
+    public function relatorioNfcesForCompetencia(Empresa $empresa, string $competencia): EloquentCollection
+    {
+        $periodo = NfceRelatorioReportService::competenciaPeriod($competencia);
+        $tabela = (new PdvVendaNfce)->getTable();
+
+        return (new NfceListQueryBuilder(
+            statusFilter: PdvVendaNfce::TAB_TRANSMITIDOS,
+            periodoDe: $periodo['de'],
+            periodoAte: $periodo['ate'],
+            empresaId: (int) $empresa->id,
+        ))
+            ->build()
+            ->where($tabela.'.status', '<>', PdvVendaNfce::STATUS_SIMULADA)
+            ->where(fn (Builder $query): Builder => $query
+                ->where($tabela.'.simulada', false)
+                ->orWhereNull($tabela.'.simulada'))
+            ->get();
+    }
+
     protected function exportXmlFiles(EloquentCollection $nfces, string $xmlDir, bool $includeCanceladas): int
     {
         $count = 0;
@@ -187,6 +224,87 @@ class NfceContadorPacoteService
         }
 
         return $count;
+    }
+
+    /**
+     * Inutilizações homologadas na SEFAZ (cStat 102 / protocolo) da empresa, no ambiente fiscal atual,
+     * gravadas dentro da competência. Uma por série+faixa (a mais recente), sem repetir protocolo.
+     *
+     * @return Collection<int, object>
+     */
+    public function inutilizacoesForCompetencia(Empresa $empresa, string $competencia): Collection
+    {
+        if (! Schema::hasTable('nfce_inutilizacoes')) {
+            return collect();
+        }
+
+        $periodo = NfceRelatorioReportService::competenciaPeriod($competencia);
+        $ambiente = NfceNumeracao::ambiente(VendasParametro::forEmpresa((int) $empresa->id));
+
+        return DB::table('nfce_inutilizacoes')
+            ->where('empresa_id', (int) $empresa->id)
+            ->where('modelo', NfceNumeracao::MODELO)
+            ->where('ambiente', $ambiente)
+            ->whereNotNull('protocolo')
+            ->where('protocolo', '<>', '')
+            ->where(fn ($q) => $q->where('status_codigo', '102')
+                ->orWhereNull('status_codigo')
+                ->orWhere('status_codigo', ''))
+            ->whereBetween('created_at', [
+                Carbon::parse($periodo['de'])->startOfDay(),
+                Carbon::parse($periodo['ate'])->endOfDay(),
+            ])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get(['id', 'serie', 'numero_inicial', 'numero_final', 'protocolo', 'status_codigo', 'justificativa', 'xml', 'created_at'])
+            ->unique(fn ($row): string => (int) $row->serie.'|'.(int) $row->numero_inicial.'|'.(int) $row->numero_final)
+            ->unique(fn ($row): string => trim((string) $row->protocolo))
+            ->sortBy(fn ($row): string => sprintf('%05d-%09d', (int) $row->serie, (int) $row->numero_inicial))
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, object>  $inutilizacoes
+     */
+    protected function exportInutilizacaoXmlFiles(Collection $inutilizacoes, string $xmlDir): int
+    {
+        $count = 0;
+
+        foreach ($inutilizacoes as $row) {
+            $xml = trim((string) ($row->xml ?? ''));
+
+            if ($xml === '') {
+                continue;
+            }
+
+            $protocolo = preg_replace('/\D/', '', (string) $row->protocolo) ?: 'sem-protocolo';
+            $nome = sprintf('INUT-S%03d-%09d-%09d-%s.xml', (int) $row->serie, (int) $row->numero_inicial, (int) $row->numero_final, $protocolo);
+
+            file_put_contents($xmlDir.DIRECTORY_SEPARATOR.$nome, $xml);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  Collection<int, object>  $inutilizacoes
+     * @return list<array{serie: string, faixa: string, data: string, protocolo: string, justificativa: string}>
+     */
+    protected function inutilizacoesReportRows(Collection $inutilizacoes): array
+    {
+        return $inutilizacoes->map(function ($row): array {
+            $ini = (int) $row->numero_inicial;
+            $fim = (int) $row->numero_final;
+
+            return [
+                'serie' => (string) (int) $row->serie,
+                'faixa' => $ini === $fim ? (string) $ini : $ini.' a '.$fim,
+                'data' => $row->created_at ? Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
+                'protocolo' => trim((string) $row->protocolo),
+                'justificativa' => mb_strtoupper(trim((string) $row->justificativa), 'UTF-8'),
+            ];
+        })->all();
     }
 
     public function expectedZipFileName(Empresa $empresa, string $competencia): string

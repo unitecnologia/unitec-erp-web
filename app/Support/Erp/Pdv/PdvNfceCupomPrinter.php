@@ -4,6 +4,8 @@ namespace App\Support\Erp\Pdv;
 
 use App\Models\Empresa;
 use App\Models\PdvVenda;
+use App\Models\PdvVendaNfce;
+use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Printing\Documents\NfceCancelamentoProtocoloCupomPrintDocument;
 use App\Support\Erp\Printing\Documents\NfceCupomPrintDocument;
 use App\Support\Erp\Printing\PrintFacade;
@@ -77,7 +79,8 @@ final class PdvNfceCupomPrinter
     public static function printPayload(string $url, int $copias = 1, ?int $pdvVendaId = null): array
     {
         $target = PrintFacade::targetFromTerminal($copias);
-        $useDevice = $target->preferredMode() === 'device'
+        $mode = $target->impressoraA4() ? 'browser' : $target->preferredMode();
+        $useDevice = $mode === 'device'
             && $target->hasPrinter()
             && $pdvVendaId !== null
             && $pdvVendaId > 0;
@@ -85,7 +88,7 @@ final class PdvNfceCupomPrinter
         return [
             'document' => 'generic_html',
             'url' => $url,
-            'mode' => $target->preferredMode(),
+            'mode' => $mode,
             'copias' => $target->copies,
             'printer' => $target->printerName,
             'tipo' => $target->tipoImpressora,
@@ -97,6 +100,26 @@ final class PdvNfceCupomPrinter
                 ])
                 : null,
         ];
+    }
+
+    /**
+     * (Re)impressão deve sair como DANFE NFC-e (e não DAV): simulada, autorizada ou em contingência.
+     * Gravada/rejeitada/cancelada mantêm o comportamento anterior.
+     */
+    public static function imprimeComoNfce(?PdvVenda $venda): bool
+    {
+        if (self::isNfceSimulada($venda)) {
+            return true;
+        }
+
+        if ($venda === null || ! $venda->fiscal) {
+            return false;
+        }
+
+        return in_array((string) $venda->nfce?->status, [
+            PdvVendaNfce::STATUS_AUTORIZADA,
+            PdvVendaNfce::STATUS_CONTINGENCIA,
+        ], true) && NfceImpressaoFiscal::motivoBloqueio($venda->nfce) === null;
     }
 
     public static function isNfceSimulada(?PdvVenda $venda): bool

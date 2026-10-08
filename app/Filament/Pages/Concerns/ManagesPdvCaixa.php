@@ -17,6 +17,7 @@ use App\Support\Erp\Pdv\TerminalResolver;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 trait ManagesPdvCaixa
 {
@@ -370,6 +371,23 @@ trait ManagesPdvCaixa
         $this->imprimirResumoCaixaEscPos($sessao, $dinheiro);
     }
 
+    /** Resumo parcial da sessão aberta: só imprime (não fecha, não altera saldos nem transfere valores). */
+    public function imprimirResumoCaixaAtual(): void
+    {
+        $sessao = $this->caixaSessaoAtual();
+
+        if (! $sessao) {
+            Notification::make()
+                ->title('Nenhuma sessão de caixa aberta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->imprimirResumoCaixaEscPos($sessao, 0.0);
+    }
+
     protected function resetFechamentoForm(): void
     {
         $this->fechamentoForm = ['dinheiro_informado' => '0,00'];
@@ -463,13 +481,19 @@ trait ManagesPdvCaixa
                 return $sessaoAberta;
             }
 
-            $sessao = PdvCaixaSessao::query()->create([
+            $dadosSessao = [
                 'user_id' => Auth::id(),
                 'empresa_id' => $this->resolveEmpresaId(),
                 'terminal_id' => $terminal?->id,
                 'valor_abertura' => $valorAbertura,
                 'aberto_em' => now(),
-            ]);
+            ];
+
+            if (Schema::hasColumn((new PdvCaixaSessao)->getTable(), 'caixa_conta_id')) {
+                $dadosSessao['caixa_conta_id'] = $this->caixaContaPdvDaSessao();
+            }
+
+            $sessao = PdvCaixaSessao::query()->create($dadosSessao);
 
             PdvCaixaMovimento::query()->create(
                 $this->pdvMovimentoPayload('abertura', [
@@ -513,6 +537,28 @@ trait ManagesPdvCaixa
             ->send();
 
         $this->dispatch('erp-pdv-caixa-opened');
+    }
+
+    /**
+     * Caixa PDV (conta tipo PDV) do operador: padrão nas permissões, senão o primeiro liberado.
+     */
+    protected function caixaContaPdvDaSessao(): ?int
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return null;
+        }
+
+        $empresaId = $this->resolveEmpresaId();
+        $liberadas = $user->accessibleCaixaContaIds($empresaId);
+        $padrao = $user->defaultCaixaContaId($empresaId);
+
+        if ($padrao && in_array($padrao, $liberadas, true)) {
+            return $padrao;
+        }
+
+        return $liberadas[0] ?? null;
     }
 
     public function confirmFecharCaixa(): void
@@ -607,13 +653,13 @@ trait ManagesPdvCaixa
         $this->closePdvModal();
 
         $totalLivro = round(array_sum(array_map(
-            fn ($l): float => (float) $l->entrada,
+            fn ($l): float => (float) $l->entrada - (float) $l->saida,
             $lancamentos,
         )), 2);
 
-        $body = $totalLivro > 0
-            ? 'Dinheiro lançado no Livro Caixa: R$ '.ErpMoney::formatBr($totalLivro)
-            : 'Sem dinheiro em espécie. Cartões ficam no Contas a Receber até cair na conta.';
+        $body = $lancamentos !== []
+            ? 'Transferido ao Livro Caixa: R$ '.ErpMoney::formatBr($totalLivro)
+            : 'Sem saldo em caixa. Cartões ficam no Contas a Receber até cair na conta.';
 
         Notification::make()
             ->title('Caixa fechado.')
@@ -694,78 +740,72 @@ trait ManagesPdvCaixa
 
         if (! in_array($forma, ['DINHEIRO', 'CHEQUE'], true)) {
             Notification::make()
-                ->title('Selecione DINHEIRO ou CHEQUE.')
+                ->title('Sangria permitida somente em DINHEIRO ou CHEQUE.')
                 ->warning()
                 ->send();
 
             return;
         }
-
-        $sessao = $this->caixaSessaoAtual();
-
-        if (! $sessao) {
-            Notification::make()
-                ->title('Sessão de caixa não encontrada.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $saldo = $sessao->saldoPorForma($forma);
-
-        if ($valor > round($saldo + 0.001, 2)) {
-            Notification::make()
-                ->title('Valor acima do saldo.')
-                ->body($forma.' disponível: R$ '.ErpMoney::formatBr($saldo))
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $destinoId = (int) ($this->sangriaForm['destino'] ?? 0);
-        $contaDestino = CaixaConta::query()
-            ->whereKey($destinoId)
-            ->where('ativo', true)
-            ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
-            ->first();
-
-        if (! $contaDestino) {
-            Notification::make()
-                ->title('Selecione uma subcaixa de destino.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $destinoLabel = trim((string) $contaDestino->codigo).' — '
-            .mb_strtoupper((string) $contaDestino->nome, 'UTF-8');
 
         $historico = filled($this->sangriaForm['historico'] ?? null)
             ? mb_strtoupper(trim($this->sangriaForm['historico']), 'UTF-8')
             : 'SANGRIA';
 
-        $movimento = DB::transaction(function () use ($valor, $historico, $forma, $destinoLabel) {
+        // Sangria = saída do Caixa PDV da sessão aberta. Não lança no Livro Caixa:
+        // o valor retirado vai ao CAIXA GERAL só no fechamento (PdvCaixaFechamentoService).
+        $erro = null;
+        $saldo = 0.0;
+
+        $movimento = DB::transaction(function () use ($valor, $historico, $forma, &$erro, &$saldo): ?PdvCaixaMovimento {
+            $sessao = PdvCaixaSessao::query()
+                ->whereKey($this->caixaSessaoId)
+                ->where('user_id', Auth::id())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $sessao || $sessao->fechado_em !== null) {
+                $erro = 'sessao';
+
+                return null;
+            }
+
+            $saldo = $sessao->saldoPorForma($forma);
+
+            if ($valor > round($saldo + 0.001, 2)) {
+                $erro = 'saldo';
+
+                return null;
+            }
+
             return PdvCaixaMovimento::query()->create(
                 $this->pdvMovimentoPayload('sangria', [
-                    'pdv_caixa_sessao_id' => $this->caixaSessaoId,
+                    'pdv_caixa_sessao_id' => $sessao->id,
                     'tipo' => 'sangria',
                     'historico' => $historico,
                     'forma_pagamento' => $forma,
-                    'sangria_destino' => $destinoLabel,
+                    'sangria_destino' => null,
                     'entrada' => 0,
                     'saida' => $valor,
                 ]),
             );
         });
 
+        if ($erro === 'sessao' || ! $movimento) {
+            Notification::make()
+                ->title($erro === 'saldo' ? 'Valor acima do saldo.' : 'Sessão de caixa não encontrada.')
+                ->body($erro === 'saldo'
+                    ? $forma.' disponível no Caixa PDV: R$ '.ErpMoney::formatBr($saldo)
+                    : 'A sangria só pode sair do Caixa PDV da sessão aberta.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->sangriaForm = [
             'historico' => '',
             'valor' => '0,00',
             'tipo_conta' => '',
-            'destino' => $this->defaultSangriaDestinoId($this->sangriaDestinoOptions),
         ];
 
         $this->closePdvModal();

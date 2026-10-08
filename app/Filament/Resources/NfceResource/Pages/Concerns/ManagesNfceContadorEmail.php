@@ -39,6 +39,10 @@ trait ManagesNfceContadorEmail
 
     public function openNfceContadorEmailModal(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $empresa = $this->currentNfceEmpresa();
 
         if (! $empresa) {
@@ -142,6 +146,10 @@ trait ManagesNfceContadorEmail
 
     public function sendNfceContadorEmail(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $this->validate([
             'nfceContadorCompetencia' => ['required', 'regex:/^\d{4}-\d{2}$/'],
             'nfceContadorEmailTo' => ['required', 'email'],
@@ -195,12 +203,7 @@ trait ManagesNfceContadorEmail
 
             Notification::make()
                 ->title('Pacote enviado por e-mail ao contador.')
-                ->body(sprintf(
-                    '%d nota(s), %d XML(s) — competência %s.',
-                    $pacote['totalNotas'],
-                    $pacote['totalXml'],
-                    $pacote['periodo']['labelShort'],
-                ))
+                ->body($this->nfceContadorResumoPacote($pacote))
                 ->success()
                 ->send();
 
@@ -220,6 +223,10 @@ trait ManagesNfceContadorEmail
 
     public function sendNfceContadorWhatsApp(): void
     {
+        if (! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $this->nfceContadorEmailMessage = WhatsAppMessageHelper::stripSystemFooter($this->nfceContadorEmailMessage);
         $maxLength = WhatsAppMessageHelper::maxUserMessageLength();
 
@@ -281,12 +288,7 @@ trait ManagesNfceContadorEmail
 
             Notification::make()
                 ->title('Pacote enviado por WhatsApp ao contador.')
-                ->body(sprintf(
-                    '%d nota(s), %d XML(s) — competência %s.',
-                    $pacote['totalNotas'],
-                    $pacote['totalXml'],
-                    $pacote['periodo']['labelShort'],
-                ))
+                ->body($this->nfceContadorResumoPacote($pacote))
                 ->success()
                 ->send();
 
@@ -314,6 +316,18 @@ trait ManagesNfceContadorEmail
      *     periodo: array{de: string, ate: string, label: string, labelShort: string}
      * }|null
      */
+    /**
+     * @param  array{totalNotas: int, totalXml: int, totalInutilizacoes?: int, periodo: array{labelShort: string}}  $pacote
+     */
+    protected function nfceContadorResumoPacote(array $pacote): string
+    {
+        $inutilizacoes = (int) ($pacote['totalInutilizacoes'] ?? 0);
+
+        return sprintf('%d nota(s), %d XML(s)', $pacote['totalNotas'], $pacote['totalXml'])
+            .($inutilizacoes > 0 ? sprintf(', %d inutilização(ões)', $inutilizacoes) : '')
+            .' — competência '.$pacote['periodo']['labelShort'].'.';
+    }
+
     protected function buildNfceContadorPacoteOrNotify(NfceContadorPacoteService $service, Empresa $empresa): ?array
     {
         if (! $this->assertNfceContadorSemPendencias($empresa, $this->nfceContadorCompetencia)) {
@@ -322,7 +336,7 @@ trait ManagesNfceContadorEmail
 
         $pacote = $service->buildPacoteMensal($empresa, $this->nfceContadorCompetencia);
 
-        if ($pacote['totalNotas'] === 0) {
+        if ($pacote['totalNotas'] === 0 && ($pacote['totalInutilizacoes'] ?? 0) === 0) {
             Notification::make()
                 ->title('Nenhuma NFC-e encontrada no mês selecionado.')
                 ->body('O pacote não foi enviado. Verifique a competência ou as notas transmitidas.')

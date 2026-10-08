@@ -13,6 +13,8 @@
     $pdvJsPath = public_path('js/erp-pdv.js');
     $shellJsVersion = $version.'-shell'.(is_file($shellJsPath) ? (int) filemtime($shellJsPath) : time());
     $pdvJsVersion = $version.'-pdv'.(is_file($pdvJsPath) ? (int) filemtime($pdvJsPath) : time());
+    $silentPrintJsPath = public_path('js/erp-silent-print.js');
+    $silentPrintJsVersion = $version.'-sp'.(is_file($silentPrintJsPath) ? (int) filemtime($silentPrintJsPath) : time());
 @endphp
 <script src="{{ asset('js/erp-shell.js') }}?v={{ $shellJsVersion }}-{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}"></script>
 {{-- PDV no layout: menu Filament usa SPA e o script da tela PDV não reexecuta. --}}
@@ -26,7 +28,7 @@
     };
 </script>
 <script src="{{ asset('js/erp-device-service.js') }}?v={{ $version }}"></script>
-<script src="{{ asset('js/erp-silent-print.js') }}?v={{ $version }}"></script>
+<script src="{{ asset('js/erp-silent-print.js') }}?v={{ $silentPrintJsVersion }}"></script>
 @include('filament.components.erp.form-scripts')
 @if (request()->is('admin/orcamentos*'))
     <script src="{{ asset('js/erp-orcamentos.js') }}?v={{ $version }}"></script>

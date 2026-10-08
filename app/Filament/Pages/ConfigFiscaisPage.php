@@ -18,6 +18,7 @@ use App\Support\Erp\Nfse\Ipm\NfseIpmMunicipios;
 use App\Support\Erp\Nfse\NfseDpsNumeracaoRecusada;
 use App\Support\Erp\Nfse\NfseRegimeTributario;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
+use App\Support\Fiscal\NfceNumeracao;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use Unitec\FiscalEngine\Nfe\DfeDistribuidor;
 use BackedEnum;
@@ -56,11 +57,13 @@ class ConfigFiscaisPage extends Page
     public array $form = [];
 
     /**
-     * Série NFC-e por caixa (aba PDVs Offline).
+     * Série NFC-e por caixa emissor (aba PDVs Offline). Aparelhos de app (Força de Vendas…) não entram.
      *
-     * @var array<int, array{id: int, nome: string, terminal: string, serie: string, proximo_numero: int, ultimo_nfce: int|null}>
+     * @var array<int, array{id: int, nome: string, terminal: string, tipo: string, ativo: bool, serie: string, serie_efetiva: string, proximo_numero: int, ultimo_nfce: int, alerta: string|null}>
      */
     public array $terminais = [];
+
+    public string $terminaisAmbienteLabel = '';
 
     public ?TemporaryUploadedFile $certificadoUpload = null;
 
@@ -125,7 +128,8 @@ class ConfigFiscaisPage extends Page
     }
 
     /**
-     * Carrega os caixas da empresa para edição da série NFC-e por caixa.
+     * Carrega os caixas emissores de NFC-e (PDV web e PDV offline) da empresa. Próx. nº e Últ. NFC-e
+     * são da série efetiva no ambiente configurado na aba NFC-e.
      */
     protected function loadTerminais(): void
     {
@@ -133,34 +137,173 @@ class ConfigFiscaisPage extends Page
 
         if (! $empresaId) {
             $this->terminais = [];
+            $this->terminaisAmbienteLabel = '';
 
             return;
         }
 
         $params = VendasParametro::forEmpresa($empresaId);
+        $this->terminaisAmbienteLabel = NfceNumeracao::ambiente($params) === PdvVendaNfce::AMBIENTE_PRODUCAO
+            ? 'Produção'
+            : 'Homologação';
 
-        $this->terminais = Terminal::query()
-            ->where('empresa_id', $empresaId)
-            ->orderBy('numero_logico_terminal')
-            ->orderBy('id')
-            ->get()
+        $this->terminais = $this->terminaisEmissores($empresaId)
             ->map(function (Terminal $t) use ($params): array {
-                $serieGravada = trim((string) ($t->serie ?: ''));
-                $serieConsulta = $serieGravada !== ''
-                    ? $serieGravada
-                    : NfceTerminalSequencia::serieEfetiva($t, $params);
-                $ultimo = NfceTerminalSequencia::ultimoNumero((int) $t->empresa_id, $serieConsulta);
+                $serie = trim((string) ($t->serie ?: ''));
+                $proximo = NfceTerminalSequencia::proximoPiso($t, $params);
 
                 return [
                     'id' => (int) $t->id,
                     'nome' => (string) ($t->nome ?: 'Caixa'),
                     'terminal' => (string) ($t->numero_logico_terminal ?: $t->id),
-                    'serie' => $serieGravada,
-                    'proximo_numero' => NfceTerminalSequencia::proximoPiso($t, $params),
-                    'ultimo_nfce' => $ultimo ?? 0,
+                    'tipo' => $t->ehPdvOffline() ? 'offline' : 'web',
+                    'ativo' => (bool) ($t->ativo ?? true),
+                    'serie' => $serie,
+                    'serie_efetiva' => (string) NfceTerminalSequencia::serieEfetivaInt($t, $params),
+                    'proximo_numero' => $proximo,
+                    'ultimo_nfce' => $this->ultimoNfceTerminal($t, $params),
+                    'alerta' => null,
                 ];
             })
+            ->values()
             ->all();
+
+        $this->aplicarAlertasSeries($params);
+    }
+
+    /**
+     * Série digitada: recalcula Próx. nº / Últ. NFC-e da nova série (sem gravar) e os alertas.
+     */
+    public function updatedTerminais(mixed $value, string $key): void
+    {
+        if (! preg_match('/^(\d+)\.serie$/', $key, $m)) {
+            return;
+        }
+
+        $index = (int) $m[1];
+        $empresaId = $this->resolveEmpresaId();
+        $linha = $this->terminais[$index] ?? null;
+
+        if (! $empresaId || $linha === null) {
+            return;
+        }
+
+        $terminal = Terminal::query()->where('empresa_id', $empresaId)->find((int) $linha['id']);
+
+        if ($terminal === null) {
+            return;
+        }
+
+        $params = VendasParametro::forEmpresa($empresaId);
+        $serie = preg_replace('/\D/', '', (string) $value) ?? '';
+        $terminal->serie = $serie !== '' ? $serie : null;
+        $proximo = NfceTerminalSequencia::proximoPiso($terminal, $params);
+
+        $this->terminais[$index]['serie'] = $serie;
+        $this->terminais[$index]['serie_efetiva'] = (string) NfceTerminalSequencia::serieEfetivaInt($terminal, $params);
+        $this->terminais[$index]['ultimo_nfce'] = $this->ultimoNfceTerminal($terminal, $params);
+        $this->terminais[$index]['proximo_numero'] = $proximo;
+
+        $this->aplicarAlertasSeries($params);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Terminal>
+     */
+    protected function terminaisEmissores(int $empresaId): \Illuminate\Support\Collection
+    {
+        return Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->orderBy('numero_logico_terminal')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Terminal $t): bool => $t->emiteNfce())
+            ->values();
+    }
+
+    protected function ultimoNfceTerminal(Terminal $terminal, VendasParametro $params): int
+    {
+        return NfceTerminalSequencia::ultimoNumero(
+            (int) $terminal->empresa_id,
+            (string) NfceTerminalSequencia::serieEfetivaInt($terminal, $params),
+            NfceNumeracao::ambiente($params),
+        ) ?? 0;
+    }
+
+    protected function aplicarAlertasSeries(VendasParametro $params): void
+    {
+        $conflitos = self::conflitosSerieNfce($this->linhasParaConflito($this->terminais), (string) $params->serie);
+
+        foreach ($this->terminais as $i => $linha) {
+            $this->terminais[$i]['alerta'] = null;
+
+            foreach ($conflitos as $conflito) {
+                if (in_array((int) $linha['id'], $conflito['ids'], true)) {
+                    $this->terminais[$i]['alerta'] = $conflito['texto'];
+
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $linhas
+     * @return list<array{id: int, nome: string, offline: bool, serie: string}>
+     */
+    protected function linhasParaConflito(array $linhas, string $campoSerie = 'serie'): array
+    {
+        return array_values(array_map(static fn (array $l): array => [
+            'id' => (int) ($l['id'] ?? 0),
+            'nome' => (string) ($l['nome'] ?? 'Caixa'),
+            'offline' => ($l['tipo'] ?? '') === 'offline',
+            'serie' => preg_replace('/\D/', '', (string) ($l[$campoSerie] ?? '')) ?? '',
+        ], $linhas));
+    }
+
+    /**
+     * Série efetiva repetida entre caixas emissores. É conflito quando há PDV offline no grupo
+     * (numera localmente, sem o contador do servidor) ou quando duas séries foram fixadas iguais.
+     * Caixas web com série em branco compartilham a série da empresa com segurança (contador único).
+     *
+     * @param  list<array{id: int, nome: string, offline: bool, serie: string}>  $linhas
+     * @return array<string, array{serie: int, ids: list<int>, texto: string}>
+     */
+    protected static function conflitosSerieNfce(array $linhas, string $serieEmpresa): array
+    {
+        $grupos = [];
+
+        foreach ($linhas as $linha) {
+            $efetiva = NfceNumeracao::serieInt($linha['serie'] !== '' ? $linha['serie'] : $serieEmpresa);
+            $grupos[$efetiva][] = $linha;
+        }
+
+        $conflitos = [];
+
+        foreach ($grupos as $serie => $grupo) {
+            if (count($grupo) < 2) {
+                continue;
+            }
+
+            $fixadas = count(array_filter($grupo, static fn (array $l): bool => $l['serie'] !== ''));
+            $temOffline = array_filter($grupo, static fn (array $l): bool => $l['offline']) !== [];
+
+            if ($fixadas < 2 && ! $temOffline) {
+                continue;
+            }
+
+            $ids = array_column($grupo, 'id');
+            sort($ids);
+
+            $conflitos[$serie.':'.implode(',', $ids)] = [
+                'serie' => (int) $serie,
+                'ids' => $ids,
+                'texto' => 'Série '.$serie.' repetida em: '.implode(', ', array_column($grupo, 'nome')).'.'
+                    .($temOffline ? ' PDV offline precisa de série exclusiva.' : ''),
+            ];
+        }
+
+        return $conflitos;
     }
 
     /**
@@ -183,7 +326,9 @@ class ConfigFiscaisPage extends Page
     }
 
     /**
-     * Persiste série / próximo nº dos caixas. Retorna false se bloqueou (duplicata ou piso).
+     * Persiste série / próximo nº dos caixas emissores. Retorna false se bloqueou (série inválida,
+     * repetição criada agora ou próximo abaixo do já usado). Nada é gravado se algum caixa bloquear.
+     * Repetições que já existiam no banco só geram aviso (não travam o F2 das demais configurações).
      */
     protected function persistTerminaisSeries(int $empresaId): bool
     {
@@ -192,62 +337,104 @@ class ConfigFiscaisPage extends Page
         }
 
         $params = VendasParametro::forEmpresa($empresaId);
-        $seriesUsadas = [];
+        $modelos = $this->terminaisEmissores($empresaId)->keyBy('id');
+        $linhas = [];
 
         foreach ($this->terminais as $linha) {
-            $serie = trim((string) ($linha['serie'] ?? ''));
+            $terminal = $modelos->get((int) ($linha['id'] ?? 0));
 
-            if ($serie === '') {
+            if ($terminal === null) {
                 continue;
             }
 
-            $chave = ltrim($serie, '0') ?: '0';
+            $serie = preg_replace('/\D/', '', (string) ($linha['serie'] ?? '')) ?? '';
 
-            if (isset($seriesUsadas[$chave])) {
+            if ($serie !== '' && ((int) $serie < 1 || (int) $serie > 889)) {
                 Notification::make()
-                    ->title('Série duplicada entre caixas')
-                    ->body("A série {$serie} está repetida. Cada caixa precisa de série exclusiva.")
+                    ->title('Série NFC-e inválida')
+                    ->body('O caixa '.$terminal->nome.' está com a série '.$serie.'. Use de 1 a 889 (890–999 são reservadas pela SEFAZ).')
                     ->danger()
                     ->send();
 
                 return false;
             }
 
-            $seriesUsadas[$chave] = true;
+            $linhas[] = [
+                'id' => (int) $terminal->id,
+                'nome' => (string) ($terminal->nome ?: 'Caixa'),
+                'tipo' => $terminal->ehPdvOffline() ? 'offline' : 'web',
+                'serie' => $serie,
+                'serie_banco' => trim((string) ($terminal->serie ?: '')),
+                'proximo' => max(1, (int) ($linha['proximo_numero'] ?? 1)),
+                'modelo' => $terminal,
+            ];
         }
 
-        foreach ($this->terminais as $linha) {
-            $terminal = Terminal::query()
-                ->where('empresa_id', $empresaId)
-                ->whereKey($linha['id'] ?? 0)
-                ->first();
+        $serieEmpresa = (string) $params->serie;
+        $conflitosAgora = self::conflitosSerieNfce($this->linhasParaConflito($linhas), $serieEmpresa);
+        $conflitosAntes = self::conflitosSerieNfce($this->linhasParaConflito($linhas, 'serie_banco'), $serieEmpresa);
+        $novos = array_diff_key($conflitosAgora, $conflitosAntes);
 
-            if (! $terminal) {
-                continue;
-            }
+        if ($novos !== []) {
+            Notification::make()
+                ->title('Série duplicada entre caixas')
+                ->body(implode(' ', array_column($novos, 'texto')).' Cada PDV emissor precisa de série exclusiva.')
+                ->danger()
+                ->send();
 
-            $serie = trim((string) ($linha['serie'] ?? ''));
-            $terminal->serie = $serie !== '' ? $serie : null;
+            return false;
+        }
 
+        $gravar = [];
+
+        foreach ($linhas as $linha) {
+            /** @var Terminal $terminal */
+            $terminal = $linha['modelo'];
+            $serieMudou = ! NfceTerminalSequencia::mesmaSerie($linha['serie'], $linha['serie_banco'])
+                || ($linha['serie'] === '') !== ($linha['serie_banco'] === '');
+
+            $terminal->serie = $linha['serie'] !== '' ? $linha['serie'] : null;
             $piso = NfceTerminalSequencia::proximoPiso($terminal, $params);
-            $proximo = max(1, (int) ($linha['proximo_numero'] ?? $piso));
 
-            if ($proximo < $piso) {
-                $nome = (string) ($linha['nome'] ?? 'Caixa');
+            if ($linha['proximo'] < $piso) {
                 Notification::make()
                     ->title('Próx. nº inválido')
-                    ->body("O caixa {$nome} não pode usar próximo {$proximo}. O mínimo é {$piso} (último da série + 1).")
+                    ->body('O caixa '.$linha['nome'].' não pode usar próximo '.$linha['proximo'].' na série '.NfceTerminalSequencia::serieEfetivaInt($terminal, $params).'. O mínimo é '.$piso.' (último número já usado + 1).')
                     ->danger()
                     ->send();
 
                 return false;
             }
 
+            if ($serieMudou || $linha['proximo'] > $piso) {
+                $gravar[] = [$terminal, $linha['serie'], $linha['proximo']];
+            }
+        }
+
+        foreach ($gravar as [$terminal, $serie, $proximo]) {
             $terminal->update([
                 'serie' => $serie !== '' ? $serie : null,
                 'numeracao_inicial' => $proximo,
                 'usar_numero_inicial' => true,
             ]);
+
+            if (NfceNumeracao::disponivel()) {
+                NfceNumeracao::garantirPeloMenos(
+                    $empresaId,
+                    NfceTerminalSequencia::serieEfetivaInt($terminal, $params),
+                    $params,
+                    $proximo,
+                    (int) $terminal->id,
+                );
+            }
+        }
+
+        if ($conflitosAgora !== []) {
+            Notification::make()
+                ->title('Atenção: série repetida entre caixas')
+                ->body(implode(' ', array_column($conflitosAgora, 'texto')).' Ajuste antes de usar o PDV offline.')
+                ->warning()
+                ->send();
         }
 
         $this->loadTerminais();

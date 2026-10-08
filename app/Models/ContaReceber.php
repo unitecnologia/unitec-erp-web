@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'cartao_bandeira',
     'cartao_parcela',
     'plano_conta_id',
+    'pdv_venda_id',
 ])]
 class ContaReceber extends Model
 {

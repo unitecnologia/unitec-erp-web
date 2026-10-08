@@ -25,6 +25,7 @@ class PdvVenda extends Model
         'venda_id',
         'person_id',
         'cpf_nota',
+        'nome_nota',
         'vendedor_id',
         'vendedor_nome',
         'numero',

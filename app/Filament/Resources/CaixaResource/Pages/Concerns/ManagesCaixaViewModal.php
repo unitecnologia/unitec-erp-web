@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\CaixaResource\Pages\Concerns;
 
 use App\Models\CaixaLancamento;
+use App\Support\Erp\CaixaListRowFormatter;
 use App\Support\Erp\ContaReceberPedidoExibicao;
+use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Filament\Notifications\Notification;
 
 trait ManagesCaixaViewModal
@@ -15,9 +17,14 @@ trait ManagesCaixaViewModal
 
     public function openCaixaView(int $lancamentoId): void
     {
-        $lancamento = CaixaLancamento::query()
-            ->with(['conta'])
-            ->find($lancamentoId);
+        $lancamento = $lancamentoId < 0
+            ? (new CaixaListQueryBuilder(contaFilter: $this->contaFilter, applyDefaultOrder: false))
+                ->buildForList()
+                ->where('id', $lancamentoId)
+                ->first()
+            : CaixaLancamento::query()
+                ->with(['conta'])
+                ->find($lancamentoId);
 
         if (! $lancamento) {
             Notification::make()
@@ -35,7 +42,10 @@ trait ManagesCaixaViewModal
                 $lancamento->documento,
                 ContaReceberPedidoExibicao::mapa([$lancamento]),
             ),
-            'historico' => mb_strtoupper($lancamento->historico, 'UTF-8'),
+            'historico' => CaixaListRowFormatter::comSessaoPdv(
+                mb_strtoupper((string) $lancamento->historico, 'UTF-8'),
+                $lancamento,
+            ),
             'plano_contas' => mb_strtoupper((string) ($lancamento->plano_contas ?? ''), 'UTF-8') ?: '—',
             'conta' => mb_strtoupper($lancamento->conta?->nome ?? '—', 'UTF-8'),
             'entrada' => number_format((float) $lancamento->entrada, 2, ',', '.'),

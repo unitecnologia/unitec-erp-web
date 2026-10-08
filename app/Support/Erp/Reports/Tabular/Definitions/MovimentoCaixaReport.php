@@ -4,6 +4,8 @@ namespace App\Support\Erp\Reports\Tabular\Definitions;
 
 use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
+use App\Support\Erp\CaixaListRowFormatter;
+use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use App\Support\Erp\Reports\Tabular\AbstractTabularReport;
 use Illuminate\Http\Request;
 
@@ -73,21 +75,33 @@ class MovimentoCaixaReport extends AbstractTabularReport
         $columns = $this->resolveColumns($request->query('cols'));
         $conta = (string) $request->query('conta', 'todos');
 
-        $query = CaixaLancamento::query()
-            ->with(['conta', 'planoConta'])
-            ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
-            ->orderBy('emissao')
-            ->orderBy('codigo');
+        $pdv = new CaixaListQueryBuilder(
+            contaFilter: is_numeric($conta) ? $conta : 'todas',
+            periodoDeApplied: $de->toDateString(),
+            periodoAteApplied: $ate->toDateString(),
+            applyDefaultOrder: false,
+        );
 
-        if ($conta !== 'todos' && is_numeric($conta)) {
-            $query->where('caixa_conta_id', (int) $conta);
+        if ($pdv->isContaPdv()) {
+            $query = $pdv->buildForList()->with(['conta', 'planoConta']);
+            $pdv->applyListDefaultOrder($query, 'asc');
+        } else {
+            $query = CaixaLancamento::query()
+                ->with(['conta', 'planoConta'])
+                ->whereBetween('emissao', [$de->toDateString(), $ate->toDateString()])
+                ->orderBy('emissao')
+                ->orderBy('codigo');
+
+            if ($conta !== 'todos' && is_numeric($conta)) {
+                $query->where('caixa_conta_id', (int) $conta);
+            }
         }
 
         $rows = $query->limit(5000)->get()->map(fn (CaixaLancamento $l): array => [
             'codigo' => (string) $l->codigo,
             'emissao' => static::formatDate($l->emissao),
             'documento' => (string) ($l->documento ?? ''),
-            'historico' => (string) ($l->historico ?? ''),
+            'historico' => CaixaListRowFormatter::comSessaoPdv((string) ($l->historico ?? ''), $l),
             'plano' => (string) ($l->planoConta?->descricao ?: $l->plano_contas ?: ''),
             'conta' => (string) ($l->conta?->nome ?? ''),
             'entrada' => static::formatMoney((float) $l->entrada),

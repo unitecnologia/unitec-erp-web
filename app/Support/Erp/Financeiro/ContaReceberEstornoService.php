@@ -4,6 +4,7 @@ namespace App\Support\Erp\Financeiro;
 
 use App\Models\ContaReceber;
 use App\Models\ContaReceberPagamento;
+use App\Models\PlanoConta;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -59,6 +60,11 @@ final class ContaReceberEstornoService
                 $conta->save();
             }
 
+            $planoId = $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null;
+            $planoNome = $planoId
+                ? PlanoConta::query()->whereKey($planoId)->value('descricao')
+                : null;
+
             app(ContaReceberBaixaService::class)->registrarSaidaCaixa(
                 valor: $valorRecebido,
                 data: optional($pagamento->data)?->toDateString() ?? now()->toDateString(),
@@ -66,6 +72,8 @@ final class ContaReceberEstornoService
                 historico: 'Estorno recebimento conta a receber #'.($conta->numero ?: $conta->id),
                 caixaContaId: $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null,
                 empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+                planoContaId: $planoNome !== null ? $planoId : null,
+                planoNome: $planoNome !== null ? mb_substr(mb_strtoupper((string) $planoNome, 'UTF-8'), 0, 120) : null,
             );
 
             $pagamento->delete();

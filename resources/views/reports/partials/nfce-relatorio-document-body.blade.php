@@ -4,11 +4,13 @@
     $fantasia = mb_strtoupper((string) ($empresa?->fantasia ?: $empresa?->nome ?: ''), 'UTF-8');
     $razao = mb_strtoupper((string) ($empresa?->razao_social ?: $empresa?->nome ?: ''), 'UTF-8');
     $hasData = count($resumidoRows) > 0 || count($detalhadoSections) > 0 || count($tributacaoRows) > 0;
+    $inutilizacoesRows = $inutilizacoesRows ?? [];
+    $temInutilizacoes = count($inutilizacoesRows) > 0;
 @endphp
 
 <div class="nfce-relatorio-doc">
     @if (! $hasData)
-        <div class="nfce-relatorio-doc__frame">
+        <div @class(['nfce-relatorio-doc__frame', 'nfce-relatorio-doc__frame--break' => $temInutilizacoes])>
             @include('reports.partials.nfce-relatorio-section-header', [
                 'sectionTitle' => 'RELATÓRIO DE NFC-e',
             ])
@@ -107,7 +109,7 @@
             </div>
         </div>
 
-        <div class="nfce-relatorio-doc__frame">
+        <div @class(['nfce-relatorio-doc__frame', 'nfce-relatorio-doc__frame--break' => $temInutilizacoes])>
             @include('reports.partials.nfce-relatorio-section-header', [
                 'sectionTitle' => NfceRelatorioReport::reportTitle(NfceRelatorioReport::TIPO_TRIBUTACAO),
             ])
@@ -141,6 +143,44 @@
             <div class="nfce-relatorio-doc__footer">
                 <span>Emissão: {{ $printedAt->format('d/m/Y  H:i:s') }}</span>
                 <span>Página: 3</span>
+            </div>
+        </div>
+    @endif
+
+    @if ($temInutilizacoes)
+        <div class="nfce-relatorio-doc__frame">
+            @include('reports.partials.nfce-relatorio-section-header', [
+                'sectionTitle' => 'NUMERAÇÕES INUTILIZADAS',
+            ])
+
+            <div class="nfce-relatorio-doc__table-wrap">
+                <table class="nfce-relatorio-doc__table" style="width: 100%">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%">SÉRIE</th>
+                            <th style="width: 16%">FAIXA</th>
+                            <th style="width: 14%">DATA</th>
+                            <th style="width: 18%">PROTOCOLO</th>
+                            <th>JUSTIFICATIVA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($inutilizacoesRows as $row)
+                            <tr>
+                                <td class="center">{{ $row['serie'] }}</td>
+                                <td class="center">{{ $row['faixa'] }}</td>
+                                <td class="center">{{ $row['data'] }}</td>
+                                <td class="protocolo">{{ $row['protocolo'] }}</td>
+                                <td>{{ $row['justificativa'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="nfce-relatorio-doc__footer">
+                <span>Emissão: {{ $printedAt->format('d/m/Y  H:i:s') }}</span>
+                <span>Página: {{ $hasData ? 4 : 2 }}</span>
             </div>
         </div>
     @endif

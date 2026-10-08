@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Models\PdvVenda;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 
 trait ManagesPdvFinalizarTotais
@@ -13,10 +14,14 @@ trait ManagesPdvFinalizarTotais
         return $this->cupomTotalValor();
     }
 
+    /**
+     * Desconto/acréscimo vindos do documento importado (pedido/orçamento) valem mesmo com
+     * o campo desabilitado nos parâmetros: já foram concedidos no documento de origem.
+     */
     public function finalizarDescontoValor(): float
     {
         if (! $this->pdvConfig()->habilitarDescontoVenda()) {
-            return 0.0;
+            return $this->importDescontoVenda();
         }
 
         return ErpMoney::parseBr($this->finalizarForm['desconto_venda'] ?? '0');
@@ -25,7 +30,7 @@ trait ManagesPdvFinalizarTotais
     public function finalizarAcrescimoValor(): float
     {
         if (! $this->pdvConfig()->habilitarAcrescimoVenda()) {
-            return 0.0;
+            return $this->importAcrescimoVenda();
         }
 
         return ErpMoney::parseBr($this->finalizarForm['acrescimo_venda'] ?? '0');
@@ -76,7 +81,7 @@ trait ManagesPdvFinalizarTotais
 
         $maxPct = $this->pdvConfig()->descontoMaximo();
 
-        if ($maxPct > 0 && $desconto > 0) {
+        if ($maxPct > 0 && $desconto > 0 && $desconto > $this->importDescontoVenda() + 0.004) {
             $maxDesconto = round($subtotal * $maxPct / 100, 2);
 
             if ($desconto > $maxDesconto) {
@@ -90,7 +95,7 @@ trait ManagesPdvFinalizarTotais
 
         $maxAcrescimoPct = $this->pdvConfig()->acrescimoMaximo();
 
-        if ($maxAcrescimoPct > 0 && $acrescimo > 0) {
+        if ($maxAcrescimoPct > 0 && $acrescimo > 0 && $acrescimo > $this->importAcrescimoVenda() + 0.004) {
             $maxAcrescimo = round($subtotal * $maxAcrescimoPct / 100, 2);
 
             if ($acrescimo > $maxAcrescimo) {
@@ -145,7 +150,7 @@ trait ManagesPdvFinalizarTotais
     {
         $venda = PdvVenda::query()->find($vendaId);
 
-        if (PdvNfceCupomPrinter::isNfceSimulada($venda)) {
+        if (PdvNfceCupomPrinter::imprimeComoNfce($venda)) {
             $this->imprimirNfceCupomPosVenda($vendaId, $copias);
 
             return;
@@ -167,6 +172,14 @@ trait ManagesPdvFinalizarTotais
 
     protected function imprimirNfceCupomPosVenda(int $vendaId, int $copias = 1): void
     {
+        $venda = PdvVenda::query()->with('nfce')->find($vendaId);
+
+        if ($venda && ($bloqueio = NfceImpressaoFiscal::motivoBloqueio($venda->nfce)) !== null) {
+            $this->notifyPdvError('Impressão fiscal bloqueada.', $bloqueio);
+
+            return;
+        }
+
         $this->js(PdvNfceCupomPrinter::livewireOpenJs($vendaId, $copias));
     }
 }

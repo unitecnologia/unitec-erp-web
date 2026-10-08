@@ -232,6 +232,81 @@ final class IbptLookupService
     }
 
     /**
+     * Linhas da bobina (qualquer UF) com os tributos aproximados da Lei 12.741/2012.
+     * A alíquota vem da tabela IBPT; o texto cabe na largura da impressora POS.
+     *
+     * @param  array{trib_fed?: float, trib_est?: float, trib_mun?: float, v_tot_trib?: float, fonte?: string}  $totais
+     * @return list<string>
+     */
+    public function linhasBobina(array $totais, int $width = 48): array
+    {
+        $width = max(32, $width);
+        $fed = (float) ($totais['trib_fed'] ?? 0);
+        $est = (float) ($totais['trib_est'] ?? 0);
+        $mun = (float) ($totais['trib_mun'] ?? 0);
+        $tot = (float) ($totais['v_tot_trib'] ?? ($fed + $est + $mun));
+        $fonte = trim((string) ($totais['fonte'] ?? 'IBPT'));
+        if ($fonte === '') {
+            $fonte = 'IBPT';
+        }
+
+        if ($tot <= 0) {
+            return $this->quebrarLinhaBobina(
+                'Tributos aprox. conforme Lei 12.741/2012. Fonte: '.$fonte.'.',
+                $width,
+            );
+        }
+
+        $money = static fn (float $valor): string => number_format($valor, 2, ',', '.');
+
+        return $this->quebrarLinhaBobina(sprintf(
+            'Trib. aprox. Fed. R$ %s Est. R$ %s Mun. R$ %s Total R$ %s. Fonte: %s. Lei 12.741/2012.',
+            $money($fed),
+            $money($est),
+            $money($mun),
+            $money($tot),
+            $fonte,
+        ), $width);
+    }
+
+    /**
+     * @param  iterable<int, object>  $itens  Itens com product e total
+     * @return list<string>
+     */
+    public function linhasBobinaDosItens(iterable $itens, int $width = 48): array
+    {
+        $rows = [];
+
+        foreach ($itens as $item) {
+            $ibpt = $this->calcularParaProduto($item->product ?? null, (float) ($item->total ?? 0));
+            $rows[] = [
+                'trib_fed' => $ibpt['trib_fed'],
+                'trib_est' => $ibpt['trib_est'],
+                'trib_mun' => $ibpt['trib_mun'],
+                'trib_imp' => $ibpt['trib_imp'],
+                'ibpt_fonte' => $ibpt['fonte'],
+                'ibpt_chave' => $ibpt['chave'],
+                'ibpt_versao' => $ibpt['versao'],
+            ];
+        }
+
+        return $this->linhasBobina($this->agregarItens($rows), $width);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function quebrarLinhaBobina(string $texto, int $width): array
+    {
+        $linhas = preg_split('/\R/u', wordwrap($texto, $width, "\n", true)) ?: [];
+
+        return array_values(array_filter(
+            array_map(static fn (string $linha): string => rtrim($linha), $linhas),
+            static fn (string $linha): bool => $linha !== '',
+        ));
+    }
+
+    /**
      * Agrega itens já calculados (com chaves trib_*).
      *
      * @param  list<array<string, mixed>>  $itens

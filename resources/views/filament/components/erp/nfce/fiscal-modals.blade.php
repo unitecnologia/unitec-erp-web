@@ -7,7 +7,11 @@
         $chaveSelecionada = $this->highlightedChave ?: '—';
     @endphp
 
-    <div class="erp-lookup-modal erp-nfce-fiscal-modal" wire:keydown.escape.window="closeNfceFiscalModal">
+    <div
+        class="erp-lookup-modal erp-nfce-fiscal-modal"
+        wire:keydown.escape.window="closeNfceFiscalModal"
+        wire:keydown.f5.prevent="{{ $this->nfceFiscalModal === 'cancelar' ? 'confirmCancelarNfce' : 'confirmInutilizarNfce' }}"
+    >
         <div class="erp-lookup-modal__backdrop" wire:click="closeNfceFiscalModal"></div>
 
         <div class="erp-lookup-modal__window" role="dialog" aria-modal="true" aria-labelledby="erp-nfce-fiscal-modal-title">
@@ -51,6 +55,9 @@
                         </p>
                     </div>
                 @else
+                    @if (filled($this->nfceInutilizarOrigem))
+                        <p class="erp-nfce-fiscal-modal__hint">{{ $this->nfceInutilizarOrigem }}</p>
+                    @endif
                     <div class="erp-nfce-fiscal-modal__grid">
                         <label class="erp-nfce-fiscal-modal__field">
                             <span>Série</span>
@@ -97,11 +104,12 @@
                         wire:click="confirmCancelarNfce"
                         wire:loading.attr="disabled"
                         wire:target="confirmCancelarNfce"
-                        class="erp-pcad-actions__btn erp-pcad-actions__btn--danger"
+                        class="erp-pcad-actions__btn"
+                        data-erp-key="F5"
                         @disabled($cancelLength < $minMotivo)
                     >
-                        <span class="erp-pcad-actions__icon">✕</span>
-                        <span wire:loading.remove wire:target="confirmCancelarNfce" class="erp-pcad-actions__label">Confirmar cancelamento</span>
+                        <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✓</span>
+                        <span wire:loading.remove wire:target="confirmCancelarNfce" class="erp-pcad-actions__label"><kbd>F5</kbd> | Confirmar</span>
                         <span wire:loading wire:target="confirmCancelarNfce" class="erp-pcad-actions__label">Cancelando…</span>
                     </button>
                 @else
@@ -110,17 +118,18 @@
                         wire:click="confirmInutilizarNfce"
                         wire:loading.attr="disabled"
                         wire:target="confirmInutilizarNfce"
-                        class="erp-pcad-actions__btn erp-pcad-actions__btn--primary"
+                        class="erp-pcad-actions__btn"
+                        data-erp-key="F5"
                         @disabled($inutilLength < $minMotivo)
                     >
-                        <span class="erp-pcad-actions__icon">✓</span>
-                        <span wire:loading.remove wire:target="confirmInutilizarNfce" class="erp-pcad-actions__label">Inutilizar</span>
+                        <span class="erp-pcad-actions__icon erp-pcad-actions__icon--save">✓</span>
+                        <span wire:loading.remove wire:target="confirmInutilizarNfce" class="erp-pcad-actions__label"><kbd>F5</kbd> | Inutilizar</span>
                         <span wire:loading wire:target="confirmInutilizarNfce" class="erp-pcad-actions__label">Inutilizando…</span>
                     </button>
                 @endif
-                <button type="button" wire:click="closeNfceFiscalModal" class="erp-pcad-actions__btn">
-                    <span class="erp-pcad-actions__icon">↩</span>
-                    <span class="erp-pcad-actions__label">Voltar</span>
+                <button type="button" wire:click="closeNfceFiscalModal" class="erp-pcad-actions__btn" data-erp-key="Escape">
+                    <span class="erp-pcad-actions__icon erp-pcad-actions__icon--exit">✕</span>
+                    <span class="erp-pcad-actions__label"><kbd>ESC</kbd> | Fechar</span>
                 </button>
             </div>
         </div>

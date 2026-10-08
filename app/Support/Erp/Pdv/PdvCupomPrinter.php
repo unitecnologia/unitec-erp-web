@@ -29,7 +29,7 @@ final class PdvCupomPrinter
     {
         $venda = PdvVenda::query()->find($pdvVendaId);
 
-        if (PdvNfceCupomPrinter::isNfceSimulada($venda)) {
+        if (PdvNfceCupomPrinter::imprimeComoNfce($venda)) {
             return PdvNfceCupomPrinter::livewireOpenJs($pdvVendaId, $copias);
         }
 

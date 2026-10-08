@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Nfce;
 
+use App\Models\FormaPagamento;
 use App\Models\Nfe;
 use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
@@ -43,7 +44,27 @@ final class NfceRegularizacaoQuery
         public string $cliente = '',
         public string $origem = '',
         public string $vendedor = '',
+        public string $pagamento = '',
     ) {}
+
+    /**
+     * Formas ativas do cadastro, na ordem do código (mesma lista do fechamento de venda).
+     *
+     * @return list<string>
+     */
+    public static function formasPagamentoOpcoes(): array
+    {
+        return FormaPagamento::query()
+            ->where('ativo', true)
+            ->orderBy('codigo')
+            ->orderBy('descricao')
+            ->pluck('descricao')
+            ->map(fn ($descricao): string => mb_strtoupper(trim((string) $descricao), 'UTF-8'))
+            ->filter(fn (string $descricao): bool => $descricao !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     /**
      * @return array<string, string>
@@ -131,6 +152,7 @@ final class NfceRegularizacaoQuery
                 'vendas.forma_pagamento',
                 'vendas.total',
                 'vendas.plataforma',
+                'vendas.cliente_id',
                 'rc.nome_razao as cliente_nome',
                 'rc.cpf_cnpj as cliente_documento',
                 'rc.codigo as cliente_codigo',
@@ -141,7 +163,9 @@ final class NfceRegularizacaoQuery
 
         self::semDocumentoValido($query);
 
-        if ($this->empresaId !== null && $this->empresaId > 0 && ErpSchema::hasColumn('vendas', 'empresa_id')) {
+        if ($this->empresaId === null || $this->empresaId <= 0) {
+            $query->whereRaw('1 = 0');
+        } elseif (ErpSchema::hasColumn('vendas', 'empresa_id')) {
             $empresaId = $this->empresaId;
             $query->where(function (Builder $q) use ($empresaId): void {
                 $q->where('vendas.empresa_id', $empresaId)->orWhereNull('vendas.empresa_id');
@@ -181,6 +205,12 @@ final class NfceRegularizacaoQuery
                 $q->where('rv.nome', 'like', '%'.$vendedor.'%')
                     ->orWhere('vendas.vendedor_nome', 'like', '%'.$vendedor.'%');
             });
+        }
+
+        $pagamento = mb_strtoupper(trim($this->pagamento), 'UTF-8');
+        if ($pagamento !== '') {
+            // Venda com mais de uma forma guarda os nomes juntos no mesmo campo.
+            $query->where('vendas.forma_pagamento', 'like', '%'.$pagamento.'%');
         }
 
         $this->applyOrigem($query);
@@ -280,12 +310,17 @@ final class NfceRegularizacaoQuery
             ->leftJoin('pdv_caixa_sessoes as s', 's.id', '=', 'pv.pdv_caixa_sessao_id')
             ->leftJoin('terminais as t', 't.id', '=', 's.terminal_id')
             ->leftJoin('pdv_venda_nfce as nf', 'nf.pdv_venda_id', '=', 'pv.id')
+            ->leftJoin('people as pp', 'pp.id', '=', 'pv.person_id')
             ->whereIn('pv.venda_id', $ids)
             ->get([
                 'pv.venda_id',
                 'pv.origem',
                 'pv.numero as pdv_numero',
                 'pv.cpf_nota',
+                ErpSchema::hasColumn('pdv_vendas', 'nome_nota') ? 'pv.nome_nota' : DB::raw('NULL as nome_nota'),
+                'pv.person_id as pdv_person_id',
+                'pp.nome_razao as pdv_person_nome',
+                'pp.codigo as pdv_person_codigo',
                 'nf.simulada as nfce_simulada',
                 't.nome as terminal',
                 'nf.status as nfce_status',
@@ -348,6 +383,8 @@ final class NfceRegularizacaoQuery
                 $vendedor = trim((string) ($record->vendedor_nome ?? ''));
             }
 
+            $edicao = self::consumidorEditavel($record, $pdvRow, $consumidorFinal);
+
             $rows[] = [
                 'id' => $id,
                 'numero' => (string) $record->numero,
@@ -358,6 +395,9 @@ final class NfceRegularizacaoQuery
                     ? 'CONSUMIDOR FINAL'
                     : mb_strtoupper((string) $record->cliente_nome, 'UTF-8'),
                 'documento' => $consumidorFinal ? '—' : self::formatDocumento($record->cliente_documento ?? null),
+                'edit_person_id' => $edicao['person_id'],
+                'edit_nome' => $edicao['nome'],
+                'edit_cpf' => $edicao['cpf'],
                 'caixa' => $pdvReal && filled($pdvRow->terminal ?? null) ? (string) $pdvRow->terminal : '—',
                 'vendedor' => $vendedor !== '' ? mb_strtoupper($vendedor, 'UTF-8') : '—',
                 'forma' => filled($record->forma_pagamento) ? (string) $record->forma_pagamento : '—',
@@ -393,16 +433,69 @@ final class NfceRegularizacaoQuery
 
         return match ($status) {
             PdvVendaNfce::STATUS_REJEITADA => [
-                'NFC-e rejeitada'.(filled($pdvRow->nfce_motivo ?? null) ? ': '.trim((string) $pdvRow->nfce_motivo) : ''),
+                'NFC-e rejeitada — transmitir (F5) na tela NFC-e'.(filled($pdvRow->nfce_motivo ?? null) ? ': '.trim((string) $pdvRow->nfce_motivo) : ''),
                 'danger',
-                true,
+                false,
             ],
+            PdvVendaNfce::STATUS_DENEGADA => ['NFC-e com uso denegado — ver aba Denegado', 'danger', false],
+            PdvVendaNfce::STATUS_DUPLICIDADE => ['NFC-e em duplicidade — resolver na aba Duplicidade', 'danger', false],
+            PdvVendaNfce::STATUS_CONTINGENCIA => ['NFC-e em contingência — transmitir na tela NFC-e', 'warning', false],
             PdvVendaNfce::STATUS_PENDENTE => ['NFC-e gravada — transmitir em Gravados', 'warning', false],
             PdvVendaNfce::STATUS_CANCELADA => $pdvReal
                 ? ['NFC-e do PDV cancelada — usar NF-e', 'gray', false]
                 : ['NFC-e anterior cancelada', 'gray', true],
-            default => ['Pendente de emissão', 'pending', true],
+            'inutilizada' => $pdvReal
+                ? ['NFC-e do PDV inutilizada — usar NF-e', 'gray', false]
+                : ['NFC-e anterior inutilizada', 'gray', true],
+            default => ['Pendente de transmissão', 'pending', true],
         };
+    }
+
+    public static function formatarCpf(?string $cpf): string
+    {
+        $digits = preg_replace('/\D/', '', (string) $cpf) ?? '';
+
+        return strlen($digits) === 11
+            ? substr($digits, 0, 3).'.'.substr($digits, 3, 3).'.'.substr($digits, 6, 3).'-'.substr($digits, 9, 2)
+            : '';
+    }
+
+    /**
+     * Valores iniciais das colunas editáveis: o que hoje iria na NFC-e (registro fiscal/PDV, senão cliente da venda).
+     *
+     * @return array{person_id: int|null, nome: string, cpf: string}
+     */
+    private static function consumidorEditavel(object $record, ?object $pdvRow, bool $consumidorFinal): array
+    {
+        $pdvPessoaFinal = $pdvRow === null
+            || $pdvRow->pdv_person_id === null
+            || Person::isCodigoConsumidorFinal(isset($pdvRow->pdv_person_codigo) ? (string) $pdvRow->pdv_person_codigo : null);
+
+        $personId = null;
+        $nome = '';
+
+        if (! $pdvPessoaFinal) {
+            $personId = (int) $pdvRow->pdv_person_id;
+            $nome = (string) ($pdvRow->pdv_person_nome ?? '');
+        } elseif (! $consumidorFinal && filled($record->cliente_nome ?? null)) {
+            $personId = $record->cliente_id ? (int) $record->cliente_id : null;
+            $nome = (string) $record->cliente_nome;
+        }
+
+        $cpf = self::formatarCpf($pdvRow->cpf_nota ?? null);
+        if ($cpf === '' && ! $consumidorFinal) {
+            $cpf = self::formatarCpf($record->cliente_documento ?? null);
+        }
+
+        if ($cpf !== '' && filled($pdvRow->nome_nota ?? null)) {
+            $nome = (string) $pdvRow->nome_nota;
+        }
+
+        return [
+            'person_id' => $personId,
+            'nome' => mb_strtoupper(trim($nome), 'UTF-8'),
+            'cpf' => $cpf,
+        ];
     }
 
     private static function formatDocumento(?string $documento): string

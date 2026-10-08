@@ -41,7 +41,7 @@ final class PdvCupomPrintDocument implements PrintDocument
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
-        $mode = $target->preferredMode();
+        $mode = $target->impressoraA4() ? 'browser' : $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 
         return [

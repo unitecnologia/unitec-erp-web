@@ -87,24 +87,26 @@ class CaixaListTable extends Component
 
     protected function records(): LengthAwarePaginator
     {
-        $query = (new CaixaListQueryBuilder(
+        $builder = new CaixaListQueryBuilder(
             contaFilter: $this->contaFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             periodoDeApplied: $this->periodoDeApplied,
             periodoAteApplied: $this->periodoAteApplied,
             applyDefaultOrder: false,
-        ))->buildForList();
+        );
 
-        $this->applySort($query);
+        $query = $builder->buildForList();
+
+        $this->applySort($query, $builder);
 
         return $query->paginate($this->perPage);
     }
 
-    protected function applySort(Builder $query): void
+    protected function applySort(Builder $query, CaixaListQueryBuilder $builder): void
     {
         if ($this->sortColumn === null) {
-            $query->orderByDesc('codigo');
+            $builder->applyListDefaultOrder($query);
 
             return;
         }
@@ -113,7 +115,7 @@ class CaixaListTable extends Component
         $allowed = ['codigo', 'emissao', 'entrada', 'saida'];
 
         if (! in_array($this->sortColumn, $allowed, true)) {
-            $query->orderByDesc('codigo');
+            $builder->applyListDefaultOrder($query);
 
             return;
         }

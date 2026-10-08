@@ -83,6 +83,9 @@
             </div>
 
             <footer class="erp-pdv-resumo-modal__footer">
+                <button type="button" wire:click="imprimirResumoCaixaAtual" class="erp-pdv-caixa-modal__btn erp-pdv-caixa-modal__btn--ghost">
+                    <kbd>F2</kbd> Imprimir
+                </button>
                 <button type="button" wire:click="closePdvModal" class="erp-pdv-caixa-modal__btn erp-pdv-caixa-modal__btn--primary">
                     <kbd>Esc</kbd> Fechar
                 </button>

@@ -54,6 +54,73 @@ final class PdvNfceCancelamentoProtocoloService
     }
 
     /**
+     * Protocolo de cancelamento em A4 (terminal com impressora A4): dados do evento lidos do XML gravado.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildA4ViewData(
+        PdvVenda $venda,
+        ?Empresa $empresa,
+        string $usuario,
+        bool $autoPrint = false,
+        bool $embed = false,
+    ): array {
+        $data = $this->buildViewData($venda, $empresa, $usuario, $autoPrint);
+        $documento = $venda->nfce;
+        $xml = (string) ($documento?->xml_cancelamento ?? '');
+        $retEvento = preg_match('/<retEvento\b[\s\S]*?<\/retEvento>/', $xml, $m) === 1 ? $m[0] : '';
+
+        $dhEvento = $this->dataHoraXml($this->tagXml($retEvento, 'dhRegEvento') ?: $this->tagXml($xml, 'dhEvento'))
+            ?? $documento?->cancelada_em;
+        $tpAmb = (int) ($this->tagXml($xml, 'tpAmb') ?: ($documento?->ambiente ?: 0));
+        $cStat = $this->tagXml($retEvento, 'cStat');
+        $xMotivo = $this->tagXml($retEvento, 'xMotivo');
+        $justificativa = $this->tagXml($xml, 'xJust') ?: (string) $data['motivoEstorno'];
+        $protocoloAutorizacao = (string) ($documento?->protocolo ?? '');
+        $emitidaEm = $documento?->autorizada_em ?? $venda->fechado_em;
+
+        return array_merge($data, [
+            'emitente' => array_merge($data['emitente'], [
+                'telefone' => (string) ($empresa?->telefone ?? ''),
+            ]),
+            'logoDataUri' => $this->danfe->logoDataUri($empresa),
+            'chaveBlocos' => trim(chunk_split(preg_replace('/\D/', '', (string) ($documento?->chave ?? '')) ?? '', 4, ' ')) ?: '—',
+            'modelo' => '65',
+            'protocoloAutorizacao' => $protocoloAutorizacao,
+            'protocoloAutorizacaoFormatado' => $protocoloAutorizacao !== '' ? $this->formatarProtocolo($protocoloAutorizacao) : '',
+            'dataEmissao' => $emitidaEm ? Carbon::parse($emitidaEm)->format('d/m/Y H:i:s') : '',
+            'valorTotal' => number_format((float) ($venda->total ?? 0), 2, ',', '.'),
+            'dataHoraEvento' => $dhEvento ? Carbon::parse($dhEvento)->format('d/m/Y H:i:s') : '',
+            'retornoSefaz' => trim($cStat.($cStat !== '' && $xMotivo !== '' ? ' – ' : '').$xMotivo),
+            'homologacao' => $tpAmb === 2,
+            'justificativa' => mb_strtoupper(trim($justificativa), 'UTF-8'),
+            'embed' => $embed,
+        ]);
+    }
+
+    private function tagXml(string $xml, string $tag): string
+    {
+        if ($xml === '' || preg_match('/<'.$tag.'>([^<]*)<\/'.$tag.'>/', $xml, $m) !== 1) {
+            return '';
+        }
+
+        return trim(html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8'));
+    }
+
+    private function dataHoraXml(string $valor): ?Carbon
+    {
+        if ($valor === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($valor)->setTimezone(config('app.timezone'));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @return list<string>
      */
@@ -136,7 +203,7 @@ final class PdvNfceCancelamentoProtocoloService
     /**
      * @return array<string, string>
      */
-    private function buildEmitente(?Empresa $empresa): array
+    public function buildEmitente(?Empresa $empresa): array
     {
         if ($empresa === null) {
             return [

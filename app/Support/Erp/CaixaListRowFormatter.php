@@ -24,6 +24,8 @@ final class CaixaListRowFormatter
             'UTF-8',
         );
 
+        $historico = self::comSessaoPdv($historico, $record);
+
         return [
             'codigo' => e((string) ($record->codigo ?? '—')),
             'emissao' => e($this->formatData($record->emissao)),
@@ -35,6 +37,26 @@ final class CaixaListRowFormatter
             'saida' => $this->formatMoneyCell((float) ($record->saida ?? 0)),
             'ver_itens' => $this->formatViewButton((int) $record->getKey()),
         ];
+    }
+
+    /**
+     * Linhas vindas da sessão PDV (tela Caixa com conta tipo PDV): sessão · operador · terminal.
+     */
+    public static function comSessaoPdv(string $historico, CaixaLancamento $record): string
+    {
+        $sessaoId = (int) ($record->getAttribute('pdv_sessao_id') ?? 0);
+
+        if ($sessaoId <= 0) {
+            return $historico;
+        }
+
+        $partes = array_filter([
+            'CX '.$sessaoId,
+            mb_strtoupper(trim((string) $record->getAttribute('pdv_operador')), 'UTF-8'),
+            mb_strtoupper(trim((string) $record->getAttribute('pdv_terminal')), 'UTF-8'),
+        ], static fn (string $parte): bool => $parte !== '');
+
+        return trim($historico.' · '.implode(' · ', $partes), ' ·');
     }
 
     private function formatData(mixed $state): string

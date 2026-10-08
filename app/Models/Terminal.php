@@ -127,6 +127,62 @@ class Terminal extends Model
         ];
     }
 
+    /**
+     * Celular/tablet de app (Força de Vendas, Vendas Internas, Gestor…): ocupa vaga de telefone e
+     * nunca emite NFC-e, mesmo que alguém marque pdv/eh_caixa por engano.
+     */
+    public function ehAparelhoMovel(): bool
+    {
+        if (strtolower(trim((string) ($this->categoria_licenca ?? ''))) === 'telefone') {
+            return true;
+        }
+
+        $origens = $this->origensNormalizadas();
+
+        return $origens !== []
+            && array_diff($origens, ['erp_web', 'gestor_web', 'pdv_offline']) === $origens
+            && ! $this->ehPdvOffline();
+    }
+
+    /** PDV offline (instalado no PC do caixa, sincroniza por carga/retorno). */
+    public function ehPdvOffline(): bool
+    {
+        if (in_array('pdv_offline', $this->origensNormalizadas(), true)) {
+            return true;
+        }
+
+        return preg_match('/^PDV\s*\d+$/i', trim((string) ($this->nome ?? ''))) === 1;
+    }
+
+    /** Caixa que emite NFC-e (PDV web do ERP ou PDV offline). */
+    public function emiteNfce(): bool
+    {
+        if ($this->ehAparelhoMovel()) {
+            return false;
+        }
+
+        return (bool) ($this->pdv ?? false) || (bool) ($this->eh_caixa ?? false) || $this->ehPdvOffline();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function origensNormalizadas(): array
+    {
+        $origens = $this->origens_dispositivo;
+
+        if (is_string($origens)) {
+            $origens = json_decode($origens, true);
+        }
+
+        return collect(is_array($origens) ? $origens : [])
+            ->map(static fn (mixed $v): string => strtolower(trim((string) $v)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
