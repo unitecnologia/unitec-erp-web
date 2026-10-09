@@ -35,9 +35,34 @@ final class PdvMovimentoCaixaCupomPrintDocument implements PrintDocument
         ]);
     }
 
+    public function a4Url(): string
+    {
+        return route('erp.reports.pdv-movimento-caixa', [
+            'movimento' => $this->movimento->id,
+            'auto' => 1,
+            'a4' => 1,
+        ]);
+    }
+
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
+
+        // Impressora A4 nunca recebe ESC/POS (sairia lixo na folha).
+        if ($target->impressoraA4()) {
+            return [
+                'document' => $this->key(),
+                'url' => $this->a4Url(),
+                'mode' => 'browser',
+                'copias' => 1,
+                'printer' => $target->printerName,
+                'tipo' => $target->tipoImpressora,
+                'movimentoId' => (int) $this->movimento->id,
+                'escposUrl' => null,
+                'printInFrame' => true,
+            ];
+        }
+
         $mode = $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 

@@ -42,6 +42,7 @@ class PdvMovimentoCaixaEscPosPrintController
         $target = PrintFacade::targetFromTerminal((int) $request->query('copias', 1));
         abort_unless($target->useDeviceService, 422, 'Device Service desativado neste terminal.');
         abort_unless($target->hasPrinter(), 422, 'Configure a impressora Windows no Terminal.');
+        abort_if($target->impressoraA4(), 422, 'Terminal configurado para impressão A4: use a impressão pelo navegador.');
 
         $document = new PdvMovimentoCaixaCupomPrintDocument(
             movimento: $movimento,

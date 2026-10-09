@@ -53,13 +53,38 @@ final class EnsureLicensedBrowserDevice
                     platform: 'web-mobile',
                 );
             } else {
-                $this->devices->attachBrowserDevice(
+                $resolver = TerminalResolver::make();
+                $terminal = $this->devices->identifyBrowserDevice(
                     empresaId: $empresaId,
                     deviceUuid: $deviceUuid,
                     origin: $origin,
-                    deviceName: TerminalResolver::make()->resolveMachineName(),
                     platform: 'web-desktop',
                 );
+
+                // ERPn = computador que acessa o ERP: criado no primeiro acesso autorizado, não só no PDV.
+                // Sem vaga na licença o acesso segue sem terminal (o PDV avisa); nada é bloqueado.
+                if ($terminal === null && $origin === 'erp_web') {
+                    try {
+                        $terminal = $this->devices->createBrowserTerminal($empresaId, $deviceUuid, $origin, 'web-desktop');
+                    } catch (DeviceLicenseLimitExceeded) {
+                        $terminal = null;
+                    }
+                }
+
+                // Mesmo computador em outro navegador: adota a identidade já vinculada (um PC = um terminal).
+                $dono = trim((string) ($terminal?->device_uuid ?? ''));
+
+                if ($dono !== '' && strcasecmp($dono, $deviceUuid) !== 0) {
+                    EnsureBrowserDeviceCookie::adopt($request, $dono);
+                    $gateKey = 'erp_device_ok_'.$empresaId.'_'.hash('sha256', $dono.'|'.$origin);
+                }
+
+                // O terminal do navegador é a fonte da sessão (série NFC-e, caixa, impressora).
+                if ($terminal === null) {
+                    $resolver->forget();
+                } elseif ((int) session('erp.terminal_id', 0) !== (int) $terminal->id) {
+                    $resolver->remember($terminal);
+                }
             }
 
             session([$gateKey => time() + 300]);

@@ -13,7 +13,7 @@
             <label class="erp-pcad-form__label" for="term-tef-loja">Nº Lógico Estabelecimento</label>
             <input id="term-tef-loja" type="text" wire:model="data.numero_loja" data-mask="integer" class="erp-pcad-form__input erp-pcad-form__input--sm">
             <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="term-tef-logico">Nº Lógico Terminal</label>
-            <input id="term-tef-logico" type="text" wire:model="data.numero_logico_terminal" data-mask="integer" class="erp-pcad-form__input erp-pcad-form__input--sm">
+            <input id="term-tef-logico" type="text" wire:model="data.numero_logico_terminal" data-mask="integer" class="erp-pcad-form__input erp-pcad-form__input--sm" @disabled($this->terminalIdentidadeFixa)>
         </div>
         <div class="erp-pcad-form__row">
             <label class="erp-pcad-form__label" for="term-tef-ip">IP Servidor TEF</label>

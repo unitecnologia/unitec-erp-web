@@ -49,6 +49,20 @@ class PdvPage extends Page
 
         $terminal = TerminalResolver::make()->resolveOrCreateDefault();
 
+        if ($terminal === null && TerminalResolver::ultimoErro() !== null) {
+            $this->openPdvAcessoNegado(
+                'Terminal não identificado',
+                [
+                    'Este computador ainda não tem terminal no ERP.',
+                    e(TerminalResolver::ultimoErro()),
+                ],
+                true,
+                'Ou, em Configurações → Terminais, selecione um terminal existente e use "Usar este terminal".',
+            );
+
+            return;
+        }
+
         $user = Auth::user();
         if ($user && ! $user->podeOperarPdvNoTerminal($terminal)) {
             $nome = trim((string) ($terminal?->nome ?? '')) ?: 'este terminal';

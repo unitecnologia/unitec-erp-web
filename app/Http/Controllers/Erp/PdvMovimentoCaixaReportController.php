@@ -47,6 +47,7 @@ class PdvMovimentoCaixaReportController
             'tipo' => $built['tipo'],
             'lines' => $built['lines'],
             'autoPrint' => $request->boolean('auto'),
+            'a4' => $request->boolean('a4'),
         ]);
     }
 }

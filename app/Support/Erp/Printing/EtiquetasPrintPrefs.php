@@ -99,6 +99,11 @@ final class EtiquetasPrintPrefs
 
     private static function resolveIdentifiableTerminalId(int $empresaId, TerminalResolver $resolver): ?int
     {
+        // Hostname é do servidor: PC da rede só usa o terminal vinculado ao próprio navegador.
+        if ($resolver->deviceUuid() !== null && ! $resolver->isServerRequest()) {
+            return $resolver->current()?->id;
+        }
+
         $sessionId = session('erp.terminal_id');
         if (filled($sessionId)) {
             $exists = Terminal::query()

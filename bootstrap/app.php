@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global: Filament não usa o grupo `web` — só o middleware do painel.
         // Sem isso, asset()/logo no /admin/login ficam com 127.0.0.1 atrás do túnel.
         $middleware->append(\App\Http\Middleware\SyncUrlOriginFromRequest::class);
+        $middleware->append(\App\Http\Middleware\LanSessionCookieSecurity::class);
 
         $middleware->web(prepend: [
             \App\Http\Middleware\EnsureStorageFrameworkDirectories::class,

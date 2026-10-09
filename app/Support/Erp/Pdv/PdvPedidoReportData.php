@@ -17,9 +17,13 @@ final class PdvPedidoReportData
 
     public const TIPO_IMPRESSORA_NFCE_A4 = '3';
 
+    /** Impressora de folha (Pedido A4 ou NFC-e A4): pedido sai no layout A4, nunca em bobina. */
     public static function shouldUsePedidoA4(?Terminal $terminal): bool
     {
-        return (string) ($terminal?->tipo_impressora ?? '1') === self::TIPO_IMPRESSORA_PEDIDO_A4;
+        return in_array((string) ($terminal?->tipo_impressora ?? '1'), [
+            self::TIPO_IMPRESSORA_PEDIDO_A4,
+            self::TIPO_IMPRESSORA_NFCE_A4,
+        ], true);
     }
 
     public static function resolveTerminal(PdvVenda $venda): ?Terminal

@@ -4,15 +4,19 @@
     <meta charset="utf-8">
     <title>{{ $tipo === 'sangria' ? 'SANGRIA' : 'SUPRIMENTO' }}</title>
     <style>
-        @page { margin: 4mm; size: 80mm auto; }
+        @if (! empty($a4))
+            @page { margin: 15mm; size: A4 portrait; }
+        @else
+            @page { margin: 4mm; size: 80mm auto; }
+        @endif
         * { box-sizing: border-box; }
         body {
             font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
+            font-size: {{ ! empty($a4) ? '14px' : '12px' }};
             color: #111;
             margin: 0;
             padding: 8px;
-            max-width: 80mm;
+            max-width: {{ ! empty($a4) ? '180mm' : '80mm' }};
             line-height: 1.35;
         }
         .toolbar { margin-bottom: 10px; }

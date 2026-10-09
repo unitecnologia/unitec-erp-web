@@ -5,6 +5,7 @@ namespace App\Support\Erp\License;
 use App\Models\Empresa;
 use App\Models\Terminal;
 use App\Support\Erp\Pdv\TerminalResolver;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -24,8 +25,46 @@ final class DeviceLicenseService
     }
 
     /**
-     * Vincula o cookie do navegador desktop ao terminal da máquina (nome do PC),
-     * sem criar um segundo registro "Mozilla…" que consumiria outra vaga.
+     * Identifica o terminal do navegador desktop pelo cookie persistente, sem criar terminal.
+     * Ordem: vínculo do cookie (inclui reassociação por "Usar este terminal") → adoção única do
+     * terminal legado do servidor, só em acesso local. IP nunca identifica PC (DHCP reaproveita e
+     * terminais cadastrados pela tela gravam o IP de quem cadastrou).
+     */
+    public function identifyBrowserDevice(
+        int $empresaId,
+        string $deviceUuid,
+        string $origin,
+        ?string $platform = null,
+    ): ?Terminal {
+        if (! $this->isAvailable()) {
+            return null;
+        }
+
+        [$deviceUuid, $origin] = $this->normalizeBrowserIdentity($deviceUuid, $origin);
+        $resolver = TerminalResolver::make();
+
+        $vinculado = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('device_uuid', $deviceUuid)
+            ->first();
+
+        if ($vinculado !== null && $resolver->usavelNoNavegador($vinculado)) {
+            if (! (bool) ($vinculado->ativo ?? true)) {
+                throw new DeviceLicenseLimitExceeded(
+                    'Este computador está desativado em Configurações → Terminais. Solicite a liberação ao administrador.'
+                );
+            }
+
+            $this->touchBrowserBinding($vinculado, $origin, $platform, $resolver);
+
+            return $vinculado;
+        }
+
+        return $this->adoptLegacyBrowserTerminal($empresaId, $deviceUuid, $origin, $platform, $resolver);
+    }
+
+    /**
+     * Usado por register(): identifica e, se o navegador ainda não tem terminal, cria um próprio.
      */
     public function attachBrowserDevice(
         int $empresaId,
@@ -38,6 +77,263 @@ final class DeviceLicenseService
             throw new \RuntimeException('Controle de dispositivos ainda não está disponível. Atualize o banco de dados.');
         }
 
+        return $this->identifyBrowserDevice($empresaId, $deviceUuid, $origin, $platform)
+            ?? $this->createBrowserTerminal($empresaId, $deviceUuid, $origin, $platform);
+    }
+
+    /**
+     * Terminal ERPn próprio deste navegador (ocupa uma vaga de computador).
+     */
+    public function createBrowserTerminal(
+        int $empresaId,
+        string $deviceUuid,
+        string $origin = 'erp_web',
+        ?string $platform = 'web-desktop',
+    ): Terminal {
+        [$deviceUuid, $origin] = $this->normalizeBrowserIdentity($deviceUuid, $origin);
+        $resolver = TerminalResolver::make();
+
+        $this->assertCapacity($empresaId, self::CATEGORY_COMPUTADOR);
+        $this->reclaimDeviceUuid($empresaId, $deviceUuid, 0);
+
+        for ($tentativa = 1; ; $tentativa++) {
+            $payload = [
+                ...Terminal::defaultAttributes($empresaId),
+                'empresa_id' => $empresaId,
+                'nome' => $resolver->nextErpTerminalName($empresaId),
+                'ip' => $this->browserIp(null, $resolver),
+                'velocidade' => 9600,
+                'numero_logico_terminal' => $resolver->nextNumeroLogico($empresaId),
+                'ativo' => true,
+                'categoria_licenca' => self::CATEGORY_COMPUTADOR,
+                'origens_dispositivo' => [$origin],
+                'device_uuid' => $deviceUuid,
+                'device_name' => $resolver->isServerRequest() ? $resolver->resolveMachineName() : null,
+                'device_platform' => $this->cleanNullable($platform),
+                'device_registered_at' => now(),
+                'device_last_seen_at' => now(),
+            ];
+
+            try {
+                $terminal = new Terminal;
+                $terminal->forceFill($payload);
+                $terminal->save();
+
+                return $terminal;
+            } catch (QueryException $e) {
+                // Duas abas criando ao mesmo tempo: o índice único (empresa, device_uuid) segura.
+                $existente = Terminal::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('device_uuid', $deviceUuid)
+                    ->first();
+
+                if ($existente !== null) {
+                    return $existente;
+                }
+
+                if ($tentativa >= 3) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    private function adoptLegacyBrowserTerminal(
+        int $empresaId,
+        string $deviceUuid,
+        string $origin,
+        ?string $platform,
+        TerminalResolver $resolver,
+    ): ?Terminal {
+        $hostname = $resolver->resolveMachineName();
+
+        if ($resolver->isServerRequest()) {
+            $servidor = Terminal::query()
+                ->where('empresa_id', $empresaId)
+                ->where('ativo', true)
+                ->where(function ($q) use ($hostname): void {
+                    $q->where('nome', $hostname)->orWhere('device_name', $hostname);
+                })
+                ->orderBy('id')
+                ->first();
+
+            if ($servidor === null || ! $resolver->usavelNoNavegador($servidor)) {
+                return null;
+            }
+
+            $servidor = $resolver->ensureFriendlyWebTerminalName($servidor, $hostname);
+
+            // Já é de outro navegador do próprio servidor: o chamador adota a mesma identidade. Se o vínculo ficou com
+            // um PC da rede (modelo antigo usava o hostname do servidor para todos), volta ao servidor.
+            if (trim((string) ($servidor->device_uuid ?? '')) !== '' && $resolver->isServerIp($servidor->ip)) {
+                return $servidor;
+            }
+
+            return $this->bindBrowserTerminal($servidor, $deviceUuid, $origin, $platform, $resolver);
+        }
+
+        return $this->findMesmoComputadorNaRede($empresaId, $hostname, $resolver);
+    }
+
+    /**
+     * Outro navegador do mesmo PC da rede: terminal já vinculado e visto há pouco pela conexão
+     * direta deste mesmo IP privado. A janela curta evita confundir com outro PC que herdou o IP
+     * pelo DHCP; IP público/túnel nunca agrupa (vários PCs saem pelo mesmo endereço).
+     * O chamador faz o navegador adotar o device_uuid do terminal (um PC = um vínculo).
+     */
+    private function findMesmoComputadorNaRede(int $empresaId, string $hostname, TerminalResolver $resolver): ?Terminal
+    {
+        $ip = $resolver->directLanIp();
+
+        if ($ip === null) {
+            return null;
+        }
+
+        return Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('ativo', true)
+            ->where('ip', $ip)
+            ->whereNotNull('device_uuid')
+            ->where('device_last_seen_at', '>=', now()->subHours(8))
+            ->orderByDesc('device_last_seen_at')
+            ->get()
+            ->first(static fn (Terminal $t): bool => $resolver->usavelNoNavegador($t)
+                && strcasecmp(trim((string) $t->nome), $hostname) !== 0
+                && strcasecmp(trim((string) ($t->device_name ?? '')), $hostname) !== 0);
+    }
+
+    /**
+     * Reassociação autorizada ("Usar este terminal"): o terminal passa a ser só deste navegador.
+     * O antigo dono perde o vínculo (não compartilha); o terminal anterior deste navegador fica
+     * livre para ser reassociado. Não cria terminal: a contagem de licença não aumenta, exceto
+     * terminal legado fora da licença, que exige vaga.
+     */
+    public function reassociarNavegador(Terminal $terminal, string $deviceUuid, string $origin = 'erp_web'): Terminal
+    {
+        [$deviceUuid, $origin] = $this->normalizeBrowserIdentity($deviceUuid, $origin);
+        $resolver = TerminalResolver::make();
+        $empresaId = (int) $terminal->empresa_id;
+
+        if (strtolower((string) ($terminal->categoria_licenca ?? '')) !== self::CATEGORY_COMPUTADOR) {
+            $this->assertCapacity($empresaId, self::CATEGORY_COMPUTADOR);
+        }
+
+        $servidor = $resolver->isServerRequest();
+        $hostname = $resolver->resolveMachineName();
+
+        $this->reclaimDeviceUuid($empresaId, $deviceUuid, (int) $terminal->id);
+
+        if ($servidor) {
+            Terminal::query()
+                ->where('empresa_id', $empresaId)
+                ->whereKeyNot($terminal->id)
+                ->where('device_name', $hostname)
+                ->update(['device_name' => null]);
+        } elseif (strcasecmp(trim((string) $terminal->nome), $hostname) === 0) {
+            $terminal->forceFill(['nome' => $resolver->nextErpTerminalName($empresaId)]);
+        }
+
+        $terminal->forceFill([
+            'categoria_licenca' => self::CATEGORY_COMPUTADOR,
+            'origens_dispositivo' => $this->mergeOrigins($terminal, $origin),
+            'device_uuid' => $deviceUuid,
+            // Hostname só identifica o servidor: terminal reassociado a um PC da rede deixa de
+            // ser "o terminal do servidor" e não é retomado no acesso local.
+            'device_name' => $servidor ? $hostname : null,
+            'device_platform' => 'web-desktop',
+            'device_registered_at' => $terminal->device_registered_at ?? now(),
+            'device_last_seen_at' => now(),
+            'ip' => $this->browserIp($terminal->ip, $resolver),
+        ])->save();
+
+        return $terminal->fresh() ?? $terminal;
+    }
+
+    /**
+     * Vincula o cookie a um terminal existente. Terminal fora da licença sem vaga não é vinculado.
+     */
+    private function bindBrowserTerminal(
+        Terminal $terminal,
+        string $deviceUuid,
+        string $origin,
+        ?string $platform,
+        TerminalResolver $resolver,
+    ): ?Terminal {
+        $empresaId = (int) $terminal->empresa_id;
+
+        if (strtolower((string) ($terminal->categoria_licenca ?? '')) !== self::CATEGORY_COMPUTADOR) {
+            try {
+                $this->assertCapacity($empresaId, self::CATEGORY_COMPUTADOR);
+            } catch (DeviceLicenseLimitExceeded) {
+                return null;
+            }
+        }
+
+        $this->reclaimDeviceUuid($empresaId, $deviceUuid, (int) $terminal->id);
+        $this->purgeBrowserOrphans($empresaId, (int) $terminal->id, $deviceUuid);
+
+        $terminal->forceFill([
+            'categoria_licenca' => self::CATEGORY_COMPUTADOR,
+            'origens_dispositivo' => $this->mergeOrigins($terminal, $origin),
+            'device_uuid' => $deviceUuid,
+            'device_name' => $terminal->device_name
+                ?: ($resolver->isServerRequest() ? $resolver->resolveMachineName() : null),
+            'device_platform' => $this->cleanNullable($platform) ?? $terminal->device_platform,
+            'device_registered_at' => $terminal->device_registered_at ?? now(),
+            'device_last_seen_at' => now(),
+            'ip' => $this->browserIp($terminal->ip, $resolver),
+        ])->save();
+
+        return $terminal->fresh() ?? $terminal;
+    }
+
+    private function touchBrowserBinding(Terminal $terminal, string $origin, ?string $platform, TerminalResolver $resolver): void
+    {
+        $origins = $this->mergeOrigins($terminal, $origin);
+        $ip = $this->browserIp($terminal->ip, $resolver);
+        $recente = $terminal->device_last_seen_at?->greaterThan(now()->subMinutes(4)) ?? false;
+
+        if ($recente && $ip === $terminal->ip && $origins === ($terminal->origens_dispositivo ?? [])) {
+            return;
+        }
+
+        $terminal->forceFill([
+            'origens_dispositivo' => $origins,
+            'device_platform' => $this->cleanNullable($platform) ?? $terminal->device_platform,
+            'device_last_seen_at' => now(),
+            'ip' => $ip,
+        ])->save();
+    }
+
+    /** IP gravado no terminal: o da rede; no próprio servidor, o IP do servidor (nunca o de outro PC). */
+    private function browserIp(?string $current, TerminalResolver $resolver): ?string
+    {
+        if ($resolver->isServerRequest()) {
+            return $resolver->serverIps()[0] ?? '127.0.0.1';
+        }
+
+        return $resolver->resolveClientIp() ?? $current;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function mergeOrigins(Terminal $terminal, string $origin): array
+    {
+        return collect($terminal->origens_dispositivo ?? [])
+            ->map(static fn (mixed $value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->push($origin)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function normalizeBrowserIdentity(string $deviceUuid, string $origin): array
+    {
         $deviceUuid = trim($deviceUuid);
         $origin = strtolower(trim($origin));
 
@@ -45,66 +341,7 @@ final class DeviceLicenseService
             throw new \InvalidArgumentException('Identificação do navegador inválida.');
         }
 
-        $resolver = TerminalResolver::make();
-
-        $machine = Terminal::query()
-            ->where('empresa_id', $empresaId)
-            ->where('device_uuid', $deviceUuid)
-            ->first();
-
-        if ($machine === null) {
-            $machine = $resolver->resolveOrCreateDefault($empresaId);
-        }
-
-        if ($machine === null || (int) $machine->empresa_id !== $empresaId) {
-            throw new \RuntimeException('Não foi possível identificar o terminal deste computador.');
-        }
-
-        $machine = $resolver->ensureFriendlyWebTerminalName($machine);
-
-        if (! (bool) ($machine->ativo ?? true)) {
-            throw new DeviceLicenseLimitExceeded(
-                'Este computador está desativado em Configurações → Terminais. Solicite a liberação ao administrador.'
-            );
-        }
-
-        $currentUuid = trim((string) ($machine->device_uuid ?? ''));
-
-        if ($currentUuid !== '' && $currentUuid !== $deviceUuid) {
-            // Mesmo PC físico: o cookie novo substitui o vínculo antigo neste terminal.
-            // Outros PCs não compartilham o mesmo TerminalResolver/hostname.
-        }
-
-        $alreadyCounted = strtolower((string) ($machine->categoria_licenca ?? '')) === self::CATEGORY_COMPUTADOR;
-
-        if (! $alreadyCounted) {
-            $this->assertCapacity($empresaId, self::CATEGORY_COMPUTADOR);
-        }
-
-        $this->reclaimDeviceUuid($empresaId, $deviceUuid, (int) $machine->id);
-        $this->purgeBrowserOrphans($empresaId, (int) $machine->id, $deviceUuid);
-
-        $origins = collect($machine->origens_dispositivo ?? [])
-            ->map(static fn (mixed $value): string => strtolower(trim((string) $value)))
-            ->filter()
-            ->push($origin)
-            ->unique()
-            ->values()
-            ->all();
-
-        $machine->forceFill([
-            'categoria_licenca' => self::CATEGORY_COMPUTADOR,
-            'origens_dispositivo' => $origins,
-            'device_uuid' => $deviceUuid,
-            // device_name guarda o hostname do PC; não sobrescrever com label amigável.
-            'device_name' => $machine->device_name ?: $resolver->resolveMachineName(),
-            'device_platform' => $this->cleanNullable($platform) ?? $machine->device_platform,
-            'device_registered_at' => $machine->device_registered_at ?? now(),
-            'device_last_seen_at' => now(),
-            'ip' => $this->preferredLanIp($machine->ip),
-        ])->save();
-
-        return $machine->fresh() ?? $machine;
+        return [$deviceUuid, $origin];
     }
 
     /**
@@ -163,6 +400,29 @@ final class DeviceLicenseService
             $this->touchPdvOffline($existing, $ip, $deviceUuid !== '' ? $deviceUuid : null);
 
             return $existing->fresh() ?? $existing;
+        }
+
+        // Caixa renomeado no ERP (não é mais "PDVn"): reaproveita em vez de criar outro PDVn.
+        $renomeado = $this->findPdvOfflineRenomeado($empresaId, $numero, $deviceUuid);
+
+        if ($renomeado !== null) {
+            if (! (bool) ($renomeado->ativo ?? true)) {
+                throw new DeviceLicenseLimitExceeded(
+                    'Terminal "'.$renomeado->nome.'" está inativo. Ative-o em Configurações → Terminais ou exclua (F4) para liberar o número.'
+                );
+            }
+
+            $ownedUuid = trim((string) ($renomeado->device_uuid ?? ''));
+
+            if ($ownedUuid !== '' && $deviceUuid !== '' && ! $this->deviceUuidEquals($ownedUuid, $deviceUuid)) {
+                throw new DeviceLicenseLimitExceeded(
+                    $this->pdvOfflineConflictMessage($numero, (string) $renomeado->nome, $renomeado)
+                );
+            }
+
+            $this->touchPdvOffline($renomeado, $ip, $deviceUuid !== '' ? $deviceUuid : null);
+
+            return $renomeado->fresh() ?? $renomeado;
         }
 
         $this->assertCapacity($empresaId, self::CATEGORY_COMPUTADOR);
@@ -449,6 +709,54 @@ final class DeviceLicenseService
             ->where('empresa_id', $empresaId)
             ->whereRaw('UPPER(TRIM(nome)) = ?', [strtoupper($nome)])
             ->first();
+    }
+
+    /**
+     * PDV offline cujo nome foi alterado no ERP. Só considera terminais que já sincronizaram
+     * como pdv_offline e cujo nome não é mais PDVn (um PDVm com outro número é outro caixa).
+     * Prioridade: mesmo device_uuid; depois mesmo nº lógico.
+     */
+    private function findPdvOfflineRenomeado(int $empresaId, int $numero, string $deviceUuid): ?Terminal
+    {
+        if (! $this->isAvailable()) {
+            return null;
+        }
+
+        $candidatos = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->where('origens_dispositivo', 'like', '%pdv_offline%')
+            ->where(function ($q): void {
+                $q->whereNull('categoria_licenca')->orWhere('categoria_licenca', '!=', self::CATEGORY_TELEFONE);
+            })
+            ->where(function ($q) use ($numero, $deviceUuid): void {
+                $q->where('numero_logico_terminal', $numero);
+
+                if ($deviceUuid !== '') {
+                    $q->orWhere('device_uuid', $deviceUuid);
+                }
+            })
+            ->orderBy('id')
+            ->get()
+            ->reject(static fn (Terminal $t): bool => preg_match('/^(PDV|ERP)\s*\d+$/i', trim((string) $t->nome)) === 1)
+            ->values();
+
+        if ($candidatos->isEmpty()) {
+            return null;
+        }
+
+        if ($deviceUuid !== '') {
+            $porUuid = $candidatos->first(
+                fn (Terminal $t): bool => $this->deviceUuidEquals((string) ($t->device_uuid ?? ''), $deviceUuid)
+            );
+
+            if ($porUuid !== null) {
+                return $porUuid;
+            }
+        }
+
+        return $candidatos->first(
+            static fn (Terminal $t): bool => (int) $t->numero_logico_terminal === $numero
+        );
     }
 
     private function normalizePdvOfflineName(string $terminalKey): ?string

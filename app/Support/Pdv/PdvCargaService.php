@@ -17,6 +17,7 @@ use App\Models\VendasParametro;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
 use App\Support\Erp\Pdv\PdvProductSearchRanking;
+use App\Support\Erp\Terminais\TerminalFormOptions;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -679,7 +680,12 @@ class PdvCargaService
      */
     private function resolveTerminal(int $empresaId, ?string $terminal): ?array
     {
-        $model = PdvOfflineTerminalLookup::find($empresaId, (string) $terminal, true);
+        // Mesmo terminal que o middleware pdv.terminal.ativo liberou (inclui caixa localizado
+        // por device_uuid / nº lógico); a busca por chave fica só como fallback.
+        $resolvido = request()?->attributes->get('pdv_terminal');
+        $model = $resolvido instanceof Terminal && (int) $resolvido->empresa_id === $empresaId
+            ? $resolvido
+            : PdvOfflineTerminalLookup::find($empresaId, (string) $terminal, true);
 
         if ($model === null) {
             return null;
@@ -711,13 +717,13 @@ class PdvCargaService
                 'impressora_nome' => $model->impressora_nome,
                 'porta' => $model->porta,
                 // Device Service sempre ativo no PDV offline (agente no PC do caixa).
-                'balanca_marca' => (string) ($model->balanca_marca ?? ''),
+                'balanca_marca' => TerminalFormOptions::canonicalOption(TerminalFormOptions::marcasBalancaSerial(), $model->balanca_marca ?? ''),
                 'balanca_porta' => (string) ($model->balanca_porta ?? ''),
                 'balanca_velocidade' => (int) ($model->balanca_velocidade ?: 9600),
                 'balanca_databits' => (int) ($model->balanca_databits ?: 8),
-                'balanca_paridade' => (string) ($model->balanca_paridade ?: 'None'),
+                'balanca_paridade' => TerminalFormOptions::canonicalOption(TerminalFormOptions::paridadesBalanca(), $model->balanca_paridade ?: 'None'),
                 'balanca_stopbits' => (string) ($model->balanca_stopbits ?: '1'),
-                'balanca_handshaking' => (string) ($model->balanca_handshaking ?: 'None'),
+                'balanca_handshaking' => TerminalFormOptions::canonicalOption(TerminalFormOptions::handshakingsBalanca(), $model->balanca_handshaking ?: 'None'),
                 'exibe_f3' => (bool) $model->exibe_f3,
                 'exibe_f4' => (bool) $model->exibe_f4,
                 'exibe_f5' => (bool) $model->exibe_f5,

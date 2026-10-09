@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\TerminalResource\Pages\Concerns;
 
+use App\Models\PdvCaixaSessao;
 use App\Models\Terminal;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\License\DeviceLicenseLimitExceeded;
@@ -9,6 +10,7 @@ use App\Support\Erp\License\DeviceLicenseService;
 use App\Support\Erp\Pdv\TerminalResolver;
 use App\Support\Erp\Terminais\TerminalFormOptions;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 
 trait ManagesTerminalMasterDetail
 {
@@ -22,6 +24,9 @@ trait ManagesTerminalMasterDetail
     public ?int $editingTerminalId = null;
 
     public ?int $terminalInfoId = null;
+
+    /** PDV offline: nome (PDVn) e nº lógico só leitura — a carga localiza o caixa por eles. */
+    public bool $terminalIdentidadeFixa = false;
 
     /** @var list<string> */
     public array $portasImpressoraLista = [];
@@ -194,11 +199,12 @@ trait ManagesTerminalMasterDetail
 
     public function selectTerminalAtual(): void
     {
-        $terminal = TerminalResolver::make()->resolveOrCreateDefault();
+        $terminal = TerminalResolver::make()->current();
 
         if (! $terminal) {
             Notification::make()
-                ->title('Empresa não identificada.')
+                ->title('Este computador ainda não tem terminal.')
+                ->body('Não havia vaga de computador na licença quando este computador acessou. Selecione um terminal na lista e use "Usar este terminal".')
                 ->warning()
                 ->send();
 
@@ -267,6 +273,10 @@ trait ManagesTerminalMasterDetail
                 return;
             }
 
+            if (array_key_exists('porta', $payload)) {
+                $payload['impressora_nome'] = TerminalFormOptions::windowsPrinterFromPorta($payload['porta'] ?? null);
+            }
+
             $terminal = Terminal::query()->create($payload);
             $this->isNewTerminal = false;
             $this->editingTerminalId = $terminal->id;
@@ -283,11 +293,21 @@ trait ManagesTerminalMasterDetail
                 return;
             }
 
+            // PDV offline é localizado na carga por PDVn / nº lógico: renomear criaria outro terminal.
+            if ($terminal->ehPdvOffline()) {
+                unset($payload['nome'], $payload['numero_logico_terminal']);
+            }
+
+            if (array_key_exists('porta', $payload)) {
+                $payload['impressora_nome'] = $this->impressoraNomeParaGravar($payload['porta'] ?? null, $terminal);
+            }
+
             $terminal->fill($payload);
             $terminal->save();
         }
 
-        TerminalResolver::make()->remember($terminal);
+        // Não altera o terminal da sessão: editar outro caixa não pode trocar série NFC-e,
+        // impressora nem caixa aberto deste navegador.
         $this->loadTerminalIntoForm($terminal->fresh());
 
         Notification::make()
@@ -308,7 +328,12 @@ trait ManagesTerminalMasterDetail
             return;
         }
 
-        $terminal = Terminal::query()->find($this->editingTerminalId ?? $this->highlightedRecordId);
+        $resolver = TerminalResolver::make();
+        $empresaId = $resolver->resolveEmpresaId();
+
+        $terminal = Terminal::query()
+            ->where('empresa_id', $empresaId)
+            ->find($this->editingTerminalId ?? $this->highlightedRecordId);
 
         if (! $terminal) {
             $this->highlightedRecordIdOrNotify('use');
@@ -316,11 +341,71 @@ trait ManagesTerminalMasterDetail
             return;
         }
 
-        TerminalResolver::make()->remember($terminal);
+        $bloqueio = match (true) {
+            ! (bool) ($terminal->ativo ?? true) => 'Terminal inativo. Ative-o antes de usar neste computador.',
+            $terminal->ehPdvOffline() => 'Caixa de PDV offline é exclusivo do PDV instalado. Escolha um terminal do ERP.',
+            ! $resolver->usavelNoNavegador($terminal) => 'Terminal de aparelho móvel não pode ser usado no navegador.',
+            default => null,
+        };
+
+        $caixaAberto = $bloqueio === null
+            ? PdvCaixaSessao::query()
+                ->where('user_id', Auth::id())
+                ->where('empresa_id', $empresaId)
+                ->whereNull('fechado_em')
+                ->whereNotNull('terminal_id')
+                ->where('terminal_id', '!=', $terminal->id)
+                ->first()
+            : null;
+
+        if ($caixaAberto !== null) {
+            $nomeCaixa = Terminal::query()->whereKey($caixaAberto->terminal_id)->value('nome') ?: 'outro terminal';
+            $bloqueio = 'Você tem caixa aberto em '.$nomeCaixa.'. Feche o caixa antes de trocar de terminal.';
+        }
+
+        $uuid = $resolver->deviceUuid();
+        $dono = trim((string) ($terminal->device_uuid ?? ''));
+        $jaEDeste = $uuid !== null && $dono !== '' && strcasecmp($dono, $uuid) === 0;
+
+        // Caixa aberto por outro operador neste terminal: está em uso em outro computador.
+        if ($bloqueio === null && ! $jaEDeste && PdvCaixaSessao::query()
+            ->where('terminal_id', $terminal->id)
+            ->whereNull('fechado_em')
+            ->where('user_id', '!=', Auth::id())
+            ->exists()) {
+            $bloqueio = 'Há caixa aberto por outro operador em '.$terminal->nome.'. Feche esse caixa antes de reassociar o terminal.';
+        }
+
+        if ($bloqueio !== null) {
+            Notification::make()
+                ->title('Não foi possível usar este terminal.')
+                ->body($bloqueio)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($uuid !== null && ! $jaEDeste) {
+            try {
+                $terminal = app(DeviceLicenseService::class)->reassociarNavegador($terminal, $uuid);
+            } catch (DeviceLicenseLimitExceeded $e) {
+                Notification::make()
+                    ->title('Não foi possível usar este terminal.')
+                    ->body($e->getMessage())
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+        }
+
+        $resolver->remember($terminal);
 
         Notification::make()
             ->title('Terminal ativo')
-            ->body($terminal->nome . ' será usado no PDV desta sessão.')
+            ->body($terminal->nome.' passa a ser o terminal deste computador (série NFC-e, caixa e impressão).'
+                .($dono !== '' && ! $jaEDeste ? ' O outro computador vinculado a ele foi desassociado.' : ''))
             ->success()
             ->send();
     }
@@ -371,10 +456,30 @@ trait ManagesTerminalMasterDetail
     public function updatedDataPorta(?string $value): void
     {
         $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($this->data['porta'] ?? null);
+        // Caminho sem RAW (COM/USB/LPT) não tem impressora Windows: descarta o nome anterior.
+        $this->data['impressora_nome'] = $fromRaw;
+        $this->data['usar_device_service'] = true;
+    }
+
+    /**
+     * RAW:Nome define a impressora. Caminho trocado para COM/USB/LPT descarta o nome antigo;
+     * caminho inalterado preserva impressora_nome legado.
+     */
+    protected function impressoraNomeParaGravar(?string $porta, Terminal $terminal): ?string
+    {
+        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($porta);
         if ($fromRaw !== null) {
-            $this->data['impressora_nome'] = $fromRaw;
-            $this->data['usar_device_service'] = true;
+            return $fromRaw;
         }
+
+        $portaMudou = strcasecmp(trim((string) $porta), trim((string) ($terminal->porta ?? ''))) !== 0;
+        if ($portaMudou) {
+            return null;
+        }
+
+        $atual = trim((string) ($terminal->impressora_nome ?? ''));
+
+        return $atual !== '' ? $atual : null;
     }
 
     protected function syncImpressoraNomeFromPorta(): void
@@ -387,7 +492,13 @@ trait ManagesTerminalMasterDetail
 
     protected function bootTerminalMasterDetail(): void
     {
-        $terminal = TerminalResolver::make()->resolveOrCreateDefault();
+        $resolver = TerminalResolver::make();
+        $terminal = $resolver->current()
+            ?? Terminal::query()
+                ->where('empresa_id', $resolver->resolveEmpresaId())
+                ->where('nome', '!=', '')
+                ->orderBy('id')
+                ->first();
 
         if ($terminal) {
             $this->selectTerminalRecord($terminal->id);
@@ -431,8 +542,11 @@ trait ManagesTerminalMasterDetail
             'modelo' => $terminal->modelo ?: 'ELGIN',
             'porta' => $terminal->porta ?: 'COM2',
             'tipo_impressora' => (string) ($terminal->tipo_impressora ?? '0'),
-            'ip' => $terminal->ip ?: TerminalResolver::make()->resolveClientIp(),
+            // IP do PDV offline vem da carga; não preencher com o IP deste navegador.
+            'ip' => $terminal->ip ?: ($terminal->ehPdvOffline() ? null : TerminalResolver::make()->resolveClientIp()),
         ];
+        $this->data = TerminalFormOptions::canonicalizeBalanca($this->data);
+        $this->terminalIdentidadeFixa = $terminal->ehPdvOffline();
 
         if ($this->terminalConfigEhPdvOffline()) {
             $this->data['porta'] = (string) ($terminal->porta ?? '');
@@ -469,6 +583,7 @@ trait ManagesTerminalMasterDetail
     {
         $this->editingTerminalId = null;
         $this->isNewTerminal = true;
+        $this->terminalIdentidadeFixa = false;
         $this->data = static::defaultTerminalFormData();
         $this->ensurePortasBasicas();
     }
@@ -483,14 +598,6 @@ trait ManagesTerminalMasterDetail
 
         if ($next) {
             $this->selectTerminalRecord($next->id);
-
-            return;
-        }
-
-        $created = TerminalResolver::make()->resolveOrCreateDefault();
-
-        if ($created) {
-            $this->selectTerminalRecord($created->id);
 
             return;
         }
@@ -526,10 +633,7 @@ trait ManagesTerminalMasterDetail
             'preview_impressao' => (bool) ($merged['preview_impressao'] ?? false),
         ];
 
-        $fromRaw = TerminalFormOptions::windowsPrinterFromPorta($merged['porta'] ?? null);
-        if ($fromRaw !== null) {
-            $merged['impressora_nome'] = $fromRaw;
-        }
+        $merged = TerminalFormOptions::canonicalizeBalanca($merged);
 
         if ($this->terminalConfigEhPdvOffline()) {
             unset(

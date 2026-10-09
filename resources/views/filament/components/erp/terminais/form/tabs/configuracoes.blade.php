@@ -19,8 +19,9 @@
                     wire:model.live="data.nome"
                     class="erp-pcad-form__input"
                     placeholder="Ex.: pdv1"
-                    title="Mesmo valor do campo PDV/Terminal no caixa offline"
+                    title="{{ $this->terminalIdentidadeFixa ? 'Definido pelo número do caixa offline (PDVn). Não pode ser alterado aqui.' : 'Mesmo valor do campo PDV/Terminal no caixa offline' }}"
                     autocomplete="off"
+                    @disabled($this->terminalIdentidadeFixa)
                 >
             </div>
             <div class="erp-terminais-form__field erp-terminais-form__field--narrow">
@@ -32,12 +33,15 @@
                     data-mask="integer"
                     class="erp-pcad-form__input"
                     placeholder="1"
-                    title="Use este número no campo PDV/Terminal do caixa offline"
+                    title="{{ $this->terminalIdentidadeFixa ? 'Número do caixa offline. Para trocar, exclua o terminal (F4) e configure o novo número no PDV.' : 'Use este número no campo PDV/Terminal do caixa offline' }}"
+                    @disabled($this->terminalIdentidadeFixa)
                 >
             </div>
             <p class="erp-terminais-form__hint erp-terminais-form__hint--inline">
                 Liberar/bloquear na grade (flag <strong>Ativo</strong>). Detalhes no <strong>olhinho</strong>.
-                @if ($this->terminalConfigEhPdvOffline())
+                @if ($this->terminalIdentidadeFixa)
+                    Caixa offline: nome e nº vêm do número configurado no PDV.
+                @elseif ($this->terminalConfigEhPdvOffline())
                     Offline: <strong>Nome</strong> ou <strong>nº lógico</strong>.
                 @endif
             </p>

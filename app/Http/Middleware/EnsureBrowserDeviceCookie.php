@@ -17,19 +17,34 @@ final class EnsureBrowserDeviceCookie
         $response = $next($request);
 
         if (! filled($request->cookie(self::COOKIE))) {
-            Cookie::queue(cookie(
-                self::COOKIE,
-                (string) Str::uuid(),
-                60 * 24 * 365 * 3,
-                null,
-                null,
-                $request->isSecure(),
-                true,
-                false,
-                'lax',
-            ));
+            Cookie::queue(self::make($request, (string) Str::uuid()));
         }
 
         return $response;
+    }
+
+    /**
+     * Outro navegador do mesmo computador passa a usar a identidade já vinculada ao terminal.
+     * Vale também para o restante desta requisição.
+     */
+    public static function adopt(Request $request, string $deviceUuid): void
+    {
+        $request->cookies->set(self::COOKIE, $deviceUuid);
+        Cookie::queue(self::make($request, $deviceUuid));
+    }
+
+    private static function make(Request $request, string $deviceUuid): \Symfony\Component\HttpFoundation\Cookie
+    {
+        return cookie(
+            self::COOKIE,
+            $deviceUuid,
+            60 * 24 * 365 * 3,
+            null,
+            null,
+            $request->isSecure(),
+            true,
+            false,
+            'lax',
+        );
     }
 }

@@ -167,15 +167,16 @@ final class PdvConfig
     public function balancaSerialSettings(): array
     {
         $terminal = $this->terminal;
+        $opts = \App\Support\Erp\Terminais\TerminalFormOptions::class;
 
         return [
-            'marca' => trim((string) ($terminal?->balanca_marca ?? '')),
+            'marca' => $opts::canonicalOption($opts::marcasBalancaSerial(), $terminal?->balanca_marca ?? ''),
             'port' => strtoupper(trim((string) ($terminal?->balanca_porta ?? ''))),
             'baudRate' => (int) ($terminal?->balanca_velocidade ?: 9600),
             'dataBits' => (int) ($terminal?->balanca_databits ?: 8),
-            'parity' => trim((string) ($terminal?->balanca_paridade ?: 'None')) ?: 'None',
+            'parity' => $opts::canonicalOption($opts::paridadesBalanca(), $terminal?->balanca_paridade ?: 'None') ?: 'None',
             'stopBits' => trim((string) ($terminal?->balanca_stopbits ?: '1')) ?: '1',
-            'handshake' => trim((string) ($terminal?->balanca_handshaking ?: 'None')) ?: 'None',
+            'handshake' => $opts::canonicalOption($opts::handshakingsBalanca(), $terminal?->balanca_handshaking ?: 'None') ?: 'None',
         ];
     }
 
@@ -306,15 +307,17 @@ final class PdvConfig
 
     public function impressoraNome(): ?string
     {
-        $nome = trim((string) ($this->terminal?->impressora_nome ?? ''));
-        if ($nome !== '') {
-            return $nome;
-        }
-
-        // CompatÃ­vel com o Delphi: caminho RAW:NomeDaImpressoraWindows
-        return \App\Support\Erp\Terminais\TerminalFormOptions::windowsPrinterFromPorta(
+        // Caminho RAW:Nome (visível na tela) prevalece sobre impressora_nome gravado antes.
+        $fromPorta = \App\Support\Erp\Terminais\TerminalFormOptions::windowsPrinterFromPorta(
             $this->terminal?->porta
         );
+        if ($fromPorta !== null) {
+            return $fromPorta;
+        }
+
+        $nome = trim((string) ($this->terminal?->impressora_nome ?? ''));
+
+        return $nome !== '' ? $nome : null;
     }
 
     public function pedidoA4(): bool

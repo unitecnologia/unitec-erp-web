@@ -174,8 +174,6 @@ trait ErpTerminalFormPage
             return;
         }
 
-        TerminalResolver::make()->remember($this->record);
-
         Notification::make()
             ->title('Terminal gravado.')
             ->body('Reabra o PDV para aplicar as configurações deste terminal.')

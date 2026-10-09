@@ -38,6 +38,24 @@ final class ReciboCupomPrintDocument implements PrintDocument
     public function clientPayload(PrintTarget $target): array
     {
         $copies = max(1, min(3, $target->copies));
+
+        // Impressora A4: recibo no layout de folha, pelo navegador (nunca ESC/POS).
+        if ($target->impressoraA4()) {
+            return [
+                'document' => $this->key(),
+                'url' => route('erp.reports.recibo', [
+                    'recibo' => $this->recibo->id,
+                    'auto' => 1,
+                ]),
+                'mode' => 'browser',
+                'copias' => $copies,
+                'printer' => $target->printerName,
+                'tipo' => $target->tipoImpressora,
+                'reciboId' => (int) $this->recibo->id,
+                'escposUrl' => null,
+            ];
+        }
+
         $mode = $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 

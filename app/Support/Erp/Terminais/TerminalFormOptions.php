@@ -212,11 +212,57 @@ final class TerminalFormOptions
         }
 
         foreach ($options as $option) {
-            if ((string) $option === $current) {
+            if (strcasecmp((string) $option, $current) === 0) {
                 return array_values($options);
             }
         }
 
         return array_values([$current, ...$options]);
+    }
+
+    /**
+     * Grafia oficial da opção (ex.: XONXOFF → XOnXOff). Valor fora da lista é mantido.
+     *
+     * @param  list<string>  $options
+     */
+    public static function canonicalOption(array $options, mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        foreach ($options as $option) {
+            if (strcasecmp((string) $option, $value) === 0) {
+                return (string) $option;
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * O save do ERP grava texto em maiúsculas; o Device Service compara Handshake com
+     * grafia exata. Normaliza os campos de balança para a grafia das opções.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function canonicalizeBalanca(array $data): array
+    {
+        $map = [
+            'balanca_marca' => self::marcasBalancaSerial(),
+            'balanca_paridade' => self::paridadesBalanca(),
+            'balanca_handshaking' => self::handshakingsBalanca(),
+        ];
+
+        foreach ($map as $field => $options) {
+            if (array_key_exists($field, $data) && $data[$field] !== null) {
+                $data[$field] = self::canonicalOption($options, $data[$field]);
+            }
+        }
+
+        if (array_key_exists('balanca_porta', $data) && $data['balanca_porta'] !== null) {
+            $data['balanca_porta'] = strtoupper(trim((string) $data['balanca_porta']));
+        }
+
+        return $data;
     }
 }
