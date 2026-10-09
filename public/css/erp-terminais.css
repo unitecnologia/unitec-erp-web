@@ -69,7 +69,6 @@
     align-items: center;
 }
 
-.erp-terminais-form__stub,
 .erp-terminais-form__hint {
     margin: 0.2rem 0 0;
     font-size: 0.68rem;
@@ -85,22 +84,6 @@
 
 .erp-terminais-form__actions {
     margin-top: 0.4rem;
-}
-
-.erp-terminais-form__test-btn {
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    background: #fff;
-    padding: 0.28rem 0.7rem;
-    font-size: 0.76rem;
-    font-weight: 700;
-    cursor: pointer;
-    border-radius: var(--erp-radius-sm, 6px);
-}
-
-.erp-terminais-form__usa-tef {
-    display: inline-flex;
-    margin-bottom: 0.4rem;
-    font-weight: 700;
 }
 
 .erp-terminais-form-page .erp-pcad__group {
@@ -146,11 +129,6 @@
 .erp-terminais-form__field--nvias {
     width: 3.6rem;
     flex: 0 0 3.6rem;
-}
-
-.erp-terminais-form__field--modelo {
-    width: 7.5rem;
-    flex: 0 0 7.5rem;
 }
 
 .erp-terminais-form__field--caminho {
@@ -236,17 +214,6 @@
     min-width: 0;
 }
 
-.erp-terminais-form__operacao-grid {
-    display: grid;
-    grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
-    gap: 0.45rem;
-    align-items: start;
-}
-
-.erp-terminais-form__operacao-grid .erp-pcad-form__select {
-    width: 100%;
-}
-
 .erp-terminais-form__operacao-list {
     margin: 0;
     padding: 0.2rem 0.35rem;
@@ -283,7 +250,6 @@
     }
 
     .erp-terminais-form__field--nvias,
-    .erp-terminais-form__field--modelo,
     .erp-terminais-form__field--caminho {
         width: auto;
         flex: 1 1 8rem;
@@ -293,7 +259,6 @@
     .erp-terminais-form__num-grid,
     .erp-terminais-form__escpos-grid,
     .erp-terminais-form__bottom,
-    .erp-terminais-form__operacao-grid,
     .erp-terminais-form__checks--compact {
         grid-template-columns: 1fr;
     }

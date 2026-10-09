@@ -272,17 +272,6 @@
                     'showFlag' => true,
                 ])
             </label>
-
-            <fieldset class="erp-fv-mon__plataformas erp-fv-mon__plataformas--status">
-                <legend class="erp-fv-mon__plataformas-legend">Status</legend>
-                <div class="erp-fv-mon__legend">
-                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--pendente"></i> Pendente</span>
-                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--financeiro"></i> Financeiro</span>
-                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--confirmado"></i> Confirmado</span>
-                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--faturado"></i> Faturado</span>
-                    <span class="erp-fv-mon__legend-item"><i class="erp-fv-mon__dot erp-fv-mon__dot--cancelado"></i> Cancelado</span>
-                </div>
-            </fieldset>
             </div>
         </div>
     </fieldset>

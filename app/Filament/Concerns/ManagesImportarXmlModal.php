@@ -1876,7 +1876,7 @@ trait ManagesImportarXmlModal
         );
         $cnpjFornecedor = (string) ($nota->cnpj ?: ($emitente['cnpj'] ?? ''));
 
-        $cadastro = (new NotaFornecedorFornecedorCadastro())->preview($emitente);
+        $cadastro = (new NotaFornecedorFornecedorCadastro())->preview([...$emitente, 'cnpj' => $cnpjFornecedor]);
 
         $this->importarXmlNotaId = (int) $nota->id;
         $chaveNota = preg_replace('/\D/', '', (string) $nota->chave) ?? '';

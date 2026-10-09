@@ -149,6 +149,8 @@ class ListCompras extends ListRecords
 
     public bool $lancamentoFinalizarConfirmOpen = false;
 
+    public ?int $reabrirConfirmCompraId = null;
+
     public bool $lancamentoParcelasOpen = false;
 
     public string $lancamentoParcelasSubtotal = '0,00';
@@ -429,6 +431,7 @@ class ListCompras extends ListRecords
                 View::make('filament.components.erp.compras.action-bar'),
                 View::make('filament.components.erp.compras.lancamento-modal'),
                 View::make('filament.components.erp.compras.finalizar-confirm-modal'),
+                View::make('filament.components.erp.compras.reabrir-confirm-modal'),
                 View::make('filament.components.erp.compras.parcelas-modal'),
                 View::make('filament.components.erp.produtos.form.precificacao-modal'),
                 View::make('filament.components.erp.notas-fornecedores.importar-xml-modal'),
@@ -2142,6 +2145,11 @@ class ListCompras extends ListRecords
     {
         $this->lancamentoFinalizarConfirmOpen = false;
 
+        // Clique repetido / Enter enfileirado após a compra já ter sido finalizada e fechada.
+        if (! $this->lancamentoPodeConfirmarFinalizacao()) {
+            return;
+        }
+
         if ($this->lancamentoParamGerarFinanceiro) {
             $this->abrirLancamentoParcelasModal();
 
@@ -2151,8 +2159,20 @@ class ListCompras extends ListRecords
         $this->executarFinalizarCompraLancamento(null);
     }
 
-    public function abrirLancamentoParcelasModal(): void
+    protected function lancamentoPodeConfirmarFinalizacao(): bool
     {
+        return ! $this->lancamentoFinalizando
+            && $this->lancamentoModalOpen
+            && $this->lancamentoModalCompraId
+            && ! in_array(mb_strtoupper((string) $this->lancamentoModalStatus, 'UTF-8'), ['FECHADA', 'CANCELADA'], true);
+    }
+
+    protected function abrirLancamentoParcelasModal(): void
+    {
+        if (! $this->lancamentoParamGerarFinanceiro || ! $this->lancamentoPodeConfirmarFinalizacao()) {
+            return;
+        }
+
         $fromXml = $this->parcelasFinanceiroDoXmlCompra();
         $somaXml = 0.0;
         foreach ($fromXml as $row) {
@@ -2389,7 +2409,9 @@ class ListCompras extends ListRecords
 
     public function concluirLancamentoParcelas(?array $tela = null): void
     {
-        if ($this->lancamentoFinalizando) {
+        if (! $this->lancamentoParcelasOpen
+            || ! $this->lancamentoParamGerarFinanceiro
+            || ! $this->lancamentoPodeConfirmarFinalizacao()) {
             return;
         }
 
@@ -2971,6 +2993,18 @@ class ListCompras extends ListRecords
 
             Notification::make()
                 ->title('Não foi possível finalizar')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        } catch (\Throwable $e) {
+            // Sem isso a trava ficava presa e a tela não aceitava nova tentativa.
+            $this->lancamentoFinalizando = false;
+            report($e);
+
+            Notification::make()
+                ->title('Erro ao finalizar a compra')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -4213,6 +4247,26 @@ class ListCompras extends ListRecords
                 ->warning()
                 ->send();
 
+            return;
+        }
+
+        $this->reabrirConfirmCompraId = (int) $compra->id;
+    }
+
+    public function cancelarReabrirCompra(): void
+    {
+        $this->reabrirConfirmCompraId = null;
+    }
+
+    public function confirmarReabrirCompra(): void
+    {
+        $compraId = (int) ($this->reabrirConfirmCompraId ?? 0);
+        $this->reabrirConfirmCompraId = null;
+        $this->dispatch('erp-compras-reabrir-fechado');
+
+        $compra = $compraId > 0 ? $this->scopedCompraQuery()->find($compraId) : null;
+
+        if (! $compra) {
             return;
         }
 

@@ -23,7 +23,8 @@
     @endif
 </div>
 
-<div class="erp-pdv__body">
+<?php $pdvMesasPainelView = (bool) ($this->pdvExibeMesas ?? false) && view()->exists('filament.components.erp.pdv.mesas.painel'); ?>
+<div @class(['erp-pdv__body', 'erp-pdv__body--mesas' => $pdvMesasPainelView])>
     <section class="erp-pdv__main-panel">
         <div class="erp-pdv__grid-wrap" id="erp-pdv-grid-wrap">
             @if ($this->pdvEmConsulta && $this->pdvSearchResults !== [])
@@ -371,6 +372,11 @@
             <span class="erp-pdv__total-value">R$ {{ $this->cupomTotal }}</span>
         </div>
     </aside>
+
+    {{-- Painel Mesas (só ERP, terminal com flag Mesas). Fica após o painel lateral no DOM; o CSS o posiciona à esquerda. --}}
+    @if ($pdvMesasPainelView)
+        @include('filament.components.erp.pdv.mesas.painel')
+    @endif
 </div>
 
 <div class="erp-pdv__toolbar">

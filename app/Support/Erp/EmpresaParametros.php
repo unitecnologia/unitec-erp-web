@@ -64,6 +64,18 @@ final class EmpresaParametros
                 'type' => 'decimal',
                 'decimals' => 2,
             ],
+            'param_pdv_qtd_mesas' => [
+                'label' => 'Quantidade de Mesas',
+                'hint' => 'Mesas exibidas no PDV dos terminais com a opção "Mesas" habilitada (1 a 300). Vazio ou zero usa 20.',
+                'default' => 20,
+                'type' => 'integer',
+            ],
+            'param_pdv_mesa_inatividade_min' => [
+                'label' => 'Tempo de inatividade da mesa (minutos)',
+                'hint' => 'Sem tecla ou clique do operador por este tempo, a mesa aberta é salva, liberada para outros terminais e o PDV volta ao modo balcão (1 a 120). Vazio ou zero usa 1.',
+                'default' => 1,
+                'type' => 'integer',
+            ],
         ];
     }
 
@@ -1610,6 +1622,34 @@ final class EmpresaParametros
     }
 
     /**
+     * Plano de compra da empresa (débito) para baixas geradas na finalização da compra.
+     */
+    public static function planoCompraId(?int $empresaId): ?int
+    {
+        $empresaId = (int) ($empresaId ?: ErpContext::currentEmpresaId());
+
+        if ($empresaId <= 0) {
+            return null;
+        }
+
+        $planoId = (int) (Empresa::query()
+            ->whereKey($empresaId)
+            ->value('param_plano_conta_compra_id') ?? 0);
+
+        if ($planoId <= 0) {
+            return null;
+        }
+
+        $ativo = PlanoConta::query()
+            ->whereKey($planoId)
+            ->where('ativo', true)
+            ->where('dc', 'D')
+            ->exists();
+
+        return $ativo ? $planoId : null;
+    }
+
+    /**
      * Planos padrão gravados na empresa.
      * O de venda entra no Livro Caixa das vendas. Compra e taxa de cartão ainda não.
      *
@@ -1686,6 +1726,13 @@ final class EmpresaParametros
                     'param_carencia_juros',
                     'param_juros_diario_pct',
                     'param_multa_atraso_pct',
+                ],
+            ],
+            [
+                'title' => 'PDV',
+                'numeric' => [
+                    'param_pdv_qtd_mesas',
+                    'param_pdv_mesa_inatividade_min',
                 ],
             ],
             [

@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Auth;
 
 final class PdvConfig
 {
+    public const FECHAMENTO_A4_PADRAO = '0';
+
+    public const FECHAMENTO_A4_DETALHADO = '1';
+
+    public const FECHAMENTO_BOBINA_DETALHADO = '2';
+
+    public const FECHAMENTO_BOBINA_SINTETICO = '3';
+
     private ?Empresa $empresa = null;
 
     private ?Terminal $terminal = null;
@@ -189,9 +197,13 @@ final class PdvConfig
         return true;
     }
 
+    /**
+     * TEF sem integração funcional: menu "Administrativo TEF" (Ctrl+T) sempre oculto.
+     * A coluna terminais.usa_tef é preservada para compatibilidade.
+     */
     public function usaTef(): bool
     {
-        return (bool) ($this->terminal?->usa_tef ?? false);
+        return false;
     }
 
     public function bloquearCancelamentoDocFiscal(): bool
@@ -285,7 +297,12 @@ final class PdvConfig
 
     public function tipoImpressora(): string
     {
-        return (string) ($this->terminal?->tipo_impressora ?? '1');
+        $tipo = (string) ($this->terminal?->tipo_impressora ?? '1');
+
+        // "Gráfico" (2) descontinuado: imprime como ESC/POS.
+        return $tipo === PdvPedidoReportData::TIPO_IMPRESSORA_GRAFICO
+            ? PdvPedidoReportData::TIPO_IMPRESSORA_ESC_POS
+            : $tipo;
     }
 
     /**
@@ -323,6 +340,58 @@ final class PdvConfig
     public function pedidoA4(): bool
     {
         return PdvPedidoReportData::shouldUsePedidoA4($this->terminal);
+    }
+
+    /** Nº de vias do terminal (1–3): cupom de venda e comprovantes de sangria/suprimento. */
+    public function viasImpressao(): int
+    {
+        return max(1, min(3, (int) ($this->terminal?->nvias ?: 1)));
+    }
+
+    /** Pedido: vias do terminal; o parâmetro "pedido em duas vias" garante pelo menos 2. */
+    public function viasPedido(): int
+    {
+        return max($this->viasImpressao(), $this->pedidoDuasVias() ? 2 : 1);
+    }
+
+    /** "Perguntar Imprimir": marcado pergunta; desmarcado imprime direto, sem perguntar. */
+    public function perguntarImprimir(): bool
+    {
+        return (bool) ($this->terminal?->imprime ?? true);
+    }
+
+    /**
+     * Tipo de fechamento do terminal. Sem valor gravado mantém o comportamento anterior
+     * (impressora A4 → A4 detalhado; demais → bobina detalhada).
+     */
+    public function tipoFechamento(): string
+    {
+        $tipo = trim((string) ($this->terminal?->tipo_fechamento ?? ''));
+
+        if (in_array($tipo, ['0', '1', '2', '3'], true)) {
+            return $tipo;
+        }
+
+        return $this->impressoraA4() ? self::FECHAMENTO_A4_DETALHADO : self::FECHAMENTO_BOBINA_DETALHADO;
+    }
+
+    /**
+     * Gaveta: habilitada no terminal e ligada a uma impressora de bobina com nome Windows
+     * (o pulso sai pela impressora via Device Service; impressora A4 não tem gaveta).
+     */
+    public function gavetaDisponivel(): bool
+    {
+        return (bool) ($this->terminal?->usa_gaveta ?? false)
+            && $this->impressoraNome() !== null
+            && ! $this->impressoraA4();
+    }
+
+    private function impressoraA4(): bool
+    {
+        return in_array($this->tipoImpressora(), [
+            PdvPedidoReportData::TIPO_IMPRESSORA_PEDIDO_A4,
+            PdvPedidoReportData::TIPO_IMPRESSORA_NFCE_A4,
+        ], true);
     }
 
     private function resolveEmpresa(): ?Empresa

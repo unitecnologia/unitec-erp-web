@@ -227,6 +227,7 @@
     <div class="erp-pcad-form__row">
         <label class="erp-pcad-form__label" for="pcad-regime">Regime Trib.</label>
         <select id="pcad-regime" wire:model="data.regime_tributario" data-erp-pessoa-enter class="erp-pcad-form__select erp-pcad-form__select--md">
+            <option value="">NÃO INFORMADO</option>
             @foreach (Person::regimesTributarios() as $value => $label)
                 <option value="{{ $value }}">{{ $label }}</option>
             @endforeach

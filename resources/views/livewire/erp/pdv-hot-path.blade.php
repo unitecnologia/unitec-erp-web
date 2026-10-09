@@ -15,6 +15,9 @@
                 <col class="erp-pdv__col-und">
                 <col class="erp-pdv__col-preco">
                 <col class="erp-pdv__col-total">
+                @if ($mesaAberta)
+                    <col class="erp-pdv__col-imprimir">
+                @endif
             </colgroup>
             <thead>
                 <tr>
@@ -27,6 +30,9 @@
                     <th class="erp-pdv__grid-col-center">Und.</th>
                     <th class="erp-pdv__grid-col-num">Preço R$</th>
                     <th class="erp-pdv__grid-col-num">Total R$</th>
+                    @if ($mesaAberta)
+                        <th class="erp-pdv__grid-col-center erp-pdv__th-imprimir" aria-label="Imprimir item"></th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -71,10 +77,27 @@
                             @endif
                         </td>
                         <td class="erp-pdv__grid-col-num">{{ number_format((float) ($item['total'] ?? 0), 2, ',', '') }}</td>
+                        @if ($mesaAberta)
+                            <td class="erp-pdv__grid-col-center erp-pdv__td-imprimir">
+                                <button
+                                    type="button"
+                                    class="erp-pdv__item-del erp-pdv__item-print"
+                                    wire:click.stop="$dispatch('erp-pdv-mesa-imprimir-item', { index: {{ $index }} })"
+                                    title="Imprimir item"
+                                    aria-label="Imprimir item {{ $index + 1 }}"
+                                >
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <polyline points="6 9 6 2 18 2 18 9"/>
+                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                        <rect x="6" y="14" width="12" height="8"/>
+                                    </svg>
+                                </button>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr class="erp-pdv__grid-empty">
-                        <td colspan="9">&nbsp;</td>
+                        <td colspan="{{ $mesaAberta ? 10 : 9 }}">&nbsp;</td>
                     </tr>
                 @endforelse
             </tbody>

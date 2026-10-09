@@ -1,0 +1,457 @@
+/* Painel Mesas do PDV — carregado só em terminais com a flag "Mesas". */
+
+.erp-pdv__body.erp-pdv__body--mesas {
+    grid-template-columns: auto minmax(0, 1fr) clamp(18rem, 24vw, 27rem);
+}
+
+.erp-pdv-mesas {
+    order: -1;
+    display: flex;
+    flex-direction: column;
+    width: 11.75rem;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    transition: width 0.15s ease;
+}
+
+.erp-pdv-mesas__header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.45rem;
+    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
+}
+
+.erp-pdv-mesas__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: transparent;
+    color: var(--erp-text-muted, #64748b);
+    cursor: pointer;
+}
+
+.erp-pdv-mesas__toggle:hover {
+    background: #e2e8f0;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-pdv-mesas__toggle svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.erp-pdv-mesas__title {
+    flex: 1 1 auto;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: 0.01em;
+}
+
+.erp-pdv-mesas__count {
+    min-width: 1.4rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.45rem;
+}
+
+.erp-pdv-mesas__abrir {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.erp-pdv-mesas__abrir-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--erp-text-muted, #64748b);
+    white-space: nowrap;
+}
+
+.erp-pdv-mesas__abrir-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 1.85rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas__abrir-input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+}
+
+.erp-pdv-mesas__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.1rem;
+    scrollbar-width: thin;
+}
+
+.erp-pdv-mesas__tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.05rem;
+    height: 2.9rem;
+    padding: 0 0.15rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+    color: #1e293b;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.erp-pdv-mesas__tile:hover {
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: var(--erp-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.08));
+}
+
+.erp-pdv-mesas__tile-num {
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas__tile-info {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas__tile.is-ocupada {
+    background: #fff7ed;
+    border-color: #fb923c;
+    color: #9a3412;
+}
+
+.erp-pdv-mesas__tile.is-bloqueada {
+    background: repeating-linear-gradient(135deg, #f1f5f9 0, #f1f5f9 6px, #e2e8f0 6px, #e2e8f0 12px);
+    border-color: #94a3b8;
+    color: #475569;
+    cursor: not-allowed;
+}
+
+.erp-pdv-mesas__tile.is-selecionada {
+    background: var(--erp-brand-primary, #1e5a9e);
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.25);
+}
+
+/* Pré-conta impressa: aguardando fechamento (vermelho em todos os terminais). */
+.erp-pdv-mesas__tile.is-aguardando {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #991b1b;
+}
+
+.erp-pdv-mesas__tile.is-selecionada.is-aguardando {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+}
+
+.erp-pdv-mesas__tile.is-cursor:not(.is-selecionada) {
+    outline: 2px solid var(--erp-row-selected-border, #1d4ed8);
+    outline-offset: 1px;
+}
+
+.erp-pdv-mesas__atual {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.45rem;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+.erp-pdv-mesas__atual[hidden] {
+    display: none;
+}
+
+.erp-pdv-mesas__atual-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--erp-brand-primary, #1e5a9e);
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas__atual.is-aguardando {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.erp-pdv-mesas__atual.is-aguardando .erp-pdv-mesas__atual-label {
+    color: #b91c1c;
+}
+
+.erp-pdv-mesas__atual-status {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #b91c1c;
+}
+
+.erp-pdv-mesas__atual-status[hidden] {
+    display: none;
+}
+
+.erp-pdv-mesas__atual-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+
+.erp-pdv-mesas__btn--wide {
+    grid-column: 1 / -1;
+}
+
+.erp-pdv-mesas__btn--danger {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+.erp-pdv-mesas__btn[hidden] {
+    display: none;
+}
+
+.erp-pdv-mesas__btn {
+    height: 1.75rem;
+    padding: 0 0.35rem;
+    border: 1px solid var(--erp-brand-primary, #1e5a9e);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.erp-pdv-mesas__btn:hover {
+    filter: brightness(1.08);
+}
+
+.erp-pdv-mesas__btn--ghost {
+    background: #fff;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-pdv-mesas__legenda {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.2rem 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.62rem;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-pdv-mesas__legenda li {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.erp-pdv-mesas__legenda i {
+    width: 0.65rem;
+    height: 0.65rem;
+    flex: 0 0 auto;
+    border-radius: 3px;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: #fff;
+}
+
+.erp-pdv-mesas__legenda i.is-ocupada { background: #fff7ed; border-color: #fb923c; }
+.erp-pdv-mesas__legenda i.is-selecionada { background: var(--erp-brand-primary, #1e5a9e); border-color: var(--erp-brand-primary, #1e5a9e); }
+.erp-pdv-mesas__legenda i.is-bloqueada { background: repeating-linear-gradient(135deg, #f1f5f9 0, #f1f5f9 2px, #cbd5e1 2px, #cbd5e1 4px); border-color: #94a3b8; }
+.erp-pdv-mesas__legenda i.is-aguardando { background: #fee2e2; border-color: #dc2626; }
+.erp-pdv-mesas__legenda li.is-largo { grid-column: 1 / -1; }
+
+/* Grade do cupom: impressão do item ao lado da lixeira (só com mesa aberta). */
+.erp-pdv__col-imprimir {
+    width: 2.1rem;
+}
+
+.erp-pdv__item-print:hover {
+    color: var(--erp-brand-primary, #1e5a9e);
+    background: #dbeafe;
+    border-color: #bfdbfe;
+    box-shadow: 0 1px 3px rgba(30, 90, 158, 0.18);
+}
+
+.erp-pdv__item-print:focus-visible {
+    outline-color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-pdv__item-print:active {
+    background: #bfdbfe;
+    color: #1e3a8a;
+}
+
+.erp-pdv__grid--cupom .erp-pdv__grid-row--selected .erp-pdv__item-print:hover {
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+/* Recolhido: só a faixa com o botão e o contador de ocupadas. */
+.erp-pdv-mesas.is-recolhido {
+    width: 2.6rem;
+}
+
+.erp-pdv-mesas.is-recolhido .erp-pdv-mesas__header {
+    flex-direction: column;
+    padding: 0.4rem 0.2rem;
+    border-bottom: 0;
+}
+
+.erp-pdv-mesas.is-recolhido .erp-pdv-mesas__title {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    flex: 0 0 auto;
+}
+
+.erp-pdv-mesas.is-recolhido .erp-pdv-mesas__content {
+    display: none;
+}
+
+/* Mesa aberta com painel recolhido: número em destaque (clique expande). */
+.erp-pdv-mesas__mini {
+    display: none;
+}
+
+.erp-pdv-mesas.is-recolhido .erp-pdv-mesas__mini:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 0;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: var(--erp-brand-primary, #1e5a9e);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+/* Modal Transferir Mesa */
+.erp-pdv-mesas-transferir .erp-pdv-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.erp-pdv-mesas-transferir__origem {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: var(--erp-brand-primary, #1e5a9e);
+}
+
+.erp-pdv-mesas-transferir__meta {
+    font-size: 0.8rem;
+    color: var(--erp-text-muted, #64748b);
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas-transferir__k {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-pdv-mesas-transferir__campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.erp-pdv-mesas-transferir__input {
+    height: 2.6rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    font-size: 1.35rem;
+    font-weight: 800;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-pdv-mesas-transferir__input:focus {
+    outline: none;
+    border-color: var(--erp-brand-primary, #1e5a9e);
+    box-shadow: 0 0 0 3px rgba(30, 90, 158, 0.18);
+}
+
+@media (max-width: 900px) {
+    .erp-pdv__body.erp-pdv__body--mesas {
+        grid-template-columns: 1fr;
+    }
+
+    .erp-pdv-mesas,
+    .erp-pdv-mesas.is-recolhido {
+        order: 0;
+        width: auto;
+        max-height: 11rem;
+    }
+
+    .erp-pdv-mesas__grid {
+        grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+    }
+}

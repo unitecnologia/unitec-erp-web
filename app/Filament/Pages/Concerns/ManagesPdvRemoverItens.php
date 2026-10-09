@@ -20,6 +20,10 @@ trait ManagesPdvRemoverItens
             return;
         }
 
+        if ($this->mesaBloqueiaAlteracao()) {
+            return;
+        }
+
         if (! $this->cupomTemItens()) {
             $this->notifyPdvError('Nenhum item no cupom.');
 
@@ -67,6 +71,12 @@ trait ManagesPdvRemoverItens
     public function confirmRemoverItens(): void
     {
         if (! $this->removerItensConfirmando || $this->removerItensIndex === null) {
+            return;
+        }
+
+        if ($this->mesaBloqueiaAlteracao()) {
+            $this->cancelRemoverItens();
+
             return;
         }
 

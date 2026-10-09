@@ -241,6 +241,10 @@ trait ErpPersonFormPage
             }
         }
 
+        if (array_key_exists('regime_tributario', $merged) && blank($merged['regime_tributario'])) {
+            $merged['regime_tributario'] = null;
+        }
+
         $formaId = $merged['forma_pagamento_id'] ?? null;
         $prazoId = $merged['tabela_prazo_id'] ?? null;
 

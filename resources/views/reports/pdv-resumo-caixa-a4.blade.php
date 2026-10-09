@@ -227,6 +227,9 @@
             </table>
         </div>
 
+        @php($detalhado = $detalhado ?? true)
+
+        @if ($detalhado)
         <table class="duas">
             <tr>
                 <td>
@@ -287,6 +290,7 @@
                 </td>
             </tr>
         </table>
+        @endif
 
         <table class="duas box--keep">
             <tr>
@@ -322,6 +326,7 @@
             </tr>
         </table>
 
+        @if ($detalhado)
         <div class="box">
             <div class="box-title">Vendas canceladas <small>{{ count($vendasCanceladas) }} venda(s)</small></div>
             <table class="grade">
@@ -380,6 +385,7 @@
                     <tfoot><tr><td colspan="4">Total</td><td class="num">{{ $m($totalProdutosCancelados) }}</td></tr></tfoot>
                 </table>
             </div>
+        @endif
         @endif
 
         <table class="assinaturas">

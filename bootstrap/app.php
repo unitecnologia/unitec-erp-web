@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'admin/erp-update/status',
             'admin/erp-update/reset',
+            'admin/erp/pdv-mesas/pulso',
         ]);
 
         $middleware->alias([

@@ -413,11 +413,48 @@ final class GerarCompraFromNotaService
 
     private function resolveFornecedorId(NotaFornecedor $nota): ?int
     {
-        $cadastro = (new NotaFornecedorFornecedorCadastro())->ensure([
-            'cnpj' => $nota->cnpj,
-            'nome' => $nota->nome,
-        ]);
+        $cadastro = (new NotaFornecedorFornecedorCadastro())->ensure($this->emitenteDaNota($nota));
 
         return $cadastro['person']?->id;
+    }
+
+    /**
+     * Emitente completo do XML; sem XML legível (ou de outro CNPJ) usa só CNPJ/nome da nota.
+     *
+     * @return array<string, mixed>
+     */
+    private function emitenteDaNota(NotaFornecedor $nota): array
+    {
+        $fallback = [
+            'cnpj' => $nota->cnpj,
+            'nome' => $nota->nome,
+        ];
+
+        try {
+            $danfe = new NotaFornecedorDanfeReportService();
+            $xml = $danfe->resolveXml($nota);
+            $emitente = filled($xml) ? ($danfe->parseXml((string) $xml)['emitente'] ?? null) : null;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return $fallback;
+        }
+
+        if (! is_array($emitente)) {
+            return $fallback;
+        }
+
+        $docNota = preg_replace('/\D/', '', (string) $nota->cnpj) ?? '';
+        $docXml = preg_replace('/\D/', '', (string) ($emitente['cnpj'] ?? '')) ?? '';
+
+        if ($docXml === '' || ($docNota !== '' && $docXml !== $docNota)) {
+            return $fallback;
+        }
+
+        if (blank($emitente['nome'] ?? null)) {
+            $emitente['nome'] = $nota->nome;
+        }
+
+        return $emitente;
     }
 }

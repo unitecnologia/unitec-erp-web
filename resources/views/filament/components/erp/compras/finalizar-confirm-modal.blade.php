@@ -1,10 +1,18 @@
 @if ($this->lancamentoFinalizarConfirmOpen)
     <div
         class="erp-compras-confirm-modal"
-        x-data
+        x-data="{
+            enviando: false,
+            confirmar() {
+                if (this.enviando || this.$wire.lancamentoFinalizando) return;
+                this.enviando = true;
+                this.$wire.confirmarFinalizarCompraLancamento().finally(() => { this.enviando = false; });
+            },
+        }"
+        x-on:erp-compras-lancamento-fechado.window="$el.remove()"
         x-on:keydown.window="
-            if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelarFinalizarCompraLancamento(); }
-            if ($event.key === 'Enter' && ! $wire.lancamentoFinalizando) { $event.preventDefault(); $wire.confirmarFinalizarCompraLancamento(); }
+            if ($event.key === 'Escape') { $event.preventDefault(); if (! enviando) $wire.cancelarFinalizarCompraLancamento(); }
+            if ($event.key === 'Enter') { $event.preventDefault(); confirmar(); }
         "
     >
         <div class="erp-compras-confirm-modal__backdrop" wire:click="cancelarFinalizarCompraLancamento"></div>
@@ -36,10 +44,10 @@
                 <button
                     type="button"
                     class="erp-compras-confirm-modal__btn erp-compras-confirm-modal__btn--yes"
-                    wire:click="confirmarFinalizarCompraLancamento"
+                    x-on:click="confirmar()"
+                    x-bind:disabled="enviando || @js($this->lancamentoFinalizando)"
                     wire:loading.attr="disabled"
                     wire:target="confirmarFinalizarCompraLancamento,concluirLancamentoParcelas"
-                    @disabled($this->lancamentoFinalizando)
                 >
                     Sim
                 </button>

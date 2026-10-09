@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Erp;
 
 use App\Models\Empresa;
 use App\Models\PdvCaixaSessao;
+use App\Support\Erp\Pdv\PdvConfig;
 use App\Support\Erp\Printing\Documents\PdvCaixaResumoCupomPrintDocument;
 use App\Support\Erp\Printing\PrintFacade;
 use Illuminate\Http\JsonResponse;
@@ -43,6 +44,9 @@ class PdvCaixaResumoEscPosPrintController
             empresa: $empresa,
             dinheiroInformado: $dinheiroInformado,
             usuarioFallback: $user->name ?? null,
+            formato: $request->boolean('sintetico')
+                ? PdvConfig::FECHAMENTO_BOBINA_SINTETICO
+                : PdvConfig::FECHAMENTO_BOBINA_DETALHADO,
         );
 
         return response()->json($document->buildEscPosPayload($target));

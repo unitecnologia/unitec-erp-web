@@ -43,6 +43,7 @@ class PdvCaixaResumoReportController
                 [
                     'autoPrint' => $request->boolean('auto'),
                     'embed' => $request->boolean('embed'),
+                    'detalhado' => $request->boolean('detalhado', true),
                 ],
             ));
         }
@@ -54,6 +55,7 @@ class PdvCaixaResumoReportController
             $empresa,
             $dinheiroInformado,
             $user->name ?? null,
+            $request->boolean('sintetico'),
         );
 
         return view('reports.pdv-resumo-caixa', [

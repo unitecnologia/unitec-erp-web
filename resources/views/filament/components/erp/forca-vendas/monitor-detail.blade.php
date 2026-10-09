@@ -18,22 +18,26 @@
 
         {{-- Itens do pedido --}}
         <section class="erp-fv-mon__panel erp-fv-mon__panel--itens">
-            <div class="erp-fv-mon__table-wrap">
+            <div
+                class="erp-fv-mon__table-wrap"
+                data-erp-csort="fv-monitor-produtos"
+                data-erp-csort-scope="{{ auth()->id() ?? 0 }}"
+            >
                 <table class="erp-fv-mon__table">
                     <thead>
                         <tr>
-                            <th class="erp-fv-mon__th--code">Código</th>
-                            <th class="erp-fv-mon__th--code">Cód. Barras</th>
-                            <th>Produto</th>
-                            <th class="erp-fv-mon__th--num">Qtde</th>
-                            <th class="erp-fv-mon__th--money erp-fv-mon__th--vlr">Vlr Unit.</th>
+                            <th class="erp-fv-mon__th--code" data-erp-csort-key="codigo" data-erp-csort-type="text">Código</th>
+                            <th class="erp-fv-mon__th--code" data-erp-csort-key="codigo_barras" data-erp-csort-type="text">Cód. Barras</th>
+                            <th data-erp-csort-key="produto" data-erp-csort-type="text">Produto</th>
+                            <th class="erp-fv-mon__th--num" data-erp-csort-key="quantidade" data-erp-csort-type="number">Qtde</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--vlr" data-erp-csort-key="preco_unitario" data-erp-csort-type="money">Vlr Unit.</th>
                             @if ($exibirCustoGrade)
-                                <th class="erp-fv-mon__th--money erp-fv-mon__th--custo">Custo</th>
+                                <th class="erp-fv-mon__th--money erp-fv-mon__th--custo" data-erp-csort-key="custo" data-erp-csort-type="money">Custo</th>
                             @endif
-                            <th class="erp-fv-mon__th--money erp-fv-mon__th--desc">Desc.</th>
-                            <th class="erp-fv-mon__th--money erp-fv-mon__th--acre">Acre.</th>
-                            <th class="erp-fv-mon__th--money erp-fv-mon__th--liq">TT Líquido</th>
-                            <th>Vendedor</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--desc" data-erp-csort-key="desconto" data-erp-csort-type="money">Desc.</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--acre" data-erp-csort-key="acrescimo" data-erp-csort-type="money">Acre.</th>
+                            <th class="erp-fv-mon__th--money erp-fv-mon__th--liq" data-erp-csort-key="total" data-erp-csort-type="money">TT Líquido</th>
+                            <th data-erp-csort-key="vendedor" data-erp-csort-type="text">Vendedor</th>
                         </tr>
                     </thead>
                     <tbody>

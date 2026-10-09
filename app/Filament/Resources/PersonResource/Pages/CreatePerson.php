@@ -43,7 +43,7 @@ class CreatePerson extends CreateRecord
             'codigo' => Person::nextCodigo(),
             'pessoa_tipo' => Person::PESSOA_JURIDICA,
             'uf' => '',
-            'regime_tributario' => 'simples',
+            'regime_tributario' => '',
             'tipo_contribuinte' => 'nao_contribuinte',
             'limite_credito' => 0,
             'salario' => 0,

@@ -25,6 +25,10 @@ class EditPerson extends EditRecord
 
         parent::mount($record);
 
+        if (blank($this->data['regime_tributario'] ?? null)) {
+            $this->data['regime_tributario'] = '';
+        }
+
         ErpScreen::set('Cadastro de Pessoas');
 
         $this->loadPersonContacts($this->record);

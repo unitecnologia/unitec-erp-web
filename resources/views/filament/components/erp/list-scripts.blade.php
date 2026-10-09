@@ -16,3 +16,4 @@
 </script>
 <script src="{{ asset('js/erp-uppercase.js') }}?v={{ $jsVersion }}" defer data-navigate-track></script>
 <script src="{{ asset('js/erp-list.js') }}?v={{ $jsVersion }}" defer data-navigate-track></script>
+@include('filament.components.erp.grid-sort-script')

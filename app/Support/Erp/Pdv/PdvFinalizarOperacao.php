@@ -112,15 +112,16 @@ final class PdvFinalizarOperacao
     /**
      * Pedido: pergunta impressão antes de fechar.
      * NFC-e Transmitir pergunta depois da autorização (com progress bar).
+     * Com "Perguntar Imprimir" desmarcado no terminal, não pergunta: imprime direto.
      */
-    public static function solicitaConfirmacaoImpressao(string $operacao): bool
+    public static function solicitaConfirmacaoImpressao(string $operacao, bool $perguntarImprimir = true): bool
     {
-        return $operacao === self::PEDIDO;
+        return $perguntarImprimir && $operacao === self::PEDIDO;
     }
 
-    public static function solicitaConfirmacaoImpressaoApos(string $operacao): bool
+    public static function solicitaConfirmacaoImpressaoApos(string $operacao, bool $perguntarImprimir = true): bool
     {
-        return in_array($operacao, [
+        return $perguntarImprimir && in_array($operacao, [
             self::NFCE_TRANSMITIR,
             self::NFCE_CONTINGENCIA,
         ], true);

@@ -44,7 +44,6 @@
     <button
         type="button"
         wire:click="reabrirCompra"
-        wire:confirm="Reabrir esta compra? Estoque, preços e contas a pagar gerados na finalização serão estornados."
         class="erp-compras-actions__btn"
         data-erp-key="F7"
         @disabled($this->highlightedCompraDevolvida)

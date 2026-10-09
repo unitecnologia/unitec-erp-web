@@ -19,6 +19,10 @@ trait ManagesPdvDesconto
     #[\Livewire\Attributes\On('erp-pdv-open-desconto')]
     public function openDescontoItemModal(): void
     {
+        if ($this->mesaBloqueiaAlteracao()) {
+            return;
+        }
+
         if (! $this->pdvConfig()->permitirDescontoItem()) {
             $this->notifyPdvError('Desconto de item não habilitado nos parâmetros.');
 
@@ -145,6 +149,12 @@ trait ManagesPdvDesconto
 
     public function confirmDescontoItem(): void
     {
+        if ($this->mesaBloqueiaAlteracao()) {
+            $this->closePdvModal();
+
+            return;
+        }
+
         if ($this->selectedCupomIndex === null || ! isset($this->cupomItens[$this->selectedCupomIndex])) {
             $this->closePdvModal();
 

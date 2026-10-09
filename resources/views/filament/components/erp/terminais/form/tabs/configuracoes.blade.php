@@ -55,20 +55,11 @@
             <div class="erp-terminais-form__radios erp-terminais-form__radios--2x2">
                 <label class="erp-pcad__check"><input type="radio" wire:model.live="data.tipo_impressora" value="0" @disabled($printerReadonly)> Pedido A4</label>
                 <label class="erp-pcad__check"><input type="radio" wire:model.live="data.tipo_impressora" value="1" @disabled($printerReadonly)> ESC/POS</label>
-                <label class="erp-pcad__check"><input type="radio" wire:model.live="data.tipo_impressora" value="2" @disabled($printerReadonly)> Gráfico</label>
                 <label class="erp-pcad__check"><input type="radio" wire:model.live="data.tipo_impressora" value="3" @disabled($printerReadonly)> NFC-e - A4</label>
             </div>
             <div class="erp-terminais-form__field erp-terminais-form__field--nvias">
                 <label class="erp-pcad-form__label" for="term-nvias">Nº Vias</label>
                 <input id="term-nvias" type="text" wire:model="data.nvias" data-mask="integer" class="erp-pcad-form__input" @disabled($printerReadonly)>
-            </div>
-            <div class="erp-terminais-form__field erp-terminais-form__field--modelo">
-                <label class="erp-pcad-form__label" for="term-modelo">Modelo</label>
-                <select id="term-modelo" wire:model="data.modelo" class="erp-pcad-form__select" @disabled($printerReadonly)>
-                    @foreach (TerminalFormOptions::modelosEscPos() as $modelo)
-                        <option value="{{ $modelo }}">{{ $modelo }}</option>
-                    @endforeach
-                </select>
             </div>
             <div class="erp-terminais-form__field erp-terminais-form__field--caminho">
                 <label class="erp-pcad-form__label" for="term-porta">Caminho</label>
@@ -113,26 +104,16 @@
 
     <div class="erp-terminais-form__bottom">
         <fieldset class="erp-pcad__group erp-terminais-form__bottom-left">
-            <legend class="erp-pcad__group-title">Tipo de Operação padrão</legend>
-            <div class="erp-terminais-form__operacao-grid">
-                <div class="erp-terminais-form__field">
-                    <label class="erp-pcad-form__label" for="term-tipo-op">Selecione o tipo</label>
-                    <select id="term-tipo-op" wire:model="data.tipo_operacao_padrao" class="erp-pcad-form__select">
-                        @foreach (TerminalFormOptions::tiposOperacaoPadrao() as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <ul class="erp-terminais-form__operacao-list">
-                    @foreach (TerminalFormOptions::botoesOperacaoPadrao() as $field => $label)
-                        <li>
-                            <label class="erp-pcad__check">
-                                <input type="checkbox" wire:model="data.{{ $field }}"> {{ $label }}
-                            </label>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
+            <legend class="erp-pcad__group-title">Operações no fechamento da venda</legend>
+            <ul class="erp-terminais-form__operacao-list">
+                @foreach (TerminalFormOptions::botoesOperacaoPadrao() as $field => $label)
+                    <li>
+                        <label class="erp-pcad__check">
+                            <input type="checkbox" wire:model="data.{{ $field }}"> {{ $label }}
+                        </label>
+                    </li>
+                @endforeach
+            </ul>
         </fieldset>
 
         <div class="erp-terminais-form__bottom-right">
@@ -142,7 +123,6 @@
                     <label class="erp-pcad__check"><input type="checkbox" wire:model="data.usa_gaveta"> Usa Gaveta</label>
                     <label class="erp-pcad__check"><input type="checkbox" wire:model="data.eh_caixa"> Controle de Caixa</label>
                     <label class="erp-pcad__check"><input type="checkbox" wire:model="data.imprime"> Perguntar Imprimir</label>
-                    <label class="erp-pcad__check"><input type="checkbox" wire:model="data.preview_impressao"> Preview Gráfico</label>
                 </div>
             </fieldset>
 
@@ -150,7 +130,6 @@
                 <legend class="erp-pcad__group-title">Abas no PDV</legend>
                 <div class="erp-terminais-form__checks erp-terminais-form__checks--compact">
                     <label class="erp-pcad__check"><input type="checkbox" wire:model="data.pdv"> PDV</label>
-                    <label class="erp-pcad__check"><input type="checkbox" wire:model="data.delivery"> Delivery</label>
                     <label class="erp-pcad__check"><input type="checkbox" wire:model="data.restaurante"> Mesas</label>
                 </div>
             </fieldset>

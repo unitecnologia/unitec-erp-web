@@ -34,6 +34,8 @@ use App\Http\Controllers\Erp\PdvEscPosPrintController;
 use App\Http\Controllers\Erp\PdvCaixaResumoEscPosPrintController;
 use App\Http\Controllers\Erp\PdvMovimentoCaixaEscPosPrintController;
 use App\Http\Controllers\Erp\PdvMovimentoCaixaReportController;
+use App\Http\Controllers\Erp\PdvMesaCupomController;
+use App\Http\Controllers\Erp\PdvMesasPulsoController;
 use App\Http\Controllers\Erp\PersonListagemReportController;
 use App\Http\Controllers\Erp\ProductEstoqueReportController;
 use App\Http\Controllers\Erp\ContaReceberCartoesReportController;
@@ -61,6 +63,15 @@ Route::middleware('web')->group(function (): void {
     Route::get('/meli/hub/oauth/callback', [MeliHubOAuthController::class, 'callback'])
         ->name('meli.hub.oauth.callback');
 });
+
+// Pulso do painel de Mesas do PDV: sem sessão (credencial HMAC) para não regravar o cupom em paralelo.
+Route::match(['get', 'post'], '/admin/erp/pdv-mesas/pulso', PdvMesasPulsoController::class)
+    ->withoutMiddleware([
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+    ])
+    ->name('erp.pdv.mesas.pulso');
 
 Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/erp/atualizacao-progress', AtualizacaoProgressController::class)
@@ -128,6 +139,12 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/admin/print/pdv-escpos/{venda}', PdvEscPosPrintController::class)
         ->middleware('erp.permission:vendas.reprint_cupom')
         ->name('erp.print.pdv-escpos');
+    Route::get('/admin/reports/pdv-mesa/{mesa}/{tipo}', [PdvMesaCupomController::class, 'report'])
+        ->where('tipo', 'pedido|item|parcial')
+        ->name('erp.reports.pdv-mesa');
+    Route::get('/admin/print/pdv-mesa-escpos/{mesa}/{tipo}', [PdvMesaCupomController::class, 'escpos'])
+        ->where('tipo', 'pedido|item|parcial')
+        ->name('erp.print.pdv-mesa-escpos');
     Route::get('/admin/reports/nfce-relatorio', NfceRelatorioReportController::class)
         ->middleware('erp.permission:nfce.access')
         ->name('erp.reports.nfce-relatorio');

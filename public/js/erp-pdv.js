@@ -591,8 +591,30 @@ function bindErpPdvLivewireEvents() {
         resetPdvIdleTimer();
     });
 
-    window.Livewire.on('erp-pdv-gaveta', () => {
+    window.Livewire.on('erp-pdv-gaveta', (event) => {
         window.dispatchEvent(new CustomEvent('erp-pdv-gaveta-pulse'));
+
+        const params = Array.isArray(event) ? (event[0] || {}) : (event || {});
+        let printer = String(params.printer || '').trim();
+        const match = printer.match(/^RAW:(.+)$/i);
+        if (match) {
+            printer = match[1].trim();
+        }
+
+        if (printer === '' || !window.ErpDeviceService?.openDrawer) {
+            return;
+        }
+
+        window.ErpDeviceService.openDrawer(printer).catch((err) => {
+            if (!params.manual || typeof FilamentNotification === 'undefined') {
+                return;
+            }
+            new FilamentNotification()
+                .title('Não foi possível abrir a gaveta')
+                .body(err?.message || 'Device Service indisponível.')
+                .warning()
+                .send();
+        });
     });
 
     window.Livewire.on('erp-pdv-overlay-closed', () => {

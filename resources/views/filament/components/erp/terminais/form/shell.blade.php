@@ -3,7 +3,6 @@
         @foreach ([
             'configuracoes' => 'Configurações',
             'balanca' => 'Balanças',
-            'tef' => 'TEF/POS',
             'aparelhos' => 'Aparelhos',
         ] as $tab => $label)
             <button

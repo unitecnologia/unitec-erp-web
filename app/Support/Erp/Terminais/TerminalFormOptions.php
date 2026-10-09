@@ -20,9 +20,20 @@ final class TerminalFormOptions
         return [
             '0' => 'Pedido A4',
             '1' => 'ESC/POS',
-            '2' => 'Gráfico',
             '3' => 'NFC-e - A4',
         ];
+    }
+
+    /** Tipo "Gráfico" (2) foi descontinuado: terminais antigos passam a ser tratados como ESC/POS. */
+    public static function normalizeTipoImpressora(?string $tipo): string
+    {
+        $tipo = trim((string) $tipo);
+
+        if ($tipo === '2') {
+            return '1';
+        }
+
+        return in_array($tipo, ['0', '1', '3'], true) ? $tipo : '0';
     }
 
     /**

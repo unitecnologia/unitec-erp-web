@@ -665,3 +665,41 @@
     max-height: 1.55rem !important;
     font-size: var(--erp-font-size-xs, 0.72rem);
 }
+
+/* ---- Ordenação client-side (js/erp-grid-sort.js) ----
+   Indicadores absolutos dentro do padding do th (sticky = bloco de contenção):
+   não alteram largura nem alinhamento da coluna. */
+[data-erp-csort] th[data-erp-csort-key] {
+    cursor: pointer;
+    user-select: none;
+}
+
+[data-erp-csort] th[data-erp-csort-key]:hover {
+    filter: brightness(1.12);
+}
+
+[data-erp-csort] th.erp-csort-active::before,
+[data-erp-csort] th.erp-csort-active::after {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--erp-csort-ind-size, 0.55rem);
+    font-weight: 800;
+    line-height: 1;
+    color: inherit;
+    pointer-events: none;
+}
+
+[data-erp-csort] th.erp-csort-active::before {
+    content: '>';
+    left: 1px;
+}
+
+[data-erp-csort] th.erp-csort-active::after {
+    content: '\2191';
+    right: 1px;
+}
+
+[data-erp-csort] th.erp-csort-active[data-erp-csort-dir="desc"]::after {
+    content: '\2193';
+}

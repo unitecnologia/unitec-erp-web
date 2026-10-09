@@ -99,6 +99,7 @@ class PdvPage extends Page
 
         $this->loadPdvSessionState();
         $this->loadCupomFromSession();
+        $this->restaurarMesaAoMontar();
 
         if (! $this->garantirOperadorDoUsuarioLogado(notify: false)) {
             $this->notificarOperadorObrigatorio(voltarDashboard: true);

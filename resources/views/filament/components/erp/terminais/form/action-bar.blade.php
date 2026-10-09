@@ -32,6 +32,12 @@
                 </span>
                 <span class="erp-pcad-actions__label"><kbd>F10</kbd> | Salvar</span>
             </button>
+            <button type="button" wire:click="reloadTerminal" class="erp-pcad-actions__btn" data-erp-key="F5" title="Atualizar terminal e lista (descarta alterações não salvas)">
+                <span class="erp-pcad-actions__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/></svg>
+                </span>
+                <span class="erp-pcad-actions__label"><kbd>F5</kbd> | Atualizar</span>
+            </button>
         @endif
         <button type="button" wire:click="closeScreen" class="erp-pcad-actions__btn erp-pcad-actions__btn--danger" data-erp-key="Escape" title="Sair">
             <span class="erp-pcad-actions__icon" aria-hidden="true">

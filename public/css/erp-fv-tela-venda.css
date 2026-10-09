@@ -973,6 +973,10 @@
     box-shadow: none;
 }
 
+.erp-fv-tv__grid-wrap[data-erp-csort] {
+    --erp-csort-ind-size: 0.6rem;
+}
+
 .erp-fv-tv__grid th:last-child {
     border-right: 0;
 }

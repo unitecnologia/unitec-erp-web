@@ -5,6 +5,7 @@ namespace App\Support\Erp\Printing\Documents;
 use App\Models\Empresa;
 use App\Models\PdvCaixaSessao;
 use App\Support\Erp\Pdv\PdvCaixaResumoBobinaBuilder;
+use App\Support\Erp\Pdv\PdvConfig;
 use App\Support\Erp\Printing\EscPos\EscPosCharset;
 use App\Support\Erp\Printing\EscPos\Mike42EscPosWriter;
 use App\Support\Erp\Printing\PrintDocument;
@@ -12,29 +13,46 @@ use App\Support\Erp\Printing\PrintTarget;
 use Mike42\Escpos\Printer;
 
 /**
- * RESUMO CAIXA → ESC/POS via Device Service (impressora do Terminal).
+ * RESUMO CAIXA → formato do "Tipo de fechamento" do Terminal:
+ * A4 padrão / A4 detalhado (navegador) ou bobina detalhada / sintética (ESC/POS ou navegador).
  */
 final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
 {
+    private readonly string $formato;
+
     public function __construct(
         private readonly PdvCaixaSessao $sessao,
         private readonly ?Empresa $empresa,
         private readonly float $dinheiroInformado = 0.0,
         private readonly ?string $usuarioFallback = null,
-    ) {}
+        ?string $formato = null,
+    ) {
+        $this->formato = $formato ?? PdvConfig::make()->tipoFechamento();
+    }
 
     public function key(): string
     {
         return 'pdv_resumo_caixa';
     }
 
+    public function formatoA4(): bool
+    {
+        return in_array($this->formato, [PdvConfig::FECHAMENTO_A4_PADRAO, PdvConfig::FECHAMENTO_A4_DETALHADO], true);
+    }
+
+    public function sintetico(): bool
+    {
+        return $this->formato === PdvConfig::FECHAMENTO_BOBINA_SINTETICO;
+    }
+
     public function htmlUrl(bool $autoPrint = false, int $copies = 1): string
     {
-        return route('erp.reports.pdv-resumo-caixa', [
+        return route('erp.reports.pdv-resumo-caixa', array_filter([
             'sessao' => $this->sessao->id,
             'dinheiro' => number_format($this->dinheiroInformado, 2, '.', ''),
             'auto' => $autoPrint ? 1 : 0,
-        ]);
+            'sintetico' => $this->sintetico() ? 1 : null,
+        ], static fn ($v): bool => $v !== null));
     }
 
     public function a4Url(bool $autoPrint = false): string
@@ -44,6 +62,7 @@ final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
             'dinheiro' => $this->dinheiroInformado > 0 ? number_format($this->dinheiroInformado, 2, '.', '') : null,
             'auto' => $autoPrint ? 1 : 0,
             'a4' => 1,
+            'detalhado' => $this->formato === PdvConfig::FECHAMENTO_A4_PADRAO ? 0 : 1,
         ], static fn ($v): bool => $v !== null));
     }
 
@@ -51,7 +70,7 @@ final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
     {
         $copies = max(1, min(3, $target->copies));
 
-        if ($target->impressoraA4()) {
+        if ($this->formatoA4()) {
             return [
                 'document' => $this->key(),
                 'url' => $this->a4Url(autoPrint: true),
@@ -65,18 +84,20 @@ final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
             ];
         }
 
-        $mode = $target->preferredMode();
+        // Bobina numa impressora A4 nunca recebe ESC/POS: sai o HTML 80 mm pelo navegador.
+        $mode = $target->impressoraA4() ? 'browser' : $target->preferredMode();
         $useDevice = $mode === 'device' && $target->hasPrinter();
 
         $escposUrl = null;
 
         if ($useDevice) {
             try {
-                $escposUrl = route('erp.print.pdv-resumo-caixa-escpos', [
+                $escposUrl = route('erp.print.pdv-resumo-caixa-escpos', array_filter([
                     'sessao' => $this->sessao->id,
                     'dinheiro' => number_format($this->dinheiroInformado, 2, '.', ''),
                     'copias' => $copies,
-                ]);
+                    'sintetico' => $this->sintetico() ? 1 : null,
+                ], static fn ($v): bool => $v !== null));
             } catch (\Throwable) {
                 $useDevice = false;
                 $mode = 'browser';
@@ -105,6 +126,7 @@ final class PdvCaixaResumoCupomPrintDocument implements PrintDocument
             $this->empresa,
             $this->dinheiroInformado,
             $this->usuarioFallback,
+            $this->sintetico(),
         );
 
         $writer = new Mike42EscPosWriter;

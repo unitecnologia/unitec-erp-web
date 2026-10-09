@@ -177,6 +177,144 @@ final class PdvDavCupomLayout
         ];
     }
 
+    public const MESA_PEDIDO = 'pedido';
+
+    public const MESA_ITEM = 'item';
+
+    public const MESA_PARCIAL = 'parcial';
+
+    /** Largura da linha em fonte dupla (número da mesa). */
+    private const WIDTH_BIG = 24;
+
+    /**
+     * Pedido da mesa, item avulso ou pré-conta (parcial). Sem valor fiscal; não gera venda.
+     *
+     * @param  list<array<string, mixed>>  $itens  itens do cupom da mesa (mesmo formato da sessão do PDV)
+     * @return array{
+     *     titulo: string,
+     *     davNumero: string,
+     *     lines: list<array{text: string, bold?: bool, center?: bool, font?: string, size?: int}>,
+     *     plain: list<string>
+     * }
+     */
+    public static function buildMesa(
+        int $numero,
+        array $itens,
+        string $tipo,
+        ?Empresa $empresa,
+        string $atendente,
+        string $terminal,
+        ?CarbonInterface $printedAt = null,
+    ): array {
+        $at = $printedAt ?? now();
+        $w = self::WIDTH;
+        $wItems = self::WIDTH_ITEMS;
+        $mesaRotulo = 'MESA '.str_pad((string) $numero, 2, '0', STR_PAD_LEFT);
+
+        $titulo = match ($tipo) {
+            self::MESA_PARCIAL => 'PRÉ-CONTA',
+            self::MESA_ITEM => 'PEDIDO - ITEM',
+            default => 'PEDIDO',
+        };
+
+        $lines = [];
+        $empresaNome = self::up($empresa?->fantasia ?: $empresa?->nome ?: 'UNITEC');
+        $lines[] = self::line(self::center($empresaNome, $w), bold: true, center: true);
+
+        if ($tipo === self::MESA_PARCIAL) {
+            $endereco = self::formatEndereco($empresa);
+            $cidadeLinha = self::formatCidadeLinha($empresa);
+            if ($endereco !== '') {
+                $lines[] = self::line(self::center($endereco, $w), center: true);
+            }
+            if ($cidadeLinha !== '') {
+                $lines[] = self::line(self::center($cidadeLinha, $w), center: true);
+            }
+        }
+
+        $lines[] = self::line(self::dash($w));
+        $lines[] = self::line(self::starsCenter($titulo, $w), bold: true, center: true);
+        $lines[] = self::bigLine($mesaRotulo);
+        $lines[] = self::line(self::dash($w));
+
+        $lines[] = self::line(self::labelDots('Emitido em', $at->format('d/m/Y').'  '.$at->format('H:i:s'), $w));
+        if ($atendente !== '') {
+            $lines[] = self::line(self::labelDots('Atendente', self::up($atendente), $w));
+        }
+        if ($terminal !== '') {
+            $lines[] = self::line(self::labelDots('Terminal', self::up($terminal), $w));
+        }
+
+        $lines[] = self::line(self::dash($wItems), font: 'B');
+        $lines[] = self::line(self::itemHeaderLine($wItems), bold: true, font: 'B');
+        $lines[] = self::line(self::dash($wItems), font: 'B');
+
+        $subtotal = 0.0;
+        $descontos = 0.0;
+        $acrescimos = 0.0;
+        $total = 0.0;
+        $ultimo = count($itens) - 1;
+
+        foreach (array_values($itens) as $index => $item) {
+            $quantidade = (float) ($item['quantidade'] ?? 0);
+            $linha = (object) [
+                'codigo' => (string) ($item['codigo'] ?? ''),
+                'descricao' => (string) ($item['descricao'] ?? ''),
+                'unidade' => (string) ($item['unidade'] ?? 'UN'),
+                'quantidade' => $quantidade,
+                'preco_unitario' => (float) ($item['preco'] ?? 0),
+                'desconto' => round((float) ($item['desconto'] ?? 0), 2),
+                'acrescimo' => round((float) ($item['acrescimo'] ?? 0), 2),
+                'total' => (float) ($item['total'] ?? 0),
+            ];
+
+            foreach (self::formatItemLines($linha, $wItems, descricaoCompleta: true) as $linhaProduto) {
+                $lines[] = self::line($linhaProduto, font: 'B');
+            }
+
+            if ($index < $ultimo) {
+                $lines[] = self::line('', font: 'B');
+            }
+
+            $subtotal += round((float) ($item['preco_base'] ?? $item['preco'] ?? 0) * $quantidade, 2);
+            $descontos += round($linha->desconto * $quantidade, 2);
+            $acrescimos += round($linha->acrescimo * $quantidade, 2);
+            $total += $linha->total;
+        }
+
+        $lines[] = self::line(self::dash($w));
+        $lines[] = self::line(self::labelDots('Itens', (string) count($itens), $w));
+
+        if ($tipo === self::MESA_PARCIAL) {
+            $lines[] = self::line(self::moneyLine('SubtTotal', number_format(round($subtotal, 2), 2, ',', ''), $w));
+            if (round($descontos, 2) > 0) {
+                $lines[] = self::line(self::moneyLine('Desconto', number_format(round($descontos, 2), 2, ',', ''), $w));
+            }
+            if (round($acrescimos, 2) > 0) {
+                $lines[] = self::line(self::moneyLine('Acrescimo', number_format(round($acrescimos, 2), 2, ',', ''), $w));
+            }
+        }
+
+        $lines[] = self::line(self::moneyLine('Total', number_format(round($total, 2), 2, ',', ''), $w), bold: true);
+        $lines[] = self::line(self::dash($w));
+
+        if ($tipo === self::MESA_PARCIAL) {
+            $lines[] = self::bigLine('PRÉ-CONTA');
+            $lines[] = self::line(self::center('SEM VALOR FISCAL', $w), bold: true, center: true);
+            $lines[] = self::line(self::center('Confira os itens antes do fechamento', $w), center: true);
+        } else {
+            $lines[] = self::line(self::center('PEDIDO DE MESA - SEM VALOR FISCAL', $w), bold: true, center: true);
+        }
+        $lines[] = self::line(self::dash($w));
+
+        return [
+            'titulo' => $titulo.' - '.$mesaRotulo,
+            'davNumero' => str_pad((string) $numero, 2, '0', STR_PAD_LEFT),
+            'lines' => $lines,
+            'plain' => array_map(static fn (array $row): string => $row['text'], $lines),
+        ];
+    }
+
     /**
      * Linhas do item (fonte condensada).
      * Com $descricaoCompleta=true, a descrição continua em linhas seguintes (sem abreviar com ".").
@@ -300,6 +438,22 @@ final class PdvDavCupomLayout
             'bold' => $bold,
             'center' => $center,
             'font' => strtoupper($font) === 'B' ? 'B' : 'A',
+        ];
+    }
+
+    /**
+     * Fonte dupla, centralizada pela impressora (ESC/POS) ou por CSS (HTML): texto sem preenchimento.
+     *
+     * @return array{text: string, bold: bool, center: bool, font: string, size: int}
+     */
+    private static function bigLine(string $text): array
+    {
+        return [
+            'text' => mb_substr(trim($text), 0, self::WIDTH_BIG),
+            'bold' => true,
+            'center' => true,
+            'font' => 'A',
+            'size' => 2,
         ];
     }
 

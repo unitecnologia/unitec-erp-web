@@ -389,6 +389,7 @@ class NotaFornecedorDanfeReportService
         $emitente = $this->buildPartyFromXml($emit instanceof DOMElement ? $emit : null, 'enderEmit');
         if ($emit instanceof DOMElement) {
             $emitente['ie_st'] = $this->child($emit, 'IEST');
+            $emitente['crt'] = $this->child($emit, 'CRT');
         }
 
         return [

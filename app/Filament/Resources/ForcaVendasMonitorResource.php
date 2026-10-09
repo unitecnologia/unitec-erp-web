@@ -55,7 +55,54 @@ class ForcaVendasMonitorResource extends Resource
             ->withExists(['pixCobrancasPedido as tem_pix_api']);
     }
 
+    /**
+     * Ordenação client-side da grade (js/erp-grid-sort.js): tipo por coluna.
+     * Fora do mapa = não ordenável (flag de seleção, Local).
+     *
+     * @var array<string, string>
+     */
+    public const GRID_SORT_TYPES = [
+        'numero_pedido' => 'number',
+        'nf_nfc' => 'text',
+        'situacao' => 'text',
+        'cliente' => 'text',
+        'vendedor' => 'text',
+        'data_abert' => 'date',
+        'hora_abert' => 'time',
+        'data_fech' => 'date',
+        'hora_fech' => 'time',
+        'sincronizado' => 'datetime',
+        'desconto' => 'money',
+        'acrescimo' => 'money',
+        'tt_bruto' => 'money',
+        'total' => 'money',
+        'meio_pgto' => 'text',
+        'plataforma' => 'text',
+        'envio' => 'text',
+        'financeiro' => 'text',
+    ];
+
     public static function table(Table $table): Table
+    {
+        $table = self::monitorTable($table);
+
+        foreach ($table->getColumns() as $name => $column) {
+            if (isset(self::GRID_SORT_TYPES[$name])) {
+                $column->extraHeaderAttributes([
+                    'data-erp-csort-key' => $name,
+                    'data-erp-csort-type' => self::GRID_SORT_TYPES[$name],
+                ], merge: true);
+            }
+        }
+
+        return $table->extraAttributes([
+            'data-erp-csort' => 'fv-monitor-pedidos',
+            'data-erp-csort-scope' => (string) (auth()->id() ?? 0),
+            'data-erp-csort-stripe' => 'fi-striped',
+        ], merge: true);
+    }
+
+    private static function monitorTable(Table $table): Table
     {
         return $table
             ->columns([

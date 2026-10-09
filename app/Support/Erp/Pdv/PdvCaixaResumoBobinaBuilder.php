@@ -39,6 +39,7 @@ final class PdvCaixaResumoBobinaBuilder
         float $saldoDinheiro,
         float $dinheiroInformado,
         float $diferencaDinheiro,
+        bool $sintetico = false,
     ): array {
         $lines = [];
 
@@ -113,13 +114,30 @@ final class PdvCaixaResumoBobinaBuilder
             }
         }
 
-        $lines[] = '';
-        $lines[] = F::center('VENDAS CANCELADAS');
-        $lines[] = F::rule('-');
-
         $vendas = $vendasCanceladas instanceof Collection
             ? $vendasCanceladas
             : collect($vendasCanceladas);
+
+        if ($sintetico) {
+            $lines[] = F::rule('-');
+            $lines[] = F::line(
+                'VENDAS CANCELADAS ('.$vendas->count().')',
+                ErpMoney::formatBr((float) $vendas->sum(fn ($v): float => (float) $v->total)),
+            );
+            $lines[] = F::line(
+                'PRODUTOS CANCELADOS ('.count($produtosCancelados).')',
+                ErpMoney::formatBr((float) array_sum(array_map(
+                    static fn ($p): float => (float) ($p['total'] ?? 0),
+                    $produtosCancelados,
+                ))),
+            );
+
+            return $this->appendTotais($lines, $totalEntrada, $totalSaida, $saldoTotal, $saldoDinheiro, $dinheiroInformado, $diferencaDinheiro);
+        }
+
+        $lines[] = '';
+        $lines[] = F::center('VENDAS CANCELADAS');
+        $lines[] = F::rule('-');
 
         if ($vendas->isEmpty()) {
             $lines[] = 'Nenhuma venda cancelada.';
@@ -193,6 +211,22 @@ final class PdvCaixaResumoBobinaBuilder
             }
         }
 
+        return $this->appendTotais($lines, $totalEntrada, $totalSaida, $saldoTotal, $saldoDinheiro, $dinheiroInformado, $diferencaDinheiro);
+    }
+
+    /**
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    private function appendTotais(
+        array $lines,
+        float $totalEntrada,
+        float $totalSaida,
+        float $saldoTotal,
+        float $saldoDinheiro,
+        float $dinheiroInformado,
+        float $diferencaDinheiro,
+    ): array {
         $lines[] = '';
         $lines[] = F::center('MOVIMENTACAO GERAL CAIXA');
         $lines[] = F::rule('-');
@@ -226,6 +260,7 @@ final class PdvCaixaResumoBobinaBuilder
         ?Empresa $empresa,
         float $dinheiroInformado,
         ?string $usuarioFallback = null,
+        bool $sintetico = false,
     ): array {
         $sessao->loadMissing(['user', 'terminal', 'movimentos']);
 
@@ -293,6 +328,7 @@ final class PdvCaixaResumoBobinaBuilder
                 $entradaDinheiro,
                 $dinheiroInformado,
                 $diferenca,
+                $sintetico,
             ),
             'dinheiroInformado' => $dinheiroInformado,
             'usuario' => $usuario,

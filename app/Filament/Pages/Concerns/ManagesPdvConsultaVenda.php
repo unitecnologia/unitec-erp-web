@@ -215,8 +215,7 @@ trait ManagesPdvConsultaVenda
             return;
         }
 
-        $copias = $this->pdvConfig()->pedidoDuasVias() ? 2 : 1;
-        $this->imprimirCupomPosVenda($vendaId, $copias);
+        $this->imprimirCupomPosVenda($vendaId);
     }
 
     public function requestEstornarConsultaVenda(): void

@@ -372,6 +372,10 @@ trait ManagesPdvImportar
             return false;
         }
 
+        if ($this->mesaBloqueiaOperacao('Importação')) {
+            return false;
+        }
+
         if ($this->cupomTemItens()) {
             $this->notifyPdvError('Cupom possui itens. Cancele (F6) antes de importar.');
 

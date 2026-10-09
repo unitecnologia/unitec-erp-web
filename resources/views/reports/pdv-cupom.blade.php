@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8">
-    <title>DAV No. {{ $layout['davNumero'] }}</title>
+    <title>{{ $layout['titulo'] ?? 'DAV No. '.$layout['davNumero'] }}</title>
     <style>
         @page { margin: 4mm; size: 80mm auto; }
         * { box-sizing: border-box; }
@@ -39,6 +39,12 @@
             transform: scaleX(0.94);
             transform-origin: left center;
             width: 106.4%;
+        }
+        .cupom .ln--big {
+            font-size: 22px;
+            line-height: 1.25;
+            margin: 2px 0;
+            white-space: normal;
         }
         .cupom .ln--condensed:empty {
             min-height: 0.55em;
@@ -85,6 +91,9 @@
                     }
                     if (($row['font'] ?? 'A') === 'B') {
                         $cls .= ' ln--condensed';
+                    }
+                    if (($row['size'] ?? 1) > 1) {
+                        $cls .= ' ln--big';
                     }
                 @endphp
                 <div class="{{ $cls }}">{{ $row['text'] }}</div>

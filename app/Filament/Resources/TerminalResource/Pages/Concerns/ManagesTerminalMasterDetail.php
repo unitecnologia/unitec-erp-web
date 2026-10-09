@@ -110,7 +110,7 @@ trait ManagesTerminalMasterDetail
      */
     public function terminalTabKeys(): array
     {
-        return ['configuracoes', 'balanca', 'tef', 'aparelhos'];
+        return ['configuracoes', 'balanca', 'aparelhos'];
     }
 
     /**
@@ -410,19 +410,6 @@ trait ManagesTerminalMasterDetail
             ->send();
     }
 
-    public function moduleStubTefTest(): void
-    {
-        Notification::make()
-            ->title('Testar TEF')
-            ->body('Integração TEF disponível no PDV desktop. Em implementação no web.')
-            ->info()
-            ->send();
-    }
-    public function moduleStubBrowseImpressora(): void
-    {
-        $this->refreshPortasComImpressorasWindows(true);
-    }
-
     public function moduleStubListaImpressoras(): void
     {
         $this->refreshPortasComImpressorasWindows(true);
@@ -541,7 +528,7 @@ trait ManagesTerminalMasterDetail
             'nvias' => $terminal->nvias ?: 1,
             'modelo' => $terminal->modelo ?: 'ELGIN',
             'porta' => $terminal->porta ?: 'COM2',
-            'tipo_impressora' => (string) ($terminal->tipo_impressora ?? '0'),
+            'tipo_impressora' => TerminalFormOptions::normalizeTipoImpressora($terminal->tipo_impressora ?? '0'),
             // IP do PDV offline vem da carga; não preencher com o IP deste navegador.
             'ip' => $terminal->ip ?: ($terminal->ehPdvOffline() ? null : TerminalResolver::make()->resolveClientIp()),
         ];

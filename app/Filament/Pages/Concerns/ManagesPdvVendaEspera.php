@@ -31,6 +31,10 @@ trait ManagesPdvVendaEspera
             return;
         }
 
+        if ($this->mesaBloqueiaOperacao('Venda em espera')) {
+            return;
+        }
+
         // Hot path grava o cupom na sessão; carregar antes de salvar a espera.
         $this->loadCupomFromSession();
 
@@ -100,6 +104,10 @@ trait ManagesPdvVendaEspera
         if (! $this->caixaAberto || ! $this->caixaSessaoId) {
             $this->notifyPdvError('Caixa fechado.');
 
+            return;
+        }
+
+        if ($this->mesaBloqueiaOperacao('Venda em espera')) {
             return;
         }
 
@@ -195,6 +203,10 @@ trait ManagesPdvVendaEspera
         if (! $this->caixaAberto) {
             $this->notifyPdvError('Caixa fechado.');
 
+            return;
+        }
+
+        if ($this->mesaBloqueiaOperacao('Venda em espera')) {
             return;
         }
 

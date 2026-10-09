@@ -428,7 +428,7 @@ class CnpjLookupService
         return null;
     }
 
-    protected function formatApiPhone(mixed $value): ?string
+    public function formatApiPhone(mixed $value): ?string
     {
         $digits = preg_replace('/\D/', '', (string) ($value ?? ''));
 
@@ -447,7 +447,7 @@ class CnpjLookupService
         return $digits;
     }
 
-    protected function formatCep(string $cep): ?string
+    public function formatCep(string $cep): ?string
     {
         $digits = preg_replace('/\D/', '', $cep);
 
@@ -458,7 +458,7 @@ class CnpjLookupService
         return substr($digits, 0, 5) . '-' . substr($digits, 5, 3);
     }
 
-    protected function formatCnpj(string $cnpj): ?string
+    public function formatCnpj(string $cnpj): ?string
     {
         $digits = preg_replace('/\D/', '', $cnpj);
 

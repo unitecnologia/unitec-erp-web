@@ -138,6 +138,7 @@ final class ContaPagarBaixaService
      * @param  list<int>  $contaIds
      * @param  array{
      *     plano_conta_id?: int|null,
+     *     caixa_conta_id?: int|null,
      *     perc_juros?: float,
      *     juros?: float,
      *     perc_desconto?: float,
@@ -185,7 +186,7 @@ final class ContaPagarBaixaService
         $caixaContaId = null;
 
         if ($movimentaCaixa) {
-            $caixaContaId = (int) ($forma->conta_destino_id ?? 0);
+            $caixaContaId = (int) ($opcoes['caixa_conta_id'] ?? 0) ?: (int) ($forma->conta_destino_id ?? 0);
             if ($caixaContaId <= 0 || ! CaixaConta::query()->whereKey($caixaContaId)->where('ativo', true)->exists()) {
                 throw new InvalidArgumentException('A forma de pagamento não possui conta de destino válida para o caixa.');
             }

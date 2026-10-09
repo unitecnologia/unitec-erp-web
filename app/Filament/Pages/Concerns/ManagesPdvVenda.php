@@ -770,14 +770,22 @@ trait ManagesPdvVenda
 
     protected function persistCupomToSession(): void
     {
+        if ($this->descartarAlteracaoMesaAguardando()) {
+            return;
+        }
+
         session(['erp.pdv.cupom' => $this->cupomItens]);
+        $this->sincronizarMesaComCupom();
     }
 
     /**
+     * Com mesa aberta, apenas solta a mesa desta estação: os itens gravados nela permanecem.
+     *
      * @param  bool  $liberarImportacao  false ao suspender em espera (documento importado segue reservado).
      */
     protected function limparCupom(bool $liberarImportacao = true): void
     {
+        $this->desvincularMesaAtual();
         $this->cupomItens = [];
         $this->selectedCupomIndex = null;
         $this->pdvMostrarDetalheItem = false;
@@ -1255,6 +1263,10 @@ trait ManagesPdvVenda
             return;
         }
 
+        if ($this->mesaBloqueiaAlteracao()) {
+            return;
+        }
+
         // Delete / lixeira: sem item selecionado, não exclui nada.
         if (! $this->pdvMostrarDetalheItem
             || $this->selectedCupomIndex === null
@@ -1271,6 +1283,13 @@ trait ManagesPdvVenda
 
     public function confirmExcluirItemCupom(): void
     {
+        if ($this->mesaBloqueiaAlteracao()) {
+            $this->closePdvModal();
+            $this->dispatch('erp-pdv-focus-search');
+
+            return;
+        }
+
         if ($this->selectedCupomIndex === null || ! isset($this->cupomItens[$this->selectedCupomIndex])) {
             $this->closePdvModal();
             $this->dispatch('erp-pdv-focus-search');
@@ -1327,6 +1346,12 @@ trait ManagesPdvVenda
             return;
         }
 
+        if (trim($this->pdvSearch) !== '' && $this->mesaBloqueiaAlteracao()) {
+            $this->clearPdvSearch();
+            $this->dispatch('erp-pdv-focus-search');
+
+            return;
+        }
 
         if (trim($this->pdvSearch) === '') {
             // Com aviso de "não encontrado" aberto, Enter não fecha o aviso
@@ -1776,6 +1801,12 @@ trait ManagesPdvVenda
         ?int $productSerialId = null,
         ?string $descricaoOverride = null,
     ): void {
+        if ($this->mesaBloqueiaAlteracao()) {
+            $this->clearPdvSearch();
+
+            return;
+        }
+
         if (! $product->ativo) {
             Notification::make()
                 ->title('Produto inativo.')
@@ -2124,6 +2155,10 @@ trait ManagesPdvVenda
             return;
         }
 
+        if ($this->mesaBloqueiaAlteracao()) {
+            return;
+        }
+
         if ($this->pdvHotPathEnabled ?? false) {
             $this->loadCupomFromSession();
         }
@@ -2143,12 +2178,20 @@ trait ManagesPdvVenda
 
     public function confirmCancelarCupom(): void
     {
+        if ($this->mesaBloqueiaAlteracao()) {
+            $this->pdvConfirmCancelarVenda = false;
+            $this->dispatch('erp-pdv-focus-search');
+
+            return;
+        }
+
         if ($this->pdvHotPathEnabled ?? false) {
             $this->loadCupomFromSession();
         }
 
         $this->pdvConfirmCancelarVenda = false;
         $this->registrarItensCanceladosCupom($this->cupomItens);
+        $this->zerarItensMesaAtual();
         $this->limparCupom();
 
         Notification::make()
@@ -2299,7 +2342,7 @@ trait ManagesPdvVenda
 
         $this->finalizarPixPendingOperacao = null;
 
-        if (PdvFinalizarOperacao::solicitaConfirmacaoImpressao($operacao)) {
+        if (PdvFinalizarOperacao::solicitaConfirmacaoImpressao($operacao, $this->pdvConfig()->perguntarImprimir())) {
             $this->finalizarOperacaoPendente = $operacao;
             $this->finalizarConfirmImprimir = true;
             $this->dispatch('erp-pdv-hide-fiscal-progress');
@@ -2339,7 +2382,7 @@ trait ManagesPdvVenda
         $this->pdvImprimirPosVendaId = null;
 
         if ($imprimir && $vendaId) {
-            $this->imprimirNfceCupomPosVenda((int) $vendaId, 1);
+            $this->imprimirNfceCupomPosVenda((int) $vendaId, $this->pdvConfig()->viasImpressao());
         }
 
         $this->dispatch('erp-pdv-focus-search');
@@ -2516,10 +2559,7 @@ trait ManagesPdvVenda
 
         if ($imprimir) {
             $imprimirCallback = function (int $vendaId): void {
-                $this->imprimirCupomPosVenda(
-                    $vendaId,
-                    $this->pdvConfig()->pedidoDuasVias() ? 2 : 1,
-                );
+                $this->imprimirCupomPosVenda($vendaId);
             };
         }
 
@@ -2556,12 +2596,15 @@ trait ManagesPdvVenda
             return;
         }
 
-        $askPrintAfter = PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos($operacao);
+        $askPrintAfter = PdvFinalizarOperacao::solicitaConfirmacaoImpressaoApos(
+            $operacao,
+            $this->pdvConfig()->perguntarImprimir(),
+        );
         $imprimirCallback = null;
 
         if ($imprimir && ! $askPrintAfter) {
             $imprimirCallback = function (int $vendaId): void {
-                $this->imprimirNfceCupomPosVenda($vendaId, 1);
+                $this->imprimirNfceCupomPosVenda($vendaId, $this->pdvConfig()->viasImpressao());
             };
         }
 
@@ -2655,6 +2698,8 @@ trait ManagesPdvVenda
                 'fechado_em' => now(),
                 'aberto_em' => $this->resolveCupomIniciadoEm(),
             ]);
+
+            $this->baixarMesaNaVenda((int) $venda->id);
 
             foreach ($this->cupomItens as $item) {
                 PdvVendaItem::query()->create([
@@ -2781,6 +2826,10 @@ trait ManagesPdvVenda
             $troco,
         );
 
+        if ($dinheiro > 0.0001) {
+            $this->abrirGavetaAutomatica();
+        }
+
         // HTTP SEFAZ fora da transaction: evita NFC-e autorizada + rollback local.
         if ($emitirNfceAposCommit && $vendaId) {
             try {
@@ -2873,6 +2922,10 @@ trait ManagesPdvVenda
             $this->pdvImprimirPosVendaId = (int) $vendaId;
         }
 
+        if ($vendaId && $imprimir !== null) {
+            $imprimir((int) $vendaId);
+        }
+
         if ($this->offerEmitirBoletosPosDocumento($contasReceberCriadas)) {
             $this->dispatch('erp-pdv-focus-search');
             $this->dispatch('erp-pdv-caixa-opened');
@@ -2885,10 +2938,6 @@ trait ManagesPdvVenda
             $this->dispatch('erp-pdv-imprimir-pos-venda-opened');
 
             return;
-        }
-
-        if ($vendaId && $imprimir !== null) {
-            $imprimir((int) $vendaId);
         }
 
         // Sempre devolve o operador para o Código, pronto para a próxima venda.

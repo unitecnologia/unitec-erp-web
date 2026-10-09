@@ -146,16 +146,18 @@ trait ManagesPdvFinalizarTotais
         $this->finalizarPagamentos = $pagamentos;
     }
 
-    protected function imprimirCupomPosVenda(int $vendaId, int $copias = 1): void
+    /** Sem $copias usa o Nº de vias do terminal (pedido: no mínimo 2 se "pedido em duas vias"). */
+    protected function imprimirCupomPosVenda(int $vendaId, ?int $copias = null): void
     {
         $venda = PdvVenda::query()->find($vendaId);
 
         if (PdvNfceCupomPrinter::imprimeComoNfce($venda)) {
-            $this->imprimirNfceCupomPosVenda($vendaId, $copias);
+            $this->imprimirNfceCupomPosVenda($vendaId, $copias ?? $this->pdvConfig()->viasImpressao());
 
             return;
         }
 
+        $copias ??= $this->pdvConfig()->viasPedido();
         $url = route('erp.reports.pdv-cupom', ['venda' => $vendaId, 'auto' => 1]);
         $payload = json_encode(
             PdvNfceCupomPrinter::printPayload($url, $copias, $vendaId),

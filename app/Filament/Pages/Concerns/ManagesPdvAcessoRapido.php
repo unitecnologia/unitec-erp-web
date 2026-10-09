@@ -344,6 +344,10 @@ trait ManagesPdvAcessoRapido
             return;
         }
 
+        if ($this->mesaBloqueiaAlteracao()) {
+            return;
+        }
+
         if (! $this->caixaAberto) {
             Notification::make()
                 ->title('Caixa fechado.')

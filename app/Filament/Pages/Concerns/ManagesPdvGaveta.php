@@ -14,12 +14,31 @@ trait ManagesPdvGaveta
             return;
         }
 
-        $this->dispatch('erp-pdv-gaveta');
+        if (! $this->pdvConfig()->gavetaDisponivel()) {
+            $this->notifyPdvError(
+                'Gaveta indisponível.',
+                'Marque "Usa Gaveta" no Terminal e configure uma impressora de bobina (ESC/POS) com nome Windows.',
+            );
+
+            return;
+        }
+
+        $this->dispatch('erp-pdv-gaveta', printer: $this->pdvConfig()->impressoraNome(), manual: true);
 
         Notification::make()
             ->title('Abrir gaveta')
-            ->body('Comando enviado. Integração com gaveta física depende do equipamento local.')
+            ->body('Comando enviado à impressora do terminal.')
             ->success()
             ->send();
+    }
+
+    /** Após receber em dinheiro: só abre se o terminal usa gaveta e tem impressora compatível. */
+    protected function abrirGavetaAutomatica(): void
+    {
+        if (! $this->pdvConfig()->gavetaDisponivel()) {
+            return;
+        }
+
+        $this->dispatch('erp-pdv-gaveta', printer: $this->pdvConfig()->impressoraNome(), manual: false);
     }
 }

@@ -29,6 +29,7 @@ trait ManagesPdvUi
     use ManagesPdvGrade;
     use ManagesPdvImportar;
     use ManagesPdvMenuFiscal;
+    use ManagesPdvMesas;
     use ManagesPdvAcessoRapido;
     use ManagesPdvReceber;
     use ManagesPdvReimprimir;
@@ -186,11 +187,6 @@ trait ManagesPdvUi
         if ($this->sangriaForm['valor'] === '' || $this->sangriaForm['valor'] === null) {
             $this->sangriaForm['valor'] = '0,00';
         }
-    }
-
-    public function getCaixaTituloProperty(): string
-    {
-        return $this->caixaAberto ? 'CAIXA ABERTO' : 'CAIXA FECHADO';
     }
 
     public function getPersonOverlayUrlProperty(): string
@@ -408,6 +404,9 @@ trait ManagesPdvUi
                 'menu_fiscal_exportacao_xml' => $this->closeMenuFiscalExportacaoXml(),
                 'menu_fiscal_registros' => $this->closeMenuFiscalRegistros(),
                 'menu_fiscal_dav' => $this->closeMenuFiscalDav(),
+                'mesa_transferir' => $this->cancelTransferirMesa(),
+                'mesa_parcial_confirmar' => $this->cancelarParcialMesa(),
+                'mesa_reabrir' => $this->cancelReabrirMesa(),
                 default => $this->closePdvModal(),
             };
 
@@ -441,6 +440,10 @@ trait ManagesPdvUi
 
     public function confirmSairPdv(): void
     {
+        if (\App\Support\Erp\Pdv\PdvMesaSessao::atual() !== null) {
+            $this->limparCupom();
+        }
+
         ErpScreen::set('Principal');
 
         $this->redirect(Dashboard::getUrl(), navigate: false);
@@ -540,15 +543,6 @@ trait ManagesPdvUi
         Notification::make()
             ->title('NFC-e')
             ->body('Use o fechamento fiscal (F4/F6) no PDV para emitir NFC-e.')
-            ->info()
-            ->send();
-    }
-
-    public function moduleStubMesa(string $acao): void
-    {
-        Notification::make()
-            ->title($acao)
-            ->body('Módulo restaurante/mesas disponível no PDV desktop. Em implementação no web.')
             ->info()
             ->send();
     }

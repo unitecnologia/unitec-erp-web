@@ -3,17 +3,20 @@
 namespace App\Support\Erp\Compra;
 
 use App\Models\CaixaConta;
+use App\Models\CaixaLancamento;
 use App\Models\Compra;
 use App\Models\Estoque;
 use App\Models\FormaPagamento;
+use App\Models\PlanoConta;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\BrDecimal;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueMovimentacaoDocumento;
-use App\Support\Erp\Financeiro\ContaPagarBaixaService;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\Financeiro\ContaPagarCadastroService;
 use App\Support\Erp\Product\ProductPriceHistoryRecorder;
 use App\Support\Erp\ProductEstoqueSaldoService;
@@ -21,6 +24,7 @@ use App\Models\EstoqueMovimentacao;
 use DomainException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Finaliza o lançamento de compra: estoque / preço / financeiro conforme parâmetros,
@@ -33,7 +37,6 @@ final class FinalizarCompraLancamentoService
     public function __construct(
         private readonly ProductEstoqueSaldoService $saldos = new ProductEstoqueSaldoService(),
         private readonly ContaPagarCadastroService $contasPagar = new ContaPagarCadastroService(),
-        private readonly ContaPagarBaixaService $contasPagarBaixa = new ContaPagarBaixaService(),
         private readonly ErpOperacaoLogService $operacaoLog = new ErpOperacaoLogService(),
         private readonly ProductPriceHistoryRecorder $priceHistory = new ProductPriceHistoryRecorder(),
     ) {}
@@ -70,6 +73,7 @@ final class FinalizarCompraLancamentoService
         $estoqueId = $this->resolveEstoqueId($empresaId);
 
         $lotesFinalizados = [];
+        $caixaLancamentoIds = [];
 
         DB::transaction(function () use (
             $compra,
@@ -81,6 +85,7 @@ final class FinalizarCompraLancamentoService
             $parcelasFinanceiro,
             $totalOverride,
             &$lotesFinalizados,
+            &$caixaLancamentoIds,
         ): void {
             $travada = Compra::query()->whereKey($compra->id)->lockForUpdate()->first();
 
@@ -218,7 +223,7 @@ final class FinalizarCompraLancamentoService
             }
 
             if ($gerarFinanceiro) {
-                $this->gerarContasPagar($compra, $parcelasFinanceiro);
+                $caixaLancamentoIds = $this->gerarContasPagar($compra, $parcelasFinanceiro);
             }
 
             $compra->update([
@@ -243,6 +248,7 @@ final class FinalizarCompraLancamentoService
                 'total' => (float) $compra->total,
                 'parcelas' => $parcelasFinanceiro !== null ? count($parcelasFinanceiro) : ($gerarFinanceiro ? 1 : 0),
                 'lotes' => $lotesFinalizados,
+                'caixa_lancamentos' => $caixaLancamentoIds,
             ],
             empresaId: $empresaId,
         );
@@ -251,9 +257,12 @@ final class FinalizarCompraLancamentoService
     }
 
     /**
+     * Dinheiro/PIX saem direto do Livro Caixa; demais formas geram contas a pagar.
+     *
      * @param  list<array{documento?: string, vencimento: string, valor: float|string, forma_pagamento_id?: int|null, caixa_conta_id?: int|null}>|null  $parcelasFinanceiro
+     * @return list<int> ids dos lançamentos do Livro Caixa
      */
-    private function gerarContasPagar(Compra $compra, ?array $parcelasFinanceiro): void
+    private function gerarContasPagar(Compra $compra, ?array $parcelasFinanceiro): array
     {
         if (! $compra->fornecedor_id) {
             throw new DomainException('Compra sem fornecedor. Não é possível gerar contas a pagar.');
@@ -277,21 +286,30 @@ final class FinalizarCompraLancamentoService
                 throw new DomainException('Parcelas do financeiro com valor total zero.');
             }
 
-            $contas = $this->contasPagar->criarDeLista([
-                'emissao' => $emissao,
-                'fornecedor_id' => (int) $compra->fornecedor_id,
-                'historico' => $historico,
-                'documento' => $documentoBase,
-                'compra_id' => (int) $compra->id,
-            ], $parcelasFinanceiro);
+            $aPrazo = [];
+            $aVista = [];
+            foreach ($parcelasFinanceiro as $parcela) {
+                $forma = $this->formaAVista((int) ($parcela['forma_pagamento_id'] ?? 0));
+                if ($forma) {
+                    $aVista[] = ['parcela' => $parcela, 'forma' => $forma];
+                } else {
+                    $aPrazo[] = $parcela;
+                }
+            }
 
-            $this->baixarParcelasDinheiro(
-                $contas,
-                $parcelasFinanceiro,
-                ErpTimezone::toLocal()->toDateString(),
-            );
+            $caixaIds = $this->lancarParcelasAVistaNoCaixa($compra, $aVista);
 
-            return;
+            if ($aPrazo !== []) {
+                $this->contasPagar->criarDeLista([
+                    'emissao' => $emissao,
+                    'fornecedor_id' => (int) $compra->fornecedor_id,
+                    'historico' => $historico,
+                    'documento' => $documentoBase,
+                    'compra_id' => (int) $compra->id,
+                ], $aPrazo);
+            }
+
+            return $caixaIds;
         }
 
         $valor = (float) $compra->total;
@@ -315,54 +333,105 @@ final class FinalizarCompraLancamentoService
             'parcelas' => 1,
             'compra_id' => (int) $compra->id,
         ]);
+
+        return [];
+    }
+
+    private function formaAVista(int $formaId): ?FormaPagamento
+    {
+        if ($formaId <= 0) {
+            return null;
+        }
+
+        $forma = FormaPagamento::query()->whereKey($formaId)->where('ativo', true)->first();
+        if (! $forma) {
+            return null;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($forma->tipo ?? '')), 'UTF-8');
+        $movimento = mb_strtolower(trim((string) ($forma->tipo_movimento ?? '')), 'UTF-8');
+
+        return in_array($tipo, ['dinheiro', 'pix'], true) || $movimento === 'caixa' ? $forma : null;
     }
 
     /**
-     * Dinheiro e PIX: baixa imediata + saída no subcaixa informado.
-     * Boleto e demais formas a prazo permanecem em aberto.
+     * Saída direta no Livro Caixa (sem conta a pagar) para parcelas em dinheiro/PIX.
      *
-     * @param  list<\App\Models\ContaPagar>  $contas
-     * @param  list<array{forma_pagamento_id?: int|null, caixa_conta_id?: int|null}>  $parcelasFinanceiro
+     * @param  list<array{parcela: array<string, mixed>, forma: FormaPagamento}>  $aVista
+     * @return list<int>
      */
-    private function baixarParcelasDinheiro(array $contas, array $parcelasFinanceiro, string $pagoEm): void
+    private function lancarParcelasAVistaNoCaixa(Compra $compra, array $aVista): array
     {
-        foreach ($parcelasFinanceiro as $i => $parcela) {
-            $conta = $contas[$i] ?? null;
-            if (! $conta) {
-                continue;
-            }
+        if ($aVista === []) {
+            return [];
+        }
 
-            $formaId = (int) ($parcela['forma_pagamento_id'] ?? 0);
-            if ($formaId <= 0) {
-                continue;
-            }
+        $empresaId = (int) ($compra->empresa_id ?? 0);
+        $planoId = EmpresaParametros::planoCompraId($empresaId);
+        if (! $planoId) {
+            throw new DomainException('Configure o Plano de Contas de Compra (débito) nos parâmetros da empresa.');
+        }
 
-            $forma = FormaPagamento::query()->whereKey($formaId)->where('ativo', true)->first();
-            $tipo = mb_strtolower(trim((string) ($forma->tipo ?? '')), 'UTF-8');
-            if (! $forma || ! in_array($tipo, ['dinheiro', 'pix'], true)) {
-                continue;
+        $planoNome = mb_substr(mb_strtoupper((string) PlanoConta::query()->whereKey($planoId)->value('descricao'), 'UTF-8'), 0, 80);
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $fornecedor = trim((string) ($compra->fornecedor?->nome_razao ?? ''));
+        $base = 'COMPRA #'.$compra->numero
+            .($compra->numero_nota ? ' NF '.$compra->numero_nota : '')
+            .($fornecedor !== '' ? ' - '.$fornecedor : '');
+        $temEmpresa = Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id');
+        $ids = [];
+
+        foreach ($aVista as ['parcela' => $parcela, 'forma' => $forma]) {
+            $valor = round(ErpMoney::parseBr($parcela['valor'] ?? 0), 2);
+            if ($valor <= 0) {
+                throw new DomainException('Parcela em dinheiro ou PIX com valor inválido.');
             }
 
             $caixaId = (int) ($parcela['caixa_conta_id'] ?? 0);
-            if ($caixaId <= 0) {
-                throw new DomainException('Parcela em dinheiro ou PIX sem subcaixa informado.');
+            if ($caixaId > 0) {
+                $caixaOk = CaixaConta::query()
+                    ->whereKey($caixaId)
+                    ->where('ativo', true)
+                    ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
+                    ->exists();
+            } else {
+                $caixaId = (int) ($forma->conta_destino_id ?? 0);
+                $caixaOk = $caixaId > 0 && CaixaConta::query()->whereKey($caixaId)->where('ativo', true)->exists();
             }
-
-            $caixaOk = CaixaConta::query()
-                ->whereKey($caixaId)
-                ->where('ativo', true)
-                ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
-                ->exists();
 
             if (! $caixaOk) {
-                throw new DomainException('Subcaixa inválido na parcela em dinheiro ou PIX.');
+                throw new DomainException('Informe um subcaixa válido na parcela em dinheiro ou PIX.');
             }
 
-            $this->contasPagarBaixa->baixarUma((int) $conta->id, $formaId, [
+            $formaNome = mb_strtoupper(trim((string) ($forma->descricao ?? '')), 'UTF-8');
+            $documentoParcela = trim((string) ($parcela['documento'] ?? ''));
+
+            $payload = [
+                'codigo' => CaixaLancamento::nextCodigo(),
+                'emissao' => $hoje,
+                'documento' => mb_substr('COMPRA-'.$compra->numero, 0, 40),
+                'historico' => mb_substr(
+                    $base
+                    .(count($aVista) > 1 && $documentoParcela !== '' ? ' PARC '.$documentoParcela : '')
+                    .($formaNome !== '' ? ' ('.$formaNome.')' : ''),
+                    0,
+                    180,
+                ),
+                'plano_contas' => $planoNome !== '' ? $planoNome : null,
+                'plano_conta_id' => $planoId,
                 'caixa_conta_id' => $caixaId,
-                'pago_em' => $pagoEm,
-            ]);
+                'entrada' => 0,
+                'saida' => $valor,
+            ];
+
+            if ($temEmpresa) {
+                $payload['empresa_id'] = $empresaId > 0 ? $empresaId : ErpContext::currentEmpresaId();
+            }
+
+            $ids[] = (int) CaixaLancamento::query()->create($payload)->id;
         }
+
+        return $ids;
     }
 
     /**

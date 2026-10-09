@@ -5,6 +5,7 @@ namespace App\Livewire\Erp;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Pdv\PdvCaixaRapidoBipService;
 use App\Support\Erp\Pdv\PdvConfig;
+use App\Support\Erp\Pdv\PdvMesaSessao;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -77,8 +78,8 @@ class PdvHotPath extends Component
     {
         $code = is_string($codigo) ? $codigo : '';
 
-        // Fora do Caixa Rápido: delega ao PDV page (mesmas regras/modais).
-        if (! $this->pdvCaixaRapido) {
+        // Fora do Caixa Rápido ou mesa aguardando fechamento: delega ao PDV page (mesmas regras/modais/bloqueios).
+        if (! $this->pdvCaixaRapido || (trim($code) !== '' && PdvMesaSessao::aguardando())) {
             $this->delegateToParent($code);
 
             return;
@@ -128,6 +129,13 @@ class PdvHotPath extends Component
         $this->produtoNaoEncontradoCodigo = null;
 
         session(['erp.pdv.cupom' => $this->cupomItens]);
+
+        $mesaStatus = PdvMesaSessao::sincronizarCupom(array_values($this->cupomItens));
+        if ($mesaStatus === PdvMesaSessao::PERDIDA) {
+            $this->dispatch('erp-pdv-mesa-reserva-perdida');
+        } elseif ($mesaStatus === PdvMesaSessao::MUDOU) {
+            $this->dispatch('erp-pdv-mesas-poll');
+        }
 
         $this->dispatch('erp-pdv-item-added');
         $this->dispatch('erp-pdv-beep');
@@ -186,7 +194,11 @@ class PdvHotPath extends Component
 
     public function render(): View
     {
-        return view('livewire.erp.pdv-hot-path');
+        $mesa = PdvMesaSessao::atual();
+
+        return view('livewire.erp.pdv-hot-path', [
+            'mesaAberta' => $mesa !== null && ! $mesa['aguardando'],
+        ]);
     }
 
     protected function loadCupomFromSession(): void

@@ -113,9 +113,7 @@ trait ManagesPdvReimprimir
         }
 
         $vendaId = (int) ($this->reimprimirResults[$index]['venda_id'] ?? 0);
-        $copias = $this->pdvConfig()->pedidoDuasVias() ? 2 : 1;
-
-        $this->imprimirCupomPosVenda($vendaId, $copias);
+        $this->imprimirCupomPosVenda($vendaId);
         $this->closePdvModal();
 
         Notification::make()

@@ -372,6 +372,7 @@
 </div>
 
 @include('filament.components.erp.form-scripts')
+@include('filament.components.erp.grid-sort-script')
 <script>
     (function () {
         const NUM_SELECTOR = '.erp-fv-tv-root input[inputmode="decimal"], .erp-fv-tv-root input[inputmode="numeric"], .erp-fv-tv-root input[data-mask]';

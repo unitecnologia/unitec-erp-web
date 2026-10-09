@@ -18,7 +18,7 @@ use Illuminate\Contracts\Support\Htmlable;
 
 trait ErpTerminalFormPage
 {
-    public string $activeTerminalTab = 'impressora';
+    public string $activeTerminalTab = 'configuracoes';
 
     public function getHeading(): string | Htmlable | null
     {
@@ -85,7 +85,7 @@ trait ErpTerminalFormPage
      */
     public function terminalTabKeys(): array
     {
-        return ['configuracoes', 'balanca', 'tef'];
+        return ['configuracoes', 'balanca'];
     }
 
     public function saveForm(): void

@@ -520,23 +520,27 @@
         $custosGrade = $exibirCustoGrade ? $this->custosUnitariosGrade : [];
         $colspanGrade = $exibirCustoGrade ? 11 : 10;
     @endphp
-    <div class="erp-fv-tv__grid-wrap">
+    <div
+        class="erp-fv-tv__grid-wrap"
+        data-erp-csort="fv-tela-venda-itens"
+        data-erp-csort-scope="{{ auth()->id() ?? 0 }}"
+    >
         <table class="erp-fv-tv__grid">
             <thead>
                 <tr>
                     <th class="erp-fv-tv__col-del" title="Excluir item" aria-label="Excluir"></th>
-                    <th class="erp-fv-tv__col-idx">#</th>
-                    <th class="erp-fv-tv__col-cod">Código</th>
-                    <th>Produto</th>
-                    <th class="erp-fv-tv__col-num">Qtde</th>
-                    <th class="erp-fv-tv__col-num">Vlr. unit.</th>
+                    <th class="erp-fv-tv__col-idx" data-erp-csort-key="numero" data-erp-csort-type="number">#</th>
+                    <th class="erp-fv-tv__col-cod" data-erp-csort-key="codigo" data-erp-csort-type="text">Código</th>
+                    <th data-erp-csort-key="produto" data-erp-csort-type="text">Produto</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="quantidade" data-erp-csort-type="number">Qtde</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="preco_unitario" data-erp-csort-type="money">Vlr. unit.</th>
                     @if ($exibirCustoGrade)
-                        <th class="erp-fv-tv__col-num erp-fv-tv__col-custo">Custo</th>
+                        <th class="erp-fv-tv__col-num erp-fv-tv__col-custo" data-erp-csort-key="custo" data-erp-csort-type="money">Custo</th>
                     @endif
-                    <th class="erp-fv-tv__col-num">TT bruto</th>
-                    <th class="erp-fv-tv__col-num">Acrés.</th>
-                    <th class="erp-fv-tv__col-num">Desc.</th>
-                    <th class="erp-fv-tv__col-num">TT líq.</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="bruto" data-erp-csort-type="money">TT bruto</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="acrescimo" data-erp-csort-type="money">Acrés.</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="desconto" data-erp-csort-type="money">Desc.</th>
+                    <th class="erp-fv-tv__col-num" data-erp-csort-key="total" data-erp-csort-type="money">TT líq.</th>
                 </tr>
             </thead>
             <tbody>

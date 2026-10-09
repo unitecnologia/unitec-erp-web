@@ -669,6 +669,13 @@ trait ManagesPdvCaixa
 
         $this->pdvImprimirResumoCaixaSessaoId = $sessaoId;
         $this->pdvImprimirResumoCaixaDinheiro = $dinheiroInformado;
+
+        if (! $this->pdvConfig()->perguntarImprimir()) {
+            $this->confirmImprimirResumoCaixa(true);
+
+            return;
+        }
+
         $this->pdvConfirmImprimirResumoCaixa = true;
         $this->dispatch('erp-pdv-imprimir-resumo-caixa-opened');
     }
@@ -897,7 +904,7 @@ trait ManagesPdvCaixa
                         empresa: $empresa,
                         usuarioFallback: $user?->name,
                     ),
-                    1,
+                    $this->pdvConfig()->viasImpressao(),
                 ));
             }
         }
@@ -909,6 +916,13 @@ trait ManagesPdvCaixa
     {
         $this->pdvImprimirMovimentoCaixaId = $movimentoId;
         $this->pdvImprimirMovimentoCaixaTipo = $tipo;
+
+        if (! $this->pdvConfig()->perguntarImprimir()) {
+            $this->confirmImprimirMovimentoCaixa(true);
+
+            return;
+        }
+
         $this->pdvConfirmImprimirMovimentoCaixa = true;
         $this->dispatch('erp-pdv-imprimir-movimento-caixa-opened');
     }

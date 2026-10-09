@@ -13,6 +13,11 @@
 >
     {{-- Fonte única: mesmas telas/modais do PDV offline. --}}
     @include('pdvui::screen')
+
+    @if ($this->pdvExibeMesas)
+        @include('filament.components.erp.pdv.mesas.transferir-modal')
+        @include('filament.components.erp.pdv.mesas.confirm-modals')
+    @endif
 </div>
 
 @include('filament.components.erp.form-scripts')

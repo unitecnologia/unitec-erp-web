@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Compra;
 
+use App\Models\CaixaLancamento;
 use App\Models\Compra;
 use App\Models\ContaPagar;
 use App\Models\DevolucaoCompra;
@@ -10,6 +11,7 @@ use App\Models\ErpOperacaoLog;
 use App\Models\Product;
 use App\Models\ProductPriceHistory;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueMovimentacaoDocumento;
 use App\Support\Erp\Financeiro\ContaPagarEstornoService;
@@ -71,6 +73,7 @@ final class ReabrirCompraLancamentoService
 
             if ($params['gerar_financeiro']) {
                 $this->estornarFinanceiro($compra);
+                $this->estornarCaixa($params['caixa_lancamentos']);
             }
 
             $compra->update([
@@ -96,7 +99,7 @@ final class ReabrirCompraLancamentoService
     }
 
     /**
-     * @return array{gera_estoque: bool, ajusta_preco: bool, gerar_financeiro: bool, lotes: array<int, mixed>|null}
+     * @return array{gera_estoque: bool, ajusta_preco: bool, gerar_financeiro: bool, lotes: array<int, mixed>|null, caixa_lancamentos: list<int>}
      */
     private function parametrosFinalizacao(Compra $compra): array
     {
@@ -116,6 +119,9 @@ final class ReabrirCompraLancamentoService
             'lotes' => array_key_exists('lotes', $detalhes) && is_array($detalhes['lotes'])
                 ? $detalhes['lotes']
                 : null,
+            'caixa_lancamentos' => is_array($detalhes['caixa_lancamentos'] ?? null)
+                ? array_values(array_filter(array_map('intval', $detalhes['caixa_lancamentos'])))
+                : [],
         ];
     }
 
@@ -337,6 +343,46 @@ final class ReabrirCompraLancamentoService
             }
 
             $conta->delete();
+        }
+    }
+
+    /**
+     * Saídas diretas no Livro Caixa (dinheiro/PIX) voltam como entrada de estorno.
+     *
+     * @param  list<int>  $ids
+     */
+    private function estornarCaixa(array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $temEmpresa = \Illuminate\Support\Facades\Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id');
+
+        $lancamentos = CaixaLancamento::query()
+            ->whereIn('id', $ids)
+            ->where('saida', '>', 0)
+            ->get();
+
+        foreach ($lancamentos as $lancamento) {
+            $payload = [
+                'codigo' => CaixaLancamento::nextCodigo(),
+                'emissao' => $hoje,
+                'documento' => $lancamento->documento,
+                'historico' => mb_substr('ESTORNO '.trim((string) $lancamento->historico), 0, 180),
+                'plano_contas' => $lancamento->plano_contas,
+                'plano_conta_id' => $lancamento->plano_conta_id,
+                'caixa_conta_id' => $lancamento->caixa_conta_id,
+                'entrada' => (float) $lancamento->saida,
+                'saida' => 0,
+            ];
+
+            if ($temEmpresa) {
+                $payload['empresa_id'] = $lancamento->empresa_id;
+            }
+
+            CaixaLancamento::query()->create($payload);
         }
     }
 
