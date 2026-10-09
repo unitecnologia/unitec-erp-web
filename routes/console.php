@@ -22,3 +22,9 @@ Schedule::command('pix:consultar-pendentes')
     ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/pix-consultar-pendentes.log'));
+
+Schedule::command('unitec:hotfix --agendado')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/erp-hotfix-run.log'));

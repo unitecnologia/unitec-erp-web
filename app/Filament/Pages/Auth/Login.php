@@ -11,6 +11,7 @@ use App\Support\Erp\CnpjLookupService;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\Atualizacao\AtualizacaoLog;
 use App\Support\Erp\Atualizacao\AtualizacaoPasta;
+use App\Support\Erp\Hotfix\HotfixLauncher;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpUpdateProcessLauncher;
 use App\Support\Erp\License\LicencaRemotaService;
@@ -580,7 +581,7 @@ class Login extends BaseLogin
             return false;
         }
 
-        if ($snapshot->bloquearAtualizacao) {
+        if (! $snapshot->permiteAtualizacaoOficial()) {
             return true;
         }
 
@@ -601,6 +602,8 @@ class Login extends BaseLogin
             } else {
                 $target = session()->pull('url.intended', filament()->getUrl());
             }
+
+            HotfixLauncher::aposLogin($licencas->currentCnpj(), $snapshot);
         } catch (\Throwable $e) {
             Log::warning('Falha ao validar licença no login.', [
                 'message' => $e->getMessage(),

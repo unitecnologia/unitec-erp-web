@@ -441,44 +441,68 @@ final class OrdemServicoReportData
      */
     private static function contasReceberOs(OrdemServico $ordem): Collection
     {
-        $documento = 'OS-'.preg_replace('/\D/', '', (string) $ordem->numero);
-        $numero = trim((string) $ordem->numero);
+        if (OrdemServicoFinanceiroVinculo::documentoBase($ordem) === null) {
+            return collect();
+        }
 
-        return ContaReceber::query()
-            ->when($ordem->empresa_id, fn ($q) => $q->where('empresa_id', (int) $ordem->empresa_id))
-            ->where(function ($q) use ($documento, $numero, $ordem): void {
-                $q->where('documento', 'like', $documento.'%')
-                    ->orWhere('historico', 'like', 'OS '.$numero.'%');
-
-                if ($ordem->cliente_id) {
-                    $q->orWhere(function ($inner) use ($ordem, $documento): void {
-                        $inner->where('cliente_id', (int) $ordem->cliente_id)
-                            ->where('documento', 'like', $documento.'%');
-                    });
-                }
-            })
+        return OrdemServicoFinanceiroVinculo::aplicar(ContaReceber::query(), $ordem)
             ->orderBy('emissao')
             ->orderBy('id')
             ->get();
     }
 
     /**
+     * Entradas de caixa da OS ainda válidas: o estorno da reabertura (OsReabrirService) grava
+     * uma saída no mesmo documento/conta e anula as entradas anteriores.
+     *
      * @return \Illuminate\Support\Collection<int, CaixaLancamento>
      */
     private static function caixaLancamentosOs(OrdemServico $ordem): Collection
     {
-        $documento = 'OS-'.preg_replace('/\D/', '', (string) $ordem->numero);
-        $numero = trim((string) $ordem->numero);
+        if (OrdemServicoFinanceiroVinculo::documentoBase($ordem) === null) {
+            return collect();
+        }
 
-        return CaixaLancamento::query()
-            ->when($ordem->empresa_id, fn ($q) => $q->where('empresa_id', (int) $ordem->empresa_id))
-            ->where(function ($q) use ($documento, $numero): void {
-                $q->where('documento', $documento)
-                    ->orWhere('historico', 'like', 'OS '.$numero.'%');
-            })
-            ->orderBy('emissao')
+        $lancamentos = OrdemServicoFinanceiroVinculo::aplicar(CaixaLancamento::query(), $ordem)
             ->orderBy('id')
             ->get();
+
+        $validas = collect();
+        $grupos = $lancamentos->groupBy(
+            static fn (CaixaLancamento $l): string => ((int) ($l->caixa_conta_id ?? 0)).'|'.(string) $l->documento
+        );
+
+        foreach ($grupos as $grupo) {
+            $pendentes = [];
+            $liquido = 0.0;
+
+            foreach ($grupo as $lancamento) {
+                $entrada = (float) ($lancamento->entrada ?? 0);
+                $saida = (float) ($lancamento->saida ?? 0);
+
+                if ($entrada > 0.0001) {
+                    $pendentes[] = $lancamento;
+                    $liquido += $entrada;
+                }
+
+                if ($saida > 0.0001) {
+                    $liquido -= $saida;
+
+                    if ($liquido <= 0.0001) {
+                        $pendentes = [];
+                        $liquido = 0.0;
+                    }
+                }
+            }
+
+            foreach ($pendentes as $lancamento) {
+                $validas->push($lancamento);
+            }
+        }
+
+        return $validas
+            ->sortBy(static fn (CaixaLancamento $l): string => (optional($l->emissao)?->format('Y-m-d') ?? '').'|'.str_pad((string) $l->id, 12, '0', STR_PAD_LEFT))
+            ->values();
     }
 
     private static function formaDoHistorico(string $historico): string

@@ -19,6 +19,15 @@ final class LicencaSnapshot
 
     public const STATUS_DESABILITADO = 'desabilitado';
 
+    public const MODO_ATUALIZACAO_NORMAL = 'normal';
+
+    public const MODO_ATUALIZACAO_HOTFIX = 'hotfix';
+
+    public const MODO_ATUALIZACAO_BLOQUEADO = 'bloqueado';
+
+    /**
+     * @param  ?string  $modoAtualizacao  null = portal sem o campo (vale só bloquear_atualizacao)
+     */
     public function __construct(
         public readonly string $status,
         public readonly ?string $validoAte = null,
@@ -28,7 +37,33 @@ final class LicencaSnapshot
         public readonly ?int $quantidadeComputadores = null,
         public readonly ?int $quantidadeTelefones = null,
         public readonly bool $fromCache = false,
+        public readonly ?string $modoAtualizacao = null,
     ) {}
+
+    public static function normalizeModoAtualizacao(mixed $value): ?string
+    {
+        $modo = strtolower(trim((string) ($value ?? '')));
+
+        return in_array($modo, [
+            self::MODO_ATUALIZACAO_NORMAL,
+            self::MODO_ATUALIZACAO_HOTFIX,
+            self::MODO_ATUALIZACAO_BLOQUEADO,
+        ], true) ? $modo : null;
+    }
+
+    public function permiteAtualizacaoOficial(): bool
+    {
+        if ($this->modoAtualizacao !== null) {
+            return $this->modoAtualizacao === self::MODO_ATUALIZACAO_NORMAL;
+        }
+
+        return ! $this->bloquearAtualizacao;
+    }
+
+    public function permiteHotfix(): bool
+    {
+        return $this->modoAtualizacao === self::MODO_ATUALIZACAO_HOTFIX;
+    }
 
     public function isAllowed(): bool
     {
@@ -60,7 +95,7 @@ final class LicencaSnapshot
     }
 
     /**
-     * @return array{status: string, valido_ate: ?string, nome: ?string, mensagem: ?string, bloquear_atualizacao: bool, quantidade_computadores: ?int, quantidade_telefones: ?int, from_cache: bool}
+     * @return array{status: string, valido_ate: ?string, nome: ?string, mensagem: ?string, bloquear_atualizacao: bool, quantidade_computadores: ?int, quantidade_telefones: ?int, from_cache: bool, modo_atualizacao: ?string}
      */
     public function toArray(): array
     {
@@ -73,11 +108,12 @@ final class LicencaSnapshot
             'quantidade_computadores' => $this->quantidadeComputadores,
             'quantidade_telefones' => $this->quantidadeTelefones,
             'from_cache' => $this->fromCache,
+            'modo_atualizacao' => $this->modoAtualizacao,
         ];
     }
 
     /**
-     * @param  array{status?: string, valido_ate?: ?string, nome?: ?string, mensagem?: ?string, bloquear_atualizacao?: bool, quantidade_computadores?: ?int, quantidade_telefones?: ?int}  $data
+     * @param  array{status?: string, valido_ate?: ?string, nome?: ?string, mensagem?: ?string, bloquear_atualizacao?: bool, quantidade_computadores?: ?int, quantidade_telefones?: ?int, modo_atualizacao?: ?string}  $data
      */
     public static function fromArray(array $data, bool $fromCache = false): self
     {
@@ -90,6 +126,7 @@ final class LicencaSnapshot
             quantidadeComputadores: self::normalizeQuota($data['quantidade_computadores'] ?? null),
             quantidadeTelefones: self::normalizeQuota($data['quantidade_telefones'] ?? null),
             fromCache: $fromCache,
+            modoAtualizacao: self::normalizeModoAtualizacao($data['modo_atualizacao'] ?? null),
         );
     }
 
