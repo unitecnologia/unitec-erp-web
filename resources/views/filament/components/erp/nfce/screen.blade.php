@@ -5,6 +5,8 @@
 @endphp
 
 <div class="erp-nfe" wire:ignore.self>
+    @include('filament.components.erp.nfce.grid-columns-style')
+
     <div class="erp-nfe__filters">
         <div class="erp-nfe__filters-row">
             @include('filament.components.erp.empresa-badge', [

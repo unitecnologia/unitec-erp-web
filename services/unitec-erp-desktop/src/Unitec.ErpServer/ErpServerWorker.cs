@@ -92,7 +92,7 @@ public sealed class ErpServerWorker : BackgroundService
             DesktopLog.Write(_appPath,
                 $"Laravel schedule:run alinhado a cada 1 min (próximo UTC {_nextScheduleRunUtc:HH:mm:ss})");
 
-            // Hotfix: verificação imediata ao iniciar/reiniciar, sem esperar login nem o ciclo de 10 min.
+            // Hotfix: verificação imediata ao iniciar/reiniciar, sem esperar login nem o ciclo de 5 min.
             QueueHotfixCheckOnStart();
         }
         catch (OperationCanceledException) when (IsStopping(stoppingToken))

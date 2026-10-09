@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Nfce\NfceConsumidorIdentificado;
 use App\Filament\Resources\NfceResource\Pages;
 use App\Models\PdvVendaNfce;
 use BackedEnum;
@@ -55,7 +56,7 @@ class NfceResource extends Resource
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('numero')
-                    ->label('Número')
+                    ->label('NFC-e')
                     ->sortable()
                     ->alignCenter()
                     ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
@@ -101,12 +102,26 @@ class NfceResource extends Resource
                         return (string) $raw;
                     })
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('cliente_nome')
+                    ->label('Cliente')
+                    ->placeholder('—')
+                    ->getStateUsing(function (PdvVendaNfce $record): ?string {
+                        $venda = $record->pdvVenda;
+                        if ($venda === null) {
+                            return null;
+                        }
+
+                        $nota = trim((string) ($venda->nome_nota ?? ''));
+                        if ($nota !== '' && filled($venda->cpf_nota)) {
+                            return $nota;
+                        }
+
+                        return NfceConsumidorIdentificado::nome($venda->person);
+                    })
+                    ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
+                    ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.sessao.terminal.nome')
                     ->label('Caixa')
-                    ->placeholder('—')
-                    ->weight(FontWeight::SemiBold),
-                TextColumn::make('pdvVenda.user.name')
-                    ->label('Usuário')
                     ->placeholder('—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.vendedor.nome')
@@ -116,13 +131,29 @@ class NfceResource extends Resource
                         ? (string) $state
                         : (string) ($record->pdvVenda?->vendedor_nome ?: '—'))
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('desc_acres')
+                    ->label('Desc/Acrés')
+                    ->alignEnd()
+                    ->getStateUsing(fn (PdvVendaNfce $record): float => round(
+                        (float) ($record->pdvVenda?->acrescimo ?? 0) - (float) ($record->pdvVenda?->desconto ?? 0),
+                        2
+                    ))
+                    ->formatStateUsing(fn ($state): string => (float) $state == 0.0
+                        ? '0,00'
+                        : ((float) $state > 0 ? '+' : '-').number_format(abs((float) $state), 2, ',', '.'))
+                    ->color(fn ($state): ?string => match (true) {
+                        (float) $state < 0 => 'danger',
+                        (float) $state > 0 => 'success',
+                        default => null,
+                    })
+                    ->weight(FontWeight::SemiBold),
                 ViewColumn::make('total')
                     ->label('Total')
                     ->view('filament.components.erp.nfce.columns.total')
                     ->alignEnd()
                     ->disabledClick(),
                 TextColumn::make('pdvVenda.venda.numero')
-                    ->label('Numero')
+                    ->label('Pedido')
                     ->alignCenter()
                     ->placeholder('—')
                     ->formatStateUsing(function (?string $state): string {

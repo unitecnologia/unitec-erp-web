@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Process;
  */
 final class HotfixLauncher
 {
-    private const INTERVALO_SEGUNDOS = 600;
+    private const INTERVALO_SEGUNDOS = 300;
 
     public static function aposLogin(?string $cnpj, ?LicencaSnapshot $snapshot): void
     {
