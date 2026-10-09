@@ -297,6 +297,7 @@ class LicencaRemotaService
             quantidadeComputadores: $snapshot->quantidadeComputadores,
             quantidadeTelefones: $snapshot->quantidadeTelefones,
             fromCache: $snapshot->fromCache,
+            modoAtualizacao: $snapshot->modoAtualizacao,
         );
     }
 
@@ -711,6 +712,7 @@ class LicencaRemotaService
             bloquearAtualizacao: filter_var($payload['bloquear_atualizacao'] ?? false, FILTER_VALIDATE_BOOLEAN),
             quantidadeComputadores: $this->normalizeQuota($payload['quantidade_computadores'] ?? null),
             quantidadeTelefones: $this->normalizeQuota($payload['quantidade_telefones'] ?? null),
+            modoAtualizacao: LicencaSnapshot::normalizeModoAtualizacao($payload['modo_atualizacao'] ?? null),
         );
     }
 
@@ -811,6 +813,7 @@ class LicencaRemotaService
                 quantidadeComputadores: $snapshot->quantidadeComputadores,
                 quantidadeTelefones: $snapshot->quantidadeTelefones,
                 fromCache: true,
+                modoAtualizacao: $snapshot->modoAtualizacao,
             );
         }
 
@@ -841,6 +844,7 @@ class LicencaRemotaService
                     quantidadeComputadores: $snapshot->quantidadeComputadores,
                     quantidadeTelefones: $snapshot->quantidadeTelefones,
                     fromCache: true,
+                    modoAtualizacao: $snapshot->modoAtualizacao,
                 );
             }
 
@@ -857,6 +861,7 @@ class LicencaRemotaService
                     quantidadeComputadores: $snapshot->quantidadeComputadores,
                     quantidadeTelefones: $snapshot->quantidadeTelefones,
                     fromCache: true,
+                    modoAtualizacao: $snapshot->modoAtualizacao,
                 );
             }
         }

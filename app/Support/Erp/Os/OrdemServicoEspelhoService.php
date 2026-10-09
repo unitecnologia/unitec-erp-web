@@ -46,8 +46,7 @@ final class OrdemServicoEspelhoService
             'imagens',
         ]);
 
-        $documento = 'OS-'.preg_replace('/\D/', '', (string) $ordem->numero);
-        $contas = $this->contasReceber($ordem, $documento);
+        $contas = $this->contasReceber($ordem);
         $boletos = $this->boletos($contas);
         $estoque = $this->estoque($ordem);
         $notas = $this->notasFiscais($ordem);
@@ -186,23 +185,13 @@ final class OrdemServicoEspelhoService
     /**
      * @return \Illuminate\Support\Collection<int, ContaReceber>
      */
-    private function contasReceber(OrdemServico $ordem, string $documento)
+    private function contasReceber(OrdemServico $ordem)
     {
-        $numero = trim((string) $ordem->numero);
+        if (OrdemServicoFinanceiroVinculo::documentoBase($ordem) === null) {
+            return collect();
+        }
 
-        return ContaReceber::query()
-            ->when($ordem->empresa_id, fn ($q) => $q->where('empresa_id', (int) $ordem->empresa_id))
-            ->where(function ($q) use ($documento, $numero, $ordem): void {
-                $q->where('documento', $documento)
-                    ->orWhere('historico', 'like', 'OS '.$numero.'%');
-
-                if ($ordem->cliente_id) {
-                    $q->orWhere(function ($inner) use ($ordem, $documento): void {
-                        $inner->where('cliente_id', (int) $ordem->cliente_id)
-                            ->where('documento', $documento);
-                    });
-                }
-            })
+        return OrdemServicoFinanceiroVinculo::aplicar(ContaReceber::query(), $ordem)
             ->orderBy('emissao')
             ->orderBy('id')
             ->get();

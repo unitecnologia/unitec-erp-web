@@ -98,3 +98,5 @@ frankenphp-worker.php
 /backup-antes-restauracao-fiscal.patch
 /app/Support/Erp/Nfse/referencia-teste-real.txt
 /scripts/sql/consolidar-boleto-formas-heidisql.sql
+hotfix-privada*
+/chaves-unitec/

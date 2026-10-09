@@ -203,16 +203,11 @@ final class OrdemServicoEnvioAnexosService
      */
     private function boletosDaOs(OrdemServico $ordem): array
     {
-        $documento = 'OS-'.preg_replace('/\D/', '', (string) $ordem->numero);
-        $numero = trim((string) $ordem->numero);
+        if (OrdemServicoFinanceiroVinculo::documentoBase($ordem) === null) {
+            return [];
+        }
 
-        $contaIds = ContaReceber::query()
-            ->when($ordem->empresa_id, fn ($q) => $q->where('empresa_id', (int) $ordem->empresa_id))
-            ->where(function ($q) use ($documento, $numero): void {
-                $q->where('documento', $documento)
-                    ->orWhere('documento', 'like', $documento.'-%')
-                    ->orWhere('historico', 'like', 'OS '.$numero.'%');
-            })
+        $contaIds = OrdemServicoFinanceiroVinculo::aplicar(ContaReceber::query(), $ordem)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)

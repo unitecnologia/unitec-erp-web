@@ -59,8 +59,7 @@ final class OrdemServicoEspelhoData
         $assinatura = $ordem->imagens
             ->first(static fn (OrdemServicoImagem $img): bool => $img->tipo === OrdemServicoImagem::TIPO_ASSINATURA);
 
-        $documento = 'OS-'.preg_replace('/\D/', '', (string) $ordem->numero);
-        $contas = self::contasDaOs($ordem, $documento);
+        $contas = self::contasDaOs($ordem);
         $contaIds = $contas->pluck('id')->all();
         $boletos = $contaIds === []
             ? collect()
@@ -151,22 +150,13 @@ final class OrdemServicoEspelhoData
     /**
      * @return \Illuminate\Support\Collection<int, ContaReceber>
      */
-    private static function contasDaOs(OrdemServico $ordem, string $documento)
+    private static function contasDaOs(OrdemServico $ordem)
     {
-        $numero = trim((string) $ordem->numero);
-        $digits = preg_replace('/\D/', '', $numero) ?: '';
+        if (OrdemServicoFinanceiroVinculo::documentoBase($ordem) === null) {
+            return collect();
+        }
 
-        return ContaReceber::query()
-            ->when($ordem->empresa_id, fn ($q) => $q->where('empresa_id', (int) $ordem->empresa_id))
-            ->where(function ($q) use ($documento, $numero, $digits): void {
-                $q->where('documento', $documento);
-                if ($numero !== '') {
-                    $q->orWhere('historico', 'like', 'OS '.$numero.'%');
-                }
-                if ($digits !== '' && $digits !== $numero) {
-                    $q->orWhere('historico', 'like', 'OS '.$digits.'%');
-                }
-            })
+        return OrdemServicoFinanceiroVinculo::aplicar(ContaReceber::query(), $ordem)
             ->orderBy('id')
             ->get();
     }
