@@ -23,8 +23,8 @@ Schedule::command('pix:consultar-pendentes')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/pix-consultar-pendentes.log'));
 
+// Exclusão mútua pelo flock do próprio comando (liberado pelo SO se o processo morrer);
+// o mutex de cache do withoutOverlapping/runInBackground podia ficar preso por 24h no Windows.
 Schedule::command('unitec:hotfix --agendado')
-    ->hourly()
-    ->withoutOverlapping()
-    ->runInBackground()
+    ->everyTenMinutes()
     ->appendOutputTo(storage_path('logs/erp-hotfix-run.log'));

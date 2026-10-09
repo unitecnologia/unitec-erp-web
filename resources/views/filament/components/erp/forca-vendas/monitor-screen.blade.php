@@ -11,16 +11,41 @@
         : '';
 @endphp
 
-<div class="erp-fv-mon-root" wire:poll.5s="pollRefresh">
+<div class="erp-fv-mon-root">
 <div class="erp-nfe erp-fv-mon" wire:ignore.self>
 
     {{-- Cabeçalho com contador de próxima atualização --}}
+    {{-- O contador dispara o poll (5s); pausa com a aba oculta e atualiza ao voltar. --}}
     <div class="erp-fv-mon__topbar">
         <span class="erp-fv-mon__topbar-title">Monitor de Recebimento de Vendas</span>
         <span
             class="erp-fv-mon__topbar-count"
-            x-data="{ s: 5 }"
-            x-init="setInterval(() => { s = s > 0 ? s - 1 : 5 }, 1000)"
+            x-data="{
+                s: 5,
+                busy: false,
+                timer: null,
+                onVis: null,
+                init() {
+                    this.timer = setInterval(() => this.tick(), 1000);
+                    this.onVis = () => { if (! document.hidden) this.poll(); };
+                    document.addEventListener('visibilitychange', this.onVis);
+                },
+                destroy() {
+                    clearInterval(this.timer);
+                    document.removeEventListener('visibilitychange', this.onVis);
+                },
+                tick() {
+                    if (document.hidden) return;
+                    this.s = this.s > 0 ? this.s - 1 : 0;
+                    if (this.s === 0) this.poll();
+                },
+                poll() {
+                    this.s = 5;
+                    if (this.busy) return;
+                    this.busy = true;
+                    this.$wire.pollRefresh().finally(() => { this.busy = false; });
+                },
+            }"
         >
             Próxima Atualização:
             <strong x-text="'00:00:' + String(s).padStart(2, '0')">00:00:05</strong>

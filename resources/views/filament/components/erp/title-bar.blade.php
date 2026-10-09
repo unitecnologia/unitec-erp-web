@@ -2,8 +2,10 @@
     use App\Support\Erp\CloudflaredStatus;
     use App\Support\Erp\ErpContext;
     use App\Support\Erp\ErpSystemConfig;
+    use App\Support\Erp\Hotfix\HotfixEstado;
 
     $statusItems = filament()->auth()->check() ? ErpContext::statusBar() : [];
+    $hotfix = isset($statusItems['Versão']) ? HotfixEstado::ativo((string) $statusItems['Versão']) : null;
     $cloud = null;
     if (filament()->auth()->check() && ErpSystemConfig::acessoRemotoHabilitado()) {
         $cloud = CloudflaredStatus::forUi();
@@ -45,6 +47,12 @@
                         ])
                         @if ($label === 'Atualizado Em') id="erp-status-updated-at" @endif
                     >{{ $value }}</span>
+                    @if ($label === 'Versão' && $hotfix !== null)
+                        <span
+                            class="erp-title-bar__status-hotfix"
+                            title="Hotfix {{ $hotfix['id'] }} instalado{{ $hotfix['aplicado_em'] !== '' ? ' em '.$hotfix['aplicado_em'] : '' }}"
+                        >| {{ $hotfix['rotulo'] }}</span>
+                    @endif
                 </div>
             @endforeach
         </div>

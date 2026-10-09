@@ -181,6 +181,12 @@ body,
     color: #fde68a;
 }
 
+.erp-title-bar__status-hotfix {
+    font-weight: 600;
+    color: #bfdbfe;
+    cursor: default;
+}
+
 .erp-title-bar__user {
     display: flex;
     align-items: baseline;

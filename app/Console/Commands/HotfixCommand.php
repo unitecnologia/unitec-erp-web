@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 class HotfixCommand extends Command
 {
     protected $signature = 'unitec:hotfix
-        {--agendado : Só consulta o portal se alguma empresa estava com hotfix liberado}
+        {--agendado : Execução do agendador: pacote negado pelo portal só é reconsultado após 1 hora}
         {--reverter : Reverte o último hotfix aplicado}
         {--verificar= : (interno) JSON com classes a carregar após aplicar}';
 

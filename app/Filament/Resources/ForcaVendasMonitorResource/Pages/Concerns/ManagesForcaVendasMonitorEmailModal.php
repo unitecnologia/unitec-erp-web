@@ -324,7 +324,7 @@ trait ManagesForcaVendasMonitorEmailModal
 
         if ($order instanceof ForcaVendasOrder) {
             $order->registrarEnvioEmail();
-            $this->resetTable();
+            $this->atualizarTabelaMantendoPagina();
         }
     }
 
@@ -427,7 +427,7 @@ trait ManagesForcaVendasMonitorEmailModal
 
         if ($order instanceof ForcaVendasOrder) {
             $order->registrarEnvioWhatsApp($this->whatsAppTo);
-            $this->resetTable();
+            $this->atualizarTabelaMantendoPagina();
         }
     }
 
