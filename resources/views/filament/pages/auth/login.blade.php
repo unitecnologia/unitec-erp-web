@@ -18,8 +18,12 @@
                 </div>
 
                 <div class="unitec-login__meta">
+                    @php
+                        $loginVersao = \App\Support\Erp\ErpUpdateService::readInstalledVersion();
+                        $loginHotfix = \App\Support\Erp\Hotfix\HotfixEstado::ativo((string) $loginVersao);
+                    @endphp
                     <p class="unitec-login__version" aria-label="Versão do sistema">
-                        Versão {{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}
+                        Versão {{ $loginVersao }}@if ($loginHotfix !== null) <span title="Hotfix {{ $loginHotfix['id'] }} instalado{{ $loginHotfix['aplicado_em'] !== '' ? ' em '.$loginHotfix['aplicado_em'] : '' }}">| {{ $loginHotfix['rotulo'] }}</span>@endif
                     </p>
                     <p class="unitec-login__copyright">
                         © Unitecnologia Sistemas LTDA

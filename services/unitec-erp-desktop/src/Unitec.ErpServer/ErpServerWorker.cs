@@ -7,6 +7,7 @@ public sealed class ErpServerWorker : BackgroundService
 {
     private static readonly TimeSpan ScheduleInterval = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan ScheduleRunTimeout = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan HotfixStartTimeout = TimeSpan.FromMinutes(10);
 
     private readonly ILogger<ErpServerWorker> _logger;
     private readonly string _appPath;
@@ -90,6 +91,9 @@ public sealed class ErpServerWorker : BackgroundService
             _nextScheduleRunUtc = NextAlignedScheduleUtc(DateTime.UtcNow);
             DesktopLog.Write(_appPath,
                 $"Laravel schedule:run alinhado a cada 1 min (próximo UTC {_nextScheduleRunUtc:HH:mm:ss})");
+
+            // Hotfix: verificação imediata ao iniciar/reiniciar, sem esperar login nem o ciclo de 10 min.
+            QueueHotfixCheckOnStart();
         }
         catch (OperationCanceledException) when (IsStopping(stoppingToken))
         {
@@ -328,6 +332,48 @@ public sealed class ErpServerWorker : BackgroundService
             DesktopLog.Write(_appPath, "schedule:run erro: " + ex.Message);
             _logger.LogWarning(ex, "Falha ao executar artisan schedule:run (ERP continua ativo)");
         }
+    }
+
+    /// <summary>
+    /// Roda <c>php artisan unitec:hotfix</c> uma vez, em segundo plano. Autorização, assinatura,
+    /// backup e rollback ficam no comando PHP; a trava de arquivo dele evita concorrer com o agendador.
+    /// </summary>
+    private void QueueHotfixCheckOnStart()
+    {
+        _ = Task.Run(() =>
+        {
+            if (Volatile.Read(ref _stopping) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var php = ErpPaths.ResolvePhpExe(_appPath);
+                DesktopLog.Write(_appPath, "Hotfix: verificacao ao iniciar o servico");
+
+                using var proc = ProcessHelper.StartHidden(
+                    php, "-d opcache.enable_cli=0 artisan unitec:hotfix", _appPath);
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+
+                if (!proc.WaitForExit((int)HotfixStartTimeout.TotalMilliseconds))
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { /* ignore */ }
+
+                    DesktopLog.Write(_appPath, "Hotfix ao iniciar: TIMEOUT — processo encerrado");
+                    return;
+                }
+
+                var saida = (stdoutTask.GetAwaiter().GetResult() + " " + stderrTask.GetAwaiter().GetResult()).Trim();
+                DesktopLog.Write(_appPath,
+                    $"Hotfix ao iniciar: exit={proc.ExitCode}" + (saida.Length > 0 ? $" {TruncateForLog(saida)}" : ""));
+            }
+            catch (Exception ex)
+            {
+                DesktopLog.Write(_appPath, "Hotfix ao iniciar erro: " + ex.Message);
+            }
+        });
     }
 
     /// <summary>

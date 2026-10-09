@@ -2,7 +2,7 @@
 
 namespace App\Support\Erp\Hotfix;
 
-use App\Support\Erp\License\LicencaSnapshot;
+use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -16,6 +16,9 @@ final class HotfixEstado
 {
     /** @var resource|null */
     private static $lock = null;
+
+    /** @var array{rotulo: string, id: string, aplicado_em: string}|false|null */
+    private static array|false|null $ativoMemo = null;
 
     public static function root(): string
     {
@@ -33,6 +36,45 @@ final class HotfixEstado
     public static function ler(): array
     {
         return self::lerJson(self::path('estado.json'));
+    }
+
+    /**
+     * Hotfix em vigor na versão instalada, para a barra superior (só leitura de arquivo local, uma vez por requisição).
+     * Após reverter, o estado não tem revisão; após atualização oficial, versao_base deixa de bater.
+     *
+     * @return array{rotulo: string, id: string, aplicado_em: string}|null
+     */
+    public static function ativo(string $versaoInstalada): ?array
+    {
+        if (self::$ativoMemo !== null) {
+            return self::$ativoMemo ?: null;
+        }
+
+        self::$ativoMemo = false;
+
+        try {
+            $estado = self::ler();
+            $revisao = (int) ($estado['revisao'] ?? 0);
+
+            if ($revisao >= 1 && $versaoInstalada !== '' && ($estado['versao_base'] ?? null) === $versaoInstalada) {
+                $aplicadoEm = (string) ($estado['aplicado_em'] ?? '');
+
+                try {
+                    $aplicadoEm = $aplicadoEm !== '' ? ErpTimezone::toLocal($aplicadoEm)->format('d/m/Y H:i') : '';
+                } catch (\Throwable) {
+                    $aplicadoEm = '';
+                }
+
+                self::$ativoMemo = [
+                    'rotulo' => 'HF'.$revisao,
+                    'id' => (string) ($estado['id'] ?? ''),
+                    'aplicado_em' => $aplicadoEm,
+                ];
+            }
+        } catch (\Throwable) {
+        }
+
+        return self::$ativoMemo ?: null;
     }
 
     /**
@@ -68,11 +110,6 @@ final class HotfixEstado
         $modos = is_array($data['modos'] ?? null) ? $data['modos'] : [];
 
         return array_map(static fn (mixed $m): ?string => is_string($m) ? $m : null, $modos);
-    }
-
-    public static function algumaPermiteHotfix(): bool
-    {
-        return in_array(LicencaSnapshot::MODO_ATUALIZACAO_HOTFIX, self::permissoes(), true);
     }
 
     public static function lembrarPermissao(string $cnpj, ?string $modo): void

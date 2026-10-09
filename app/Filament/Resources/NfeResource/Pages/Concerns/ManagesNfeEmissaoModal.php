@@ -1732,7 +1732,7 @@ trait ManagesNfeEmissaoModal
             return;
         }
 
-        if (preg_match('/^(\d{3,4})\s*[-—]/s*/u', $term, $m)) {
+        if (preg_match('/^(\d{3,4})(?:\s*[-—]\s*|\s+)/u', $term, $m)) {
             if ($this->aplicarNfeNaturezaPorCodigo((int) $m[1])) {
                 return;
             }
@@ -1918,6 +1918,50 @@ trait ManagesNfeEmissaoModal
 
         return true;
     }
+
+    /**
+     * Aplica o CFOP da natureza da operação em todos os itens da nota.
+     */
+    public function aplicarNfeCfopNaturezaNosItens(): void
+    {
+        if ($this->nfeModalStatus !== 'ABERTA') {
+            return;
+        }
+
+        if ($this->nfeModalRows === []) {
+            Notification::make()->title('Nenhum item na nota para aplicar o CFOP.')->warning()->send();
+
+            return;
+        }
+
+        $natureza = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if (! preg_match('/^(\d{4})\b/u', $natureza, $m)) {
+            Notification::make()->title('Informe a natureza da operação com o código CFOP.')->warning()->send();
+
+            return;
+        }
+
+        $codigo = (int) $m[1];
+
+        if (! Cfop::query()->where('codigo', $codigo)->exists()) {
+            Notification::make()->title('CFOP não encontrado.')->warning()->send();
+
+            return;
+        }
+
+        foreach (array_keys($this->nfeModalRows) as $index) {
+            $this->nfeModalRows[$index]['cfop'] = (string) $codigo;
+        }
+
+        $this->recalculateNfeTotais();
+
+        Notification::make()
+            ->title('CFOP '.$codigo.' aplicado em todos os itens.')
+            ->success()
+            ->send();
+    }
+
     #[Computed]
     public function naturezaOperacaoOptions(): array
     {

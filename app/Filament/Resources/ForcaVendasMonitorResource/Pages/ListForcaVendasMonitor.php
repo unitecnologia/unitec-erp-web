@@ -18,6 +18,7 @@ use App\Models\Vendedor;
 use App\Models\Venda;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
@@ -42,6 +43,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 
 class ListForcaVendasMonitor extends ListRecords
@@ -194,6 +196,19 @@ class ListForcaVendasMonitor extends ListRecords
 
     /** @var list<array{id: string, ok: bool, numero: string, etapa: string, erro: ?string}> */
     public array $faturarResultados = [];
+
+    /** Assinatura dos pedidos do filtro atual na última renderização da grade. */
+    #[Locked]
+    public string $pollAssinatura = '';
+
+    #[Locked]
+    public int $pollRenderizadoEm = 0;
+
+    /**
+     * Mudanças em dados relacionados (NF-e/NFC-e, PIX) não alteram o pedido;
+     * a grade é renderizada ao menos nesse intervalo mesmo sem mudança na assinatura.
+     */
+    private const POLL_RENDER_FORCADO_SEGUNDOS = 30;
 
     public function mount(): void
     {
@@ -567,7 +582,6 @@ class ListForcaVendasMonitor extends ListRecords
             (new ForcaVendasFaturamentoService())->liberarFinanceiro($order, auth()->user());
             $this->fecharLiberacaoFinanceira();
             $this->avisa('Pedido liberado. Status: Pendente (Enviado no app).', 'success');
-            $this->resetTable();
         } catch (\Throwable $e) {
             $this->avisa($e->getMessage(), 'warning');
         }
@@ -584,7 +598,6 @@ class ListForcaVendasMonitor extends ListRecords
             (new ForcaVendasFaturamentoService())->cancelarPendente($order);
             $this->fecharLiberacaoFinanceira();
             $this->avisa('Pedido negado e cancelado.', 'success');
-            $this->resetTable();
         } catch (\Throwable $e) {
             $this->avisa($e->getMessage(), 'warning');
         }
@@ -937,11 +950,126 @@ class ListForcaVendasMonitor extends ListRecords
     }
 
     /**
-     * Atualização automática silenciosa (sem notificação).
+     * Atualização automática silenciosa (sem notificação), mantendo a página.
+     * Sem mudança nos pedidos: só a consulta de assinatura, sem render.
      */
     public function pollRefresh(): void
     {
-        $this->resetTable();
+        $assinatura = $this->lerAssinaturaPedidos();
+
+        if ($this->pollAssinatura === '') {
+            // Primeiro ciclo após abrir a tela: a grade acabou de ser renderizada.
+            $this->guardarAssinaturaPedidos($assinatura);
+            $this->skipRender();
+
+            return;
+        }
+
+        if ($assinatura['hash'] === $this->pollAssinatura
+            && (time() - $this->pollRenderizadoEm) < self::POLL_RENDER_FORCADO_SEGUNDOS) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->aplicarAtualizacaoTabela($assinatura);
+    }
+
+    /**
+     * Mudança de filtro: volta para a página 1 (comportamento do Filament).
+     */
+    public function resetTable(): void
+    {
+        parent::resetTable();
+
+        $this->guardarAssinaturaPedidos($this->lerAssinaturaPedidos());
+    }
+
+    /**
+     * Recarrega a grade após ações (avisos, faturamento, cancelamento, liberação)
+     * sem voltar para a página 1.
+     */
+    protected function atualizarTabelaMantendoPagina(): void
+    {
+        $this->aplicarAtualizacaoTabela($this->lerAssinaturaPedidos());
+    }
+
+    /**
+     * @param  array{hash: string, total: int}  $assinatura
+     */
+    private function aplicarAtualizacaoTabela(array $assinatura): void
+    {
+        $this->guardarAssinaturaPedidos($assinatura);
+        $this->ajustarPaginaAoTotal($assinatura['total']);
+        $this->flushCachedTableRecords();
+    }
+
+    /**
+     * @param  array{hash: string, total: int}  $assinatura
+     */
+    private function guardarAssinaturaPedidos(array $assinatura): void
+    {
+        $this->pollAssinatura = $assinatura['hash'];
+        $this->pollRenderizadoEm = time();
+    }
+
+    /**
+     * Se a página atual deixou de existir, vai para a última disponível.
+     */
+    private function ajustarPaginaAoTotal(int $total): void
+    {
+        $porPagina = $this->getTableRecordsPerPage();
+
+        if (! is_numeric($porPagina) || (int) $porPagina <= 0) {
+            return;
+        }
+
+        $ultima = max(1, (int) ceil($total / (int) $porPagina));
+
+        if ((int) $this->getTablePage() > $ultima) {
+            $this->setPage($ultima, $this->getTablePaginationPageName());
+        }
+    }
+
+    /**
+     * Uma única consulta agregada com os mesmos filtros da grade (sem eager load
+     * nem ordenação) + versão em cache das vendas (número do pedido na grade).
+     *
+     * @return array{hash: string, total: int}
+     */
+    private function lerAssinaturaPedidos(): array
+    {
+        $query = $this->getFilteredTableQuery();
+
+        if (! $query) {
+            return ['hash' => '', 'total' => 0];
+        }
+
+        $base = $query->toBase();
+        $grammar = $base->getGrammar();
+        $updatedAt = $grammar->wrap($query->qualifyColumn('updated_at'));
+        $id = $grammar->wrap($query->qualifyColumn($query->getModel()->getKeyName()));
+
+        $row = $base
+            ->reorder()
+            ->select([
+                DB::raw('COUNT(*) as total'),
+                DB::raw("MAX({$updatedAt}) as max_updated"),
+                DB::raw("MAX({$id}) as max_id"),
+            ])
+            ->first();
+
+        $total = (int) ($row->total ?? 0);
+
+        return [
+            'hash' => md5(implode('|', [
+                $total,
+                (string) ($row->max_updated ?? ''),
+                (string) ($row->max_id ?? ''),
+                ErpDataSyncVersion::current(ErpDataSyncVersion::CHANNEL_SALES),
+            ])),
+            'total' => $total,
+        ];
     }
 
     // ---- Seleção em lote ---------------------------------------------------
@@ -2196,7 +2324,7 @@ class ListForcaVendasMonitor extends ListRecords
 
         $this->selecionados = [];
         $this->pushSelecaoToDetalhePanel();
-        $this->resetTable();
+        $this->atualizarTabelaMantendoPagina();
         unset($this->nfeEmitirEstado, $this->nfeAbrirEstado);
         $this->nfeLoteEmpresaEmitenteId = null;
     }
@@ -2449,6 +2577,6 @@ class ListForcaVendasMonitor extends ListRecords
         };
 
         $notification->send();
-        $this->resetTable();
+        $this->atualizarTabelaMantendoPagina();
     }
 }

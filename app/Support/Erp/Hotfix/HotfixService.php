@@ -47,6 +47,9 @@ final class HotfixService
 
     private const ESPERA_APOS_FALHA_SEGUNDOS = 6 * 3600;
 
+    /** Agendador: pacote novo ainda não liberado no portal só é reconsultado após este intervalo. */
+    private const NOVA_CONSULTA_PORTAL_SEGUNDOS = 3600;
+
     private const BACKUPS_MANTIDOS = 10;
 
     private const SUFIXO_TEMPORARIO = '.hotfix-tmp';
@@ -169,18 +172,8 @@ final class HotfixService
             return $this->resultado('atualizacao_oficial', 'Atualização oficial em andamento; hotfix adiado.');
         }
 
-        if ($agendado && ! HotfixEstado::algumaPermiteHotfix()) {
-            return $this->resultado('nao_autorizado', 'Nenhuma empresa com hotfix liberado na última consulta.');
-        }
-
         if (! HotfixAssinatura::configurada()) {
             return $this->resultado('sem_chave', 'Esta versão não tem chave pública de hotfix; nenhum pacote é aceito.');
-        }
-
-        $negado = $this->autorizarInstalacao();
-
-        if ($negado !== null) {
-            return $this->resultado('nao_autorizado', $negado);
         }
 
         $versao = trim(ErpUpdateService::readInstalledVersion());
@@ -197,12 +190,6 @@ final class HotfixService
             return $this->resultado('sem_hotfix', 'Nenhum hotfix publicado para a versão '.$versao.'.');
         }
 
-        if (! HotfixAssinatura::valida($versao, $integridade['sha256'], $integridade['size'], $integridade['assinatura'])) {
-            HotfixLog::line('Assinatura', 'invalida ou ausente sha256='.$integridade['sha256']);
-
-            return $this->resultado('recusado', 'Assinatura do hotfix inválida ou ausente; pacote ignorado.');
-        }
-
         $estado = HotfixEstado::ler();
 
         if (($estado['versao_base'] ?? null) === $versao && ($estado['sha256_pacote'] ?? null) === $integridade['sha256']) {
@@ -217,6 +204,20 @@ final class HotfixService
             if (! empty($recusado['definitivo']) || time() - $desde < self::ESPERA_APOS_FALHA_SEGUNDOS) {
                 return $this->resultado('recusado', 'Pacote recusado anteriormente: '.($recusado['motivo'] ?? ''));
             }
+        }
+
+        if (! HotfixAssinatura::valida($versao, $integridade['sha256'], $integridade['size'], $integridade['assinatura'])) {
+            HotfixLog::line('Assinatura', 'invalida ou ausente sha256='.$integridade['sha256']);
+
+            return $this->resultado('recusado', 'Assinatura do hotfix inválida ou ausente; pacote ignorado.');
+        }
+
+        // Portal só é consultado quando existe pacote novo para esta instalação.
+        $negado = $agendado ? $this->negadoRecentemente($integridade['sha256'], $estado) : null;
+        $negado ??= $this->autorizarInstalacao($integridade['sha256']);
+
+        if ($negado !== null) {
+            return $this->resultado('nao_autorizado', $negado);
         }
 
         HotfixLog::line('Inicio', 'versao='.$versao.' sha256='.$integridade['sha256'].' size='.$integridade['size']);
@@ -854,7 +855,7 @@ final class HotfixService
      *
      * @return string|null motivo da recusa, ou null quando autorizado
      */
-    private function autorizarInstalacao(): ?string
+    private function autorizarInstalacao(string $sha256Pacote): ?string
     {
         $cnpjs = $this->cnpjsEmpresasAtivas();
 
@@ -878,14 +879,36 @@ final class HotfixService
 
             if (! $snapshot->isAllowed() || ! $snapshot->permiteHotfix()) {
                 HotfixEstado::lembrarPermissoes($modos);
+                HotfixEstado::atualizar(['nao_autorizado' => ['sha256' => $sha256Pacote, 'ts' => time()]]);
 
-                return 'Hotfix não liberado para o CNPJ '.$cnpj.' (modo='.($snapshot->modoAtualizacao ?? 'ausente').'); todas as empresas precisam estar em "hotfix".';
+                $motivo = 'Hotfix não liberado para o CNPJ '.$cnpj.' (modo='.($snapshot->modoAtualizacao ?? 'ausente').'); todas as empresas precisam estar em "hotfix".';
+                HotfixLog::line('Nao autorizado', $motivo);
+
+                return $motivo;
             }
         }
 
         HotfixEstado::lembrarPermissoes($modos, substituir: true);
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $estado
+     */
+    private function negadoRecentemente(string $sha256Pacote, array $estado): ?string
+    {
+        $negado = is_array($estado['nao_autorizado'] ?? null) ? $estado['nao_autorizado'] : [];
+
+        if (($negado['sha256'] ?? null) !== $sha256Pacote) {
+            return null;
+        }
+
+        if (time() - (int) ($negado['ts'] ?? 0) >= self::NOVA_CONSULTA_PORTAL_SEGUNDOS) {
+            return null;
+        }
+
+        return 'Hotfix ainda não liberado no portal (nova consulta em até 1 hora ou no próximo login).';
     }
 
     /**

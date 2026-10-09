@@ -137,6 +137,16 @@
                             @if ($this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== []) data-cfop-open @endif
                         >
                             <label class="erp-nfe-lancamento-modal__form-label">Natureza da Operação</label>
+                            @once
+                                <style>
+                                    .erp-nfe-page .erp-nfe-natureza__field { display: flex; align-items: stretch; gap: 0.3rem; min-width: 0; }
+                                    .erp-nfe-page .erp-nfe-natureza__field .erp-nfe-lancamento-modal__form-input--natureza { flex: 1 1 auto; max-width: none; }
+                                    .erp-nfe-page .erp-nfe-natureza__aplicar { flex: 0 0 auto; padding: 0 0.6rem; border: 1px solid #1e5a9e; border-radius: 4px; background: #1e5a9e; color: #fff; font-size: 0.72rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color 0.15s ease; }
+                                    .erp-nfe-page .erp-nfe-natureza__aplicar:hover:not(:disabled) { background: #174a85; }
+                                    .erp-nfe-page .erp-nfe-natureza__aplicar:disabled { opacity: 0.5; cursor: not-allowed; }
+                                </style>
+                            @endonce
+                            <div class="erp-nfe-natureza__field">
                             <input
                                 id="nfe-natureza-busca"
                                 type="text"
@@ -154,6 +164,16 @@
                                 aria-expanded="{{ $this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== [] ? 'true' : 'false' }}"
                                 aria-controls="nfe-natureza-sugestoes"
                             >
+                            <button
+                                type="button"
+                                class="erp-nfe-natureza__aplicar"
+                                wire:click="aplicarNfeCfopNaturezaNosItens"
+                                wire:loading.attr="disabled"
+                                wire:target="aplicarNfeCfopNaturezaNosItens"
+                                @disabled($this->nfeModalStatus !== 'ABERTA' || $this->nfeModalRows === [])
+                                title="Aplicar o CFOP da natureza em todos os itens"
+                            >Aplicar nos itens</button>
+                            </div>
                             @if ($this->nfeNaturezaSugestoesOpen && $this->nfeNaturezaSugestoes !== [])
                                 <ul id="nfe-natureza-sugestoes" class="erp-nfe-natureza__suggest" role="listbox" aria-label="CFOPs encontrados">
                                     @foreach ($this->nfeNaturezaSugestoes as $index => $sug)
