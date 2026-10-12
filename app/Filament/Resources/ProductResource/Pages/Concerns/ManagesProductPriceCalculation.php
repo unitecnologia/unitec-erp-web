@@ -141,6 +141,10 @@ trait ManagesProductPriceCalculation
 
         ProductFormValidator::validateBeforeSave($data, $excludeId);
 
+        if (method_exists($this, 'assertTabPrecoSelectionValid')) {
+            $this->assertTabPrecoSelectionValid($data);
+        }
+
         if (($data['is_grade'] ?? false) && ($data['contr_est_grade'] ?? false)) {
             if (method_exists($this, 'ensureProductGradesLoaded')) {
                 $this->ensureProductGradesLoaded();

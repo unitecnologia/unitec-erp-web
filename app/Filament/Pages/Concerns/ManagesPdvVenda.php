@@ -928,7 +928,12 @@ trait ManagesPdvVenda
             $product = Product::query()->find($productId);
 
             if ($product) {
-                $preco = $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade);
+                if ($this->pdvLaunchTabelaNivel) {
+                    $preco = app(\App\Support\Erp\ProductTabelaPrecoService::class)
+                        ->resolvePrecoNivel($product, (string) $this->pdvLaunchTabelaNivel, $quantidade);
+                } else {
+                    $preco = $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade);
+                }
             }
         }
 
@@ -1474,8 +1479,22 @@ trait ManagesPdvVenda
                 return;
             }
 
+            if ($this->maybeRequireTabelaPrecoForProduct($product, $quantidade, $preco)) {
+                return;
+            }
+
             $this->confirmAddProduct($product, $quantidade, $preco);
 
+            return;
+        }
+
+        // Tab. Preço: exige escolha (mesmo com 1 tabela) antes de qtd/preço.
+        if ($this->maybeRequireTabelaPrecoForProduct(
+            $product,
+            $this->resolveCaixaRapidoLaunchQuantidade(),
+            null,
+            continuarLaunch: true,
+        )) {
             return;
         }
 
@@ -1654,12 +1673,20 @@ trait ManagesPdvVenda
 
         if ($product) {
             $quantidade = $this->parsePdvLaunchQtd();
-            $preco = ErpMoney::parseBr($this->pdvLaunchPreco, 2);
 
-            if ($preco <= 0) {
+            if ($this->pdvLaunchTabelaNivel) {
                 $this->pdvLaunchPreco = ErpMoney::formatBr(
-                    $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade),
+                    app(\App\Support\Erp\ProductTabelaPrecoService::class)
+                        ->resolvePrecoNivel($product, (string) $this->pdvLaunchTabelaNivel, $quantidade),
                 );
+            } else {
+                $preco = ErpMoney::parseBr($this->pdvLaunchPreco, 2);
+
+                if ($preco <= 0) {
+                    $this->pdvLaunchPreco = ErpMoney::formatBr(
+                        $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade),
+                    );
+                }
             }
         }
 
@@ -1800,6 +1827,9 @@ trait ManagesPdvVenda
         ?int $productGradeId = null,
         ?int $productSerialId = null,
         ?string $descricaoOverride = null,
+        ?int $priceTableId = null,
+        ?string $tabelaNivel = null,
+        bool $skipTabelaPrecoCheck = false,
     ): void {
         if ($this->mesaBloqueiaAlteracao()) {
             $this->clearPdvSearch();
@@ -1818,6 +1848,24 @@ trait ManagesPdvVenda
 
         $quantidade = $quantidade ?? $this->parsePdvLaunchQtd();
         $preco = $preco ?? ErpMoney::parseBr($this->pdvLaunchPreco, 2);
+
+        if (! $skipTabelaPrecoCheck && ($product->usa_tab_preco ?? false)) {
+            if ($this->pdvLaunchTabelaNivel) {
+                $tabelaNivel = $tabelaNivel ?? $this->pdvLaunchTabelaNivel;
+                $priceTableId = $priceTableId ?? $this->pdvLaunchPriceTableId;
+                $preco = app(\App\Support\Erp\ProductTabelaPrecoService::class)
+                    ->resolvePrecoNivel($product, (string) $tabelaNivel, $quantidade);
+            } elseif ($this->maybeRequireTabelaPrecoForProduct(
+                $product,
+                $quantidade,
+                $preco,
+                $productGradeId,
+                $productSerialId,
+                $descricaoOverride,
+            )) {
+                return;
+            }
+        }
 
         $validator = $this->pdvItemValidator();
 
@@ -1848,6 +1896,8 @@ trait ManagesPdvVenda
             $productGradeId,
             $productSerialId,
             $descricaoOverride,
+            $priceTableId,
+            $tabelaNivel,
         );
         $this->recheckAtacadoPrices((int) $product->id);
 
@@ -2081,16 +2131,33 @@ trait ManagesPdvVenda
         ?int $productGradeId = null,
         ?int $productSerialId = null,
         ?string $descricaoOverride = null,
+        ?int $priceTableId = null,
+        ?string $tabelaNivel = null,
     ): int {
         $quantidade = max(0.001, $quantidade ?? 1);
-        $preco = $preco ?? $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade);
+        $tabSvc = app(\App\Support\Erp\ProductTabelaPrecoService::class);
+        $nivel = $tabSvc->normalizarNivel($tabelaNivel)
+            ?? $tabSvc->nivelDaTabelaId($priceTableId)
+            ?? $tabSvc->nivelDaTabelaId($this->pdvPriceTableId);
+
+        if (($product->usa_tab_preco ?? false) && $nivel && $tabSvc->habilitaNivel($product, $nivel)) {
+            $preco = $preco ?? $tabSvc->resolvePrecoNivel($product, $nivel, $quantidade);
+            $priceTableId = $priceTableId ?? $tabSvc->tabelaIdDoNivel($nivel);
+        } else {
+            $preco = $preco ?? $this->pdvPriceService()->resolvePrecoVenda($product, $quantidade);
+            if (! ($product->usa_tab_preco ?? false)) {
+                $priceTableId = null;
+                $nivel = null;
+            }
+        }
 
         if (! $productSerialId) {
             foreach ($this->cupomItens as $index => $item) {
                 if ((int) ($item['product_id'] ?? 0) === (int) $product->id
                     && (int) ($item['product_grade_id'] ?? 0) === (int) ($productGradeId ?? 0)
                     && empty($item['product_serial_id'])
-                    && round((float) ($item['preco'] ?? 0), 2) === round($preco, 2)) {
+                    && round((float) ($item['preco'] ?? 0), 2) === round($preco, 2)
+                    && (int) ($item['price_table_id'] ?? 0) === (int) ($priceTableId ?? 0)) {
                     $novaQuantidade = round((float) ($item['quantidade'] ?? 0) + $quantidade, 3);
                     $this->cupomItens[$index]['quantidade'] = $novaQuantidade;
                     $this->cupomItens[$index]['total'] = round($novaQuantidade * $preco, 2);
@@ -2115,6 +2182,8 @@ trait ManagesPdvVenda
             'quantidade' => $quantidade,
             'preco' => $preco,
             'preco_base' => $preco,
+            'price_table_id' => $priceTableId,
+            'tabela_nivel' => $nivel,
             'desconto' => 0.0,
             'acrescimo' => 0.0,
             'total' => round($quantidade * $preco, 2),
@@ -2140,6 +2209,8 @@ trait ManagesPdvVenda
         $this->pdvPendingLaunchProductId = null;
         $this->pdvLaunchQtd = '0';
         $this->pdvLaunchPreco = '0,00';
+        $this->pdvLaunchTabelaNivel = null;
+        $this->pdvLaunchPriceTableId = null;
     }
 
     public function getPdvRateioPessoaProperty(): bool
@@ -2702,7 +2773,7 @@ trait ManagesPdvVenda
             $this->baixarMesaNaVenda((int) $venda->id);
 
             foreach ($this->cupomItens as $item) {
-                PdvVendaItem::query()->create([
+                $pdvItem = PdvVendaItem::query()->create([
                     'pdv_venda_id' => $venda->id,
                     'product_id' => $item['product_id'] ?? null,
                     'product_grade_id' => $item['product_grade_id'] ?? null,
@@ -2736,6 +2807,8 @@ trait ManagesPdvVenda
                                 origemId: (int) $venda->id,
                                 origemNumero: (string) $numero,
                             ),
+                            'pdv_venda_item',
+                            (int) $pdvItem->id,
                         );
                     }
                 }

@@ -320,6 +320,10 @@ final class NfeXmlBuilder
 
         XmlHelper::append($prod, 'indTot', '1');
 
+        if ($item->combustivel !== null) {
+            CombXmlBuilder::append($prod, $item->combustivel);
+        }
+
         $imposto = $det->ownerDocument->createElementNS(XmlHelper::NFE_NS, 'imposto');
         $det->appendChild($imposto);
 
@@ -380,6 +384,7 @@ final class NfeXmlBuilder
             infoAdicionais: $item->infoAdicionais,
             chaveDfeReferenciado: $chave,
             nItemDfeReferenciado: $item->nItemDfeReferenciado ?? $item->numero,
+            combustivel: $item->combustivel,
         );
     }
 

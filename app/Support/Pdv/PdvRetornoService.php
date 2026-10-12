@@ -167,7 +167,7 @@ class PdvRetornoService
                     $productId = null;
                 }
 
-                PdvVendaItem::query()->create([
+                $pdvItem = PdvVendaItem::query()->create([
                     'pdv_venda_id' => $pdvVenda->id,
                     'product_id' => $productId,
                     'codigo' => $this->str($item['codigo'] ?? null, 60),
@@ -201,6 +201,8 @@ class PdvRetornoService
                                 origemId: (int) $pdvVenda->id,
                                 origemNumero: $pdvVenda->numero !== null ? (string) $pdvVenda->numero : null,
                             ),
+                            'pdv_venda_item',
+                            (int) $pdvItem->id,
                         );
                     }
                 }

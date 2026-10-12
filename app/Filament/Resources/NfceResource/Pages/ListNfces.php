@@ -463,6 +463,20 @@ class ListNfces extends ListRecords
             ->send();
     }
 
+    public function applyPeriodFilterAuto(): void
+    {
+        if ($this->periodoDe === $this->periodoDeApplied && $this->periodoAte === $this->periodoAteApplied) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->periodoDeApplied = $this->periodoDe;
+        $this->periodoAteApplied = $this->periodoAte;
+        $this->clearListSelection();
+        $this->resetTable();
+    }
+
     public function applyChaveFilter(): void
     {
         $this->chaveFilterApplied = trim($this->chaveFilter);
@@ -470,11 +484,31 @@ class ListNfces extends ListRecords
         $this->resetTable();
     }
 
+    public function applyChaveFilterValue(string $chave = ''): void
+    {
+        $digits = substr(preg_replace('/\D/', '', $chave) ?? '', 0, 44);
+        $this->chaveFilter = $digits;
+
+        if ($digits === $this->chaveFilterApplied) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->applyChaveFilter();
+    }
+
     public function updatedSearchColumn(): void
     {
         $this->localSearch = '';
         $this->clearListSelection();
         $this->resetTable();
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->clearListSelection();
+        $this->resetPage();
     }
 
     public function updatedTableRecordsPerPage(): void

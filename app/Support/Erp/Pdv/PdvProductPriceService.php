@@ -3,8 +3,8 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Models\Product;
-use App\Models\ProductPriceTableItem;
 use App\Support\Erp\ProductEmpresaPrecoService;
+use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Erp\Promocao\PromocaoPrecoService;
 use Carbon\Carbon;
 
@@ -14,61 +14,50 @@ final class PdvProductPriceService
         private readonly PdvConfig $config,
     ) {}
 
-    public function resolvePrecoVenda(Product $product, float $quantidade = 1): float
-    {
-        $preco = $this->resolvePrecoBase($product, $quantidade);
+    public function resolvePrecoVenda(
+        Product $product,
+        float $quantidade = 1,
+        ?string $nivel = null,
+        ?int $priceTableId = null,
+    ): float {
+        $tabSvc = app(ProductTabelaPrecoService::class);
 
-        if ($this->config->habilitarTabelaPreco() && ($product->usa_tab_preco ?? false)) {
-            $precoTabela = $this->resolvePrecoTabela($product, $quantidade);
+        if ($product->usa_tab_preco ?? false) {
+            $nivelResolvido = $tabSvc->normalizarNivel($nivel)
+                ?? $tabSvc->nivelDaTabelaId($priceTableId)
+                ?? $tabSvc->nivelDaTabelaId($this->config->priceTableId());
 
-            if ($precoTabela !== null) {
-                return $precoTabela;
+            if ($nivelResolvido && $tabSvc->habilitaNivel($product, $nivelResolvido)) {
+                return $tabSvc->resolvePrecoNivel($product, $nivelResolvido, $quantidade);
             }
         }
 
-        return $preco;
+        return $this->resolvePrecoBase($product, $quantidade);
     }
 
-    public function resolvePrecoTabela(Product $product, float $quantidade = 1, ?int $priceTableId = null): ?float
-    {
-        if (! $this->config->habilitarTabelaPreco() || ! ($product->usa_tab_preco ?? false)) {
+    /**
+     * Preço do nível da tabela quando o produto habilita Tab. Preço nesse nível.
+     */
+    public function resolvePrecoTabela(
+        Product $product,
+        float $quantidade = 1,
+        ?int $priceTableId = null,
+        ?string $nivel = null,
+    ): ?float {
+        if (! ($product->usa_tab_preco ?? false)) {
             return null;
         }
 
-        $tableId = $priceTableId ?? $this->config->priceTableId();
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $nivelResolvido = $tabSvc->normalizarNivel($nivel)
+            ?? $tabSvc->nivelDaTabelaId($priceTableId)
+            ?? $tabSvc->nivelDaTabelaId($this->config->priceTableId());
 
-        if (! $tableId) {
+        if (! $nivelResolvido || ! $tabSvc->habilitaNivel($product, $nivelResolvido)) {
             return null;
         }
 
-        $item = $product->relationLoaded('priceTableItems')
-            ? $product->priceTableItems->first(
-                fn ($row): bool => (int) $row->price_table_id === (int) $tableId
-            )
-            : ProductPriceTableItem::query()
-                ->where('product_id', $product->id)
-                ->where('price_table_id', $tableId)
-                ->first();
-
-        if (! $item) {
-            return null;
-        }
-
-        $valor = (float) $item->valor;
-
-        if ($valor > 0) {
-            return round($valor, 2);
-        }
-
-        $fator = (float) $item->fator;
-
-        if ($fator > 0) {
-            $base = $this->resolvePrecoBase($product, $quantidade);
-
-            return round($base * $fator, 2);
-        }
-
-        return null;
+        return $tabSvc->resolvePrecoNivel($product, $nivelResolvido, $quantidade);
     }
 
     public function emPromocao(Product $product, ?Carbon $data = null): bool
@@ -80,7 +69,6 @@ final class PdvProductPriceService
             return true;
         }
 
-        // Fallback legado (colunas no produto) — só varejo.
         if (blank($product->promo_data_inicio) || blank($product->promo_data_fim)) {
             return false;
         }
@@ -135,7 +123,6 @@ final class PdvProductPriceService
             $empresaId > 0 ? $empresaId : null
         );
 
-        // Atacado: sempre preço atacado normal (promoção é só varejo).
         if ($this->aplicaAtacado($product, $quantidade, $precosEmpresa['preco_atacado'])) {
             return (float) $precosEmpresa['preco_atacado'];
         }
@@ -148,7 +135,6 @@ final class PdvProductPriceService
             return $campanha;
         }
 
-        // Fallback legado: promo_preco_venda nas datas do produto.
         if ($this->emPromocaoLegado($product, $hoje)) {
             return (float) $product->promo_preco_venda;
         }

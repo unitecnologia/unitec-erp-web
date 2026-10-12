@@ -20,6 +20,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\Pdv\PdvStockService;
 use App\Support\Erp\Pdv\PdvVendaFinanceiroService;
+use App\Support\Erp\ProductLoteService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -216,6 +217,7 @@ final class FinalizarDevolucaoVendaService
             }
 
             [$gradeId, $serialId] = $this->resolveGradeSerial($item, $pdvItens);
+            [$loteOrigemTipo, $loteOrigemId] = $this->resolveLoteOrigem($item, $pdvItens);
 
             $this->stockService->estornoItemVenda(
                 $product,
@@ -232,8 +234,59 @@ final class FinalizarDevolucaoVendaService
                     origemId: (int) $devolucao->id,
                     origemNumero: $devolucao->numero !== null ? (string) $devolucao->numero : null,
                 ),
+                $loteOrigemTipo,
+                $loteOrigemId,
             );
         }
+    }
+
+    /**
+     * Origem do rastro de lote da venda (nunca inventa para devolução sem rastro).
+     * PDV grava rastro em pdv_venda_item; FV/ERP em venda_item. Prefere a origem que tem movimento.
+     *
+     * @param  \Illuminate\Support\Collection<int, PdvVendaItem>  $pdvItens
+     * @return array{0: ?string, 1: ?int}
+     */
+    private function resolveLoteOrigem(DevolucaoVendaItem $item, $pdvItens): array
+    {
+        $lotes = new ProductLoteService();
+        $productId = $item->product_id ? (int) $item->product_id : 0;
+        $vendaItemId = $item->venda_item_id ? (int) $item->venda_item_id : 0;
+
+        $pdvItemId = null;
+        if ($productId > 0 && $pdvItens->isNotEmpty()) {
+            $candidatos = $pdvItens->filter(
+                fn (PdvVendaItem $pdv): bool => (int) $pdv->product_id === $productId
+            );
+
+            $match = $candidatos->first(function (PdvVendaItem $pdv) use ($item): bool {
+                return abs((float) $pdv->quantidade - (float) $item->qtd_vendida) < 0.001
+                    || abs((float) $pdv->quantidade - (float) $item->qtd) < 0.001;
+            }) ?? $candidatos->first();
+
+            if ($match) {
+                $pdvItemId = (int) $match->id;
+            }
+        }
+
+        // Prefere origem com rastro real (PDV baixa estoque/lote antes do espelho retaguarda).
+        if ($pdvItemId && $lotes->origemTemRastro('pdv_venda_item', $pdvItemId, $productId ?: null)) {
+            return ['pdv_venda_item', $pdvItemId];
+        }
+
+        if ($vendaItemId > 0 && $lotes->origemTemRastro('venda_item', $vendaItemId, $productId ?: null)) {
+            return ['venda_item', $vendaItemId];
+        }
+
+        if ($pdvItemId) {
+            return ['pdv_venda_item', $pdvItemId];
+        }
+
+        if ($vendaItemId > 0) {
+            return ['venda_item', $vendaItemId];
+        }
+
+        return [null, null];
     }
 
     /**

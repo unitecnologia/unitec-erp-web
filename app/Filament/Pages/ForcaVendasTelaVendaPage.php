@@ -12,9 +12,9 @@ use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\PriceTable;
 use App\Models\Product;
-use App\Models\ProductPriceTableItem;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
@@ -139,6 +139,18 @@ class ForcaVendasTelaVendaPage extends Page
     public bool $tabelaProgressOpen = false;
 
     public int $tabelaRecalcAlterados = 0;
+
+    public bool $tabPrecoItemModalOpen = false;
+
+    /** @var list<array{nivel: string, price_table_id: int, label: string, preco: float}> */
+    public array $tabPrecoItemOpcoes = [];
+
+    public ?int $tabPrecoItemSelectedIndex = null;
+
+    public ?int $tabPrecoItemProductId = null;
+
+    /** Tabela já confirmada para o produto atual no formulário. */
+    public bool $tabPrecoItemConfirmada = false;
 
     public string $codigoBarras = '';
 
@@ -752,6 +764,17 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        // Após confirmar Tab. Preço, Enter na qtde já inclui (preço já veio da tabela).
+        if (
+            $this->tabPrecoItemConfirmada
+            && $this->produtoAtualId
+            && $this->parseDecimal($this->precoUnitario) > 0
+        ) {
+            $this->adicionarItem();
+
+            return;
+        }
+
         $this->dispatch('fv-tela-venda-focus-preco');
     }
 
@@ -1057,7 +1080,22 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        $this->carregarProdutoNoForm($product);
+        if ((int) $this->produtoAtualId !== (int) $product->id) {
+            $this->carregarProdutoNoForm($product);
+
+            if ($this->tabPrecoItemModalOpen) {
+                return;
+            }
+        } elseif (($product->usa_tab_preco ?? false) && ! $this->tabPrecoItemConfirmada) {
+            $this->abrirTabPrecoItemModal($product, $this->parseDecimal($this->quantidade) ?: 1);
+
+            Notification::make()
+                ->title('Confirme a tabela de preço do produto.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         $qtd = $this->parseDecimal($this->quantidade);
         $digitado = $this->parseDecimal($this->precoUnitario);
@@ -1142,6 +1180,10 @@ class ForcaVendasTelaVendaPage extends Page
                 'descricao' => (string) ($product->descricao ?? ''),
                 'quantidade' => $qtd,
                 'preco_unitario' => $preco,
+                'price_table_id' => ($product->usa_tab_preco ?? false) ? $this->tabelaPrecoId : null,
+                'tabela_nivel' => ($product->usa_tab_preco ?? false)
+                    ? $this->nivelTabelaPrecoSelecionada()
+                    : null,
                 'acrescimo' => $acrescimo,
                 'desconto' => $desconto,
                 'total' => round(($qtd * $preco) + $acrescimo - $desconto, 2),
@@ -1151,6 +1193,7 @@ class ForcaVendasTelaVendaPage extends Page
 
         $this->itens = array_values($this->itens);
         $this->itemSelecionado = 0;
+        $this->tabPrecoItemConfirmada = false;
         $this->limparEntradaItem();
         $this->dispatch('fv-tela-venda-focus-barcode');
     }
@@ -2331,7 +2374,11 @@ class ForcaVendasTelaVendaPage extends Page
             ])
             ->all();
 
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $ids = array_values($tabSvc->tabelasPadraoIds());
+
         $this->tabelaPrecoOpcoes = PriceTable::query()
+            ->whereIn('id', $ids)
             ->where('ativo', true)
             ->orderByRaw('CAST(codigo AS UNSIGNED)')
             ->orderBy('descricao')
@@ -2557,9 +2604,9 @@ class ForcaVendasTelaVendaPage extends Page
     }
 
     /**
-     * Preço do produto na tabela selecionada — mesmo critério do app Força de Vendas:
-     * VAREJO → preco_venda, ATACADO → preco_atacado, ESPECIAL → preco_especial,
-     * com overlay de product_price_table_items quando usa_tab_preco.
+     * Preço do produto na tabela selecionada:
+     * com usa_tab_preco → preço do nível habilitado (Varejo/Atacado/Especial da Precificação);
+     * sem flag → preço padrão por nível da tabela da venda.
      */
     private function precoNaTabelaSelecionada(Product $product): ?float
     {
@@ -2568,35 +2615,24 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function precoProdutoNaTabela(Product $product, float $quantidade = 1): float
     {
-        $nivel = $this->nivelTabelaPrecoSelecionada();
-        $base = $this->precoBasePorNivel($product, $nivel, $quantidade);
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $nivel = $tabSvc->nivelDaTabelaId($this->tabelaPrecoId) ?? ProductTabelaPrecoService::NIVEL_VAREJO;
 
-        if (! $this->tabelaPrecoId || ! ($product->usa_tab_preco ?? false)) {
-            return $base;
+        if ($product->usa_tab_preco ?? false) {
+            $tabSvc->carregarItens($product);
+
+            if ($tabSvc->habilitaNivel($product, $nivel)) {
+                return $tabSvc->resolvePrecoNivel($product, $nivel, $quantidade);
+            }
+
+            $habilitados = $tabSvc->niveisHabilitados($product);
+
+            if ($habilitados !== []) {
+                return $tabSvc->resolvePrecoNivel($product, $habilitados[0], $quantidade);
+            }
         }
 
-        $item = ProductPriceTableItem::query()
-            ->where('product_id', $product->id)
-            ->where('price_table_id', $this->tabelaPrecoId)
-            ->first();
-
-        if (! $item) {
-            return $base;
-        }
-
-        $valor = (float) ($item->valor ?? 0);
-
-        if ($valor > 0) {
-            return round($valor, 2);
-        }
-
-        $fator = (float) ($item->fator ?? 0);
-
-        if ($fator > 0) {
-            return round($base * $fator, 2);
-        }
-
-        return $base;
+        return $this->precoBasePorNivel($product, $nivel, $quantidade);
     }
 
     /**
@@ -2604,36 +2640,8 @@ class ForcaVendasTelaVendaPage extends Page
      */
     private function nivelTabelaPrecoSelecionada(): string
     {
-        if (! $this->tabelaPrecoId) {
-            return 'varejo';
-        }
-
-        $tabela = PriceTable::query()->find($this->tabelaPrecoId, ['id', 'codigo', 'descricao']);
-
-        if (! $tabela) {
-            return 'varejo';
-        }
-
-        $blob = mb_strtoupper(trim((string) ($tabela->codigo ?? '').' '.(string) ($tabela->descricao ?? '')));
-
-        if (str_contains($blob, 'ESPECIAL')) {
-            return 'especial';
-        }
-
-        if (str_contains($blob, 'ATACADO')) {
-            return 'atacado';
-        }
-
-        if (
-            str_contains($blob, 'VAREJO')
-            || str_contains($blob, 'PADRAO')
-            || str_contains($blob, 'PADRÃO')
-            || (string) ($tabela->codigo ?? '') === '1'
-        ) {
-            return 'varejo';
-        }
-
-        return 'varejo';
+        return app(ProductTabelaPrecoService::class)->nivelDaTabelaId($this->tabelaPrecoId)
+            ?? ProductTabelaPrecoService::NIVEL_VAREJO;
     }
 
     private function precoBasePorNivel(Product $product, string $nivel, float $quantidade = 1): float
@@ -2641,10 +2649,105 @@ class ForcaVendasTelaVendaPage extends Page
         $varejo = $this->precoVarejoProduto($product);
 
         return match ($nivel) {
-            'atacado' => $this->precoAtacadoProduto($product, $varejo),
-            'especial' => $this->precoEspecialProduto($product, $varejo),
+            ProductTabelaPrecoService::NIVEL_ATACADO => $this->precoAtacadoProduto($product, $varejo),
+            ProductTabelaPrecoService::NIVEL_ESPECIAL => $this->precoEspecialProduto($product, $varejo),
             default => $this->precoVarejoComAtacadoPorQtd($product, $varejo, $quantidade),
         };
+    }
+
+    private function abrirTabPrecoItemModal(Product $product, float $quantidade = 1): void
+    {
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $tabSvc->carregarItens($product);
+        $opcoes = $tabSvc->opcoesParaProduto($product, max(0.001, $quantidade));
+
+        if ($opcoes === []) {
+            Notification::make()
+                ->title('Produto com Tab. Preço sem tabelas habilitadas. Revise o cadastro.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->tabPrecoItemProductId = (int) $product->id;
+        $this->tabPrecoItemOpcoes = array_map(static fn (array $op): array => [
+            'nivel' => $op['nivel'],
+            'price_table_id' => $op['price_table_id'],
+            'codigo' => $op['codigo'],
+            'descricao' => $op['descricao'],
+            'label' => $op['label'].' — R$ '.number_format($op['preco'], 2, ',', '.'),
+            'preco' => $op['preco'],
+        ], $opcoes);
+
+        $selected = 0;
+
+        foreach ($this->tabPrecoItemOpcoes as $index => $op) {
+            if ((int) $op['price_table_id'] === (int) $this->tabelaPrecoId) {
+                $selected = $index;
+                break;
+            }
+        }
+
+        $this->tabPrecoItemSelectedIndex = $selected;
+        $this->tabPrecoItemModalOpen = true;
+        $this->tabPrecoItemConfirmada = false;
+    }
+
+    public function selectTabPrecoItemRow(int $index): void
+    {
+        if (isset($this->tabPrecoItemOpcoes[$index])) {
+            $this->tabPrecoItemSelectedIndex = $index;
+            $this->skipRender();
+        }
+    }
+
+    public function confirmTabPrecoItemAt(int $index): void
+    {
+        $this->tabPrecoItemSelectedIndex = $index;
+        $this->confirmTabPrecoItem();
+    }
+
+    public function confirmTabPrecoItem(): void
+    {
+        $index = $this->tabPrecoItemSelectedIndex;
+
+        if ($index === null || ! isset($this->tabPrecoItemOpcoes[$index])) {
+            Notification::make()->title('Selecione uma tabela de preço.')->warning()->send();
+
+            return;
+        }
+
+        $op = $this->tabPrecoItemOpcoes[$index];
+        $productId = (int) ($this->tabPrecoItemProductId ?? 0);
+
+        $this->aplicarTabelaPreco((int) $op['price_table_id']);
+        $this->tabPrecoItemConfirmada = true;
+        $this->tabPrecoItemModalOpen = false;
+
+        $lista = (float) $op['preco'];
+        $this->precoListaItem = $this->formatMoney($lista);
+        $this->precoUnitario = $this->formatMoney($lista);
+        $this->recalcularTotalItem();
+
+        $this->tabPrecoItemProductId = null;
+        $this->tabPrecoItemOpcoes = [];
+        $this->tabPrecoItemSelectedIndex = null;
+
+        // Mantém o produto no formulário e inclui na grade (igual ao PDV após escolher a tabela).
+        if ($productId > 0) {
+            $this->produtoAtualId = $productId;
+            $this->adicionarItem();
+        }
+    }
+
+    public function cancelTabPrecoItem(): void
+    {
+        $this->tabPrecoItemModalOpen = false;
+        $this->tabPrecoItemProductId = null;
+        $this->tabPrecoItemOpcoes = [];
+        $this->tabPrecoItemSelectedIndex = null;
+        $this->tabPrecoItemConfirmada = false;
     }
 
     private function precoVarejoProduto(Product $product): float
@@ -3366,7 +3469,11 @@ class ForcaVendasTelaVendaPage extends Page
         $this->precoUnitario = '0,00';
         $this->fecharSugestoesProduto();
         $this->carregarProdutoNoForm($product);
-        $this->dispatch('fv-tela-venda-focus-qtd');
+
+        // Com Tab. Preço o foco fica no modal; senão segue para a quantidade.
+        if (! $this->tabPrecoItemModalOpen) {
+            $this->dispatch('fv-tela-venda-focus-qtd');
+        }
     }
 
     /**
@@ -3452,6 +3559,13 @@ class ForcaVendasTelaVendaPage extends Page
         $this->produtoAtualFoto = $product->fotoUrl();
         // Troca o código digitado pela descrição ao confirmar o produto.
         $this->codigoBarras = $this->produtoAtualNome;
+        $this->tabPrecoItemConfirmada = false;
+
+        if ($product->usa_tab_preco ?? false) {
+            $this->abrirTabPrecoItemModal($product, $this->parseDecimal($this->quantidade) ?: 1);
+
+            return;
+        }
 
         $lista = $this->precoNaTabelaSelecionada($product) ?? (float) ($product->preco_venda ?? 0);
         $this->precoListaItem = $this->formatMoney($lista);

@@ -40,6 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'vendasinternas.device' => \App\Http\Middleware\EnsureVendasInternasDeviceApproved::class,
             'unitecos.device' => \App\Http\Middleware\EnsureUnitecOsDeviceApproved::class,
             'entregas.device' => \App\Http\Middleware\EnsureEntregasDeviceApproved::class,
+            'mesas.device' => \App\Http\Middleware\EnsureMesasDeviceApproved::class,
+            'mesas.user' => \App\Http\Middleware\EnsureMesasAppUser::class,
             'pdv.carga.token' => \App\Http\Middleware\EnsurePdvCargaToken::class,
             'pdv.terminal.ativo' => \App\Http\Middleware\EnsurePdvTerminalAtivo::class,
         ]);

@@ -102,10 +102,30 @@ final class AjusteEstoqueService
             origemNumero: $ajusteId !== null ? (string) $ajusteId : null,
         );
 
+        $product = Product::query()->find($productId);
+        $lotes = new ProductLoteService();
+        $permitirNegativo = ! EstoqueNegativoPolicy::ativo($empresa);
+
         if ($delta > 0) {
             $this->saldos->incrementar($productId, $delta, $estoqueId, $empresa, $ctx);
+            if ($product && $product->controla_lote_validade) {
+                // Exclusão de ajuste de saída: restitui pelos lotes rastreados.
+                // Ajuste positivo sem rastro: devolve a lote real existente (nunca cria fictício).
+                if ($ajusteId && $lotes->origemTemRastro('ajuste_estoque', $ajusteId, (int) $product->id)) {
+                    $lotes->estornarPorOrigem($product, 'ajuste_estoque', $ajusteId, $delta);
+                } else {
+                    $lotes->devolver($product, $delta);
+                }
+            }
         } else {
-            $this->saldos->decrementar($productId, abs($delta), $estoqueId, $empresa, $ctx);
+            $saida = abs($delta);
+            if ($product && $product->controla_lote_validade) {
+                $fatias = $lotes->consumirFefo($product, $saida, $permitirNegativo);
+                if ($ajusteId) {
+                    $lotes->registrarSaidas($product, $fatias, 'ajuste_estoque', $ajusteId);
+                }
+            }
+            $this->saldos->decrementar($productId, $saida, $estoqueId, $empresa, $ctx);
         }
     }
 

@@ -24,6 +24,7 @@ use App\Support\Erp\Nfse\NfseFromOrdemServico;
 use App\Support\Erp\Os\OsFaturamentoService;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
+use App\Support\Erp\ProductTabelaPrecoService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
@@ -143,6 +144,18 @@ trait ErpOrdemServicoFormPage
     public string $itemPendingAcrescimo = '0,00';
 
     public string $itemTotalEntryDisplay = '0,00';
+
+    /** Modal Tab. Preço ao lançar peça/serviço com usa_tab_preco. */
+    public bool $tabPrecoItemModalOpen = false;
+
+    public bool $tabPrecoItemConfirmada = false;
+
+    public ?int $tabPrecoItemProductId = null;
+
+    /** @var list<array{nivel: string, price_table_id: int, codigo: string, descricao: string, label: string, preco: float}> */
+    public array $tabPrecoItemOpcoes = [];
+
+    public ?int $tabPrecoItemSelectedIndex = null;
 
     public bool $postSavePromptOpen = false;
 
@@ -1183,12 +1196,22 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $this->appendProductItem($product, $qtd);
         $this->barcodeInput = '';
-        $this->clearItemEntryRow();
 
-        if ($this->activeItemTab === 'pecas' && $this->selectedItemIndex !== null) {
-            $this->aplicarFotoDoItemSelecionado($this->selectedItemIndex);
+        // Mesmo fluxo da barra: Tab. Preço abre o modal e só então inclui.
+        $this->stageProductForEntry($product);
+
+        if ($this->tabPrecoItemModalOpen) {
+            if (abs($qtd - 1.0) > 0.0005) {
+                $this->itemQtdInput = ErpMoney::formatBr($qtd, 3);
+            }
+
+            return;
+        }
+
+        if ($this->itemPendingProductId !== null) {
+            $this->itemQtdInput = ErpMoney::formatBr($qtd, 3);
+            $this->confirmPendingItemEntry();
         }
     }
 
@@ -1580,6 +1603,16 @@ trait ErpOrdemServicoFormPage
 
         $this->normalizeItemQtdInput();
 
+        // Após confirmar Tab. Preço, Enter na qtde já inclui o item.
+        if (
+            $this->tabPrecoItemConfirmada
+            && ErpMoney::parseBr($this->itemPrecoInput) > 0
+        ) {
+            $this->confirmPendingItemEntry();
+
+            return;
+        }
+
         $this->dispatch('erp-os-focus-item-preco');
     }
 
@@ -1630,6 +1663,28 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
+        $product = Product::query()->find($this->itemPendingProductId);
+
+        if (! $product) {
+            $this->clearItemEntryRow();
+
+            return;
+        }
+
+        if (
+            $this->editingItemIndex === null
+            && ($product->usa_tab_preco ?? false)
+            && ! $this->tabPrecoItemConfirmada
+        ) {
+            $this->abrirTabPrecoItemModal($product, $qtd ?: 1);
+            Notification::make()
+                ->title('Confirme a tabela de preço do produto.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $preco = max(0.0, ErpMoney::parseBr($this->itemPrecoInput));
 
         if ($preco <= 0) {
@@ -1649,14 +1704,6 @@ trait ErpOrdemServicoFormPage
                 $this->applyEditedItemFromBar($qtd, $preco, $acrescimo, $desconto);
                 $this->clearItemEntryRow();
                 $this->dispatch('erp-os-focus-item-descricao');
-
-                return;
-            }
-
-            $product = Product::query()->find($this->itemPendingProductId);
-
-            if (! $product) {
-                $this->clearItemEntryRow();
 
                 return;
             }
@@ -1711,16 +1758,16 @@ trait ErpOrdemServicoFormPage
             return;
         }
 
-        $preco = (float) ($product->preco_venda ?? 0);
         $tipo = $product->is_servico ? 'S' : 'P';
+        $exigeTabPreco = ($product->usa_tab_preco ?? false) && $this->editingItemIndex === null;
 
         $this->itemPendingProductId = $product->id;
         $this->itemCodigoInput = (string) $product->codigo;
         $this->itemProdutoSearch = mb_strtoupper($product->descricao, 'UTF-8');
         $this->itemQtdInput = ErpMoney::formatBr(1, 3);
-        $this->itemPrecoInput = ErpMoney::formatBr($preco);
         $this->itemPendingDesconto = '0,00';
         $this->itemPendingAcrescimo = '0,00';
+        $this->tabPrecoItemConfirmada = false;
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
@@ -1734,8 +1781,101 @@ trait ErpOrdemServicoFormPage
             $this->produtoAtualFoto = null;
         }
 
+        if ($exigeTabPreco) {
+            $this->itemPrecoInput = '0,00';
+            $this->recalcOsEntryRowFromPending();
+            $this->abrirTabPrecoItemModal($product, 1);
+
+            return;
+        }
+
+        $preco = (float) ($product->preco_venda ?? 0);
+        $this->itemPrecoInput = ErpMoney::formatBr($preco);
         $this->recalcOsEntryRowFromPending();
         $this->dispatch('erp-os-focus-item-qtd');
+    }
+
+    protected function abrirTabPrecoItemModal(Product $product, float $quantidade = 1): void
+    {
+        $tabSvc = app(ProductTabelaPrecoService::class);
+        $tabSvc->carregarItens($product);
+        $opcoes = $tabSvc->opcoesParaProduto($product, max(0.001, $quantidade));
+
+        if ($opcoes === []) {
+            Notification::make()
+                ->title('Produto com Tab. Preço sem tabelas habilitadas. Revise o cadastro.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->tabPrecoItemProductId = (int) $product->id;
+        $this->tabPrecoItemOpcoes = array_map(static fn (array $op): array => [
+            'nivel' => $op['nivel'],
+            'price_table_id' => $op['price_table_id'],
+            'codigo' => $op['codigo'],
+            'descricao' => $op['descricao'],
+            'label' => $op['label'].' — R$ '.number_format($op['preco'], 2, ',', '.'),
+            'preco' => $op['preco'],
+        ], $opcoes);
+        $this->tabPrecoItemSelectedIndex = 0;
+        $this->tabPrecoItemModalOpen = true;
+        $this->tabPrecoItemConfirmada = false;
+        $this->dispatch('erp-os-focus-tab-preco');
+    }
+
+    public function selectTabPrecoItemRow(int $index): void
+    {
+        if (isset($this->tabPrecoItemOpcoes[$index])) {
+            $this->tabPrecoItemSelectedIndex = $index;
+            $this->skipRender();
+        }
+    }
+
+    public function confirmTabPrecoItemAt(int $index): void
+    {
+        $this->tabPrecoItemSelectedIndex = $index;
+        $this->confirmTabPrecoItem();
+    }
+
+    public function confirmTabPrecoItem(): void
+    {
+        $index = $this->tabPrecoItemSelectedIndex;
+
+        if ($index === null || ! isset($this->tabPrecoItemOpcoes[$index])) {
+            Notification::make()->title('Selecione uma tabela de preço.')->warning()->send();
+
+            return;
+        }
+
+        $op = $this->tabPrecoItemOpcoes[$index];
+        $productId = (int) ($this->tabPrecoItemProductId ?? 0);
+
+        $this->tabPrecoItemConfirmada = true;
+        $this->tabPrecoItemModalOpen = false;
+        $this->itemPrecoInput = ErpMoney::formatBr((float) $op['preco']);
+        $this->recalcOsEntryRowFromPending();
+
+        $this->tabPrecoItemProductId = null;
+        $this->tabPrecoItemOpcoes = [];
+        $this->tabPrecoItemSelectedIndex = null;
+
+        if ($productId > 0) {
+            $this->itemPendingProductId = $productId;
+            $this->confirmPendingItemEntry();
+        }
+    }
+
+    public function cancelTabPrecoItem(): void
+    {
+        $this->tabPrecoItemModalOpen = false;
+        $this->tabPrecoItemProductId = null;
+        $this->tabPrecoItemOpcoes = [];
+        $this->tabPrecoItemSelectedIndex = null;
+        $this->tabPrecoItemConfirmada = false;
+        $this->clearItemEntryRow();
+        $this->dispatch('erp-os-focus-item-descricao');
     }
 
     protected function clearItemEntryRow(): void
@@ -1752,6 +1892,11 @@ trait ErpOrdemServicoFormPage
         $this->produtoLookupOpen = false;
         $this->produtoResults = [];
         $this->selectedProdutoIndex = null;
+        $this->tabPrecoItemModalOpen = false;
+        $this->tabPrecoItemConfirmada = false;
+        $this->tabPrecoItemProductId = null;
+        $this->tabPrecoItemOpcoes = [];
+        $this->tabPrecoItemSelectedIndex = null;
         $this->clearProdutoAtual();
     }
 
@@ -2785,6 +2930,12 @@ trait ErpOrdemServicoFormPage
 
     public function handleOsFormEscape(): void
     {
+        if ($this->tabPrecoItemModalOpen) {
+            $this->cancelTabPrecoItem();
+
+            return;
+        }
+
         if ($this->osImportOrcamentoOpen) {
             $this->fecharImportarOrcamentoOs();
 

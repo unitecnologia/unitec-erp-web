@@ -18,23 +18,48 @@
         ? $this->record->created_at->format('d/m/Y')
         : '';
 
+    $isGrade = (bool) ($this->data['is_grade'] ?? false);
+
     $parametros = [
         ['field' => 'ativo', 'label' => 'Ativo', 'disabled' => false],
-        ['field' => 'is_fiscal', 'label' => 'É Fiscal', 'disabled' => false],
-        ['field' => 'tributacao_monofasica', 'label' => 'Tributação Monofásica', 'disabled' => false],
-        ['field' => 'paga_comissao', 'label' => 'Paga Comissão', 'disabled' => false],
+        [
+            'field' => 'paga_comissao',
+            'label' => 'Paga Comissão',
+            'disabled' => false,
+            'title' => 'Paga comissão adicional pela venda deste produto, conforme valor configurado na Precificação, além da comissão padrão do funcionário.',
+        ],
         ['field' => 'preco_variavel', 'label' => 'Preço Variavel', 'disabled' => false],
         ['field' => 'is_composicao', 'label' => 'Composição', 'disabled' => ! $this->isEditingProduct()],
         ['field' => 'is_servico', 'label' => 'Serviço', 'disabled' => false],
         ['field' => 'is_grade', 'label' => 'Grade', 'disabled' => ! $this->isEditingProduct()],
         ['field' => 'usa_tab_preco', 'label' => 'Usar Tab. Preço', 'disabled' => false],
-        ['field' => 'is_combustivel', 'label' => 'Combustível', 'disabled' => false],
+        [
+            'field' => 'is_combustivel',
+            'label' => 'Combustível',
+            'disabled' => false,
+            'title' => 'Marque para produtos de combustível/ANP. Na emissão da NF-e/NFC-e, os dados da aba Combustível (código ANP, percentuais de GLP quando aplicável) são enviados no grupo fiscal comb do XML.',
+        ],
         ['field' => 'tem_info_nutricional', 'label' => 'Info. Nutricional', 'disabled' => false],
         ['field' => 'usa_imei', 'label' => 'Usa IMEI', 'disabled' => false],
-        ['field' => 'contr_est_grade', 'label' => 'Contr. Est. Grade', 'disabled' => false],
-        ['field' => 'mostrar_no_app', 'label' => 'Mostrar no App', 'disabled' => false],
+        [
+            'field' => 'contr_est_grade',
+            'label' => 'Contr. Est. Grade',
+            'disabled' => ! $isGrade,
+            'title' => 'Só disponível com Grade marcado. Quando ativo, o estoque é controlado por variação da grade (cor/tamanho etc.) nas vendas e baixas. Desmarcar Grade desliga este controle, mas mantém as quantidades já cadastradas na aba Grade.',
+        ],
+        [
+            'field' => 'mostrar_no_app',
+            'label' => 'Mostrar no App',
+            'disabled' => false,
+            'title' => 'Controla a visibilidade do produto nos aplicativos Força de Vendas, Vendas Internas e Unitec Mesas. Desmarcado: o produto some do catálogo no próximo sync (pedidos e históricos permanecem). Marcado: só aparece se o produto também estiver Ativo e atender às demais regras do app.',
+        ],
         ['field' => 'produto_pesado', 'label' => 'Produto de Balança', 'disabled' => false],
-        ['field' => 'controla_lote_validade', 'label' => 'Controla lote/validade', 'disabled' => false],
+        [
+            'field' => 'controla_lote_validade',
+            'label' => 'Controla lote/validade',
+            'disabled' => false,
+            'title' => 'Quando marcado, o produto passa a controlar estoque por lote e data de validade: na compra é obrigatório informar os lotes; nas saídas (PDV, NF-e, ajustes) a baixa usa o lote que vence primeiro (FEFO); a aba Lote/Validade fica disponível para consulta e manutenção.',
+        ],
     ];
 @endphp
 
@@ -137,11 +162,15 @@
                     <legend class="erp-pcad__group-title">Parâmetros</legend>
                     <div class="erp-pcad__checks">
                         @foreach ($parametros as $param)
-                            <label @class(['erp-pcad__check', 'erp-pcad__check--disabled' => $param['disabled']])>
+                            <label
+                                @class(['erp-pcad__check', 'erp-pcad__check--disabled' => $param['disabled']])
+                                @if (! empty($param['title'])) title="{{ $param['title'] }}" @endif
+                            >
                                 <input
                                     type="checkbox"
                                     wire:model.live="data.{{ $param['field'] }}"
                                     @disabled($param['disabled'])
+                                    @if (! empty($param['title'])) title="{{ $param['title'] }}" @endif
                                 >
                                 <span>{{ $param['label'] }}</span>
                             </label>

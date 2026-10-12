@@ -272,6 +272,17 @@ final class PdvDavCupomLayout
                 $lines[] = self::line($linhaProduto, font: 'B');
             }
 
+            $obs = self::up(trim((string) ($item['obs'] ?? '')));
+            if ($obs !== '') {
+                $resto = 'OBS: '.$obs;
+                $larguraObs = max(8, $wItems - 5);
+                while ($resto !== '') {
+                    $pedaco = mb_substr($resto, 0, $larguraObs);
+                    $resto = mb_substr($resto, mb_strlen($pedaco));
+                    $lines[] = self::line(str_repeat(' ', 5).$pedaco, bold: true, font: 'B');
+                }
+            }
+
             if ($index < $ultimo) {
                 $lines[] = self::line('', font: 'B');
             }

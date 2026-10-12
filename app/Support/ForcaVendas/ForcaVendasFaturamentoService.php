@@ -173,7 +173,7 @@ class ForcaVendasFaturamentoService
                 continue;
             }
 
-            VendaItem::query()->create([
+            $vendaItem = VendaItem::query()->create([
                 'venda_id' => $venda->id,
                 'product_id' => $item->product_id,
                 'quantidade' => $item->quantidade,
@@ -199,6 +199,8 @@ class ForcaVendasFaturamentoService
                         origemId: (int) $venda->id,
                         origemNumero: $venda->numero !== null ? (string) $venda->numero : null,
                     ),
+                    'venda_item',
+                    (int) $vendaItem->id,
                 );
             }
         }
@@ -555,39 +557,6 @@ class ForcaVendasFaturamentoService
             ? $empresaId
             : ErpContext::currentEmpresaId();
 
-        $itens = $pedido && $pedido->itens->isNotEmpty()
-            ? $pedido->itens
-            : null;
-
-        if ($itens !== null) {
-            foreach ($itens as $item) {
-                if (! $item->product_id) {
-                    continue;
-                }
-
-                $product = Product::query()->find($item->product_id);
-
-                if ($product) {
-                    $stock->estornoItemVenda(
-                        $product,
-                        (float) $item->quantidade,
-                        $item->product_grade_id ? (int) $item->product_grade_id : null,
-                        null,
-                        $estoqueId,
-                        EstoqueMovimentacaoContext::make(
-                            EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
-                            empresaId: $empresaId,
-                            origemTipo: 'venda',
-                            origemId: (int) $venda->id,
-                            origemNumero: $venda->numero !== null ? (string) $venda->numero : null,
-                        ),
-                    );
-                }
-            }
-
-            return;
-        }
-
         $venda->loadMissing('itens');
 
         foreach ($venda->itens as $item) {
@@ -598,10 +567,18 @@ class ForcaVendasFaturamentoService
             $product = Product::query()->find($item->product_id);
 
             if ($product) {
+                $gradeId = null;
+                if ($pedido) {
+                    $pedidoItem = $pedido->itens->first(
+                        fn ($pi): bool => (int) ($pi->product_id ?? 0) === (int) $item->product_id
+                    );
+                    $gradeId = $pedidoItem?->product_grade_id ? (int) $pedidoItem->product_grade_id : null;
+                }
+
                 $stock->estornoItemVenda(
                     $product,
                     (float) $item->quantidade,
-                    null,
+                    $gradeId,
                     null,
                     $estoqueId,
                     EstoqueMovimentacaoContext::make(
@@ -611,6 +588,8 @@ class ForcaVendasFaturamentoService
                         origemId: (int) $venda->id,
                         origemNumero: $venda->numero !== null ? (string) $venda->numero : null,
                     ),
+                    'venda_item',
+                    (int) $item->id,
                 );
             }
         }

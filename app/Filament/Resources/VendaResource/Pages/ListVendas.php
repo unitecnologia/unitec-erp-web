@@ -52,6 +52,12 @@ class ListVendas extends ListRecords
     #[Url(as: 'campo')]
     public string $searchColumn = 'data';
 
+    public string $searchColumn2 = '';
+
+    public string $localSearch2 = '';
+
+    public string $searchSignatureApplied = '';
+
     #[Url(as: 'status')]
     public string $statusFilter = 'todos';
 
@@ -92,14 +98,21 @@ class ListVendas extends ListRecords
         $this->tipoFilter = $this->normalizeTipoFilter($this->tipoFilter);
         // Sempre abre em DATA de/até = hoje (amanhã vira o dia seguinte).
         $this->applyTodayDateFilter();
+        $this->searchSignatureApplied = $this->searchSignature();
         $this->dispatch('erp-masks-refresh');
     }
 
     public function booted(): void
     {
-        if ($this->searchColumn === 'data'
-            && ($this->localSearchDe === '' || $this->localSearchAte === '')) {
+        if (! in_array('data', [$this->searchColumn, $this->searchColumn2], true)
+            || ($this->localSearchDe !== '' && $this->localSearchAte !== '')) {
+            return;
+        }
+
+        if ($this->searchColumn2 === '') {
             $this->applyTodayDateFilter();
+        } else {
+            $this->applyTodayDates();
         }
     }
 
@@ -118,13 +131,20 @@ class ListVendas extends ListRecords
 
     protected function applyTodayDateFilter(): void
     {
-        $hoje = ErpTimezone::toLocal()->toDateString();
         $this->searchColumn = 'data';
         $this->localSearch = '';
-        $this->localSearchDe = $hoje;
-        $this->localSearchAte = $hoje;
+        $this->searchColumn2 = '';
+        $this->localSearch2 = '';
+        $this->applyTodayDates();
         $this->localSearchHoraDe = '';
         $this->localSearchHoraAte = '';
+    }
+
+    protected function applyTodayDates(): void
+    {
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $this->localSearchDe = $hoje;
+        $this->localSearchAte = $hoje;
     }
 
     protected static function erpListPageClass(): string
@@ -167,20 +187,10 @@ class ListVendas extends ListRecords
 
     protected function buildListQuery(): Builder
     {
-        return (new VendaListQueryBuilder(
-            statusFilter: $this->statusFilter,
-            tipoFilter: $this->tipoFilter,
-            searchColumn: $this->searchColumn,
-            localSearch: $this->localSearch,
-            localSearchDe: $this->localSearchDe,
-            localSearchAte: $this->localSearchAte,
-            localSearchHoraDe: $this->localSearchHoraDe,
-            localSearchHoraAte: $this->localSearchHoraAte,
-            applyDefaultOrder: false,
-        ))->buildForList();
+        return $this->listQueryBuilder(applyDefaultOrder: false)->buildForList();
     }
 
-    protected function listQueryBuilder(): VendaListQueryBuilder
+    protected function listQueryBuilder(bool $applyDefaultOrder = true): VendaListQueryBuilder
     {
         return new VendaListQueryBuilder(
             statusFilter: $this->statusFilter,
@@ -191,6 +201,9 @@ class ListVendas extends ListRecords
             localSearchAte: $this->localSearchAte,
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
+            applyDefaultOrder: $applyDefaultOrder,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
         );
     }
 
@@ -389,6 +402,8 @@ class ListVendas extends ListRecords
 
         $this->searchColumn = $normalized;
         $this->localSearch = '';
+        $this->searchColumn2 = '';
+        $this->localSearch2 = '';
         $this->localSearchDe = '';
         $this->localSearchAte = '';
         $this->localSearchHoraDe = '';
@@ -398,7 +413,7 @@ class ListVendas extends ListRecords
             $this->applyTodayDateFilter();
             $this->clearListSelection();
             $this->dispatch('erp-masks-refresh');
-            $this->pushVendaListRefresh(resetSort: true);
+            $this->pushVendaListRefresh(resetSort: true, renderPage: true);
 
             return;
         }
@@ -407,7 +422,7 @@ class ListVendas extends ListRecords
 
         if ($wasData || $hadSearch) {
             $this->dispatch('erp-masks-refresh');
-            $this->pushVendaListRefresh(resetSort: true);
+            $this->pushVendaListRefresh(resetSort: true, renderPage: true);
 
             return;
         }
@@ -418,8 +433,172 @@ class ListVendas extends ListRecords
             return;
         }
 
-        $this->skipRender();
+        $this->searchSignatureApplied = $this->searchSignature();
         $this->dispatch('erp-masks-refresh');
+    }
+
+    /**
+     * Marca/desmarca campo de pesquisa (até 2 combinados). Ao marcar um 3º, sai o mais antigo.
+     */
+    public function toggleSearchField(string $column): void
+    {
+        if (! in_array($column, $this->localSearchColumns(), true)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $active = $this->activeSearchColumns();
+
+        if (in_array($column, $active, true)) {
+            if (count($active) < 2) {
+                $this->skipRender();
+
+                return;
+            }
+
+            $this->removeSearchField($column);
+        } else {
+            if (count($active) >= 2) {
+                $this->removeSearchField($this->searchColumn);
+            }
+
+            $this->searchColumn2 = $column;
+            $this->localSearch2 = '';
+
+            if ($column === 'data' && ($this->localSearchDe === '' || $this->localSearchAte === '')) {
+                $this->applyTodayDates();
+            }
+        }
+
+        $this->dispatch('erp-masks-refresh');
+
+        if ($this->searchSignature() === $this->searchSignatureApplied) {
+            return;
+        }
+
+        $this->clearListSelection();
+        $this->pushVendaListRefresh(resetSort: true, renderPage: true);
+    }
+
+    protected function removeSearchField(string $column): void
+    {
+        if ($this->searchColumn2 === $column) {
+            $this->searchColumn2 = '';
+            $this->localSearch2 = '';
+        } elseif ($this->searchColumn === $column && $this->searchColumn2 !== '') {
+            $this->searchColumn = $this->searchColumn2;
+            $this->localSearch = $this->localSearch2;
+            $this->searchColumn2 = '';
+            $this->localSearch2 = '';
+        }
+
+        if ($column === 'data') {
+            $this->localSearchDe = '';
+            $this->localSearchAte = '';
+        }
+
+        if ($column === 'hora') {
+            $this->localSearchHoraDe = '';
+            $this->localSearchHoraAte = '';
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function activeSearchColumns(): array
+    {
+        return array_values(array_unique(array_filter(
+            [$this->searchColumn, $this->searchColumn2],
+            fn (string $column): bool => $column !== '',
+        )));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function localSearchColumns(): array
+    {
+        return ['numero', 'data', 'cliente', 'vendedor', 'plataforma', 'meio_pagamento', 'total', 'situacao', 'tipo', 'hora'];
+    }
+
+    /**
+     * Filtro efetivo (campo vazio não muda o resultado, então não entra).
+     */
+    protected function searchSignature(): string
+    {
+        $active = $this->activeSearchColumns();
+        $terms = [];
+
+        foreach ([[$this->searchColumn, $this->localSearch], [$this->searchColumn2, $this->localSearch2]] as [$column, $term]) {
+            $term = trim($term);
+
+            if ($column !== '' && ! in_array($column, ['data', 'hora'], true) && $term !== '') {
+                $terms[] = $column.'='.$term;
+            }
+        }
+
+        sort($terms);
+
+        $hasData = in_array('data', $active, true);
+        $hasTime = $hasData || in_array('hora', $active, true);
+
+        return json_encode([
+            $terms,
+            $hasData ? [$this->localSearchDe, $this->localSearchAte] : null,
+            $hasTime ? [$this->localSearchHoraDe, $this->localSearchHoraAte] : null,
+        ], JSON_UNESCAPED_UNICODE) ?: '';
+    }
+
+    /**
+     * Pesquisa automática: só consulta quando o filtro efetivo mudou.
+     */
+    protected function applySearchIfChanged(): void
+    {
+        if ($this->searchSignature() === $this->searchSignatureApplied) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->clearListSelection();
+        $this->pushVendaListRefresh(resetSort: true);
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearch2(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearchHoraDe(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearchHoraAte(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearchDe(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearchAte(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function applyDateFilterAuto(): void
+    {
+        $this->applySearchIfChanged();
     }
 
     public function clearSearch(): void
@@ -427,7 +606,7 @@ class ListVendas extends ListRecords
         $this->applyTodayDateFilter();
         $this->clearListSelection();
         $this->dispatch('erp-masks-refresh');
-        $this->pushVendaListRefresh(resetSort: true);
+        $this->pushVendaListRefresh(resetSort: true, renderPage: true);
     }
 
     public function updatedSearchColumn(): void
@@ -655,16 +834,7 @@ class ListVendas extends ListRecords
             return;
         }
 
-        $builder = new VendaListQueryBuilder(
-            statusFilter: $this->statusFilter,
-            tipoFilter: $this->tipoFilter,
-            searchColumn: $this->searchColumn,
-            localSearch: $this->localSearch,
-            localSearchDe: $this->localSearchDe,
-            localSearchAte: $this->localSearchAte,
-            localSearchHoraDe: $this->localSearchHoraDe,
-            localSearchHoraAte: $this->localSearchHoraAte,
-        );
+        $builder = $this->listQueryBuilder();
 
         $params = array_filter(
             $builder->reportFilters(),
@@ -739,9 +909,10 @@ class ListVendas extends ListRecords
             ->send();
     }
 
-    protected function pushVendaListRefresh(bool $resetSort = false): void
+    protected function pushVendaListRefresh(bool $resetSort = false, bool $renderPage = false): void
     {
         $total = $this->listQueryBuilder()->sumFilteredTotal();
+        $this->searchSignatureApplied = $this->searchSignature();
 
         $this->dispatch(
             'erp-venda-list-refresh',
@@ -755,9 +926,13 @@ class ListVendas extends ListRecords
             localSearchHoraAte: $this->localSearchHoraAte,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
         )->to(VendaListTable::class);
 
-        $this->skipRender();
+        if (! $renderPage) {
+            $this->skipRender();
+        }
 
         $this->js(sprintf(
             '(() => { const el = document.querySelector(".erp-vendas__total-value"); if (el) el.textContent = %s; })()',

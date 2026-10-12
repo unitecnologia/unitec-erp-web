@@ -66,7 +66,7 @@ trait ManagesProductPrecificacao
             2
         );
         $margemVarejo = BrDecimal::parse($data['pct_lucro'] ?? 0, 2);
-        $comissao = 0.0;
+        $comissao = BrDecimal::parse($data['comissao_pct'] ?? 0, 2);
         $desconto = 0.0;
 
         $varejo = BrDecimal::parse($data['preco_venda'] ?? 0, 2);
@@ -733,6 +733,7 @@ trait ManagesProductPrecificacao
             $this->data['pct_custos'] = $this->precificacao['pct_custos'] ?? '0,00';
             $this->data['preco_custo'] = $this->precificacao['preco_custo'] ?? '0,00';
             $this->data['pct_lucro'] = $this->precificacao['niveis']['varejo']['margem'] ?? '0,00';
+            $this->data['comissao_pct'] = $this->precificacao['niveis']['varejo']['comissao'] ?? '0,00';
             $this->data['preco_venda'] = $this->precificacao['niveis']['varejo']['praticado'] ?? '0,00';
             $this->data['preco_atacado'] = $this->precificacao['niveis']['atacado']['praticado'] ?? '0,00';
             $this->data['preco_especial'] = $this->precificacao['niveis']['especial']['praticado'] ?? '0,00';

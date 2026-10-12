@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.243',
+    'versao' => '6.4.1.244',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -15,6 +15,9 @@ return [
         'timeout' => 8,
         'cache_seconds' => 600,
         'grace_hours' => 24,
+        // Dias corridos após o vencimento da mensalidade em que o ERP ainda libera (inclusive).
+        // Ex.: vence 10/10 → liberado até 15/10; bloqueia a partir de 16/10.
+        'grace_days' => 5,
     ],
 
     /*

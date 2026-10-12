@@ -124,7 +124,11 @@
                     @endif
 
                     @if (filled($this->feedback))
-                        <p class="erp-lb__feedback">{{ $this->feedback }}</p>
+                        <p class="erp-lb__feedback" style="white-space:pre-wrap;word-break:break-word;">{{ $this->feedback }}</p>
+                    @endif
+
+                    @if (filled($this->diagnostico))
+                        <pre style="margin:.65rem 0 0;padding:.55rem .65rem;border-radius:10px;background:#0f172a;color:#e2e8f0;font-size:.62rem;line-height:1.35;white-space:pre-wrap;word-break:break-word;max-height:11rem;overflow:auto;">{{ $this->diagnostico }}</pre>
                     @endif
 
                     <div class="erp-lb__actions">

@@ -100,28 +100,39 @@ final class ReabrirDevolucaoCompraService
             }
 
             $doc = EstoqueMovimentacaoDocumento::fromDevolucaoCompra($devolucao);
-            $this->saldos->incrementar(
-                (int) $product->id,
-                (float) $item->qtd,
-                $estoqueId,
-                $empresa,
-                EstoqueMovimentacaoContext::make(
-                    EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
-                    empresaId: $empresaId,
-                    origemTipo: $doc['origemTipo'],
-                    origemId: $doc['origemId'],
-                    origemNumero: $doc['origemNumero'],
-                    docFiscalTipo: $doc['docFiscalTipo'],
-                    docFiscalNumero: $doc['docFiscalNumero'],
-                ),
+            $qtd = (float) $item->qtd;
+            $ctx = EstoqueMovimentacaoContext::make(
+                EstoqueMovimentacao::TIPO_CANCELAMENTO_ESTORNO,
+                empresaId: $empresaId,
+                origemTipo: $doc['origemTipo'],
+                origemId: $doc['origemId'],
+                origemNumero: $doc['origemNumero'],
+                docFiscalTipo: $doc['docFiscalTipo'],
+                docFiscalNumero: $doc['docFiscalNumero'],
             );
 
-            if ($product->controla_lote_validade) {
-                try {
-                    $this->lotes->devolver($product, (float) $item->qtd);
-                } catch (RuntimeException $e) {
-                    throw new DomainException($e->getMessage(), 0, $e);
-                }
+            try {
+                DB::transaction(function () use ($product, $qtd, $estoqueId, $empresa, $ctx, $item): void {
+                    $this->saldos->incrementar(
+                        (int) $product->id,
+                        $qtd,
+                        $estoqueId,
+                        $empresa,
+                        $ctx,
+                    );
+
+                    if ($product->controla_lote_validade) {
+                        // Com rastro: restitui ao lote original. Sem rastro (legado): não inventa lote.
+                        $this->lotes->estornarPorOrigem(
+                            $product,
+                            'devolucao_compra_item',
+                            (int) $item->id,
+                            $qtd,
+                        );
+                    }
+                });
+            } catch (RuntimeException $e) {
+                throw new DomainException($e->getMessage(), 0, $e);
             }
         }
     }

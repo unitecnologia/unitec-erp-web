@@ -27,6 +27,9 @@
                 <input id="pprod-issqn" type="text" wire:model="data.issqn" data-mask="percent-br" class="erp-pcad-form__input">
             </div>
         </div>
-        <p class="erp-produtos-tab-group__hint">GLP + GNn + GNi = 100% quando informado.</p>
+        <p class="erp-produtos-tab-group__hint">
+            Com o parâmetro Combustível marcado: Código ANP (9 dígitos) é obrigatório.
+            Para GLP (ANP 210203001), GLP% + GNn% + GNi% deve somar 100%. Esses dados geram o grupo <code>comb</code> na NF-e/NFC-e.
+        </p>
     </fieldset>
 </div>

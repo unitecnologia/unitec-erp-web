@@ -343,6 +343,7 @@ final class EmpresaParametros
     {
         return [
             'mercadopago' => 'Mercado Pago',
+            'ailos' => 'Ailos',
         ];
     }
 
@@ -372,6 +373,14 @@ final class EmpresaParametros
     public static function boletoAilosAuthCallbackUrl(?string $erpPublicUrl = null): string
     {
         return self::BOLETO_AILOS_AUTH_CALLBACK_URL;
+    }
+
+    /** Webhook padrão Ailos Pix (preenchido no campo Webhook ao selecionar Ailos). */
+    public const PIX_AILOS_WEBHOOK_URL = 'https://unitecnologiasc.digital/api/webhooks/ailos';
+
+    public static function pixAilosWebhookUrl(): string
+    {
+        return self::PIX_AILOS_WEBHOOK_URL;
     }
 
     /**

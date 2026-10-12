@@ -8,6 +8,8 @@
         :local-search-ate="$this->localSearchAte"
         :local-search-hora-de="$this->localSearchHoraDe"
         :local-search-hora-ate="$this->localSearchHoraAte"
+        :search-column2="$this->searchColumn2"
+        :local-search2="$this->localSearch2"
         :per-page="(int) ($this->tableRecordsPerPage ?? 50)"
         wire:key="erp-venda-list-table-host"
     />

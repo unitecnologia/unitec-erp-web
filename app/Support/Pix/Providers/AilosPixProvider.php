@@ -12,14 +12,19 @@ use App\Support\Pix\Contracts\PixProvider;
 use App\Support\Pix\Data\PixCobrancaInput;
 use App\Support\Pix\Data\PixCobrancaResult;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 final class AilosPixProvider implements PixProvider
 {
     private readonly AilosPixService $service;
 
+    private readonly string $pixKey;
+
     public function __construct(Empresa $empresa)
     {
-        $this->service = new AilosPixService(AilosPixConfig::fromEmpresa($empresa));
+        $config = AilosPixConfig::fromEmpresa($empresa);
+        $this->pixKey = $config->pixKey;
+        $this->service = new AilosPixService($config);
     }
 
     public function nome(): string
@@ -48,13 +53,17 @@ final class AilosPixProvider implements PixProvider
             'debtorDocument' => $input->debtorDocument,
         ]);
 
-        // Registra webhook na Ailos (idempotente) quando houver URL HTTPS pública.
+        // Registra webhook na Ailos quando houver URL HTTPS pública; 1x/dia por chave+URL.
         $webhook = trim((string) ($input->notificationUrl ?? ''));
         if ($webhook !== '' && str_starts_with(strtolower($webhook), 'https://')) {
-            try {
-                $this->service->configureWebhook($webhook);
-            } catch (\Throwable) {
-                // Não impede a emissão do QR; polling/webhook já cadastrado cobrem.
+            $cacheKey = 'ailos.pix.webhook.'.hash('sha256', $this->pixKey.'|'.$webhook);
+            if (! Cache::has($cacheKey)) {
+                try {
+                    $this->service->configureWebhook($webhook);
+                    Cache::put($cacheKey, true, now()->addDay());
+                } catch (\Throwable) {
+                    // Não impede a emissão do QR; polling/webhook já cadastrado cobrem.
+                }
             }
         }
 

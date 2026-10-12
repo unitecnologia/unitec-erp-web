@@ -156,8 +156,12 @@
     background: transparent;
 }
 
-.erp-empresas-form-page .fi-sc > div:has(> .erp-empresas-window) {
-    flex: 1;
+/* Filament envolve a View em `.fi-sc > div > .fi-sc-component > .erp-empresas-window`;
+   os dois wrappers precisam repassar a altura, senão a janela cresce com o conteúdo
+   e o rodapé (Gravar / Sair) é cortado pelo overflow da página. */
+.erp-empresas-form-page .fi-sc > div:has(.erp-empresas-window),
+.erp-empresas-form-page .fi-sc-component:has(> .erp-empresas-window) {
+    flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
     display: flex;
@@ -263,16 +267,33 @@
     overflow: hidden;
 }
 
+/* Tela alta: só o painel da subaba rola. Tela baixa: o painel mantém altura mínima útil
+   e a área de configurações inteira rola, com as subabas presas no topo. */
 .erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros {
-    flex: 1;
-    min-height: 0;
-}
-
-.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros__subpanel {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros__subtabs {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding-top: 0.3rem;
+    background: var(--erp-bg-panel, #fff);
+}
+
+.erp-empresas-form-page .erp-pcad__workspace--parametros .erp-empresas-parametros__subpanel {
+    flex: 1 1 0;
+    min-height: 16rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 0 var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px) var(--erp-radius-sm, 6px);
 }
 
 .erp-empresas-form-page .erp-pcad__tab--active {

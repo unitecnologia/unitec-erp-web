@@ -59,7 +59,8 @@ $titulo = "Hotfix $VersaoBase (revisao $($manifesto.revisao))"
 $notas = "Hotfix $($manifesto.id) para a versao $VersaoBase.`n`n$($manifesto.descricao)`n`nArquivos:`n" +
     (($manifesto.arquivos | ForEach-Object { "- $($_.caminho)" }) -join "`n")
 
-& gh release view $tag --repo $Repo 1>$null 2>$null
+# gh escreve "release not found" no stderr — nao pode derrubar o script com $ErrorActionPreference=Stop.
+cmd /c "gh release view `"$tag`" --repo `"$Repo`" 1>nul 2>nul"
 if ($LASTEXITCODE -eq 0) {
     # Ordem: ZIP antes do .sha256, para o cliente nunca ver hash novo apontando para ZIP antigo.
     & gh release upload $tag $zip --repo $Repo --clobber

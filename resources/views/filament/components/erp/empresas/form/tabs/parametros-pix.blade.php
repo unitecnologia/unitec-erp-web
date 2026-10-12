@@ -36,17 +36,19 @@
                 </select>
             </div>
 
-            <div class="erp-empresas-pix__field">
-                <label class="erp-pcad-form__label" for="param-param_pix_ambiente">Ambiente</label>
-                <select
-                    id="param-param_pix_ambiente"
-                    wire:model.live="data.param_pix_ambiente"
-                    class="erp-pcad-form__select"
-                >
-                    <option value="homologacao">Homologação</option>
-                    <option value="producao">Produção</option>
-                </select>
-            </div>
+            @unless ($isAilos)
+                <div class="erp-empresas-pix__field">
+                    <label class="erp-pcad-form__label" for="param-param_pix_ambiente">Ambiente</label>
+                    <select
+                        id="param-param_pix_ambiente"
+                        wire:model.live="data.param_pix_ambiente"
+                        class="erp-pcad-form__select"
+                    >
+                        <option value="homologacao">Homologação</option>
+                        <option value="producao">Produção</option>
+                    </select>
+                </div>
+            @endunless
         </div>
 
         @if ($isMp)
@@ -67,8 +69,9 @@
 
         @if ($isAilos)
             <p class="erp-empresas-pix__hint">
-                Credenciais desta empresa (cada cliente tem as suas). O certificado mTLS é o A1 da NF-e
-                já cadastrado em Configurações Fiscais — não cole PFX nesta tela.
+                Informe apenas as credenciais fornecidas pela Ailos para esta empresa.
+                Ambiente de produção, endpoints e autenticação são configurados automaticamente.
+                O certificado exigido pela Ailos é o A1 da NF-e já cadastrado em Configurações Fiscais.
             </p>
 
             <div class="erp-empresas-pix__grid">

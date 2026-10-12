@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports;
 
 use App\Models\Venda;
+use App\Support\Erp\Financeiro\ProdutoComissaoAdicional;
 
 /**
  * Calcula a comissão dos vendedores a partir das vendas faturadas.
@@ -10,7 +11,9 @@ use App\Models\Venda;
  * Regra de negócio (definida pelo cliente):
  *   - base = valor faturado da venda (pela data da venda);
  *   - "a prazo" = boleto ou crediário (usa a alíquota comissao_ap);
- *   - todas as demais formas = "à vista" (usa a alíquota comissao_av).
+ *   - todas as demais formas = "à vista" (usa a alíquota comissao_av);
+ *   - produtos com "Paga Comissão" somam adicional (comissao_pct da Precificação)
+ *     sobre o total do item, sem substituir a comissão padrão do vendedor.
  */
 class ComissaoVendedoresReport
 {
@@ -29,9 +32,18 @@ class ComissaoVendedoresReport
      */
     public static function build(iterable $vendas): array
     {
+        $lista = [];
+        foreach ($vendas as $venda) {
+            $lista[] = $venda;
+        }
+
+        $adicionais = ProdutoComissaoAdicional::porVendaIds(
+            array_map(static fn (Venda $v): int => (int) $v->id, $lista),
+        );
+
         $grupos = [];
 
-        foreach ($vendas as $venda) {
+        foreach ($lista as $venda) {
             $vid = $venda->vendedor_id ? (int) $venda->vendedor_id : 0;
 
             if (! isset($grupos[$vid])) {
@@ -51,15 +63,20 @@ class ComissaoVendedoresReport
                     'qtd' => 0,
                     'total_avista' => 0.0,
                     'total_aprazo' => 0.0,
+                    'adicional_avista' => 0.0,
+                    'adicional_aprazo' => 0.0,
                 ];
             }
 
             $grupos[$vid]['qtd']++;
+            $adicional = (float) ($adicionais[(int) $venda->id] ?? 0);
 
             if (self::isAPrazo($venda->forma_pagamento)) {
                 $grupos[$vid]['total_aprazo'] += (float) $venda->total;
+                $grupos[$vid]['adicional_aprazo'] += $adicional;
             } else {
                 $grupos[$vid]['total_avista'] += (float) $venda->total;
+                $grupos[$vid]['adicional_avista'] += $adicional;
             }
         }
 
@@ -75,8 +92,8 @@ class ComissaoVendedoresReport
         ];
 
         foreach ($grupos as $g) {
-            $comAv = round($g['total_avista'] * $g['comissao_av'] / 100, 2);
-            $comAp = round($g['total_aprazo'] * $g['comissao_ap'] / 100, 2);
+            $comAv = round($g['total_avista'] * $g['comissao_av'] / 100 + $g['adicional_avista'], 2);
+            $comAp = round($g['total_aprazo'] * $g['comissao_ap'] / 100 + $g['adicional_aprazo'], 2);
             $totalGeral = round($g['total_avista'] + $g['total_aprazo'], 2);
             $comTotal = round($comAv + $comAp, 2);
 

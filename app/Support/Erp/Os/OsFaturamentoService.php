@@ -414,6 +414,8 @@ final class OsFaturamentoService
                     origemId: (int) $os->id,
                     origemNumero: (string) $os->numero,
                 ),
+                'os_item',
+                (int) $item->id,
             );
         }
     }

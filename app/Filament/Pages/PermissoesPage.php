@@ -324,6 +324,7 @@ class PermissoesPage extends Page
             'acesso_app_entregas' => false,
             'acesso_app_gestao' => false,
             'acesso_app_inventario' => false,
+            'acesso_app_mesas' => false,
             'empresa_id' => $empresaId,
             'erp_profile_id' => '',
             'is_admin' => 'N',
@@ -358,6 +359,7 @@ class PermissoesPage extends Page
             'acesso_app_entregas' => (bool) $user->acesso_app_entregas,
             'acesso_app_gestao' => (bool) $user->acesso_app_gestao,
             'acesso_app_inventario' => (bool) $user->acesso_app_inventario,
+            'acesso_app_mesas' => (bool) ($user->acesso_app_mesas ?? false),
             'empresa_id' => (string) ($user->empresa_id ?? ''),
             'erp_profile_id' => $user->erp_profile_id ? (string) $user->erp_profile_id : '',
             'is_admin' => $user->is_admin ? 'S' : 'N',
@@ -474,6 +476,10 @@ class PermissoesPage extends Page
             'acesso_app_gestao' => filter_var($this->userForm['acesso_app_gestao'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'acesso_app_inventario' => filter_var($this->userForm['acesso_app_inventario'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ];
+
+        if (\App\Support\Erp\ErpSchema::hasColumn('users', 'acesso_app_mesas')) {
+            $data['acesso_app_mesas'] = filter_var($this->userForm['acesso_app_mesas'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        }
 
         if (filled($this->userForm['password'] ?? null)) {
             $plain = (string) $this->userForm['password'];

@@ -77,7 +77,13 @@ final class PdvCaixaRapidoBipService
             return ['status' => 'not_found'] + $empty;
         }
 
-        if ($product->is_grade || $product->preco_variavel || $product->usa_imei) {
+        // Grade / preço variável / IMEI / Tab. Preço: modal no PDV page (não bip direto).
+        if (
+            $product->is_grade
+            || $product->preco_variavel
+            || $product->usa_imei
+            || ($product->usa_tab_preco ?? false)
+        ) {
             return ['status' => 'delegate', 'reason' => 'modal'] + $empty;
         }
 

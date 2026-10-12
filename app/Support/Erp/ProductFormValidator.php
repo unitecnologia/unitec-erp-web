@@ -213,17 +213,31 @@ class ProductFormValidator
             return;
         }
 
-        $sum = BrDecimal::parse($data['glp_pct'] ?? 0, 2)
-            + BrDecimal::parse($data['gnn_pct'] ?? 0, 2)
-            + BrDecimal::parse($data['gni_pct'] ?? 0, 2);
+        $anp = preg_replace('/\D/', '', (string) ($data['anp_code'] ?? '')) ?? '';
+        if (strlen($anp) !== 9) {
+            throw ValidationException::withMessages([
+                'anp_code' => 'Informe o Código ANP com 9 dígitos na aba Combustível (obrigatório para gerar o grupo comb na NF-e/NFC-e).',
+            ]);
+        }
 
-        if ($sum <= 0) {
+        $glp = BrDecimal::parse($data['glp_pct'] ?? 0, 2);
+        $gnn = BrDecimal::parse($data['gnn_pct'] ?? 0, 2);
+        $gni = BrDecimal::parse($data['gni_pct'] ?? 0, 2);
+        $sum = round($glp + $gnn + $gni, 2);
+
+        if ($anp === '210203001') {
+            if ($sum !== 100.0) {
+                throw ValidationException::withMessages([
+                    'glp_pct' => 'Para GLP (ANP 210203001), a soma de GLP% + GNn% + GNi% deve ser 100%.',
+                ]);
+            }
+
             return;
         }
 
-        if (round($sum, 2) !== 100.0) {
+        if ($sum > 0) {
             throw ValidationException::withMessages([
-                'glp_pct' => 'A soma das alíquotas de GLP, GNi e GNn deve ser 100%.',
+                'glp_pct' => 'Percentuais de GLP/GNn/GNi só se aplicam ao código ANP 210203001 (GLP). Limpe esses campos ou altere o Código ANP.',
             ]);
         }
     }
@@ -388,7 +402,6 @@ class ProductFormValidator
             'icms_diferido' => (float) ($empresa?->param_imp_icms_diferido ?? 0),
             'aliq_deson' => (float) ($empresa?->param_imp_aliq_deson ?? 0),
             'motivo_desoneracao' => $motivoDeson,
-            'tributacao_monofasica' => false,
             'iva_cst' => $nullable($empresa?->param_imp_iva_cst),
             'cclass_trib' => $nullable($empresa?->param_imp_cclass_trib),
             'aliq_ibs_uf' => (float) ($empresa?->param_imp_aliq_ibs_uf ?? 0),

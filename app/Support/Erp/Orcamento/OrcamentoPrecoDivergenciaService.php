@@ -123,14 +123,7 @@ final class OrcamentoPrecoDivergenciaService
             return;
         }
 
-        $config = new PdvConfig;
-        $tableId = $config->habilitarTabelaPreco() ? $config->priceTableId() : null;
-
-        if ($tableId) {
-            $products->load([
-                'priceTableItems' => fn ($query) => $query->where('price_table_id', $tableId),
-            ]);
-        }
+        app(\App\Support\Erp\ProductTabelaPrecoService::class)->carregarItens($products);
 
         $empresaId = (int) (session('erp_empresa_id') ?? 0);
 

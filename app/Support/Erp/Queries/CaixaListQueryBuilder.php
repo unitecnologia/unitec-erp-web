@@ -19,6 +19,8 @@ class CaixaListQueryBuilder
         public string $orderBy = 'codigo',
         public string $orderDirection = 'desc',
         public bool $applyDefaultOrder = true,
+        public string $searchColumn2 = '',
+        public string $localSearch2 = '',
     ) {}
 
     private ?bool $contaPdv = null;
@@ -96,6 +98,10 @@ class CaixaListQueryBuilder
 
         if (filled($this->localSearch)) {
             $this->applyLocalSearch($query, $this->localSearch);
+        }
+
+        if ($this->searchColumn2 !== '' && $this->searchColumn2 !== $this->searchColumn && filled($this->localSearch2)) {
+            $this->applyLocalSearch($query, $this->localSearch2, $this->searchColumn2);
         }
 
         return $query;
@@ -189,7 +195,7 @@ class CaixaListQueryBuilder
         return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
     }
 
-    protected function applyLocalSearch(Builder $query, string $term): void
+    protected function applyLocalSearch(Builder $query, string $term, ?string $searchColumn = null): void
     {
         $term = mb_strtoupper(trim($term), 'UTF-8');
 
@@ -197,8 +203,9 @@ class CaixaListQueryBuilder
             return;
         }
 
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
+        $searchColumn ??= $this->searchColumn;
+        $column = in_array($searchColumn, $this->localSearchColumns(), true)
+            ? $searchColumn
             : 'documento';
 
         $prefixLike = $term.'%';

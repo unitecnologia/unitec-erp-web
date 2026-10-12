@@ -9,19 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'product_id',
     'price_table_id',
-    'valor',
-    'fator',
 ])]
 class ProductPriceTableItem extends Model
 {
-    protected function casts(): array
-    {
-        return [
-            'valor' => 'decimal:2',
-            'fator' => 'decimal:3',
-        ];
-    }
-
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);

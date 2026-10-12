@@ -24,6 +24,8 @@ class VendaListQueryBuilder
         public string $orderBy = 'numero',
         public string $orderDirection = 'desc',
         public bool $applyDefaultOrder = true,
+        public string $searchColumn2 = '',
+        public string $localSearch2 = '',
     ) {}
 
     public static function fromRequest(Request $request): self
@@ -43,13 +45,16 @@ class VendaListQueryBuilder
         $status = (string) $request->query('status', 'todos');
         $tipo = (string) $request->query('tipo', 'todos');
         $campo = (string) $request->query('campo', 'cliente');
+        $campo2 = (string) $request->query('campo2', '');
         $ordenar = (string) $request->query('ordenar', 'numero');
         $dir = (string) $request->query('dir', 'desc');
+        $searchColumn = in_array($campo, $allowedCampo, true) ? $campo : 'cliente';
+        $searchColumn2 = in_array($campo2, $allowedCampo, true) && $campo2 !== $searchColumn ? $campo2 : '';
 
         return new self(
             statusFilter: in_array($status, $allowedStatus, true) ? $status : 'todos',
             tipoFilter: in_array($tipo, $allowedTipo, true) ? $tipo : 'todos',
-            searchColumn: in_array($campo, $allowedCampo, true) ? $campo : 'cliente',
+            searchColumn: $searchColumn,
             localSearch: trim((string) $request->query('q', '')),
             localSearchDe: trim((string) $request->query('de', '')),
             localSearchAte: trim((string) $request->query('ate', '')),
@@ -57,6 +62,8 @@ class VendaListQueryBuilder
             localSearchHoraAte: trim((string) $request->query('hora_ate', '')),
             orderBy: in_array($ordenar, $allowedOrder, true) ? $ordenar : 'numero',
             orderDirection: in_array($dir, $allowedDir, true) ? $dir : 'desc',
+            searchColumn2: $searchColumn2,
+            localSearch2: $searchColumn2 !== '' ? trim((string) $request->query('q2', '')) : '',
         );
     }
 
@@ -145,16 +152,36 @@ class VendaListQueryBuilder
             $query->where('tipo', $this->tipoFilter);
         }
 
-        if ($this->isDateSearchColumn()) {
+        $columns = $this->activeSearchColumns();
+
+        if (in_array('data', $columns, true)) {
             $this->applyLocalSearchByDateRange($query);
+        }
+
+        if (in_array('data', $columns, true) || in_array('hora', $columns, true)) {
             $this->applyLocalSearchByTimeRange($query);
-        } elseif ($this->isTimeSearchColumn()) {
-            $this->applyLocalSearchByTimeRange($query);
-        } elseif (filled($this->localSearch)) {
-            $this->applyLocalSearch($query, $this->localSearch);
+        }
+
+        foreach ([[$this->searchColumn, $this->localSearch], [$this->searchColumn2, $this->localSearch2]] as [$column, $term]) {
+            if ($column !== '' && ! in_array($column, ['data', 'hora'], true) && filled($term)) {
+                $this->applyLocalSearch($query, $term, $column);
+            }
         }
 
         return $query;
+    }
+
+    /**
+     * Campos de pesquisa ativos (no máximo 2, sem repetição).
+     *
+     * @return list<string>
+     */
+    public function activeSearchColumns(): array
+    {
+        return array_values(array_unique(array_filter(
+            [$this->searchColumn, $this->searchColumn2],
+            fn (string $column): bool => $column !== '',
+        )));
     }
 
     protected function applyDefaultOrder(Builder $query): Builder
@@ -248,7 +275,7 @@ class VendaListQueryBuilder
         return ['numero', 'data', 'cliente', 'vendedor', 'plataforma', 'meio_pagamento', 'total', 'situacao', 'tipo', 'hora'];
     }
 
-    protected function applyLocalSearch(Builder $query, string $term): void
+    protected function applyLocalSearch(Builder $query, string $term, ?string $searchColumn = null): void
     {
         $trimmed = trim($term);
 
@@ -256,8 +283,9 @@ class VendaListQueryBuilder
             return;
         }
 
-        $column = in_array($this->searchColumn, $this->localSearchColumns(), true)
-            ? $this->searchColumn
+        $searchColumn ??= $this->searchColumn;
+        $column = in_array($searchColumn, $this->localSearchColumns(), true)
+            ? $searchColumn
             : 'cliente';
 
         if ($column === 'meio_pagamento') {
@@ -427,6 +455,8 @@ class VendaListQueryBuilder
             'ate' => filled($this->localSearchAte) ? $this->localSearchAte : null,
             'hora_de' => filled($this->localSearchHoraDe) ? $this->localSearchHoraDe : null,
             'hora_ate' => filled($this->localSearchHoraAte) ? $this->localSearchHoraAte : null,
+            'campo2' => $this->searchColumn2 !== '' ? $this->searchColumn2 : null,
+            'q2' => $this->searchColumn2 !== '' && filled($this->localSearch2) ? $this->localSearch2 : null,
             'ordenar' => $this->orderBy !== 'numero' ? $this->orderBy : null,
             'dir' => $this->orderDirection !== 'desc' ? $this->orderDirection : null,
         ];

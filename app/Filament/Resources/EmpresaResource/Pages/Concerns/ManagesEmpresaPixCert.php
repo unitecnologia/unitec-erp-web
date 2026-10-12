@@ -76,9 +76,7 @@ trait ManagesEmpresaPixCert
             return;
         }
 
-        if (blank($this->data['param_pix_ambiente'] ?? null) || ($this->data['param_pix_ambiente'] ?? '') === 'homologacao') {
-            $this->data['param_pix_ambiente'] = 'producao';
-        }
+        $this->data['param_pix_ambiente'] = 'producao';
 
         if (blank($this->data['param_pix_webhook_url'] ?? null)) {
             $this->data['param_pix_webhook_url'] = \App\Support\Erp\EmpresaParametros::pixAilosWebhookUrl();

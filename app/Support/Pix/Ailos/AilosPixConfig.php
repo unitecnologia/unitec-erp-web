@@ -12,17 +12,29 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * Configuração Pix Ailos por empresa.
+ * Configuração Pix Ailos por empresa — somente dados do banco, nunca .env.
  *
- * Credenciais (Client ID/Secret/Chave) vêm de Empresa > API PIX.
- * PFX: usa o certificado A1 da NF-e da mesma empresa (mTLS), sem colar .pfx na tela.
- * Secrets AILOS_PRODUCTION_* no .env são fallback opcional (ex.: teste local).
+ * O cliente informa apenas Client ID, Client Secret e Chave PIX (Empresa > API PIX).
+ * Endpoint, ambiente (produção), escopos e tempos são padrão da integração.
+ * mTLS obrigatório da Ailos: usa o certificado A1 da NF-e da mesma empresa.
  */
 final readonly class AilosPixConfig
 {
     public const ENV_HOMOLOGATION = 'homologation';
 
     public const ENV_PRODUCTION = 'production';
+
+    public const BASE_URL_PRODUCTION = 'https://pixcobranca.ailos.coop.br/ailos/pix-cobranca/api/v1';
+
+    public const BASE_URL_HOMOLOGATION = 'https://pixcobranca-h.ailos.coop.br/qa/ailos/pix-cobranca/api/v1';
+
+    public const TIMEOUT_SECONDS = 20;
+
+    public const EXPIRATION_SECONDS = 86400;
+
+    public const TOKEN_SCOPES = 'cob.read cob.write cobv.read cobv.write pix.read pix.write '
+        .'webhook.read webhook.write qrcode.read qrcode.write '
+        .'payloadlocation.write payloadlocation.read lotecobv.write lotecobv.read';
 
     public function __construct(
         public string $environment,
@@ -41,54 +53,9 @@ final readonly class AilosPixConfig
 
     public static function fromEmpresa(Empresa $empresa): self
     {
-        $ambienteEmpresa = strtolower(trim((string) ($empresa->param_pix_ambiente ?? 'producao')));
-        $environment = $ambienteEmpresa === 'homologacao'
-            ? self::ENV_HOMOLOGATION
-            : self::ENV_PRODUCTION;
-
-        $settings = config("ailos.environments.{$environment}", []);
-        if (! is_array($settings)) {
-            $settings = [];
-        }
-
-        // Por empresa (cliente) — fonte principal no ERP multi-empresa.
-        $clientId = trim((string) ($empresa->param_pix_client_id ?: ($settings['client_id'] ?? '')));
-        $clientSecret = (string) ($empresa->param_pix_client_secret ?: ($settings['client_secret'] ?? ''));
-        $pixKey = trim((string) ($empresa->param_pix_chave ?: ($settings['pix_key'] ?? '')));
-
-        $pfxPassword = trim((string) ($empresa->param_pix_certificado_senha ?: ($settings['pfx_password'] ?? '')));
-        $pfxPath = null;
-        $pfxBase64 = trim((string) ($settings['pfx_base64'] ?? ''));
-        $envPath = trim((string) ($settings['pfx_path'] ?? ''));
-        if ($envPath !== '' && is_file($envPath)) {
-            $pfxPath = $envPath;
-            $pfxBase64 = '';
-        }
-
-        // Certificado A1 da NF-e desta empresa (mesmo PFX / senha).
-        [$nfePfxBase64, $nfeSenha] = self::nfePfxFromEmpresa($empresa);
-        if ($pfxBase64 === '' && $pfxPath === null && $nfePfxBase64 !== null) {
-            $pfxBase64 = $nfePfxBase64;
-        }
-        if ($pfxPassword === '' && filled($nfeSenha)) {
-            $pfxPassword = (string) $nfeSenha;
-        }
-
-        // Homologação: ainda aceita upload/caminho em param_pix_certificado.
-        if ($environment === self::ENV_HOMOLOGATION) {
-            $cert = trim((string) ($empresa->param_pix_certificado ?: ''));
-            if ($pfxPath === null && $pfxBase64 === '' && $cert !== '') {
-                if (is_file($cert)) {
-                    $pfxPath = $cert;
-                } elseif (Storage::disk('local')->exists($cert)) {
-                    $pfxPath = Storage::disk('local')->path($cert);
-                } elseif (is_file(storage_path('app/private/'.$cert))) {
-                    $pfxPath = storage_path('app/private/'.$cert);
-                } else {
-                    $pfxBase64 = $cert;
-                }
-            }
-        }
+        $clientId = trim((string) ($empresa->param_pix_client_id ?? ''));
+        $clientSecret = (string) ($empresa->param_pix_client_secret ?? '');
+        $pixKey = trim((string) ($empresa->param_pix_chave ?? ''));
 
         if ($clientId === '' || $clientSecret === '' || $pixKey === '') {
             throw new InvalidArgumentException(
@@ -97,39 +64,35 @@ final readonly class AilosPixConfig
             );
         }
 
+        [$pfxBase64, $nfeSenha] = self::nfePfxFromEmpresa($empresa);
+
+        if ($pfxBase64 === null) {
+            throw new InvalidArgumentException(
+                'A Ailos exige o certificado A1 (.pfx) da empresa. '
+                .'Importe o certificado da NF-e em Configurações Fiscais.'
+            );
+        }
+
+        $pfxPassword = trim((string) ($nfeSenha ?: ($empresa->param_pix_certificado_senha ?? '')));
+
         if ($pfxPassword === '') {
             throw new InvalidArgumentException(
-                'Senha do certificado A1 ausente. Cadastre o certificado em Configurações Fiscais (NF-e) '
-                .'ou informe a senha do PFX em API PIX.'
+                'Senha do certificado A1 ausente. Informe a senha do certificado em Configurações Fiscais (NF-e).'
             );
         }
-
-        if ($pfxPath === null && $pfxBase64 === '') {
-            throw new InvalidArgumentException(
-                'Certificado A1 (.pfx) não encontrado. Importe o certificado da NF-e em Configurações Fiscais.'
-            );
-        }
-
-        $baseUrl = rtrim((string) ($settings['base_url'] ?? self::defaultBaseUrl($environment)), '/');
-        self::assertBaseUrl($environment, $baseUrl);
 
         return new self(
-            environment: $environment,
-            baseUrl: $baseUrl,
+            environment: self::ENV_PRODUCTION,
+            baseUrl: self::BASE_URL_PRODUCTION,
             clientId: $clientId,
             clientSecret: $clientSecret,
             pixKey: $pixKey,
-            pfxPath: $pfxPath,
-            pfxBase64: $pfxBase64 !== '' ? $pfxBase64 : null,
+            pfxPath: null,
+            pfxBase64: $pfxBase64,
             pfxPassword: $pfxPassword,
-            timeout: max(5, (int) config('ailos.timeout', 20)),
-            expirationSeconds: max(60, (int) config('ailos.expiration_seconds', 86400)),
-            tokenScopes: (string) config(
-                'ailos.token_scopes',
-                'cob.read cob.write cobv.read cobv.write pix.read pix.write '
-                .'webhook.read webhook.write qrcode.read qrcode.write '
-                .'payloadlocation.write payloadlocation.read lotecobv.write lotecobv.read',
-            ),
+            timeout: self::TIMEOUT_SECONDS,
+            expirationSeconds: self::EXPIRATION_SECONDS,
+            tokenScopes: self::TOKEN_SCOPES,
         );
     }
 
@@ -193,22 +156,7 @@ final readonly class AilosPixConfig
     public static function defaultBaseUrl(string $environment): string
     {
         return $environment === self::ENV_PRODUCTION
-            ? 'https://pixcobranca.ailos.coop.br/ailos/pix-cobranca/api/v1'
-            : 'https://pixcobranca-h.ailos.coop.br/qa/ailos/pix-cobranca/api/v1';
-    }
-
-    private static function assertBaseUrl(string $environment, string $baseUrl): void
-    {
-        $parsedUrl = parse_url($baseUrl);
-        $hostname = strtolower((string) ($parsedUrl['host'] ?? ''));
-        if (($parsedUrl['scheme'] ?? '') !== 'https' || ! preg_match('/(?:^|\.)ailos\.coop\.br$/', $hostname)) {
-            throw new InvalidArgumentException('A URL da API Ailos Pix deve usar HTTPS e o domínio ailos.coop.br.');
-        }
-        if ($environment === self::ENV_HOMOLOGATION && ! str_contains($hostname, 'pixcobranca-h.')) {
-            throw new InvalidArgumentException('A URL de homologação Ailos Pix é inválida.');
-        }
-        if ($environment === self::ENV_PRODUCTION && str_contains($hostname, 'pixcobranca-h.')) {
-            throw new InvalidArgumentException('A URL de produção Ailos Pix é inválida.');
-        }
+            ? self::BASE_URL_PRODUCTION
+            : self::BASE_URL_HOMOLOGATION;
     }
 }

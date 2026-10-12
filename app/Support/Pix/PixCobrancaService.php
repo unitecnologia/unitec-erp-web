@@ -3,13 +3,13 @@
 namespace App\Support\Pix;
 
 use App\Models\ContaReceber;
-use App\Models\Empresa;
 use App\Models\FormaPagamento;
 use App\Models\PixCobranca;
 use App\Models\PlanoConta;
 use App\Support\Erp\Boleto\Api\BoletoApi;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
+use App\Support\Pix\Ailos\AilosPixConfig;
 use App\Support\Pix\Ailos\AilosPixService;
 use App\Support\Pix\Contracts\PixProvider;
 use App\Support\Pix\Data\PixCobrancaInput;
@@ -29,8 +29,8 @@ class PixCobrancaService
     /** Tempo de expiração do QR Mercado Pago, em minutos. */
     public const EXPIRA_MINUTOS = 5;
 
-    /** Expiração padrão Ailos (segundos) — alinhada ao kit / config. */
-    public const AILOS_EXPIRA_SEGUNDOS = 86400;
+    /** Expiração padrão Ailos (segundos) — mesma enviada no PUT /cob. */
+    public const AILOS_EXPIRA_SEGUNDOS = AilosPixConfig::EXPIRATION_SECONDS;
 
     public function __construct(private readonly PixProviderManager $providers)
     {
@@ -138,7 +138,7 @@ class PixCobrancaService
     ): PixCobranca {
         try {
             $webhookUrl = $provider->nome() === 'ailos'
-                ? (string) (Empresa::query()->find($cobranca->empresa_id)?->param_pix_webhook_url
+                ? (string) (\App\Models\Empresa::query()->find($cobranca->empresa_id)?->param_pix_webhook_url
                     ?: \App\Support\Erp\EmpresaParametros::pixAilosWebhookUrl())
                 : (string) config('services.mercadopago.webhook_url');
 
@@ -188,9 +188,7 @@ class PixCobrancaService
     private function expiraEmParaProvedor(string $provedor): \Carbon\Carbon
     {
         if ($provedor === 'ailos') {
-            $seconds = max(60, (int) config('ailos.expiration_seconds', self::AILOS_EXPIRA_SEGUNDOS));
-
-            return ErpTimezone::toLocal()->addSeconds($seconds);
+            return ErpTimezone::toLocal()->addSeconds(self::AILOS_EXPIRA_SEGUNDOS);
         }
 
         return ErpTimezone::toLocal()->addMinutes(self::EXPIRA_MINUTOS);

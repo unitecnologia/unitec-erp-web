@@ -152,8 +152,8 @@ class LicencaSistemaPage extends Page
             $this->jaConsultado = true;
 
             $title = match (true) {
-                $licencas->mensalidadeVencida() => 'Mensalidade vencida. Regularize o pagamento.',
                 $snapshot->status === LicencaSnapshot::STATUS_ATIVO => 'Licença ativa no portal.',
+                $licencas->mensalidadeVencida() => 'Mensalidade vencida. Regularize o pagamento.',
                 $snapshot->status === LicencaSnapshot::STATUS_BLOQUEADO => 'CNPJ cadastrado, porém bloqueado.',
                 $snapshot->status === LicencaSnapshot::STATUS_NAO_ENCONTRADO => 'CNPJ não cadastrado no portal.',
                 $snapshot->status === LicencaSnapshot::STATUS_SEM_CNPJ => 'Cadastre o CNPJ da empresa.',

@@ -81,4 +81,24 @@
     </div>
 
     @include('filament.components.erp.home.partials.pix-renovar-modal')
+
+    @include('filament.components.erp.aviso-modal', [
+        'open' => $this->licencaAvisoOpen,
+        'tone' => 'warning',
+        'titleId' => 'erp-licenca-aviso-title',
+        'title' => $this->licencaAvisoTitle !== '' ? $this->licencaAvisoTitle : 'Aviso de licença',
+        'lines' => $this->licencaAvisoLines,
+        'primaryLabel' => 'OK',
+        'primaryAction' => 'fecharLicencaAviso',
+        'secondaryLabel' => 'Renovar',
+        'secondaryAction' => 'renovarLicencaDoAviso',
+        'escapeAction' => 'fecharLicencaAviso',
+        'backdropAction' => 'fecharLicencaAviso',
+    ])
+
+    @once
+        <style>
+            .erp-home-page .erp-aviso-modal { z-index: 120; }
+        </style>
+    @endonce
 </div>

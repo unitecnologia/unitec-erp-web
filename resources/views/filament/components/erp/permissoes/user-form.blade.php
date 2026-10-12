@@ -49,6 +49,7 @@
                     acesso_app_entregas: 'Entregas',
                     acesso_app_gestao: 'Gestão',
                     acesso_app_inventario: 'Inventário',
+                    acesso_app_mesas: 'Mesas',
                 },
                 summary() {
                     const form = $wire.userForm || {};
@@ -92,6 +93,10 @@
                 <label class="erp-permissoes__apps-check">
                     <input type="checkbox" wire:model.live="userForm.acesso_app_inventario">
                     <span>Inventário</span>
+                </label>
+                <label class="erp-permissoes__apps-check">
+                    <input type="checkbox" wire:model.live="userForm.acesso_app_mesas">
+                    <span>Mesas (garçom)</span>
                 </label>
             </div>
         </div>

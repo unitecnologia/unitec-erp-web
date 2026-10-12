@@ -23,6 +23,10 @@ class CaixaListTable extends Component
 
     public string $localSearch = '';
 
+    public string $searchColumn2 = '';
+
+    public string $localSearch2 = '';
+
     public string $periodoDeApplied = '';
 
     public string $periodoAteApplied = '';
@@ -42,10 +46,14 @@ class CaixaListTable extends Component
         string $periodoAteApplied = '',
         ?int $perPage = null,
         bool $resetSort = false,
+        string $searchColumn2 = '',
+        string $localSearch2 = '',
     ): void {
         $this->contaFilter = $contaFilter;
         $this->searchColumn = $searchColumn;
         $this->localSearch = $localSearch;
+        $this->searchColumn2 = $searchColumn2;
+        $this->localSearch2 = $localSearch2;
         $this->periodoDeApplied = $periodoDeApplied;
         $this->periodoAteApplied = $periodoAteApplied;
 
@@ -94,6 +102,8 @@ class CaixaListTable extends Component
             periodoDeApplied: $this->periodoDeApplied,
             periodoAteApplied: $this->periodoAteApplied,
             applyDefaultOrder: false,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
         );
 
         $query = $builder->buildForList();

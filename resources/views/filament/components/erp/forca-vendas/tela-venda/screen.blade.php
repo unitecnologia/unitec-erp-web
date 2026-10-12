@@ -8,7 +8,7 @@
     class="erp-fv-tv-root"
     x-data
     x-init="$nextTick(() => {
-        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen) || @js($this->observacaoPedidoModalOpen) || @js($this->observacaoClienteModalOpen)) return;
+        if (@js($finOpen) || @js($this->descontoModalOpen) || @js($this->excluirItemModalOpen) || @js($this->fvImportarOrcamentoOpen) || @js($this->boletoContaPickOpen) || @js($this->margemModalOpen) || @js($this->observacaoPedidoModalOpen) || @js($this->observacaoClienteModalOpen) || @js($this->tabPrecoItemModalOpen)) return;
         // Após lançar item / fechar modal o Livewire remonta: não roubar o foco de volta ao cliente.
         if (@js(count($this->itens) > 0) || window.__erpFvTvInitialFocusDone) {
             return;
@@ -25,6 +25,8 @@
     x-on:keydown.window.capture="
         const finOpen = $wire.etapa === 'finalizacao';
         const descontoOpen = !!$wire.descontoModalOpen;
+        // Preferir o DOM: após fechar o modal, o $wire pode atrasar e engolir o Enter na Qtde.
+        const tabPrecoOpen = !!document.getElementById('erp-fv-tab-preco-panel');
         const excluirOpen = !!$wire.excluirItemModalOpen;
         const importarOpen = !!$wire.fvImportarOrcamentoOpen;
         const margemOpen = !!$wire.margemModalOpen;
@@ -70,6 +72,20 @@
 
         if (margemOpen) {
             if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharMargemVenda(); }
+            return;
+        }
+        if (tabPrecoOpen) {
+            if ($event.key === 'ArrowDown' || $event.key === 'ArrowUp') {
+                $event.preventDefault();
+                window.erpFvMoveTabPrecoSelection?.($event.key === 'ArrowDown' ? 1 : -1);
+                return;
+            }
+            if ($event.key === 'Enter') {
+                $event.preventDefault();
+                window.erpFvConfirmTabPreco?.($wire);
+                return;
+            }
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.cancelTabPrecoItem(); return; }
             return;
         }
         if (excluirOpen) {
@@ -242,7 +258,7 @@
         })
     "
 >
-    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || $this->observacaoPedidoModalOpen || $this->observacaoClienteModalOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
+    <div class="erp-nfe erp-fv-tv {{ $finOpen || $this->descontoModalOpen || $this->excluirItemModalOpen || $this->fvImportarOrcamentoOpen || $this->margemModalOpen || $this->boletoContaPickOpen || $this->observacaoPedidoModalOpen || $this->observacaoClienteModalOpen || $this->tabPrecoItemModalOpen || filled($this->boletoSucessoDetalhe) ? 'is-dimmed' : '' }}">
         @include('filament.components.erp.forca-vendas.tela-venda.venda')
     </div>
 
@@ -256,6 +272,7 @@
 
     @include('filament.components.erp.forca-vendas.tela-venda.desconto-item')
     @include('filament.components.erp.forca-vendas.tela-venda.excluir-item')
+    @include('filament.components.erp.forca-vendas.tela-venda.tab-preco-item')
     @include('filament.components.erp.forca-vendas.tela-venda.importar-orcamento')
     @include('filament.components.erp.forca-vendas.tela-venda.margem-venda')
     @include('filament.components.erp.forca-vendas.tela-venda.observacoes')
@@ -375,6 +392,49 @@
 @include('filament.components.erp.grid-sort-script')
 <script>
     (function () {
+        // Tab. Preço: setas locais (sem round-trip), igual ao PDV.
+        window.erpFvMoveTabPrecoSelection = function (delta, forceIndex) {
+            const panel = document.getElementById('erp-fv-tab-preco-panel');
+            if (! panel) return;
+
+            const rows = Array.from(panel.querySelectorAll('[id^="erp-fv-tab-preco-row-"]'));
+            if (! rows.length) return;
+
+            let current = Number.parseInt(panel.dataset.selectedIndex || '-1', 10);
+            if (! Number.isFinite(current) || current < 0) {
+                current = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
+            }
+            if (current < 0) current = 0;
+
+            const next = forceIndex !== undefined && forceIndex !== null
+                ? Math.max(0, Math.min(rows.length - 1, Number(forceIndex)))
+                : Math.max(0, Math.min(rows.length - 1, current + Number(delta || 0)));
+
+            panel.dataset.selectedIndex = String(next);
+            rows.forEach((row, index) => {
+                const on = index === next;
+                row.classList.toggle('erp-pdv__grid-row--selected', on);
+                row.setAttribute('aria-selected', on ? 'true' : 'false');
+                row.tabIndex = on ? 0 : -1;
+            });
+            rows[next].focus({ preventScroll: true });
+            rows[next].scrollIntoView({ block: 'nearest' });
+        };
+
+        window.erpFvConfirmTabPreco = function (wire) {
+            const panel = document.getElementById('erp-fv-tab-preco-panel');
+            const index = panel
+                ? Number.parseInt(panel.dataset.selectedIndex || '0', 10)
+                : 0;
+
+            if (wire && typeof wire.confirmTabPrecoItemAt === 'function') {
+                wire.confirmTabPrecoItemAt(Number.isFinite(index) ? index : 0);
+                return;
+            }
+
+            wire?.confirmTabPrecoItem?.();
+        };
+
         const NUM_SELECTOR = '.erp-fv-tv-root input[inputmode="decimal"], .erp-fv-tv-root input[inputmode="numeric"], .erp-fv-tv-root input[data-mask]';
         const NAV_KEYS = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
 

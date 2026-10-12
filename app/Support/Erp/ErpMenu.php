@@ -504,7 +504,6 @@ class ErpMenu
                 static::link('Relatório de Vendas de Produtos - Clientes', route('erp.reports.tabular', ['slug' => 'vendas-produtos-clientes']), permission: 'vendas.print', icon: 'heroicon-o-users', iconColor: 'erp-menu-bar__icon--purple'),
                 static::link('Relatório de Vendas de Produtos - Vendedores', route('erp.reports.tabular', ['slug' => 'vendas-produtos-vendedores']), permission: 'vendas.print', icon: 'heroicon-o-shopping-bag', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Relatório de Vendas Por CFOP/CSOSN', route('erp.reports.tabular', ['slug' => 'vendas-cfop-csosn']), permission: 'vendas.print', icon: 'heroicon-o-hashtag', iconColor: 'erp-menu-bar__icon--teal'),
-                static::link('Relatório de Vendas de Produtos c/ Trib.Monofásica', route('erp.reports.tabular', ['slug' => 'vendas-produtos-monofasica']), permission: 'vendas.print', icon: 'heroicon-o-receipt-percent', iconColor: 'erp-menu-bar__icon--indigo'),
                 static::link('Visitas realizadas sem venda', route('erp.reports.tabular', ['slug' => 'visitas-realizadas-sem-venda']), permission: 'vendas.print', icon: 'heroicon-o-map-pin', iconColor: 'erp-menu-bar__icon--slate'),
             ], icon: 'heroicon-o-shopping-cart', iconColor: 'erp-menu-bar__icon--red'),
             static::group('Financeiro', [

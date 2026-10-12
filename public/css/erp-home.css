@@ -1755,7 +1755,13 @@ button.erp-dash-kpi__action:disabled {
     }
 }
 
+/* Modal de aviso de licença (padrão laranja central) */
+.erp-home-page .erp-aviso-modal {
+    z-index: 120;
+}
+
 /* Modal Pix — renovar licença pelo KPI */
+
 .erp-dash-pix {
     position: fixed;
     inset: 0;

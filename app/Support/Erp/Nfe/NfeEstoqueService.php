@@ -130,6 +130,8 @@ final class NfeEstoqueService
                     origemId: (int) $nfe->id,
                     origemNumero: $nfe->numero !== null ? ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero : null,
                 ),
+                loteOrigemTipo: 'nfe_item',
+                loteOrigemId: (int) $item->id,
             );
         }
 
@@ -179,6 +181,8 @@ final class NfeEstoqueService
                     origemId: (int) $nfe->id,
                     origemNumero: $nfe->numero !== null ? ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero : null,
                 ),
+                loteOrigemTipo: 'nfe_item',
+                loteOrigemId: (int) $item->id,
             );
         }
 

@@ -116,10 +116,17 @@ final class PdvNfceFiscalPayloadBuilder
                 )['cfop'];
             }
 
+            $descricao = (string) $item->descricao;
+            $combustivel = ProdutoCombustivelFiscal::fromProduct(
+                $product,
+                strtoupper((string) ($empresa->uf ?? 'SC')),
+                $descricao,
+            );
+
             $itens[] = new ItemDto(
                 numero: $index + 1,
                 codigo: (string) ($item->codigo ?: $item->product_id ?: ($index + 1)),
-                descricao: (string) $item->descricao,
+                descricao: $descricao,
                 ncm: (string) ($product?->ncm ?: '00000000'),
                 cfop: $cfop,
                 unidade: (string) ($item->unidade ?: 'UN'),
@@ -129,6 +136,7 @@ final class PdvNfceFiscalPayloadBuilder
                 imposto: $imposto,
                 desconto: $descontoItem,
                 acrescimo: $acrescimoItem,
+                combustivel: $combustivel,
             );
         }
 

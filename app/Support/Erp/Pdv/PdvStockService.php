@@ -11,6 +11,8 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Erp\ProductLoteService;
+use Illuminate\Support\Facades\DB;
 
 final class PdvStockService
 {
@@ -27,6 +29,8 @@ final class PdvStockService
         ?int $estoqueId = null,
         ?\App\Models\Empresa $empresa = null,
         ?EstoqueMovimentacaoContext $movimentacao = null,
+        ?string $loteOrigemTipo = null,
+        ?int $loteOrigemId = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -37,37 +41,72 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->baixaComposicao($product, $quantidade, $docSaida, $estoqueId, $empresa, $movimentacao);
+            $this->baixaComposicao(
+                $product,
+                $quantidade,
+                $docSaida,
+                $estoqueId,
+                $empresa,
+                $movimentacao,
+                $loteOrigemTipo,
+                $loteOrigemId,
+            );
 
             return;
         }
 
-        if (EstoqueNegativoPolicy::ativo($empresa)) {
-            EstoqueNegativoPolicy::garantirSaidaPermitida($product, $quantidade, $estoqueId, $empresa);
+        // Estoque global e lotes na mesma transação: evita baixa global órfã se o FEFO falhar.
+        DB::transaction(function () use (
+            $product,
+            $quantidade,
+            $productGradeId,
+            $productSerialId,
+            $docSaida,
+            $estoqueId,
+            $empresa,
+            $movimentacao,
+            $loteOrigemTipo,
+            $loteOrigemId,
+        ): void {
+            $bloquearNegativo = EstoqueNegativoPolicy::ativo($empresa);
 
-            if ($productGradeId && $product->contr_est_grade) {
-                if ($msg = $this->validaEstoqueGrade($product, $productGradeId, $quantidade)) {
-                    throw new \RuntimeException($msg.' Bloqueio de estoque negativo está ativo.');
+            if ($bloquearNegativo) {
+                EstoqueNegativoPolicy::garantirSaidaPermitida($product, $quantidade, $estoqueId, $empresa);
+
+                if ($productGradeId && $product->contr_est_grade) {
+                    if ($msg = $this->validaEstoqueGrade($product, $productGradeId, $quantidade)) {
+                        throw new \RuntimeException($msg.' Bloqueio de estoque negativo está ativo.');
+                    }
                 }
             }
-        }
 
-        $this->decrementarEstoqueProduto($product, $quantidade, $estoqueId, $empresa, $this->ctxBaixa($movimentacao, $empresa, $docSaida));
+            if ($product->controla_lote_validade) {
+                $lotes = new ProductLoteService();
+                $fatias = $lotes->consumirFefo($product, $quantidade, permitirNegativo: ! $bloquearNegativo);
+                if ($loteOrigemTipo && $loteOrigemId) {
+                    $lotes->registrarSaidas($product, $fatias, $loteOrigemTipo, $loteOrigemId);
+                }
+            }
 
-        if ($product->controla_lote_validade) {
-            (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, $quantidade);
-        }
+            $this->decrementarEstoqueProduto(
+                $product,
+                $quantidade,
+                $estoqueId,
+                $empresa,
+                $this->ctxBaixa($movimentacao, $empresa, $docSaida),
+            );
 
-        if ($productGradeId && $product->contr_est_grade) {
-            ProductGrade::query()
-                ->whereKey($productGradeId)
-                ->where('product_id', $product->id)
-                ->decrement('qtd', $quantidade);
-        }
+            if ($productGradeId && $product->contr_est_grade) {
+                ProductGrade::query()
+                    ->whereKey($productGradeId)
+                    ->where('product_id', $product->id)
+                    ->decrement('qtd', $quantidade);
+            }
 
-        if ($productSerialId) {
-            $this->baixaSerial($productSerialId, $docSaida);
-        }
+            if ($productSerialId) {
+                $this->baixaSerial($productSerialId, $docSaida);
+            }
+        });
     }
 
     public function validaEstoqueComposicao(Product $product, float $quantidade, ?int $estoqueId = null): ?string
@@ -100,8 +139,24 @@ final class PdvStockService
                 continue;
             }
 
-            if ($this->saldos->fisico((int) $comp->id, $estoqueId) < $qtdNecessaria) {
+            if (EstoqueNegativoPolicy::ativo()
+                && $this->saldos->fisico((int) $comp->id, $estoqueId) < $qtdNecessaria
+            ) {
                 return 'Estoque insuficiente do componente: ' . $comp->descricao;
+            }
+
+            if ($comp->controla_lote_validade) {
+                $lotes = new ProductLoteService();
+                if (! $lotes->possuiLotes($comp)) {
+                    return 'Componente "'.$comp->descricao.'" controla lote/validade sem lotes cadastrados.';
+                }
+                if (EstoqueNegativoPolicy::ativo()) {
+                    $saldoLotes = $lotes->saldoDisponivel($comp);
+                    if ($saldoLotes + 0.0005 < $qtdNecessaria) {
+                        return 'Estoque por lote insuficiente do componente: '.$comp->descricao
+                            .' (lotes: '.number_format($saldoLotes, 3, ',', '.').').';
+                    }
+                }
             }
         }
 
@@ -137,6 +192,8 @@ final class PdvStockService
         ?int $estoqueId = null,
         ?\App\Models\Empresa $empresa = null,
         ?EstoqueMovimentacaoContext $movimentacao = null,
+        ?string $loteOrigemTipo = null,
+        ?int $loteOrigemId = null,
     ): void {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -151,7 +208,18 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->baixaItemVenda($comp, $qtd, null, null, $docSaida, $estoqueId, $empresa, $movimentacao);
+            $this->baixaItemVenda(
+                $comp,
+                $qtd,
+                null,
+                null,
+                $docSaida,
+                $estoqueId,
+                $empresa,
+                $movimentacao,
+                $loteOrigemTipo,
+                $loteOrigemId,
+            );
         }
     }
 
@@ -247,6 +315,8 @@ final class PdvStockService
         ?int $productSerialId = null,
         ?int $estoqueId = null,
         ?EstoqueMovimentacaoContext $movimentacao = null,
+        ?string $loteOrigemTipo = null,
+        ?int $loteOrigemId = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -257,27 +327,55 @@ final class PdvStockService
         }
 
         if ($product->is_composicao) {
-            $this->estornoComposicao($product, $quantidade, $estoqueId, $movimentacao);
+            $this->estornoComposicao(
+                $product,
+                $quantidade,
+                $estoqueId,
+                $movimentacao,
+                $loteOrigemTipo,
+                $loteOrigemId,
+            );
 
             return;
         }
 
-        $this->saldos->incrementar((int) $product->id, $quantidade, $estoqueId, null, $this->ctxEstorno($movimentacao));
+        DB::transaction(function () use (
+            $product,
+            $quantidade,
+            $productGradeId,
+            $productSerialId,
+            $estoqueId,
+            $movimentacao,
+            $loteOrigemTipo,
+            $loteOrigemId,
+        ): void {
+            $this->saldos->incrementar(
+                (int) $product->id,
+                $quantidade,
+                $estoqueId,
+                null,
+                $this->ctxEstorno($movimentacao),
+            );
 
-        if ($product->controla_lote_validade) {
-            (new \App\Support\Erp\ProductLoteService())->devolver($product, $quantidade);
-        }
+            if ($product->controla_lote_validade) {
+                $lotes = new ProductLoteService();
+                // Só restituí lotes com rastro da venda. Vendas antigas sem rastro: não inventa lote.
+                if ($loteOrigemTipo && $loteOrigemId) {
+                    $lotes->estornarPorOrigem($product, $loteOrigemTipo, $loteOrigemId, $quantidade);
+                }
+            }
 
-        if ($productGradeId && $product->contr_est_grade) {
-            ProductGrade::query()
-                ->whereKey($productGradeId)
-                ->where('product_id', $product->id)
-                ->increment('qtd', $quantidade);
-        }
+            if ($productGradeId && $product->contr_est_grade) {
+                ProductGrade::query()
+                    ->whereKey($productGradeId)
+                    ->where('product_id', $product->id)
+                    ->increment('qtd', $quantidade);
+            }
 
-        if ($productSerialId) {
-            $this->estornoSerial($productSerialId);
-        }
+            if ($productSerialId) {
+                $this->estornoSerial($productSerialId);
+            }
+        });
     }
 
     private function estornoComposicao(
@@ -285,6 +383,8 @@ final class PdvStockService
         float $quantidade,
         ?int $estoqueId = null,
         ?EstoqueMovimentacaoContext $movimentacao = null,
+        ?string $loteOrigemTipo = null,
+        ?int $loteOrigemId = null,
     ): void {
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -299,7 +399,16 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
-            $this->estornoItemVenda($comp, $qtd, null, null, $estoqueId, $movimentacao);
+            $this->estornoItemVenda(
+                $comp,
+                $qtd,
+                null,
+                null,
+                $estoqueId,
+                $movimentacao,
+                $loteOrigemTipo,
+                $loteOrigemId,
+            );
         }
     }
 

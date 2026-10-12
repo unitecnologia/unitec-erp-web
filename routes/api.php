@@ -18,6 +18,11 @@ use App\Http\Controllers\Api\Entregas\AuthController as EntregasAuthController;
 use App\Http\Controllers\Api\Entregas\DeviceController as EntregasDeviceController;
 use App\Http\Controllers\Api\Entregas\InfoController as EntregasInfoController;
 use App\Http\Controllers\Api\Entregas\SyncController as EntregasSyncController;
+use App\Http\Controllers\Api\Mesas\AuthController as MesasAuthController;
+use App\Http\Controllers\Api\Mesas\DeviceController as MesasDeviceController;
+use App\Http\Controllers\Api\Mesas\InfoController as MesasInfoController;
+use App\Http\Controllers\Api\Mesas\LancamentoController as MesasLancamentoController;
+use App\Http\Controllers\Api\Mesas\MesaController as MesasMesaController;
 use App\Http\Controllers\Api\UnitecOs\AuthController as UnitecOsAuthController;
 use App\Http\Controllers\Api\UnitecOs\CepController as UnitecOsCepController;
 use App\Http\Controllers\Api\UnitecOs\ClienteController as UnitecOsClienteController;
@@ -257,6 +262,43 @@ Route::prefix('v1/entregas')->group(function (): void {
             Route::post('auth/logout', [EntregasAuthController::class, 'logout']);
             Route::get('sync/pull', [EntregasSyncController::class, 'pull']);
             Route::post('sync/push', [EntregasSyncController::class, 'push']);
+        });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| API — Unitec Mesas (app do garçom)
+|--------------------------------------------------------------------------
+| Auth: Sanctum (ability "mesas") + senha do app + aparelho aprovado (X-MES-Device).
+| Usa as mesas do PDV (pdv_mesas / PdvMesaService); fechamento, pagamento e
+| fiscal continuam no PDV. Lançamentos idempotentes pelo uuid do celular.
+*/
+
+Route::prefix('v1/mesas')->group(function (): void {
+    Route::middleware('throttle:60,1')->group(function (): void {
+        Route::get('ping', [MesasInfoController::class, 'ping']);
+        Route::post('devices/register', [MesasDeviceController::class, 'register']);
+        Route::get('devices/status', [MesasDeviceController::class, 'status']);
+    });
+
+    Route::middleware('mesas.device')->group(function (): void {
+        Route::middleware('throttle:30,1')->group(function (): void {
+            Route::get('info', [MesasInfoController::class, 'index']);
+            Route::get('users', [MesasInfoController::class, 'users']);
+            Route::post('auth/login', [MesasAuthController::class, 'login']);
+        });
+
+        Route::middleware('auth:sanctum')->group(function (): void {
+            Route::post('auth/logout', [MesasAuthController::class, 'logout']);
+        });
+
+        Route::middleware(['auth:sanctum', 'mesas.user', 'throttle:240,1'])->group(function (): void {
+            Route::get('auth/me', [MesasAuthController::class, 'me']);
+            Route::get('catalogo', [MesasMesaController::class, 'catalogo']);
+            Route::get('mesas', [MesasMesaController::class, 'index']);
+            Route::get('mesas/{numero}', [MesasMesaController::class, 'show'])->whereNumber('numero');
+            Route::post('lancamentos', [MesasLancamentoController::class, 'store']);
         });
     });
 });

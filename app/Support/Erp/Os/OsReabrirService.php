@@ -356,6 +356,8 @@ final class OsReabrirService
                     origemId: (int) $os->id,
                     origemNumero: (string) $os->numero,
                 ),
+                'os_item',
+                (int) $item->id,
             );
 
             $devolvidas++;

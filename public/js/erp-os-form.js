@@ -76,6 +76,17 @@ document.addEventListener('livewire:init', () => {
         focusOsFormInput('os-item-preco');
     });
 
+    window.Livewire.on('erp-os-focus-tab-preco', () => {
+        window.setTimeout(() => {
+            const panel = document.getElementById('erp-os-tab-preco-panel');
+            if (! panel) {
+                return;
+            }
+            const index = Number.parseInt(panel.dataset.selectedIndex || '0', 10) || 0;
+            window.erpOsMoveTabPrecoSelection?.(0, index);
+        }, 40);
+    });
+
     window.Livewire.on('erp-os-post-save-prompt-opened', () => {
         window.setTimeout(() => {
             document.getElementById('erp-os-post-save-sair')?.focus();
@@ -364,6 +375,39 @@ function bindErpOsFormKeys() {
             return;
         }
 
+        // Tab. Preço do item (usa_tab_preco) — setas locais + Enter confirma.
+        if (document.getElementById('erp-os-tab-preco-panel')) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                event.stopPropagation();
+                window.erpOsMoveTabPrecoSelection?.(event.key === 'ArrowDown' ? 1 : -1);
+
+                return;
+            }
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
+                window.erpOsConfirmTabPreco?.();
+
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                component.call('cancelTabPrecoItem');
+
+                return;
+            }
+
+            if (event.key.startsWith('F')) {
+                event.preventDefault();
+            }
+
+            return;
+        }
+
         if (document.querySelector('.erp-fv-tv-desconto')) {
             if (event.key === 'Escape') {
                 event.preventDefault();
@@ -593,6 +637,54 @@ function isOsEditableTarget(target) {
 
     return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
 }
+
+window.erpOsMoveTabPrecoSelection = function (delta, forceIndex) {
+    const panel = document.getElementById('erp-os-tab-preco-panel');
+    if (! panel) {
+        return;
+    }
+
+    const rows = Array.from(panel.querySelectorAll('[id^="erp-os-tab-preco-row-"]'));
+    if (! rows.length) {
+        return;
+    }
+
+    let current = Number.parseInt(panel.dataset.selectedIndex || '-1', 10);
+    if (! Number.isFinite(current) || current < 0) {
+        current = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
+    }
+    if (current < 0) {
+        current = 0;
+    }
+
+    const next = forceIndex !== undefined && forceIndex !== null
+        ? Math.max(0, Math.min(rows.length - 1, Number(forceIndex)))
+        : Math.max(0, Math.min(rows.length - 1, current + Number(delta || 0)));
+
+    panel.dataset.selectedIndex = String(next);
+    rows.forEach((row, index) => {
+        const on = index === next;
+        row.classList.toggle('erp-pdv__grid-row--selected', on);
+        row.setAttribute('aria-selected', on ? 'true' : 'false');
+        row.tabIndex = on ? 0 : -1;
+    });
+    rows[next].focus({ preventScroll: true });
+    rows[next].scrollIntoView({ block: 'nearest' });
+};
+
+window.erpOsConfirmTabPreco = function () {
+    const panel = document.getElementById('erp-os-tab-preco-panel');
+    const index = panel
+        ? Number.parseInt(panel.dataset.selectedIndex || '0', 10)
+        : 0;
+    const component = getErpOsComponent();
+
+    if (! component) {
+        return;
+    }
+
+    component.call('confirmTabPrecoItemAt', Number.isFinite(index) ? index : 0);
+};
 
 function focusOsFormInput(id, options = {}) {
     const run = () => {

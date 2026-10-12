@@ -5,6 +5,7 @@ namespace App\Support\Gestor;
 use App\Models\EntregasDevice;
 use App\Models\ForcaVendasDevice;
 use App\Models\ForcaVendasOrder;
+use App\Models\MesasDevice;
 use App\Models\Terminal;
 use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
@@ -150,6 +151,22 @@ final class GestorAprovacaoService
             // ignore
         }
 
+        try {
+            if (ErpSchema::hasTable((new MesasDevice)->getTable())) {
+                $q = MesasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', MesasDevice::STATUS_APROVADO);
+
+                if ($empresaId > 0) {
+                    $q->where('empresa_id', $empresaId);
+                }
+
+                $total += (int) $q->count();
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
         return $total;
     }
 
@@ -206,19 +223,24 @@ final class GestorAprovacaoService
             throw new \RuntimeException('Aparelho já autorizado.');
         }
 
+        if ($device instanceof MesasDevice && $device->isApproved()) {
+            throw new \RuntimeException('Aparelho já autorizado.');
+        }
+
         $empresaId = (int) ($device->empresa_id ?: ErpContext::currentEmpresaId() ?: 0);
         $devices = app(DeviceLicenseService::class);
 
         $origin = match (true) {
+            $device instanceof MesasDevice => 'mesas',
             $device instanceof EntregasDevice => 'entregas',
             $device instanceof UnitecOsDevice => 'unitec_os',
             $device instanceof VendasInternasDevice => 'vendas_internas',
             default => 'forca_vendas',
         };
 
-        // Unitec OS / Entregas: autoriza só na tabela de devices (aba Aparelhos).
+        // Unitec OS / Entregas / Mesas: autoriza só na tabela de devices (aba Aparelhos).
         // Não cria terminal "Telefone" na lista Dispositivo.
-        if (! in_array($origin, ['unitec_os', 'entregas'], true) && $empresaId > 0 && $devices->isAvailable()) {
+        if (! in_array($origin, ['unitec_os', 'entregas', 'mesas'], true) && $empresaId > 0 && $devices->isAvailable()) {
             $devices->register(
                 empresaId: $empresaId,
                 deviceUuid: (string) $device->device_uuid,
@@ -463,6 +485,26 @@ final class GestorAprovacaoService
             // ignore
         }
 
+        try {
+            if (ErpSchema::hasTable((new MesasDevice)->getTable())) {
+                $q = MesasDevice::query()
+                    ->whereNull('revoked_at')
+                    ->where('status', '!=', MesasDevice::STATUS_APROVADO)
+                    ->orderByDesc('id')
+                    ->limit(20);
+
+                if ($empresaId > 0) {
+                    $q->where('empresa_id', $empresaId);
+                }
+
+                foreach ($q->get() as $device) {
+                    $out[] = $this->mapDevice('mes', $device);
+                }
+            }
+        } catch (Throwable) {
+            // ignore
+        }
+
         return $out;
     }
 
@@ -493,12 +535,13 @@ final class GestorAprovacaoService
         return null;
     }
 
-    private function mapDevice(string $origem, ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice $device): array
+    private function mapDevice(string $origem, ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice|MesasDevice $device): array
     {
         $label = match ($origem) {
             'vi' => 'Vendas Internas',
             'os' => 'Unitec OS',
             'ent' => 'Unitec Entregas',
+            'mes' => 'Unitec Mesas',
             default => 'Força de Vendas',
         };
 
@@ -515,12 +558,13 @@ final class GestorAprovacaoService
         ];
     }
 
-    private function findDevice(string $origem, int $deviceId): ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice
+    private function findDevice(string $origem, int $deviceId): ForcaVendasDevice|VendasInternasDevice|UnitecOsDevice|EntregasDevice|MesasDevice
     {
         return match ($origem) {
             'vi' => VendasInternasDevice::query()->whereKey($deviceId)->firstOrFail(),
             'os' => UnitecOsDevice::query()->whereKey($deviceId)->firstOrFail(),
             'ent' => EntregasDevice::query()->whereKey($deviceId)->firstOrFail(),
+            'mes' => MesasDevice::query()->whereKey($deviceId)->firstOrFail(),
             default => ForcaVendasDevice::query()->whereKey($deviceId)->firstOrFail(),
         };
     }

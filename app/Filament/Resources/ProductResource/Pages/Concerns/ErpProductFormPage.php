@@ -413,7 +413,7 @@ trait ErpProductFormPage
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['pct_custos', 'pct_lucro'] as $field) {
+        foreach (['pct_custos', 'pct_lucro', 'comissao_pct'] as $field) {
             $data[$field] = $this->formatBrDecimal($data[$field] ?? 0, 2);
         }
 
@@ -551,7 +551,7 @@ trait ErpProductFormPage
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
-        foreach (['pct_custos', 'pct_lucro'] as $field) {
+        foreach (['pct_custos', 'pct_lucro', 'comissao_pct'] as $field) {
             $data[$field] = $this->parseBrDecimal($data[$field] ?? 0, 2);
         }
 
@@ -600,6 +600,10 @@ trait ErpProductFormPage
         $data['estoque'] = $this->parseBrDecimal($data['estoque'] ?? 0, 3);
         $data['estoque_minimo'] = $this->parseBrDecimal($data['estoque_minimo'] ?? 0, 0);
         $data['peso_kg'] = $this->parseBrDecimal($data['peso_kg'] ?? 0, 3);
+
+        if (! ($data['is_grade'] ?? false)) {
+            $data['contr_est_grade'] = false;
+        }
 
         return ProductLocalizacao::collapseFromForm($data);
     }
@@ -944,7 +948,6 @@ trait ErpProductFormPage
             'estoque_minimo' => 1,
             'peso_kg' => 0,
             'ativo' => true,
-            'is_fiscal' => true,
             'mostrar_no_app' => true,
             'is_restaurante' => false,
             'tipo_restaurante' => null,
@@ -974,6 +977,7 @@ trait ErpProductFormPage
             'nutri_gorduras_trans' => 0,
             'nutri_fibra' => 0,
             'nutri_sodio' => 0,
+            'comissao_pct' => 0,
             'paga_comissao' => false,
             'preco_variavel' => false,
             'is_composicao' => false,

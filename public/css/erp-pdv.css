@@ -708,6 +708,14 @@
     text-align: left;
 }
 
+.erp-pdv__item-obs {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: #b45309;
+    line-height: 1.2;
+}
+
 .erp-pdv__grid th {
     background: #1e5a9e;
     color: #fff;
@@ -3993,6 +4001,49 @@
 .erp-pdv-tabela-preco-list {
     max-height: 14rem;
     overflow: auto;
+}
+
+.erp-pdv-tabela-preco-modal {
+    width: min(34rem, calc(100vw - 1rem)) !important;
+}
+
+.erp-pdv-tabela-preco-scroll {
+    max-height: min(18rem, 48vh);
+    overflow: auto;
+    margin-top: 0.35rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.erp-pdv-tabela-preco-grid {
+    margin: 0;
+}
+
+.erp-pdv-tabela-preco-grid tbody tr {
+    cursor: pointer;
+}
+
+.erp-pdv-tabela-preco-grid tbody tr.erp-pdv__grid-row--selected td {
+    background: #316ac5;
+    color: #fff;
+}
+
+.erp-pdv-tabela-preco-preco {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.erp-pdv-tabela-preco-grid tbody tr.erp-pdv__grid-row--selected .erp-pdv-tabela-preco-preco {
+    color: #fff;
+}
+
+/* Lista antiga (botões): seleção precisa vencer .erp-pdv-options__list button */
+.erp-pdv-tabela-preco-list button.erp-pdv-vendedor-row--selected,
+.erp-pdv-options__list.erp-pdv-tabela-preco-list button.erp-pdv-vendedor-row--selected {
+    background: linear-gradient(180deg, #2563eb 0%, #1e5a9e 100%) !important;
+    color: #fff !important;
 }
 
 .erp-pdv-modal__btn--danger {

@@ -24,5 +24,7 @@ final class ItemDto
         public readonly ?string $chaveDfeReferenciado = null,
         /** nItem do documento original referenciado (opcional, recomendado em devolução). */
         public readonly ?int $nItemDfeReferenciado = null,
+        /** Grupo prod/comb — somente produtos com flag combustível e dados ANP. */
+        public readonly ?CombustivelDto $combustivel = null,
     ) {}
 }

@@ -31,6 +31,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\PersonCpfCnpjUnicidade;
 use App\Support\Erp\PersonDocumentoDuplicadoException;
+use App\Support\Erp\ProductAppCatalog;
 use App\Support\Erp\ProductEstoqueSaldoService;
 use App\Support\Pix\PixProviderManager;
 use Illuminate\Support\Carbon;
@@ -196,7 +197,9 @@ class ForcaVendasSyncService
             'foto_path',
             'ativo',
             'updated_at',
-        ])->where('ativo', true);
+        ]);
+
+        ProductAppCatalog::constrainParaSync($query, $since);
 
         if ($since !== null && Schema::hasColumn('products', 'updated_at')) {
             $idsReservaAlterada = EstoqueReserva::query()
@@ -267,7 +270,7 @@ class ForcaVendasSyncService
                     'estoque_disponivel' => $disponivel,
                     'estoque_id' => $estoqueId,
                     'usa_tab_preco' => (bool) $p->usa_tab_preco,
-                    'mostrar_no_app' => (bool) $p->mostrar_no_app,
+                    'mostrar_no_app' => (bool) ($p->mostrar_no_app ?? true),
                     'promo_preco_venda' => (float) $p->promo_preco_venda,
                     'promo_data_inicio' => optional($p->promo_data_inicio)->toDateString(),
                     'promo_data_fim' => optional($p->promo_data_fim)->toDateString(),
@@ -372,6 +375,8 @@ class ForcaVendasSyncService
      */
     private function priceTableItems(?Carbon $since): array
     {
+        $tabSvc = app(\App\Support\Erp\ProductTabelaPrecoService::class);
+
         return $this->applySince(ProductPriceTableItem::query(), $since, 'product_price_table_items')
             ->orderBy('id')
             ->get()
@@ -379,8 +384,10 @@ class ForcaVendasSyncService
                 'id' => $i->id,
                 'product_id' => $i->product_id,
                 'price_table_id' => $i->price_table_id,
-                'valor' => (float) $i->valor,
-                'fator' => (float) $i->fator,
+                'nivel' => $tabSvc->nivelDaTabelaId((int) $i->price_table_id),
+                // Compat apps antigos: presença do item = habilitado; preço vem da Precificação.
+                'valor' => 0.0,
+                'fator' => 0.0,
                 'updated_at' => optional($i->updated_at)->toIso8601String(),
             ])
             ->all();
@@ -1002,6 +1009,10 @@ class ForcaVendasSyncService
                     $totalItem = round(($quantidade * $preco) - $descItem, 2);
                     $subtotal += $totalItem;
 
+                    $nivelItem = strtolower(trim((string) ($item['tabela_nivel'] ?? $item['nivel'] ?? '')));
+                    $priceTableItem = (int) ($item['price_table_id'] ?? 0);
+                    $itensTable = $isPedido ? 'pedido_itens' : 'orcamento_itens';
+
                     $itemAttrs = [
                         'item' => $linha,
                         'product_id' => $productId,
@@ -1012,6 +1023,13 @@ class ForcaVendasSyncService
                         'desconto' => $descItem,
                         'descricao' => $item['descricao'] ?? null,
                     ];
+
+                    if (Schema::hasColumn($itensTable, 'price_table_id') && $priceTableItem > 0) {
+                        $itemAttrs['price_table_id'] = $priceTableItem;
+                    }
+                    if (Schema::hasColumn($itensTable, 'tabela_nivel') && $nivelItem !== '') {
+                        $itemAttrs['tabela_nivel'] = $nivelItem;
+                    }
 
                     if ($isPedido) {
                         PedidoItem::query()->create(array_merge($itemAttrs, [

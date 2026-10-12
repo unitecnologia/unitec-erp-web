@@ -9,6 +9,24 @@
         'saida' => 'SAÍDA',
     ];
 
+    $activeFields = array_values(array_unique(array_filter(
+        [$this->searchColumn, $this->searchColumn2],
+        fn (string $column): bool => $column !== '' && array_key_exists($column, $searchFields),
+    )));
+    if ($activeFields === []) {
+        $activeFields = ['documento'];
+    }
+    $searchButtonLabel = implode(' + ', array_map(fn (string $column): string => $searchFields[$column], $activeFields));
+    $placeholders = [
+        'emissao' => 'dd/mm/aaaa',
+        'documento' => 'DIGITE O PEDIDO',
+        'historico' => 'DIGITE O HISTÓRICO',
+        'plano_contas' => 'DIGITE O PLANO DE CONTAS',
+        'conta' => 'DIGITE A CONTA',
+        'entrada' => 'DIGITE O VALOR',
+        'saida' => 'DIGITE O VALOR',
+    ];
+
     $pageSizeOptions = [25, 50, 100];
 @endphp
 
@@ -23,13 +41,25 @@
             </select>
         </label>
 
-        <div class="erp-caixa__period">
+        <div
+            class="erp-caixa__period"
+            wire:ignore
+            data-erp-date-group
+            data-erp-date-auto-apply="1"
+            data-erp-date-apply-method="applyPeriodFilterAuto"
+        >
             <label class="erp-caixa__period-label">
                 Período de
                 <input
                     type="date"
+                    data-erp-date
                     data-wire-field="periodoDe"
                     data-erp-date-wire="iso"
+                    data-erp-date-initial="{{ $this->periodoDe }}"
+                    value="{{ $this->periodoDe }}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="dd/mm/aaaa"
                     class="erp-caixa__period-input erp-caixa__period-from"
                 >
             </label>
@@ -37,35 +67,41 @@
                 até
                 <input
                     type="date"
+                    data-erp-date
                     data-wire-field="periodoAte"
                     data-erp-date-wire="iso"
+                    data-erp-date-initial="{{ $this->periodoAte }}"
+                    value="{{ $this->periodoAte }}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="dd/mm/aaaa"
                     class="erp-caixa__period-input"
                 >
             </label>
-            <button
-                type="button"
-                wire:click="applyPeriodFilter"
-                onclick="window.ErpDatepicker?.commitAllIn(this.closest('.erp-caixa') ?? document)"
-                class="erp-caixa__btn"
-            >
-                Filtrar Período
-            </button>
         </div>
 
         <div class="erp-caixa__locate-group">
             <span class="erp-caixa__locate-label">Localizar</span>
-            <select wire:model.live="searchColumn" class="erp-caixa__select erp-caixa__locate-field">
-                @foreach ($searchFields as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="localSearch"
-                wire:key="caixa-local-search-{{ $this->searchColumn }}"
-                class="erp-caixa__input erp-caixa__locate-input"
-                placeholder="DIGITE AQUI SUA PESQUISA"
-            >
+            @include('filament.components.erp.shared.search-field-dropdown', [
+                'fields' => $searchFields,
+                'searchColumn' => $this->searchColumn,
+                'markedFields' => $activeFields,
+                'buttonLabel' => $searchButtonLabel,
+                'wireMethod' => 'toggleSearchField',
+                'closeOnSelect' => false,
+            ])
+            @foreach ($activeFields as $index => $column)
+                @php $model = $index === 0 ? 'localSearch' : 'localSearch2'; @endphp
+                <input
+                    type="text"
+                    wire:model.live.debounce.400ms="{{ $model }}"
+                    wire:key="caixa-local-search-{{ $model }}-{{ $column }}"
+                    class="erp-caixa__input erp-caixa__locate-input"
+                    placeholder="{{ $placeholders[$column] ?? 'DIGITE AQUI SUA PESQUISA' }}"
+                    autocomplete="off"
+                    @if (in_array($column, ['entrada', 'saida'], true)) inputmode="decimal" @endif
+                >
+            @endforeach
         </div>
 
         <div class="erp-caixa__page-size-group">

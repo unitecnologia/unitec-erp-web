@@ -17,6 +17,7 @@ use App\Models\VendasInternasOrder;
 use App\Models\Vendedor;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\ProductAppCatalog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -111,6 +112,7 @@ class VendasInternasSyncService
         $reservados = (new EstoqueReservaService())->totaisReservadosAtivos();
 
         $query = Product::query();
+        ProductAppCatalog::constrainParaSync($query, $since);
 
         if ($since !== null && Schema::hasColumn('products', 'updated_at')) {
             $idsReservaAlterada = EstoqueReserva::query()
@@ -155,7 +157,7 @@ class VendasInternasSyncService
                 'estoque_reservado' => $reservado,
                 'estoque_disponivel' => $disponivel,
                 'usa_tab_preco' => (bool) $p->usa_tab_preco,
-                'mostrar_no_app' => (bool) $p->mostrar_no_app,
+                'mostrar_no_app' => (bool) ($p->mostrar_no_app ?? true),
                 'promo_preco_venda' => (float) $p->promo_preco_venda,
                 'promo_data_inicio' => optional($p->promo_data_inicio)->toDateString(),
                 'promo_data_fim' => optional($p->promo_data_fim)->toDateString(),
@@ -202,6 +204,8 @@ class VendasInternasSyncService
      */
     private function priceTableItems(?Carbon $since): array
     {
+        $tabSvc = app(\App\Support\Erp\ProductTabelaPrecoService::class);
+
         return $this->applySince(ProductPriceTableItem::query(), $since, 'product_price_table_items')
             ->orderBy('id')
             ->get()
@@ -209,8 +213,9 @@ class VendasInternasSyncService
                 'id' => $i->id,
                 'product_id' => $i->product_id,
                 'price_table_id' => $i->price_table_id,
-                'valor' => (float) $i->valor,
-                'fator' => (float) $i->fator,
+                'nivel' => $tabSvc->nivelDaTabelaId((int) $i->price_table_id),
+                'valor' => 0.0,
+                'fator' => 0.0,
                 'updated_at' => optional($i->updated_at)->toIso8601String(),
             ])
             ->all();
@@ -510,7 +515,7 @@ class VendasInternasSyncService
             $totalItem = round(($quantidade * $preco) - $descItem, 2);
             $subtotal += $totalItem;
 
-            OrcamentoItem::query()->create([
+            $attrs = [
                 'orcamento_id' => $orcamento->id,
                 'item' => $linha,
                 'product_id' => $productId,
@@ -520,7 +525,9 @@ class VendasInternasSyncService
                 'total' => $totalItem,
                 'desconto' => $descItem,
                 'descricao' => $item['descricao'] ?? null,
-            ]);
+            ];
+            $this->aplicarTabPrecoNoItemAttrs($attrs, $item, 'orcamento_itens');
+            OrcamentoItem::query()->create($attrs);
 
             $linha++;
         }
@@ -593,7 +600,7 @@ class VendasInternasSyncService
             $totalItem = round(($quantidade * $preco) - $descItem, 2);
             $subtotal += $totalItem;
 
-            PedidoItem::query()->create([
+            $attrs = [
                 'pedido_id' => $pedido->id,
                 'item' => $linha,
                 'product_id' => $productId,
@@ -603,7 +610,9 @@ class VendasInternasSyncService
                 'total' => $totalItem,
                 'desconto' => $descItem,
                 'descricao' => $item['descricao'] ?? null,
-            ]);
+            ];
+            $this->aplicarTabPrecoNoItemAttrs($attrs, $item, 'pedido_itens');
+            PedidoItem::query()->create($attrs);
 
             $linha++;
         }
@@ -616,6 +625,25 @@ class VendasInternasSyncService
         ]);
 
         return [$pedido, $total, $clientCreatedAt];
+    }
+
+    /**
+     * Persiste escolha de Tab. Preço enviada pelo app (quando colunas existirem).
+     *
+     * @param  array<string, mixed>  $attrs
+     * @param  array<string, mixed>  $item
+     */
+    private function aplicarTabPrecoNoItemAttrs(array &$attrs, array $item, string $table): void
+    {
+        $nivel = strtolower(trim((string) ($item['tabela_nivel'] ?? $item['nivel'] ?? '')));
+        $priceTableId = (int) ($item['price_table_id'] ?? 0);
+
+        if (Schema::hasColumn($table, 'price_table_id') && $priceTableId > 0) {
+            $attrs['price_table_id'] = $priceTableId;
+        }
+        if (Schema::hasColumn($table, 'tabela_nivel') && $nivel !== '') {
+            $attrs['tabela_nivel'] = $nivel;
+        }
     }
 
     /**

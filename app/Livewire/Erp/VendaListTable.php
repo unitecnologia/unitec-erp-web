@@ -33,6 +33,10 @@ class VendaListTable extends Component
 
     public string $localSearchHoraAte = '';
 
+    public string $searchColumn2 = '';
+
+    public string $localSearch2 = '';
+
     public int $perPage = 50;
 
     public ?string $sortColumn = null;
@@ -59,16 +63,7 @@ class VendaListTable extends Component
         $this->statusFilter = $filter;
         $this->resetPage();
 
-        $total = (new VendaListQueryBuilder(
-            statusFilter: $this->statusFilter,
-            tipoFilter: $this->tipoFilter,
-            searchColumn: $this->searchColumn,
-            localSearch: $this->localSearch,
-            localSearchDe: $this->localSearchDe,
-            localSearchAte: $this->localSearchAte,
-            localSearchHoraDe: $this->localSearchHoraDe,
-            localSearchHoraAte: $this->localSearchHoraAte,
-        ))->sumFilteredTotal();
+        $total = $this->queryBuilder()->sumFilteredTotal();
 
         $this->js(sprintf(
             '(() => {
@@ -109,16 +104,7 @@ class VendaListTable extends Component
         $this->tipoFilter = $filter;
         $this->resetPage();
 
-        $total = (new VendaListQueryBuilder(
-            statusFilter: $this->statusFilter,
-            tipoFilter: $this->tipoFilter,
-            searchColumn: $this->searchColumn,
-            localSearch: $this->localSearch,
-            localSearchDe: $this->localSearchDe,
-            localSearchAte: $this->localSearchAte,
-            localSearchHoraDe: $this->localSearchHoraDe,
-            localSearchHoraAte: $this->localSearchHoraAte,
-        ))->sumFilteredTotal();
+        $total = $this->queryBuilder()->sumFilteredTotal();
 
         $this->js(sprintf(
             '(() => {
@@ -160,6 +146,8 @@ class VendaListTable extends Component
         string $localSearchHoraAte = '',
         ?int $perPage = null,
         bool $resetSort = false,
+        string $searchColumn2 = '',
+        string $localSearch2 = '',
     ): void {
         $this->statusFilter = $statusFilter;
         $this->tipoFilter = $tipoFilter;
@@ -169,6 +157,8 @@ class VendaListTable extends Component
         $this->localSearchAte = $localSearchAte;
         $this->localSearchHoraDe = $localSearchHoraDe;
         $this->localSearchHoraAte = $localSearchHoraAte;
+        $this->searchColumn2 = $searchColumn2;
+        $this->localSearch2 = $localSearch2;
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;
@@ -202,9 +192,9 @@ class VendaListTable extends Component
         ]);
     }
 
-    protected function records(): LengthAwarePaginator
+    protected function queryBuilder(bool $applyDefaultOrder = true): VendaListQueryBuilder
     {
-        $query = (new VendaListQueryBuilder(
+        return new VendaListQueryBuilder(
             statusFilter: $this->statusFilter,
             tipoFilter: $this->tipoFilter,
             searchColumn: $this->searchColumn,
@@ -213,8 +203,15 @@ class VendaListTable extends Component
             localSearchAte: $this->localSearchAte,
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
-            applyDefaultOrder: false,
-        ))->buildForList();
+            applyDefaultOrder: $applyDefaultOrder,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
+        );
+    }
+
+    protected function records(): LengthAwarePaginator
+    {
+        $query = $this->queryBuilder(applyDefaultOrder: false)->buildForList();
 
         $this->applySort($query);
 

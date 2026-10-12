@@ -191,7 +191,7 @@ final class ProdutosPlanilhaImportService
             'descricao', 'referencia', 'codigo_barras', 'codigo_barras_caixa', 'tipo_produto', 'marca', 'grupo',
             'unidade', 'preco_compra', 'ult_compra', 'ult_compra_anterior', 'pct_custos', 'preco_custo',
             'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda', 'preco_venda_anterior',
-            'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'peso_kg',
+            'qtd_atacado', 'preco_atacado', 'preco_especial', 'comissao_pct', 'estoque', 'estoque_minimo', 'peso_kg',
             'localizacao', 'validade', 'lote', 'info_adicionais', 'ncm', 'ncm_descricao', 'cest',
             'cfop_interno', 'origem', 'cst_icms', 'csosn', 'aliq_icms', 'cfop_externo', 'cst_externo',
             'csosn_externo', 'aliq_icms_externo', 'cst_entrada', 'cst_saida', 'cst_cofins', 'aliq_pis',
@@ -199,14 +199,14 @@ final class ProdutosPlanilhaImportService
             'reducao_base_pct', 'icms_diferido', 'aliq_deson', 'motivo_desoneracao', 'tipo_tributacao',
             'cod_beneficio', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao', 'aliq_ibs_uf', 'aliq_cbs',
             'aliq_ibs_mun', 'aliq_adrem_ibs', 'aliq_adrem_cbs', 'reducao_cbs', 'reducao_ibs',
-            'tributacao_monofasica', 'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'anp_code', 'issqn',
+            'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'anp_code', 'issqn',
             'prefixo_balanca', 'produto_pesado', 'tem_info_nutricional', 'nutri_porcao_qtd',
             'nutri_porcao_unidade', 'nutri_medida_inteiro', 'nutri_medida_fracao', 'nutri_medida_tipo',
             'nutri_valor_energetico', 'nutri_carboidratos', 'nutri_proteinas', 'nutri_gorduras_totais',
             'nutri_gorduras_saturadas', 'nutri_gorduras_trans', 'nutri_fibra', 'nutri_sodio',
             'is_restaurante', 'tipo_restaurante', 'menu_id', 'tipo_alimento', 'qtd_sabores', 'valor_pequena',
             'valor_media', 'valor_grande', 'complemento', 'tempo_espera', 'is_remedio', 'principio_ativo_id',
-            'aplicacao', 'ativo', 'is_fiscal', 'paga_comissao', 'preco_variavel', 'is_composicao', 'is_servico',
+            'aplicacao', 'ativo', 'paga_comissao', 'preco_variavel', 'is_composicao', 'is_servico',
             'is_grade', 'usa_tab_preco', 'is_combustivel', 'usa_imei', 'contr_est_grade', 'mostrar_no_app',
             'promo_data_inicio', 'promo_data_fim', 'promo_preco_venda', 'promo_preco_atacado',
         ];
@@ -219,7 +219,7 @@ final class ProdutosPlanilhaImportService
     {
         return [
             'Cadastro' => ['descricao', 'referencia', 'codigo_barras', 'codigo_barras_caixa', 'tipo_produto', 'marca', 'grupo', 'unidade', 'localizacao', 'validade', 'lote', 'info_adicionais', 'ativo'],
-            'Preços e estoque' => ['preco_compra', 'ult_compra', 'ult_compra_anterior', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda', 'preco_venda_anterior', 'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'peso_kg'],
+            'Preços e estoque' => ['preco_compra', 'ult_compra', 'ult_compra_anterior', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda', 'preco_venda_anterior', 'qtd_atacado', 'preco_atacado', 'preco_especial', 'comissao_pct', 'estoque', 'estoque_minimo', 'peso_kg'],
             'Fiscal' => ['ncm', 'ncm_descricao', 'cest', 'cfop_interno', 'origem', 'cst_icms', 'csosn', 'aliq_icms', 'cfop_externo', 'cst_externo', 'csosn_externo', 'aliq_icms_externo', 'cst_entrada', 'cst_saida', 'cst_cofins', 'aliq_pis', 'aliq_cofins', 'cst_ipi', 'cod_enq_ipi', 'aliq_ipi', 'fcp_pct', 'mva_pct', 'mva_normal', 'reducao_base_pct', 'icms_diferido', 'aliq_deson', 'motivo_desoneracao', 'tipo_tributacao', 'cod_beneficio', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao'],
             'Recursos especiais' => ['produto_pesado', 'tem_info_nutricional', 'nutri_porcao_qtd', 'nutri_porcao_unidade', 'nutri_medida_inteiro', 'nutri_medida_fracao', 'nutri_medida_tipo', 'nutri_valor_energetico', 'nutri_carboidratos', 'nutri_proteinas', 'nutri_gorduras_totais', 'nutri_gorduras_saturadas', 'nutri_gorduras_trans', 'nutri_fibra', 'nutri_sodio', 'is_restaurante', 'tipo_restaurante', 'menu_id', 'tipo_alimento', 'qtd_sabores', 'valor_pequena', 'valor_media', 'valor_grande', 'complemento', 'tempo_espera', 'is_remedio', 'principio_ativo_id', 'aplicacao', 'is_composicao', 'is_servico', 'is_grade', 'usa_tab_preco', 'is_combustivel', 'usa_imei', 'contr_est_grade', 'mostrar_no_app'],
         ];
@@ -442,7 +442,7 @@ final class ProdutosPlanilhaImportService
             'referencia', 'codigo_barras', 'codigo_barras_caixa', 'tipo_produto', 'marca', 'grupo', 'unidade',
             'cfop_interno', 'cst_icms', 'csosn', 'cfop_externo', 'cst_externo', 'csosn_externo', 'cst_entrada',
             'cst_saida', 'cst_cofins', 'cst_ipi', 'cod_enq_ipi', 'motivo_desoneracao', 'tipo_tributacao',
-            'cod_beneficio', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao', 'tributacao_monofasica',
+            'cod_beneficio', 'iva_cst', 'cclass_trib', 'cclass_trib_descricao',
             'anp_code', 'issqn', 'prefixo_balanca', 'nutri_porcao_unidade', 'nutri_medida_tipo', 'tipo_restaurante',
             'tipo_alimento', 'complemento', 'aplicacao', 'ncm', 'ncm_descricao', 'cest', 'localizacao', 'lote',
             'info_adicionais',
@@ -455,7 +455,7 @@ final class ProdutosPlanilhaImportService
             'reducao_ibs', 'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'nutri_porcao_qtd',
             'nutri_valor_energetico', 'nutri_carboidratos', 'nutri_proteinas', 'nutri_gorduras_totais',
             'nutri_gorduras_saturadas', 'nutri_gorduras_trans', 'nutri_fibra', 'nutri_sodio', 'preco_venda',
-            'preco_venda_anterior', 'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque_minimo', 'peso_kg',
+            'preco_venda_anterior', 'qtd_atacado', 'preco_atacado', 'preco_especial', 'comissao_pct', 'estoque_minimo', 'peso_kg',
             'valor_pequena', 'valor_media', 'valor_grande', 'tempo_espera', 'promo_preco_venda', 'promo_preco_atacado',
         ];
         $integerFields = [
@@ -463,7 +463,7 @@ final class ProdutosPlanilhaImportService
             'nutri_medida_fracao',
         ];
         $booleanFields = [
-            'produto_pesado', 'tem_info_nutricional', 'is_restaurante', 'is_remedio', 'ativo', 'is_fiscal',
+            'produto_pesado', 'tem_info_nutricional', 'is_restaurante', 'is_remedio', 'ativo',
             'paga_comissao', 'preco_variavel', 'is_composicao', 'is_servico', 'is_grade', 'usa_tab_preco',
             'is_combustivel', 'usa_imei', 'contr_est_grade', 'mostrar_no_app',
         ];

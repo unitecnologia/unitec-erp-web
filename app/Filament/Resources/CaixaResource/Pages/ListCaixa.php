@@ -42,6 +42,12 @@ class ListCaixa extends ListRecords
     #[Url(as: 'campo')]
     public string $searchColumn = 'documento';
 
+    public string $searchColumn2 = '';
+
+    public string $localSearch2 = '';
+
+    public string $searchSignatureApplied = '';
+
     public string $contaFilter = '';
 
     public string $periodoDe = '';
@@ -90,6 +96,8 @@ class ListCaixa extends ListRecords
             $this->periodoDeApplied = $inicioMes;
             $this->periodoAteApplied = $fimMes;
         }
+
+        $this->searchSignatureApplied = $this->searchSignature();
     }
 
     public function mountInteractsWithTable(): void
@@ -137,6 +145,8 @@ class ListCaixa extends ListRecords
             localSearch: $this->localSearch,
             periodoDeApplied: $this->periodoDeApplied,
             periodoAteApplied: $this->periodoAteApplied,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
         );
     }
 
@@ -229,15 +239,153 @@ class ListCaixa extends ListRecords
     {
         $this->localSearch = '';
         $this->searchColumn = 'documento';
+        $this->searchColumn2 = '';
+        $this->localSearch2 = '';
         $this->clearListSelection();
-        $this->pushCaixaListRefresh(resetSort: true);
+        $this->pushCaixaListRefresh(resetSort: true, renderPage: true);
     }
 
     public function updatedSearchColumn(): void
     {
+        if (! in_array($this->searchColumn, $this->localSearchColumns(), true)) {
+            $this->searchColumn = 'documento';
+        }
+
         $this->localSearch = '';
+        $this->searchColumn2 = '';
+        $this->localSearch2 = '';
         $this->clearListSelection();
-        $this->pushCaixaListRefresh(resetSort: true);
+        $this->pushCaixaListRefresh(resetSort: true, renderPage: true);
+    }
+
+    /**
+     * Marca/desmarca campo de pesquisa (até 2 combinados). Ao marcar um 3º, sai o mais antigo.
+     */
+    public function toggleSearchField(string $column): void
+    {
+        if (! in_array($column, $this->localSearchColumns(), true)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $active = array_values(array_filter([$this->searchColumn, $this->searchColumn2], fn (string $c): bool => $c !== ''));
+
+        if (in_array($column, $active, true)) {
+            if (count($active) < 2) {
+                $this->skipRender();
+
+                return;
+            }
+
+            $this->removeSearchField($column);
+        } else {
+            if (count($active) >= 2) {
+                $this->removeSearchField($this->searchColumn);
+            }
+
+            $this->searchColumn2 = $column;
+            $this->localSearch2 = '';
+        }
+
+        if ($this->searchSignature() === $this->searchSignatureApplied) {
+            return;
+        }
+
+        $this->clearListSelection();
+        $this->pushCaixaListRefresh(resetSort: true, renderPage: true);
+    }
+
+    protected function removeSearchField(string $column): void
+    {
+        if ($this->searchColumn2 === $column) {
+            $this->searchColumn2 = '';
+            $this->localSearch2 = '';
+
+            return;
+        }
+
+        if ($this->searchColumn === $column && $this->searchColumn2 !== '') {
+            $this->searchColumn = $this->searchColumn2;
+            $this->localSearch = $this->localSearch2;
+            $this->searchColumn2 = '';
+            $this->localSearch2 = '';
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function localSearchColumns(): array
+    {
+        return ['emissao', 'documento', 'historico', 'plano_contas', 'conta', 'entrada', 'saida'];
+    }
+
+    /**
+     * Filtro efetivo (campo vazio não muda o resultado, então não entra).
+     */
+    protected function searchSignature(): string
+    {
+        $terms = [];
+
+        foreach ([[$this->searchColumn, $this->localSearch], [$this->searchColumn2, $this->localSearch2]] as [$column, $term]) {
+            $term = mb_strtoupper(trim($term), 'UTF-8');
+
+            if ($column !== '' && $term !== '') {
+                $terms[] = $column.'='.$term;
+            }
+        }
+
+        sort($terms);
+
+        return json_encode([
+            $terms,
+            $this->periodoDeApplied,
+            $this->periodoAteApplied,
+        ], JSON_UNESCAPED_UNICODE) ?: '';
+    }
+
+    /**
+     * Pesquisa automática: só consulta quando o filtro efetivo mudou.
+     */
+    protected function applySearchIfChanged(): void
+    {
+        $this->periodoDeApplied = $this->periodoDe;
+        $this->periodoAteApplied = $this->periodoAte;
+
+        if ($this->searchSignature() === $this->searchSignatureApplied) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->clearListSelection();
+        $this->pushCaixaListRefresh();
+    }
+
+    public function updatedLocalSearch(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedLocalSearch2(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedPeriodoDe(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function updatedPeriodoAte(): void
+    {
+        $this->applySearchIfChanged();
+    }
+
+    public function applyPeriodFilterAuto(): void
+    {
+        $this->applySearchIfChanged();
     }
 
     public function search(): void
@@ -536,9 +684,10 @@ class ListCaixa extends ListRecords
         $this->pushCaixaListRefresh();
     }
 
-    protected function pushCaixaListRefresh(bool $resetSort = false): void
+    protected function pushCaixaListRefresh(bool $resetSort = false, bool $renderPage = false): void
     {
         $builder = $this->listQueryBuilder();
+        $this->searchSignatureApplied = $this->searchSignature();
         $saldoAnterior = $builder->sumSaldoAnterior();
         $totalEntrada = $builder->sumEntradaFiltered();
         $totalSaida = $builder->sumSaidaFiltered();
@@ -553,9 +702,13 @@ class ListCaixa extends ListRecords
             periodoAteApplied: $this->periodoAteApplied,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
+            searchColumn2: $this->searchColumn2,
+            localSearch2: $this->localSearch2,
         )->to(CaixaListTable::class);
 
-        $this->skipRender();
+        if (! $renderPage) {
+            $this->skipRender();
+        }
 
         $this->patchCaixaFooterTotals($saldoAnterior, $totalEntrada, $totalSaida, $saldoAtual);
     }

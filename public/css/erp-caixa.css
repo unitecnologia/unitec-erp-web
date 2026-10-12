@@ -224,6 +224,23 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     font-size: 0.75rem;
 }
 
+.erp-caixa-page .erp-caixa__locate-group .erp-field-dd {
+    flex: 0 0 auto;
+    min-width: 6.75rem;
+}
+
+.erp-caixa-page .erp-caixa__locate-group .erp-field-dd__btn {
+    height: 1.75rem;
+    min-height: 1.75rem;
+    max-width: 15rem;
+}
+
+.erp-caixa-page .erp-caixa__locate-group .erp-field-dd__btn > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .erp-caixa-page .erp-caixa__page-size-group {
     display: inline-flex;
     align-items: center;

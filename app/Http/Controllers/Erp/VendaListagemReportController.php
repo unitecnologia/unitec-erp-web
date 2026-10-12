@@ -34,14 +34,7 @@ class VendaListagemReportController extends Controller
             'statusLabel' => VendaListagemReport::statusLabels()[$builder->statusFilter] ?? 'Todos',
             'tipoLabel' => VendaListagemReport::tipoLabels()[$builder->tipoFilter] ?? 'Todos',
             'orderLabel' => VendaListagemReport::orderLabels()[$builder->orderBy] ?? 'Número',
-            'searchLabel' => VendaListagemReport::searchSummary(
-                $builder->searchColumn,
-                $builder->localSearch,
-                $builder->localSearchDe,
-                $builder->localSearchAte,
-                $builder->localSearchHoraDe,
-                $builder->localSearchHoraAte,
-            ),
+            'searchLabel' => $this->searchLabel($builder),
             'printedAt' => now(),
             'empresaEndereco' => $this->formatEmpresaEndereco($empresa),
             'logoDataUri' => $this->logoDataUri($empresa),
@@ -130,6 +123,26 @@ class VendaListagemReportController extends Controller
                 ? $columns
                 : VendaListagemReport::defaultColumns(),
         ];
+    }
+
+    protected function searchLabel(VendaListQueryBuilder $builder): ?string
+    {
+        $columns = $builder->activeSearchColumns();
+        $hasHora = in_array('hora', $columns, true);
+
+        $parts = array_filter(array_map(
+            fn (string $column): ?string => VendaListagemReport::searchSummary(
+                $column,
+                $column === $builder->searchColumn2 ? $builder->localSearch2 : $builder->localSearch,
+                $builder->localSearchDe,
+                $builder->localSearchAte,
+                $column === 'data' && $hasHora ? '' : $builder->localSearchHoraDe,
+                $column === 'data' && $hasHora ? '' : $builder->localSearchHoraAte,
+            ),
+            $columns,
+        ));
+
+        return $parts !== [] ? implode(' | ', $parts) : null;
     }
 
     protected function closeUrl(VendaListQueryBuilder $builder): string

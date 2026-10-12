@@ -65,7 +65,7 @@ class ProductResource extends Resource
         $numbers = [
             'preco_compra', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda',
             'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior',
-            'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'peso_kg',
+            'qtd_atacado', 'preco_atacado', 'preco_especial', 'comissao_pct', 'estoque', 'estoque_minimo', 'peso_kg',
             'origem', 'aliq_icms', 'aliq_icms_externo', 'aliq_pis', 'aliq_cofins', 'aliq_ipi',
             'fcp_pct', 'mva_pct', 'mva_normal', 'reducao_base_pct', 'icms_diferido', 'aliq_deson', 'motivo_desoneracao',
             'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'issqn',
@@ -84,7 +84,7 @@ class ProductResource extends Resource
         $brDecimalFields = [
             'preco_compra', 'pct_custos', 'preco_custo', 'preco_custo_anterior', 'e_medio', 'pct_lucro', 'preco_venda',
             'preco_venda_anterior', 'ult_compra', 'ult_compra_anterior',
-            'qtd_atacado', 'preco_atacado', 'preco_especial', 'estoque', 'estoque_minimo', 'peso_kg',
+            'qtd_atacado', 'preco_atacado', 'preco_especial', 'comissao_pct', 'estoque', 'estoque_minimo', 'peso_kg',
             'aliq_icms', 'aliq_icms_externo', 'aliq_pis', 'aliq_cofins', 'aliq_ipi',
             'fcp_pct', 'mva_pct', 'mva_normal', 'reducao_base_pct', 'icms_diferido', 'aliq_deson',
             'glp_pct', 'gnn_pct', 'gni_pct', 'peso_liq', 'issqn',
@@ -97,9 +97,9 @@ class ProductResource extends Resource
         ];
 
         $booleans = [
-            'ativo', 'is_fiscal', 'paga_comissao', 'preco_variavel', 'is_composicao',
+            'ativo', 'paga_comissao', 'preco_variavel', 'is_composicao',
             'is_servico', 'is_grade', 'usa_tab_preco', 'is_combustivel', 'usa_imei',
-            'contr_est_grade', 'mostrar_no_app', 'is_restaurante', 'is_remedio', 'produto_pesado', 'tem_info_nutricional', 'tributacao_monofasica',
+            'contr_est_grade', 'mostrar_no_app', 'is_restaurante', 'is_remedio', 'produto_pesado', 'tem_info_nutricional',
             'controla_lote_validade',
         ];
 

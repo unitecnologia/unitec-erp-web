@@ -357,6 +357,8 @@ final class EstornarVendaService
                                 docFiscalTipo: $docFiscal['docFiscalTipo'] ?? null,
                                 docFiscalNumero: $docFiscal['docFiscalNumero'] ?? null,
                             ),
+                            'pdv_venda_item',
+                            (int) $item->id,
                         );
                     }
                 }
@@ -548,6 +550,8 @@ final class EstornarVendaService
                             origemId: (int) $venda->id,
                             origemNumero: $venda->numero !== null ? (string) $venda->numero : null,
                         ),
+                        'venda_item',
+                        (int) $item->id,
                     );
                 }
             }

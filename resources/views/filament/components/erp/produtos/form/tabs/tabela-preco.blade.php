@@ -1,55 +1,38 @@
+@php
+    $precoVarejo = $this->data['preco_venda'] ?? '0,00';
+    $precoAtacado = $this->data['preco_atacado'] ?? '0,00';
+    $precoEspecial = $this->data['preco_especial'] ?? '0,00';
+@endphp
+
 <div class="erp-produtos-child-grid">
     <div class="erp-produtos-tabpreco__form">
-        <div class="erp-produtos-tabpreco__fields">
-            <div class="erp-produtos-tabpreco__field">
-                <label for="pprod-tabpreco-tabela">Tabela</label>
-                <select id="pprod-tabpreco-tabela" wire:model="tabPrecoSelectedTableId" class="erp-pcad-form__select">
-                    @foreach ($this->priceTableOptions as $option)
-                        <option value="{{ $option['id'] }}">{{ $option['codigo'] }} - {{ $option['descricao'] }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="erp-produtos-tabpreco__field">
-                <label for="pprod-tabpreco-valor">Valor</label>
-                <input id="pprod-tabpreco-valor" type="text" wire:model="tabPrecoValor" data-mask="money-br" class="erp-pcad-form__input erp-produtos-child-grid__input-num">
-            </div>
-            <div class="erp-produtos-tabpreco__field">
-                <label for="pprod-tabpreco-fator">Fator</label>
-                <input id="pprod-tabpreco-fator" type="text" wire:model="tabPrecoFator" data-mask="decimal3" class="erp-pcad-form__input erp-produtos-child-grid__input-num">
-            </div>
-            <div class="erp-produtos-tabpreco__actions">
-                <button type="button" wire:click="startPriceTableItem" class="erp-produtos-child-grid__btn">+ Novo</button>
-                <button type="button" wire:click="savePriceTableItem" class="erp-produtos-child-grid__btn">✓ Gravar</button>
-                <button type="button" wire:click="deletePriceTableItem" class="erp-produtos-child-grid__btn">− Excluir</button>
-            </div>
+        <p class="erp-produtos-tabpreco__hint">
+            Marque quais preços da Precificação este produto pode usar na venda.
+            Com <strong>Usar Tab. Preço</strong> ativo, a venda exige escolher entre as tabelas marcadas.
+            Desmarcar a flag só desativa o uso — as tabelas escolhidas permanecem salvas.
+        </p>
+        <div class="erp-produtos-tabpreco__checks">
+            <label class="erp-produtos-tabpreco__check">
+                <input type="checkbox" wire:model.live="tabPrecoVarejo">
+                <span class="erp-produtos-tabpreco__check-body">
+                    <span class="erp-produtos-tabpreco__check-title">Varejo</span>
+                    <span class="erp-produtos-tabpreco__check-price">R$ {{ $precoVarejo }}</span>
+                </span>
+            </label>
+            <label class="erp-produtos-tabpreco__check">
+                <input type="checkbox" wire:model.live="tabPrecoAtacado">
+                <span class="erp-produtos-tabpreco__check-body">
+                    <span class="erp-produtos-tabpreco__check-title">Atacado</span>
+                    <span class="erp-produtos-tabpreco__check-price">R$ {{ $precoAtacado }}</span>
+                </span>
+            </label>
+            <label class="erp-produtos-tabpreco__check">
+                <input type="checkbox" wire:model.live="tabPrecoEspecial">
+                <span class="erp-produtos-tabpreco__check-body">
+                    <span class="erp-produtos-tabpreco__check-title">Especial</span>
+                    <span class="erp-produtos-tabpreco__check-price">R$ {{ $precoEspecial }}</span>
+                </span>
+            </label>
         </div>
-    </div>
-
-    <div class="erp-produtos-child-grid__wrap">
-        <table class="erp-produtos-child-grid__table">
-            <thead>
-                <tr>
-                    <th>Tabela</th>
-                    <th>Valor</th>
-                    <th>Fator</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($this->priceTableRows as $index => $row)
-                    <tr
-                        wire:click="selectPriceTableRow({{ $index }})"
-                        @class(['erp-produtos-child-grid__row', 'erp-produtos-child-grid__row--selected' => $this->selectedPriceTableRowIndex === $index])
-                    >
-                        <td>{{ $row['tabela'] ?? '—' }}</td>
-                        <td class="erp-produtos-child-grid__num">{{ $row['valor'] ?? '0,00' }}</td>
-                        <td class="erp-produtos-child-grid__num">{{ $row['fator'] ?? '0' }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="3" class="erp-produtos-child-grid__empty">Nenhum item de tabela de preço.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
     </div>
 </div>

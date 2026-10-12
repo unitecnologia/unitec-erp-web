@@ -19,12 +19,6 @@
             @include('filament.components.erp.vendas.toolbar-filters')
 
             <div class="erp-vendas__search-actions">
-                <button
-                    type="button"
-                    wire:click="search"
-                    onclick="window.ErpDatepicker?.commitAllIn(this.closest('.erp-vendas') ?? document)"
-                    class="erp-vendas__btn"
-                >Pesquisa</button>
                 <button type="button" wire:click="clearSearch" class="erp-vendas__btn erp-vendas__btn--secondary">Limpar</button>
             </div>
 
@@ -44,7 +38,7 @@
     @include('filament.components.erp.vendas.tabs')
 
     <p class="erp-vendas__hint">
-        Pressione Enter ou clique em Pesquisa. Use as setas para navegar na lista.
+        A pesquisa é automática (até 2 campos combinados). Use as setas para navegar na lista.
     </p>
 
     @include('filament.components.erp.list-scripts', [

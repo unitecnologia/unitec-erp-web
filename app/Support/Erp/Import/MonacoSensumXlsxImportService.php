@@ -204,9 +204,8 @@ final class MonacoSensumXlsxImportService
                 ProductPriceTableItem::query()->create([
                     'product_id' => $product->id,
                     'price_table_id' => $priceTable3->id,
-                    'valor' => $row['preco'],
-                    'fator' => 1,
                 ]);
+                $product->forceFill(['usa_tab_preco' => true])->saveQuietly();
 
                 $productsByCodigo[$codigo] = $product;
                 $stats['produtos_criados']++;

@@ -583,7 +583,10 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.on('erp-pdv-focus-tabela-preco', () => {
         window.setTimeout(() => {
-            document.getElementById('erp-pdv-tabela-preco-confirm')?.focus();
+            syncTabelaPrecoSelectionFromDom();
+            const selected = document.querySelector('#erp-pdv-tabela-preco-panel .erp-pdv__grid-row--selected')
+                ?? document.querySelector('#erp-pdv-tabela-preco-panel [id^="erp-pdv-tabela-preco-row-"]');
+            (selected ?? document.getElementById('erp-pdv-tabela-preco-confirm'))?.focus();
         }, 50);
     });
 
@@ -4325,29 +4328,119 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
-    const tabelaPrecoConfirm = document.getElementById('erp-pdv-tabela-preco-confirm');
+    const tabelaPrecoPanel = document.getElementById('erp-pdv-tabela-preco-panel')
+        ?? document.getElementById('erp-pdv-tabela-preco-confirm');
 
-    if (tabelaPrecoConfirm) {
+    if (tabelaPrecoPanel) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            component.call('confirmTabelaPreco');
+            const index = getTabelaPrecoSelectedIndex();
+            if (index !== null) {
+                component.call('confirmTabelaPrecoAt', index);
+            } else {
+                component.call('confirmTabelaPreco');
+            }
 
             return true;
         }
 
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            component.call('moveTabelaPrecoSelection', event.key === 'ArrowDown' ? 1 : -1);
-            scrollPdvModalRowIntoView('erp-pdv-tabela-preco-row-');
+            // Navegação 100% local — sem round-trip Livewire (evita delay das setas).
+            moveTabelaPrecoSelectionLocal(event.key === 'ArrowDown' ? 1 : -1);
 
             return true;
         }
 
-        return false;
+        return true;
     }
 
     return false;
 }
+
+function getTabelaPrecoRows() {
+    const panel = document.getElementById('erp-pdv-tabela-preco-panel');
+    if (! panel) {
+        return [];
+    }
+
+    return Array.from(panel.querySelectorAll('[id^="erp-pdv-tabela-preco-row-"]'));
+}
+
+function getTabelaPrecoSelectedIndex() {
+    const panel = document.getElementById('erp-pdv-tabela-preco-panel');
+    if (! panel) {
+        return null;
+    }
+
+    if (panel.dataset.selectedIndex !== undefined && panel.dataset.selectedIndex !== '') {
+        const parsed = Number.parseInt(panel.dataset.selectedIndex, 10);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    const rows = getTabelaPrecoRows();
+    const current = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
+
+    return current >= 0 ? current : (rows.length ? 0 : null);
+}
+
+function syncTabelaPrecoSelectionFromDom() {
+    const panel = document.getElementById('erp-pdv-tabela-preco-panel');
+    const rows = getTabelaPrecoRows();
+    if (! panel || ! rows.length) {
+        return;
+    }
+
+    let current = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--selected'));
+    if (current < 0) {
+        current = 0;
+    }
+
+    panel.dataset.selectedIndex = String(current);
+}
+
+function moveTabelaPrecoSelectionLocal(delta) {
+    const panel = document.getElementById('erp-pdv-tabela-preco-panel');
+    const rows = getTabelaPrecoRows();
+    if (! panel || ! rows.length) {
+        return;
+    }
+
+    let current = getTabelaPrecoSelectedIndex();
+    if (current === null) {
+        current = 0;
+    }
+
+    const next = Math.max(0, Math.min(rows.length - 1, current + delta));
+    panel.dataset.selectedIndex = String(next);
+
+    rows.forEach((row, index) => {
+        const selected = index === next;
+        row.classList.toggle('erp-pdv__grid-row--selected', selected);
+        row.setAttribute('aria-selected', selected ? 'true' : 'false');
+        row.tabIndex = selected ? 0 : -1;
+    });
+
+    rows[next].focus({ preventScroll: true });
+    rows[next].scrollIntoView({ block: 'nearest' });
+}
+
+window.confirmPdvTabelaPrecoFromUi = function confirmPdvTabelaPrecoFromUi() {
+    const page = document.querySelector('.erp-pdv-page') ?? document.querySelector('.erp-pdv');
+    const component = page ? getErpPdvComponent(page) : null;
+    if (! component) {
+        return;
+    }
+
+    const index = getTabelaPrecoSelectedIndex();
+    if (index !== null) {
+        component.call('confirmTabelaPrecoAt', index);
+    } else {
+        component.call('confirmTabelaPreco');
+    }
+};
 
 function scrollPdvModalRowIntoView(prefix) {
     window.requestAnimationFrame(() => {

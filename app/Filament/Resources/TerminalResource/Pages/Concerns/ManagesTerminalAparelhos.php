@@ -6,6 +6,7 @@ use App\Models\Empresa;
 use App\Models\EntregasDevice;
 use App\Models\ForcaVendasDevice;
 use App\Models\ForcaVendasDeviceReset;
+use App\Models\MesasDevice;
 use App\Models\UnitecOsDevice;
 use App\Models\VendasInternasDevice;
 use App\Support\Erp\ErpAccess;
@@ -267,6 +268,10 @@ trait ManagesTerminalAparelhos
 
         if (Schema::hasTable((new EntregasDevice)->getTable())) {
             $items = $items->merge($this->mapDevices('ent', 'Unitec Entregas', EntregasDevice::query(), $empresaId));
+        }
+
+        if (Schema::hasTable((new MesasDevice)->getTable())) {
+            $items = $items->merge($this->mapDevices('mes', 'Unitec Mesas', MesasDevice::query(), $empresaId));
         }
 
         return $items

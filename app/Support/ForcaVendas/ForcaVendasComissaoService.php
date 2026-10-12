@@ -5,6 +5,7 @@ namespace App\Support\ForcaVendas;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\Vendedor;
+use App\Support\Erp\Financeiro\ProdutoComissaoAdicional;
 use App\Support\Erp\Reports\ComissaoVendedoresReport;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -35,22 +36,32 @@ final class ForcaVendasComissaoService
 
         $totalAvista = 0.0;
         $totalAprazo = 0.0;
+        $adicionalAvista = 0.0;
+        $adicionalAprazo = 0.0;
         $qtd = 0;
         /** @var list<array{data: string, origem: string, cliente: string, forma: string, tipo: string, total: float, comissao_exata: float}> $itens */
         $itens = [];
 
         if ($vendedorId > 0) {
-            foreach ($this->coletarVendas($vendedorId, $de, $ate) as $row) {
+            $vendas = $this->coletarVendas($vendedorId, $de, $ate);
+            $adicionais = ProdutoComissaoAdicional::porVendaIds(
+                array_map(static fn (array $row): int => (int) ($row['venda_id'] ?? 0), $vendas),
+            );
+
+            foreach ($vendas as $row) {
                 $qtd++;
                 $total = (float) $row['total'];
                 $aPrazo = ComissaoVendedoresReport::isAPrazo($row['forma'] ?? null);
                 $pct = $aPrazo ? $pctAp : $pctAv;
                 $tipo = $aPrazo ? 'aprazo' : 'avista';
+                $adicional = (float) ($adicionais[(int) ($row['venda_id'] ?? 0)] ?? 0);
 
                 if ($aPrazo) {
                     $totalAprazo += $total;
+                    $adicionalAprazo += $adicional;
                 } else {
                     $totalAvista += $total;
+                    $adicionalAvista += $adicional;
                 }
 
                 $itens[] = [
@@ -60,14 +71,14 @@ final class ForcaVendasComissaoService
                     'forma' => $row['forma'] ?: '—',
                     'tipo' => $tipo,
                     'total' => round($total, 2),
-                    'comissao_exata' => $total * $pct / 100,
+                    'comissao_exata' => $total * $pct / 100 + $adicional,
                 ];
             }
         }
 
-        // Oficial ERP: comissao sobre base agregada AV/AP.
-        $comissaoAvista = round($totalAvista * $pctAv / 100, 2);
-        $comissaoAprazo = round($totalAprazo * $pctAp / 100, 2);
+        // Oficial ERP: comissão padrão do vendedor + adicional dos produtos (Paga Comissão).
+        $comissaoAvista = round($totalAvista * $pctAv / 100 + $adicionalAvista, 2);
+        $comissaoAprazo = round($totalAprazo * $pctAp / 100 + $adicionalAprazo, 2);
         $totalGeral = round($totalAvista + $totalAprazo, 2);
         $comissaoTotal = round($comissaoAvista + $comissaoAprazo, 2);
 
@@ -180,7 +191,7 @@ final class ForcaVendasComissaoService
     /**
      * Mesma fonte do relatorio ERP: vendas fechadas por data e vendedor.
      *
-     * @return list<array{data: string, origem: string, cliente: string, forma: ?string, total: float}>
+     * @return list<array{venda_id: int, data: string, origem: string, cliente: string, forma: ?string, total: float}>
      */
     private function coletarVendas(int $vendedorId, Carbon $de, Carbon $ate): array
     {
@@ -208,6 +219,7 @@ final class ForcaVendasComissaoService
                 : (string) $dataRaw;
 
             $rows[] = [
+                'venda_id' => (int) $venda->id,
                 'data' => $dataStr,
                 'origem' => 'venda',
                 'cliente' => (string) ($venda->cliente?->nome_razao ?? '—'),

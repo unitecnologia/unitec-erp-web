@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Models\Product;
+use App\Support\Erp\ProductLoteService;
 
 final class PdvItemValidator
 {
@@ -27,7 +28,23 @@ final class PdvItemValidator
             return $stockService->validaEstoqueComposicao($product, $quantidade);
         }
 
-        if (! $this->config->bloquearEstoqueNegativo()) {
+        $bloquearNegativo = $this->config->bloquearEstoqueNegativo();
+
+        if ($product->controla_lote_validade) {
+            $lotes = new ProductLoteService();
+            if (! $lotes->possuiLotes($product)) {
+                return 'Produto "'.$product->descricao.'" controla lote/validade, mas não há lotes cadastrados.';
+            }
+            if ($bloquearNegativo) {
+                $saldoLotes = $lotes->saldoDisponivel($product);
+                if ($saldoLotes + 0.0005 < $quantidade) {
+                    return 'Estoque por lote insuficiente para "'.$product->descricao.'". Disponível em lotes: '
+                        .number_format($saldoLotes, 3, ',', '.').'.';
+                }
+            }
+        }
+
+        if (! $bloquearNegativo) {
             return null;
         }
 

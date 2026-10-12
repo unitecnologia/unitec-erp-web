@@ -2820,6 +2820,53 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
 }
 
+.erp-produtos-tabpreco__hint {
+    margin: 0 0 0.55rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #475569;
+}
+
+.erp-produtos-tabpreco__checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.erp-produtos-tabpreco__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    min-width: 10.5rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #8fa8c8;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.erp-produtos-tabpreco__check input {
+    margin-top: 0.15rem;
+}
+
+.erp-produtos-tabpreco__check-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.erp-produtos-tabpreco__check-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.erp-produtos-tabpreco__check-price {
+    font-size: 0.75rem;
+    color: #047857;
+    font-variant-numeric: tabular-nums;
+}
+
 .erp-produtos-composicao__fields,
 .erp-produtos-tabpreco__fields {
     display: flex;

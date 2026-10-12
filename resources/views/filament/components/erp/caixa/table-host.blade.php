@@ -3,6 +3,8 @@
         :conta-filter="$this->contaFilter"
         :search-column="$this->searchColumn"
         :local-search="$this->localSearch"
+        :search-column2="$this->searchColumn2"
+        :local-search2="$this->localSearch2"
         :periodo-de-applied="$this->periodoDeApplied"
         :periodo-ate-applied="$this->periodoAteApplied"
         :per-page="(int) ($this->tableRecordsPerPage ?? 50)"

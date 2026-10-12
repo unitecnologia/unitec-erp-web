@@ -493,10 +493,17 @@ final class FinalizarCompraLancamentoService
                 continue;
             }
 
+            $comissaoPct = null;
+            $snapshot = $row['precificacao_snapshot'] ?? null;
+            if (is_array($snapshot)) {
+                $comissaoPct = BrDecimal::parse($snapshot['niveis']['varejo']['comissao'] ?? 0, 2);
+            }
+
             $byProduct[$productId] = [
                 'preco_venda' => BrDecimal::parse($row['preco_venda'] ?? 0, 4),
                 'preco_atacado' => BrDecimal::parse($row['preco_atacado'] ?? 0, 4),
                 'preco_especial' => BrDecimal::parse($row['preco_especial'] ?? 0, 4),
+                'comissao_pct' => $comissaoPct,
             ];
         }
 
@@ -516,6 +523,9 @@ final class FinalizarCompraLancamentoService
             }
             if ($precos['preco_especial'] > 0) {
                 $updates['preco_especial'] = $precos['preco_especial'];
+            }
+            if ($precos['comissao_pct'] !== null && Schema::hasColumn('products', 'comissao_pct')) {
+                $updates['comissao_pct'] = max(0, (float) $precos['comissao_pct']);
             }
 
             if ($updates === []) {

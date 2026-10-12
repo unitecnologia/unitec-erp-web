@@ -155,28 +155,36 @@ final class FinalizarDevolucaoCompraService
             }
 
             $doc = EstoqueMovimentacaoDocumento::fromDevolucaoCompra($devolucao);
-            $this->saldos->decrementar(
-                (int) $product->id,
-                (float) $item->qtd,
-                $estoqueId,
-                $empresa,
-                EstoqueMovimentacaoContext::make(
-                    EstoqueMovimentacao::TIPO_DEVOLUCAO_COMPRA,
-                    empresaId: $empresaId,
-                    origemTipo: $doc['origemTipo'],
-                    origemId: $doc['origemId'],
-                    origemNumero: $doc['origemNumero'],
-                    docFiscalTipo: $doc['docFiscalTipo'],
-                    docFiscalNumero: $doc['docFiscalNumero'],
-                ),
+            $qtd = (float) $item->qtd;
+            $ctx = EstoqueMovimentacaoContext::make(
+                EstoqueMovimentacao::TIPO_DEVOLUCAO_COMPRA,
+                empresaId: $empresaId,
+                origemTipo: $doc['origemTipo'],
+                origemId: $doc['origemId'],
+                origemNumero: $doc['origemNumero'],
+                docFiscalTipo: $doc['docFiscalTipo'],
+                docFiscalNumero: $doc['docFiscalNumero'],
             );
 
-            if ($product->controla_lote_validade) {
-                try {
-                    (new \App\Support\Erp\ProductLoteService())->consumirFefo($product, (float) $item->qtd);
-                } catch (\RuntimeException $e) {
-                    throw new DomainException($e->getMessage(), 0, $e);
-                }
+            try {
+                DB::transaction(function () use ($product, $qtd, $estoqueId, $empresa, $ctx, $item): void {
+                    if ($product->controla_lote_validade) {
+                        $lotes = new \App\Support\Erp\ProductLoteService();
+                        $permitirNegativo = ! \App\Support\Erp\EstoqueNegativoPolicy::ativo($empresa);
+                        $fatias = $lotes->consumirFefo($product, $qtd, $permitirNegativo);
+                        $lotes->registrarSaidas($product, $fatias, 'devolucao_compra_item', (int) $item->id);
+                    }
+
+                    $this->saldos->decrementar(
+                        (int) $product->id,
+                        $qtd,
+                        $estoqueId,
+                        $empresa,
+                        $ctx,
+                    );
+                });
+            } catch (\RuntimeException $e) {
+                throw new DomainException($e->getMessage(), 0, $e);
             }
         }
     }

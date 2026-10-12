@@ -36,7 +36,6 @@ use App\Support\Erp\Reports\Tabular\Definitions\VendasFormaPagamentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasPdvReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosClientesReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosGeralReport;
-use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosMonofasicaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosVendedoresReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VisitasRealizadasSemVendaReport;
 use InvalidArgumentException;
@@ -76,7 +75,6 @@ class ReportRegistry
             'vendas-produtos-clientes' => VendasProdutosClientesReport::class,
             'vendas-produtos-vendedores' => VendasProdutosVendedoresReport::class,
             'vendas-cfop-csosn' => VendasCfopCsosnReport::class,
-            'vendas-produtos-monofasica' => VendasProdutosMonofasicaReport::class,
             'visitas-realizadas-sem-venda' => VisitasRealizadasSemVendaReport::class,
             'contas-receber' => ContasReceberReport::class,
             'contas-pagar' => ContasPagarReport::class,

@@ -438,9 +438,7 @@ trait ErpEmpresaFormPage
         }
 
         if (mb_strtolower(trim((string) ($data['param_pix_provedor'] ?? '')), 'UTF-8') === 'ailos') {
-            if (blank($data['param_pix_ambiente'] ?? null)) {
-                $data['param_pix_ambiente'] = 'producao';
-            }
+            $data['param_pix_ambiente'] = 'producao';
             if (blank($data['param_pix_webhook_url'] ?? null)) {
                 $data['param_pix_webhook_url'] = EmpresaParametros::pixAilosWebhookUrl();
             }

@@ -78,6 +78,15 @@ trait ManagesProductFormUi
             $this->syncActiveTabAfterParameterChange($key, (bool) $value);
         }
 
+        // Contr. Est. Grade só faz sentido com Grade. Desligar Grade não apaga as linhas/quantidades da aba.
+        if ($key === 'is_grade' && ! (bool) $value) {
+            $this->data['contr_est_grade'] = false;
+        }
+
+        if ($key === 'contr_est_grade' && (bool) $value && ! (bool) ($this->data['is_grade'] ?? false)) {
+            $this->data['contr_est_grade'] = false;
+        }
+
         if ($key === 'is_restaurante' && ! (bool) $value) {
             $this->data['menu_id'] = null;
             $this->data['tipo_alimento'] = null;

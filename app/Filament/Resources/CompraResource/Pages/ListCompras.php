@@ -1091,6 +1091,7 @@ class ListCompras extends ListRecords
             'pct_custos' => (float) ($product->pct_custos ?? 0),
             // Mg% da própria linha do lançamento (não o % antigo do cadastro).
             'pct_lucro' => BrDecimal::parse($row['margem_varejo'] ?? $product->pct_lucro ?? 0, 2),
+            'comissao_pct' => BrDecimal::parse($product->comissao_pct ?? 0, 2),
             'preco_venda' => BrDecimal::parse($row['preco_venda'] ?? $product->preco_venda ?? 0, 2),
             'preco_atacado' => BrDecimal::parse($row['preco_atacado'] ?? $product->preco_atacado ?? 0, 2),
             'preco_especial' => BrDecimal::parse($row['preco_especial'] ?? $product->preco_especial ?? 0, 2),

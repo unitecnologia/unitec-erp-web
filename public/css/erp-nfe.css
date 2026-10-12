@@ -6827,3 +6827,158 @@
 .erp-nfce-page .erp-nfce-inut__xml:hover {
     background: var(--erp-bg-muted, #f1f5f9);
 }
+
+/* ── NFC-e — chave da nota selecionada (rodapé, somente leitura) ── */
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-group--footer {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-label {
+    gap: 0.5rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce .erp-nfe__chave-input--readonly {
+    width: calc(44ch + 1.4rem);
+    min-width: calc(44ch + 1.4rem);
+    max-width: calc(44ch + 1.4rem);
+    padding-inline: 0.6rem;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    cursor: text;
+    user-select: all;
+}
+
+/* ── NFC-e — barra de filtros (padrão de pesquisa de Produtos) ── */
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters-row {
+    gap: 0.5rem 0.75rem;
+    min-height: 2.1rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__locate {
+    flex: 1 1 auto;
+    gap: 0.55rem;
+    min-width: 13rem;
+    max-width: 30rem;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__locate-controls {
+    gap: 0.4rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__locate .erp-field-dd {
+    flex: 0 0 auto;
+    min-width: 7.25rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__locate .erp-field-dd__btn {
+    height: 1.85rem;
+    min-height: 1.85rem;
+    padding: 0 0.55rem;
+    border-color: var(--erp-border, #94a3b8);
+    font-size: 0.6875rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters .erp-nfe__search-text {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 8rem;
+    max-width: none;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters-main {
+    flex: 0 0 auto;
+    gap: 0.75rem;
+    padding-left: 0.75rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters .erp-nfe__footer-label {
+    font-size: var(--erp-font-size-xs);
+    letter-spacing: 0.04em;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group {
+    gap: 0.45rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group .erp-nfe__period-label {
+    gap: 0.3rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text-muted, #64748b);
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group .erp-date-field,
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-label > .erp-nfe__period-input {
+    width: calc(11ch + 2.35rem) !important;
+    min-width: calc(11ch + 2.35rem) !important;
+    max-width: calc(11ch + 2.35rem) !important;
+    box-sizing: border-box;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group .erp-date-field > .erp-nfe__period-input {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group .erp-nfe__period-input,
+.erp-nfe-page.erp-nfce-page .erp-nfe__period-group .erp-nfe__period-input.erp-date-input {
+    height: 1.85rem;
+    min-height: 1.85rem;
+    padding-block: 0;
+    padding-inline: 0.4rem 2.25rem !important;
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters-main .erp-nfe__chave-group--inline {
+    gap: 0.4rem;
+    padding-left: 0.75rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__chave-label {
+    gap: 0.45rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__filters .erp-nfe__chave-input {
+    width: 13.5rem;
+    min-width: 10rem;
+    max-width: 13.5rem;
+    padding-inline: 0.5rem;
+    letter-spacing: 0.02em;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__page-size-group {
+    padding: 0 0 0 0.75rem;
+    background: transparent;
+    border-radius: 0;
+}
+
+@media (max-width: 1200px) {
+    .erp-nfe-page.erp-nfce-page .erp-nfe__filters-row {
+        flex-wrap: wrap;
+    }
+
+    .erp-nfe-page.erp-nfce-page .erp-nfe__locate {
+        max-width: none;
+    }
+
+    .erp-nfe-page.erp-nfce-page .erp-nfe__filters-main,
+    .erp-nfe-page.erp-nfce-page .erp-nfe__filters-main .erp-nfe__chave-group--inline {
+        padding-left: 0;
+        border-left: none;
+    }
+
+    .erp-nfe-page.erp-nfce-page .erp-nfe__page-size-group {
+        padding-left: 0;
+    }
+}

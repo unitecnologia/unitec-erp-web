@@ -24,6 +24,7 @@
     @include('filament.components.erp.ordens-servico.form.post-save-prompt')
 </div>
 
+@include('filament.components.erp.ordens-servico.form.tab-preco-item')
 @include('filament.components.erp.ordens-servico.form.desconto-item')
 @include('filament.components.erp.ordens-servico.form.servico-prestado-modal')
 

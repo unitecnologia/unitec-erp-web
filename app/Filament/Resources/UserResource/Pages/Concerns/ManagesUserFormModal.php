@@ -180,6 +180,9 @@ trait ManagesUserFormModal
             'is_admin' => ($this->userForm['is_admin'] ?? 'N') === 'S',
             'ativo' => ($this->userForm['ativo'] ?? 'S') === 'S',
         ];
+        if (\App\Support\Erp\ErpSchema::hasColumn('users', 'acesso_app_mesas')) {
+            $data['acesso_app_mesas'] = filter_var($this->userForm['acesso_app_mesas'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        }
         if (filled($this->userForm['password'] ?? null)) {
             $plainPassword = (string) $this->userForm['password'];
             $data['password'] = Hash::make($plainPassword);
@@ -283,6 +286,7 @@ trait ManagesUserFormModal
             'acesso_app_entregas',
             'acesso_app_gestao',
             'acesso_app_inventario',
+            'acesso_app_mesas',
         ] as $field) {
             $form[$field] = filter_var($form[$field] ?? false, FILTER_VALIDATE_BOOLEAN);
         }
@@ -363,6 +367,7 @@ trait ManagesUserFormModal
             'acesso_app_entregas' => false,
             'acesso_app_gestao' => false,
             'acesso_app_inventario' => false,
+            'acesso_app_mesas' => false,
             'empresa_id' => (string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1),
             'empresas' => [(string) (session('erp_empresa_id') ?? Auth::user()?->empresa_id ?? 1)],
             'erp_profile_id' => '',
@@ -394,6 +399,7 @@ trait ManagesUserFormModal
             'acesso_app_entregas' => (bool) $record->acesso_app_entregas,
             'acesso_app_gestao' => (bool) $record->acesso_app_gestao,
             'acesso_app_inventario' => (bool) $record->acesso_app_inventario,
+            'acesso_app_mesas' => (bool) ($record->acesso_app_mesas ?? false),
             'empresa_id' => (string) ($record->empresa_id ?? ''),
             'empresas' => $record->empresas->pluck('id')->map(fn ($id): string => (string) $id)->values()->all()
                 ?: array_values(array_filter([(string) ($record->empresa_id ?? '')])),

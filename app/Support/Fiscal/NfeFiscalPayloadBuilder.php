@@ -114,6 +114,7 @@ final class NfeFiscalPayloadBuilder
                 $index + 1,
                 $crt,
                 $emissao,
+                $clienteUf,
             ))
             ->all();
 
@@ -347,6 +348,7 @@ final class NfeFiscalPayloadBuilder
         int $numero,
         int $crt = 1,
         ?\DateTimeInterface $dataEmissao = null,
+        string $ufCons = 'SC',
     ): ItemDto {
         $origem = $item->origem !== null
             ? (int) $item->origem
@@ -389,10 +391,17 @@ final class NfeFiscalPayloadBuilder
 
         [$valorUnitario, $valorBruto, $desconto] = $this->valoresComerciaisItem($item);
 
+        $descricao = (string) $item->descricao;
+        $combustivel = ProdutoCombustivelFiscal::fromProduct(
+            $item->product,
+            $ufCons,
+            $descricao,
+        );
+
         return new ItemDto(
             numero: $numero,
             codigo: (string) ($item->cod_barra ?: $item->product_id ?: $numero),
-            descricao: (string) $item->descricao,
+            descricao: $descricao,
             ncm: $ncm,
             cfop: $cfop,
             unidade: (string) ($item->unidade ?: 'UN'),
@@ -413,6 +422,7 @@ final class NfeFiscalPayloadBuilder
             seguro: (float) ($item->seguro ?? 0),
             acrescimo: (float) ($item->outros ?? 0),
             infoAdicionais: filled($item->info_adicionais) ? (string) $item->info_adicionais : null,
+            combustivel: $combustivel,
         );
     }
 

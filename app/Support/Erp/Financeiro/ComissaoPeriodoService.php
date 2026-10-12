@@ -334,8 +334,12 @@ final class ComissaoPeriodoService
             ->orderBy('id')
             ->get(['id', 'data', 'total', 'forma_pagamento']);
 
+        $adicionais = ProdutoComissaoAdicional::porVendaIds($vendas->pluck('id')->all());
+
         $baseAv = 0.0;
         $baseAp = 0.0;
+        $adicionalAv = 0.0;
+        $adicionalAp = 0.0;
         /** @var list<array{venda_id: int, data: string, base: float, tipo: string, percentual: float, comissao_exata: float}> $linhas */
         $linhas = [];
 
@@ -344,11 +348,14 @@ final class ComissaoPeriodoService
             $aPrazo = ComissaoVendedoresReport::isAPrazo($venda->forma_pagamento);
             $pct = $aPrazo ? $pctAp : $pctAv;
             $tipo = $aPrazo ? 'ap' : 'av';
+            $adicional = (float) ($adicionais[(int) $venda->id] ?? 0);
 
             if ($aPrazo) {
                 $baseAp += $base;
+                $adicionalAp += $adicional;
             } else {
                 $baseAv += $base;
+                $adicionalAv += $adicional;
             }
 
             $data = $venda->data instanceof Carbon
@@ -361,12 +368,12 @@ final class ComissaoPeriodoService
                 'base' => $base,
                 'tipo' => $tipo,
                 'percentual' => $pct,
-                'comissao_exata' => $base * $pct / 100,
+                'comissao_exata' => $base * $pct / 100 + $adicional,
             ];
         }
 
-        $comissaoAv = round($baseAv * $pctAv / 100, 2);
-        $comissaoAp = round($baseAp * $pctAp / 100, 2);
+        $comissaoAv = round($baseAv * $pctAv / 100 + $adicionalAv, 2);
+        $comissaoAp = round($baseAp * $pctAp / 100 + $adicionalAp, 2);
         $comissaoTotal = round($comissaoAv + $comissaoAp, 2);
 
         $this->aplicarRateioCentavos($linhas, 'av', $comissaoAv);

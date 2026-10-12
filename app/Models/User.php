@@ -28,6 +28,7 @@ use Laravel\Sanctum\HasApiTokens;
     'acesso_app_entregas',
     'acesso_app_gestao',
     'acesso_app_inventario',
+    'acesso_app_mesas',
     'empresa_id',
     'is_admin',
     'ativo',
@@ -49,6 +50,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const APP_INVENTARIO = 'inventario';
 
+    public const APP_MESAS = 'mesas';
+
     /** @var array<string, string> */
     public const APP_ACCESS_COLUMNS = [
         self::APP_FORCA_VENDAS => 'acesso_app_forca_vendas',
@@ -57,6 +60,7 @@ class User extends Authenticatable implements FilamentUser
         self::APP_ENTREGAS => 'acesso_app_entregas',
         self::APP_GESTAO => 'acesso_app_gestao',
         self::APP_INVENTARIO => 'acesso_app_inventario',
+        self::APP_MESAS => 'acesso_app_mesas',
     ];
 
     /** @use HasFactory<UserFactory> */
@@ -77,6 +81,7 @@ class User extends Authenticatable implements FilamentUser
             'acesso_app_entregas' => 'boolean',
             'acesso_app_gestao' => 'boolean',
             'acesso_app_inventario' => 'boolean',
+            'acesso_app_mesas' => 'boolean',
         ];
     }
 

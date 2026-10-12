@@ -65,7 +65,12 @@
                         <td class="erp-pdv__grid-col-center">{{ $index + 1 }}</td>
                         <td class="erp-pdv__grid-col-codigo">{{ $item['codigo'] ?? '—' }}</td>
                         <td class="erp-pdv__grid-col-codigo">{{ ($item['codigo_barras'] ?? '') !== '' ? $item['codigo_barras'] : '—' }}</td>
-                        <td class="erp-pdv__grid-col-descricao">{{ $item['descricao'] ?? '—' }}</td>
+                        <td class="erp-pdv__grid-col-descricao">
+                            {{ $item['descricao'] ?? '—' }}
+                            @if (($item['obs'] ?? '') !== '')
+                                <small class="erp-pdv__item-obs">Obs: {{ $item['obs'] }}</small>
+                            @endif
+                        </td>
                         <td class="erp-pdv__grid-col-center">{{ $this->formatCupomQuantidade((float) ($item['quantidade'] ?? 0)) }}</td>
                         <td class="erp-pdv__grid-col-center">{{ $item['unidade'] ?? 'UN' }}</td>
                         <td class="erp-pdv__grid-col-num">

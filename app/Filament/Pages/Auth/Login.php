@@ -612,7 +612,8 @@ class Login extends BaseLogin
             $licencas = app(LicencaRemotaService::class);
             $licencas->hydrateMensalidadeFromCache();
 
-            if ($licencas->isEnabled() && ($licencas->mensalidadeVencida() || $licencas->loginGateIsAllowed() === false)) {
+            // Não bloquear só por vencimento: status=ativo / tolerância de 5 dias entram em loginGateIsAllowed.
+            if ($licencas->isEnabled() && $licencas->loginGateIsAllowed() === false) {
                 $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
             } else {
                 $target = session()->pull('url.intended', filament()->getUrl());

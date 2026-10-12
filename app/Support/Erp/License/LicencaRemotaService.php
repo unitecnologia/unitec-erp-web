@@ -12,6 +12,15 @@ class LicencaRemotaService
     /** @var array<string, LicencaSnapshot> */
     private static array $requestMemo = [];
 
+    /** @var array<string, mixed>|null Último JSON bruto de GET /api/licenca/{cnpj} nesta requisição. */
+    private static ?array $lastApiPayload = null;
+
+    /** @var array{http_status: int, url: string, cnpj: string, body: array<string, mixed>|null, error?: string}|null */
+    private static ?array $lastApiFetch = null;
+
+    /** @var array{allowed: bool, field: string, detail: string}|null */
+    private static ?array $lastAccessDecision = null;
+
     public function isEnabled(): bool
     {
         if (! $this->resolveEnabled()) {
@@ -241,40 +250,42 @@ class LicencaRemotaService
             return null;
         }
 
-        // Mensalidade vencida bloqueia mesmo se o portal ainda disser "ativo".
-        if ($this->mensalidadeVencida()) {
-            return false;
+        $snapshot = $this->loginGateSnapshot();
+
+        if ($snapshot !== null) {
+            return $this->resolveAccess($snapshot)['allowed'];
         }
 
         return (bool) ($gate['allowed'] ?? false);
     }
 
     /**
-     * True quando há data de mensalidade e ela já passou (início do dia).
+     * True quando a janela local (vencimento + tolerância / valido_ate) já acabou.
+     * O vencimento sozinho, dentro dos 5 dias de tolerância, não bloqueia.
      */
     public function mensalidadeVencida(): bool
     {
-        $raw = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
+        $due = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
+        $validoAte = $this->loginGateSnapshot()?->validoAte;
 
-        if ($raw === '') {
-            return false;
-        }
-
-        try {
-            $due = \Carbon\Carbon::parse($raw)->startOfDay();
-        } catch (Throwable) {
-            return false;
-        }
-
-        return $due->lt(now()->startOfDay());
+        return LicencaLiberacao::bloqueadoPorData(
+            $due !== '' ? $due : null,
+            $validoAte,
+        );
     }
 
     /**
-     * Se a mensalidade estiver vencida, força status bloqueado (KPI "Vencida" passa a bloquear o ERP).
+     * Se a janela local já acabou, força status bloqueado — exceto quando o portal
+     * acabou de dizer status=ativo (vencimento passado durante a tolerância não bloqueia).
      */
     public function applyMensalidadeExpiry(LicencaSnapshot $snapshot): LicencaSnapshot
     {
         if (! $this->isEnabled()) {
+            return $snapshot;
+        }
+
+        // Portal ativo: libera. vencimento/mensalidade em atraso sozinho não sobrescreve.
+        if ($snapshot->status === LicencaSnapshot::STATUS_ATIVO) {
             return $snapshot;
         }
 
@@ -299,6 +310,132 @@ class LicencaRemotaService
             fromCache: $snapshot->fromCache,
             modoAtualizacao: $snapshot->modoAtualizacao,
         );
+    }
+
+    /**
+     * Decisão de liberação + campo usado (para diagnóstico na tela de bloqueio).
+     *
+     * @return array{allowed: bool, field: string, detail: string}
+     */
+    public function resolveAccess(LicencaSnapshot $snapshot): array
+    {
+        if ($snapshot->status === LicencaSnapshot::STATUS_ATIVO) {
+            return self::$lastAccessDecision = [
+                'allowed' => true,
+                'field' => 'status',
+                'detail' => 'ativo',
+            ];
+        }
+
+        if (in_array($snapshot->status, [
+            LicencaSnapshot::STATUS_DESABILITADO,
+            LicencaSnapshot::STATUS_INDISPONIVEL,
+        ], true)) {
+            if ($this->mensalidadeVencida()) {
+                $due = (string) ($this->loginGateMensalidadeDueDate() ?? '');
+                $liberadoAte = LicencaLiberacao::liberadoAte($due !== '' ? $due : null, $snapshot->validoAte);
+
+                return self::$lastAccessDecision = [
+                    'allowed' => false,
+                    'field' => 'mensalidade_due_date+grace_days/valido_ate',
+                    'detail' => 'liberado_ate='.($liberadoAte?->toDateString() ?? 'null')
+                        .'; mensalidade_due_date='.($due !== '' ? $due : 'null')
+                        .'; valido_ate='.((string) ($snapshot->validoAte ?? 'null'))
+                        .'; grace_days='.LicencaLiberacao::graceDays(),
+                ];
+            }
+
+            return self::$lastAccessDecision = [
+                'allowed' => true,
+                'field' => 'status',
+                'detail' => $snapshot->status,
+            ];
+        }
+
+        if ($snapshot->status === LicencaSnapshot::STATUS_BLOQUEADO) {
+            return self::$lastAccessDecision = [
+                'allowed' => false,
+                'field' => 'status',
+                'detail' => 'bloqueado',
+            ];
+        }
+
+        return self::$lastAccessDecision = [
+            'allowed' => false,
+            'field' => 'status',
+            'detail' => $snapshot->status,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function lastApiPayload(): ?array
+    {
+        return self::$lastApiPayload;
+    }
+
+    /**
+     * @return array{http_status: int, url: string, cnpj: string, body: array<string, mixed>|null, error?: string}|null
+     */
+    public function lastApiFetch(): ?array
+    {
+        if (self::$lastApiFetch !== null) {
+            return self::$lastApiFetch;
+        }
+
+        $cnpj = $this->currentCnpj();
+        if ($cnpj === null) {
+            return null;
+        }
+
+        $cached = Cache::get($this->lastFetchCacheKey($cnpj));
+
+        return is_array($cached) ? $cached : null;
+    }
+
+    /**
+     * @return array{allowed: bool, field: string, detail: string}|null
+     */
+    public function lastAccessDecision(): ?array
+    {
+        return self::$lastAccessDecision;
+    }
+
+    /**
+     * Diagnóstico persistido (sobrevive a redirect/remount da tela de bloqueio).
+     *
+     * @return array{at: string, http_status: int|null, status: mixed, valido_ate: mixed, vencimento: mixed, decision_field: string, decision_detail: string, body: array<string, mixed>|null}|null
+     */
+    public function pullPersistedDiagnostico(): ?array
+    {
+        $data = session()->pull('erp.licenca.last_diagnostico');
+
+        return is_array($data) ? $data : null;
+    }
+
+    /**
+     * @param  array{allowed: bool, field: string, detail: string}  $decision
+     */
+    public function persistDiagnostico(array $decision): void
+    {
+        $fetch = $this->lastApiFetch();
+        $body = is_array($fetch['body'] ?? null) ? $fetch['body'] : self::$lastApiPayload;
+
+        $diag = [
+            'at' => now()->toDateTimeString(),
+            'http_status' => isset($fetch['http_status']) ? (int) $fetch['http_status'] : null,
+            'status' => is_array($body) ? ($body['status'] ?? null) : null,
+            'valido_ate' => is_array($body) ? ($body['valido_ate'] ?? null) : null,
+            'vencimento' => is_array($body) ? ($body['vencimento'] ?? null) : null,
+            'decision_field' => (string) ($decision['field'] ?? ''),
+            'decision_detail' => (string) ($decision['detail'] ?? ''),
+            'body' => $body,
+        ];
+
+        session(['erp.licenca.last_diagnostico' => $diag]);
+
+        Log::warning('erp.licenca.verificacao', $diag);
     }
 
     /**
@@ -377,8 +514,8 @@ class LicencaRemotaService
         $gate = session($this->loginGateKey());
         $previous = is_array($gate) ? $gate : [];
 
-        // Mantém o status do portal intacto; o vencimento da mensalidade só afeta `allowed`.
-        $allowed = $snapshot->isAllowed() && ! $this->mensalidadeVencida();
+        // status=ativo libera; vencimento passado na tolerância não derruba o gate.
+        $allowed = $this->resolveAccess($snapshot)['allowed'];
 
         session([
             $this->loginGateKey() => [
@@ -557,7 +694,30 @@ class LicencaRemotaService
             $this->loginGateKey(),
             'erp.licenca.mensalidade_sync_scheduled',
             'erp.licenca.mensalidade_sync_tried',
+            'erp.licenca.aviso_startup_shown',
         ]);
+    }
+
+    /**
+     * Aviso de vencimento para o início da sessão (Dashboard).
+     *
+     * @return array{title: string, body: ?string, level: string}|null
+     */
+    public function avisoStartup(): ?array
+    {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
+        $this->hydrateMensalidadeFromCache($this->currentCnpj());
+
+        $due = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
+        $validoAte = $this->loginGateSnapshot()?->validoAte;
+
+        return LicencaLiberacao::avisoStartup(
+            $due !== '' ? $due : null,
+            $validoAte,
+        );
     }
 
     public function checkCnpj(string $cnpj, bool $forceRefresh = false): LicencaSnapshot
@@ -629,6 +789,15 @@ class LicencaRemotaService
 
             return $snapshot;
         } catch (Throwable $e) {
+            $baseUrl = $this->resolveBaseUrl();
+            $this->rememberApiFetch(
+                $cnpj,
+                $baseUrl.'/api/licenca/'.$cnpj,
+                0,
+                self::$lastApiPayload,
+                $e->getMessage(),
+            );
+
             Log::warning('Licença remota indisponível.', [
                 'cnpj' => $cnpj,
                 'message' => $e->getMessage(),
@@ -673,8 +842,14 @@ class LicencaRemotaService
             ->acceptJson()
             ->get($url);
 
-        if ($response->status() === 404) {
-            $payload = $response->json();
+        $httpStatus = $response->status();
+        /** @var array<string, mixed>|null $payload */
+        $payload = $response->json();
+        $payload = is_array($payload) ? $payload : null;
+
+        $this->rememberApiFetch($cnpj, $url, $httpStatus, $payload);
+
+        if ($httpStatus === 404) {
             $erro = is_array($payload) ? (string) ($payload['erro'] ?? 'Cliente não encontrado') : 'Cliente não encontrado';
 
             return new LicencaSnapshot(
@@ -684,20 +859,21 @@ class LicencaRemotaService
         }
 
         if (! $response->successful()) {
-            throw new \RuntimeException('HTTP '.$response->status().' ao consultar licença.');
+            throw new \RuntimeException('HTTP '.$httpStatus.' ao consultar licença.');
         }
-
-        /** @var array<string, mixed>|null $payload */
-        $payload = $response->json();
 
         if (! is_array($payload)) {
             throw new \RuntimeException('Resposta de licença inválida.');
         }
 
+        self::$lastApiPayload = $payload;
+
         $status = strtolower(trim((string) ($payload['status'] ?? '')));
+        // status=ativo prevalece: o portal pode manter vencimento no passado na tolerância.
+        // Só força bloqueio por flag quando o status não veio como ativo.
         $bloqueado = filter_var($payload['bloqueado'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        if ($bloqueado) {
+        if ($bloqueado && $status !== LicencaSnapshot::STATUS_ATIVO) {
             $status = LicencaSnapshot::STATUS_BLOQUEADO;
         }
 
@@ -705,15 +881,83 @@ class LicencaRemotaService
             throw new \RuntimeException('Status de licença desconhecido: '.$status);
         }
 
+        $validoAte = $this->normalizeValidoAte($payload['valido_ate'] ?? null);
+        $vencimento = $this->normalizeValidoAte($payload['vencimento'] ?? null);
+
+        // Alinha KPI local ao vencimento do portal sem reavaliar o gate (evita snapshot antigo).
+        if ($vencimento !== null && (
+            $status === LicencaSnapshot::STATUS_ATIVO
+            || trim((string) ($this->loginGateMensalidadeDueDate() ?? '')) === ''
+        )) {
+            $this->storeMensalidadeDueOnly($cnpj, $vencimento);
+        }
+
+        Log::warning('erp.licenca.api_resposta', [
+            'cnpj' => $cnpj,
+            'http_status' => $httpStatus,
+            'status' => $payload['status'] ?? null,
+            'valido_ate' => $payload['valido_ate'] ?? null,
+            'vencimento' => $payload['vencimento'] ?? null,
+            'url' => $url,
+        ]);
+
         return new LicencaSnapshot(
             status: $status,
-            validoAte: $this->normalizeValidoAte($payload['valido_ate'] ?? null),
+            validoAte: $validoAte,
             nome: filled($payload['nome'] ?? null) ? trim((string) $payload['nome']) : null,
             bloquearAtualizacao: filter_var($payload['bloquear_atualizacao'] ?? false, FILTER_VALIDATE_BOOLEAN),
             quantidadeComputadores: $this->normalizeQuota($payload['quantidade_computadores'] ?? null),
             quantidadeTelefones: $this->normalizeQuota($payload['quantidade_telefones'] ?? null),
             modoAtualizacao: LicencaSnapshot::normalizeModoAtualizacao($payload['modo_atualizacao'] ?? null),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $body
+     */
+    private function rememberApiFetch(string $cnpj, string $url, int $httpStatus, ?array $body, ?string $error = null): void
+    {
+        $fetch = [
+            'http_status' => $httpStatus,
+            'url' => $url,
+            'cnpj' => $cnpj,
+            'body' => $body,
+            'at' => now()->toDateTimeString(),
+        ];
+
+        if ($error !== null) {
+            $fetch['error'] = $error;
+        }
+
+        self::$lastApiFetch = $fetch;
+        self::$lastApiPayload = $body;
+        Cache::put($this->lastFetchCacheKey($cnpj), $fetch, now()->addHours(6));
+    }
+
+    private function lastFetchCacheKey(string $cnpj): string
+    {
+        return 'erp.licenca.last_fetch.'.$cnpj;
+    }
+
+    /**
+     * Atualiza só a data de mensalidade (sessão + cache), sem regravar o snapshot do gate.
+     */
+    private function storeMensalidadeDueOnly(string $cnpj, string $dueDate): void
+    {
+        $gate = session($this->loginGateKey());
+        if (! is_array($gate)) {
+            $gate = [];
+        }
+
+        $gate['mensalidade_due_date'] = $dueDate;
+        session([$this->loginGateKey() => $gate]);
+
+        Cache::put($this->mensalidadeCacheKey($cnpj), [
+            'due_date' => $dueDate,
+            'description' => $gate['mensalidade_description'] ?? null,
+            'amount' => $gate['mensalidade_amount'] ?? null,
+            'pending' => $gate['mensalidade_pending'] ?? null,
+        ], now()->addHours(12));
     }
 
     private function normalizeValidoAte(mixed $value): ?string

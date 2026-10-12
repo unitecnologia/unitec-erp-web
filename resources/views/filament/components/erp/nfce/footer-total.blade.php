@@ -5,9 +5,12 @@
             <input
                 type="text"
                 readonly
+                data-erp-locked
                 value="{{ $this->highlightedChave }}"
                 class="erp-nfe__input erp-nfe__chave-input erp-nfe__chave-input--readonly"
                 tabindex="-1"
+                title="Chave da NFC-e selecionada (somente leitura)"
+                onclick="this.select()"
             >
         </label>
     </div>

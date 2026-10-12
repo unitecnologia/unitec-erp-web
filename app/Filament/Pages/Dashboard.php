@@ -10,6 +10,7 @@ use App\Support\Erp\ErpScreen;
 use App\Support\Erp\License\LicencaPortalPagamentoService;
 use App\Support\Erp\License\LicencaRemotaService;
 use Filament\Notifications\Notification;
+use Throwable;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -40,11 +41,60 @@ class Dashboard extends BaseDashboard
 
     public string $pixFeedback = '';
 
+    public bool $licencaAvisoOpen = false;
+
+    public string $licencaAvisoTitle = '';
+
+    /** @var list<string> */
+    public array $licencaAvisoLines = [];
+
     public function mount(): void
     {
         ErpScreen::set('Principal');
         $this->dashboardVisao = ErpDashboardScope::VISAO_EMPRESA;
         $this->dashboardHeavyReady = false;
+        $this->avisarLicencaNaAbertura();
+    }
+
+    /**
+     * Uma vez por sessão: modal laranja central se a mensalidade vence em breve ou já venceu (carência).
+     */
+    private function avisarLicencaNaAbertura(): void
+    {
+        if (session('erp.licenca.aviso_startup_shown')) {
+            return;
+        }
+
+        try {
+            $aviso = app(LicencaRemotaService::class)->avisoStartup();
+        } catch (Throwable) {
+            return;
+        }
+
+        if ($aviso === null) {
+            return;
+        }
+
+        session(['erp.licenca.aviso_startup_shown' => true]);
+
+        $this->licencaAvisoTitle = (string) ($aviso['title'] ?? 'Aviso de licença');
+        $this->licencaAvisoLines = filled($aviso['body'] ?? null)
+            ? [(string) $aviso['body']]
+            : ['Regularize o pagamento para evitar interrupção do sistema.'];
+        $this->licencaAvisoOpen = true;
+    }
+
+    public function fecharLicencaAviso(): void
+    {
+        $this->licencaAvisoOpen = false;
+    }
+
+    public function renovarLicencaDoAviso(
+        LicencaRemotaService $licencas,
+        LicencaPortalPagamentoService $pagamentos,
+    ): void {
+        $this->licencaAvisoOpen = false;
+        $this->abrirRenovacaoPix($licencas, $pagamentos);
     }
 
     #[Computed]

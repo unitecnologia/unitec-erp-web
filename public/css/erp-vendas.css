@@ -119,6 +119,31 @@
     min-width: 6rem;
 }
 
+.erp-vendas-page .erp-vendas__search-group--dual .erp-vendas__search-text {
+    width: 5.5cm;
+    max-width: 5.5cm;
+}
+
+.erp-vendas-page .erp-vendas__search-group--dual .erp-vendas__search-value-select {
+    flex: 0 1 auto;
+    max-width: 11rem;
+}
+
+.erp-vendas-page .erp-vendas__search-group--dual .erp-vendas__search-date-range,
+.erp-vendas-page .erp-vendas__search-group--dual .erp-vendas__search-time-range {
+    flex: 0 0 auto;
+}
+
+.erp-vendas-page .erp-vendas__search-group .erp-field-dd__btn {
+    max-width: 16rem;
+}
+
+.erp-vendas-page .erp-vendas__search-group .erp-field-dd__btn > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .erp-vendas-page .erp-vendas__search-date-range,
 .erp-vendas-page .erp-vendas__search-time-range {
     display: inline-flex;

@@ -37,6 +37,8 @@ class LicencaBloqueadaPage extends Page
 
     public string $feedback = '';
 
+    public string $diagnostico = '';
+
     public bool $mensalidadeVencida = false;
 
     public bool $pixLoading = false;
@@ -58,15 +60,37 @@ class LicencaBloqueadaPage extends Page
         ErpScreen::set('Licença');
         $this->cnpj = $licencas->currentCnpj() ?? '';
 
+        $persisted = $licencas->pullPersistedDiagnostico();
+        if (is_array($persisted)) {
+            $this->diagnostico = $this->formatDiagnosticoArray($persisted);
+        }
+
         $portal = $licencas->checkCurrentEmpresa();
+        $decision = $licencas->resolveAccess($portal);
         $snapshot = $licencas->applyMensalidadeExpiry($portal);
         $this->applySnapshot($snapshot, $licencas);
 
         // Libera a tela só se portal + mensalidade permitirem.
-        if ($snapshot->isAllowed()) {
+        if ($decision['allowed'] || $snapshot->isAllowed()) {
             $this->redirect(Filament::getUrl());
 
             return;
+        }
+
+        if ($this->diagnostico === '') {
+            $fetch = $licencas->lastApiFetch();
+            if (is_array($fetch)) {
+                $this->diagnostico = $this->formatDiagnosticoArray([
+                    'at' => (string) ($fetch['at'] ?? now()->toDateTimeString()),
+                    'http_status' => $fetch['http_status'] ?? null,
+                    'status' => is_array($fetch['body'] ?? null) ? ($fetch['body']['status'] ?? null) : null,
+                    'valido_ate' => is_array($fetch['body'] ?? null) ? ($fetch['body']['valido_ate'] ?? null) : null,
+                    'vencimento' => is_array($fetch['body'] ?? null) ? ($fetch['body']['vencimento'] ?? null) : null,
+                    'decision_field' => $decision['field'],
+                    'decision_detail' => $decision['detail'],
+                    'body' => $fetch['body'] ?? null,
+                ]);
+            }
         }
 
         if ($this->mensalidadeVencida) {
@@ -113,6 +137,7 @@ class LicencaBloqueadaPage extends Page
         LicencaPortalPagamentoService $pagamentos,
     ): void {
         $this->feedback = '';
+        $this->diagnostico = '';
 
         if ($this->pixInvoiceId > 0 && filled($this->cnpj)) {
             $pago = $pagamentos->verificarPagamentoFatura($this->cnpj, $this->pixInvoiceId);
@@ -121,24 +146,40 @@ class LicencaBloqueadaPage extends Page
             }
         }
 
+        // 1) Consulta portal  2) grava gate com status fresco  3) só então sincroniza mensalidade
         $portal = $licencas->checkCurrentEmpresa(forceRefresh: true);
+        $licencas->rememberLoginGate($portal);
         $licencas->syncMensalidadeNoGate();
         $licencas->rememberLoginGate($portal);
+
+        $decision = $licencas->resolveAccess($portal);
+        $licencas->persistDiagnostico($decision);
+        $this->diagnostico = $this->formatDiagnosticoArray([
+            'at' => now()->toDateTimeString(),
+            'http_status' => $licencas->lastApiFetch()['http_status'] ?? null,
+            'status' => $licencas->lastApiPayload()['status'] ?? null,
+            'valido_ate' => $licencas->lastApiPayload()['valido_ate'] ?? null,
+            'vencimento' => $licencas->lastApiPayload()['vencimento'] ?? null,
+            'decision_field' => $decision['field'],
+            'decision_detail' => $decision['detail'],
+            'body' => $licencas->lastApiPayload(),
+        ]);
 
         $snapshot = $licencas->applyMensalidadeExpiry($portal);
         $this->applySnapshot($snapshot, $licencas);
 
-        if ($snapshot->isAllowed()) {
+        // status=ativo do portal libera mesmo com vencimento no passado (tolerância).
+        if ($decision['allowed'] || $snapshot->isAllowed()) {
             $this->redirect(Filament::getUrl());
 
             return;
         }
 
         if ($this->mensalidadeVencida) {
-            $this->carregarPixMensalidade();
             $this->feedback = filled($this->feedback)
                 ? $this->feedback
                 : 'Mensalidade ainda vencida. Pague o Pix e verifique novamente.';
+            $this->carregarPixMensalidade();
         } else {
             $this->limparPix();
             $this->feedback = 'Ainda bloqueado. Aguarde a liberação no gerenciador de licenças.';
@@ -161,6 +202,28 @@ class LicencaBloqueadaPage extends Page
         $this->validoAte = (string) ($snapshot->validoAte ?? '');
         $this->mensagem = (string) ($snapshot->mensagem ?? '');
         $this->mensalidadeVencida = $licencas->mensalidadeVencida();
+    }
+
+    /**
+     * @param  array{at?: string, http_status?: int|null, status?: mixed, valido_ate?: mixed, vencimento?: mixed, decision_field?: string, decision_detail?: string, body?: array<string, mixed>|null}  $diag
+     */
+    private function formatDiagnosticoArray(array $diag): string
+    {
+        $corpo = array_key_exists('body', $diag)
+            ? (json_encode($diag['body'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) ?: '(JSON inválido)')
+            : '(sem corpo)';
+
+        return implode("\n", [
+            'Horário: '.((string) ($diag['at'] ?? now()->toDateTimeString())),
+            'HTTP: '.((string) ($diag['http_status'] ?? '—')),
+            'status: '.json_encode($diag['status'] ?? null, JSON_UNESCAPED_UNICODE),
+            'valido_ate: '.json_encode($diag['valido_ate'] ?? null, JSON_UNESCAPED_UNICODE),
+            'vencimento: '.json_encode($diag['vencimento'] ?? null, JSON_UNESCAPED_UNICODE),
+            'Campo usado para bloquear: '.((string) ($diag['decision_field'] ?? '—'))
+                .' ('.((string) ($diag['decision_detail'] ?? '')).')',
+            'Corpo completo:',
+            $corpo,
+        ]);
     }
 
     private function carregarPixMensalidade(): void

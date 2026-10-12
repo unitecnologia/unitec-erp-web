@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'item',
     'product_id',
     'product_grade_id',
+    'price_table_id',
+    'tabela_nivel',
     'quantidade',
     'preco_unitario',
     'total',
@@ -25,6 +27,7 @@ class PedidoItem extends Model
     {
         return [
             'item' => 'integer',
+            'price_table_id' => 'integer',
             'quantidade' => 'decimal:3',
             'preco_unitario' => 'decimal:2',
             'total' => 'decimal:2',
