@@ -156,6 +156,17 @@
                             >
                         </div>
 
+                        <div class="erp-devcompra-lancamento-modal__form-group erp-devcompra-lancamento-modal__form-group--garantia">
+                            <label class="erp-devcompra-lancamento-modal__form-label" for="erp-devcompra-troca-garantia">Troca em garantia</label>
+                            <input
+                                id="erp-devcompra-troca-garantia"
+                                type="checkbox"
+                                class="erp-devcompra-lancamento-modal__form-checkbox"
+                                wire:model="formTrocaEmGarantia"
+                                @disabled(! $editable)
+                            >
+                        </div>
+
                         <div class="erp-devcompra-lancamento-modal__form-group">
                             <label class="erp-devcompra-lancamento-modal__form-label" for="erp-devcompra-data">Data</label>
                             <input

@@ -4,10 +4,15 @@ namespace App\Support\ForcaVendas;
 
 use App\Models\ForcaVendasOrder;
 use App\Models\Pedido;
+use App\Models\PixCobranca;
 use App\Models\Venda;
 use App\Support\Erp\Boleto\Api\BoletoApi;
+use App\Support\Erp\Financeiro\ComissaoPeriodoService;
 use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\Logistica\ExpedicaoService;
+use App\Support\VendasInternas\VendasInternasMonitorHookService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
@@ -195,6 +200,22 @@ final class ForcaVendasMonitorCancelamentoService
                 (new \App\Support\Erp\EstoqueReservaService())->reservarPedido($locked, $locked->pedido, $locked->user);
             }
 
+            if ($venda instanceof Venda) {
+                try {
+                    (new ComissaoPeriodoService())->liberarVendaEstornada((int) $venda->id);
+                } catch (\InvalidArgumentException $e) {
+                    throw new RuntimeException($e->getMessage(), 0, $e);
+                }
+
+                (new ExpedicaoService())->removerVendaDeCargasAbertas($venda);
+
+                if (Schema::hasTable((new PixCobranca)->getTable())) {
+                    PixCobranca::query()
+                        ->where('venda_id', (int) $venda->id)
+                        ->update(['venda_id' => null]);
+                }
+            }
+
             $avancar('Reabrindo pedido');
             $locked->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
@@ -209,6 +230,8 @@ final class ForcaVendasMonitorCancelamentoService
             if ($locked->pedido && $locked->pedido->status !== Pedido::STATUS_ABERTO) {
                 $locked->pedido->update(['status' => Pedido::STATUS_ABERTO]);
             }
+
+            (new VendasInternasMonitorHookService())->onForcaVendasOrderReaberto($locked);
         });
     }
 

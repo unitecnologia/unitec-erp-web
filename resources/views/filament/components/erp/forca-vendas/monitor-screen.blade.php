@@ -255,7 +255,7 @@
                     @else
                         <input type="text" wire:model="filtroValor" wire:keydown.enter="consultar"
                                class="erp-nfe__input erp-fv-mon__filtro-valor" autocomplete="off"
-                               placeholder="{{ $this->filtroCampo === 'pedido' || $this->filtroCampo === 'dav' ? 'Digite o nº do pedido e Enter' : 'Digite e Enter' }}">
+                               placeholder="{{ $this->filtroCampo === 'pedido' || $this->filtroCampo === 'dav' ? 'Digite o nº do pedido (DAV) e Enter' : ($this->filtroCampo === 'venda' ? 'Digite o nº da venda e Enter' : 'Digite e Enter') }}">
                     @endif
                 </div>
             </div>

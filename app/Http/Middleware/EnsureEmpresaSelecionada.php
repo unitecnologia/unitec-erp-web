@@ -67,6 +67,8 @@ class EnsureEmpresaSelecionada
         $path = trim($request->path(), '/');
 
         return $path === 'admin/empresas/create'
+            || $path === 'admin/schema-incompativel'
+            || str_starts_with($path, 'admin/schema-incompativel')
             || str_starts_with($path, 'livewire/')
             || str_starts_with($path, 'admin/livewire')
             || str_starts_with($path, 'gestor/livewire')

@@ -1283,7 +1283,20 @@ function Start-UnitecWhatsAppGateway {
         New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
     }
 
-    $started = Start-Process -FilePath $nodeExe -ArgumentList 'index.js' -WorkingDirectory $gatewayPath -WindowStyle Hidden -PassThru
+    # Preferir IPv4: em alguns clientes o Node trava no IPv6 e o Baileys não gera QR.
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $nodeExe
+    $psi.Arguments = 'index.js'
+    $psi.WorkingDirectory = $gatewayPath
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.EnvironmentVariables['NODE_OPTIONS'] = '--dns-result-order=ipv4first'
+    if (Test-Path $gatewayConfig) {
+        $psi.EnvironmentVariables['ERP_WHATSAPP_CONFIG'] = $gatewayConfig
+    }
+
+    $started = [System.Diagnostics.Process]::Start($psi)
+
     if ($started?.Id) {
         Set-Content -Path $pidFile -Value $started.Id -Encoding ASCII
     }

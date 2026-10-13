@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 final class ComissaoPeriodoService
@@ -558,6 +559,142 @@ final class ComissaoPeriodoService
         foreach ($indices as $i) {
             $linhas[$i]['comissao'] = round($floors[$i] / 100, 2);
         }
+    }
+
+    /**
+     * Ao estornar/reabrir venda: libera reserva ativa e remove a venda de
+     * períodos fechados ainda não pagos, recalculando totais e CAP.
+     * Período pago bloqueia (mesma regra do cancelamento de comissão).
+     *
+     * @throws InvalidArgumentException
+     */
+    public function liberarVendaEstornada(int $vendaId): void
+    {
+        if ($vendaId <= 0) {
+            return;
+        }
+
+        if (! Schema::hasTable('comissao_venda_ativa')
+            && ! Schema::hasTable('comissao_periodo_vendas')) {
+            return;
+        }
+
+        DB::transaction(function () use ($vendaId): void {
+            if (Schema::hasTable('comissao_venda_ativa')) {
+                ComissaoVendaAtiva::query()
+                    ->where('venda_id', $vendaId)
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            if (! Schema::hasTable('comissao_periodo_vendas')) {
+                ComissaoVendaAtiva::query()->where('venda_id', $vendaId)->delete();
+
+                return;
+            }
+
+            $linhas = ComissaoPeriodoVenda::query()
+                ->where('venda_id', $vendaId)
+                ->lockForUpdate()
+                ->get();
+
+            $periodoIds = $linhas->pluck('comissao_periodo_id')->unique()->filter()->values();
+
+            foreach ($periodoIds as $periodoId) {
+                /** @var ComissaoPeriodo|null $periodo */
+                $periodo = ComissaoPeriodo::query()->whereKey((int) $periodoId)->lockForUpdate()->first();
+
+                if (! $periodo) {
+                    continue;
+                }
+
+                if ($periodo->status === ComissaoPeriodo::STATUS_PAGA) {
+                    throw new InvalidArgumentException(
+                        'Não é possível reabrir: a venda está em comissão já paga. '
+                        .'Estorne a Conta a Pagar e cancele o período de comissão antes de reabrir o pedido.'
+                    );
+                }
+
+                if ($periodo->status === ComissaoPeriodo::STATUS_CANCELADA) {
+                    continue;
+                }
+
+                if ($periodo->status !== ComissaoPeriodo::STATUS_FECHADA) {
+                    continue;
+                }
+
+                $linha = $linhas->firstWhere('comissao_periodo_id', (int) $periodo->id);
+
+                if (! $linha) {
+                    continue;
+                }
+
+                if (filled($periodo->conta_pagar_id)) {
+                    $conta = ContaPagar::query()->whereKey((int) $periodo->conta_pagar_id)->lockForUpdate()->first();
+
+                    if ($conta) {
+                        $pago = (float) $conta->valor_pago;
+                        $valor = (float) $conta->valor;
+                        $saldo = (float) $conta->saldo;
+
+                        if ($pago > 0.0001 || $saldo + 0.0001 < $valor) {
+                            throw new InvalidArgumentException(
+                                'Não é possível reabrir: o CAP da comissão desta venda já possui pagamento. '
+                                .'Estorne no Contas a Pagar e cancele o período antes de reabrir o pedido.'
+                            );
+                        }
+                    }
+                }
+
+                $linha->delete();
+
+                $restantes = ComissaoPeriodoVenda::query()
+                    ->where('comissao_periodo_id', (int) $periodo->id)
+                    ->get();
+
+                $baseAv = 0.0;
+                $baseAp = 0.0;
+                $comAv = 0.0;
+                $comAp = 0.0;
+
+                foreach ($restantes as $rest) {
+                    $base = round((float) $rest->base, 2);
+                    $com = round((float) $rest->comissao, 2);
+
+                    if ((string) $rest->tipo === 'ap') {
+                        $baseAp += $base;
+                        $comAp += $com;
+                    } else {
+                        $baseAv += $base;
+                        $comAv += $com;
+                    }
+                }
+
+                $total = round($comAv + $comAp, 2);
+
+                $periodo->fill([
+                    'base_avista' => round($baseAv, 2),
+                    'base_aprazo' => round($baseAp, 2),
+                    'comissao_avista' => round($comAv, 2),
+                    'comissao_aprazo' => round($comAp, 2),
+                    'comissao_total' => $total,
+                ]);
+                $periodo->save();
+
+                if (filled($periodo->conta_pagar_id)) {
+                    $conta = ContaPagar::query()->whereKey((int) $periodo->conta_pagar_id)->lockForUpdate()->first();
+
+                    if ($conta) {
+                        $conta->valor = $total;
+                        $conta->save();
+                    }
+                }
+            }
+
+            if (Schema::hasTable('comissao_venda_ativa')) {
+                ComissaoVendaAtiva::query()->where('venda_id', $vendaId)->delete();
+            }
+        });
     }
 
     private function isUniqueVendaAtivaViolation(QueryException $e): bool

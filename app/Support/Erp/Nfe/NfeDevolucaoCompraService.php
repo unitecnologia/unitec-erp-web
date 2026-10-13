@@ -47,9 +47,9 @@ class NfeDevolucaoCompraService
             throw new RuntimeException('Empresa não identificada para a devolução.');
         }
 
-        $this->resolveCfop($empresa, $devolucao->fornecedor);
+        $this->resolveCfop($empresa, $devolucao->fornecedor, $devolucao->isTrocaEmGarantia());
 
-        if ($this->temNfeAtiva($devolucao)) {
+        if ($this->temNfeImpeditiva($devolucao)) {
             throw new RuntimeException('Esta devolução de compra já possui NF-e vinculada.');
         }
 
@@ -84,6 +84,7 @@ class NfeDevolucaoCompraService
      *     natureza_operacao: string,
      *     obs_contribuinte: string,
      *     referencias: list<array{referencia: string}>,
+     *     troca_em_garantia: bool,
      *     rows: list<array<string, mixed>>
      * }
      */
@@ -95,7 +96,8 @@ class NfeDevolucaoCompraService
 
         $empresa = $this->resolveEmpresa($devolucao);
         $fornecedor = $devolucao->fornecedor;
-        $cfop = $this->resolveCfop($empresa, $fornecedor);
+        $trocaEmGarantia = $devolucao->isTrocaEmGarantia();
+        $cfop = $this->resolveCfop($empresa, $fornecedor, $trocaEmGarantia);
         $natureza = $this->formatNaturezaOperacao($cfop);
         $chave = $this->normalizeChave($devolucao->compra?->chave_nfe);
         $data = $devolucao->data?->format('Y-m-d') ?? now()->format('Y-m-d');
@@ -125,6 +127,7 @@ class NfeDevolucaoCompraService
                 : null;
 
             if ($notaItem) {
+                // Mantém rateio fiscal da entrada; não inventa isenção.
                 $row = [
                     ...$row,
                     ...$this->fiscalDevolucao->montarOverridesNfe($notaItem, $qtd, $empresa),
@@ -145,12 +148,14 @@ class NfeDevolucaoCompraService
             numeroCompra: $numeroCompra,
             numeroNotaOrigem: $this->resolveNumeroNotaOrigem($devolucao),
             chaveReferenciada: $chave,
+            trocaEmGarantia: $trocaEmGarantia,
         );
 
         return [
             'devolucao_compra_id' => (int) $devolucao->id,
             'cliente_id' => (int) $devolucao->fornecedor_id,
-            'finalidade' => 'devolucao',
+            // Troca em garantia: finNFe=1 + CFOP Outras saídas (evita rejeição 327 com 5949).
+            'finalidade' => $trocaEmGarantia ? 'normal' : 'devolucao',
             'movimento' => 'saida',
             'data_emissao' => $data,
             'data_saida' => $data,
@@ -158,6 +163,7 @@ class NfeDevolucaoCompraService
             'natureza_operacao' => $natureza,
             'obs_contribuinte' => trim($obsDevolucao === '' ? $origem : $origem.' '.$obsDevolucao),
             'referencias' => $chave !== null ? [['referencia' => $chave]] : [],
+            'troca_em_garantia' => $trocaEmGarantia,
             'rows' => $rows,
         ];
     }
@@ -167,8 +173,13 @@ class NfeDevolucaoCompraService
         string $numeroCompra,
         ?string $numeroNotaOrigem,
         ?string $chaveReferenciada,
+        bool $trocaEmGarantia = false,
     ): string {
-        $partes = ['NF-e de devolução de compra nº '.$numeroDevolucao.'.'];
+        $partes = [
+            $trocaEmGarantia
+                ? 'NF-e de troca em garantia (devolução de compra nº '.$numeroDevolucao.').'
+                : 'NF-e de devolução de compra nº '.$numeroDevolucao.'.',
+        ];
 
         if ($numeroCompra !== '') {
             $partes[] = 'Compra nº '.$numeroCompra.'.';
@@ -208,6 +219,30 @@ class NfeDevolucaoCompraService
             ->exists();
     }
 
+    /**
+     * NF-e que impede nova emissão (transmitida, denegada, etc.).
+     * Cancelada libera reemissão; aberta deve ser reutilizada, não bloqueada.
+     */
+    public function temNfeImpeditiva(DevolucaoCompra $devolucao): bool
+    {
+        return Nfe::query()
+            ->where('devolucao_compra_id', $devolucao->id)
+            ->whereNotIn('status', [
+                Nfe::STATUS_CANCELADA,
+                Nfe::STATUS_ABERTA,
+            ])
+            ->exists();
+    }
+
+    public function nfeAberta(DevolucaoCompra $devolucao): ?Nfe
+    {
+        return Nfe::query()
+            ->where('devolucao_compra_id', $devolucao->id)
+            ->where('status', Nfe::STATUS_ABERTA)
+            ->orderByDesc('id')
+            ->first();
+    }
+
     protected function resolveEmpresa(DevolucaoCompra $devolucao): ?Empresa
     {
         if ($devolucao->relationLoaded('empresa') && $devolucao->empresa) {
@@ -219,7 +254,7 @@ class NfeDevolucaoCompraService
         return $empresaId > 0 ? Empresa::query()->find($empresaId) : null;
     }
 
-    protected function resolveCfop(Empresa $empresa, ?Person $fornecedor): int
+    protected function resolveCfop(Empresa $empresa, ?Person $fornecedor, bool $trocaEmGarantia = false): int
     {
         $empresaUf = strtoupper(trim((string) ($empresa->uf ?? '')));
         $fornecedorUf = strtoupper(trim((string) ($fornecedor?->uf ?? '')));
@@ -227,14 +262,19 @@ class NfeDevolucaoCompraService
             && $empresaUf !== ''
             && $fornecedorUf !== $empresaUf;
 
-        $cfop = OperacaoFiscal::forEmpresa((int) $empresa->id)
-            ->cfopDevolucaoCompras($interestadual);
+        $ops = OperacaoFiscal::forEmpresa((int) $empresa->id);
+        $cfop = $trocaEmGarantia
+            ? $ops->cfopOutrasSaidas($interestadual)
+            : $ops->cfopDevolucaoCompras($interestadual);
 
         if ($cfop === null) {
             $label = $interestadual ? 'interestadual' : 'estadual';
+            $operacao = $trocaEmGarantia
+                ? 'Outras saídas de estoque'
+                : 'Devolução de Compras';
 
             throw new RuntimeException(
-                'Configure o CFOP de Devolução de Compras ('.$label.') em Operações Fiscais antes de emitir a NF-e.'
+                'Configure o CFOP de '.$operacao.' ('.$label.') em Operações Fiscais antes de emitir a NF-e.'
             );
         }
 
@@ -243,13 +283,7 @@ class NfeDevolucaoCompraService
 
     protected function formatNaturezaOperacao(int $cfop): string
     {
-        $descricao = Cfop::query()
-            ->where('codigo', $cfop)
-            ->value('descricao');
-
-        return trim(
-            $cfop.($descricao ? ' - '.mb_strtoupper((string) $descricao, 'UTF-8') : '')
-        );
+        return Cfop::formatNaturezaLabel($cfop);
     }
 
     protected function normalizeChave(?string $chave): ?string

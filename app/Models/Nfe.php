@@ -70,6 +70,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'consumidor_final',
     'tipo_emissao',
     'cfop',
+    'natureza_operacao',
     'npedido',
     'tipo_frete',
     'especie',

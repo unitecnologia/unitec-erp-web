@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Nfe;
 
+use App\Models\Cfop;
 use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\NfeFatura;
@@ -685,10 +686,26 @@ class NfeDanfeReportService
 
     protected function resolveNaturezaOperacao(Nfe $nfe): string
     {
-        $cfop = trim((string) ($nfe->cfop ?? ''));
+        $stored = trim((string) ($nfe->natureza_operacao ?? ''));
 
-        if ($cfop !== '') {
-            return 'VENDA DE MERCADORIA';
+        if ($stored !== '') {
+            if (preg_match('/^\d{4}\b\s*[-–]\s*(.+)$/u', $stored, $matches)) {
+                return trim((string) $matches[1]);
+            }
+
+            return $stored;
+        }
+
+        $cfop = (int) ($nfe->cfop ?? 0);
+
+        if ($cfop > 0) {
+            $descricao = Cfop::query()
+                ->where('codigo', $cfop)
+                ->value('descricao');
+
+            if (filled($descricao)) {
+                return mb_strtoupper(trim((string) $descricao), 'UTF-8');
+            }
         }
 
         return 'VENDA DE MERCADORIA';

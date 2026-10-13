@@ -156,7 +156,7 @@ class WhatsAppClient
 
     {
 
-        $this->bumpExecutionTime(90);
+        $this->bumpExecutionTime(120);
 
         $config = WhatsAppConfig::fromEmpresa($empresa);
 
@@ -190,56 +190,18 @@ class WhatsAppClient
 
         try {
 
-            $response = $this->requestFor($empresa)
-                ->timeout($this->httpTimeout($config, 25, 60))
-                ->post('/sessions/'.$empresa->id.'/start');
+            $result = $this->performStartSession($empresa, $config);
 
-            if (! $response->successful()) {
-                return $this->failureFromResponse($response, 'iniciar a conexão');
-            }
-
-            /** @var array<string, mixed> $payload */
-            $payload = $response->json() ?? [];
-
-            $result = [
-                'ok' => true,
-                'message' => (string) ($payload['message'] ?? 'Conexão iniciada.'),
-                'status' => (string) ($payload['status'] ?? WhatsAppConfig::STATUS_AGUARDANDO_QR),
-                'number' => (string) ($payload['number'] ?? ''),
-                'qr' => isset($payload['qr']) && is_string($payload['qr']) && $payload['qr'] !== ''
-                    ? $payload['qr']
-                    : null,
-            ];
-
-            // Fallback: se o /start voltar sem QR, consulta o status algumas vezes.
+            // Gateway antigo em IPv6 pode responder sem QR. Reinicia com NODE_OPTIONS e tenta 1x.
             if (
-                ($result['status'] ?? '') === WhatsAppConfig::STATUS_AGUARDANDO_QR
+                ($result['ok'] ?? false)
+                && ($result['status'] ?? '') === WhatsAppConfig::STATUS_AGUARDANDO_QR
                 && empty($result['qr'])
             ) {
-                for ($i = 0; $i < 8; $i++) {
-                    usleep(400_000);
-                    $status = $this->fetchSessionStatus($empresa, lightweight: true);
+                $restart = $this->gatewayManager->restartGateway($empresa);
 
-                    if (! ($status['ok'] ?? false)) {
-                        continue;
-                    }
-
-                    $result['status'] = (string) ($status['status'] ?? $result['status']);
-                    $result['number'] = (string) ($status['number'] ?? $result['number']);
-
-                    if (! empty($status['qr'])) {
-                        $result['qr'] = (string) $status['qr'];
-                        $result['message'] = 'Leia o QR Code no ERP para conectar.';
-
-                        break;
-                    }
-
-                    if (($status['status'] ?? '') === WhatsAppConfig::STATUS_CONECTADO) {
-                        $result['qr'] = null;
-                        $result['message'] = (string) ($status['message'] ?? 'WhatsApp já conectado.');
-
-                        break;
-                    }
+                if ($restart['ok'] ?? false) {
+                    $result = $this->performStartSession($empresa, $config);
                 }
             }
 
@@ -257,6 +219,69 @@ class WhatsAppClient
 
         }
 
+    }
+
+    /**
+     * @return array{ok: bool, message: string, status?: string, number?: string, qr?: string|null}
+     */
+    protected function performStartSession(Empresa $empresa, WhatsAppConfig $config): array
+    {
+        // O gateway pode levar ~8s (versão Baileys) + até ~25s aguardando QR.
+        // Se o HTTP timeout for igual ao wait do Node, o PHP corta com cURL 28 (0 bytes).
+        $response = $this->requestFor($empresa)
+            ->timeout($this->httpTimeout($config, 55, 90))
+            ->post('/sessions/'.$empresa->id.'/start');
+
+        if (! $response->successful()) {
+            return $this->failureFromResponse($response, 'iniciar a conexão');
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = $response->json() ?? [];
+
+        $result = [
+            'ok' => true,
+            'message' => (string) ($payload['message'] ?? 'Conexão iniciada.'),
+            'status' => (string) ($payload['status'] ?? WhatsAppConfig::STATUS_AGUARDANDO_QR),
+            'number' => (string) ($payload['number'] ?? ''),
+            'qr' => isset($payload['qr']) && is_string($payload['qr']) && $payload['qr'] !== ''
+                ? $payload['qr']
+                : null,
+        ];
+
+        // Fallback: se o /start voltar sem QR, consulta o status algumas vezes.
+        if (
+            ($result['status'] ?? '') === WhatsAppConfig::STATUS_AGUARDANDO_QR
+            && empty($result['qr'])
+        ) {
+            for ($i = 0; $i < 8; $i++) {
+                usleep(400_000);
+                $status = $this->fetchSessionStatus($empresa, lightweight: true);
+
+                if (! ($status['ok'] ?? false)) {
+                    continue;
+                }
+
+                $result['status'] = (string) ($status['status'] ?? $result['status']);
+                $result['number'] = (string) ($status['number'] ?? $result['number']);
+
+                if (! empty($status['qr'])) {
+                    $result['qr'] = (string) $status['qr'];
+                    $result['message'] = 'Leia o QR Code no ERP para conectar.';
+
+                    break;
+                }
+
+                if (($status['status'] ?? '') === WhatsAppConfig::STATUS_CONECTADO) {
+                    $result['qr'] = null;
+                    $result['message'] = (string) ($status['message'] ?? 'WhatsApp já conectado.');
+
+                    break;
+                }
+            }
+        }
+
+        return $result;
     }
 
 

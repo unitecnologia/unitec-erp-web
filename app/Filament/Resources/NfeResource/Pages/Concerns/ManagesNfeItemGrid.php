@@ -1329,6 +1329,14 @@ trait ManagesNfeItemGrid
         }
 
         $this->recalculateNfeTotais();
+
+        if ($field === 'cfop') {
+            $digits = preg_replace('/\D/', '', $raw) ?: '';
+            $codigo = (int) $digits;
+            if (strlen($digits) === 4 && $codigo >= 1000 && Cfop::query()->where('codigo', $codigo)->exists()) {
+                $this->syncNfeNaturezaOperacaoAposAlterarCfopItem($codigo);
+            }
+        }
     }
 
     public function resolveNfeItemCfop(int $index, ?string $cfopFromInput = null): void
@@ -1372,6 +1380,7 @@ trait ManagesNfeItemGrid
 
         $this->nfeModalRows[$index]['cfop'] = (string) $cfop->codigo;
         $this->recalculateNfeTotais();
+        $this->syncNfeNaturezaOperacaoAposAlterarCfopItem((int) $cfop->codigo);
     }
 
     public function updating($property, $value): void

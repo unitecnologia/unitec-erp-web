@@ -2064,6 +2064,15 @@
     width: 6.8rem;
 }
 
+.erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-group--finalidade {
+    flex: 0 0 auto;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-input--finalidade {
+    width: 8.5rem;
+    min-width: 8.5rem;
+}
+
 .erp-nfe-page .erp-nfe-lancamento-modal__form-row--ops .erp-nfe-lancamento-modal__form-group--meio-pgto {
     flex: 0 0 auto;
     min-width: 14rem;

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'fornecedor_nome',
     'usuario_id',
     'observacoes',
+    'troca_em_garantia',
     'total',
 ])]
 class DevolucaoCompra extends Model
@@ -134,11 +135,17 @@ class DevolucaoCompra extends Model
             ->whereNot('status', Nfe::STATUS_CANCELADA);
     }
 
+    public function isTrocaEmGarantia(): bool
+    {
+        return (bool) $this->troca_em_garantia;
+    }
+
     protected function casts(): array
     {
         return [
             'data' => 'date',
             'hora' => 'string',
+            'troca_em_garantia' => 'boolean',
             'total' => 'decimal:2',
         ];
     }

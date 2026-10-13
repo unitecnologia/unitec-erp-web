@@ -2,6 +2,9 @@
 
 namespace App\Support\Logistica;
 
+use App\Models\Carga;
+use App\Models\CargaEntrega;
+use App\Models\CargaPedido;
 use App\Models\Entrega;
 use App\Models\EntregaEvento;
 use App\Models\EntregaItem;
@@ -15,6 +18,7 @@ use App\Models\VendasInternasOrder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 final class ExpedicaoService
@@ -362,6 +366,62 @@ final class ExpedicaoService
         }
 
         $this->transicionar($entrega, Entrega::STATUS_CANCELADO, Auth::user(), $motivo ?? 'Venda cancelada/estornada.');
+    }
+
+    /**
+     * Remove a venda cancelada de cargas ainda abertas sem registro de entrega.
+     * Cargas fechadas/canceladas e vínculos com entrega permanecem (histórico).
+     */
+    public function removerVendaDeCargasAbertas(Venda $venda): void
+    {
+        if (! Schema::hasTable('carga_pedidos') || ! Schema::hasTable('cargas')) {
+            return;
+        }
+
+        $vendaId = (int) $venda->id;
+
+        if ($vendaId <= 0) {
+            return;
+        }
+
+        $links = CargaPedido::query()
+            ->where('pedido_id', $vendaId)
+            ->whereHas('carga', static fn ($q) => $q->where('status', Carga::STATUS_ABERTA))
+            ->get(['id', 'carga_id', 'pedido_id']);
+
+        if ($links->isEmpty()) {
+            return;
+        }
+
+        $cargaIds = $links->pluck('carga_id')->unique()->filter()->values()->all();
+
+        $comEntrega = [];
+
+        if (Schema::hasTable('carga_entregas') && $cargaIds !== []) {
+            $comEntrega = CargaEntrega::query()
+                ->where('pedido_id', $vendaId)
+                ->whereIn('carga_id', $cargaIds)
+                ->pluck('carga_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+            $comEntrega = array_fill_keys($comEntrega, true);
+        }
+
+        $removerIds = [];
+
+        foreach ($links as $link) {
+            $cargaId = (int) $link->carga_id;
+
+            if (isset($comEntrega[$cargaId])) {
+                continue;
+            }
+
+            $removerIds[] = (int) $link->id;
+        }
+
+        if ($removerIds !== []) {
+            CargaPedido::query()->whereIn('id', $removerIds)->delete();
+        }
     }
 
     public function transicionar(

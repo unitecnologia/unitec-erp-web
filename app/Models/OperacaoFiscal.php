@@ -94,6 +94,11 @@ class OperacaoFiscal extends Model
         return $this->cfopOperacao('devolucao_compras', $interestadual);
     }
 
+    public function cfopOutrasSaidas(bool $interestadual): ?int
+    {
+        return $this->cfopOperacao('outras_saidas', $interestadual);
+    }
+
     public function cfopVendaMercadoria(bool $interestadual): ?int
     {
         return $this->cfopOperacao('venda_mercadoria', $interestadual);

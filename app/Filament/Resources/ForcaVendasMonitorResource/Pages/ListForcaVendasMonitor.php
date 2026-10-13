@@ -398,7 +398,33 @@ class ListForcaVendasMonitor extends ListRecords
         switch ($campo) {
             case 'dav':
             case 'pedido':
-                $query->whereHas('venda', fn (Builder $s) => $s->where('numero', 'like', '%' . $valor . '%'));
+                $digits = preg_replace('/\D/', '', $valor) ?? '';
+                $padded = $digits !== '' ? str_pad($digits, 6, '0', STR_PAD_LEFT) : '';
+                $query->whereHas('pedido', function (Builder $s) use ($valor, $digits, $padded): void {
+                    $s->where(function (Builder $inner) use ($valor, $digits, $padded): void {
+                        $inner->where('numero', 'like', '%'.$valor.'%');
+
+                        if ($digits !== '') {
+                            $inner->orWhere('numero', $digits)
+                                ->orWhere('numero', $padded);
+                        }
+                    });
+                });
+                break;
+
+            case 'venda':
+                $digits = preg_replace('/\D/', '', $valor) ?? '';
+                $padded = $digits !== '' ? str_pad($digits, 6, '0', STR_PAD_LEFT) : '';
+                $query->whereHas('venda', function (Builder $s) use ($valor, $digits, $padded): void {
+                    $s->where(function (Builder $inner) use ($valor, $digits, $padded): void {
+                        $inner->where('numero', 'like', '%'.$valor.'%');
+
+                        if ($digits !== '') {
+                            $inner->orWhere('numero', $digits)
+                                ->orWhere('numero', $padded);
+                        }
+                    });
+                });
                 break;
 
             case 'meio_pgto':
@@ -742,6 +768,7 @@ class ListForcaVendasMonitor extends ListRecords
     {
         return [
             'pedido' => 'Nº Pedido',
+            'venda' => 'Nº Venda',
             'status' => 'Status',
             'cliente' => 'Cliente',
             'vendedor' => 'Vendedor',

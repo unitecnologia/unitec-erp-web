@@ -38,7 +38,10 @@ final class ConsultaPlacaOsService
     private ?string $tipoFalha = null;
 
     /**
-     * @return array{ok: bool, message: string, fields: array<string, string>}
+     * Consulta externa. Não grava em os_veiculos — a persistência fica a cargo do chamador
+     * (após validar placa atual e completude do retorno).
+     *
+     * @return array{ok: bool, message: string, fields: array<string, string>, vehicle?: array<string, mixed>}
      */
     public function consultar(Empresa $empresa, string $placaInformada): array
     {
@@ -83,7 +86,7 @@ final class ConsultaPlacaOsService
     }
 
     /**
-     * @return array{ok: bool, message: string, fields: array<string, string>}
+     * @return array{ok: bool, message: string, fields: array<string, string>, vehicle?: array<string, mixed>}
      */
     private function executarConsulta(Empresa $empresa, string $placaInformada): array
     {
@@ -115,24 +118,14 @@ final class ConsultaPlacaOsService
 
         $response = $this->enviar($endpoint, $token, $placa, $idempotency, $timeout, true);
         if ($response === null) {
+            $this->tipoFalha = $this->falhaPorTimeout ? 'timeout' : 'indisponivel';
+
             return $this->falha($this->falhaPorTimeout
                 ? 'A consulta de placa excedeu o tempo limite. Tente novamente.'
                 : 'A consulta de placa está indisponível no momento. Tente novamente.');
         }
 
-        $resultado = $this->interpretar($response, $base, $token, $deadline);
-        $vehicle = $resultado['vehicle'] ?? null;
-        unset($resultado['vehicle']);
-
-        if (is_array($vehicle)) {
-            $salvo = OsVeiculo::salvarDaApi((int) $empresa->id, $placa, $vehicle);
-            $resultado['extras'] = $salvo->extrasEquipamento();
-            if (($resultado['fields']['placa'] ?? '') === '') {
-                $resultado['fields']['placa'] = $placa;
-            }
-        }
-
-        return $resultado;
+        return $this->interpretar($response, $base, $token, $deadline);
     }
 
     /**
@@ -143,7 +136,7 @@ final class ConsultaPlacaOsService
         $vazio = ['message' => null, 'token' => '', 'timeout' => 0, 'base' => ''];
 
         if (! filter_var(config('unitec.consulta_placa.enabled', true), FILTER_VALIDATE_BOOLEAN)) {
-            $vazio['message'] = 'A consulta por placa não está habilitada.';
+            $vazio['message'] = 'A consulta por placa não está disponível no momento.';
 
             return $vazio;
         }
@@ -155,7 +148,10 @@ final class ConsultaPlacaOsService
         }
 
         if ($base === '' || filter_var($base, FILTER_VALIDATE_URL) === false || ! preg_match('#^https?://#i', $base)) {
-            $vazio['message'] = 'Informe a URL da API de consulta por placa nos parâmetros da empresa.';
+            $this->registrar('warning', 'Consulta de placa: URL não configurada ou inválida.', [
+                'tipo_falha' => 'configuracao',
+            ]);
+            $vazio['message'] = 'A consulta por placa não está configurada. Contate o suporte.';
 
             return $vazio;
         }
@@ -163,14 +159,21 @@ final class ConsultaPlacaOsService
         $token = trim((string) config('unitec.consulta_placa.token', ''));
 
         if ($token === '') {
-            $vazio['message'] = 'Informe a API Key da consulta por placa nos parâmetros da empresa.';
+            $this->registrar('warning', 'Consulta de placa: token/chave ausente na configuração.', [
+                'tipo_falha' => 'configuracao',
+            ]);
+            $vazio['message'] = 'A consulta por placa não está configurada. Contate o suporte.';
 
             return $vazio;
         }
 
         $timeout = (int) config('unitec.consulta_placa.timeout', 0);
         if ($timeout < 1 || $timeout > 300) {
-            $vazio['message'] = 'Informe o timeout da consulta por placa nos parâmetros da empresa.';
+            $this->registrar('warning', 'Consulta de placa: timeout inválido na configuração.', [
+                'tipo_falha' => 'configuracao',
+                'timeout' => $timeout,
+            ]);
+            $vazio['message'] = 'A consulta por placa não está configurada. Contate o suporte.';
 
             return $vazio;
         }
@@ -232,11 +235,15 @@ final class ConsultaPlacaOsService
         $status = $response->status();
 
         if ($status === 402 || $codigo === 'insufficient_balance') {
-            return $this->falha('Saldo insuficiente para consultar a placa.');
+            $this->tipoFalha = 'saldo_insuficiente';
+
+            return $this->falha('Não foi possível consultar a placa no momento. Tente novamente mais tarde.');
         }
 
         if ($status === 401) {
-            return $this->falha('A API Key da consulta por placa foi recusada. Confira a chave nos parâmetros da empresa.');
+            $this->tipoFalha = 'http_401';
+
+            return $this->falha('A consulta por placa não está configurada corretamente. Contate o suporte.');
         }
 
         if ($status === 422) {
@@ -353,13 +360,29 @@ final class ConsultaPlacaOsService
 
         $vehicle = data_get($json, 'data.vehicle');
         if (! is_array($vehicle)) {
+            $this->tipoFalha = 'placa_nao_encontrada';
+
             return $this->falha('Placa não encontrada.');
+        }
+
+        if (! OsVeiculo::vehicleIdentificavel($vehicle)) {
+            $this->tipoFalha = 'resposta_incompleta';
+            $this->registrar('warning', 'Consulta de placa: retorno sem identificação utilizável do veículo.', [
+                'placa_api' => $this->texto($vehicle['plate'] ?? null),
+            ]);
+
+            return $this->falha('Não foi possível obter os dados do veículo. Tente novamente.');
+        }
+
+        $fields = $this->camposOs($vehicle);
+        if (($fields['placa'] ?? '') === '') {
+            $fields['placa'] = $this->normalizarPlaca((string) ($this->contextoLog['placa'] ?? ''));
         }
 
         return [
             'ok' => true,
             'message' => 'Dados do veículo preenchidos.',
-            'fields' => $this->camposOs($vehicle),
+            'fields' => $fields,
             'vehicle' => $vehicle,
         ];
     }

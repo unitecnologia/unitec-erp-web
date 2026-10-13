@@ -260,32 +260,28 @@ class LicencaRemotaService
     }
 
     /**
-     * True quando a janela local (vencimento + tolerância / valido_ate) já acabou.
-     * O vencimento sozinho, dentro dos 5 dias de tolerância, não bloqueia.
+     * True quando a janela local (vencimento + grace_days da config) já acabou.
+     * O vencimento sozinho, dentro dos dias de tolerância, não bloqueia.
+     * Não usa valido_ate do portal quando há mensalidade (evita tolerância antiga em cache).
      */
     public function mensalidadeVencida(): bool
     {
         $due = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
-        $validoAte = $this->loginGateSnapshot()?->validoAte;
 
+        // Com vencimento conhecido: só grace_days local. Sem vencimento: fallback valido_ate.
         return LicencaLiberacao::bloqueadoPorData(
             $due !== '' ? $due : null,
-            $validoAte,
+            $due !== '' ? null : $this->loginGateSnapshot()?->validoAte,
         );
     }
 
     /**
-     * Se a janela local já acabou, força status bloqueado — exceto quando o portal
-     * acabou de dizer status=ativo (vencimento passado durante a tolerância não bloqueia).
+     * Se a janela local (vencimento + grace_days) já acabou, força status bloqueado.
+     * Vale também quando o portal ainda devolve status=ativo (tolerância antiga no portal).
      */
     public function applyMensalidadeExpiry(LicencaSnapshot $snapshot): LicencaSnapshot
     {
         if (! $this->isEnabled()) {
-            return $snapshot;
-        }
-
-        // Portal ativo: libera. vencimento/mensalidade em atraso sozinho não sobrescreve.
-        if ($snapshot->status === LicencaSnapshot::STATUS_ATIVO) {
             return $snapshot;
         }
 
@@ -319,6 +315,23 @@ class LicencaRemotaService
      */
     public function resolveAccess(LicencaSnapshot $snapshot): array
     {
+        // Janela local sempre prevalece: não reaproveita valido_ate/tolerância antiga do portal.
+        if ($this->mensalidadeVencida()) {
+            $due = (string) ($this->loginGateMensalidadeDueDate() ?? '');
+            $liberadoAte = LicencaLiberacao::liberadoAte(
+                $due !== '' ? $due : null,
+                $due !== '' ? null : $snapshot->validoAte,
+            );
+
+            return self::$lastAccessDecision = [
+                'allowed' => false,
+                'field' => 'mensalidade_due_date+grace_days',
+                'detail' => 'liberado_ate='.($liberadoAte?->toDateString() ?? 'null')
+                    .'; mensalidade_due_date='.($due !== '' ? $due : 'null')
+                    .'; grace_days='.LicencaLiberacao::graceDays(),
+            ];
+        }
+
         if ($snapshot->status === LicencaSnapshot::STATUS_ATIVO) {
             return self::$lastAccessDecision = [
                 'allowed' => true,
@@ -331,20 +344,6 @@ class LicencaRemotaService
             LicencaSnapshot::STATUS_DESABILITADO,
             LicencaSnapshot::STATUS_INDISPONIVEL,
         ], true)) {
-            if ($this->mensalidadeVencida()) {
-                $due = (string) ($this->loginGateMensalidadeDueDate() ?? '');
-                $liberadoAte = LicencaLiberacao::liberadoAte($due !== '' ? $due : null, $snapshot->validoAte);
-
-                return self::$lastAccessDecision = [
-                    'allowed' => false,
-                    'field' => 'mensalidade_due_date+grace_days/valido_ate',
-                    'detail' => 'liberado_ate='.($liberadoAte?->toDateString() ?? 'null')
-                        .'; mensalidade_due_date='.($due !== '' ? $due : 'null')
-                        .'; valido_ate='.((string) ($snapshot->validoAte ?? 'null'))
-                        .'; grace_days='.LicencaLiberacao::graceDays(),
-                ];
-            }
-
             return self::$lastAccessDecision = [
                 'allowed' => true,
                 'field' => 'status',
@@ -514,7 +513,7 @@ class LicencaRemotaService
         $gate = session($this->loginGateKey());
         $previous = is_array($gate) ? $gate : [];
 
-        // status=ativo libera; vencimento passado na tolerância não derruba o gate.
+        // resolveAccess já aplica grace_days local (mesmo com status=ativo do portal).
         $allowed = $this->resolveAccess($snapshot)['allowed'];
 
         session([
@@ -712,11 +711,11 @@ class LicencaRemotaService
         $this->hydrateMensalidadeFromCache($this->currentCnpj());
 
         $due = trim((string) ($this->loginGateMensalidadeDueDate() ?? ''));
-        $validoAte = $this->loginGateSnapshot()?->validoAte;
 
+        // Com mensalidade: aviso usa só vencimento + grace_days (ignora valido_ate antigo).
         return LicencaLiberacao::avisoStartup(
             $due !== '' ? $due : null,
-            $validoAte,
+            $due !== '' ? null : $this->loginGateSnapshot()?->validoAte,
         );
     }
 
@@ -869,7 +868,7 @@ class LicencaRemotaService
         self::$lastApiPayload = $payload;
 
         $status = strtolower(trim((string) ($payload['status'] ?? '')));
-        // status=ativo prevalece: o portal pode manter vencimento no passado na tolerância.
+        // status=ativo do portal não ignora a janela local (vencimento + grace_days).
         // Só força bloqueio por flag quando o status não veio como ativo.
         $bloqueado = filter_var($payload['bloqueado'] ?? false, FILTER_VALIDATE_BOOLEAN);
 

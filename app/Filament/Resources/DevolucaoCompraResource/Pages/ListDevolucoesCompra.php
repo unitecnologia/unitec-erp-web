@@ -179,7 +179,10 @@ class ListDevolucoesCompra extends ListRecords
     protected function buildListQuery(): Builder
     {
         $query = parent::getTableQuery()
-            ->with(['fornecedor']);
+            ->with([
+                'fornecedor',
+                'nfe:id,devolucao_compra_id,numero',
+            ]);
 
         $empresaId = ErpContext::currentEmpresaId();
         if ($empresaId) {

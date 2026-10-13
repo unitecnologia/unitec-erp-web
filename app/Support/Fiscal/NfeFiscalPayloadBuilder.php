@@ -195,7 +195,7 @@ final class NfeFiscalPayloadBuilder
                 cNf: $cNf,
                 tpAmb: $tpAmb,
                 tpEmis: (int) ltrim((string) ($nfe->tipo_emissao ?: '1'), '0') ?: 1,
-                natOp: $finNFe === 4 ? 'DEVOLUCAO DE MERCADORIA' : 'VENDA',
+                natOp: $this->resolveNatOp($nfe, $finNFe),
                 codigoMunicipioFg: (string) ($empresa->cidade_codigo ?: ''),
                 dataEmissao: $emissao,
             ),
@@ -213,7 +213,7 @@ final class NfeFiscalPayloadBuilder
             valorOutros: $this->sumItensCampo($nfe, 'outros'),
             valorTotTrib: $valorTotTrib,
             dataSaida: $dataSaida,
-            parcelas: $finNFe === 4 ? [] : $parcelas,
+            parcelas: ($finNFe === 4 || $this->isTrocaEmGarantia($nfe)) ? [] : $parcelas,
             informacoesComplementares: $informacoesContribuinte,
             informacoesFisco: $informacoesFisco,
             pagamentos: $this->mapPagamentos($nfe, $finNFe),
@@ -477,6 +477,40 @@ final class NfeFiscalPayloadBuilder
         };
     }
 
+    private function isTrocaEmGarantia(Nfe $nfe): bool
+    {
+        if ((int) ($nfe->devolucao_compra_id ?? 0) <= 0) {
+            return false;
+        }
+
+        $nfe->loadMissing('devolucaoCompra');
+
+        return (bool) ($nfe->devolucaoCompra?->troca_em_garantia ?? false);
+    }
+
+    private function resolveNatOp(Nfe $nfe, int $finNFe): string
+    {
+        if ($finNFe === 4) {
+            return 'DEVOLUCAO DE MERCADORIA';
+        }
+
+        if ($this->isTrocaEmGarantia($nfe)) {
+            $stored = trim((string) ($nfe->natureza_operacao ?? ''));
+
+            if (preg_match('/^\d{4}\b\s*[-–]\s*(.+)$/u', $stored, $matches)) {
+                return mb_substr(mb_strtoupper(trim((string) $matches[1]), 'UTF-8'), 0, 60);
+            }
+
+            if ($stored !== '') {
+                return mb_substr(mb_strtoupper($stored, 'UTF-8'), 0, 60);
+            }
+
+            return 'TROCA EM GARANTIA';
+        }
+
+        return 'VENDA';
+    }
+
     /**
      * @return list<string>
      */
@@ -572,7 +606,8 @@ final class NfeFiscalPayloadBuilder
      */
     private function mapPagamentos(Nfe $nfe, int $finNFe = 1): array
     {
-        if ($finNFe === 4) {
+        // Devolução (finNFe=4) e troca em garantia: sem pagamento (tPag=90).
+        if ($finNFe === 4 || $this->isTrocaEmGarantia($nfe)) {
             return [new PagamentoDto(tipo: '90', valor: 0.0)];
         }
 

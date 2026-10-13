@@ -8,6 +8,7 @@ use App\Rules\DocumentoBrasileiroValido;
 use App\Support\Erp\Atualizacao\AtualizacaoApplyService;
 use App\Support\Erp\CepLookupService;
 use App\Support\Erp\CnpjLookupService;
+use App\Support\Erp\Database\PendingMigrationsGuard;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\Atualizacao\AtualizacaoLog;
 use App\Support\Erp\Atualizacao\AtualizacaoPasta;
@@ -111,9 +112,7 @@ class Login extends BaseLogin
 
     public function mount(): void
     {
-        $this->schemaMigrateError = session()->pull('erp_migrate_error')
-            ?: (\Illuminate\Support\Facades\Cache::pull('erp.schema.migrate_error') ?: null);
-        $this->schemaMigrateOk = session()->pull('erp_migrate_ok');
+        $this->refreshSchemaCompatibilityAlert();
 
         $this->configuracaoInicial = Empresa::configuracaoInicialPendente();
         if ($this->configuracaoInicial) {
@@ -125,13 +124,46 @@ class Login extends BaseLogin
             $snapshot = $this->snapshotForAtualizacaoGate();
             if ($this->shouldSkipAtualizacaoPrompt($snapshot)) {
                 $this->clearUpdatePromptSession();
+                // Evita loop schema → login → schema quando a licença impede instalar o pacote.
+                session(['erp_update_choice_skipped' => true]);
+                if (filled($this->schemaMigrateError)) {
+                    $this->redirect(url('/admin/schema-incompativel'));
+
+                    return;
+                }
                 $this->finishLoginAfterUpdateChoice($snapshot);
 
                 return;
             }
 
+            session()->forget('erp_update_choice_skipped');
             $this->showUpdatePrompt = true;
             $this->pendingUpdateVersion = (string) session('erp_pending_update_version', '');
+
+            return;
+        }
+
+        // Autenticado sem prompt de update: se schema incompatível, bloqueia painel
+        // mas mantém caminho de correção (login / atualização / reparo).
+        if (filament()->auth()->check() && filled($this->schemaMigrateError)) {
+            if (AtualizacaoPasta::ensurePendingReady()) {
+                $snapshot = $this->snapshotForAtualizacaoGate();
+                if (! $this->shouldSkipAtualizacaoPrompt($snapshot)) {
+                    $version = AtualizacaoPasta::pendingVersion() ?? '';
+                    session([
+                        'erp_awaiting_update_choice' => true,
+                        'erp_pending_update_version' => $version,
+                    ]);
+                    session()->forget('erp_update_choice_skipped');
+                    $this->showUpdatePrompt = true;
+                    $this->pendingUpdateVersion = $version;
+
+                    return;
+                }
+                session(['erp_update_choice_skipped' => true]);
+            }
+
+            $this->redirect(url('/admin/schema-incompativel'));
 
             return;
         }
@@ -465,9 +497,18 @@ class Login extends BaseLogin
         \App\Support\Erp\ErpContext::clearMemo();
 
         // Atualização pronta: pergunta Sim/Não, salvo se o portal bloquear a instalação.
+        // Prioridade sobre schema: o apply oficial é o caminho para migrar o banco.
         if (AtualizacaoPasta::ensurePendingReady()) {
             $snapshot = $this->snapshotForAtualizacaoGate();
             if ($this->shouldSkipAtualizacaoPrompt($snapshot)) {
+                session(['erp_update_choice_skipped' => true]);
+                $this->refreshSchemaCompatibilityAlert();
+                if (filled($this->schemaMigrateError)) {
+                    $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
+                    $this->redirect(url('/admin/schema-incompativel'));
+
+                    return null;
+                }
                 $this->finishLoginAfterUpdateChoice($snapshot);
 
                 return null;
@@ -478,6 +519,7 @@ class Login extends BaseLogin
                 'erp_awaiting_update_choice' => true,
                 'erp_pending_update_version' => $version,
             ]);
+            session()->forget('erp_update_choice_skipped');
             $this->showUpdatePrompt = true;
             $this->pendingUpdateVersion = $version;
             $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
@@ -485,9 +527,54 @@ class Login extends BaseLogin
             return null;
         }
 
+        $this->refreshSchemaCompatibilityAlert();
+        if (filled($this->schemaMigrateError)) {
+            $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
+            $this->redirect(url('/admin/schema-incompativel'));
+
+            return null;
+        }
+
         $this->finishLoginAfterUpdateChoice();
 
         return null;
+    }
+
+    private function refreshSchemaCompatibilityAlert(): void
+    {
+        $this->schemaMigrateOk = session()->pull('erp_migrate_ok');
+
+        try {
+            $guard = app(PendingMigrationsGuard::class);
+            $result = $guard->check();
+
+            // Lock transitório: não tratar como schema incompatível (evita redirect falso).
+            for ($i = 0; $i < 4 && (($result['transient'] ?? false) === true); $i++) {
+                usleep(150_000);
+                $result = $guard->check(forceRefresh: true);
+            }
+
+            if (($result['transient'] ?? false) === true) {
+                $this->schemaMigrateError = null;
+
+                return;
+            }
+
+            if (! $result['ok']) {
+                $this->schemaMigrateError = $result['message']
+                    ?: session()->pull('erp_migrate_error')
+                    ?: (\Illuminate\Support\Facades\Cache::get('erp.schema.migrate_error') ?: null);
+
+                return;
+            }
+        } catch (\Throwable $e) {
+            $this->schemaMigrateError = 'Falha ao verificar schema do banco: '.$e->getMessage();
+
+            return;
+        }
+
+        $this->schemaMigrateError = session()->pull('erp_migrate_error')
+            ?: (\Illuminate\Support\Facades\Cache::pull('erp.schema.migrate_error') ?: null);
     }
 
     public function aceitarAtualizacao(): void
@@ -565,7 +652,36 @@ class Login extends BaseLogin
     private function snapshotForAtualizacaoGate(): ?LicencaSnapshot
     {
         try {
-            return app(LicencaRemotaService::class)->validateAtLogin();
+            $licencas = app(LicencaRemotaService::class);
+
+            if (! $licencas->isEnabled()) {
+                return $licencas->validateAtLogin();
+            }
+
+            $cnpj = $licencas->currentCnpj();
+            if ($cnpj === null) {
+                return $licencas->validateAtLogin();
+            }
+
+            // Cache/gate local primeiro (sem HTTP). Só reconsulta o portal se esse
+            // snapshot impediria o aviso — evita modo_atualizacao/bloquear velhos
+            // esconderem um pacote já baixado, sem atrasar o login no caminho normal.
+            $local = $licencas->applyMensalidadeExpiry(
+                $licencas->checkCnpj($cnpj, forceRefresh: false),
+            );
+
+            if (! $this->shouldSkipAtualizacaoPrompt($local)) {
+                $licencas->rememberLoginGate($local);
+
+                return $local;
+            }
+
+            $fresh = $licencas->applyMensalidadeExpiry(
+                $licencas->checkCnpj($cnpj, forceRefresh: true),
+            );
+            $licencas->rememberLoginGate($fresh);
+
+            return $fresh;
         } catch (\Throwable $e) {
             Log::warning('Falha ao consultar licença para o gate de atualização.', [
                 'message' => $e->getMessage(),
@@ -597,7 +713,8 @@ class Login extends BaseLogin
         try {
             $licencas = app(LicencaRemotaService::class);
             $snapshot ??= $licencas->validateAtLogin();
-            if ($licencas->isEnabled() && ! $snapshot->isAllowed()) {
+            // resolveAccess (não só status): bloqueia após grace_days mesmo com status=ativo.
+            if ($licencas->isEnabled() && ! $licencas->resolveAccess($snapshot)['allowed']) {
                 $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
             } else {
                 $target = session()->pull('url.intended', filament()->getUrl());
@@ -612,7 +729,7 @@ class Login extends BaseLogin
             $licencas = app(LicencaRemotaService::class);
             $licencas->hydrateMensalidadeFromCache();
 
-            // Não bloquear só por vencimento: status=ativo / tolerância de 5 dias entram em loginGateIsAllowed.
+            // Bloqueio por data: grace_days local (via loginGateIsAllowed / resolveAccess).
             if ($licencas->isEnabled() && $licencas->loginGateIsAllowed() === false) {
                 $target = \App\Filament\Pages\LicencaBloqueadaPage::getUrl();
             } else {

@@ -58,7 +58,14 @@
         text-transform: uppercase;
     }
 
+    .carga-romaneio__doc .pessoa-list-doc__footer {
+        position: relative;
+    }
+
     .carga-romaneio__footer-page {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
         white-space: nowrap;
         font-weight: 700;
     }
@@ -73,11 +80,14 @@
         }
 
         .carga-romaneio__page-layer {
-            display: block;
-            position: absolute;
-            right: 0;
-            left: auto;
-            width: auto;
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            text-align: center !important;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 8pt;
             font-weight: 700;

@@ -63,6 +63,7 @@ class ForcaVendasMonitorResource extends Resource
      */
     public const GRID_SORT_TYPES = [
         'numero_pedido' => 'number',
+        'numero_venda' => 'number',
         'nf_nfc' => 'text',
         'situacao' => 'text',
         'cliente' => 'text',
@@ -112,11 +113,14 @@ class ForcaVendasMonitorResource extends Resource
                     ->alignCenter(),
                 TextColumn::make('numero_pedido')
                     ->label('Nº Pedido')
-                    ->state(fn (ForcaVendasOrder $record): string => $record->venda?->numero
-                        ? (string) (int) preg_replace('/\D/', '', (string) $record->venda->numero)
-                        : '—')
+                    ->state(fn (ForcaVendasOrder $record): string => self::formatNumeroDav($record))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
+                TextColumn::make('numero_venda')
+                    ->label('Nº Venda')
+                    ->state(fn (ForcaVendasOrder $record): string => self::formatNumeroVenda($record))
+                    ->alignCenter()
+                    ->placeholder('—'),
                 TextColumn::make('nf_nfc')
                     ->label('NF/NFC')
                     ->state(fn (ForcaVendasOrder $record): string => self::documentoFiscalNumero($record))
@@ -394,6 +398,38 @@ class ForcaVendasMonitorResource extends Resource
         }
 
         return (string) (int) $digits;
+    }
+
+    /**
+     * Nº Pedido estável = DAV (pedidos.numero). Mantém-se após reabrir/refaturar.
+     */
+    public static function formatNumeroDav(ForcaVendasOrder $record): string
+    {
+        $raw = trim((string) ($record->pedido?->numero ?? ''));
+
+        if ($raw === '') {
+            return (string) $record->id;
+        }
+
+        $digits = preg_replace('/\D/', '', $raw) ?? '';
+
+        return $digits !== '' ? (string) (int) $digits : $raw;
+    }
+
+    /**
+     * Número oficial da venda de faturamento (sequência independente do DAV).
+     */
+    public static function formatNumeroVenda(ForcaVendasOrder $record): string
+    {
+        $raw = trim((string) ($record->venda?->numero ?? ''));
+
+        if ($raw === '') {
+            return '—';
+        }
+
+        $digits = preg_replace('/\D/', '', $raw) ?? '';
+
+        return $digits !== '' ? (string) (int) $digits : $raw;
     }
 
     /**

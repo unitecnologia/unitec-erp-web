@@ -171,6 +171,43 @@ class WhatsAppSender
             ];
         }
 
+        $boot = $this->gatewayManager->ensureRunning($empresa);
+
+        if (! $boot['ok']) {
+            return [
+                'ok' => false,
+                'message' => (string) ($boot['message'] ?? 'Gateway WhatsApp indisponível.'),
+                'sent' => 0,
+            ];
+        }
+
+        $empresa = $empresa->fresh() ?? $empresa;
+        $this->ensureGatewayWhatsAppSession($empresa);
+        $empresa = $empresa->fresh() ?? $empresa;
+
+        $config = WhatsAppConfig::fromEmpresa($empresa);
+        $validation = $this->validateBeforeSend($empresa, $config, $tipo, $number);
+
+        if (! $validation['ok']) {
+            return [
+                'ok' => false,
+                'message' => $validation['message'],
+                'sent' => 0,
+            ];
+        }
+
+        $normalized = WhatsAppPhone::normalize($number);
+
+        if ($normalized === null) {
+            return [
+                'ok' => false,
+                'message' => 'Informe um número de WhatsApp válido.',
+                'sent' => 0,
+            ];
+        }
+
+        $config = WhatsAppConfig::fromEmpresa($empresa->fresh() ?? $empresa);
+        $candidates = WhatsAppPhone::lookupCandidates($number);
         $sent = 0;
         $total = count($documents);
 
@@ -178,18 +215,36 @@ class WhatsAppSender
             $path = (string) ($document['path'] ?? '');
             $name = (string) ($document['name'] ?? 'documento');
             $mimetype = (string) ($document['mimetype'] ?? 'application/pdf');
-            $caption = $index === 0
-                ? $text
-                : (string) ($document['caption'] ?? '');
 
-            $result = $this->sendDocumentMessage(
-                empresa: $empresa,
-                tipo: $tipo,
-                number: $number,
-                text: $caption,
-                documentPath: $path,
-                documentName: $name !== '' ? $name : 'documento',
-                mimetype: $mimetype !== '' ? $mimetype : 'application/pdf',
+            if ($path === '' || ! is_file($path)) {
+                if ($sent > 0) {
+                    return [
+                        'ok' => false,
+                        'message' => 'Arquivo para envio não encontrado. ('.$sent.' de '.$total.' anexos enviados.)',
+                        'sent' => $sent,
+                    ];
+                }
+
+                return [
+                    'ok' => false,
+                    'message' => 'Arquivo para envio não encontrado.',
+                    'sent' => 0,
+                ];
+            }
+
+            $caption = $index === 0
+                ? WhatsAppMessageHelper::withSystemFooter($text)
+                : WhatsAppMessageHelper::withSystemFooter((string) ($document['caption'] ?? ''));
+
+            $result = $this->client->sendDocument(
+                $config,
+                (int) $empresa->id,
+                $normalized,
+                $caption,
+                $path,
+                $name !== '' ? $name : 'documento',
+                $mimetype !== '' ? $mimetype : 'application/pdf',
+                $candidates,
             );
 
             if (! $result['ok']) {
@@ -208,6 +263,7 @@ class WhatsAppSender
                 ];
             }
 
+            $this->incrementDailyCounter($empresa);
             $sent++;
         }
 

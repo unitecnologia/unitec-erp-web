@@ -187,6 +187,32 @@ body,
     cursor: default;
 }
 
+.erp-title-bar__status-sep {
+    margin: 0 0.28rem 0 0.3rem;
+    color: rgba(148, 163, 184, 0.7);
+    font-weight: 500;
+}
+
+.erp-title-bar__bd {
+    font-size: inherit;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.erp-title-bar__bd--ok {
+    color: #86efac;
+}
+
+.erp-title-bar__bd--pending {
+    color: #fdba74;
+}
+
+.erp-title-bar__bd--unavailable {
+    color: rgba(203, 213, 225, 0.85);
+}
+
 .erp-title-bar__user {
     display: flex;
     align-items: baseline;

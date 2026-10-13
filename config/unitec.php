@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.244',
+    'versao' => '6.4.1.247',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -16,8 +16,8 @@ return [
         'cache_seconds' => 600,
         'grace_hours' => 24,
         // Dias corridos após o vencimento da mensalidade em que o ERP ainda libera (inclusive).
-        // Ex.: vence 10/10 → liberado até 15/10; bloqueia a partir de 16/10.
-        'grace_days' => 5,
+        // Ex.: vence 10/10 → liberado até 12/10; bloqueia a partir de 13/10.
+        'grace_days' => 2,
     ],
 
     /*
@@ -74,11 +74,11 @@ return [
     'browser_zoom' => max(50, min(200, (int) env('UNITEC_BROWSER_ZOOM', 100))),
 
     /*
-    | Ao abrir o ERP: se o schema estiver atr├ís do c├│digo (ex. restore de dump
-    | antigo), aplica apenas `php artisan migrate --force`. Nunca migrate:fresh.
-    | ERP_AUTO_MIGRATE=false ÔåÆ s├│ detecta e avisa, sem alterar o banco.
+    | Compatibilidade de schema no painel: apenas verificação leve (sem migrate).
+    | Migrate fica no atualizador oficial (gate pending=0) e no Reparar Sistema.
+    | ERP_AUTO_MIGRATE permanece por compatibilidade de .env; o HTTP não aplica migrate.
     */
-    'auto_migrate' => filter_var(env('ERP_AUTO_MIGRATE', true), FILTER_VALIDATE_BOOL),
+    'auto_migrate' => filter_var(env('ERP_AUTO_MIGRATE', false), FILTER_VALIDATE_BOOL),
 
     /*
     | Atualiza├º├úo remota de produ├º├úo (UnitecErpServer).

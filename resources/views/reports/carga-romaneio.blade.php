@@ -157,6 +157,14 @@
                 const layer = document.createElement('div');
                 layer.className = 'carga-romaneio__page-layer';
                 layer.textContent = 'Pag: ' + page + ' de ' + totalPages;
+                // Inline prevalece sobre CSS residual (ex.: right:0); só o top muda por página.
+                layer.style.display = 'block';
+                layer.style.position = 'absolute';
+                layer.style.left = '0';
+                layer.style.right = '0';
+                layer.style.width = '100%';
+                layer.style.margin = '0';
+                layer.style.textAlign = 'center';
                 layer.style.top = ((page * pageHeightPx) - mmToPx(8)) + 'px';
                 paper.appendChild(layer);
             }

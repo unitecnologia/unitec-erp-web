@@ -50,7 +50,6 @@ class DevolucaoCompraResource extends Resource
             ->columns([
                 TextColumn::make('numero')
                     ->label('Número')
-                    ->sortable()
                     ->alignCenter()
                     ->formatStateUsing(function (?string $state, DevolucaoCompra $record): string {
                         if (filled($state)) {
@@ -65,7 +64,6 @@ class DevolucaoCompraResource extends Resource
                 TextColumn::make('data')
                     ->label('Data')
                     ->date('d/m/Y')
-                    ->sortable()
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('compra_numero')
@@ -78,6 +76,26 @@ class DevolucaoCompraResource extends Resource
                     ->state(fn (DevolucaoCompra $record): string => mb_strtoupper($record->fornecedorNome(), 'UTF-8'))
                     ->wrap(false)
                     ->weight(FontWeight::Bold),
+                ViewColumn::make('troca_em_garantia')
+                    ->label('Garantia')
+                    ->view('filament.components.erp.devolucoes-compra.columns.garantia')
+                    ->alignCenter()
+                    ->disabledClick(),
+                TextColumn::make('nfe.numero')
+                    ->label('Nº NF-e')
+                    ->alignCenter()
+                    ->placeholder('—')
+                    ->formatStateUsing(function (?string $state): string {
+                        if (! filled($state)) {
+                            return '—';
+                        }
+
+                        $digits = (int) preg_replace('/\D/', '', $state);
+
+                        return $digits > 0 ? (string) $digits : $state;
+                    })
+                    ->weight(FontWeight::SemiBold)
+                    ->disabledClick(),
                 ViewColumn::make('situacao')
                     ->label('Situação')
                     ->view('filament.components.erp.devolucoes-compra.columns.status')

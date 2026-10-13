@@ -134,7 +134,8 @@
 .erp-aniversariantes__locate-label,
 .erp-produtos__locate-label,
 .erp-usuarios__locate-label,
-.erp-empresas__locate-label {
+.erp-empresas__locate-label,
+.erp-veiculos__locate-label {
     font-size: var(--erp-font-size-xs);
     font-weight: 700;
     color: var(--erp-brand-primary);
@@ -250,6 +251,7 @@
 .erp-transportadoras__select,
 .erp-terminais__select,
 .erp-aniversariantes__select,
+.erp-veiculos__select,
 .erp-pessoas__input,
 .erp-vendedores__input,
 .erp-grupos__input,
@@ -266,6 +268,7 @@
 .erp-transportadoras__input,
 .erp-terminais__input,
 .erp-aniversariantes__input,
+.erp-veiculos__input,
 .erp-produtos__select,
 .erp-produtos__input,
 .erp-usuarios__select,
@@ -332,6 +335,8 @@
 .erp-contadores__input:focus,
 .erp-transportadoras__input:focus,
 .erp-aniversariantes__input:focus,
+.erp-veiculos__select:focus,
+.erp-veiculos__input:focus,
 .erp-produtos__select:focus,
 .erp-produtos__input:focus,
 .erp-usuarios__input:focus,

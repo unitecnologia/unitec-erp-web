@@ -53,6 +53,10 @@
                             title="Hotfix {{ $hotfix['id'] }} instalado{{ $hotfix['aplicado_em'] !== '' ? ' em '.$hotfix['aplicado_em'] : '' }}"
                         >| {{ $hotfix['rotulo'] }}</span>
                     @endif
+                    @if ($label === 'Versão')
+                        <span class="erp-title-bar__status-sep" aria-hidden="true">·</span>
+                        @include('filament.components.erp.schema-bd-indicator', ['class' => 'erp-title-bar__bd'])
+                    @endif
                 </div>
             @endforeach
         </div>

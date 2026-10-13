@@ -89,9 +89,13 @@ class GestorPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 AuthenticateSession::class,
+                \App\Http\Middleware\EnsureDatabaseUpToDate::class,
                 \App\Http\Middleware\EnsureEmpresaSelecionada::class,
                 \App\Http\Middleware\EnsureLicencaAtiva::class,
                 \App\Http\Middleware\EnsureLicensedBrowserDevice::class,
+            ])
+            ->persistentMiddleware([
+                \App\Http\Middleware\EnsureDatabaseUpToDate::class,
             ]);
     }
 }

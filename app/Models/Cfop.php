@@ -68,6 +68,27 @@ class Cfop extends Model
         return $query->where('ativo', false);
     }
 
+    /**
+     * Monta o rótulo "NNNN - DESCRIÇÃO" a partir do cadastro de CFOP.
+     */
+    public static function formatNaturezaLabel(int|string|null $codigo): string
+    {
+        $digits = preg_replace('/\D/', '', (string) $codigo) ?? '';
+        $codigoInt = (int) $digits;
+
+        if ($codigoInt <= 0) {
+            return '';
+        }
+
+        $descricao = static::query()
+            ->where('codigo', $codigoInt)
+            ->value('descricao');
+
+        return trim(
+            $codigoInt.($descricao ? ' - '.mb_strtoupper(trim((string) $descricao), 'UTF-8') : '')
+        );
+    }
+
     protected function casts(): array
     {
         return [

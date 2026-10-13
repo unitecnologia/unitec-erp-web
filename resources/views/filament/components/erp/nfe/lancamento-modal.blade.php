@@ -91,9 +91,9 @@
                     @include('filament.components.erp.nfe.lancamento-cliente')
 
                     <div class="erp-nfe-lancamento-modal__form-row erp-nfe-lancamento-modal__form-row--ops">
-                        <div class="erp-nfe-lancamento-modal__form-group">
+                        <div class="erp-nfe-lancamento-modal__form-group erp-nfe-lancamento-modal__form-group--finalidade">
                             <label class="erp-nfe-lancamento-modal__form-label">Finalidade</label>
-                            <select wire:model="nfeForm.finalidade" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo">
+                            <select wire:model="nfeForm.finalidade" class="erp-nfe-lancamento-modal__form-select erp-nfe-lancamento-modal__form-input--combo erp-nfe-lancamento-modal__form-input--finalidade">
                                 <option value="normal">NORMAL</option>
                                 <option value="complementar">COMPLEMENTAR</option>
                                 <option value="ajuste">AJUSTE</option>

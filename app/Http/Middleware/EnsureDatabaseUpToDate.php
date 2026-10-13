@@ -8,8 +8,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Ao abrir o ERP: se o schema estiver atrás do código (restore de dump antigo),
- * aplica só `migrate --force` (nunca fresh).
+ * Painel Filament: bloqueia uso normal se o schema estiver atrás do código.
+ * Não executa migrate — só verifica (leve + cache). Login/atualização/reparo ficam livres.
  */
 class EnsureDatabaseUpToDate
 {
@@ -22,13 +22,59 @@ class EnsureDatabaseUpToDate
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // API do PDV / health: evita custo e race em alta frequência.
-        if ($request->is('api/*') || $request->is('up')) {
+        if ($this->isExempt($request)) {
             return $next($request);
         }
 
-        $this->guard->ensureUpToDate();
+        $result = $this->guard->check();
 
-        return $next($request);
+        for ($i = 0; $i < 3 && (($result['transient'] ?? false) === true); $i++) {
+            usleep(150_000);
+            $result = $this->guard->check(forceRefresh: true);
+        }
+
+        if ($result['ok']) {
+            return $next($request);
+        }
+
+        // Lock ainda ocupado ou schema incompatível: nunca liberar o painel sem OK confirmado.
+        // Livewire/AJAX: redirect (não 503) para a tela de bloqueio/recuperação.
+        return redirect()->to(url('/admin/schema-incompativel'));
+    }
+
+    private function isExempt(Request $request): bool
+    {
+        if ($request->routeIs('filament.admin.auth.logout')
+            || $request->routeIs('filament.gestor.auth.logout')
+            || $request->routeIs('filament.inventario.auth.logout')) {
+            return true;
+        }
+
+        $path = trim($request->path(), '/');
+
+        if ($path === 'admin/schema-incompativel'
+            || str_starts_with($path, 'admin/schema-incompativel')) {
+            return true;
+        }
+
+        // Livewire da tela de schema (e login com atualização) precisa passar.
+        if ($this->isLivewirePath($path)) {
+            $referer = (string) $request->headers->get('referer', '');
+
+            return str_contains($referer, '/schema-incompativel')
+                || str_contains($referer, '/admin/login')
+                || str_contains($referer, '/gestor/login')
+                || str_contains($referer, '/inventario/login');
+        }
+
+        return false;
+    }
+
+    private function isLivewirePath(string $path): bool
+    {
+        return str_starts_with($path, 'livewire/')
+            || str_starts_with($path, 'admin/livewire')
+            || str_starts_with($path, 'gestor/livewire')
+            || str_starts_with($path, 'inventario/livewire');
     }
 }

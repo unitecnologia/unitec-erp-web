@@ -430,7 +430,15 @@ class WhatsAppGatewayManager
 \$dir = Split-Path -Parent \$log
 if (-not (Test-Path \$dir)) { New-Item -ItemType Directory -Path \$dir -Force | Out-Null }
 Add-Content -Path \$log -Value ("{0} --- start {1} index.js" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), '{$nodeEscaped}')
-\$p = Start-Process -FilePath '{$nodeEscaped}' -ArgumentList 'index.js' -WorkingDirectory '{$workEscaped}' -WindowStyle Hidden -PassThru
+# UseShellExecute=false para herdar NODE_OPTIONS (IPv4). Em IPv6 o Baileys sobe sem gerar QR.
+\$psi = New-Object System.Diagnostics.ProcessStartInfo
+\$psi.FileName = '{$nodeEscaped}'
+\$psi.Arguments = 'index.js'
+\$psi.WorkingDirectory = '{$workEscaped}'
+\$psi.UseShellExecute = \$false
+\$psi.CreateNoWindow = \$true
+\$psi.EnvironmentVariables['NODE_OPTIONS'] = '--dns-result-order=ipv4first'
+\$p = [System.Diagnostics.Process]::Start(\$psi)
 if (-not \$p) { exit 1 }
 Start-Sleep -Milliseconds 800
 if (\$p.HasExited) {

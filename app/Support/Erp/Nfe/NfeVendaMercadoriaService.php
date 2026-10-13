@@ -290,13 +290,7 @@ class NfeVendaMercadoriaService
 
     protected function formatNaturezaOperacao(int $cfop): string
     {
-        $descricao = Cfop::query()
-            ->where('codigo', $cfop)
-            ->value('descricao');
-
-        return trim(
-            $cfop.($descricao ? ' - '.mb_strtoupper((string) $descricao, 'UTF-8') : '')
-        );
+        return Cfop::formatNaturezaLabel($cfop);
     }
 
     /**

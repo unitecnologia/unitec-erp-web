@@ -175,6 +175,30 @@ body:has(.unitec-login-root) {
     color: #fff;
 }
 
+.unitec-login__version-sep {
+    margin: 0 0.28rem;
+    font-weight: 500;
+    color: rgba(226, 232, 240, 0.45);
+}
+
+.unitec-login__bd {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.unitec-login__bd--ok {
+    color: #bbf7d0;
+}
+
+.unitec-login__bd--pending {
+    color: #fdba74;
+}
+
+.unitec-login__bd--unavailable {
+    color: rgba(226, 232, 240, 0.72);
+}
+
 .unitec-login__copyright {
     margin: 0;
     font-size: 0.68rem;

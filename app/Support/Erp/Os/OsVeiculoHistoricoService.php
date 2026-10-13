@@ -32,15 +32,12 @@ final class OsVeiculoHistoricoService
             (string) $veiculo->placa,
             (string) ($veiculo->placa_alternativa ?? ''),
         ] as $bruta) {
-            $placa = OsVeiculo::normalizarPlaca($bruta);
-            if ($placa === '') {
-                continue;
-            }
-
-            $variantes[] = $placa;
-            if (strlen($placa) === 7) {
-                $variantes[] = substr($placa, 0, 3).'-'.substr($placa, 3);
-                $variantes[] = substr($placa, 0, 3).' '.substr($placa, 3);
+            foreach (OsVeiculo::variantesPlaca($bruta) as $placa) {
+                $variantes[] = $placa;
+                if (strlen($placa) === 7) {
+                    $variantes[] = substr($placa, 0, 3).'-'.substr($placa, 3);
+                    $variantes[] = substr($placa, 0, 3).' '.substr($placa, 3);
+                }
             }
         }
 

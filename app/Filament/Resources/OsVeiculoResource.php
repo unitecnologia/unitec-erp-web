@@ -94,7 +94,7 @@ class OsVeiculoResource extends Resource
                     ->alignCenter()
                     ->disabledClick(),
             ])
-            ->defaultSort('placa', 'asc')
+            ->defaultSort('id', 'desc')
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

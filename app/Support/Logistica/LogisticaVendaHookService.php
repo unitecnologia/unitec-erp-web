@@ -14,6 +14,8 @@ final class LogisticaVendaHookService
 
     public function onVendaCancelada(Venda $venda, ?string $motivo = null): void
     {
-        (new ExpedicaoService())->cancelarPorVenda($venda, $motivo);
+        $expedicao = new ExpedicaoService();
+        $expedicao->cancelarPorVenda($venda, $motivo);
+        $expedicao->removerVendaDeCargasAbertas($venda);
     }
 }

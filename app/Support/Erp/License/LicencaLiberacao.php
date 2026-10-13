@@ -6,44 +6,36 @@ use Carbon\Carbon;
 use Throwable;
 
 /**
- * Regras locais de liberação por data (tolerância pós-vencimento + valido_ate).
+ * Regras locais de liberação por data (tolerância pós-vencimento).
  *
- * Ex.: vencimento 10/10 → liberado até 15/10 (5 dias corridos, inclusive);
- * bloqueio a partir de 16/10. valido_ate pode estender essa janela.
+ * Ex.: vencimento 10/10 → liberado até 12/10 (2 dias corridos, inclusive);
+ * bloqueio a partir de 13/10.
+ *
+ * Com vencimento conhecido, só vale vencimento + grace_days da config — não
+ * reaproveita valido_ate do portal/cache (pode trazer tolerância antiga).
+ * valido_ate só entra como fallback quando não há vencimento.
  */
 final class LicencaLiberacao
 {
     public static function graceDays(): int
     {
-        return max(0, (int) config('unitec.licenca_api.grace_days', 5));
+        return max(0, (int) config('unitec.licenca_api.grace_days', 2));
     }
 
     /**
-     * Último dia em que o ERP ainda libera com base nas datas
-     * (max de vencimento+grace e valido_ate).
+     * Último dia em que o ERP ainda libera com base nas datas.
+     * Prioridade: vencimento + grace_days; senão valido_ate (fallback).
      */
     public static function liberadoAte(?string $vencimento, ?string $validoAte, ?int $graceDays = null): ?Carbon
     {
         $graceDays ??= self::graceDays();
-        $candidates = [];
 
         $venc = self::parseDate($vencimento);
         if ($venc !== null) {
-            $candidates[] = $venc->copy()->addDays($graceDays);
+            return $venc->copy()->addDays($graceDays)->startOfDay();
         }
 
-        $valido = self::parseDate($validoAte);
-        if ($valido !== null) {
-            $candidates[] = $valido;
-        }
-
-        if ($candidates === []) {
-            return null;
-        }
-
-        usort($candidates, static fn (Carbon $a, Carbon $b): int => $b->timestamp <=> $a->timestamp);
-
-        return $candidates[0]->copy()->startOfDay();
+        return self::parseDate($validoAte)?->copy()->startOfDay();
     }
 
     /**

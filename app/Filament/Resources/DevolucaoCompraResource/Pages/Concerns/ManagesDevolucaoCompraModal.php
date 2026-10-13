@@ -30,6 +30,8 @@ trait ManagesDevolucaoCompraModal
 
     public string $formObservacoes = '';
 
+    public bool $formTrocaEmGarantia = false;
+
     public string $formData = '';
 
     public string $formSituacao = 'aberta';
@@ -123,6 +125,7 @@ trait ManagesDevolucaoCompraModal
         $this->formFornecedorId = $devolucao->fornecedor_id ? (int) $devolucao->fornecedor_id : null;
         $this->formFornecedor = $devolucao->fornecedorNome();
         $this->formObservacoes = (string) ($devolucao->observacoes ?? '');
+        $this->formTrocaEmGarantia = (bool) ($devolucao->troca_em_garantia ?? false);
         $this->formData = $devolucao->data?->format('Y-m-d') ?? ErpTimezone::toLocal()->format('Y-m-d');
         $this->formSituacao = (string) ($devolucao->situacao ?: DevolucaoCompra::SITUACAO_ABERTA);
 
@@ -610,6 +613,7 @@ trait ManagesDevolucaoCompraModal
                         ? DevolucaoCompra::TIPO_TOTAL
                         : DevolucaoCompra::TIPO_PARCIAL,
                     'observacoes' => trim($this->formObservacoes) ?: null,
+                    'troca_em_garantia' => (bool) $this->formTrocaEmGarantia,
                     'total' => $this->formTotal,
                     'situacao' => DevolucaoCompra::SITUACAO_ABERTA,
                 ];
@@ -759,6 +763,7 @@ trait ManagesDevolucaoCompraModal
         $this->formEmpresa = '';
         $this->formFornecedor = '';
         $this->formObservacoes = '';
+        $this->formTrocaEmGarantia = false;
         $this->formData = '';
         $this->formSituacao = DevolucaoCompra::SITUACAO_ABERTA;
         $this->formItens = [];

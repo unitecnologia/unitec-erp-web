@@ -48,7 +48,9 @@ class EnsureOnboardingCompleto
         $path = trim($request->path(), '/');
 
         if (
-            str_starts_with($path, 'livewire/')
+            $path === 'admin/schema-incompativel'
+            || str_starts_with($path, 'admin/schema-incompativel')
+            || str_starts_with($path, 'livewire/')
             || str_starts_with($path, 'admin/livewire')
         ) {
             return true;

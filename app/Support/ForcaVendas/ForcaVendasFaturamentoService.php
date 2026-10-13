@@ -23,6 +23,7 @@ use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\ComissaoPeriodoService;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
@@ -386,6 +387,13 @@ class ForcaVendasFaturamentoService
         $avancar('Estornando financeiro');
         $this->garantirTitulosNaoRecebidos($order);
         $this->garantirSemBoletoEmitido($order);
+
+        try {
+            (new ComissaoPeriodoService())->liberarVendaEstornada((int) $venda->id);
+        } catch (\InvalidArgumentException $e) {
+            throw new \RuntimeException($e->getMessage(), 0, $e);
+        }
+
         $this->contasDoPedido($order)
             ->where(function (Builder $query): void {
                 $query->whereNull('valor_recebido')->orWhere('valor_recebido', '<=', 0);
@@ -421,6 +429,7 @@ class ForcaVendasFaturamentoService
         $avancar('Reabrindo pedido');
         $venda->update(['status' => Venda::STATUS_CANCELADO]);
         (new LogisticaVendaHookService())->onVendaCancelada($venda, $motivoLogistica);
+        $this->desvincularPixDaVenda((int) $venda->id);
 
         $order->forceFill([
             'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
@@ -435,6 +444,23 @@ class ForcaVendasFaturamentoService
         if ($order->pedido && $order->pedido->status !== Pedido::STATUS_ABERTO) {
             $order->pedido->update(['status' => Pedido::STATUS_ABERTO]);
         }
+
+        (new VendasInternasMonitorHookService())->onForcaVendasOrderReaberto($order);
+    }
+
+    /**
+     * Mantém cobrança Pix (uuid/status/histórico) e só desfaz o vínculo com a
+     * venda cancelada — o próximo faturamento religa se ainda estiver paga.
+     */
+    private function desvincularPixDaVenda(int $vendaId): void
+    {
+        if ($vendaId <= 0 || ! Schema::hasTable((new PixCobranca)->getTable())) {
+            return;
+        }
+
+        PixCobranca::query()
+            ->where('venda_id', $vendaId)
+            ->update(['venda_id' => null]);
     }
 
     /**

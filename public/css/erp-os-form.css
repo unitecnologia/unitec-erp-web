@@ -356,6 +356,17 @@
     cursor: not-allowed;
 }
 
+.erp-os-placa-btn--secondary {
+    border-color: #cbd5e1;
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    color: #334155;
+}
+
+.erp-os-placa-btn--secondary:hover:not(:disabled) {
+    border-color: #94a3b8;
+    background: linear-gradient(180deg, #f1f5f9 0%, #dbe3ee 100%);
+}
+
 .erp-os-equipamento.erp-os-panel--fill {
     overflow: visible;
 }

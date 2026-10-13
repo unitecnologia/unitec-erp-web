@@ -34,9 +34,12 @@ use App\Support\Fiscal\FormaPagamentoTPagMap;
 use App\Support\Fiscal\NfeEmissionService;
 use Filament\Notifications\Notification;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Js;
+use RuntimeException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -510,121 +513,127 @@ trait ManagesNfeEmissaoModal
         $isEditing = (bool) $this->nfeModalRecordId;
         $savedId = null;
 
-        DB::transaction(function () use ($empresaId, $totais, $calculated, $isEditing, &$savedId): void {
-            $params = $empresaId ? VendasParametro::forEmpresa($empresaId) : null;
-            $numero = $isEditing
-                ? $this->nfeForm['numero']
-                : (string) ($params?->peekNumeroNfe() ?? Nfe::nextNumero($empresaId));
+        try {
+            DB::transaction(function () use ($empresaId, $totais, $calculated, &$isEditing, &$savedId): void {
+                $this->garantirVinculoUnicoDevolucaoCompra($isEditing);
 
-            $serie = $this->nfeForm['serie'] ?: (string) ($params?->serie_nfe ?? 1);
+                $params = $empresaId ? VendasParametro::forEmpresa($empresaId) : null;
+                $numero = $isEditing
+                    ? $this->nfeForm['numero']
+                    : (string) ($params?->peekNumeroNfe() ?? Nfe::nextNumero($empresaId));
 
-            if (! $isEditing && $empresaId) {
-                $duplicada = Nfe::query()
-                    ->where('empresa_id', $empresaId)
-                    ->where('numero', $numero)
-                    ->where('serie', $serie)
-                    ->exists();
+                $serie = $this->nfeForm['serie'] ?: (string) ($params?->serie_nfe ?? 1);
 
-                if ($duplicada) {
-                    Notification::make()->title('Número de NF-e já utilizado nesta série.')->danger()->send();
+                if (! $isEditing && $empresaId) {
+                    $duplicada = Nfe::query()
+                        ->where('empresa_id', $empresaId)
+                        ->where('numero', $numero)
+                        ->where('serie', $serie)
+                        ->exists();
 
-                    return;
-                }
-            }
+                    if ($duplicada) {
+                        Notification::make()->title('Número de NF-e já utilizado nesta série.')->danger()->send();
 
-            $payload = [
-                'empresa_id' => $empresaId,
-                'numero' => $numero,
-                'serie' => $serie,
-                'modelo' => '55',
-                'data_emissao' => $this->nfeForm['data_emissao'],
-                'data_saida' => $this->nfeForm['data_saida'] ?: $this->nfeForm['data_emissao'],
-                'cliente_id' => (int) $this->nfeForm['cliente_id'],
-                'npedido' => $this->nfeForm['numero_pedido'] ?: null,
-                'venda_id' => $this->nfeModalVendaId ?: null,
-                'pdv_venda_id' => $this->nfeModalPdvVendaId ?: null,
-                'devolucao_compra_id' => $this->nfeModalDevolucaoCompraId ?: null,
-                'ordem_servico_id' => $this->nfeModalOrdemServicoId ?: null,
-                'cfop' => $calculated['cfop'],
-                'finalidade' => $this->mapFinalidade($this->nfeForm['finalidade'] ?? 'normal'),
-                'movimento' => ($this->nfeForm['movimento'] ?? 'saida') === 'entrada' ? '0' : '1',
-                'consumidor_final' => ! empty($this->nfeForm['consumidor_final']) ? '1' : '0',
-                'forma_pgto' => $this->nfeForm['forma_pgto'] ?? null,
-                'meio_pgto' => $this->normalizeNfeMeioPgto($this->nfeForm['meio_pgto'] ?? null),
-                'obs_fisco' => $this->nfeForm['obs_fisco'] ?? null,
-                'obs_contribuinte' => $this->mergeObsContribuinteWithIbpt(
-                    (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
-                    (string) ($totais['ibpt_texto'] ?? ''),
-                ),
-                'tipo_frete' => (string) ($this->nfeForm['tipo_frete'] ?? '9'),
-                'transportadora_id' => ((int) ($this->nfeForm['transportadora_id'] ?? 0)) ?: null,
-                'placa' => filled($this->nfeForm['placa'] ?? null)
-                    ? mb_strtoupper(trim((string) $this->nfeForm['placa']), 'UTF-8')
-                    : null,
-                'uf_placa' => filled($this->nfeForm['uf_placa'] ?? null)
-                    ? mb_strtoupper(trim((string) $this->nfeForm['uf_placa']), 'UTF-8')
-                    : null,
-                'especie' => filled($this->nfeForm['especie'] ?? null)
-                    ? mb_strtoupper(trim((string) $this->nfeForm['especie']), 'UTF-8')
-                    : null,
-                'marca' => filled($this->nfeForm['marca'] ?? null)
-                    ? mb_strtoupper(trim((string) $this->nfeForm['marca']), 'UTF-8')
-                    : null,
-                'nvol' => filled($this->nfeForm['nvol'] ?? null)
-                    ? trim((string) $this->nfeForm['nvol'])
-                    : null,
-                'qvol' => max(0, (int) preg_replace('/\D/', '', (string) ($this->nfeForm['qvol'] ?? '0'))),
-                'peso_l' => ErpMoney::parseBr((string) ($this->nfeForm['peso_l'] ?? '0'), 3),
-                'peso_b' => ErpMoney::parseBr((string) ($this->nfeForm['peso_b'] ?? '0'), 3),
-                'subtotal' => $totais['subtotal'],
-                'desconto' => $totais['desconto'],
-                'total' => $totais['total'],
-                'total_itens' => count($calculated['rows']),
-                'base_icms' => $totais['base_icms'],
-                'total_icms' => $totais['valor_icms'],
-                'base_ipi' => $totais['base_ipi'],
-                'total_ipi' => $totais['valor_ipi'],
-                'base_icms_pis' => $totais['base_pis'],
-                'total_icms_pis' => $totais['valor_pis'],
-                'base_icms_cofins' => $totais['base_cofins'],
-                'total_icms_cofins' => $totais['valor_cofins'],
-                'base_icms_st' => $totais['base_st'],
-                'valor_icms_st' => $totais['valor_st'],
-                'frete' => $totais['frete'],
-                'seguro' => $totais['seguro'],
-                'outros' => $totais['outras'],
-                'total_desoneracao' => $totais['desoneracao'],
-                'trib_fed' => $totais['trib_fed'] ?? 0,
-                'trib_est' => $totais['trib_est'] ?? 0,
-                'trib_mun' => $totais['trib_mun'] ?? 0,
-                'trib_imp' => $totais['trib_imp'] ?? 0,
-                'situacao' => Nfe::SITUACAO_ABERTA,
-                'status' => Nfe::STATUS_ABERTA,
-                'chave_nfe_referenciada' => $this->primeiraChaveReferenciaModal(),
-            ];
-
-            if ($isEditing) {
-                $nfe = Nfe::query()->find($this->nfeModalRecordId);
-
-                if (! $nfe) {
-                    Notification::make()->title('NF-e não encontrada.')->warning()->send();
-
-                    return;
+                        return;
+                    }
                 }
 
-                if ($nfe->situacao !== Nfe::SITUACAO_ABERTA) {
-                    Notification::make()->title('Somente NF-e aberta pode ser alterada.')->warning()->send();
+                $payload = [
+                    'empresa_id' => $empresaId,
+                    'numero' => $numero,
+                    'serie' => $serie,
+                    'modelo' => '55',
+                    'data_emissao' => $this->nfeForm['data_emissao'],
+                    'data_saida' => $this->nfeForm['data_saida'] ?: $this->nfeForm['data_emissao'],
+                    'cliente_id' => (int) $this->nfeForm['cliente_id'],
+                    'npedido' => $this->nfeForm['numero_pedido'] ?: null,
+                    'venda_id' => $this->nfeModalVendaId ?: null,
+                    'pdv_venda_id' => $this->nfeModalPdvVendaId ?: null,
+                    'devolucao_compra_id' => $this->nfeModalDevolucaoCompraId ?: null,
+                    'ordem_servico_id' => $this->nfeModalOrdemServicoId ?: null,
+                    'cfop' => $calculated['cfop'],
+                    'natureza_operacao' => $this->resolveNaturezaOperacaoParaPersistir(
+                        $calculated['cfop'] !== null ? (int) $calculated['cfop'] : null
+                    ),
+                    'finalidade' => $this->mapFinalidade($this->nfeForm['finalidade'] ?? 'normal'),
+                    'movimento' => ($this->nfeForm['movimento'] ?? 'saida') === 'entrada' ? '0' : '1',
+                    'consumidor_final' => ! empty($this->nfeForm['consumidor_final']) ? '1' : '0',
+                    'forma_pgto' => $this->nfeForm['forma_pgto'] ?? null,
+                    'meio_pgto' => $this->normalizeNfeMeioPgto($this->nfeForm['meio_pgto'] ?? null),
+                    'obs_fisco' => $this->nfeForm['obs_fisco'] ?? null,
+                    'obs_contribuinte' => $this->mergeObsContribuinteWithIbpt(
+                        (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
+                        (string) ($totais['ibpt_texto'] ?? ''),
+                    ),
+                    'tipo_frete' => (string) ($this->nfeForm['tipo_frete'] ?? '9'),
+                    'transportadora_id' => ((int) ($this->nfeForm['transportadora_id'] ?? 0)) ?: null,
+                    'placa' => filled($this->nfeForm['placa'] ?? null)
+                        ? mb_strtoupper(trim((string) $this->nfeForm['placa']), 'UTF-8')
+                        : null,
+                    'uf_placa' => filled($this->nfeForm['uf_placa'] ?? null)
+                        ? mb_strtoupper(trim((string) $this->nfeForm['uf_placa']), 'UTF-8')
+                        : null,
+                    'especie' => filled($this->nfeForm['especie'] ?? null)
+                        ? mb_strtoupper(trim((string) $this->nfeForm['especie']), 'UTF-8')
+                        : null,
+                    'marca' => filled($this->nfeForm['marca'] ?? null)
+                        ? mb_strtoupper(trim((string) $this->nfeForm['marca']), 'UTF-8')
+                        : null,
+                    'nvol' => filled($this->nfeForm['nvol'] ?? null)
+                        ? trim((string) $this->nfeForm['nvol'])
+                        : null,
+                    'qvol' => max(0, (int) preg_replace('/\D/', '', (string) ($this->nfeForm['qvol'] ?? '0'))),
+                    'peso_l' => ErpMoney::parseBr((string) ($this->nfeForm['peso_l'] ?? '0'), 3),
+                    'peso_b' => ErpMoney::parseBr((string) ($this->nfeForm['peso_b'] ?? '0'), 3),
+                    'subtotal' => $totais['subtotal'],
+                    'desconto' => $totais['desconto'],
+                    'total' => $totais['total'],
+                    'total_itens' => count($calculated['rows']),
+                    'base_icms' => $totais['base_icms'],
+                    'total_icms' => $totais['valor_icms'],
+                    'base_ipi' => $totais['base_ipi'],
+                    'total_ipi' => $totais['valor_ipi'],
+                    'base_icms_pis' => $totais['base_pis'],
+                    'total_icms_pis' => $totais['valor_pis'],
+                    'base_icms_cofins' => $totais['base_cofins'],
+                    'total_icms_cofins' => $totais['valor_cofins'],
+                    'base_icms_st' => $totais['base_st'],
+                    'valor_icms_st' => $totais['valor_st'],
+                    'frete' => $totais['frete'],
+                    'seguro' => $totais['seguro'],
+                    'outros' => $totais['outras'],
+                    'total_desoneracao' => $totais['desoneracao'],
+                    'trib_fed' => $totais['trib_fed'] ?? 0,
+                    'trib_est' => $totais['trib_est'] ?? 0,
+                    'trib_mun' => $totais['trib_mun'] ?? 0,
+                    'trib_imp' => $totais['trib_imp'] ?? 0,
+                    'situacao' => Nfe::SITUACAO_ABERTA,
+                    'status' => Nfe::STATUS_ABERTA,
+                    'chave_nfe_referenciada' => $this->primeiraChaveReferenciaModal(),
+                ];
 
-                    return;
+                if ($isEditing) {
+                    $nfe = Nfe::query()->find($this->nfeModalRecordId);
+
+                    if (! $nfe) {
+                        Notification::make()->title('NF-e não encontrada.')->warning()->send();
+
+                        return;
+                    }
+
+                    if ($nfe->situacao !== Nfe::SITUACAO_ABERTA) {
+                        Notification::make()->title('Somente NF-e aberta pode ser alterada.')->warning()->send();
+
+                        return;
+                    }
+
+                    $nfe->update($payload);
+                } else {
+                    $nfe = Nfe::query()->create($payload);
+                    $params?->consumeNumeroNfe();
+                    $this->nfeModalRecordId = $nfe->id;
+                    $this->nfeForm['numero'] = $numero;
                 }
-
-                $nfe->update($payload);
-            } else {
-                $nfe = Nfe::query()->create($payload);
-                $params?->consumeNumeroNfe();
-                $this->nfeModalRecordId = $nfe->id;
-                $this->nfeForm['numero'] = $numero;
-            }
 
             $nfe->itens()->delete();
             foreach ($calculated['rows'] as $row) {
@@ -715,9 +724,18 @@ trait ManagesNfeEmissaoModal
                 )));
             }
 
-            $savedId = $nfe->id;
-            $this->nfeModalStatus = 'ABERTA';
-        });
+                $savedId = $nfe->id;
+                $this->nfeModalStatus = 'ABERTA';
+            });
+        } catch (UniqueConstraintViolationException|QueryException|RuntimeException $exception) {
+            if (! $this->nfeModalDevolucaoCompraId) {
+                throw $exception;
+            }
+
+            $this->notificarFalhaGravacaoNfeDevolucao($exception);
+
+            return false;
+        }
 
         if (! $savedId) {
             return false;
@@ -752,37 +770,118 @@ trait ManagesNfeEmissaoModal
     }
 
     /**
+     * Serializa criação/gravação vinculada à devolução: reutiliza aberta ou bloqueia
+     * outra NF-e ativa (inclusive em requisições simultâneas).
+     */
+    protected function garantirVinculoUnicoDevolucaoCompra(bool &$isEditing): void
+    {
+        $devolucaoCompraId = (int) ($this->nfeModalDevolucaoCompraId ?: 0);
+
+        if ($devolucaoCompraId <= 0) {
+            return;
+        }
+
+        DevolucaoCompra::query()
+            ->whereKey($devolucaoCompraId)
+            ->lockForUpdate()
+            ->first();
+
+        $atualId = (int) ($this->nfeModalRecordId ?: 0);
+
+        $ativa = Nfe::query()
+            ->where('devolucao_compra_id', $devolucaoCompraId)
+            ->where('status', '!=', Nfe::STATUS_CANCELADA)
+            ->when($atualId > 0, fn ($query) => $query->where('id', '!=', $atualId))
+            ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Nfe::STATUS_ABERTA])
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+
+        if (! $ativa) {
+            return;
+        }
+
+        if ($ativa->status === Nfe::STATUS_ABERTA) {
+            $this->nfeModalRecordId = (int) $ativa->id;
+            $this->nfeForm['numero'] = (string) $ativa->numero;
+            $this->nfeForm['serie'] = (string) ($ativa->serie ?: ($this->nfeForm['serie'] ?? '1'));
+            $isEditing = true;
+
+            return;
+        }
+
+        throw new RuntimeException('Esta devolução de compra já possui NF-e vinculada.');
+    }
+
+    protected function notificarFalhaGravacaoNfeDevolucao(\Throwable $exception): void
+    {
+        $mensagem = 'Não foi possível gravar a NF-e de devolução. Tente novamente.';
+
+        if ($exception instanceof RuntimeException && trim($exception->getMessage()) !== '') {
+            $mensagem = $exception->getMessage();
+        } elseif (
+            $exception instanceof UniqueConstraintViolationException
+            || (
+                $exception instanceof QueryException
+                && str_contains(strtolower($exception->getMessage()), 'devolucao_compra_id')
+            )
+        ) {
+            $mensagem = 'Esta devolução de compra já possui NF-e vinculada. Abra a NF-e existente ou cancele-a antes de emitir outra.';
+        }
+
+        Notification::make()
+            ->title('Não foi possível gravar a NF-e.')
+            ->body($mensagem)
+            ->danger()
+            ->send();
+    }
+
+    /**
      * Grava rascunho após mount (ex.: ?devolucao_compra_id=) e recarrega o modal do banco,
      * para não perder referência/itens no próximo save/transmit.
      */
     public function saveNfeDraftFromMount(): bool
     {
-        if (! $this->saveNfe(quiet: true)) {
+        try {
+            if (! $this->saveNfe(quiet: true)) {
+                return false;
+            }
+
+            if (! $this->nfeModalRecordId) {
+                return false;
+            }
+
+            $nfe = Nfe::query()
+                ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda', 'devolucaoCompra.compra'])
+                ->find($this->nfeModalRecordId);
+
+            if ($nfe) {
+                $this->loadNfeIntoModal($nfe);
+            }
+
+            return true;
+        } catch (\Throwable $exception) {
+            $this->notificarFalhaGravacaoNfeDevolucao(
+                $exception instanceof RuntimeException
+                    ? $exception
+                    : new RuntimeException('Não foi possível gravar o rascunho da NF-e de devolução. Tente novamente.', 0, $exception),
+            );
+
             return false;
         }
-
-        if (! $this->nfeModalRecordId) {
-            return false;
-        }
-
-        $nfe = Nfe::query()
-            ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda', 'devolucaoCompra.compra'])
-            ->find($this->nfeModalRecordId);
-
-        if ($nfe) {
-            $this->loadNfeIntoModal($nfe);
-        }
-
-        return true;
     }
 
     /**
      * Evita apagar chave referenciada / vínculo da devolução quando o estado do modal
      * chegou incompleto (ex.: regravação no Transmitir após abrir via query string).
+     * Inclui troca em garantia (finalidade Normal com devolucao_compra_id).
      */
     protected function ensureNfeDevolucaoVinculos(): void
     {
-        if (($this->nfeForm['finalidade'] ?? '') !== 'devolucao') {
+        $ehDevolucaoFluxo = ($this->nfeForm['finalidade'] ?? '') === 'devolucao'
+            || (int) ($this->nfeModalDevolucaoCompraId ?? 0) > 0;
+
+        if (! $ehDevolucaoFluxo) {
             return;
         }
 
@@ -1868,8 +1967,10 @@ trait ManagesNfeEmissaoModal
 
         $this->nfeNaturezaSugestoes = $cfops
             ->map(function (Cfop $cfop): array {
-                $descricao = mb_strtoupper((string) $cfop->descricao, 'UTF-8');
-                $label = trim($cfop->codigo.' - '.$descricao);
+                $label = Cfop::formatNaturezaLabel((int) $cfop->codigo);
+                $descricao = preg_match('/^\d{4}\b\s*[-–]\s*(.+)$/u', $label, $m)
+                    ? trim((string) $m[1])
+                    : mb_strtoupper(trim((string) $cfop->descricao), 'UTF-8');
 
                 return [
                     'codigo' => (string) $cfop->codigo,
@@ -1912,9 +2013,7 @@ trait ManagesNfeEmissaoModal
             return false;
         }
 
-        $this->selecionarNfeNatureza(
-            trim($cfop->codigo.' - '.mb_strtoupper((string) $cfop->descricao, 'UTF-8'))
-        );
+        $this->selecionarNfeNatureza(Cfop::formatNaturezaLabel((int) $cfop->codigo));
 
         return true;
     }
@@ -1974,7 +2073,7 @@ trait ManagesNfeEmissaoModal
             ->orderBy('codigo')
             ->get(['codigo', 'descricao'])
             ->mapWithKeys(function (Cfop $cfop): array {
-                $label = trim($cfop->codigo.' - '.mb_strtoupper((string) $cfop->descricao, 'UTF-8'));
+                $label = Cfop::formatNaturezaLabel((int) $cfop->codigo);
 
                 return [$label => $label];
             })
@@ -2073,7 +2172,7 @@ trait ManagesNfeEmissaoModal
             'cliente_id' => (string) ($nfe->cliente_id ?? ''),
             'uf' => $nfe->cliente?->uf ?? '',
             'cnpj' => $this->formatNfeCpfCnpj($nfe->cliente?->cpf_cnpj),
-            'natureza_operacao' => ($nfe->cfop ? $nfe->cfop . ' - ' : '') . 'VENDA DE MERCADORIA',
+            'natureza_operacao' => $this->resolveNaturezaOperacaoAoAbrir($nfe),
             'numero_pedido' => $nfe->npedido ?? ($nfe->venda?->numero ?? ''),
             'data_emissao' => $nfe->data_emissao?->format('Y-m-d') ?? ErpTimezone::today(),
             'data_saida' => $nfe->data_saida?->format('Y-m-d') ?? ErpTimezone::today(),
@@ -2529,7 +2628,8 @@ trait ManagesNfeEmissaoModal
             'cliente_id' => '',
             'uf' => '',
             'cnpj' => '',
-            'natureza_operacao' => '5102 - VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS',
+            'natureza_operacao' => Cfop::formatNaturezaLabel(5102)
+                ?: '5102 - VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS',
             'numero_pedido' => '',
             'data_emissao' => $today,
             'data_saida' => $today,
@@ -2621,6 +2721,142 @@ trait ManagesNfeEmissaoModal
             'v_tot_trib' => '0,00',
             'ibpt_texto' => '',
         ];
+    }
+
+    /**
+     * Natureza ao reabrir: mantém texto personalizado; senão usa descrição fiscal do cadastro.
+     * Notas antigas (sem coluna preenchida) caem no CFOP gravado na nota.
+     */
+    protected function resolveNaturezaOperacaoAoAbrir(Nfe $nfe): string
+    {
+        $stored = trim((string) ($nfe->natureza_operacao ?? ''));
+
+        if ($stored !== '') {
+            if ($this->isNfeNaturezaPersonalizada($stored)) {
+                return $stored;
+            }
+
+            $cfopStored = $this->extractCfopCodigoFromNatureza($stored);
+            if ($cfopStored) {
+                $fromCadastro = Cfop::formatNaturezaLabel($cfopStored);
+                if ($fromCadastro !== '') {
+                    return $fromCadastro;
+                }
+            }
+
+            return $stored;
+        }
+
+        $cfop = (int) ($nfe->cfop ?? 0);
+        if ($cfop > 0) {
+            return Cfop::formatNaturezaLabel($cfop) ?: (string) $cfop;
+        }
+
+        return '';
+    }
+
+    /**
+     * Persiste a natureza do formulário (customizada) ou a descrição fiscal do CFOP informado nela.
+     * Se a natureza estiver vazia, usa o CFOP dominante dos itens — sem alterar CFOPs.
+     */
+    protected function resolveNaturezaOperacaoParaPersistir(?int $cfopDominante): ?string
+    {
+        $atual = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($this->isNfeNaturezaPersonalizada($atual)) {
+            return mb_substr($atual, 0, 120);
+        }
+
+        $cfopNatureza = $this->extractCfopCodigoFromNatureza($atual);
+        $cfop = $cfopNatureza ?: $cfopDominante;
+
+        if ($cfop && $cfop > 0) {
+            $label = Cfop::formatNaturezaLabel($cfop);
+            if ($label !== '') {
+                $this->nfeForm['natureza_operacao'] = $label;
+
+                return mb_substr($label, 0, 120);
+            }
+        }
+
+        return $atual !== '' ? mb_substr($atual, 0, 120) : null;
+    }
+
+    /**
+     * Após alterar CFOP de um item: atualiza Natureza com o cadastro quando não for texto manual.
+     * Não altera CFOPs dos demais itens.
+     */
+    protected function syncNfeNaturezaOperacaoAposAlterarCfopItem(int $cfopAlterado): void
+    {
+        if ($cfopAlterado <= 0 || $this->nfeModalStatus !== 'ABERTA') {
+            return;
+        }
+
+        $atual = trim((string) ($this->nfeForm['natureza_operacao'] ?? ''));
+
+        if ($this->isNfeNaturezaPersonalizada($atual)) {
+            return;
+        }
+
+        $codigos = collect($this->nfeModalRows)
+            ->map(fn (array $row): int => (int) (preg_replace('/\D/', '', (string) ($row['cfop'] ?? '')) ?: 0))
+            ->filter(fn (int $codigo): bool => $codigo > 0)
+            ->unique()
+            ->values();
+
+        $cfopNatureza = $this->extractCfopCodigoFromNatureza($atual);
+
+        if ($codigos->count() === 1) {
+            $this->nfeForm['natureza_operacao'] = Cfop::formatNaturezaLabel((int) $codigos->first());
+
+            return;
+        }
+
+        if ($cfopNatureza === $cfopAlterado || $cfopNatureza === null) {
+            $this->nfeForm['natureza_operacao'] = Cfop::formatNaturezaLabel($cfopAlterado);
+        }
+    }
+
+    protected function isNfeNaturezaPersonalizada(string $natureza): bool
+    {
+        $natureza = trim($natureza);
+
+        if ($natureza === '') {
+            return false;
+        }
+
+        if (! preg_match('/^(\d{4})\b\s*[-–]?\s*(.*)$/u', $natureza, $matches)) {
+            return true;
+        }
+
+        $codigo = (int) $matches[1];
+        $descricao = mb_strtoupper(trim((string) ($matches[2] ?? '')), 'UTF-8');
+
+        // Texto legado incorreto do reopen antigo — não é personalização.
+        if ($descricao === '' || $descricao === 'VENDA DE MERCADORIA') {
+            return false;
+        }
+
+        $cadastro = Cfop::query()
+            ->where('codigo', $codigo)
+            ->value('descricao');
+
+        if ($cadastro === null) {
+            return $descricao !== '';
+        }
+
+        return $descricao !== mb_strtoupper(trim((string) $cadastro), 'UTF-8');
+    }
+
+    protected function extractCfopCodigoFromNatureza(string $natureza): ?int
+    {
+        if (! preg_match('/^(\d{4})\b/u', trim($natureza), $matches)) {
+            return null;
+        }
+
+        $codigo = (int) $matches[1];
+
+        return $codigo > 0 ? $codigo : null;
     }
 
     protected function mapFinalidade(string $value): string

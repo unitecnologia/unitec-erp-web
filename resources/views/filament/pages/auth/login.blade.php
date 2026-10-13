@@ -24,6 +24,8 @@
                     @endphp
                     <p class="unitec-login__version" aria-label="Versão do sistema">
                         Versão {{ $loginVersao }}@if ($loginHotfix !== null) <span title="Hotfix {{ $loginHotfix['id'] }} instalado{{ $loginHotfix['aplicado_em'] !== '' ? ' em '.$loginHotfix['aplicado_em'] : '' }}">| {{ $loginHotfix['rotulo'] }}</span>@endif
+                        <span class="unitec-login__version-sep" aria-hidden="true">·</span>
+                        @include('filament.components.erp.schema-bd-indicator', ['class' => 'unitec-login__bd'])
                     </p>
                     <p class="unitec-login__copyright">
                         © Unitecnologia Sistemas LTDA
@@ -57,7 +59,11 @@
                 <div class="unitec-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
                     @if (filled($schemaMigrateError))
                         <div class="unitec-login__schema-alert unitec-login__schema-alert--erro" role="alert">
-                            {{ $schemaMigrateError }}
+                            <strong>Banco incompatível com esta versão.</strong>
+                            <span style="display:block;margin-top:.35rem;font-weight:500;">{{ $schemaMigrateError }}</span>
+                            <span style="display:block;margin-top:.4rem;font-weight:600;">
+                                Se houver atualização pendente, aceite no login. Senão, execute Reparar Sistema.bat (não apaga dados).
+                            </span>
                         </div>
                     @elseif (filled($schemaMigrateOk))
                         <div class="unitec-login__schema-alert unitec-login__schema-alert--ok" role="status">

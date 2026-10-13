@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Support\Erp\ErpAccess;
+use App\Support\Erp\ErpTableSort;
 use App\Filament\Resources\NfeResource\Pages;
 use App\Models\Nfe;
 use BackedEnum;
@@ -12,6 +13,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class NfeResource extends Resource
 {
@@ -46,7 +48,12 @@ class NfeResource extends Resource
                     ->disabledClick(),
                 TextColumn::make('numero')
                     ->label('Número')
-                    ->sortable()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => ErpTableSort::orderByCodigoNumerico(
+                        $query,
+                        $direction,
+                        'numero',
+                        desempateIdDesc: true,
+                    ))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('npedido')
@@ -107,7 +114,16 @@ class NfeResource extends Resource
                     ->alignCenter()
                     ->disabledClick(),
             ])
-            ->defaultSort('numero', 'desc')
+            ->defaultSort(
+                fn (Builder $query, string $direction, $livewire): Builder => ErpTableSort::applyDefaultCodigoNumerico(
+                    $query,
+                    $direction,
+                    $livewire,
+                    'numero',
+                    desempateIdDesc: true,
+                ),
+                'desc',
+            )
             ->striped()
             ->searchable(false)
             ->defaultPaginationPageOption(50)

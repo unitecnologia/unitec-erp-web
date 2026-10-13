@@ -225,12 +225,7 @@ class ListNfes extends ListRecords
             $cfop = OperacaoFiscal::forEmpresa($empresaId)->cfopSaidaPerda(false);
 
             if ($cfop) {
-                $descricaoCfop = \App\Models\Cfop::query()
-                    ->where('codigo', $cfop)
-                    ->value('descricao');
-                $this->nfeForm['natureza_operacao'] = trim(
-                    $cfop.($descricaoCfop ? ' - '.mb_strtoupper((string) $descricaoCfop, 'UTF-8') : '')
-                );
+                $this->nfeForm['natureza_operacao'] = \App\Models\Cfop::formatNaturezaLabel($cfop);
 
                 foreach ($rows as $index => $row) {
                     $rows[$index]['cfop'] = (string) $cfop;
@@ -266,8 +261,31 @@ class ListNfes extends ListRecords
             return;
         }
 
+        $service = app(NfeDevolucaoCompraService::class);
+        $aberta = $service->nfeAberta($devolucao);
+
+        if ($aberta) {
+            $nfe = Nfe::query()
+                ->with(['cliente', 'transportadora', 'itens.product', 'faturas', 'referencias', 'empresa', 'venda', 'devolucaoCompra.compra'])
+                ->find($aberta->id);
+
+            if ($nfe) {
+                $this->loadNfeIntoModal($nfe);
+
+                Notification::make()
+                    ->title('NF-e de devolução reaberta.')
+                    ->body('Já existia um rascunho aberto. Revise os dados e transmita a nota.')
+                    ->success()
+                    ->send();
+
+                $this->dispatch('erp-nfe-focus-item-codigo');
+
+                return;
+            }
+        }
+
         try {
-            $payload = app(NfeDevolucaoCompraService::class)->montarPayload($devolucao);
+            $payload = $service->montarPayload($devolucao);
 
             $this->createNfe();
 

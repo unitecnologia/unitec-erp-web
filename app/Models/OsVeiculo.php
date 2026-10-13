@@ -60,71 +60,169 @@ class OsVeiculo extends Model
             || (bool) preg_match('/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/', $placa);
     }
 
-    public static function porEmpresaPlaca(int $empresaId, string $placa): ?self
+    /**
+     * Placa informada + equivalente clássica/Mercosul (quando conversível).
+     *
+     * @return list<string>
+     */
+    public static function variantesPlaca(string $placa): array
     {
-        if ($empresaId <= 0 || ! self::placaValida($placa)) {
-            return null;
+        $placa = self::normalizarPlaca($placa);
+        if (! self::placaValida($placa)) {
+            return [];
         }
 
-        return static::query()
-            ->where('empresa_id', $empresaId)
-            ->where('placa', $placa)
-            ->first([
-                'id',
-                'placa',
-                'descricao',
-                'marca',
-                'modelo',
-                'versao',
-                'ano_fabricacao',
-                'ano_modelo',
-                'cor',
-                'chassi',
-                'placa_alternativa',
-                'combustivel',
-                'tipo',
-                'especie',
-                'carroceria',
-                'cidade',
-                'uf',
-                'renavam',
-            ]);
+        $variantes = [$placa];
+        $mapa = 'ABCDEFGHIJ';
+
+        if (preg_match('/^([A-Z]{3})([0-9])([0-9])([0-9]{2})$/', $placa, $m) === 1) {
+            $variantes[] = $m[1].$m[2].$mapa[(int) $m[3]].$m[4];
+        } elseif (preg_match('/^([A-Z]{3})([0-9])([A-J])([0-9]{2})$/', $placa, $m) === 1) {
+            $digito = strpos($mapa, $m[3]);
+            if ($digito !== false) {
+                $variantes[] = $m[1].$m[2].$digito.$m[4];
+            }
+        }
+
+        return array_values(array_unique($variantes));
     }
 
     /**
-     * Grava o retorno de data.vehicle. Não persiste fipe_candidates.
+     * @param  array<string, mixed>  $vehicle
+     */
+    public static function vehicleIdentificavel(array $vehicle): bool
+    {
+        foreach (['brand', 'model', 'chassis'] as $chave) {
+            if (trim((string) ($vehicle[$chave] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Busca por placa exata, alternativa ou equivalente Mercosul na mesma empresa.
+     * Se houver mais de um cadastro conflitante sem match exato, não escolhe (evita fusão).
+     */
+    public static function porEmpresaPlaca(int $empresaId, string $placa): ?self
+    {
+        $placa = self::normalizarPlaca($placa);
+        $variantes = self::variantesPlaca($placa);
+        if ($empresaId <= 0 || $variantes === []) {
+            return null;
+        }
+
+        $colunas = [
+            'id',
+            'placa',
+            'descricao',
+            'marca',
+            'modelo',
+            'versao',
+            'ano_fabricacao',
+            'ano_modelo',
+            'cor',
+            'chassi',
+            'placa_alternativa',
+            'combustivel',
+            'tipo',
+            'especie',
+            'carroceria',
+            'cidade',
+            'uf',
+            'renavam',
+        ];
+
+        $candidatos = static::query()
+            ->where('empresa_id', $empresaId)
+            ->where(function ($query) use ($variantes): void {
+                $query->whereIn('placa', $variantes)
+                    ->orWhereIn('placa_alternativa', $variantes);
+            })
+            ->get($colunas);
+
+        if ($candidatos->isEmpty()) {
+            return null;
+        }
+
+        $exato = $candidatos->first(static fn (self $item): bool => self::normalizarPlaca((string) $item->placa) === $placa);
+        if ($exato !== null) {
+            return $exato;
+        }
+
+        $porAlternativa = $candidatos->first(
+            static fn (self $item): bool => self::normalizarPlaca((string) ($item->placa_alternativa ?? '')) === $placa,
+        );
+        if ($porAlternativa !== null) {
+            return $porAlternativa;
+        }
+
+        // Um único candidato via equivalência Mercosul: reutiliza sem fundir registros.
+        return $candidatos->count() === 1 ? $candidatos->first() : null;
+    }
+
+    /**
+     * Grava o retorno de data.vehicle como snapshot dos campos da consulta.
+     * Atualiza o cadastro já existente (incl. equivalente Mercosul) sem criar duplicata.
+     * Não persiste fipe_candidates. Não altera OS/orçamentos já gravados.
      *
      * @param  array<string, mixed>  $vehicle
      */
     public static function salvarDaApi(int $empresaId, string $placaConsultada, array $vehicle): self
     {
         $placa = self::placaValida($placaConsultada)
-            ? $placaConsultada
+            ? self::normalizarPlaca($placaConsultada)
             : self::normalizarPlaca((string) ($vehicle['plate'] ?? ''));
 
         if ($empresaId <= 0 || ! self::placaValida($placa)) {
             throw new \InvalidArgumentException('Placa inválida.');
         }
 
-        $attrs = self::atributosDaApi($vehicle, $placa);
+        if (! self::vehicleIdentificavel($vehicle)) {
+            throw new \InvalidArgumentException('Retorno de veículo incompleto.');
+        }
+
+        $existente = self::porEmpresaPlaca($empresaId, $placa);
+        $placaGravacao = $existente !== null
+            ? self::normalizarPlaca((string) $existente->placa)
+            : $placa;
+
+        $attrs = self::atributosDaApi($vehicle, $placaGravacao);
         $attrs['consultado_em'] = now();
+
+        // Mantém a placa principal do cadastro; a forma digitada vira alternativa se diferente.
+        if ($existente !== null && $placaGravacao !== $placa) {
+            $altAtual = self::normalizarPlaca((string) ($attrs['placa_alternativa'] ?? ''));
+            if ($altAtual === '' || $altAtual === $placaGravacao) {
+                $attrs['placa_alternativa'] = $placa;
+            }
+        }
+
         $chave = [
             'empresa_id' => $empresaId,
-            'placa' => $placa,
+            'placa' => $placaGravacao,
         ];
 
         try {
+            if ($existente !== null) {
+                $existente->fill($attrs);
+                $existente->save();
+
+                return $existente->fresh() ?? $existente;
+            }
+
             return static::query()->updateOrCreate($chave, $attrs);
         } catch (UniqueConstraintViolationException $exception) {
-            $existente = static::query()->where($chave)->first();
-            if ($existente === null) {
+            $conflito = static::query()->where($chave)->first();
+            if ($conflito === null) {
                 throw $exception;
             }
 
-            $existente->fill($attrs);
-            $existente->save();
+            $conflito->fill($attrs);
+            $conflito->save();
 
-            return $existente;
+            return $conflito;
         }
     }
 
@@ -246,7 +344,7 @@ class OsVeiculo extends Model
 
     /**
      * @param  array<string, mixed>  $vehicle
-     * @return array<string, string>
+     * @return array<string, string|null>
      */
     private static function atributosDaApi(array $vehicle, string $placaConsultada): array
     {
@@ -294,30 +392,38 @@ class OsVeiculo extends Model
             return mb_strlen($valor, 'UTF-8') > $max ? mb_substr($valor, 0, $max, 'UTF-8') : $valor;
         };
 
-        $attrs = [
-            'placa_alternativa' => $corte($alternativa, 10),
-            'descricao' => $corte($descricao, 160),
-            'marca' => $corte($marca, 80),
-            'modelo' => $corte($modelo, 80),
-            'submodelo' => $corte($up($texto($vehicle['submodel'] ?? null)), 80),
-            'versao' => $corte($versao, 80),
-            'ano_fabricacao' => $corte($ano($vehicle['manufacture_year'] ?? null), 4),
-            'ano_modelo' => $corte($ano($vehicle['model_year'] ?? null), 4),
-            'cidade' => $corte($up($texto($vehicle['city'] ?? null)), 80),
-            'uf' => $corte($uf, 2),
-            'renavam' => $corte($up($texto($vehicle['renavam'] ?? null)), 20),
-            'chassi' => $corte($up($texto($vehicle['chassis'] ?? null)), 30),
-            'cor' => $corte($up($texto($vehicle['color'] ?? null)), 40),
-            'combustivel' => $corte($up($texto($vehicle['fuel'] ?? null)), 40),
-            'tipo' => $corte($up($texto($vehicle['type'] ?? null)), 60),
-            'especie' => $corte($up($texto($vehicle['kind'] ?? null)), 60),
-            'carroceria' => $corte($up($texto($vehicle['body_type'] ?? null)), 60),
-            'origem' => $corte($up($texto($vehicle['origin'] ?? null)), 60),
-            'nacionalidade' => $corte($up($texto($vehicle['nationality'] ?? null)), 60),
-            'segmento' => $corte($up($texto($vehicle['segment'] ?? null)), 60),
-            'subsegmento' => $corte($up($texto($vehicle['subsegment'] ?? null)), 60),
-        ];
+        $nullable = static function (string $valor, int $max) use ($corte): ?string {
+            $valor = trim($valor);
+            if ($valor === '') {
+                return null;
+            }
 
-        return array_filter($attrs, static fn (string $valor): bool => $valor !== '');
+            return $corte($valor, $max);
+        };
+
+        // Snapshot completo dos campos da API: vazio limpa valor antigo no mesmo cadastro da placa.
+        return [
+            'placa_alternativa' => $nullable($alternativa, 10),
+            'descricao' => $nullable($descricao, 160),
+            'marca' => $nullable($marca, 80),
+            'modelo' => $nullable($modelo, 80),
+            'submodelo' => $nullable($up($texto($vehicle['submodel'] ?? null)), 80),
+            'versao' => $nullable($versao, 80),
+            'ano_fabricacao' => $nullable($ano($vehicle['manufacture_year'] ?? null), 4),
+            'ano_modelo' => $nullable($ano($vehicle['model_year'] ?? null), 4),
+            'cidade' => $nullable($up($texto($vehicle['city'] ?? null)), 80),
+            'uf' => $nullable($uf, 2),
+            'renavam' => $nullable($up($texto($vehicle['renavam'] ?? null)), 20),
+            'chassi' => $nullable($up($texto($vehicle['chassis'] ?? null)), 30),
+            'cor' => $nullable($up($texto($vehicle['color'] ?? null)), 40),
+            'combustivel' => $nullable($up($texto($vehicle['fuel'] ?? null)), 40),
+            'tipo' => $nullable($up($texto($vehicle['type'] ?? null)), 60),
+            'especie' => $nullable($up($texto($vehicle['kind'] ?? null)), 60),
+            'carroceria' => $nullable($up($texto($vehicle['body_type'] ?? null)), 60),
+            'origem' => $nullable($up($texto($vehicle['origin'] ?? null)), 60),
+            'nacionalidade' => $nullable($up($texto($vehicle['nationality'] ?? null)), 60),
+            'segmento' => $nullable($up($texto($vehicle['segment'] ?? null)), 60),
+            'subsegmento' => $nullable($up($texto($vehicle['subsegment'] ?? null)), 60),
+        ];
     }
 }

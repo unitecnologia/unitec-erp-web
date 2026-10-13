@@ -139,7 +139,10 @@ class ErpPermissionCatalog
       'orcamentos' => [
         'label' => 'Orçamentos',
         'group' => 'Vendas',
-        'actions' => static::crudPrintActions(),
+        'actions' => [
+          ...static::crudPrintActions(),
+          'atualizar_veiculo' => 'Atualizar dados do veículo',
+        ],
       ],
       'promocoes' => [
         'label' => 'Promoções',
@@ -154,7 +157,10 @@ class ErpPermissionCatalog
       'ordens_servico' => [
         'label' => 'Ordem de Serviço',
         'group' => 'OS',
-        'actions' => static::crudPrintActions(),
+        'actions' => [
+          ...static::crudPrintActions(),
+          'atualizar_veiculo' => 'Atualizar dados do veículo',
+        ],
       ],
       'pdv' => [
         'label' => 'PDV',
@@ -706,7 +712,18 @@ class ErpPermissionCatalog
         'id' => 'vendas',
         'label' => 'Vendas',
         'items' => [
-          ['label' => 'Orçamento', 'module' => 'orcamentos', 'access' => 'orcamentos.access'],
+          [
+            'label' => 'Orçamento',
+            'module' => 'orcamentos',
+            'access' => 'orcamentos.access',
+            'actions' => [
+              ['label' => 'Incluir', 'key' => 'orcamentos.create'],
+              ['label' => 'Alterar', 'key' => 'orcamentos.update'],
+              ['label' => 'Excluir', 'key' => 'orcamentos.delete'],
+              ['label' => 'Imprimir', 'key' => 'orcamentos.print'],
+              ['label' => 'Atualizar veículo', 'key' => 'orcamentos.atualizar_veiculo'],
+            ],
+          ],
           [
             'label' => 'Promoções',
             'module' => 'promocoes',
@@ -907,6 +924,7 @@ class ErpPermissionCatalog
               ['label' => 'Incluir', 'key' => 'ordens_servico.create'],
               ['label' => 'Alterar', 'key' => 'ordens_servico.update'],
               ['label' => 'Imprimir', 'key' => 'ordens_servico.print'],
+              ['label' => 'Atualizar veículo', 'key' => 'ordens_servico.atualizar_veiculo'],
             ],
           ],
         ],

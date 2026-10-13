@@ -148,6 +148,12 @@
     cursor: pointer;
 }
 
+.erp-orc-equip-modal .erp-os-placa-btn--secondary {
+    border-color: #cbd5e1;
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    color: #334155;
+}
+
 .erp-orc-equip-modal .erp-os-placa-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;

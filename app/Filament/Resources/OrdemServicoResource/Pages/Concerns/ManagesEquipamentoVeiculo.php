@@ -3,14 +3,15 @@
 namespace App\Filament\Resources\OrdemServicoResource\Pages\Concerns;
 
 use App\Models\OsVeiculo;
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\Os\ConsultaPlacaOsService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Campos, consulta de placa e cadastro de veículo/equipamento usados pela OS.
- * O orçamento reutiliza o mesmo fluxo e a mesma tabela os_veiculos.
+ * Campos, consulta de placa e cadastro de veículo/equipamento.
+ * Compartilhado por OS, Orçamento e NFS-e (mesma tabela os_veiculos e ConsultaPlacaOsService).
  */
 trait ManagesEquipamentoVeiculo
 {
@@ -26,6 +27,11 @@ trait ManagesEquipamentoVeiculo
     public ?int $selectedEquipamentoIndex = null;
 
     public bool $ignorarBuscaEquipamento = false;
+
+    /** Evita abrir o lookup ao limpar/preencher veículo por placa ou seleção. */
+    protected bool $equipamentoPreenchimentoInterno = false;
+
+    public bool $atualizarVeiculoConfirmOpen = false;
 
     public string $descricao2 = '';
 
@@ -88,7 +94,10 @@ trait ManagesEquipamentoVeiculo
         if (! OsVeiculo::placaValida($placa)) {
             $this->placaLocalResolvida = '';
             $this->lembrarOsVeiculo(null);
-            $this->aplicarExtrasVeiculo([]);
+            // Placa apagada: remove identidade do veículo anterior. Digitação incompleta não limpa.
+            if ($placa === '') {
+                $this->comPreenchimentoEquipamentoInterno(fn () => $this->limparCamposIdentidadeVeiculo());
+            }
 
             return;
         }
@@ -101,17 +110,79 @@ trait ManagesEquipamentoVeiculo
         $this->placaLocalResolvida = $placa;
         $local = OsVeiculo::porEmpresaPlaca($empresaId, $placa);
         $this->lembrarOsVeiculo($local);
-        if ($local === null) {
-            $this->aplicarExtrasVeiculo([]);
+
+        // Troca de placa: zera identidade antes do autofill local (evita misturar veículos).
+        $this->comPreenchimentoEquipamentoInterno(function () use ($local): void {
+            $this->limparCamposIdentidadeVeiculo();
+            if ($local === null) {
+                return;
+            }
+
+            $this->preencherCamposVeiculoOs($local->camposOs());
+            $this->aplicarExtrasVeiculo($local->extrasEquipamento());
+        });
+    }
+
+    public function podeAtualizarVeiculoPorPlaca(): bool
+    {
+        return ErpAccess::currentCan('ordens_servico.atualizar_veiculo')
+            || ErpAccess::currentCan('orcamentos.atualizar_veiculo');
+    }
+
+    public function consultarPlaca(): void
+    {
+        $this->resolverConsultaPlaca(forcarExterno: false);
+    }
+
+    public function pedirAtualizarVeiculoPorPlaca(): void
+    {
+        if ($this->equipamentoSomenteLeitura()) {
+            return;
+        }
+
+        if (! $this->podeAtualizarVeiculoPorPlaca()) {
+            Notification::make()
+                ->title('Acesso negado')
+                ->body('Você não tem permissão para esta operação.')
+                ->danger()
+                ->send();
 
             return;
         }
 
-        $this->preencherCamposVeiculoOs($local->camposOs());
-        $this->aplicarExtrasVeiculo($local->extrasEquipamento());
+        $placa = OsVeiculo::normalizarPlaca($this->placa);
+        if (! OsVeiculo::placaValida($placa)) {
+            Notification::make()->title('Informe uma placa válida (ABC1234 ou ABC1D23).')->warning()->send();
+
+            return;
+        }
+
+        $this->atualizarVeiculoConfirmOpen = true;
     }
 
-    public function consultarPlaca(): void
+    public function fecharAtualizarVeiculoConfirm(): void
+    {
+        $this->atualizarVeiculoConfirmOpen = false;
+    }
+
+    public function confirmarAtualizarVeiculoPorPlaca(): void
+    {
+        $this->atualizarVeiculoConfirmOpen = false;
+
+        if (! $this->podeAtualizarVeiculoPorPlaca()) {
+            Notification::make()
+                ->title('Acesso negado')
+                ->body('Você não tem permissão para esta operação.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->resolverConsultaPlaca(forcarExterno: true);
+    }
+
+    protected function resolverConsultaPlaca(bool $forcarExterno): void
     {
         if ($this->equipamentoSomenteLeitura()) {
             return;
@@ -127,27 +198,15 @@ trait ManagesEquipamentoVeiculo
         $placa = OsVeiculo::normalizarPlaca($this->placa);
         if (! OsVeiculo::placaValida($placa)) {
             $this->lembrarOsVeiculo(null);
-            $this->aplicarExtrasVeiculo([]);
             Notification::make()->title('Informe uma placa válida (ABC1234 ou ABC1D23).')->warning()->send();
 
             return;
         }
 
-        $local = OsVeiculo::porEmpresaPlaca((int) $empresa->id, $placa);
-        if ($local !== null) {
-            $this->placaLocalResolvida = $placa;
-            $this->lembrarOsVeiculo($local);
-            $this->preencherCamposVeiculoOs($local->camposOs());
-            $this->aplicarExtrasVeiculo($local->extrasEquipamento());
-            Notification::make()->title('Dados do veículo preenchidos pelo cadastro.')->success()->send();
-
-            return;
-        }
-
-        $this->aplicarExtrasVeiculo([]);
-
+        $empresaId = (int) $empresa->id;
+        $lockKey = $this->chaveLockConsultaPlaca($empresaId, $placa);
         $espera = max(15, min(300, (int) config('unitec.consulta_placa.timeout', 10)) + 5);
-        $lock = Cache::lock('os-consulta-placa:'.$empresa->id.':'.$placa, $espera);
+        $lock = Cache::lock($lockKey, $espera);
         if (! $lock->get()) {
             Notification::make()->title('A consulta desta placa já está em andamento.')->warning()->send();
 
@@ -155,24 +214,127 @@ trait ManagesEquipamentoVeiculo
         }
 
         try {
-            $resultado = app(ConsultaPlacaOsService::class)->consultar($empresa, $placa);
-
-            if (! ($resultado['ok'] ?? false)) {
-                Notification::make()->title((string) ($resultado['message'] ?? 'Não foi possível consultar a placa.'))->warning()->send();
+            // Revalida dentro do lock (concorrência: outro request pode ter gravado).
+            $local = OsVeiculo::porEmpresaPlaca($empresaId, $placa);
+            if ($local !== null && ! $forcarExterno) {
+                $this->aplicarVeiculoLocalResolvido($placa, $local, 'Dados do veículo preenchidos pelo cadastro.');
 
                 return;
             }
 
-            $this->placaLocalResolvida = $placa;
-            $this->preencherCamposVeiculoOs($resultado['fields'] ?? []);
-            $this->aplicarExtrasVeiculo($resultado['extras'] ?? []);
-            $this->lembrarOsVeiculo(OsVeiculo::porEmpresaPlaca((int) $empresa->id, $placa));
+            if ($forcarExterno && $this->consultaPlacaEmCooldownoldown($empresaId, $placa)) {
+                Notification::make()->title('Aguarde alguns segundos antes de atualizar novamente.')->warning()->send();
 
-            Notification::make()->title((string) $resultado['message'])->success()->send();
+                return;
+            }
+
+            $resultado = app(ConsultaPlacaOsService::class)->consultar($empresa, $placa);
+
+            if (! ($resultado['ok'] ?? false)) {
+                Notification::make()
+                    ->title((string) ($resultado['message'] ?? 'Não foi possível consultar a placa.'))
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            // Resposta atrasada: usuário já trocou a placa na tela.
+            if (OsVeiculo::normalizarPlaca($this->placa) !== $placa) {
+                Notification::make()->title('A placa foi alterada. A consulta anterior foi descartada.')->warning()->send();
+
+                return;
+            }
+
+            $vehicle = $resultado['vehicle'] ?? null;
+            if (! is_array($vehicle) || ! OsVeiculo::vehicleIdentificavel($vehicle)) {
+                Notification::make()->title('Não foi possível obter os dados do veículo. Tente novamente.')->warning()->send();
+
+                return;
+            }
+
+            $salvo = OsVeiculo::salvarDaApi($empresaId, $placa, $vehicle);
+            $this->aplicarVeiculoLocalResolvido(
+                $placa,
+                $salvo,
+                (string) ($resultado['message'] ?? 'Dados do veículo preenchidos.'),
+            );
+            $this->marcarCooldownoldownConsultaPlaca($empresaId, $placa);
         } catch (\Throwable) {
             Notification::make()->title('Não foi possível consultar a placa. Tente novamente.')->warning()->send();
         } finally {
             $lock->release();
+        }
+    }
+
+    protected function aplicarVeiculoLocalResolvido(string $placa, OsVeiculo $veiculo, string $mensagem): void
+    {
+        $this->placaLocalResolvida = $placa;
+        $this->comPreenchimentoEquipamentoInterno(function () use ($veiculo, $placa): void {
+            $this->limparCamposIdentidadeVeiculo();
+            $fields = $veiculo->camposOs();
+            // Mantém a placa digitada pelo usuário (ex.: forma Mercosul) quando o cadastro usa a equivalente.
+            $fields['placa'] = $placa;
+            $this->preencherCamposVeiculoOs($fields);
+            $this->aplicarExtrasVeiculo($veiculo->extrasEquipamento());
+        });
+        $this->lembrarOsVeiculo($veiculo);
+
+        Notification::make()->title($mensagem)->success()->send();
+    }
+
+    protected function chaveLockConsultaPlaca(int $empresaId, string $placa): string
+    {
+        $canonica = $placa;
+        foreach (OsVeiculo::variantesPlaca($placa) as $variante) {
+            if (preg_match('/^[A-Z]{3}[0-9]{4}$/', $variante) === 1) {
+                $canonica = $variante;
+                break;
+            }
+        }
+
+        return 'os-consulta-placa:'.$empresaId.':'.$canonica;
+    }
+
+    protected function chaveCooldownConsultaPlaca(int $empresaId, string $placa): string
+    {
+        return $this->chaveLockConsultaPlaca($empresaId, $placa).':cooldown';
+    }
+
+    protected function consultaPlacaEmCooldownoldown(int $empresaId, string $placa): bool
+    {
+        return Cache::has($this->chaveCooldownConsultaPlaca($empresaId, $placa));
+    }
+
+    protected function marcarCooldownoldownConsultaPlaca(int $empresaId, string $placa): void
+    {
+        Cache::put($this->chaveCooldownConsultaPlaca($empresaId, $placa), 1, now()->addSeconds(20));
+    }
+
+    /**
+     * Limpa marca/modelo/ano/cor/chassi e extras da API.
+     * Preserva placa, KM, nº de série e descrição/complemento (dados manuais da OS/orçamento).
+     */
+    protected function limparCamposIdentidadeVeiculo(): void
+    {
+        $this->descricao = '';
+        $this->modelo = '';
+        $this->ano = '';
+        $this->corVeiculo = '';
+        $this->chassiVeiculo = '';
+        $this->aplicarExtrasVeiculo([]);
+    }
+
+    /**
+     * @param  callable(): void  $callback
+     */
+    protected function comPreenchimentoEquipamentoInterno(callable $callback): void
+    {
+        $this->equipamentoPreenchimentoInterno = true;
+        try {
+            $callback();
+        } finally {
+            $this->equipamentoPreenchimentoInterno = false;
         }
     }
 
@@ -239,6 +401,10 @@ trait ManagesEquipamentoVeiculo
 
     public function updatedDescricao(string $value): void
     {
+        if ($this->equipamentoPreenchimentoInterno) {
+            return;
+        }
+
         if ($this->equipamentoSomenteLeitura() || $this->ignorarBuscaEquipamento) {
             $this->ignorarBuscaEquipamento = false;
 
@@ -310,21 +476,23 @@ trait ManagesEquipamentoVeiculo
             return;
         }
 
-        $this->ignorarBuscaEquipamento = true;
         $this->lembrarOsVeiculo($veiculo);
-        $this->preencherCamposVeiculoOs($veiculo->camposOs());
-        $this->aplicarExtrasVeiculo($veiculo->extrasEquipamento());
-        $descricao = trim((string) ($veiculo->descricao ?? ''));
-        if ($descricao === '') {
-            $descricao = trim((string) ($veiculo->marca ?? ''));
-        }
-        $modelo = trim((string) ($veiculo->modelo ?? ''));
-        if ($descricao !== '') {
-            $this->descricao = mb_strtoupper($descricao, 'UTF-8');
-        }
-        if ($modelo !== '') {
-            $this->modelo = mb_strtoupper($modelo, 'UTF-8');
-        }
+        $this->comPreenchimentoEquipamentoInterno(function () use ($veiculo): void {
+            $this->limparCamposIdentidadeVeiculo();
+            $this->preencherCamposVeiculoOs($veiculo->camposOs());
+            $this->aplicarExtrasVeiculo($veiculo->extrasEquipamento());
+            $descricao = trim((string) ($veiculo->descricao ?? ''));
+            if ($descricao === '') {
+                $descricao = trim((string) ($veiculo->marca ?? ''));
+            }
+            $modelo = trim((string) ($veiculo->modelo ?? ''));
+            if ($descricao !== '') {
+                $this->descricao = mb_strtoupper($descricao, 'UTF-8');
+            }
+            if ($modelo !== '') {
+                $this->modelo = mb_strtoupper($modelo, 'UTF-8');
+            }
+        });
         $placaLocal = OsVeiculo::normalizarPlaca($this->placa);
         $this->placaLocalResolvida = OsVeiculo::placaValida($placaLocal) ? $placaLocal : '';
         $this->closeEquipamentoLookup();
@@ -343,22 +511,46 @@ trait ManagesEquipamentoVeiculo
 
         $descricao = mb_substr(mb_strtoupper(trim($this->descricao), 'UTF-8'), 0, 160, 'UTF-8');
         $modelo = mb_substr(mb_strtoupper(trim($this->modelo), 'UTF-8'), 0, 80, 'UTF-8');
+        $existente = OsVeiculo::porEmpresaPlaca($empresaId, $placa);
+
         if ($descricao === '' && $modelo === '') {
-            return OsVeiculo::porEmpresaPlaca($empresaId, $placa);
+            return $existente;
         }
 
-        $attrs = array_filter([
-            'descricao' => $descricao,
-            'marca' => mb_substr($descricao, 0, 80, 'UTF-8'),
-            'modelo' => $modelo,
-        ], static fn (string $valor): bool => $valor !== '');
+        // Cadastro já existe: só aplica edição manual legítima; não deriva marca da descrição.
+        if ($existente !== null) {
+            $attrs = [];
+            $descricaoAtual = trim((string) ($existente->descricao ?? ''));
+            $modeloAtual = trim((string) ($existente->modelo ?? ''));
 
-        return OsVeiculo::query()->updateOrCreate(
+            if ($descricao !== '' && $descricao !== $descricaoAtual) {
+                $attrs['descricao'] = $descricao;
+            }
+            if ($modelo !== '' && $modelo !== $modeloAtual) {
+                $attrs['modelo'] = $modelo;
+            }
+
+            if ($attrs === []) {
+                return $existente;
+            }
+
+            $existente->fill($attrs);
+            $existente->save();
+
+            return $existente;
+        }
+
+        // Novo cadastro manual (sem consulta externa): cria registro mínimo.
+        return OsVeiculo::query()->firstOrCreate(
             [
                 'empresa_id' => $empresaId,
                 'placa' => $placa,
             ],
-            $attrs,
+            [
+                'descricao' => $descricao !== '' ? $descricao : null,
+                'marca' => $descricao !== '' ? mb_substr($descricao, 0, 80, 'UTF-8') : null,
+                'modelo' => $modelo !== '' ? $modelo : null,
+            ],
         );
     }
 
@@ -394,37 +586,41 @@ trait ManagesEquipamentoVeiculo
             return;
         }
 
-        if ($osVeiculoId !== null && $osVeiculoId > 0) {
-            $veiculo = OsVeiculo::query()->find($osVeiculoId);
-            if ($veiculo !== null) {
-                $this->preencherCamposVeiculoOs($veiculo->camposOs());
-                $this->aplicarExtrasVeiculo($veiculo->extrasEquipamento());
+        $this->comPreenchimentoEquipamentoInterno(function () use ($osVeiculoId, $snapshot): void {
+            $this->limparCamposIdentidadeVeiculo();
+
+            if ($osVeiculoId !== null && $osVeiculoId > 0) {
+                $veiculo = OsVeiculo::query()->find($osVeiculoId);
+                if ($veiculo !== null) {
+                    $this->preencherCamposVeiculoOs($veiculo->camposOs());
+                    $this->aplicarExtrasVeiculo($veiculo->extrasEquipamento());
+                }
             }
-        }
 
-        $this->preencherCamposVeiculoOs([
-            'placa' => (string) ($snapshot['placa'] ?? ''),
-            'descricao' => (string) ($snapshot['descricao'] ?? ''),
-            'modelo' => (string) ($snapshot['modelo'] ?? ''),
-            'ano' => (string) ($snapshot['ano'] ?? ''),
-            'cor' => (string) ($snapshot['cor'] ?? ''),
-            'chassi' => (string) ($snapshot['chassi'] ?? ''),
-        ]);
+            $this->preencherCamposVeiculoOs([
+                'placa' => (string) ($snapshot['placa'] ?? ''),
+                'descricao' => (string) ($snapshot['descricao'] ?? ''),
+                'modelo' => (string) ($snapshot['modelo'] ?? ''),
+                'ano' => (string) ($snapshot['ano'] ?? ''),
+                'cor' => (string) ($snapshot['cor'] ?? ''),
+                'chassi' => (string) ($snapshot['chassi'] ?? ''),
+            ]);
 
-        $numeroSerie = trim((string) ($snapshot['numero_serie'] ?? ''));
-        if ($numeroSerie !== '') {
-            $this->numeroSerie = $numeroSerie;
-        }
+            $numeroSerie = trim((string) ($snapshot['numero_serie'] ?? ''));
+            if ($numeroSerie !== '') {
+                $this->numeroSerie = $numeroSerie;
+            }
 
-        $descricao2 = trim((string) ($snapshot['descricao2'] ?? ''));
-        if ($descricao2 !== '') {
-            $this->descricao2 = mb_strtoupper($descricao2, 'UTF-8');
-        }
+            $descricao2 = trim((string) ($snapshot['descricao2'] ?? ''));
+            if ($descricao2 !== '') {
+                $this->descricao2 = mb_strtoupper($descricao2, 'UTF-8');
+            }
 
-        $km = trim((string) ($snapshot['km'] ?? ''));
-        if ($km !== '') {
-            $this->km = $km;
-        }
+            $km = trim((string) ($snapshot['km'] ?? ''));
+            if ($km !== '') {
+                $this->km = $km;
+            }
+        });
 
         $placaLocal = OsVeiculo::normalizarPlaca($this->placa);
         $this->placaLocalResolvida = OsVeiculo::placaValida($placaLocal) ? $placaLocal : '';

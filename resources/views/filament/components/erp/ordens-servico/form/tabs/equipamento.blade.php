@@ -18,12 +18,25 @@
                     class="erp-os-placa-btn"
                     wire:click="consultarPlaca"
                     wire:loading.attr="disabled"
-                    wire:target="consultarPlaca"
+                    wire:target="consultarPlaca,confirmarAtualizarVeiculoPorPlaca"
                     @disabled($readOnly)
                 >
-                    <span wire:loading.remove wire:target="consultarPlaca">Consultar placa</span>
+                    <span wire:loading.remove wire:target="consultarPlaca,confirmarAtualizarVeiculoPorPlaca">Consultar placa</span>
                     <span wire:loading wire:target="consultarPlaca">Consultando…</span>
                 </button>
+                @if (! $readOnly && $this->podeAtualizarVeiculoPorPlaca())
+                    <button
+                        type="button"
+                        class="erp-os-placa-btn erp-os-placa-btn--secondary"
+                        wire:click="pedirAtualizarVeiculoPorPlaca"
+                        wire:loading.attr="disabled"
+                        wire:target="consultarPlaca,confirmarAtualizarVeiculoPorPlaca,pedirAtualizarVeiculoPorPlaca"
+                        title="Atualizar dados do veículo"
+                    >
+                        <span wire:loading.remove wire:target="confirmarAtualizarVeiculoPorPlaca">Atualizar</span>
+                        <span wire:loading wire:target="confirmarAtualizarVeiculoPorPlaca">Atualizando…</span>
+                    </button>
+                @endif
             </div>
         </div>
         <div class="erp-os-form-group erp-os-form-group--grow">
@@ -147,5 +160,31 @@
             <label class="erp-os-form-label" for="os-descricao2">Descrição / Complemento</label>
             <input id="os-descricao2" type="text" wire:model="descricao2" @disabled($readOnly) class="erp-os-form-input">
         </div>
+    </div>
+
+    <div
+        x-data
+        x-on:keydown.window="
+            if (! $wire.atualizarVeiculoConfirmOpen) return;
+            if ($event.key === 'Escape') { $event.preventDefault(); $wire.fecharAtualizarVeiculoConfirm(); }
+            if ($event.key === 'Enter') { $event.preventDefault(); $wire.confirmarAtualizarVeiculoPorPlaca(); }
+        "
+    >
+        @include('filament.components.erp.aviso-modal', [
+            'open' => $this->atualizarVeiculoConfirmOpen,
+            'tone' => 'warning',
+            'icon' => '?',
+            'titleId' => 'erp-atualizar-veiculo-title',
+            'title' => 'Confirmação',
+            'lines' => [
+                'Deseja atualizar os dados deste veículo?',
+            ],
+            'primaryLabel' => 'Sim',
+            'primaryAction' => 'confirmarAtualizarVeiculoPorPlaca',
+            'secondaryLabel' => 'Não',
+            'secondaryAction' => 'fecharAtualizarVeiculoConfirm',
+            'escapeAction' => 'fecharAtualizarVeiculoConfirm',
+            'backdropAction' => 'fecharAtualizarVeiculoConfirm',
+        ])
     </div>
 </div>

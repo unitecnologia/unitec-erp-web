@@ -81,13 +81,19 @@ class CargaRomaneioReportController extends Controller
             $dompdf = $pdf->getDomPDF();
             $dompdf->render();
             $canvas = $dompdf->getCanvas();
-            $font = $dompdf->getFontMetrics()->getFont('Helvetica', 'bold');
+            $fontMetrics = $dompdf->getFontMetrics();
+            $font = $fontMetrics->getFont('Helvetica', 'bold');
+            $fontSize = 8;
+            // Centraliza horizontalmente; Y permanece o mesmo (rodapé).
+            $textWidth = $fontMetrics->getTextWidth('Pag: 99 de 99', $font, $fontSize);
+            $pageX = max(0, ($canvas->get_width() - $textWidth) / 2);
+            $pageY = $canvas->get_height() - 28;
             $canvas->page_text(
-                $canvas->get_width() - 120,
-                $canvas->get_height() - 28,
+                $pageX,
+                $pageY,
                 'Pag: {PAGE_NUM} de {PAGE_COUNT}',
                 $font,
-                8,
+                $fontSize,
                 [0.07, 0.07, 0.07]
             );
 

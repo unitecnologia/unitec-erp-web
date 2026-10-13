@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Atualizacao;
 
+use App\Support\Erp\Database\PendingMigrationsGuard;
 use App\Support\Erp\ErpUpdateProcessLauncher;
 use App\Support\Erp\Printing\DeviceServiceLauncher;
 use Illuminate\Support\Facades\File;
@@ -143,8 +144,10 @@ final class AtualizacaoApplyService
                 'message' => 'Atualizando banco de dados…',
             ]);
             // Migrate sempre via CLI: o processo do apply já bootou com código/vendor mistos.
+            app(PendingMigrationsGuard::class)->invalidate();
             $this->runCliArtisan($appPath, 'migrate --force');
-            AtualizacaoLog::line('Migrate', 'ok', $appPath);
+            $this->assertSchemaFullyMigrated($appPath);
+            AtualizacaoLog::line('Migrate', 'ok pending=0', $appPath);
 
             /** @var list<array{command: string, percent: int, message: string, critical?: bool}> $cacheSteps */
             $cacheSteps = [
@@ -886,6 +889,39 @@ final class AtualizacaoApplyService
     private function resolvePhp(string $appPath): string
     {
         return ErpUpdateProcessLauncher::resolvePhpBinary($appPath);
+    }
+
+    /**
+     * Após migrate --force: exige zero pendências. Em falha mantém atualizacao/
+     * (clear só ocorre no sucesso) e impede concluir o apply.
+     */
+    private function assertSchemaFullyMigrated(string $appPath): void
+    {
+        self::writeProgress($appPath, [
+            'state' => 'migrating',
+            'percent' => 90,
+            'done' => 0,
+            'total' => 0,
+            'message' => 'Confirmando schema do banco…',
+        ]);
+
+        try {
+            app(PendingMigrationsGuard::class)->assertZeroPending();
+        } catch (\Throwable $e) {
+            $detail = trim($e->getMessage());
+            AtualizacaoLog::line('Migrate', 'schema ainda incompatível: '.$detail, $appPath);
+            Log::error('Atualização bloqueada: schema incompatível após migrate.', [
+                'message' => $detail,
+            ]);
+
+            throw new RuntimeException(
+                'Atualização não concluída: o banco continua incompatível com o código após o migrate. '
+                .($detail !== '' ? $detail.' ' : '')
+                .'A pasta atualizacao/ foi mantida. Aceite a atualização novamente no login ou execute Reparar Sistema.bat.',
+                (int) $e->getCode(),
+                $e
+            );
+        }
     }
 
     private function runCliArtisan(string $appPath, string $artisanArgs): void

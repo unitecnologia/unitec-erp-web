@@ -105,15 +105,11 @@
                     @if ($order)
                         <span class="erp-fv-mon__foot-pedido">
                             PEDIDO:
-                            {{ $order->venda?->numero
-                                ? (string) (int) preg_replace('/\D/', '', (string) $order->venda->numero)
-                                : '—' }}
+                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroDav($order) }}
                         </span>
                         <span class="erp-fv-mon__foot-pedido">
-                            DAV:
-                            {{ $order->pedido?->numero
-                                ? (string) (int) preg_replace('/\D/', '', (string) $order->pedido->numero)
-                                : (string) $order->id }}
+                            VENDA:
+                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroVenda($order) }}
                         </span>
                     @endif
                     <span class="erp-fv-mon__foot-total">

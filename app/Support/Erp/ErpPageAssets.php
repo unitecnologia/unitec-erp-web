@@ -51,7 +51,7 @@ class ErpPageAssets
         'balanca' => ['css/erp-balanca.css', 'css/erp-form-ui.css'],
         'nfce' => ['css/erp-nfe.css', 'css/erp-form-ui.css', 'css/erp-nfce-regularizacao.css', 'css/erp-pdv.css', 'css/erp-sefaz-progress.css'],
         'nfe' => ['css/erp-nfe.css', 'css/erp-pdv.css'],
-        'nfse' => ['css/erp-nfe.css', 'css/erp-nfse.css', 'css/erp-equipamento-modal.css'],
+        'nfse' => ['css/erp-nfe.css', 'css/erp-nfse.css', 'css/erp-form-ui.css', 'css/erp-equipamento-modal.css'],
         'cfops' => ['css/erp-estoque-menus.css', 'css/erp-cfop.css'],
         'operacoes-fiscais' => ['css/erp-os-form.css', 'css/erp-operacoes-fiscais.css'],
         'tabela-icms' => ['css/erp-tabela-icms.css'],

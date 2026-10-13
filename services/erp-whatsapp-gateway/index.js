@@ -260,25 +260,28 @@ async function prepareRecipient(sock, jid) {
   } catch (error) {
     logger.warn({ err: error, jid }, 'presenceSubscribe falhou');
   }
-
-  // Dá tempo da sessão de criptografia estabilizar (evita "Aguardando mensagem").
-  await delay(800);
 }
 
 /**
- * Mantém a conexão ativa após o sendMessage para o upload/relay terminar.
- * Sem isso o destinatário costuma ver "Aguardando mensagem" com 1 ✓.
+ * Mantém a conexão ativa após o sendMessage (upload/relay).
+ * Não bloqueia a resposta HTTP: sendMessage com messageId já é confirmação efetiva.
  */
-async function settleAfterSend(sock, jid, ms = 2500) {
-  try {
-    if (typeof sock.sendPresenceUpdate === 'function') {
-      await sock.sendPresenceUpdate('available', jid);
+function settleAfterSend(sock, jid, ms = 800) {
+  const run = async () => {
+    try {
+      if (typeof sock.sendPresenceUpdate === 'function') {
+        await sock.sendPresenceUpdate('available', jid);
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
-  }
 
-  await delay(ms);
+    await delay(ms);
+  };
+
+  run().catch((error) => {
+    logger.warn({ err: error, jid }, 'settleAfterSend falhou');
+  });
 }
 
 async function resolveBaileysVersion() {
@@ -338,7 +341,7 @@ async function sendTextMessage(sock, jid, text) {
     throw new Error('WhatsApp não aceitou a mensagem.');
   }
 
-  await settleAfterSend(sock, jid, 1500);
+  settleAfterSend(sock, jid, 800);
 
   return {
     key: sent.key,
@@ -367,7 +370,7 @@ function publicStatus(state) {
  * Aguarda QR / conexão / erro antes de responder o /start.
  * Sem isso a UI fica em "Aguardando QR" com imagem vazia.
  */
-function waitUntilSessionReady(empresaId, timeoutMs = 30000) {
+function waitUntilSessionReady(empresaId, timeoutMs = 25000) {
   const key = String(empresaId);
   const startedAt = Date.now();
 
@@ -388,6 +391,12 @@ function waitUntilSessionReady(empresaId, timeoutMs = 30000) {
       }
 
       if (Date.now() - startedAt >= timeoutMs) {
+        logger.warn({
+          empresaId: key,
+          status: current.status,
+          hasQr: Boolean(current.qr),
+          timeoutMs,
+        }, 'Timeout aguardando QR/conexão WhatsApp');
         resolve(current);
 
         return;
@@ -428,9 +437,10 @@ async function destroySession(empresaId, logout = true) {
 }
 
 async function startSession(empresaId, options = {}) {
-  const waitForQrMs = Number(options.waitForQrMs ?? 30000);
+  const waitForQrMs = Number(options.waitForQrMs ?? 25000);
   const key = String(empresaId);
   let state = sessions.get(key);
+  logger.warn({ empresaId: key, waitForQrMs }, 'Iniciando sessão WhatsApp');
 
   if (!state) {
     state = createSessionState();
@@ -452,14 +462,16 @@ async function startSession(empresaId, options = {}) {
     return publicStatus(state);
   }
 
-  if (state.sock) {
+  // Tentativa anterior sem QR / erro: zera socket em memória antes de abrir de novo.
+  if (state.sock || state.status === 'erro' || (state.status === 'aguardando_qr' && !state.qr)) {
     try {
-      state.sock.end(undefined);
+      state.sock?.end(undefined);
     } catch {
       // ignore
     }
 
     state.sock = null;
+    sessions.set(key, state);
   }
 
   state.starting = true;
@@ -493,6 +505,15 @@ async function startSession(empresaId, options = {}) {
         return;
       }
 
+      const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+      logger.warn({
+        empresaId: key,
+        connection: update.connection ?? null,
+        hasQr: Boolean(update.qr),
+        statusCode: statusCode ?? null,
+        isNewLogin: update.isNewLogin ?? null,
+      }, 'connection.update');
+
       if (update.qr) {
         try {
           current.qr = await QRCode.toDataURL(update.qr);
@@ -515,7 +536,6 @@ async function startSession(empresaId, options = {}) {
       }
 
       if (update.connection === 'close') {
-        const statusCode = update.lastDisconnect?.error?.output?.statusCode;
         current.starting = false;
         current.qr = null;
         current.sock = null;
@@ -538,6 +558,12 @@ async function startSession(empresaId, options = {}) {
 
         if (statusCode !== DisconnectReason.loggedOut) {
           setTimeout(() => {
+            const live = sessions.get(key);
+
+            if (live?.status === 'conectado' || live?.starting || live?.qr) {
+              return;
+            }
+
             startSession(empresaId).catch((error) => {
               logger.error({ err: error }, 'Falha ao reconectar sessão');
             });
@@ -547,6 +573,18 @@ async function startSession(empresaId, options = {}) {
     });
 
     await waitUntilSessionReady(empresaId, waitForQrMs);
+
+    const afterWait = sessions.get(key);
+
+    if (
+      afterWait
+      && !afterWait.qr
+      && afterWait.status !== 'conectado'
+      && !sessionHasCredentials(empresaId)
+    ) {
+      afterWait.status = 'erro';
+      logger.error({ empresaId: key }, 'Sessão iniciada sem QR — possível bloqueio de rede/firewall ao WhatsApp');
+    }
   } finally {
     const current = sessions.get(key);
 
@@ -610,17 +648,29 @@ app.get('/sessions/:empresaId/status', requireAuth, (req, res) => {
 });
 
 app.post('/sessions/:empresaId/start', requireAuth, async (req, res) => {
+  const empresaId = String(req.params.empresaId);
+  const startedAt = Date.now();
+
   try {
-    const payload = await startSession(req.params.empresaId);
+    const payload = await startSession(empresaId);
+
+    logger.warn({
+      empresaId,
+      status: payload.status,
+      hasQr: Boolean(payload.qr),
+      elapsedMs: Date.now() - startedAt,
+    }, 'Resposta /sessions/start');
 
     res.json({
       ...payload,
       message: payload.status === 'conectado'
         ? 'WhatsApp já conectado.'
-        : 'Leia o QR Code no ERP para conectar.',
+        : (payload.qr
+          ? 'Leia o QR Code no ERP para conectar.'
+          : 'Gateway não gerou QR a tempo. Verifique internet/firewall e tente novamente.'),
     });
   } catch (error) {
-    logger.error({ err: error }, 'Erro ao iniciar sessão');
+    logger.error({ err: error, empresaId, elapsedMs: Date.now() - startedAt }, 'Erro ao iniciar sessão');
     res.status(500).json({ message: error instanceof Error ? error.message : 'Erro ao iniciar sessão.' });
   }
 });
@@ -703,7 +753,8 @@ app.post('/sessions/:empresaId/send', requireAuth, async (req, res) => {
         return res.status(500).json({ message: 'WhatsApp não aceitou o envio do documento.' });
       }
 
-      await settleAfterSend(state.sock, jid, 3000);
+      // messageId = WhatsApp aceitou o envio; settle segue em background.
+      settleAfterSend(state.sock, jid, 800);
 
       return res.json({
         message: 'Documento enviado.',

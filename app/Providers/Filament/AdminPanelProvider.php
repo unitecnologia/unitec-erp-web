@@ -124,11 +124,16 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 AuthenticateSession::class,
+                \App\Http\Middleware\EnsureDatabaseUpToDate::class,
                 \App\Http\Middleware\EnsureEmpresaCadastrada::class,
                 \App\Http\Middleware\EnsureOnboardingCompleto::class,
                 \App\Http\Middleware\EnsureEmpresaSelecionada::class,
                 \App\Http\Middleware\EnsureLicencaAtiva::class,
                 \App\Http\Middleware\EnsureLicensedBrowserDevice::class,
+            ])
+            // SPA/Livewire: reaplica só o gate de schema (login guest não tem este middleware na rota).
+            ->persistentMiddleware([
+                \App\Http\Middleware\EnsureDatabaseUpToDate::class,
             ]);
     }
 }
