@@ -12,12 +12,15 @@ use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
 use App\Models\Pedido;
 use App\Models\Person;
+use App\Models\PdvCaixaMovimento;
+use App\Models\PdvCaixaSessao;
 use App\Models\PixCobranca;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
@@ -27,6 +30,7 @@ use App\Support\Erp\Financeiro\ComissaoPeriodoService;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
 use App\Support\Erp\Financeiro\FormaPagamentoDestino;
+use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\Erp\Pdv\PdvStockService;
 use App\Support\Erp\ProductEstoqueSaldoService;
@@ -45,8 +49,10 @@ use Illuminate\Support\Facades\Schema;
  * As contas a receber usam o documento "FV-{orderId}" (e "FV-{orderId}/{n}"
  * quando há mais de uma parcela), mesma convenção da tela Monitor de Vendas.
  *
- * Caixa: FV lança no Livro Caixa (`caixa_lancamentos`) na hora do faturamento.
- * PDV usa `pdv_caixa_movimentos` da sessão e consolida no Livro só no fechamento.
+ * Caixa (Tela/FV/Monitor): destino via VendaCaixaDestinoResolver
+ * (forma → seleção autorizada → Permissões → CAIXA GERAL).
+ * PDV autorizado com sessão aberta → só `pdv_caixa_movimentos` (Livro no fechamento).
+ * Demais destinos → só `caixa_lancamentos`. Formas que não movimentam caixa: sem lançamento.
  *
  * Observação: com "Bloquear Estoque Negativo" ativo, a baixa respeita o saldo
  * (ProductEstoqueSaldoService / PdvStockService). Com o parâmetro desligado,
@@ -80,7 +86,7 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException('Pedido não encontrado.');
         }
 
-        if ($order->venda_id || $order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
             throw new \RuntimeException('Pedido já foi faturado.');
         }
 
@@ -98,6 +104,8 @@ class ForcaVendasFaturamentoService
         ], true)) {
             throw new \RuntimeException('Pedido não pode ser faturado.');
         }
+
+        $vendaReaberta = $this->resolverVendaReabertaParaRefaturar($order);
 
         $pedido = $order->pedido;
 
@@ -126,6 +134,14 @@ class ForcaVendasFaturamentoService
             throw new \RuntimeException('Pedido sem forma de pagamento.');
         }
 
+        if ($pixPago === null) {
+            $payloadGuard = is_array($order->payload) ? $order->payload : [];
+            ConsumidorFinalGuard::assertPagamentoPermitido(
+                Person::query()->find((int) $pedido->cliente_id),
+                $this->resolveFormaPagamento($payloadGuard),
+            );
+        }
+
         $empresaId = $order->empresa_id
             ? (int) $order->empresa_id
             : ErpContext::currentEmpresaId();
@@ -136,6 +152,24 @@ class ForcaVendasFaturamentoService
 
         $estoqueId = $this->resolveEstoqueId($empresaId, $vendedor);
         $isTelaErp = $this->isTelaVendaErp($order);
+        $formaPagamento = $pixPago ? 'PIX' : ($order->payload['forma_pagamento'] ?? null);
+
+        if ($vendaReaberta instanceof Venda) {
+            return $this->refaturarVendaExistente(
+                $order,
+                $pedido,
+                $vendaReaberta,
+                $pixPago,
+                $vendedor,
+                $empresaId,
+                $estoqueId,
+                $abertura,
+                $fechamento,
+                $formaPagamento,
+                $isTelaErp,
+                $avancar,
+            );
+        }
 
         $avancar('Gerando venda');
 
@@ -151,17 +185,127 @@ class ForcaVendasFaturamentoService
             'vendedor_id' => $vendedor?->id,
             'vendedor_nome' => $vendedor?->nome,
             'total' => $pedido->total,
-            'forma_pagamento' => $pixPago ? 'PIX' : ($order->payload['forma_pagamento'] ?? null),
+            'forma_pagamento' => $formaPagamento,
             'status' => Venda::STATUS_FECHADO,
             'tipo' => Venda::TIPO_PEDIDO,
             'plataforma' => $isTelaErp ? Venda::PLATAFORMA_ERP : Venda::PLATAFORMA_MOBILE,
         ]);
 
+        return $this->aplicarEfeitosFaturamento(
+            $order,
+            $pedido,
+            $venda,
+            $pixPago,
+            $empresaId,
+            $estoqueId,
+            $avancar,
+        );
+    }
+
+    /**
+     * Venda reaberta (status aberto) do mesmo order — refaturar sem novo número.
+     */
+    private function resolverVendaReabertaParaRefaturar(ForcaVendasOrder $order): ?Venda
+    {
+        if (! $order->venda_id) {
+            return null;
+        }
+
+        /** @var Venda|null $venda */
+        $venda = Venda::query()->whereKey((int) $order->venda_id)->lockForUpdate()->first();
+
+        if (! $venda instanceof Venda) {
+            return null;
+        }
+
+        if ($venda->status === Venda::STATUS_FECHADO) {
+            throw new \RuntimeException('Pedido já foi faturado.');
+        }
+
+        if ($venda->status === Venda::STATUS_ABERTO) {
+            return $venda;
+        }
+
+        // Cancelada definitiva: próximo faturar cria nova venda.
+        return null;
+    }
+
+    /**
+     * @param  callable(string): void  $avancar
+     * @return array{venda: Venda, contas_receber: list<ContaReceber>}
+     */
+    private function refaturarVendaExistente(
+        ForcaVendasOrder $order,
+        Pedido $pedido,
+        Venda $venda,
+        ?PixCobranca $pixPago,
+        ?Vendedor $vendedor,
+        ?int $empresaId,
+        ?int $estoqueId,
+        \Carbon\CarbonInterface $abertura,
+        \Carbon\CarbonInterface $fechamento,
+        mixed $formaPagamento,
+        bool $isTelaErp,
+        callable $avancar,
+    ): array {
+        $avancar('Atualizando venda');
+
+        // Não reutiliza número de documento fiscal — trava permanece no Monitor.
+        // Mantém id/numero; atualiza cabeçalho comercial.
+        $venda->forceFill([
+            'empresa_id' => $empresaId,
+            'data' => $abertura->toDateString(),
+            'hora' => $fechamento->format('H:i:s'),
+            'hora_abertura' => $order->dataAberturaAt() !== null
+                ? $abertura->format('H:i:s')
+                : $venda->hora_abertura,
+            'cliente_id' => $pedido->cliente_id,
+            'vendedor_id' => $vendedor?->id,
+            'vendedor_nome' => $vendedor?->nome,
+            'total' => $pedido->total,
+            'forma_pagamento' => $formaPagamento,
+            'status' => Venda::STATUS_FECHADO,
+            'tipo' => Venda::TIPO_PEDIDO,
+            'plataforma' => $isTelaErp ? Venda::PLATAFORMA_ERP : Venda::PLATAFORMA_MOBILE,
+        ])->save();
+
+        return $this->aplicarEfeitosFaturamento(
+            $order,
+            $pedido,
+            $venda->fresh() ?? $venda,
+            $pixPago,
+            $empresaId,
+            $estoqueId,
+            $avancar,
+            sincronizarItens: true,
+        );
+    }
+
+    /**
+     * Baixa estoque, financeiro, reserva, vínculos e logística após create/update da venda.
+     *
+     * @param  callable(string): void  $avancar
+     * @return array{venda: Venda, contas_receber: list<ContaReceber>}
+     */
+    private function aplicarEfeitosFaturamento(
+        ForcaVendasOrder $order,
+        Pedido $pedido,
+        Venda $venda,
+        ?PixCobranca $pixPago,
+        ?int $empresaId,
+        ?int $estoqueId,
+        callable $avancar,
+        bool $sincronizarItens = false,
+    ): array {
         if ($pixPago !== null) {
             $pixPago->forceFill(['venda_id' => $venda->id])->save();
         }
 
         $avancar('Movimentando estoque');
+
+        if ($sincronizarItens) {
+            VendaItem::query()->where('venda_id', (int) $venda->id)->delete();
+        }
 
         $stock = new PdvStockService();
         $docSaida = $this->documentoBase($order);
@@ -218,7 +362,12 @@ class ForcaVendasFaturamentoService
             'venda_id' => $venda->id,
             'situacao' => ForcaVendasOrder::SITUACAO_FATURADO,
             'faturado_at' => now(),
+            'canceled_at' => null,
         ])->save();
+
+        if ($pedido->status !== Pedido::STATUS_FECHADO) {
+            $pedido->update(['status' => Pedido::STATUS_FECHADO]);
+        }
 
         (new VendasInternasMonitorHookService())->onForcaVendasOrderFaturado($order);
 
@@ -226,9 +375,9 @@ class ForcaVendasFaturamentoService
             ? Entrega::ORIGEM_VI
             : Entrega::ORIGEM_MONITOR;
 
-        (new LogisticaVendaHookService())->onVendaFechada($venda, $origemExpedicao);
+        (new LogisticaVendaHookService())->onVendaFechada($venda->fresh() ?? $venda, $origemExpedicao);
 
-        return ['venda' => $venda, 'contas_receber' => $contas];
+        return ['venda' => $venda->fresh() ?? $venda, 'contas_receber' => $contas];
     }
 
     /**
@@ -321,7 +470,18 @@ class ForcaVendasFaturamentoService
             $this->garantirEntregaNaoExpedida($venda);
 
             if ($reabrir) {
+                if ($venda->status !== Venda::STATUS_FECHADO) {
+                    throw new \RuntimeException('Somente venda fechada pode ser reaberta.');
+                }
+
                 $this->reabrirVendaEstornada($order, $venda, $motivoLogistica, $avancar);
+
+                return;
+            }
+
+            // Cancelamento definitivo após reabertura: efeitos já foram estornados.
+            if ($venda->status === Venda::STATUS_ABERTO) {
+                $this->cancelarVendaReaberta($order, $venda, $motivoLogistica, $avancar);
 
                 return;
             }
@@ -345,7 +505,7 @@ class ForcaVendasFaturamentoService
             $this->estornarEstoque($order, $venda, $stock, $estoqueId, $empresaId);
 
             $avancar('Estornando financeiro');
-            $this->estornarLancamentosCaixaDoPedido($order, $empresaId);
+            $this->estornarCaixaDoPedido($order, $empresaId);
             $this->contasDoPedido($order)
                 ->where(function (Builder $query): void {
                     $query->whereNull('valor_recebido')->orWhere('valor_recebido', '<=', 0);
@@ -368,11 +528,14 @@ class ForcaVendasFaturamentoService
             if ($order->pedido && $order->pedido->status !== Pedido::STATUS_CANCELADO) {
                 $order->pedido->update(['status' => Pedido::STATUS_CANCELADO]);
             }
+
+            (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($order);
         });
     }
 
     /**
-     * Mesmo estorno do cancelamento, mas o pedido volta a pendente e editável.
+     * Estorna faturamento e mantém a mesma venda (id/numero) em status aberto,
+     * distinta do cancelamento definitivo.
      *
      * @param  callable(string): void  $avancar
      */
@@ -409,8 +572,8 @@ class ForcaVendasFaturamentoService
             : ($venda->empresa_id ? (int) $venda->empresa_id : ErpContext::currentEmpresaId());
         $estoqueId = $this->resolveEstoqueId($empresaId, $vendedor);
 
-        $avancar('Estornando Livro Caixa');
-        $this->estornarLancamentosCaixaDoPedido($order, $empresaId);
+        $avancar('Estornando caixa');
+        $this->estornarCaixaDoPedido($order, $empresaId);
 
         $avancar('Devolvendo estoque');
         $this->estornarEstoque($order, $venda, $stock, $estoqueId, $empresaId);
@@ -427,13 +590,13 @@ class ForcaVendasFaturamentoService
         }
 
         $avancar('Reabrindo pedido');
-        $venda->update(['status' => Venda::STATUS_CANCELADO]);
+        // Mantém id/numero; distingue de cancelamento definitivo.
+        $venda->update(['status' => Venda::STATUS_ABERTO]);
         (new LogisticaVendaHookService())->onVendaCancelada($venda, $motivoLogistica);
-        $this->desvincularPixDaVenda((int) $venda->id);
 
         $order->forceFill([
             'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,
-            'venda_id' => null,
+            'venda_id' => $venda->id,
             'confirmed_at' => null,
             'faturado_at' => null,
             'canceled_at' => null,
@@ -449,18 +612,36 @@ class ForcaVendasFaturamentoService
     }
 
     /**
-     * Mantém cobrança Pix (uuid/status/histórico) e só desfaz o vínculo com a
-     * venda cancelada — o próximo faturamento religa se ainda estiver paga.
+     * Cancelamento definitivo de venda já reaberta (efeitos já estornados).
+     *
+     * @param  callable(string): void  $avancar
      */
-    private function desvincularPixDaVenda(int $vendaId): void
-    {
-        if ($vendaId <= 0 || ! Schema::hasTable((new PixCobranca)->getTable())) {
-            return;
+    private function cancelarVendaReaberta(
+        ForcaVendasOrder $order,
+        Venda $venda,
+        string $motivoLogistica,
+        callable $avancar,
+    ): void {
+        $avancar('Liberando reserva');
+        (new EstoqueReservaService())->liberarPedido($order);
+
+        $avancar('Cancelando venda');
+        $venda->update(['status' => Venda::STATUS_CANCELADO]);
+        (new LogisticaVendaHookService())->onVendaCancelada($venda, $motivoLogistica);
+
+        $avancar('Finalizando pedido');
+        $order->forceFill([
+            'situacao' => ForcaVendasOrder::SITUACAO_CANCELADO,
+            'canceled_at' => now(),
+        ])->save();
+
+        $order->load('pedido');
+
+        if ($order->pedido && $order->pedido->status !== Pedido::STATUS_CANCELADO) {
+            $order->pedido->update(['status' => Pedido::STATUS_CANCELADO]);
         }
 
-        PixCobranca::query()
-            ->where('venda_id', $vendaId)
-            ->update(['venda_id' => null]);
+        (new VendasInternasMonitorHookService())->onForcaVendasOrderCancelado($order);
     }
 
     /**
@@ -695,7 +876,8 @@ class ForcaVendasFaturamentoService
 
     /**
      * Financeiro do faturamento:
-     * - à vista dinheiro/PIX → só Livro Caixa (sem Contas a Receber)
+     * - à vista dinheiro/PIX/caixa → sessão PDV ou Livro Caixa (sem Contas a Receber)
+     * - depósito → Livro Caixa
      * - demais / a prazo → Contas a Receber
      *
      * @return list<ContaReceber>
@@ -728,21 +910,21 @@ class ForcaVendasFaturamentoService
         $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
         $prefixoHist = $this->isTelaVendaErp($order) ? 'VENDA ERP ' : 'VENDA APP ';
         $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
+        $historicoCaixa = $prefixoHist.'FV ('.$formaLabel.') ['.$base.']';
 
-        // Caixa do vendedor (Permissões do usuário vinculado); nunca o operador do Monitor.
-        $caixaContaId = $this->resolveCaixaContaId($order);
-
-        // PIX pago no app: vai direto para o Livro Caixa (sem CR).
+        // PIX pago no app: caixa sem CR.
         if ($pixPago !== null) {
-            $baixa->registrarEntradaCaixa(
-                valor: $total,
+            $this->lancarEntradaCaixaVenda(
+                order: $order,
+                formaModel: $formaModel,
+                total: $total,
                 data: $hoje->toDateString(),
                 documento: $base,
-                historico: $prefixoHist.'FV (PIX)',
-                caixaContaId: $caixaContaId,
+                historico: $prefixoHist.'FV (PIX) ['.$base.']',
+                formaLabel: 'PIX',
                 empresaId: $empresaId,
-                planoContaId: $planoVenda['id'] ?? null,
-                planoNome: $planoVenda['nome'] ?? null,
+                planoVenda: $planoVenda,
+                permitirSessao: true,
             );
 
             return [];
@@ -761,22 +943,22 @@ class ForcaVendasFaturamentoService
             return [];
         }
 
-        // Caixa ou depósito: Livro Caixa (conta destino da forma, se houver).
+        // Caixa: sessão PDV (se aplicável) ou Livro. Depósito: sempre Livro.
         if ($formaModel !== null && (
             FormaPagamentoDestino::vaiParaCaixa($movimento)
             || FormaPagamentoDestino::vaiParaDeposito($movimento)
         )) {
-            $baixa->registrarEntradaCaixa(
-                valor: $total,
+            $this->lancarEntradaCaixaVenda(
+                order: $order,
+                formaModel: $formaModel,
+                total: $total,
                 data: $hoje->toDateString(),
                 documento: $base,
-                historico: $prefixoHist.'FV ('.$formaLabel.')',
-                caixaContaId: $formaModel->conta_destino_id
-                    ? (int) $formaModel->conta_destino_id
-                    : $caixaContaId,
+                historico: $historicoCaixa,
+                formaLabel: $formaLabel,
                 empresaId: $empresaId,
-                planoContaId: $planoVenda['id'] ?? null,
-                planoNome: $planoVenda['nome'] ?? null,
+                planoVenda: $planoVenda,
+                permitirSessao: FormaPagamentoDestino::vaiParaCaixa($movimento),
             );
 
             return [];
@@ -791,15 +973,17 @@ class ForcaVendasFaturamentoService
         if ($formaModel === null) {
             $aVista = $n === 1 && (int) $dias[0] === 0;
             if ($aVista && in_array($forma, ['dinheiro', ContaReceber::FORMA_PIX], true)) {
-                $baixa->registrarEntradaCaixa(
-                    valor: $total,
+                $this->lancarEntradaCaixaVenda(
+                    order: $order,
+                    formaModel: null,
+                    total: $total,
                     data: $hoje->toDateString(),
                     documento: $base,
-                    historico: $prefixoHist.'FV ('.$formaLabel.')',
-                    caixaContaId: $caixaContaId,
+                    historico: $historicoCaixa,
+                    formaLabel: $formaLabel !== '' ? $formaLabel : 'DINHEIRO',
                     empresaId: $empresaId,
-                    planoContaId: $planoVenda['id'] ?? null,
-                    planoNome: $planoVenda['nome'] ?? null,
+                    planoVenda: $planoVenda,
+                    permitirSessao: true,
                 );
 
                 return [];
@@ -820,7 +1004,7 @@ class ForcaVendasFaturamentoService
 
             $documento = $n > 1 ? $base.'/'.($i + 1) : $base;
 
-            $criadas[] = ContaReceber::query()->create([
+            $payload = [
                 'empresa_id' => $order->empresa_id
                     ? (int) $order->empresa_id
                     : ErpContext::currentEmpresaId(),
@@ -837,10 +1021,69 @@ class ForcaVendasFaturamentoService
                     $forma,
                     $order->empresa_id ? (int) $order->empresa_id : null
                 ),
-            ]);
+            ];
+
+            if (! empty($planoVenda['id'])) {
+                $payload['plano_conta_id'] = (int) $planoVenda['id'];
+            }
+
+            $criadas[] = ContaReceber::query()->create($payload);
         }
 
         return $criadas;
+    }
+
+    /**
+     * @param  array{id: int|null, nome: string|null}|null  $planoVenda
+     */
+    private function lancarEntradaCaixaVenda(
+        ForcaVendasOrder $order,
+        ?FormaPagamento $formaModel,
+        float $total,
+        string $data,
+        string $documento,
+        string $historico,
+        string $formaLabel,
+        ?int $empresaId,
+        ?array $planoVenda,
+        bool $permitirSessao,
+    ): void {
+        $total = round($total, 2);
+        if ($total <= 0) {
+            return;
+        }
+
+        // Idempotência: já lançado (Livro ou sessão) com saldo líquido.
+        if ($this->saldoLiquidoLivroDocumento($documento) > 0.005
+            || $this->saldoLiquidoSessaoDocumento($documento) > 0.005) {
+            return;
+        }
+
+        $destino = $this->resolverDestinoCaixaVenda($order, $formaModel);
+        $viaSessao = $permitirSessao && ($destino['sessao_id'] ?? null);
+
+        if ($viaSessao) {
+            $this->registrarMovimentoSessaoVenda(
+                sessaoId: (int) $destino['sessao_id'],
+                valor: $total,
+                historico: $historico,
+                formaLabel: $formaLabel,
+                estorno: false,
+            );
+
+            return;
+        }
+
+        app(ContaReceberBaixaService::class)->registrarEntradaCaixa(
+            valor: $total,
+            data: $data,
+            documento: $documento,
+            historico: $historico,
+            caixaContaId: (int) $destino['caixa_conta_id'],
+            empresaId: $empresaId,
+            planoContaId: $planoVenda['id'] ?? null,
+            planoNome: $planoVenda['nome'] ?? null,
+        );
     }
 
     /**
@@ -886,36 +1129,199 @@ class ForcaVendasFaturamentoService
     }
 
     /**
-     * Conta do Livro Caixa (sem usar o operador do Monitor):
-     * 1) caixa padrão do usuário ligado ao vendedor (caixa_conta_user)
-     * 2) pivot empresa_vendedor (legado)
-     * 3) payload.caixa_id / caixa_conta_id
-     * 4) CAIXA GERAL
+     * Destino do caixa da venda (nunca usa o operador do Monitor).
      *
-     * Não altera formas_pagamento.conta_destino_id (aplicado depois em gerarContasReceber).
+     * @return array{caixa_conta_id: int, sessao_id: int|null}
      */
-    private function resolveCaixaContaId(ForcaVendasOrder $order): int
+    private function resolverDestinoCaixaVenda(ForcaVendasOrder $order, ?FormaPagamento $formaModel): array
     {
-        $empresaId = $order->empresa_id ? (int) $order->empresa_id : null;
+        $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
+        $payload = is_array($order->payload) ? $order->payload : [];
+        $selecionadaId = (int) ($payload['caixa_id'] ?? $payload['caixa_conta_id'] ?? 0) ?: null;
 
+        $usuario = null;
         if ($order->vendedor_id) {
-            $vendedor = Vendedor::query()
-                ->with(['empresas', 'usuario'])
-                ->find($order->vendedor_id);
+            $vendedor = Vendedor::query()->with('usuario')->find($order->vendedor_id);
+            $usuario = $vendedor?->usuario;
+        }
+        if (! $usuario && $order->user_id) {
+            $usuario = User::query()->find((int) $order->user_id);
+        }
 
-            $caixaVendedor = $vendedor?->caixaContaDaEmpresa($empresaId);
-            if ($caixaVendedor?->id) {
-                return (int) $caixaVendedor->id;
+        return app(VendaCaixaDestinoResolver::class)->resolver(
+            $formaModel,
+            $selecionadaId,
+            $usuario instanceof User ? $usuario : null,
+            $empresaId,
+        );
+    }
+
+    /**
+     * Estorna caixa na origem: sessão PDV e/ou Livro Caixa.
+     * Sessão já fechada: contra-lançamento também no CAIXA GERAL (fechamento agregou lá).
+     */
+    private function estornarCaixaDoPedido(ForcaVendasOrder $order, ?int $empresaId = null): void
+    {
+        $empresaId = $empresaId && $empresaId > 0
+            ? $empresaId
+            : ErpContext::currentEmpresaId();
+        $base = $this->documentoBase($order);
+
+        $this->estornarMovimentosSessaoDoPedido($order, $base, $empresaId);
+        $this->estornarLancamentosCaixaDoPedido($order, $empresaId);
+    }
+
+    private function estornarMovimentosSessaoDoPedido(
+        ForcaVendasOrder $order,
+        string $base,
+        ?int $empresaId,
+    ): void {
+        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+            return;
+        }
+
+        $movimentos = PdvCaixaMovimento::query()
+            ->where('historico', 'like', '%['.$base.']%')
+            ->orderBy('id')
+            ->get();
+
+        if ($movimentos->isEmpty()) {
+            return;
+        }
+
+        $grupos = $movimentos->groupBy(
+            fn (PdvCaixaMovimento $m): string => ((int) $m->pdv_caixa_sessao_id).'|'.mb_strtoupper(trim((string) ($m->forma_pagamento ?? 'DINHEIRO')), 'UTF-8')
+        );
+
+        $hoje = ErpTimezone::toLocal()->toDateString();
+        $baixa = app(ContaReceberBaixaService::class);
+        $geralId = (int) CaixaConta::ensureCaixaGeral()->id;
+        $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
+
+        foreach ($grupos as $grupo) {
+            $liquido = round((float) $grupo->sum('entrada') - (float) $grupo->sum('saida'), 2);
+            if ($liquido <= 0.005) {
+                continue;
+            }
+
+            /** @var PdvCaixaMovimento $ref */
+            $ref = $grupo->first();
+            $sessaoId = (int) $ref->pdv_caixa_sessao_id;
+            $forma = mb_strtoupper(trim((string) ($ref->forma_pagamento ?? 'DINHEIRO')), 'UTF-8');
+            if ($forma === '') {
+                $forma = 'DINHEIRO';
+            }
+
+            $historicoOrig = trim((string) ($ref->historico ?? ''));
+            $historico = $historicoOrig !== ''
+                ? 'ESTORNO '.$historicoOrig
+                : 'ESTORNO ['.$base.']';
+
+            $this->registrarMovimentoSessaoVenda(
+                sessaoId: $sessaoId,
+                valor: $liquido,
+                historico: $historico,
+                formaLabel: $forma,
+                estorno: true,
+            );
+
+            $sessao = PdvCaixaSessao::query()->find($sessaoId);
+            // Fechamento já consolidou no Geral (PDV-CX-*): compensa com documento FV.
+            // Sem PDV-CX, o dinheiro nunca entrou no Livro — só o estorno na sessão basta.
+            if ($sessao && ! $sessao->isAberto() && $this->sessaoJaConsolidadaNoLivro($sessaoId)) {
+                // Já há lançamento FV neste documento (entrada antiga ou compensação).
+                if (abs($this->saldoLiquidoLivroDocumento($base)) > 0.005) {
+                    continue;
+                }
+
+                $baixa->registrarSaidaCaixa(
+                    valor: $liquido,
+                    data: $hoje,
+                    documento: $base,
+                    historico: $historico,
+                    caixaContaId: $geralId,
+                    empresaId: $empresaId,
+                    planoContaId: $planoVenda['id'] ?? null,
+                    planoNome: $planoVenda['nome'] ?? null,
+                );
             }
         }
+    }
 
-        $payload = is_array($order->payload) ? $order->payload : [];
-        $caixaPayloadId = (int) ($payload['caixa_id'] ?? $payload['caixa_conta_id'] ?? 0);
-        if ($caixaPayloadId > 0 && CaixaConta::query()->whereKey($caixaPayloadId)->exists()) {
-            return $caixaPayloadId;
+    private function sessaoJaConsolidadaNoLivro(int $sessaoId): bool
+    {
+        if ($sessaoId <= 0 || ! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            return false;
         }
 
-        return (int) CaixaConta::ensureCaixaGeral()->id;
+        $base = 'PDV-CX-'.$sessaoId;
+
+        return CaixaLancamento::query()
+            ->where(function ($query) use ($base): void {
+                $query->where('documento', $base)
+                    ->orWhere('documento', 'like', $base.'-%');
+            })
+            ->exists();
+    }
+
+    private function registrarMovimentoSessaoVenda(
+        int $sessaoId,
+        float $valor,
+        string $historico,
+        string $formaLabel,
+        bool $estorno,
+    ): void {
+        if ($sessaoId <= 0 || $valor <= 0) {
+            return;
+        }
+
+        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+            return;
+        }
+
+        $forma = mb_strtoupper(trim($formaLabel), 'UTF-8');
+        if ($forma === '') {
+            $forma = 'DINHEIRO';
+        }
+
+        PdvCaixaMovimento::query()->create([
+            'pdv_caixa_sessao_id' => $sessaoId,
+            'tipo' => $estorno ? 'estorno' : 'venda',
+            'historico' => $historico,
+            'forma_pagamento' => $forma,
+            'entrada' => $estorno ? 0 : $valor,
+            'saida' => $estorno ? $valor : 0,
+            'pdv_venda_id' => null,
+        ]);
+    }
+
+    private function saldoLiquidoLivroDocumento(string $documento): float
+    {
+        if (! Schema::hasTable((new CaixaLancamento)->getTable())) {
+            return 0.0;
+        }
+
+        $rows = CaixaLancamento::query()
+            ->where(function ($query) use ($documento): void {
+                $query->where('documento', $documento)
+                    ->orWhere('documento', 'like', $documento.'/%');
+            })
+            ->get(['entrada', 'saida']);
+
+        return round((float) $rows->sum('entrada') - (float) $rows->sum('saida'), 2);
+    }
+
+    private function saldoLiquidoSessaoDocumento(string $documento): float
+    {
+        if (! Schema::hasTable((new PdvCaixaMovimento)->getTable())) {
+            return 0.0;
+        }
+
+        $rows = PdvCaixaMovimento::query()
+            ->where('historico', 'like', '%['.$documento.']%')
+            ->get(['entrada', 'saida']);
+
+        return round((float) $rows->sum('entrada') - (float) $rows->sum('saida'), 2);
     }
 
     /**
@@ -966,9 +1372,16 @@ class ForcaVendasFaturamentoService
                 ? 'ESTORNO '.$historicoOrig
                 : 'ESTORNO '.$base;
 
-            $planoVenda = EmpresaParametros::planoVendaLancamento(
-                $ref->empresa_id ? (int) $ref->empresa_id : $empresaId
-            );
+            $planoContaId = $ref->plano_conta_id ? (int) $ref->plano_conta_id : null;
+            $planoNome = filled($ref->plano_contas) ? (string) $ref->plano_contas : null;
+
+            if (! $planoContaId) {
+                $planoVenda = EmpresaParametros::planoVendaLancamento(
+                    $ref->empresa_id ? (int) $ref->empresa_id : $empresaId
+                );
+                $planoContaId = $planoVenda['id'] ?? null;
+                $planoNome = $planoVenda['nome'] ?? null;
+            }
 
             $baixa->registrarSaidaCaixa(
                 valor: $liquido,
@@ -979,8 +1392,8 @@ class ForcaVendasFaturamentoService
                 empresaId: $ref->empresa_id
                     ? (int) $ref->empresa_id
                     : $empresaId,
-                planoContaId: $planoVenda['id'] ?? null,
-                planoNome: $planoVenda['nome'] ?? null,
+                planoContaId: $planoContaId,
+                planoNome: $planoNome,
             );
         }
     }
@@ -1013,7 +1426,8 @@ class ForcaVendasFaturamentoService
      * 1) canhoto do cartão (cartao_canhoto.dias), se houver
      * 2) tabela fixa do cliente
      * 3) financeiro → só max_parcelas + intervalo_parcelas
-     * 4) tabela → tabela_prazo_dias somente se existir na mesma forma; senão erro
+     * 4) tabela → Prazo Avulso (condicao_pagamento), depois tabela_prazo_dias
+     *    somente se existir na mesma forma; senão erro
      *
      * Sem modo_prazo (legado): payload negociado, depois tabela do cliente,
      * depois prazo financeiro da heurística, depois [0].
@@ -1055,6 +1469,13 @@ class ForcaVendasFaturamentoService
                 );
 
                 return ($resolved !== null && $resolved !== []) ? $resolved : [0];
+            }
+
+            // App/Tela: Prazo Avulso tem prioridade sobre tabela_prazo_dias.
+            $avulso = $this->diasPrazoAvulsoDoPayload($payload);
+
+            if ($avulso !== []) {
+                return $avulso;
             }
 
             $recebido = $this->diasTabelaPrazoDoPayload($payload);
@@ -1138,6 +1559,17 @@ class ForcaVendasFaturamentoService
     }
 
     /**
+     * Prazo Avulso negociado no app/Tela (`condicao_pagamento`), ex.: "15" ou "30,60,90".
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<int>
+     */
+    private function diasPrazoAvulsoDoPayload(array $payload): array
+    {
+        return $this->diasDeString((string) ($payload['condicao_pagamento'] ?? ''));
+    }
+
+    /**
      * A lista inteira precisa ser igual a uma tabela da mesma forma.
      *
      * @param  list<int>  $dias
@@ -1172,7 +1604,7 @@ class ForcaVendasFaturamentoService
             return $canhoto;
         }
 
-        $avulso = $this->diasDeString((string) ($payload['condicao_pagamento'] ?? ''));
+        $avulso = $this->diasPrazoAvulsoDoPayload($payload);
 
         if ($avulso !== []) {
             return $avulso;

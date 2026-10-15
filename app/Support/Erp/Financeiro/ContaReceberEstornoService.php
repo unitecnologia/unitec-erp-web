@@ -60,21 +60,26 @@ final class ContaReceberEstornoService
                 $conta->save();
             }
 
-            $planoId = $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null;
-            $planoNome = $planoId
-                ? PlanoConta::query()->whereKey($planoId)->value('descricao')
-                : null;
+            $caixaContaId = $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null;
 
-            app(ContaReceberBaixaService::class)->registrarSaidaCaixa(
-                valor: $valorRecebido,
-                data: optional($pagamento->data)?->toDateString() ?? now()->toDateString(),
-                documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
-                historico: 'Estorno recebimento conta a receber #'.($conta->numero ?: $conta->id),
-                caixaContaId: $pagamento->caixa_conta_id ? (int) $pagamento->caixa_conta_id : null,
-                empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
-                planoContaId: $planoNome !== null ? $planoId : null,
-                planoNome: $planoNome !== null ? mb_substr(mb_strtoupper((string) $planoNome, 'UTF-8'), 0, 120) : null,
-            );
+            // Só estorna Livro Caixa se a baixa original movimentou caixa.
+            if ($caixaContaId) {
+                $planoId = $pagamento->plano_conta_id ? (int) $pagamento->plano_conta_id : null;
+                $planoNome = $planoId
+                    ? PlanoConta::query()->whereKey($planoId)->value('descricao')
+                    : null;
+
+                app(ContaReceberBaixaService::class)->registrarSaidaCaixa(
+                    valor: $valorRecebido,
+                    data: optional($pagamento->data)?->toDateString() ?? now()->toDateString(),
+                    documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
+                    historico: 'Estorno recebimento conta a receber #'.($conta->numero ?: $conta->id),
+                    caixaContaId: $caixaContaId,
+                    empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+                    planoContaId: $planoNome !== null ? $planoId : null,
+                    planoNome: $planoNome !== null ? mb_substr(mb_strtoupper((string) $planoNome, 'UTF-8'), 0, 120) : null,
+                );
+            }
 
             $pagamento->delete();
 

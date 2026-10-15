@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ClienteCreditoMovimentacao;
 use App\Models\VendasParametro;
 use App\Support\Erp\Balanca\BalancaEtiquetaLayout;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
@@ -2726,6 +2727,27 @@ trait ManagesPdvVenda
                     $cpfNota = trim((string) $extraido);
                 }
             }
+        }
+
+        try {
+            $clienteFinalizar = $this->finalizarClienteId
+                ? Person::query()->find((int) $this->finalizarClienteId)
+                : Person::resolveConsumidorFinal();
+
+            foreach ($this->finalizarPagamentos as $pagamentoGuard) {
+                if (ErpMoney::parseBr($pagamentoGuard['valor'] ?? '0') <= 0) {
+                    continue;
+                }
+
+                ConsumidorFinalGuard::assertPagamentoPermitido($clienteFinalizar, $pagamentoGuard);
+            }
+        } catch (\DomainException $e) {
+            Notification::make()
+                ->title($e->getMessage())
+                ->warning()
+                ->send();
+
+            return;
         }
 
         try {

@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources\ContaReceberResource\Pages\Concerns;
 
+use App\Models\CaixaConta;
 use App\Models\ContaReceber;
-use App\Models\FormaPagamento;
 use App\Models\PlanoConta;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaReceberBaixaService;
@@ -26,8 +27,15 @@ trait ManagesContaReceberBaixaModal
 
     public string $baixaResumoTotal = '0,00';
 
-    /** @var list<array{id: int, label: string, tipo: string|null}> */
+    /** @var list<array{id: int, label: string, tipo: string|null, caixa_conta_id?: int|null, caixa_label?: string, movimenta_caixa?: bool}> */
     public array $baixaFormasOptions = [];
+
+    public bool $baixaMovimentaCaixa = false;
+
+    public ?int $baixaCaixaContaId = null;
+
+    /** @var list<array{id: int, label: string}> */
+    public array $baixaCaixasOptions = [];
 
     public bool $baixaUnica = false;
 
@@ -81,9 +89,6 @@ trait ManagesContaReceberBaixaModal
     /** @var list<array{id: int, label: string}> */
     public array $baixaPlanosOptions = [];
 
-    /** @var array<int, string> */
-    public array $baixaDestinosPorForma = [];
-
     public function baixarConta(): void
     {
         $ids = $this->resolverIdsParaBaixa();
@@ -109,6 +114,7 @@ trait ManagesContaReceberBaixaModal
 
         $service = app(ContaReceberBaixaService::class);
         $this->baixaFormasOptions = $service->formasDisponiveis();
+        $this->baixaCaixasOptions = $this->caixasAtivasBaixaOptions();
 
         if ($this->baixaFormasOptions === []) {
             Notification::make()
@@ -136,6 +142,7 @@ trait ManagesContaReceberBaixaModal
         $this->baixaMultaEditada = false;
         $this->baixaDesconto = '0,00';
         $this->baixaValorRecebido = $this->baixaResumoTotal;
+        $this->syncFormaBaixa();
         $this->preencherBaixa($pendentes);
 
         $this->baixaModalOpen = true;
@@ -143,7 +150,7 @@ trait ManagesContaReceberBaixaModal
 
     public function updatedBaixaFormaPagamentoId(): void
     {
-        $this->syncContaDestinoBaixa();
+        $this->syncFormaBaixa();
     }
 
     public function updatedBaixaData(): void
@@ -323,7 +330,9 @@ trait ManagesContaReceberBaixaModal
         $this->baixaPlanoContas = '—';
         $this->baixaPlanoContaId = '';
         $this->baixaPlanosOptions = [];
-        $this->baixaDestinosPorForma = [];
+        $this->baixaCaixasOptions = [];
+        $this->baixaMovimentaCaixa = false;
+        $this->baixaCaixaContaId = null;
     }
 
     /**
@@ -332,7 +341,6 @@ trait ManagesContaReceberBaixaModal
     protected function preencherBaixa(Collection $contas): void
     {
         $contas->loadMissing('cliente:id,nome_razao');
-        $this->carregarDestinosBaixa();
 
         $saldo = round($contas->sum(fn (ContaReceber $conta): float => (float) $conta->saldo), 2);
         $nomes = $contas
@@ -392,42 +400,70 @@ trait ManagesContaReceberBaixaModal
         $this->baixaPercJuros = $this->percentualSobre($juros, $saldo);
         $this->baixaPercDesconto = '0,00';
         $this->baixaDesconto = '0,00';
-        $this->syncContaDestinoBaixa();
+        $this->syncFormaBaixa();
         $this->baixaPlanosOptions = $this->planosCreditoBaixaOptions();
         $planosTitulo = $contas->map(fn (ContaReceber $conta): int => (int) ($conta->plano_conta_id ?? 0))->unique();
         $this->baixaPlanoContaId = $this->sugerirPlanoBaixa($planosTitulo->count() === 1 ? $contas->first() : null);
         $this->recalcularBaixaReceber();
     }
 
-    protected function carregarDestinosBaixa(): void
+    protected function syncFormaBaixa(): void
     {
-        $ids = collect($this->baixaFormasOptions)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->filter()
-            ->all();
+        $formaId = (int) $this->baixaFormaPagamentoId;
+        $forma = null;
 
-        $this->baixaDestinosPorForma = FormaPagamento::query()
-            ->with('contaDestino:id,codigo,nome')
-            ->whereIn('id', $ids)
-            ->get()
-            ->mapWithKeys(function (FormaPagamento $forma): array {
-                $caixa = $forma->contaDestino;
-                $codigo = trim((string) ($caixa->codigo ?? ''));
-                $nome = mb_strtoupper(trim((string) ($caixa->nome ?? '')), 'UTF-8');
-                $label = $caixa
-                    ? ($codigo !== '' && $nome !== '' ? $codigo.' — '.$nome : ($nome !== '' ? $nome : ($codigo !== '' ? $codigo : '—')))
-                    : '—';
+        foreach ($this->baixaFormasOptions as $opcao) {
+            if ((int) $opcao['id'] === $formaId) {
+                $forma = $opcao;
+                break;
+            }
+        }
 
-                return [(int) $forma->id => $label];
-            })
-            ->all();
+        $this->baixaMovimentaCaixa = (bool) ($forma['movimenta_caixa'] ?? false);
+
+        if (! $this->baixaMovimentaCaixa) {
+            $this->baixaCaixaContaId = null;
+            $this->baixaContaDestino = 'Não movimenta o caixa';
+
+            return;
+        }
+
+        // Pré-seleção: destino da forma (já resolvido no service) ou Caixa Geral.
+        $sugerida = (int) ($forma['caixa_conta_id'] ?? 0);
+        if ($sugerida <= 0 || ! collect($this->baixaCaixasOptions)->contains(fn (array $c): bool => (int) $c['id'] === $sugerida)) {
+            $sugerida = (int) CaixaConta::ensureCaixaGeral()->id;
+        }
+
+        $this->baixaCaixaContaId = $sugerida;
+        $this->baixaContaDestino = (string) ($forma['caixa_label'] ?? CaixaConta::LABEL_CAIXA_GERAL_PADRAO);
     }
 
-    protected function syncContaDestinoBaixa(): void
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    protected function caixasAtivasBaixaOptions(): array
     {
-        $id = (int) $this->baixaFormaPagamentoId;
-        $this->baixaContaDestino = $this->baixaDestinosPorForma[$id] ?? '—';
+        CaixaConta::ensureCaixaGeral();
+
+        return CaixaConta::query()
+            ->where('ativo', true)
+            ->orderBy('codigo')
+            ->orderBy('nome')
+            ->get(['id', 'codigo', 'nome'])
+            ->map(function (CaixaConta $caixa): array {
+                $codigo = trim((string) ($caixa->codigo ?? ''));
+                $nome = mb_strtoupper(trim((string) ($caixa->nome ?? '')), 'UTF-8');
+                $label = $codigo !== '' && $nome !== ''
+                    ? $codigo.' — '.$nome
+                    : ($nome !== '' ? $nome : ($codigo !== '' ? $codigo : 'Caixa #'.$caixa->id));
+
+                return [
+                    'id' => (int) $caixa->id,
+                    'label' => $label,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function atualizarDiasAtraso(string $vencimentoIso): void
@@ -472,13 +508,10 @@ trait ManagesContaReceberBaixaModal
             return (string) $doTitulo;
         }
 
-        $sugerido = (int) PlanoConta::query()
-            ->where('codigo', 103)
-            ->where('dc', 'C')
-            ->where('ativo', true)
-            ->value('id');
+        $empresaId = $conta?->empresa_id ? (int) $conta->empresa_id : null;
+        $sugerido = (int) (EmpresaParametros::planoVendaId($empresaId) ?? 0);
 
-        return $sugerido > 0 ? (string) $sugerido : '';
+        return ($sugerido > 0 && in_array($sugerido, $ids, true)) ? (string) $sugerido : '';
     }
 
     protected function percentualSobre(float $parte, float $base): string
@@ -522,6 +555,9 @@ trait ManagesContaReceberBaixaModal
             'recebido_em' => $this->baixaData,
             'numero_cheque' => $this->baixaCheque,
             'plano_conta_id' => (int) $this->baixaPlanoContaId,
+            'caixa_conta_id' => $this->baixaMovimentaCaixa
+                ? ((int) ($this->baixaCaixaContaId ?? 0) ?: null)
+                : null,
         ];
 
         if (! $this->baixaUnica) {

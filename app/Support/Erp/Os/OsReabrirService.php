@@ -169,6 +169,14 @@ final class OsReabrirService
 
             $travada->forceFill($payload)->save();
 
+            $espelho = app(OsVendaEspelhoService::class);
+
+            if ($situacaoFinal === OrdemServico::SITUACAO_ABERTA) {
+                $espelho->marcarAberta($travada);
+            } elseif ($situacaoFinal === OrdemServico::SITUACAO_CANCELADA) {
+                $espelho->marcarCancelada($travada);
+            }
+
             return $resumo;
         });
 

@@ -4,6 +4,7 @@ namespace App\Livewire\Erp;
 
 use App\Models\Compra;
 use App\Support\Erp\CompraListRowFormatter;
+use App\Support\Erp\Compras\CompraDevolucaoIndicadorService;
 use App\Support\Erp\ErpTableSort;
 use App\Support\Erp\Queries\CompraListQueryBuilder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -26,6 +27,12 @@ class CompraListTable extends Component
     public string $localSearchDe = '';
 
     public string $localSearchAte = '';
+
+    /** @var list<string> */
+    public array $searchFieldsActive = [];
+
+    /** @var array<string, string> */
+    public array $localSearchByField = [];
 
     public int $perPage = 50;
 
@@ -54,18 +61,17 @@ class CompraListTable extends Component
         $this->sortDirection = 'desc';
         $this->resetPage();
 
-        $total = (new CompraListQueryBuilder(
-            statusFilter: $this->statusFilter,
-            searchColumn: $this->searchColumn,
-            localSearch: $this->localSearch,
-            localSearchDe: $this->localSearchDe,
-            localSearchAte: $this->localSearchAte,
-        ))->sumFilteredTotal();
+        $builder = $this->listQueryBuilder();
+        $total = $builder->sumFilteredTotal();
+        $totalDevolvido = $builder->sumFilteredValorDevolvido();
+        $totalLiquido = round($total - $totalDevolvido, 2);
 
         $this->js(sprintf(
             '(() => {
                 const status = %s;
                 const totalLabel = %s;
+                const totalDevLabel = %s;
+                const totalLiqLabel = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
@@ -81,11 +87,17 @@ class CompraListTable extends Component
                     }
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
-                const el = document.querySelector(".erp-compras__total-value");
+                const el = document.querySelector(".erp-compras__total-value--compras");
                 if (el) el.textContent = totalLabel;
+                const elDev = document.querySelector(".erp-compras__total-value--devolvido");
+                if (elDev) elDev.textContent = totalDevLabel;
+                const elLiq = document.querySelector(".erp-compras__total-value--liquido");
+                if (elLiq) elLiq.textContent = totalLiqLabel;
             })()',
             json_encode($filter, JSON_UNESCAPED_UNICODE),
             json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalDevolvido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalLiquido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
             json_encode('app.filament.resources.compra-resource.pages.list-compras', JSON_UNESCAPED_UNICODE),
         ));
     }
@@ -97,6 +109,8 @@ class CompraListTable extends Component
         string $localSearch,
         string $localSearchDe = '',
         string $localSearchAte = '',
+        array $searchFieldsActive = [],
+        array $localSearchByField = [],
         ?int $perPage = null,
         bool $resetSort = false,
     ): void {
@@ -105,6 +119,14 @@ class CompraListTable extends Component
         $this->localSearch = $localSearch;
         $this->localSearchDe = $localSearchDe;
         $this->localSearchAte = $localSearchAte;
+        $this->searchFieldsActive = array_values(array_filter(
+            $searchFieldsActive,
+            fn (mixed $column): bool => is_string($column) && $column !== '',
+        ));
+        $this->localSearchByField = collect($localSearchByField)
+            ->filter(fn (mixed $value, mixed $key): bool => is_string($key) && (is_string($value) || is_numeric($value)))
+            ->map(fn (mixed $value): string => (string) $value)
+            ->all();
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;
@@ -138,20 +160,41 @@ class CompraListTable extends Component
         ]);
     }
 
-    protected function records(): LengthAwarePaginator
+    protected function listQueryBuilder(): CompraListQueryBuilder
     {
-        $query = (new CompraListQueryBuilder(
+        return new CompraListQueryBuilder(
             statusFilter: $this->statusFilter,
             searchColumn: $this->searchColumn,
             localSearch: $this->localSearch,
             localSearchDe: $this->localSearchDe,
             localSearchAte: $this->localSearchAte,
+            searchFieldsActive: $this->searchFieldsActive,
+            localSearchByField: $this->localSearchByField,
             applyDefaultOrder: false,
-        ))->buildForList();
+        );
+    }
+
+    protected function records(): LengthAwarePaginator
+    {
+        $query = $this->listQueryBuilder()->buildForList();
 
         $this->applySort($query);
 
-        return $query->paginate($this->perPage);
+        $paginator = $query->paginate($this->perPage);
+        $ids = $paginator->getCollection()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $valores = app(CompraDevolucaoIndicadorService::class)->valoresDevolvidosEmLote($ids);
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(function (Compra $compra) use ($valores): Compra {
+                $valor = (float) ($valores[(int) $compra->id] ?? 0);
+                $compra->setAttribute('valor_devolvido', $valor);
+                $compra->setAttribute('tem_devolucao_finalizada', $valor > 0.00005);
+
+                return $compra;
+            }),
+        );
+
+        return $paginator;
     }
 
     protected function applySort(Builder $query): void

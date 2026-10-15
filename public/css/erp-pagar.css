@@ -1193,6 +1193,48 @@
     gap: 0.45rem;
 }
 
+.erp-pagar-page .erp-pagar-baixa-modal__dual {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.45rem 0.55rem;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.erp-pagar-page .erp-pagar-baixa-modal__dual > .erp-pagar-baixa-modal__pair--compact {
+    width: 100%;
+}
+
+.erp-pagar-page .erp-pagar-baixa-modal__dual-item {
+    display: grid;
+    grid-template-columns: 3.1rem minmax(0, 1fr);
+    gap: 0.3rem;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+}
+
+.erp-pagar-page .erp-pagar-baixa-modal__dual-item > span {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #000;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.erp-pagar-page .erp-pagar-baixa-modal__pair--compact {
+    grid-template-columns: 4.2rem minmax(0, 1fr);
+    gap: 0.28rem;
+    width: 100%;
+}
+
+.erp-pagar-page .erp-pagar-baixa-modal__pair--compact .erp-pagar-baixa-modal__input {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.4rem;
+    font-size: 0.86rem;
+}
+
 .erp-pagar-page .erp-pagar-baixa-modal__pct {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1343,6 +1385,17 @@
     .erp-pagar-page .erp-pagar-baixa-modal__kv,
     .erp-pagar-page .erp-pagar-baixa-modal__pair {
         grid-template-columns: 1fr;
+    }
+
+    .erp-pagar-page .erp-pagar-baixa-modal__dual,
+    .erp-pagar-page .erp-pagar-baixa-modal__dual-item {
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+
+    .erp-pagar-page .erp-pagar-baixa-modal__pair--compact {
+        width: 100%;
+        grid-template-columns: 4.2rem minmax(0, 1fr);
     }
 }
 /* Desdobramentos de Parcelas */

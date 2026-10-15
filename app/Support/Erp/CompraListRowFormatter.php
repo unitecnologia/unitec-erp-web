@@ -12,13 +12,31 @@ final class CompraListRowFormatter
      */
     public function format(Compra $record): array
     {
-        $devolvida = (bool) ($record->has_devolucao_finalizada ?? false);
-        $status = $devolvida ? 'devolvida' : (string) ($record->status ?? '');
-        $statusLabel = $devolvida
-            ? 'Devolvida'
-            : (Compra::statusLabels()[$status] ?? $status);
+        $statusOriginal = (string) ($record->status ?? '');
+        $statusOriginalLabel = Compra::statusLabels()[$statusOriginal] ?? $statusOriginal;
+        $valorDevolvido = round((float) ($record->valor_devolvido ?? 0), 2);
+        $temDevolucao = $valorDevolvido > 0.00005
+            || (bool) ($record->tem_devolucao_finalizada ?? false);
+
+        if ($temDevolucao) {
+            $statusChip = '<span class="erp-compras__status-chip erp-compras__status-chip--devolvida"'
+                .' title="Situação: '.e($statusOriginalLabel).'">Devolvida</span>';
+        } else {
+            $statusChip = '<span class="erp-compras__status-chip erp-compras__status-chip--'
+                .e($statusOriginal).'">'.e($statusOriginalLabel).'</span>';
+        }
 
         $valor = number_format((float) ($record->total ?? 0), 2, ',', '.');
+
+        if ($valorDevolvido > 0.00005) {
+            $valorDevFmt = number_format($valorDevolvido, 2, ',', '.');
+            $cellDev = '<span class="erp-compras-total-cell erp-compras-total-cell--devolvido">'
+                .'<span class="erp-compras-total-cell__currency">R$</span>'
+                .'<span class="erp-compras-total-cell__amount" title="R$ '.e($valorDevFmt).'">'
+                .e($valorDevFmt).'</span></span>';
+        } else {
+            $cellDev = '—';
+        }
 
         return [
             'numero' => e($this->formatNumero($record->numero)),
@@ -27,9 +45,10 @@ final class CompraListRowFormatter
             'numero_nota' => filled($record->numero_nota) ? e((string) $record->numero_nota) : '—',
             'fornecedor' => e($record->fornecedor?->nome_razao ?? '—'),
             'chave_nfe' => filled($record->chave_nfe) ? e((string) $record->chave_nfe) : '—',
-            'status' => '<span class="erp-compras__status-chip erp-compras__status-chip--' . e($status) . '">' . e($statusLabel) . '</span>',
+            'status' => $statusChip,
+            'valor_devolvido' => $cellDev,
             'total' => '<span class="erp-compras-total-cell"><span class="erp-compras-total-cell__currency">R$</span>'
-                . '<span class="erp-compras-total-cell__amount" title="R$ ' . e($valor) . '">' . e($valor) . '</span></span>',
+                .'<span class="erp-compras-total-cell__amount" title="R$ '.e($valor).'">'.e($valor).'</span></span>',
             'ver_itens' => $this->formatVerItensButton((int) $record->getKey()),
         ];
     }
@@ -61,13 +80,13 @@ final class CompraListRowFormatter
     private function formatVerItensButton(int $compraId): string
     {
         return '<button type="button"'
-            . ' wire:click.stop="$dispatch(\'erp-compra-open-lancamento\', { compraId: ' . $compraId . ' })"'
-            . ' wire:keydown.enter.stop="$dispatch(\'erp-compra-open-lancamento\', { compraId: ' . $compraId . ' })"'
-            . ' class="erp-compras__eye-btn" title="Lançamento de compras" aria-label="Lançamento de compras">'
-            . '<svg class="erp-compras__eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"'
-            . ' stroke-width="1.75" stroke="currentColor" aria-hidden="true">'
-            . '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>'
-            . '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>'
-            . '</svg></button>';
+            .' wire:click.stop="$dispatch(\'erp-compra-open-lancamento\', { compraId: '.$compraId.' })"'
+            .' wire:keydown.enter.stop="$dispatch(\'erp-compra-open-lancamento\', { compraId: '.$compraId.' })"'
+            .' class="erp-compras__eye-btn" title="Lançamento de compras" aria-label="Lançamento de compras">'
+            .'<svg class="erp-compras__eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"'
+            .' stroke-width="1.75" stroke="currentColor" aria-hidden="true">'
+            .'<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>'
+            .'<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>'
+            .'</svg></button>';
     }
 }

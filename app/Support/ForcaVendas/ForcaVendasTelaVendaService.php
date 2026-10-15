@@ -2,6 +2,7 @@
 
 namespace App\Support\ForcaVendas;
 
+use App\Models\CaixaConta;
 use App\Models\ForcaVendasOrder;
 use App\Models\FormaPagamento;
 use App\Models\Pedido;
@@ -9,9 +10,12 @@ use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Venda;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueReservaService;
+use App\Support\Erp\Financeiro\FormaPagamentoDestino;
+use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -41,7 +45,19 @@ class ForcaVendasTelaVendaService
             throw new \RuntimeException('Este pedido não pode mais ser editado (situação: '.$order->situacaoLabel().').');
         }
 
+        // Reabertura no Monitor mantém venda_id com status aberto — ainda editável.
+        // Fechada/cancelada (ou inexistente) bloqueia como faturado/encerrado.
         if ($order->venda_id) {
+            $venda = Venda::query()->find((int) $order->venda_id);
+
+            if ($venda instanceof Venda && $venda->status === Venda::STATUS_ABERTO) {
+                return;
+            }
+
+            if ($venda instanceof Venda && $venda->status === Venda::STATUS_CANCELADO) {
+                throw new \RuntimeException('Pedido com venda cancelada. Não é possível editar.');
+            }
+
             throw new \RuntimeException('Pedido já faturado. Não é possível editar.');
         }
     }
@@ -118,6 +134,7 @@ class ForcaVendasTelaVendaService
                 'total' => $total,
             ]);
 
+            $dataSanitizado = $this->sanitizarPrazoNoData($data, $formaId, $formaNome);
             $payload = $this->montarPayload(
                 uuid: $uuid,
                 clienteId: $clienteId,
@@ -126,8 +143,8 @@ class ForcaVendasTelaVendaService
                 percentualDesconto: $percentualDesconto,
                 formaId: $formaId,
                 formaNome: $formaNome,
-                data: $data,
-                tabelaPrazo: $data['tabela_prazo_dias'] ?? null,
+                data: $dataSanitizado,
+                tabelaPrazo: $dataSanitizado['tabela_prazo_dias'] ?? null,
             );
 
             $fvOrder = ForcaVendasOrder::query()->create([
@@ -211,10 +228,15 @@ class ForcaVendasTelaVendaService
             ]);
 
             $payloadAnterior = is_array($order->payload) ? $order->payload : [];
-            $tabelaPrazo = $data['tabela_prazo_dias'] ?? ($payloadAnterior['tabela_prazo_dias'] ?? null);
+            $dataSanitizado = $this->sanitizarPrazoNoData($data, $formaId, $formaNome, $payloadAnterior);
+            $tabelaPrazo = $dataSanitizado['tabela_prazo_dias'] ?? null;
 
             if (is_array($tabelaPrazo)) {
                 $tabelaPrazo = implode(',', array_map('intval', $tabelaPrazo));
+            }
+
+            if ($tabelaPrazo === '') {
+                $tabelaPrazo = null;
             }
 
             $payload = $this->montarPayload(
@@ -225,7 +247,7 @@ class ForcaVendasTelaVendaService
                 percentualDesconto: $percentualDesconto,
                 formaId: $formaId,
                 formaNome: $formaNome,
-                data: $data,
+                data: $dataSanitizado,
                 tabelaPrazo: $tabelaPrazo,
             );
             $payload['origem'] = 'monitor_tela_venda_edicao';
@@ -266,10 +288,9 @@ class ForcaVendasTelaVendaService
 
         $caixaId = filled($data['caixa_conta_id'] ?? null) ? (int) $data['caixa_conta_id'] : null;
 
+        // Sem caixa vinculado/selecionado: CAIXA GERAL (padrão).
         if ($caixaId === null || $caixaId <= 0) {
-            throw new \RuntimeException(
-                'Caixa não definido. Vincule um caixa ao vendedor antes de vender.'
-            );
+            $caixaId = (int) CaixaConta::ensureCaixaGeral()->id;
         }
 
         $estoqueId = filled($data['estoque_id'] ?? null) ? (int) $data['estoque_id'] : null;
@@ -403,6 +424,11 @@ class ForcaVendasTelaVendaService
                 $payloadItens,
             )), 2);
 
+        $mantemPrazo = $this->formaMantemCamposPrazo($formaId, $formaNome, $data);
+        $condicao = array_key_exists('condicao_pagamento', $data)
+            ? $data['condicao_pagamento']
+            : null;
+
         return [
             'uuid' => $uuid,
             'device_uuid' => 'monitor-web',
@@ -414,14 +440,119 @@ class ForcaVendasTelaVendaService
             'acrescimo_valor' => $acrescimoValor,
             'forma_pagamento' => $formaNome !== '' ? $formaNome : null,
             'forma_pagamento_id' => $formaId,
-            'tabela_prazo_dias' => $tabelaPrazo,
-            'cartao_canhoto' => is_array($data['cartao_canhoto'] ?? null) ? $data['cartao_canhoto'] : null,
+            'tabela_prazo_dias' => $mantemPrazo ? $tabelaPrazo : null,
+            'condicao_pagamento' => $mantemPrazo ? $condicao : null,
+            'cartao_canhoto' => $mantemPrazo && is_array($data['cartao_canhoto'] ?? null)
+                ? $data['cartao_canhoto']
+                : null,
             'caixa_conta_id' => filled($data['caixa_conta_id'] ?? null) ? (int) $data['caixa_conta_id'] : null,
             'estoque_id' => filled($data['estoque_id'] ?? null) ? (int) $data['estoque_id'] : null,
             'observacoes' => $data['observacoes'] ?? null,
             'created_at' => now()->toIso8601String(),
             'origem' => 'monitor_tela_venda',
         ];
+    }
+
+    /**
+     * Null explícito em tabela_prazo_dias / cartao_canhoto / condicao_pagamento
+     * não ressuscita valor antigo do payload (evita `??` indevido).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $payloadAnterior
+     * @return array<string, mixed>
+     */
+    private function sanitizarPrazoNoData(
+        array $data,
+        ?int $formaId,
+        string $formaNome,
+        array $payloadAnterior = [],
+    ): array {
+        if (array_key_exists('tabela_prazo_dias', $data)) {
+            $tabela = $data['tabela_prazo_dias'];
+        } else {
+            $tabela = $payloadAnterior['tabela_prazo_dias'] ?? null;
+        }
+
+        if (is_array($tabela)) {
+            $tabela = implode(',', array_map('intval', $tabela));
+        }
+
+        if ($tabela === '') {
+            $tabela = null;
+        }
+
+        if (array_key_exists('cartao_canhoto', $data)) {
+            $canhoto = is_array($data['cartao_canhoto']) ? $data['cartao_canhoto'] : null;
+        } else {
+            $canhoto = is_array($payloadAnterior['cartao_canhoto'] ?? null)
+                ? $payloadAnterior['cartao_canhoto']
+                : null;
+        }
+
+        if (array_key_exists('condicao_pagamento', $data)) {
+            $condicao = $data['condicao_pagamento'];
+        } else {
+            $condicao = $payloadAnterior['condicao_pagamento'] ?? null;
+        }
+
+        $data['tabela_prazo_dias'] = $tabela;
+        $data['cartao_canhoto'] = $canhoto;
+        $data['condicao_pagamento'] = $condicao !== '' ? $condicao : null;
+
+        if (! $this->formaMantemCamposPrazo($formaId, $formaNome, $data)) {
+            $data['tabela_prazo_dias'] = null;
+            $data['cartao_canhoto'] = null;
+            $data['condicao_pagamento'] = null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function formaMantemCamposPrazo(?int $formaId, string $formaNome, array $data): bool
+    {
+        // Sem forma na gravação (ex.: pendente): preserva prazo já negociado.
+        if ((! $formaId || $formaId <= 0) && trim($formaNome) === '') {
+            return true;
+        }
+
+        $formaModel = $formaId && $formaId > 0
+            ? FormaPagamento::query()->find($formaId)
+            : null;
+
+        if (! $formaModel && $formaNome !== '') {
+            $formaModel = FormaPagamento::query()
+                ->whereRaw('UPPER(TRIM(descricao)) = ?', [mb_strtoupper($formaNome, 'UTF-8')])
+                ->orderByDesc('ativo')
+                ->first();
+        }
+
+        $pagamento = [
+            'forma' => $formaNome !== '' ? $formaNome : (string) ($formaModel?->descricao ?? ''),
+            'tipo' => (string) ($formaModel?->tipo ?? ''),
+            'tipo_movimento' => (string) ($formaModel?->tipo_movimento ?? ''),
+            'aparece_contas_receber' => (bool) ($formaModel?->aparece_contas_receber ?? false),
+        ];
+
+        $canhoto = $data['cartao_canhoto'] ?? null;
+        $temCanhoto = is_array($canhoto) && ! empty($canhoto['dias']) && is_array($canhoto['dias']);
+
+        // Cartão: só mantém prazo do canhoto (não herda carnê antigo).
+        if (PdvFinalizarPagamentosHelper::isFormaCartao($pagamento)) {
+            return $temCanhoto;
+        }
+
+        if (PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+            return true;
+        }
+
+        if ($formaModel !== null && FormaPagamentoDestino::geraContasReceber($formaModel)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

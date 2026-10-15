@@ -590,6 +590,7 @@ class ListContasPagar extends ListRecords
                 'data' => optional($pagamento->data)?->format('d/m/Y') ?? '—',
                 'valor_pago' => number_format((float) $pagamento->valor_pago, 2, ',', '.'),
                 'juros' => number_format((float) $pagamento->juros, 2, ',', '.'),
+                'multa' => number_format((float) ($pagamento->multa ?? 0), 2, ',', '.'),
                 'desconto' => number_format((float) $pagamento->desconto, 2, ',', '.'),
                 'forma' => mb_strtoupper((string) ($pagamento->formaPagamento?->descricao ?? '—'), 'UTF-8'),
                 'plano' => mb_strtoupper((string) ($pagamento->planoConta?->descricao ?? '—'), 'UTF-8'),
@@ -739,6 +740,7 @@ class ListContasPagar extends ListRecords
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
             selecionadosParaBaixa: $this->selecionadosParaBaixa,
+            highlightedRecordId: $this->highlightedRecordId !== null ? (int) $this->highlightedRecordId : null,
         )->to(ContaPagarListTable::class);
 
         if (! $renderPage) {

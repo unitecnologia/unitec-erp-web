@@ -88,6 +88,38 @@ class Person extends Model
             }
         });
 
+        static::updating(static function (Person $person): void {
+            $codigoOriginal = (string) ($person->getOriginal('codigo') ?? '');
+
+            if (! self::isCodigoConsumidorFinal($codigoOriginal) && ! self::isCodigoConsumidorFinal($person->codigo)) {
+                return;
+            }
+
+            // Única alteração permitida: migrar código legado 000001 → CF.
+            $dirty = $person->getDirty();
+
+            if (
+                count($dirty) === 1
+                && array_key_exists('codigo', $dirty)
+                && $codigoOriginal === self::CODIGO_CONSUMIDOR_FINAL_LEGADO
+                && (string) $dirty['codigo'] === self::CODIGO_CONSUMIDOR_FINAL
+            ) {
+                return;
+            }
+
+            throw new \DomainException(
+                \App\Support\Erp\ConsumidorFinalGuard::mensagemCadastroProtegido()
+            );
+        });
+
+        static::deleting(static function (Person $person): void {
+            if ($person->isCadastroConsumidorFinal()) {
+                throw new \DomainException(
+                    \App\Support\Erp\ConsumidorFinalGuard::mensagemCadastroProtegido()
+                );
+            }
+        });
+
         static::saved(static function (): void {
             ErpDataSyncVersion::bump(ErpDataSyncVersion::CHANNEL_PEOPLE);
         });
@@ -304,6 +336,15 @@ class Person extends Model
         $digits = preg_replace('/\D/', '', (string) ($this->cpf_cnpj ?? '')) ?? '';
 
         return strlen($digits) === 11;
+    }
+
+    /**
+     * Cadastro padrão do sistema (PDV / NFC-e / FV), identificado pelo código CF/000001.
+     * Não confundir com {@see isConsumidorFinalPadrao()} (flag fiscal da NF-e).
+     */
+    public function isCadastroConsumidorFinal(): bool
+    {
+        return self::isCodigoConsumidorFinal($this->codigo !== null ? (string) $this->codigo : null);
     }
 
     public function isConsumidorFinalPadrao(): bool

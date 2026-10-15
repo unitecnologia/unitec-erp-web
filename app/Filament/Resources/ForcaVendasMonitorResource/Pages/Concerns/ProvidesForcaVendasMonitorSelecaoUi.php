@@ -446,7 +446,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         $semForma = [];
 
         foreach ($orders as $order) {
-            if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO || $order->venda_id) {
+            if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
                 continue;
             }
 
@@ -456,6 +456,15 @@ trait ProvidesForcaVendasMonitorSelecaoUi
 
             if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO || ! $order->pedido) {
                 continue;
+            }
+
+            // Venda fechada = já faturado; aberta = reabertura (refaturável); cancelada = novo faturar.
+            if ($order->venda_id) {
+                $statusVenda = (string) ($order->venda?->status ?? '');
+
+                if ($statusVenda === \App\Models\Venda::STATUS_FECHADO) {
+                    continue;
+                }
             }
 
             $faturaveis[] = $order;

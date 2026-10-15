@@ -40,6 +40,8 @@ class ContaPagarListTable extends Component
     /** @var list<int|string> */
     public array $selecionadosParaBaixa = [];
 
+    public ?int $highlightedRecordId = null;
+
     #[On('erp-pagar-selection-sync')]
     public function syncSelecao(array $selecionadosParaBaixa): void
     {
@@ -58,6 +60,7 @@ class ContaPagarListTable extends Component
         ?int $perPage = null,
         bool $resetSort = false,
         array $selecionadosParaBaixa = [],
+        ?int $highlightedRecordId = null,
     ): void {
         $this->situacaoFilter = $situacaoFilter;
         $this->fornecedorFilter = $fornecedorFilter;
@@ -67,6 +70,7 @@ class ContaPagarListTable extends Component
         $this->localSearchAte = $localSearchAte;
         $this->skipFornecedorSearch = $skipFornecedorSearch;
         $this->selecionadosParaBaixa = $selecionadosParaBaixa;
+        $this->highlightedRecordId = $highlightedRecordId;
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;

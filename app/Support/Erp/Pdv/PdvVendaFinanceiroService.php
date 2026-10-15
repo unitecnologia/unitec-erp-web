@@ -5,6 +5,8 @@ namespace App\Support\Erp\Pdv;
 use App\Models\ContaReceber;
 use App\Models\PdvVenda;
 use App\Models\Person;
+use App\Support\Erp\ConsumidorFinalGuard;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpSchema;
 use App\Support\Erp\Financeiro\ContaReceberJurosCarteira;
@@ -43,6 +45,7 @@ final class PdvVendaFinanceiroService
         $documentoBase = 'PDV-'.$numeroVenda;
         $hoje = Carbon::today();
         $criadas = [];
+        $cliente = Person::query()->find($personId);
 
         foreach ($pagamentos as $pagamento) {
             $forma = mb_strtoupper(trim($pagamento['forma'] ?? ''), 'UTF-8');
@@ -51,6 +54,8 @@ final class PdvVendaFinanceiroService
             if ($valor <= 0) {
                 continue;
             }
+
+            ConsumidorFinalGuard::assertPagamentoPermitido($cliente, $pagamento);
 
             if (
                 ! FormaPagamentoDestino::geraContasReceber($pagamento)
@@ -143,6 +148,7 @@ final class PdvVendaFinanceiroService
         $parcelaBase = floor($total / $n * 100) / 100;
         $criadas = [];
         $vinculo = $this->temVinculoPdvVenda() ? ['pdv_venda_id' => $pdvVendaId] : [];
+        $planoContaId = EmpresaParametros::planoVendaId($empresaId);
 
         foreach (array_values($dias) as $i => $dia) {
             $valor = $i === $n - 1
@@ -174,7 +180,7 @@ final class PdvVendaFinanceiroService
                 $historico .= ' | CHQ '.$numeroCheque;
             }
 
-            $criadas[] = ContaReceber::query()->create([
+            $payload = [
                 'empresa_id' => $empresaId,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
@@ -192,7 +198,13 @@ final class PdvVendaFinanceiroService
                 'numero_cheque' => $numeroCheque !== '' ? mb_substr($numeroCheque, 0, 40) : null,
                 ...$vinculo,
                 ...ContaReceberJurosCarteira::atributosParaCreate($contaForma, $empresaId),
-            ]);
+            ];
+
+            if ($planoContaId && ErpSchema::hasColumnActual('contas_receber', 'plano_conta_id')) {
+                $payload['plano_conta_id'] = $planoContaId;
+            }
+
+            $criadas[] = ContaReceber::query()->create($payload);
         }
 
         return $criadas;

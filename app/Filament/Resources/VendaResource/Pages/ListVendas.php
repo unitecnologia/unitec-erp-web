@@ -667,6 +667,18 @@ class ListVendas extends ListRecords
             return;
         }
 
+        $venda = Venda::query()->find($resolvedId);
+
+        if ($venda?->temOrigemOs()) {
+            Notification::make()
+                ->title('Não é possível alterar esta venda pelo ERP.')
+                ->body('Vendas de Ordem de Serviço devem ser alteradas pela própria OS.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->modulePending('Alteração de venda (Fase 2)');
     }
 
@@ -701,6 +713,16 @@ class ListVendas extends ListRecords
             Notification::make()
                 ->title('Não é possível cancelar esta venda pelo ERP.')
                 ->body('Vendas do PDV devem ser canceladas no próprio PDV (Consulta de vendas → Estorno).')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($venda->temOrigemOs()) {
+            Notification::make()
+                ->title('Não é possível cancelar esta venda pelo ERP.')
+                ->body('Vendas de Ordem de Serviço devem ser reabertas ou canceladas pela própria OS.')
                 ->warning()
                 ->send();
 
@@ -756,6 +778,17 @@ class ListVendas extends ListRecords
             Notification::make()
                 ->title('Não é possível cancelar esta venda pelo ERP.')
                 ->body('Vendas do PDV devem ser canceladas no próprio PDV (Consulta de vendas → Estorno).')
+                ->warning()
+                ->send();
+            $this->closeCancelVendaModal();
+
+            return;
+        }
+
+        if ($venda->temOrigemOs()) {
+            Notification::make()
+                ->title('Não é possível cancelar esta venda pelo ERP.')
+                ->body('Vendas de Ordem de Serviço devem ser reabertas ou canceladas pela própria OS.')
                 ->warning()
                 ->send();
             $this->closeCancelVendaModal();

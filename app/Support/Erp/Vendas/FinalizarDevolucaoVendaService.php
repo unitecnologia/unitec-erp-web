@@ -9,12 +9,12 @@ use App\Models\ContaReceber;
 use App\Models\DevolucaoVenda;
 use App\Models\DevolucaoVendaItem;
 use App\Models\PdvVendaItem;
-use App\Models\PlanoConta;
 use App\Models\EstoqueMovimentacao;
 use App\Models\Product;
 use App\Models\Venda;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ClienteCreditoService;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueMovimentacaoContext;
@@ -501,11 +501,14 @@ final class FinalizarDevolucaoVendaService
             return;
         }
 
-        $plano = $this->planoDevolucao(9);
+        $empresaId = $devolucao->empresa_id
+            ? (int) $devolucao->empresa_id
+            : ErpContext::currentEmpresaId();
+        $plano = EmpresaParametros::planoVendaLancamento($empresaId);
 
         $caixaContaId = (int) CaixaConta::ensureCaixaGeral()->id;
 
-        CaixaLancamento::query()->create([
+        $payload = [
             'codigo' => CaixaLancamento::nextCodigo(),
             'emissao' => ErpTimezone::toLocal()->toDateString(),
             'documento' => mb_substr('DEV-'.($devolucao->numero ?: $devolucao->id), 0, 40),
@@ -515,28 +518,17 @@ final class FinalizarDevolucaoVendaService
                 0,
                 180
             ),
-            'plano_contas' => $plano
-                ? mb_substr(mb_strtoupper((string) $plano->descricao, 'UTF-8'), 0, 120)
-                : null,
-            'plano_conta_id' => $plano?->id,
+            'plano_contas' => $plano['nome'] ?? null,
+            'plano_conta_id' => $plano['id'] ?? null,
             'caixa_conta_id' => $caixaContaId > 0 ? $caixaContaId : null,
             'entrada' => 0,
             'saida' => $valor,
-        ]);
-    }
+        ];
 
-    /**
-     * Resolve plano de contas por id ou código legado. Se não existir, o caixa segue sem plano.
-     */
-    private function planoDevolucao(mixed $parametro): ?PlanoConta
-    {
-        $valor = (int) $parametro;
-
-        if ($valor <= 0) {
-            return null;
+        if ($empresaId && Schema::hasColumn((new CaixaLancamento)->getTable(), 'empresa_id')) {
+            $payload['empresa_id'] = $empresaId;
         }
 
-        return PlanoConta::query()->whereKey($valor)->first()
-            ?? PlanoConta::query()->where('codigo', $valor)->first();
+        CaixaLancamento::query()->create($payload);
     }
 }

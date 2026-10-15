@@ -105,11 +105,11 @@
                     @if ($order)
                         <span class="erp-fv-mon__foot-pedido">
                             PEDIDO:
-                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroDav($order) }}
+                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroVenda($order) }}
                         </span>
                         <span class="erp-fv-mon__foot-pedido">
-                            VENDA:
-                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroVenda($order) }}
+                            DAV:
+                            {{ \App\Filament\Resources\ForcaVendasMonitorResource::formatNumeroDav($order) }}
                         </span>
                     @endif
                     <span class="erp-fv-mon__foot-total">

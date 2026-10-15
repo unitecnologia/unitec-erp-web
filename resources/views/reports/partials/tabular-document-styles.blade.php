@@ -95,6 +95,17 @@
         border: 1px solid #bbb;
         padding: 1.2mm 1.4mm;
         vertical-align: top;
+        word-break: break-word;
+    }
+
+    .tabular-doc__table--compact th,
+    .tabular-doc__table--compact td {
+        padding: 1mm 1mm;
+        font-size: 10px;
+    }
+
+    .tabular-doc__table--compact .col-nowrap {
+        white-space: nowrap;
     }
 
     .tabular-doc__table thead th {

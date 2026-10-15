@@ -10,6 +10,7 @@ use App\Filament\Concerns\ManagesErpSearchColumn;
 use App\Filament\Resources\PersonResource;
 use App\Livewire\Erp\PersonListTable;
 use App\Models\Person;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\ErpDataSyncVersion;
 use App\Support\Erp\Queries\PersonListQueryBuilder;
 use App\Support\Erp\ErpScreen;
@@ -443,6 +444,17 @@ class ListPeople extends ListRecords
             return;
         }
 
+        $person = Person::query()->find($resolvedId);
+
+        if (ConsumidorFinalGuard::isCadastro($person)) {
+            Notification::make()
+                ->title(ConsumidorFinalGuard::mensagemCadastroProtegido())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->redirect($this->urlWithPdvEmbed(
             PersonResource::getUrl('edit', ['record' => $resolvedId])
         ));
@@ -460,7 +472,27 @@ class ListPeople extends ListRecords
             return;
         }
 
-        Person::query()->whereKey($recordId)->delete();
+        $person = Person::query()->find($recordId);
+
+        if (ConsumidorFinalGuard::isCadastro($person)) {
+            Notification::make()
+                ->title(ConsumidorFinalGuard::mensagemCadastroProtegido())
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            Person::query()->whereKey($recordId)->delete();
+        } catch (\DomainException $e) {
+            Notification::make()
+                ->title($e->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         $this->clearListSelection();
         $this->pushPersonListRefresh();

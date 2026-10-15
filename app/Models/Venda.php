@@ -83,6 +83,8 @@ class Venda extends Model
 
     public const PLATAFORMA_MOBILE = 'mobile';
 
+    public const PLATAFORMA_OS = 'os';
+
     protected static function booted(): void
     {
         static::saved(static function (): void {
@@ -149,22 +151,32 @@ class Venda extends Model
             self::PLATAFORMA_PDV => 'PDV',
             self::PLATAFORMA_ERP => 'ERP',
             self::PLATAFORMA_MOBILE => 'Mobile',
+            self::PLATAFORMA_OS => 'OS',
         ];
     }
 
     /**
      * Plataforma de origem da venda.
-     * Respeita o campo gravado (erp/mobile/pdv); só infere quando estiver vazio.
+     * Respeita o campo gravado (erp/mobile/pdv/os); só infere quando estiver vazio.
      */
     public function plataformaEfetiva(): string
     {
+        if ($this->temOrigemOs()) {
+            return self::PLATAFORMA_OS;
+        }
+
         if ($this->temOrigemPdv()) {
             return self::PLATAFORMA_PDV;
         }
 
         $plataforma = $this->plataforma;
 
-        if (in_array($plataforma, [self::PLATAFORMA_ERP, self::PLATAFORMA_MOBILE, self::PLATAFORMA_PDV], true)) {
+        if (in_array($plataforma, [
+            self::PLATAFORMA_ERP,
+            self::PLATAFORMA_MOBILE,
+            self::PLATAFORMA_PDV,
+            self::PLATAFORMA_OS,
+        ], true)) {
             return (string) $plataforma;
         }
 
@@ -198,6 +210,18 @@ class Venda extends Model
         }
 
         return $this->pdvVenda()->comercial()->exists();
+    }
+
+    /**
+     * Espelho comercial de Ordem de Serviço (faturamento pela OS).
+     */
+    public function temOrigemOs(): bool
+    {
+        if ($this->plataforma === self::PLATAFORMA_OS) {
+            return true;
+        }
+
+        return $this->relationLoaded('ordemServico') && $this->ordemServico !== null;
     }
 
     /**
@@ -301,6 +325,11 @@ class Venda extends Model
     public function forcaVendasOrder(): HasOne
     {
         return $this->hasOne(ForcaVendasOrder::class, 'venda_id');
+    }
+
+    public function ordemServico(): HasOne
+    {
+        return $this->hasOne(OrdemServico::class, 'venda_id');
     }
 
     public function nfes(): HasMany

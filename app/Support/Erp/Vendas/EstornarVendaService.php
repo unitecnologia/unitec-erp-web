@@ -99,6 +99,12 @@ final class EstornarVendaService
             );
         }
 
+        if ($venda->temOrigemOs()) {
+            throw new DomainException(
+                'Vendas originadas de Ordem de Serviço devem ser reabertas ou canceladas pela própria OS.',
+            );
+        }
+
         $this->assertSemDevolucaoQueBloqueiaEstorno($venda);
         $this->assertSemDocumentoFiscalAtivo($venda, $origem);
 

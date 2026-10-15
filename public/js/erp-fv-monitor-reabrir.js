@@ -199,6 +199,11 @@
         root()?.querySelector('[data-erp-fv-mon-reabrir-boleto]')?.classList.remove('is-visible');
     }
 
+    function esconderOverlay() {
+        root()?.classList.remove('is-visible');
+        root()?.setAttribute('aria-busy', 'false');
+    }
+
     function perguntarBoleto(mensagem) {
         return new Promise((resolve) => {
             const box = root()?.querySelector('[data-erp-fv-mon-reabrir-boleto]');
@@ -329,20 +334,30 @@
             }
 
             esconderBoleto();
-            await wire.concluirReabertura();
+            esconderOverlay();
+
+            try {
+                await wire.concluirReabertura();
+            } catch (closeError) {
+                console.error(closeError);
+                esconderOverlay();
+            }
         } catch (e) {
             console.error(e);
             esconderBoleto();
+            esconderOverlay();
             setStatus('Falha ao acompanhar a reabertura.', true);
 
             try {
                 await wire.concluirReabertura();
             } catch (closeError) {
                 console.error(closeError);
+                esconderOverlay();
             }
         } finally {
             running = false;
             stopTick();
+            esconderOverlay();
         }
     };
 })();

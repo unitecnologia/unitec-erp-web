@@ -79,23 +79,49 @@
     min-width: 0;
 }
 
-.erp-compras-page .erp-compras__search-field {
-    width: auto;
-    min-width: 5.75rem;
-    max-width: 7.5rem;
+.erp-compras-page .erp-compras__locate .erp-field-dd {
     flex-shrink: 0;
-    font-weight: 700;
 }
 
-.erp-compras-page .erp-compras__search-field option {
-    font-weight: 700;
+.erp-compras-page .erp-compras__locate .erp-field-dd__btn {
+    min-width: 7.5rem;
+    max-width: 14rem;
+}
+
+.erp-compras-page .erp-compras__locate .erp-field-dd__btn > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .erp-compras-page .erp-compras__search-text {
     flex: 1 1 auto;
     width: auto;
-    min-width: 6rem;
-    max-width: 9cm;
+    min-width: 5.5rem;
+    max-width: 7.5cm;
+}
+
+.erp-compras-page .erp-compras__locate--dual .erp-compras__search-text {
+    max-width: 5.5cm;
+    min-width: 4.5rem;
+}
+
+.erp-compras-page .erp-compras__btn--secondary {
+    flex-shrink: 0;
+    height: 1.85rem;
+    padding: 0 0.65rem;
+    border-radius: 4px;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    background: var(--erp-bg-muted, #eef2f7);
+    color: var(--erp-text, #0f172a);
+    font-size: var(--erp-font-size-xs, 0.75rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+}
+
+.erp-compras-page .erp-compras__btn--secondary:hover {
+    background: #e2e8f0;
 }
 
 .erp-compras-page .erp-compras__search-date-range {
@@ -408,6 +434,10 @@
 /* â”€â”€ RodapÃ© total â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .erp-compras-page .erp-compras__total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.15rem 0.35rem;
     margin: 0 0.65rem;
     padding: 0.35rem 0.75rem;
     border-radius: var(--erp-radius-md) !important;
@@ -419,6 +449,31 @@
 
 .erp-compras-page .erp-compras__total-label::after {
     content: ' |';
+}
+
+.erp-compras-page .erp-compras__total-value--compras::after,
+.erp-compras-page .erp-compras__total-value--devolvido::after {
+    content: '  ·  ';
+    color: var(--erp-text-muted, #64748b);
+    font-weight: 500;
+}
+
+.erp-compras-page .erp-compras__total-label--devolvido {
+    color: #854d0e;
+}
+
+.erp-compras-page .erp-compras__total-value--devolvido {
+    color: #854d0e;
+    font-weight: 700;
+}
+
+.erp-compras-page .erp-compras__total-label--liquido {
+    color: #166534;
+}
+
+.erp-compras-page .erp-compras__total-value--liquido {
+    color: #166534;
+    font-weight: 800;
 }
 
 /* â”€â”€ Action bar (F2â€“F9) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -573,9 +628,9 @@
 }
 
 .erp-compras-page .erp-compras__status-chip--devolvida {
-    background: #2563eb;
-    color: #ffffff;
-    border-color: #1d4ed8;
+    background: #facc15;
+    color: #713f12;
+    border-color: #eab308;
 }
 
 .erp-compras-page .erp-compras__status-chip--cancelada {
@@ -586,6 +641,28 @@
 
 .erp-compras-page .fi-ta-header-cell:nth-child(8),
 .erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8),
+.erp-compras-page .erp-compras-col--valor-devolvido,
+.erp-compras-page .fi-ta-header-cell-valor-devolvido,
+.erp-compras-page .fi-ta-cell-valor-devolvido {
+    width: 6.25rem !important;
+    min-width: 6.25rem !important;
+    max-width: 7.25rem !important;
+    padding-inline: 0.18rem 0.22rem !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-compras-page .fi-ta-cell-valor-devolvido .fi-ta-col {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    justify-content: flex-start !important;
+}
+
+.erp-compras-page .fi-ta-header-cell:nth-child(9),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9),
 .erp-compras-page .fi-ta-header-cell-total,
 .erp-compras-page .fi-ta-cell-total {
     width: 6.5rem !important;
@@ -596,7 +673,7 @@
     white-space: nowrap !important;
 }
 
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
 .erp-compras-page .fi-ta-cell-total .fi-ta-col {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -605,7 +682,7 @@
     justify-content: flex-start !important;
 }
 
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(8) .fi-ta-col .fi-ta-text,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col .fi-ta-text,
 .erp-compras-page .fi-ta-cell-total .fi-ta-col .fi-ta-text {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -624,6 +701,15 @@
     min-width: 0;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+}
+
+.erp-compras-page .erp-compras-total-cell--devolvido .erp-compras-total-cell__amount {
+    color: #854d0e;
+}
+
+.erp-compras-page .fi-ta-row.erp-row-selected .erp-compras-total-cell--devolvido .erp-compras-total-cell__currency,
+.erp-compras-page .fi-ta-row.erp-row-selected .erp-compras-total-cell--devolvido .erp-compras-total-cell__amount {
+    color: #fef08a;
 }
 
 .erp-compras-page .erp-compras-total-cell__currency {
@@ -646,8 +732,8 @@
     color: #fff;
 }
 
-.erp-compras-page .fi-ta-header-cell:nth-child(9),
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9),
+.erp-compras-page .fi-ta-header-cell:nth-child(10),
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(10),
 .erp-compras-page .fi-ta-header-cell-ver-itens,
 .erp-compras-page .fi-ta-cell-ver-itens {
     width: 1.35rem !important;
@@ -657,7 +743,7 @@
     overflow: hidden;
 }
 
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) .fi-ta-col,
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(10) .fi-ta-col,
 .erp-compras-page .fi-ta-cell-ver-itens .fi-ta-col {
     width: auto !important;
     min-width: 0 !important;
@@ -717,18 +803,18 @@
 }
 
 .erp-compras-page .fi-ta-header-cell-ver-itens,
-.erp-compras-page .fi-ta-header-cell:nth-child(9) {
+.erp-compras-page .fi-ta-header-cell:nth-child(10) {
     padding: 0 !important;
     box-shadow: var(--erp-compras-scrollbar-size, 17px) 0 0 0 #164a85;
 }
 
 .erp-compras-page .fi-ta-cell-ver-itens,
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9) {
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(10) {
     position: relative;
 }
 
 .erp-compras-page .fi-ta-cell-ver-itens::after,
-.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(9)::after {
+.erp-compras-page .fi-ta-row .fi-ta-cell:nth-child(10)::after {
     content: '';
     position: absolute;
     top: 0;

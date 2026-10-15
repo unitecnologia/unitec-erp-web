@@ -67,7 +67,9 @@
                         && (int) $record->fornecedor_id === (int) $fornecedorFilter
                         && (float) $record->saldo > 0;
                     $marcado = in_array((int) $record->getKey(), array_map('intval', $selecionadosParaBaixa), true);
-                    if ($marcado) {
+                    $destaque = $highlightedRecordId !== null
+                        && (int) $record->getKey() === (int) $highlightedRecordId;
+                    if ($marcado || $destaque) {
                         $rowClass = trim($rowClass.' erp-row-selected');
                     }
                 @endphp

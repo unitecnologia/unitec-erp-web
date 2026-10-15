@@ -49,7 +49,8 @@ final class VendasInternasMonitorHookService
         }
 
         $query->update([
-            'venda_id' => null,
+            // Mantém o vínculo com a mesma venda quando a reabertura a preserva (status aberto).
+            'venda_id' => $order->venda_id,
             'situacao' => VendasInternasOrder::SITUACAO_PENDENTE,
             'pago_at' => null,
         ]);

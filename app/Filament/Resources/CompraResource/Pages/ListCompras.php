@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CompraResource\Pages;
 
+use App\Filament\Concerns\InteractsWithErpDualSearchFields;
 use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Resources\CompraResource\Pages\Concerns\ManagesCompraContadorEmail;
@@ -38,6 +39,7 @@ use Livewire\Attributes\Url;
 
 class ListCompras extends ListRecords
 {
+    use InteractsWithErpDualSearchFields;
     use InteractsWithErpListPage;
     use InteractsWithErpPermissions;
     use ManagesCompraContadorEmail;
@@ -57,6 +59,9 @@ class ListCompras extends ListRecords
 
     #[Url(as: 'campo')]
     public string $searchColumn = 'fornecedor';
+
+    /** @var array<string, string> */
+    public array $localSearchByField = [];
 
     #[Url(as: 'status')]
     public string $statusFilter = 'todas';
@@ -259,6 +264,9 @@ class ListCompras extends ListRecords
         ErpScreen::set('Compras');
 
         $this->statusFilter = $this->normalizeStatusFilter($this->statusFilter);
+        $this->erpRestoreDualSearchFields($this->compraSearchColumns(), $this->compraSearchFieldsSessionKey());
+        $this->hydrateLocalSearchByFieldFromLegacy();
+        $this->pruneLocalSearchByField();
 
         $abrirId = (int) request()->query('abrir_lancamento', 0);
         if ($abrirId > 0) {
@@ -332,7 +340,93 @@ class ListCompras extends ListRecords
             localSearch: $this->localSearch,
             localSearchDe: $this->localSearchDe,
             localSearchAte: $this->localSearchAte,
+            searchFieldsActive: $this->normalizedCompraSearchFields(),
+            localSearchByField: $this->localSearchByField,
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function compraSearchColumns(): array
+    {
+        return ['numero', 'data_emissao', 'data_entrada', 'numero_nota', 'fornecedor', 'chave', 'total'];
+    }
+
+    protected function compraSearchFieldsSessionKey(): string
+    {
+        return 'erp_compras_search_fields';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function normalizedCompraSearchFields(): array
+    {
+        return $this->searchFieldsActive !== []
+            ? $this->searchFieldsActive
+            : [$this->searchColumn ?: 'fornecedor'];
+    }
+
+    protected function isDateColumn(string $column): bool
+    {
+        return in_array($column, ['data_emissao', 'data_entrada'], true);
+    }
+
+    protected function hasDateSearchField(): bool
+    {
+        foreach ($this->normalizedCompraSearchFields() as $column) {
+            if ($this->isDateColumn($column)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function pruneLocalSearchByField(): void
+    {
+        $active = $this->normalizedCompraSearchFields();
+
+        foreach (array_keys($this->localSearchByField) as $column) {
+            if (! in_array($column, $active, true) || $this->isDateColumn($column)) {
+                unset($this->localSearchByField[$column]);
+            }
+        }
+    }
+
+    protected function syncLegacyLocalSearch(): void
+    {
+        foreach ($this->normalizedCompraSearchFields() as $column) {
+            if ($this->isDateColumn($column)) {
+                continue;
+            }
+
+            $this->localSearch = (string) ($this->localSearchByField[$column] ?? '');
+
+            return;
+        }
+
+        $this->localSearch = '';
+    }
+
+    protected function hydrateLocalSearchByFieldFromLegacy(): void
+    {
+        if (! filled($this->localSearch)) {
+            return;
+        }
+
+        foreach ($this->normalizedCompraSearchFields() as $column) {
+            if ($this->isDateColumn($column)) {
+                continue;
+            }
+
+            if (! filled($this->localSearchByField[$column] ?? null)) {
+                $this->localSearchByField[$column] = $this->localSearch;
+            }
+
+            return;
+        }
     }
 
     protected function buildListQuery(): Builder
@@ -342,7 +436,7 @@ class ListCompras extends ListRecords
 
     protected function isDateSearchColumn(): bool
     {
-        return $this->listQueryBuilder()->isDateSearchColumn();
+        return $this->hasDateSearchField();
     }
 
     /**
@@ -382,6 +476,89 @@ class ListCompras extends ListRecords
             ->exists();
     }
 
+    #[Computed]
+    public function highlightedCompraFechada(): bool
+    {
+        if (! $this->highlightedRecordId) {
+            return false;
+        }
+
+        return $this->scopedCompraQuery()
+            ->whereKey($this->highlightedRecordId)
+            ->where('status', Compra::STATUS_FECHADA)
+            ->exists();
+    }
+
+    #[Computed]
+    public function canAlterarHighlightedCompra(): bool
+    {
+        if (! $this->highlightedRecordId) {
+            return true;
+        }
+
+        if ($this->highlightedCompraDevolvida || $this->highlightedCompraFechada) {
+            return false;
+        }
+
+        $status = $this->scopedCompraQuery()
+            ->whereKey($this->highlightedRecordId)
+            ->value('status');
+
+        return $status !== Compra::STATUS_CANCELADA;
+    }
+
+    public function highlightRecord(int | string $recordId): void
+    {
+        $this->highlightedRecordId = (int) $recordId;
+
+        // skipRender: action bar não remonta — sincroniza botões pela linha/status.
+        unset($this->canAlterarHighlightedCompra);
+        unset($this->highlightedCompraDevolvida);
+        unset($this->highlightedCompraFechada);
+        $podeAlterar = $this->canAlterarHighlightedCompra;
+        $recordKey = (string) $this->highlightedRecordId;
+
+        $this->js(sprintf(
+            '(() => {
+                const page = document.querySelector(".erp-compras-page");
+                if (!page) return;
+                const row = page.querySelector(%s);
+                if (row) {
+                    page.querySelectorAll(".fi-ta-row.erp-row-selected").forEach((el) => el.classList.remove("erp-row-selected"));
+                    row.classList.add("erp-row-selected");
+                    page.querySelectorAll("[data-erp-disable-on-row]").forEach((button) => {
+                        const classes = String(button.dataset.erpDisableOnRow || "").split(/\s+/).filter(Boolean);
+                        button.disabled = classes.some((cls) => row.classList.contains(cls));
+                    });
+                }
+                const alterar = page.querySelector(%s);
+                if (alterar) alterar.disabled = %s;
+            })()',
+            json_encode('.fi-ta-row[data-record-key="'.$recordKey.'"]', JSON_UNESCAPED_UNICODE),
+            json_encode('[data-erp-key="F3"]', JSON_UNESCAPED_UNICODE),
+            $podeAlterar ? 'false' : 'true',
+        ));
+
+        $this->skipRender();
+    }
+
+    protected function clearListSelection(): void
+    {
+        $this->highlightedRecordId = null;
+        unset($this->canAlterarHighlightedCompra);
+        unset($this->highlightedCompraDevolvida);
+        unset($this->highlightedCompraFechada);
+
+        $this->js(<<<'JS'
+(() => {
+    const page = document.querySelector('.erp-compras-page');
+    if (!page) return;
+    page.querySelectorAll('.fi-ta-row.erp-row-selected').forEach((el) => el.classList.remove('erp-row-selected'));
+    page.querySelectorAll('[data-erp-disable-on-row]').forEach((button) => { button.disabled = false; });
+})();
+JS);
+    }
+
     protected function abortIfHighlightedCompraDevolvida(string $acao): bool
     {
         if (! $this->highlightedCompraDevolvida) {
@@ -417,6 +594,12 @@ class ListCompras extends ListRecords
     public function filteredTotal(): float
     {
         return $this->listQueryBuilder()->sumFilteredTotal();
+    }
+
+    #[Computed]
+    public function filteredTotalDevolvido(): float
+    {
+        return $this->listQueryBuilder()->sumFilteredValorDevolvido();
     }
 
     public function content(Schema $schema): Schema
@@ -4067,53 +4250,76 @@ class ListCompras extends ListRecords
         $this->pushCompraListRefresh(resetSort: true);
     }
 
+    public function setSearchColumn(string $column): void
+    {
+        if (! $this->erpToggleDualSearchField(
+            $column,
+            $this->compraSearchColumns(),
+            $this->compraSearchFieldsSessionKey(),
+        )) {
+            return;
+        }
+
+        $this->pruneLocalSearchByField();
+
+        if (! $this->hasDateSearchField()) {
+            $this->localSearchDe = '';
+            $this->localSearchAte = '';
+        }
+
+        $this->syncLegacyLocalSearch();
+        $this->clearListSelection();
+        $this->pushCompraListRefresh(resetSort: true, skipParentRender: false);
+    }
+
     public function clearSearch(): void
     {
         $this->localSearch = '';
         $this->localSearchDe = '';
         $this->localSearchAte = '';
-        $this->searchColumn = 'fornecedor';
+        $this->localSearchByField = [];
+        $this->erpApplyDualSearchFields(['fornecedor'], $this->compraSearchFieldsSessionKey());
         $this->clearListSelection();
-        $this->pushCompraListRefresh(resetSort: true);
+        $this->pushCompraListRefresh(resetSort: true, skipParentRender: false);
     }
 
-    public function updatedSearchColumn(): void
+    public function updatedLocalSearchByField(): void
     {
-        $this->localSearch = '';
-        $this->localSearchDe = '';
-        $this->localSearchAte = '';
+        $this->pruneLocalSearchByField();
+        $this->syncLegacyLocalSearch();
         $this->clearListSelection();
         $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedLocalSearch(): void
     {
-        if ($this->isDateSearchColumn()) {
+        if ($this->hasDateSearchField() && $this->normalizedCompraSearchFields() === []) {
             return;
         }
 
+        $this->hydrateLocalSearchByFieldFromLegacy();
         $this->clearListSelection();
-        $this->pushCompraListRefresh();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedLocalSearchDe(): void
     {
-        if (! $this->isDateSearchColumn()) {
+        if (! $this->hasDateSearchField()) {
             return;
         }
 
         $this->clearListSelection();
-        $this->pushCompraListRefresh();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedLocalSearchAte(): void
     {
-        if (! $this->isDateSearchColumn()) {
+        if (! $this->hasDateSearchField()) {
             return;
         }
 
         $this->clearListSelection();
-        $this->pushCompraListRefresh();
+        $this->pushCompraListRefresh(resetSort: true);
     }
 
     public function updatedTableRecordsPerPage(): void
@@ -4134,10 +4340,7 @@ class ListCompras extends ListRecords
             return;
         }
 
-        if ($this->abortIfHighlightedCompraDevolvida('ler XML de')) {
-            return;
-        }
-
+        // Entrada XML cria nova compra — não depende da linha selecionada (mesmo se devolvida).
         $this->openImportarXmlModalVazio();
     }
 
@@ -4155,6 +4358,32 @@ class ListCompras extends ListRecords
             Notification::make()
                 ->title('Compra devolvida')
                 ->body('Não é possível alterar uma compra que possui devolução finalizada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $compra = $this->scopedCompraQuery()->find($resolvedId);
+
+        if (! $compra) {
+            return;
+        }
+
+        if ($compra->status === Compra::STATUS_FECHADA) {
+            Notification::make()
+                ->title('Compra fechada')
+                ->body('Para alterar, use F7 Reabrir.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($compra->status === Compra::STATUS_CANCELADA) {
+            Notification::make()
+                ->title('Compra cancelada')
+                ->body('Não é possível alterar uma compra cancelada.')
                 ->warning()
                 ->send();
 
@@ -4337,9 +4566,12 @@ class ListCompras extends ListRecords
             ->exists();
     }
 
-    protected function pushCompraListRefresh(bool $resetSort = false): void
+    protected function pushCompraListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
     {
-        $total = $this->listQueryBuilder()->sumFilteredTotal();
+        $builder = $this->listQueryBuilder();
+        $total = $builder->sumFilteredTotal();
+        $totalDevolvido = $builder->sumFilteredValorDevolvido();
+        $totalLiquido = round($total - $totalDevolvido, 2);
 
         $this->dispatch(
             'erp-compra-list-refresh',
@@ -4348,15 +4580,28 @@ class ListCompras extends ListRecords
             localSearch: $this->localSearch,
             localSearchDe: $this->localSearchDe,
             localSearchAte: $this->localSearchAte,
+            searchFieldsActive: $this->normalizedCompraSearchFields(),
+            localSearchByField: $this->localSearchByField,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
         )->to(CompraListTable::class);
 
-        $this->skipRender();
+        if ($skipParentRender) {
+            $this->skipRender();
+        }
 
         $this->js(sprintf(
-            '(() => { const el = document.querySelector(".erp-compras__total-value"); if (el) el.textContent = %s; })()',
+            '(() => {
+                const el = document.querySelector(".erp-compras__total-value--compras");
+                if (el) el.textContent = %s;
+                const elDev = document.querySelector(".erp-compras__total-value--devolvido");
+                if (elDev) elDev.textContent = %s;
+                const elLiq = document.querySelector(".erp-compras__total-value--liquido");
+                if (elLiq) elLiq.textContent = %s;
+            })()',
             json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalDevolvido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode('R$ '.number_format($totalLiquido, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
         ));
     }
 }

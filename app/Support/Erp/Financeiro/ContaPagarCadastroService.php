@@ -79,6 +79,7 @@ class ContaPagarCadastroService
                     'valor' => $valores[$i],
                     'desconto' => 0,
                     'juros' => 0,
+                    'multa' => 0,
                     'valor_pago' => 0,
                     'pago_em' => null,
                 ];
@@ -173,6 +174,7 @@ class ContaPagarCadastroService
                     'valor' => $valor,
                     'desconto' => 0,
                     'juros' => 0,
+                    'multa' => 0,
                     'valor_pago' => 0,
                     'pago_em' => null,
                 ];

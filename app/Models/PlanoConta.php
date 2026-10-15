@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'codigo',
@@ -24,6 +25,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PlanoConta extends Model
 {
     protected $table = 'planos_contas';
+
+    /**
+     * Próximo código numérico interno (MAX+1), sem reutilizar existentes nem preencher lacunas.
+     * Trava a linha do maior código para serializar cadastros concorrentes.
+     */
+    public static function nextCodigo(): int
+    {
+        return (int) DB::transaction(function (): int {
+            $max = static::query()
+                ->orderByDesc('codigo')
+                ->lockForUpdate()
+                ->value('codigo');
+
+            return max(1, ((int) $max) + 1);
+        });
+    }
 
     public function pagamentos(): HasMany
     {

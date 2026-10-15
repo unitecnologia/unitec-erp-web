@@ -119,6 +119,7 @@ class VendaResource extends Resource
                     ->color(fn (Venda $record): string => match ($record->plataformaEfetiva()) {
                         Venda::PLATAFORMA_PDV => 'info',
                         Venda::PLATAFORMA_MOBILE => 'warning',
+                        Venda::PLATAFORMA_OS => 'success',
                         default => 'gray',
                     })
                     ->alignCenter()
@@ -153,7 +154,27 @@ class VendaResource extends Resource
                     ->label('Nº Dav')
                     ->alignCenter()
                     ->placeholder('—')
-                    ->formatStateUsing(fn ($state): string => $state !== null ? str_pad((string) $state, 6, '0', STR_PAD_LEFT) : '—')
+                    ->state(function (Venda $record): ?string {
+                        $pdv = $record->pdvVenda;
+                        if ($pdv !== null && ! $pdv->isRegularizacaoFiscal() && filled($pdv->numero)) {
+                            return (string) $pdv->numero;
+                        }
+
+                        $pedidoNumero = $record->forcaVendasOrder?->pedido?->numero;
+                        if (filled($pedidoNumero)) {
+                            return (string) $pedidoNumero;
+                        }
+
+                        $osNumero = $record->ordemServico?->numero;
+                        if (filled($osNumero)) {
+                            return (string) preg_replace('/\D/', '', (string) $osNumero);
+                        }
+
+                        return null;
+                    })
+                    ->formatStateUsing(fn ($state): string => $state !== null && $state !== ''
+                        ? str_pad((string) $state, 6, '0', STR_PAD_LEFT)
+                        : '—')
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('pdvVenda.nfce.numero')
                     ->label('NFC-e')

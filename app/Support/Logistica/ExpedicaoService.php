@@ -25,63 +25,108 @@ final class ExpedicaoService
 {
     public function criarAPartirDaVenda(Venda $venda, string $origem): ?Entrega
     {
+        return $this->garantirEntregaAtivaDaVenda($venda, $origem);
+    }
+
+    /**
+     * Garante entrega ativa para venda fechada: cria se não existir; se estiver
+     * cancelada (reabertura/refaturamento), reabre e ressincroniza itens.
+     * Não reaproveita entrega expedida (trava permanece no Monitor).
+     */
+    public function garantirEntregaAtivaDaVenda(Venda $venda, string $origem): ?Entrega
+    {
         if ($venda->status !== Venda::STATUS_FECHADO) {
             return null;
-        }
-
-        if (Entrega::query()->where('venda_id', $venda->id)->exists()) {
-            return Entrega::query()->where('venda_id', $venda->id)->first();
         }
 
         $venda->loadMissing(['itens.product', 'cliente']);
 
         return DB::transaction(function () use ($venda, $origem): Entrega {
-            $cliente = $venda->cliente;
-            $endereco = $this->snapshotEndereco($cliente);
+            /** @var Entrega|null $entrega */
+            $entrega = Entrega::query()->where('venda_id', $venda->id)->lockForUpdate()->first();
 
-            $entrega = Entrega::query()->create([
-                'numero' => Entrega::nextNumero(),
-                'venda_id' => $venda->id,
-                'cliente_id' => $venda->cliente_id,
-                'cliente_nome' => $cliente?->nome_razao ?? $cliente?->apelido_fantasia ?? 'CONSUMIDOR',
-                'cliente_telefone' => $cliente?->celular1 ?: $cliente?->fone1,
-                ...$endereco,
-                'status' => Entrega::STATUS_PENDENTE,
-                'origem' => $origem,
-                'usuario_expedicao_id' => Auth::id(),
-            ]);
-
-            foreach ($venda->itens as $item) {
-                if (! $item->product_id) {
-                    continue;
-                }
-
-                /** @var Product|null $product */
-                $product = $item->relationLoaded('product') ? $item->product : Product::query()->find($item->product_id);
-
-                if ($product?->is_servico) {
-                    continue;
-                }
-
-                EntregaItem::query()->create([
-                    'entrega_id' => $entrega->id,
-                    'venda_item_id' => $item->id,
-                    'product_id' => $item->product_id,
-                    'codigo' => $product?->codigo,
-                    'codigo_barras' => $product?->codigo_barras,
-                    'descricao' => $product?->descricao ?? 'Item',
-                    'localizacao' => $product?->localizacao,
-                    'quantidade_pedida' => $item->quantidade,
-                    'quantidade_expedida' => 0,
-                    'quantidade_separada' => 0,
-                    'quantidade_conferida' => 0,
-                ]);
+            if ($entrega === null) {
+                return $this->criarEntregaNova($venda, $origem);
             }
 
-            $this->registrarEvento($entrega, null, Entrega::STATUS_PENDENTE, 'Expedição gerada automaticamente.');
+            if ($entrega->status === Entrega::STATUS_EXPEDIDO) {
+                return $entrega;
+            }
+
+            if ($entrega->status === Entrega::STATUS_CANCELADO) {
+                $this->transicionar(
+                    $entrega,
+                    Entrega::STATUS_PENDENTE,
+                    Auth::user(),
+                    'Reabertura da venda no Monitor de Vendas.',
+                );
+                $entrega->refresh();
+            }
+
+            $this->sincronizarItensDaVenda($entrega, $venda);
 
             return $entrega->fresh(['itens']);
         });
+    }
+
+    private function criarEntregaNova(Venda $venda, string $origem): Entrega
+    {
+        $cliente = $venda->cliente;
+        $endereco = $this->snapshotEndereco($cliente);
+
+        $entrega = Entrega::query()->create([
+            'numero' => Entrega::nextNumero(),
+            'venda_id' => $venda->id,
+            'cliente_id' => $venda->cliente_id,
+            'cliente_nome' => $cliente?->nome_razao ?? $cliente?->apelido_fantasia ?? 'CONSUMIDOR',
+            'cliente_telefone' => $cliente?->celular1 ?: $cliente?->fone1,
+            ...$endereco,
+            'status' => Entrega::STATUS_PENDENTE,
+            'origem' => $origem,
+            'usuario_expedicao_id' => Auth::id(),
+        ]);
+
+        $this->sincronizarItensDaVenda($entrega, $venda);
+        $this->registrarEvento($entrega, null, Entrega::STATUS_PENDENTE, 'Expedição gerada automaticamente.');
+
+        return $entrega->fresh(['itens']);
+    }
+
+    /**
+     * Recria itens da entrega a partir dos venda_itens atuais (após refaturar).
+     */
+    private function sincronizarItensDaVenda(Entrega $entrega, Venda $venda): void
+    {
+        EntregaItem::query()->where('entrega_id', (int) $entrega->id)->delete();
+
+        $venda->loadMissing(['itens.product']);
+
+        foreach ($venda->itens as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+
+            /** @var Product|null $product */
+            $product = $item->relationLoaded('product') ? $item->product : Product::query()->find($item->product_id);
+
+            if ($product?->is_servico) {
+                continue;
+            }
+
+            EntregaItem::query()->create([
+                'entrega_id' => $entrega->id,
+                'venda_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'codigo' => $product?->codigo,
+                'codigo_barras' => $product?->codigo_barras,
+                'descricao' => $product?->descricao ?? 'Item',
+                'localizacao' => $product?->localizacao,
+                'quantidade_pedida' => $item->quantidade,
+                'quantidade_expedida' => 0,
+                'quantidade_separada' => 0,
+                'quantidade_conferida' => 0,
+            ]);
+        }
     }
 
     /**

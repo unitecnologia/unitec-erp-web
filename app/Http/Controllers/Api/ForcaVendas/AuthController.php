@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\ForcaVendas;
 
+use App\Models\CaixaConta;
 use App\Models\ForcaVendasDevice;
 use App\Models\User;
 use App\Support\ForcaVendas\ForcaVendasDeviceVinculo;
@@ -151,7 +152,9 @@ class AuthController
         $user->loadMissing(['vendedor.estoqueCadastro', 'vendedor.empresas', 'vendedor.tabelaVenda']);
 
         $vendedor = $user->vendedor;
-        $caixa = $vendedor?->caixaContaDaEmpresa($user->empresa_id ? (int) $user->empresa_id : null);
+        // PDV só com vínculo em Permissões → Caixas; senão CAIXA GERAL (padrão).
+        $caixa = $vendedor?->caixaContaDaEmpresa($user->empresa_id ? (int) $user->empresa_id : null)
+            ?? CaixaConta::ensureCaixaGeral();
         $estoque = $vendedor?->estoqueCadastro;
         $tabela = $vendedor?->tabelaVenda;
         $empresa = $user->empresa_id
@@ -164,8 +167,8 @@ class AuthController
             'empresa_id' => $user->empresa_id,
             'vendedor_id' => $user->vendedor_id,
             'vendedor_nome' => $vendedor?->nome,
-            'caixa_id' => $caixa?->id,
-            'caixa_nome' => $caixa?->nome,
+            'caixa_id' => $caixa->id,
+            'caixa_nome' => $caixa->nome,
             'estoque_id' => $estoque?->id ?? $vendedor?->estoque_id,
             'estoque_nome' => $estoque?->nome
                 ?? (filled($vendedor?->estoque) ? (string) $vendedor->estoque : null),

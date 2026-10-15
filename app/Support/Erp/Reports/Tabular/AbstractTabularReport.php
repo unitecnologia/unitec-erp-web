@@ -37,6 +37,52 @@ abstract class AbstractTabularReport implements TabularReportDefinition
     }
 
     /**
+     * Pesos relativos das colunas (opcional). Vazio = largura automática.
+     *
+     * @return array<string, int|float>
+     */
+    public function columnWidthWeights(): array
+    {
+        return [];
+    }
+
+    /**
+     * Colunas que não devem quebrar linha (opcional).
+     *
+     * @return list<string>
+     */
+    public function nowrapColumns(): array
+    {
+        return [];
+    }
+
+    /**
+     * @param  list<string>  $visible
+     */
+    public function columnWidthPercent(string $column, array $visible): ?string
+    {
+        $weights = $this->columnWidthWeights();
+
+        if ($weights === []) {
+            return null;
+        }
+
+        $sum = 0.0;
+
+        foreach ($visible as $key) {
+            $sum += (float) ($weights[$key] ?? 10);
+        }
+
+        if ($sum <= 0) {
+            return null;
+        }
+
+        $percent = ((float) ($weights[$column] ?? 10) / $sum) * 100;
+
+        return number_format($percent, 2, '.', '').'%';
+    }
+
+    /**
      * @param  list<string>|null  $requested
      * @return list<string>
      */

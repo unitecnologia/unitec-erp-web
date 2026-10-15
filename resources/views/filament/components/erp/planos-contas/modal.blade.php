@@ -16,15 +16,16 @@
             </div>
 
             <div class="erp-contas-caixa-modal__body">
-                <label class="erp-contas-caixa-modal__field erp-contas-caixa-modal__field--code">
-                    <span>Código</span>
-                    <input type="number" min="1" wire:model="form.codigo" autofocus>
-                </label>
-                @error('form.codigo') <p class="erp-contas-caixa-modal__error">{{ $message }}</p> @enderror
+                @if ($isEdit)
+                    <label class="erp-contas-caixa-modal__field erp-contas-caixa-modal__field--code">
+                        <span>Código</span>
+                        <input type="number" wire:model="form.codigo" readonly tabindex="-1">
+                    </label>
+                @endif
 
                 <label class="erp-contas-caixa-modal__field">
                     <span>Conta completa</span>
-                    <input type="text" wire:model="form.conta_completa" maxlength="80" data-erp-uppercase>
+                    <input type="text" wire:model="form.conta_completa" maxlength="80" data-erp-uppercase @if (! $isEdit) autofocus @endif>
                 </label>
                 @error('form.conta_completa') <p class="erp-contas-caixa-modal__error">{{ $message }}</p> @enderror
 
@@ -36,7 +37,7 @@
 
                 <label class="erp-contas-caixa-modal__field">
                     <span>Tipo</span>
-                    <select wire:model="form.dc">
+                    <select wire:model="form.dc" required>
                         <option value="">—</option>
                         <option value="C">CRÉDITO</option>
                         <option value="D">DÉBITO</option>

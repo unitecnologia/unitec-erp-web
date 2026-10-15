@@ -76,7 +76,7 @@
                 @if (! empty($fiscalDocsChart['empty']) || array_sum($fiscalDocsChart['values'] ?? []) <= 0)
                     <p class="erp-dash-panel__empty">Sem documentos no mês</p>
                 @else
-                    <canvas id="erp-dash-fiscal-chart" aria-label="Gráfico pizza de NFe e NFCe"></canvas>
+                    <canvas id="erp-dash-fiscal-chart" aria-label="Gráfico pizza de NFe, NFCe e NFSe"></canvas>
                 @endif
             </div>
         </article>

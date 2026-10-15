@@ -30,6 +30,7 @@
                     <span><em>Valor</em> {{ $t['valor'] }}</span>
                     <span><em>Desconto</em> {{ $t['desconto'] }}</span>
                     <span><em>Juros</em> {{ $t['juros'] }}</span>
+                    <span><em>Multa</em> {{ $t['multa'] ?? '0,00' }}</span>
                     <span><em>Valor Pago</em> {{ $t['valor_pago'] }}</span>
                     <span><em>Saldo</em> {{ $t['saldo'] }}</span>
                     <span class="is-wide"><em>Histórico</em> {{ $t['historico'] }}</span>
@@ -47,6 +48,7 @@
                                 <th>Data do Pagamento</th>
                                 <th class="is-num">Valor Parcela</th>
                                 <th class="is-num">Juros</th>
+                                <th class="is-num">Multa</th>
                                 <th class="is-num">Desconto</th>
                                 <th class="is-num">Valor Pago</th>
                                 <th>Meio de pagamento</th>
@@ -75,6 +77,7 @@
                                     <td>{{ $row['data'] }}</td>
                                     <td class="is-num">{{ $row['valor_parcela'] }}</td>
                                     <td class="is-num">{{ $row['juros'] }}</td>
+                                    <td class="is-num">{{ $row['multa'] ?? '0,00' }}</td>
                                     <td class="is-num">{{ $row['desconto'] }}</td>
                                     <td class="is-num">{{ $row['valor_pago'] }}</td>
                                     <td>{{ $row['forma'] ?? '—' }}</td>

@@ -683,6 +683,8 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
 }
 
 .erp-caixa-page .erp-caixa-view-modal__window {
+    position: relative;
+    z-index: 1;
     width: min(42rem, calc(100vw - 1rem));
     max-height: calc(100vh - 1.5rem);
     display: flex;
@@ -692,6 +694,7 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     background: var(--erp-bg-app, #e3ecf7);
     box-shadow: var(--erp-shadow-lg, 0 8px 32px rgba(15, 52, 96, 0.35));
     overflow: hidden;
+    pointer-events: auto;
 }
 
 .erp-caixa-page .erp-lookup-modal__titlebar {
@@ -724,6 +727,7 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: auto;
     padding: 0.65rem 0.75rem 0.55rem;
 }
 
@@ -732,6 +736,38 @@ body:has(.erp-caixa-form-modal) [data-filament-notifications] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.55rem 0.85rem;
     margin-bottom: 0.65rem;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__origem {
+    margin: 0 0 0.65rem;
+    padding: 0.5rem 0.6rem 0.55rem;
+    border: 1px solid var(--erp-border-light, #c7d5e8);
+    border-radius: var(--erp-radius-sm, 6px);
+    background: #fff;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__origem-title {
+    margin: 0 0 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__grid--origem {
+    margin-bottom: 0;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__value--money {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-caixa-page .erp-caixa-view-modal__value--estorno {
+    color: #9a3412;
+    background: #fff7ed;
+    border-color: #fdba74;
 }
 
 .erp-caixa-page .erp-caixa-view-modal__field {

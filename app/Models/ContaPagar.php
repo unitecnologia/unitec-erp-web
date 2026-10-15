@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'valor',
     'desconto',
     'juros',
+    'multa',
     'valor_pago',
     'pago_em',
     'saldo',
@@ -37,9 +38,9 @@ class ContaPagar extends Model
         return str_pad((string) (($max ?? 0) + 1), 6, '0', STR_PAD_LEFT);
     }
 
-    public static function calcularSaldo(float $valor, float $desconto, float $juros, float $valorPago): float
+    public static function calcularSaldo(float $valor, float $desconto, float $juros, float $valorPago, float $multa = 0): float
     {
-        return round(max(0, $valor - $desconto + $juros - $valorPago), 2);
+        return round(max(0, $valor - $desconto + $juros + $multa - $valorPago), 2);
     }
 
     public function empresa(): BelongsTo
@@ -71,6 +72,7 @@ class ContaPagar extends Model
             'valor' => 'decimal:2',
             'desconto' => 'decimal:2',
             'juros' => 'decimal:2',
+            'multa' => 'decimal:2',
             'valor_pago' => 'decimal:2',
             'saldo' => 'decimal:2',
         ];
@@ -84,6 +86,7 @@ class ContaPagar extends Model
                 (float) $conta->desconto,
                 (float) $conta->juros,
                 (float) $conta->valor_pago,
+                (float) ($conta->multa ?? 0),
             );
         });
     }

@@ -2,6 +2,7 @@
 
 namespace App\Support\Erp\Financeiro;
 
+use App\Models\CaixaConta;
 use App\Models\CaixaLancamento;
 use App\Models\ContaReceber;
 use App\Models\ContaReceberPagamento;
@@ -13,38 +14,72 @@ use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 /**
- * Baixa de Contas a Receber + lançamento no Livro Caixa.
+ * Baixa de Contas a Receber + lançamento no Livro Caixa quando a forma movimenta caixa.
  *
  * Regra operacional de caixa (PDV vs Força de Vendas):
  * - PDV: dinheiro/cartão à vista entram em `pdv_caixa_movimentos` da sessão
  *   aberta; o Livro Caixa (`caixa_lancamentos`) recebe o consolidado no
  *   fechamento da sessão (`PdvCaixaFechamentoService`).
- * - Contas a Receber / Força de Vendas: baixa ou faturamento à vista
- *   (dinheiro/PIX) registram entrada direto no Livro Caixa neste serviço.
+ * - Contas a Receber / Força de Vendas: baixa com forma que movimenta caixa
+ *   (dinheiro/PIX) registra entrada direto no Livro Caixa neste serviço.
  * - PIX de título (`PixCobrancaService`): baixa o CR e também gera entrada
  *   no Livro Caixa (mesmo caminho deste serviço).
  */
 final class ContaReceberBaixaService
 {
     /**
+     * Dinheiro/Pix (mesmo com movimento legado vazio) ou tipo_movimento = caixa.
+     * Mesma regra de Contas a Pagar — boleto/cheque/cartão/crediário não geram Livro Caixa.
+     */
+    public function formaMovimentaCaixa(FormaPagamento $forma): bool
+    {
+        $movimento = FormaPagamentoDestino::from($forma);
+
+        if ($movimento === 'caixa') {
+            return true;
+        }
+
+        if ($movimento !== 'nenhum') {
+            return false;
+        }
+
+        $tipo = mb_strtolower(trim((string) ($forma->tipo ?? '')), 'UTF-8');
+        $nome = mb_strtoupper(trim((string) ($forma->descricao ?? '')), 'UTF-8');
+
+        return in_array($tipo, ['dinheiro', 'pix'], true)
+            || str_contains($nome, 'PIX')
+            || str_contains($nome, 'DINHEIRO')
+            || str_contains($nome, 'ESPÉCIE')
+            || str_contains($nome, 'ESPECIE');
+    }
+
+    /**
      * Formas ativas para baixa em Contas a Receber.
      *
      * Prefere `aparece_contas_receber`; se nenhuma estiver marcada, usa todas as ativas.
      *
-     * @return list<array{id: int, label: string, tipo: string|null}>
+     * @return list<array{
+     *     id: int,
+     *     label: string,
+     *     tipo: string|null,
+     *     caixa_conta_id: int|null,
+     *     caixa_label: string,
+     *     movimenta_caixa: bool
+     * }>
      */
     public function formasDisponiveis(): array
     {
         $base = FormaPagamento::query()
+            ->with('contaDestino:id,codigo,nome,ativo')
             ->where('ativo', true)
             ->orderBy('codigo')
             ->orderBy('descricao');
 
         $query = (clone $base)->where('aparece_contas_receber', true);
-        $formas = $query->get(['id', 'codigo', 'descricao', 'tipo']);
+        $formas = $query->get(['id', 'codigo', 'descricao', 'tipo', 'tipo_movimento', 'conta_destino_id']);
 
         if ($formas->isEmpty()) {
-            $formas = $base->get(['id', 'codigo', 'descricao', 'tipo']);
+            $formas = $base->get(['id', 'codigo', 'descricao', 'tipo', 'tipo_movimento', 'conta_destino_id']);
         }
 
         return $formas
@@ -55,10 +90,29 @@ final class ContaReceberBaixaService
                     ? str_pad((string) $codigo, 2, '0', STR_PAD_LEFT).' — '.($descricao !== '' ? $descricao : 'Sem descrição')
                     : ($descricao !== '' ? $descricao : 'Forma #'.$forma->id);
 
+                $movimenta = $this->formaMovimentaCaixa($forma);
+                $caixa = $forma->contaDestino;
+                $caixaAtivo = $caixa && (bool) $caixa->ativo;
+                $caixaId = null;
+                $caixaLabel = 'Não movimenta o caixa';
+
+                if ($movimenta) {
+                    if ($caixaAtivo) {
+                        $caixaId = (int) $caixa->id;
+                        $caixaLabel = $this->rotuloCaixa($caixa);
+                    } else {
+                        $caixaId = (int) CaixaConta::ensureCaixaGeral()->id;
+                        $caixaLabel = CaixaConta::LABEL_CAIXA_GERAL_PADRAO;
+                    }
+                }
+
                 return [
                     'id' => (int) $forma->id,
                     'label' => $label,
                     'tipo' => $forma->tipo,
+                    'caixa_conta_id' => $caixaId,
+                    'caixa_label' => $caixaLabel,
+                    'movimenta_caixa' => $movimenta,
                 ];
             })
             ->values()
@@ -76,6 +130,7 @@ final class ContaReceberBaixaService
      *     recebido_em?: string|null,
      *     numero_cheque?: string|null,
      *     plano_conta_id?: int|null,
+     *     caixa_conta_id?: int|null,
      *     multa?: float,
      *     grupo?: array{juros_editado?: bool, multa_editada?: bool, desconto_editado?: bool, valor_editado?: bool}
      * }  $opcoes
@@ -104,7 +159,16 @@ final class ContaReceberBaixaService
         }
 
         $hoje = ErpTimezone::toLocal()->toDateString();
-        $caixaContaId = (int) ($forma->conta_destino_id ?? 0);
+        $movimentaCaixa = $this->formaMovimentaCaixa($forma);
+        $caixaContaId = null;
+
+        if ($movimentaCaixa) {
+            $selecionada = (int) ($opcoes['caixa_conta_id'] ?? 0);
+            $caixaContaId = CaixaConta::resolverDestinoLivroCaixa(
+                $selecionada > 0 ? $selecionada : null,
+                (int) ($forma->conta_destino_id ?? 0) ?: null,
+            );
+        }
 
         $recebidoEm = trim((string) ($opcoes['recebido_em'] ?? ''));
         if ($recebidoEm === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $recebidoEm)) {
@@ -147,6 +211,7 @@ final class ContaReceberBaixaService
             $ids,
             $forma,
             $recebidoEm,
+            $movimentaCaixa,
             $caixaContaId,
             $percJuros,
             $jurosInformado,
@@ -265,7 +330,7 @@ final class ContaReceberBaixaService
                     $percD,
                     $valorRecebido,
                     $numeroCheque !== '' ? $numeroCheque : null,
-                    $caixaContaId > 0 ? $caixaContaId : null,
+                    $movimentaCaixa ? $caixaContaId : null,
                     $planoContaId,
                     $multa,
                 );
@@ -277,16 +342,18 @@ final class ContaReceberBaixaService
                 $conta->recebido_em = $recebidoEm;
                 $conta->save();
 
-                $this->lancarEntradaCaixa(
-                    valor: $valorRecebido,
-                    data: $recebidoEm,
-                    documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
-                    historico: 'Recebimento conta a receber #'.($conta->numero ?: $conta->id),
-                    caixaContaId: $caixaContaId > 0 ? $caixaContaId : null,
-                    empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
-                    planoContaId: $planoContaId,
-                    planoNome: $planoNome,
-                );
+                if ($movimentaCaixa && $caixaContaId) {
+                    $this->lancarEntradaCaixa(
+                        valor: $valorRecebido,
+                        data: $recebidoEm,
+                        documento: (string) ($conta->documento ?: $conta->numero ?: ('CR-'.$conta->id)),
+                        historico: 'Recebimento conta a receber #'.($conta->numero ?: $conta->id),
+                        caixaContaId: $caixaContaId,
+                        empresaId: $conta->empresa_id ? (int) $conta->empresa_id : null,
+                        planoContaId: $planoContaId,
+                        planoNome: $planoNome,
+                    );
+                }
 
                 $ok++;
                 $total += $valorRecebido;
@@ -609,5 +676,17 @@ final class ContaReceberBaixaService
             $tipo === 'deposito' || str_contains($descricao, 'DEPOSIT') => 'deposito',
             default => ContaReceber::FORMA_CARTEIRA,
         };
+    }
+
+    private function rotuloCaixa(CaixaConta $caixa): string
+    {
+        $codigo = trim((string) ($caixa->codigo ?? ''));
+        $nome = mb_strtoupper(trim((string) ($caixa->nome ?? '')), 'UTF-8');
+
+        if ($codigo !== '' && $nome !== '') {
+            return $codigo.' — '.$nome;
+        }
+
+        return $nome !== '' ? $nome : ($codigo !== '' ? $codigo : '—');
     }
 }

@@ -82,13 +82,16 @@ class CompraResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 ViewColumn::make('status')
                     ->label('Situação')
-                    ->state(function (Compra $record): string {
-                        return $record->has_devolucao_finalizada
-                            ? 'devolvida'
-                            : (string) $record->status;
-                    })
+                    ->state(fn (Compra $record): string => (string) $record->status)
                     ->view('filament.components.erp.compras.columns.status')
                     ->alignCenter()
+                    ->disabledClick(),
+                ViewColumn::make('valor_devolvido')
+                    ->label('V. Devolvido')
+                    ->view('filament.components.erp.compras.columns.devolucao')
+                    ->alignEnd()
+                    ->extraHeaderAttributes(['class' => 'erp-compras-col--valor-devolvido'])
+                    ->extraCellAttributes(['class' => 'erp-compras-col--valor-devolvido'])
                     ->disabledClick(),
                 ViewColumn::make('total')
                     ->label('Total')

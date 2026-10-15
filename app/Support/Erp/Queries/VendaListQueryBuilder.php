@@ -73,7 +73,7 @@ class VendaListQueryBuilder
     public function build(): Builder
     {
         $query = $this->buildFilteredQuery();
-        $query->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'entrega']);
+        $query->with(['cliente', 'vendedor', 'pdvVenda.nfce', 'forcaVendasOrder', 'ordemServico', 'entrega']);
 
         return $this->applyDefaultOrder($query);
     }
@@ -110,6 +110,7 @@ class VendaListQueryBuilder
             'entrega:id,venda_id,status',
             'forcaVendasOrder:id,venda_id,device_uuid,meli_order_id,payload,pedido_id',
             'forcaVendasOrder.pedido:id,numero',
+            'ordemServico:id,venda_id,numero',
         ]);
 
         if (! $this->applyDefaultOrder) {
@@ -425,6 +426,13 @@ class VendaListQueryBuilder
 
                 $q->orWhereHas('pdvVenda', fn (Builder $pdv): Builder => $pdv->comercial());
             }),
+            Venda::PLATAFORMA_OS => $query->where(function (Builder $q) use ($hasPlataformaColumn): void {
+                if ($hasPlataformaColumn) {
+                    $q->where('plataforma', Venda::PLATAFORMA_OS);
+                }
+
+                $q->orWhereHas('ordemServico');
+            }),
             default => $query
                 ->when($hasPlataformaColumn, fn (Builder $q): Builder => $q->where(
                     fn (Builder $inner): Builder => $inner
@@ -432,7 +440,8 @@ class VendaListQueryBuilder
                         ->orWhereNull('plataforma'),
                 ))
                 ->whereDoesntHave('forcaVendasOrder')
-                ->whereDoesntHave('pdvVenda', fn (Builder $pdv): Builder => $pdv->comercial()),
+                ->whereDoesntHave('pdvVenda', fn (Builder $pdv): Builder => $pdv->comercial())
+                ->whereDoesntHave('ordemServico'),
         };
     }
 

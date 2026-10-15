@@ -3,7 +3,7 @@
     wire:ignore.self
     x-data
     x-on:keydown.escape.window="
-        if (! $wire.showForm) {
+        if (! $wire.showForm && ! $wire.deleteConfirmOpen) {
             $event.preventDefault();
             $wire.closeScreen();
         }
@@ -17,6 +17,6 @@
         ],
         'uppercaseColumns' => 'descricao',
         'wireKeyPrefix' => 'planos',
-        'hint' => 'Enter pesquisa · setas navegam na lista · F2 novo · F3 alterar',
+        'hint' => 'Enter pesquisa · setas navegam na lista · F2 novo · F3 alterar · F4 excluir',
     ])
 </div>

@@ -4,8 +4,7 @@
         wire:click="createCompra"
         class="erp-compras-actions__btn"
         data-erp-key="F2"
-        @disabled($this->highlightedCompraDevolvida)
-        title="{{ $this->highlightedCompraDevolvida ? 'Compra devolvida não permite entrada por XML' : 'Dar entrada de mercadoria pelo XML da NF-e (atalho F6 também)' }}"
+        title="Dar entrada de mercadoria pelo XML da NF-e (atalho F6 também)"
     >
         <span class="erp-compras-actions__icon erp-compras-actions__icon--new">+</span>
         <span class="erp-compras-actions__label"><kbd>F2</kbd> | Entrada XML</span>
@@ -24,8 +23,9 @@
         wire:click="editCompra"
         class="erp-compras-actions__btn"
         data-erp-key="F3"
-        @disabled($this->highlightedCompraDevolvida)
-        title="{{ $this->highlightedCompraDevolvida ? 'Compra devolvida não pode ser alterada' : 'Alterar compra' }}"
+        data-erp-disable-on-row="erp-compra-row--devolvida erp-compra-row--fechada erp-compra-row--cancelada"
+        @disabled(! $this->canAlterarHighlightedCompra)
+        title="{{ $this->canAlterarHighlightedCompra ? 'Alterar compra' : 'Compra fechada/cancelada/devolvida: use F7 Reabrir quando aplicável' }}"
     >
         <span class="erp-compras-actions__icon">✎</span>
         <span class="erp-compras-actions__label"><kbd>F3</kbd> | Alterar</span>
@@ -35,8 +35,8 @@
         wire:click="cancelCompra"
         class="erp-compras-actions__btn"
         data-erp-key="F4"
-        @disabled($this->highlightedCompraDevolvida)
-        title="{{ $this->highlightedCompraDevolvida ? 'Compra devolvida não pode ser cancelada' : 'Cancelar compra aberta (fechada: use F7 Reabrir antes)' }}"
+        data-erp-disable-on-row="erp-compra-row--devolvida"
+        title="Cancelar compra aberta (fechada: use F7 Reabrir antes; devolvida: bloqueado)"
     >
         <span class="erp-compras-actions__icon erp-compras-actions__icon--cancel">✕</span>
         <span class="erp-compras-actions__label"><kbd>F4</kbd> | Cancelar</span>
@@ -46,8 +46,8 @@
         wire:click="reabrirCompra"
         class="erp-compras-actions__btn"
         data-erp-key="F7"
-        @disabled($this->highlightedCompraDevolvida)
-        title="{{ $this->highlightedCompraDevolvida ? 'Compra devolvida não pode ser reaberta' : 'Reabrir compra fechada para editar novamente' }}"
+        data-erp-disable-on-row="erp-compra-row--devolvida"
+        title="Reabrir compra fechada para editar novamente (devolvida: bloqueado)"
     >
         <span class="erp-compras-actions__icon">↩</span>
         <span class="erp-compras-actions__label"><kbd>F7</kbd> | Reabrir</span>

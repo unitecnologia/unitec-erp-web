@@ -13,6 +13,7 @@ use App\Models\Person;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\Vendedor;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ProductTabelaPrecoService;
 use App\Support\Erp\ErpContext;
@@ -22,6 +23,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\EstoqueNegativoPolicy;
 use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\ProductEstoqueSaldoService;
+use App\Support\Erp\Financeiro\VendaCaixaDestinoResolver;
 use App\Support\Erp\Pdv\PdvClienteLimiteService;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
@@ -1475,6 +1477,9 @@ class ForcaVendasTelaVendaPage extends Page
             if (! $this->ensureFvTabelaPrazoCrediario()) {
                 return;
             }
+        } elseif ($valor > 0) {
+            // Troca de parcelado/cartão para à vista: zera prazo na tela.
+            $this->limparPrazoVendaAVista();
         }
 
         if ($valor > 0 && PdvFinalizarPagamentosHelper::isFormaTef($meio)) {
@@ -1645,6 +1650,29 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
+        if ($faturar) {
+            try {
+                $clienteGuard = $this->clienteId
+                    ? Person::query()->find((int) $this->clienteId)
+                    : null;
+
+                foreach ($this->meiosPagamento as $meio) {
+                    if (ErpMoney::parseBr($meio['valor'] ?? '0') <= 0) {
+                        continue;
+                    }
+
+                    ConsumidorFinalGuard::assertPagamentoPermitido($clienteGuard, $meio);
+                }
+            } catch (\DomainException $e) {
+                Notification::make()
+                    ->title($e->getMessage())
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+        }
+
         if ($msg = $this->validaCartaoCanhotoFinalizar()) {
             Notification::make()->title($msg)->warning()->send();
             $this->ensureCartaoCanhoto();
@@ -1681,12 +1709,27 @@ class ForcaVendasTelaVendaPage extends Page
 
             $canhoto = $this->finalizarCartaoCanhotoPayload();
             $tabelaPrazo = $this->tabelaPrazoDias;
+            $pdvMeio = $this->fvPagamentoComoPdv($formaPrincipal);
+            $aVista = ! PdvFinalizarPagamentosHelper::precisaParcelasCarne($pdvMeio)
+                && ! PdvFinalizarPagamentosHelper::isFormaCartao($pdvMeio);
 
-            if ($canhoto !== null && ! empty($canhoto['dias']) && is_array($canhoto['dias'])) {
+            // À vista / sem carnê: limpa prazo residual da UI e do payload.
+            if ($aVista) {
+                $this->limparPrazoVendaAVista();
+                $tabelaPrazo = null;
+                $canhoto = null;
+            } elseif (
+                PdvFinalizarPagamentosHelper::isFormaCartao($pdvMeio)
+                && ($canhoto === null || empty($canhoto['dias']))
+            ) {
+                $this->tabelaPrazoDias = null;
+                $this->resetFvParcelasFaturamento();
+                $tabelaPrazo = null;
+            } elseif ($canhoto !== null && ! empty($canhoto['dias']) && is_array($canhoto['dias'])) {
                 $tabelaPrazo = implode(',', array_map('intval', $canhoto['dias']));
             }
 
-            $order = app(ForcaVendasTelaVendaService::class)->gravarPedido($user, [
+            $dadosGravar = [
                 'cliente_id' => (int) $this->clienteId,
                 'vendedor_id' => $this->vendedorId,
                 'caixa_conta_id' => $this->caixaId,
@@ -1701,7 +1744,14 @@ class ForcaVendasTelaVendaPage extends Page
                 'cartao_canhoto' => $canhoto,
                 'transporte' => $this->fvTransportePayload(),
                 'itens' => $this->itensParaGravar(),
-            ], $existente);
+            ];
+
+            // Só força null na condição quando à vista (parcelado preserva Prazo Avulso do app).
+            if ($aVista) {
+                $dadosGravar['condicao_pagamento'] = null;
+            }
+
+            $order = app(ForcaVendasTelaVendaService::class)->gravarPedido($user, $dadosGravar, $existente);
 
             if (! $faturar) {
                 Notification::make()
@@ -2361,18 +2411,8 @@ class ForcaVendasTelaVendaPage extends Page
             })
             ->all();
 
-        $this->caixaOpcoes = CaixaConta::query()
-            ->where('ativo', true)
-            ->whereIn('tipo', [CaixaConta::TIPO_PDV, CaixaConta::TIPO_SUBCAIXA])
-            ->orderByRaw('CAST(codigo AS UNSIGNED)')
-            ->orderBy('nome')
-            ->get(['id', 'codigo', 'nome', 'situacao'])
-            ->map(fn (CaixaConta $c): array => [
-                'id' => (int) $c->id,
-                'label' => trim(($c->codigo ? $c->codigo.' - ' : '').($c->nome ?? '')),
-                'situacao' => (string) $c->situacao,
-            ])
-            ->all();
+        // CAIXA GERAL + PDVs liberados ao usuário do vendedor (Permissões → Caixas).
+        $this->caixaOpcoes = $this->opcoesCaixaDaTela();
 
         $tabSvc = app(ProductTabelaPrecoService::class);
         $ids = array_values($tabSvc->tabelasPadraoIds());
@@ -2958,16 +2998,17 @@ class ForcaVendasTelaVendaPage extends Page
 
     private function caixaOperacionalDefinido(): bool
     {
+        // Sempre há destino: vínculo do usuário ou CAIXA GERAL.
+        if ($this->caixaId === null || $this->caixaId <= 0) {
+            $this->aplicarCaixaGeralPadrao();
+        }
+
         return $this->caixaId !== null && $this->caixaId > 0;
     }
 
     private function bloquearSeOperacaoInvalida(bool $exigeEstoque = true): bool
     {
-        if (! $this->caixaOperacionalDefinido()) {
-            $this->notificarCaixaNaoDefinido();
-
-            return true;
-        }
+        $this->caixaOperacionalDefinido();
 
         if ($exigeEstoque && ! $this->estoqueOperacionalDefinido()) {
             $this->notificarEstoqueNaoDefinido();
@@ -3011,47 +3052,63 @@ class ForcaVendasTelaVendaPage extends Page
             ->send();
     }
 
-    private function notificarCaixaNaoDefinido(): void
+    /**
+     * @return list<array{id: int, label: string, situacao: string}>
+     */
+    private function opcoesCaixaDaTela(?Vendedor $vendedor = null): array
     {
-        $nome = trim($this->vendedorLabel) !== '' ? trim($this->vendedorLabel) : 'vendedor selecionado';
+        $empresaId = ErpContext::currentEmpresaId()
+            ?: ((int) (Auth::user()?->empresa_id ?? 0) ?: null);
 
-        Notification::make()
-            ->title('Caixa não definido')
-            ->body(
-                'O vendedor '.$nome.' não possui caixa vinculado. '
-                .'Configure em Cadastros → Vendedores (ou Permissões do usuário) antes de vender.'
-            )
-            ->warning()
-            ->send();
+        $usuario = null;
+        $vendedor ??= $this->vendedorId
+            ? Vendedor::query()->with('usuario')->find((int) $this->vendedorId)
+            : null;
+
+        if ($vendedor) {
+            $vendedor->loadMissing('usuario');
+            $usuario = $vendedor->usuario;
+        }
+
+        if (! $usuario) {
+            $usuario = Auth::user();
+        }
+
+        return app(VendaCaixaDestinoResolver::class)->opcoesParaUsuario(
+            $usuario instanceof \App\Models\User ? $usuario : null,
+            $empresaId,
+        );
+    }
+
+    private function aplicarCaixaGeralPadrao(): void
+    {
+        $geral = CaixaConta::ensureCaixaGeral();
+        $this->caixaId = (int) $geral->id;
+        $this->caixaLabel = trim(($geral->codigo ? $geral->codigo.' - ' : '').($geral->nome ?? CaixaConta::NOME_CAIXA_GERAL));
+
+        $existe = collect($this->caixaOpcoes)->contains(
+            fn (array $op): bool => (int) ($op['id'] ?? 0) === $this->caixaId
+        );
+
+        if (! $existe) {
+            array_unshift($this->caixaOpcoes, [
+                'id' => $this->caixaId,
+                'label' => $this->caixaLabel,
+                'situacao' => (string) ($geral->situacao ?? ''),
+            ]);
+        }
     }
 
     private function carregarCaixaDoVendedor(Vendedor $vendedor): void
     {
-        // Empresa ativa no ERP (sessão) tem prioridade sobre o cadastro fixo do usuário.
         $empresaId = ErpContext::currentEmpresaId()
             ?: ($vendedor->empresa_id ? (int) $vendedor->empresa_id : null)
             ?: ((int) (Auth::user()?->empresa_id ?? 0) ?: null);
 
+        $this->caixaOpcoes = $this->opcoesCaixaDaTela($vendedor);
+
+        // Somente Permissões → Caixas do usuário vinculado; senão CAIXA GERAL.
         $caixa = $empresaId ? $vendedor->caixaContaDaEmpresa((int) $empresaId) : null;
-
-        // Fallback: primeiro caixa amarrado em qualquer empresa do colaborador.
-        if (! $caixa) {
-            $vendedor->loadMissing('empresas');
-
-            foreach ($vendedor->empresas as $empresa) {
-                $caixaId = (int) ($empresa->pivot?->caixa_conta_id ?? 0);
-
-                if ($caixaId <= 0) {
-                    continue;
-                }
-
-                $caixa = CaixaConta::query()->find($caixaId);
-
-                if ($caixa) {
-                    break;
-                }
-            }
-        }
 
         if ($caixa) {
             $this->caixaId = (int) $caixa->id;
@@ -3068,10 +3125,11 @@ class ForcaVendasTelaVendaPage extends Page
                     'situacao' => (string) ($caixa->situacao ?? ''),
                 ]);
             }
-        } else {
-            $this->caixaId = null;
-            $this->caixaLabel = '';
+
+            return;
         }
+
+        $this->aplicarCaixaGeralPadrao();
     }
 
     public function updatedVendedorId(mixed $value): void
@@ -3090,14 +3148,11 @@ class ForcaVendasTelaVendaPage extends Page
             return;
         }
 
-        // Ao trocar de vendedor, o caixa amarrado é sugerido de novo.
+        // Ao trocar de vendedor, o caixa amarrado (ou GERAL) é sugerido de novo.
         $this->caixaId = null;
         $this->caixaLabel = '';
         $this->aplicarVendedor($vendedor);
-
-        if (! $this->caixaOperacionalDefinido()) {
-            $this->notificarCaixaNaoDefinido();
-        }
+        $this->caixaOperacionalDefinido();
 
         if (! $this->estoqueOperacionalDefinido()) {
             $this->notificarEstoqueNaoDefinido();

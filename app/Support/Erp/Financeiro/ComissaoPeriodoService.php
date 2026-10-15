@@ -271,6 +271,7 @@ final class ComissaoPeriodoService
                     $conta->valor_pago = 0;
                     $conta->desconto = 0;
                     $conta->juros = 0;
+                    $conta->multa = 0;
                     $conta->pago_em = null;
                     $conta->produto = trim((string) $conta->produto.' [COMISSAO CANCELADA]');
                     $conta->save();
@@ -330,6 +331,11 @@ final class ComissaoPeriodoService
         $vendas = Venda::query()
             ->where('status', Venda::STATUS_FECHADO)
             ->where('vendedor_id', $vendedor->id)
+            ->where(function ($q): void {
+                // Espelho OS: comissão (se houver) fica no faturamento da OS, não na Lista.
+                $q->whereNull('plataforma')
+                    ->orWhere('plataforma', '!=', Venda::PLATAFORMA_OS);
+            })
             ->whereBetween('data', [$de->toDateString(), $ate->toDateString()])
             ->orderBy('data')
             ->orderBy('id')

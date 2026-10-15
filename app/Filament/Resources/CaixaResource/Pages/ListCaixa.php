@@ -436,10 +436,17 @@ class ListCaixa extends ListRecords
     public function updatedCaixaFormFormaPagamentoId(): void
     {
         $formaId = (int) ($this->caixaForm['forma_pagamento_id'] ?? 0);
-        $contaId = FormaPagamento::query()->whereKey($formaId)->value('conta_destino_id');
+        $destinoId = $formaId > 0
+            ? (int) (FormaPagamento::query()->whereKey($formaId)->value('conta_destino_id') ?? 0)
+            : 0;
 
-        if ($contaId) {
-            $this->caixaForm['caixa_conta_id'] = (string) $contaId;
+        try {
+            $this->caixaForm['caixa_conta_id'] = (string) CaixaConta::resolverDestinoLivroCaixa(
+                null,
+                $destinoId > 0 ? $destinoId : null,
+            );
+        } catch (\InvalidArgumentException) {
+            $this->caixaForm['caixa_conta_id'] = (string) CaixaConta::ensureCaixaGeral()->id;
         }
     }
 
@@ -451,12 +458,22 @@ class ListCaixa extends ListRecords
 
         $entrada = max(0, BrDecimal::parse($this->caixaForm['entrada'] ?? 0, 2));
         $saida = max(0, BrDecimal::parse($this->caixaForm['saida'] ?? 0, 2));
-        $contaId = (int) ($this->caixaForm['caixa_conta_id'] ?? 0);
+        $selecionada = (int) ($this->caixaForm['caixa_conta_id'] ?? 0);
+        $formaId = (int) ($this->caixaForm['forma_pagamento_id'] ?? 0);
+        $destinoForma = $formaId > 0
+            ? (int) (FormaPagamento::query()->whereKey($formaId)->value('conta_destino_id') ?? 0)
+            : 0;
         $planoId = (int) ($this->caixaForm['plano_conta_id'] ?? 0);
         $historico = trim((string) ($this->caixaForm['historico'] ?? ''));
 
-        if (! $contaId || ! CaixaConta::query()->whereKey($contaId)->where('ativo', true)->exists()) {
-            $this->caixaFormAlert = 'Selecione a conta de caixa para registrar o movimento.';
+        try {
+            $contaId = CaixaConta::resolverDestinoLivroCaixa(
+                $selecionada > 0 ? $selecionada : null,
+                $destinoForma > 0 ? $destinoForma : null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->caixaFormAlert = $e->getMessage();
+
             return;
         }
 

@@ -76,7 +76,15 @@
                         </label>
                         <label class="erp-receber-baixa-modal__field">
                             <span class="erp-receber-baixa-modal__label">Conta de destino</span>
-                            <input type="text" class="erp-receber-baixa-modal__select erp-receber-baixa-modal__select--ro" value="{{ $this->baixaContaDestino }}" readonly tabindex="-1">
+                            @if ($this->baixaMovimentaCaixa)
+                                <select class="erp-receber-baixa-modal__select" wire:model="baixaCaixaContaId">
+                                    @foreach ($this->baixaCaixasOptions as $caixa)
+                                        <option value="{{ $caixa['id'] }}">{{ $caixa['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <input type="text" class="erp-receber-baixa-modal__select erp-receber-baixa-modal__select--ro" value="Não movimenta o caixa" readonly tabindex="-1">
+                            @endif
                         </label>
                         <label class="erp-receber-baixa-modal__field">
                             <span class="erp-receber-baixa-modal__label">Saldo</span>

@@ -16,6 +16,7 @@ use App\Models\Person;
 use App\Models\PixCobranca;
 use App\Models\Vendedor;
 use App\Models\Venda;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpDataSyncVersion;
@@ -767,8 +768,8 @@ class ListForcaVendasMonitor extends ListRecords
     public function filtroCamposOptions(): array
     {
         return [
-            'pedido' => 'Nº Pedido',
-            'venda' => 'Nº Venda',
+            'pedido' => 'Nº DAV',
+            'venda' => 'Nº Pedido',
             'status' => 'Status',
             'cliente' => 'Cliente',
             'vendedor' => 'Vendedor',
@@ -1232,7 +1233,7 @@ class ListForcaVendasMonitor extends ListRecords
         $candidatos = [];
 
         foreach ($orders as $order) {
-            if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO || $order->venda_id) {
+            if ($order->situacao === ForcaVendasOrder::SITUACAO_FATURADO) {
                 continue;
             }
 
@@ -1242,6 +1243,14 @@ class ListForcaVendasMonitor extends ListRecords
 
             if ($order->situacao === ForcaVendasOrder::SITUACAO_CANCELADO || ! $order->pedido) {
                 continue;
+            }
+
+            if ($order->venda_id) {
+                $statusVenda = (string) ($order->venda?->status ?? '');
+
+                if ($statusVenda === Venda::STATUS_FECHADO) {
+                    continue;
+                }
             }
 
             $candidatos[] = $order;
@@ -1930,6 +1939,7 @@ class ListForcaVendasMonitor extends ListRecords
         $erro = trim($this->reabrirEtapa.($this->reabrirErro !== '' ? ': '.$this->reabrirErro : ''));
         $numero = $this->reabrirNumero;
 
+        // Fecha o overlay antes de notificar/atualizar — evita modal preso se o refresh falhar.
         $this->reabrirProgressOpen = false;
         $this->reabrirOrderId = null;
         $this->reabrirNumero = '';
@@ -1941,13 +1951,17 @@ class ListForcaVendasMonitor extends ListRecords
         $this->reabrirEtapa = '';
         $this->reabrirErro = '';
 
+        try {
+            $this->pushSelecaoToDetalhePanel();
+        } catch (\Throwable) {
+            // Painel é secundário; o overlay já fechou.
+        }
+
         if ($ok) {
             $this->avisa('Pedido '.$numero.' reaberto.', 'success');
         } else {
             $this->avisa($erro !== '' ? 'Pedido '.$numero.' — '.$erro : 'Não foi possível reabrir o pedido.', 'warning');
         }
-
-        $this->pushSelecaoToDetalhePanel();
     }
 
     /**
@@ -2045,6 +2059,8 @@ class ListForcaVendasMonitor extends ListRecords
 
         $parcelas = count($dias);
         $total = round((float) $order->total, 2);
+        $empresaId = $order->empresa_id ? (int) $order->empresa_id : ErpContext::currentEmpresaId();
+        $planoContaId = EmpresaParametros::planoVendaId($empresaId);
 
         // Distribui o total entre as parcelas, jogando o resto de centavos na última.
         $valorBase = floor(($total / $parcelas) * 100) / 100;
@@ -2054,7 +2070,7 @@ class ListForcaVendasMonitor extends ListRecords
                 ? round($total - ($valorBase * ($parcelas - 1)), 2)
                 : $valorBase;
 
-            ContaReceber::query()->create([
+            $payload = [
                 'empresa_id' => $order->empresa_id ? (int) $order->empresa_id : null,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => Carbon::today(),
@@ -2069,7 +2085,13 @@ class ListForcaVendasMonitor extends ListRecords
                     $forma,
                     $order->empresa_id ? (int) $order->empresa_id : null
                 ),
-            ]);
+            ];
+
+            if ($planoContaId) {
+                $payload['plano_conta_id'] = $planoContaId;
+            }
+
+            ContaReceber::query()->create($payload);
         }
 
         $order->update([

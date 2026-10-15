@@ -160,9 +160,11 @@ trait ManagesContaPagarFormModal
             return;
         }
 
+        $idSelecionar = null;
+
         try {
             if ($this->contaFormRecordId !== null) {
-                app(ContaPagarCadastroService::class)->atualizar((int) $this->contaFormRecordId, [
+                $conta = app(ContaPagarCadastroService::class)->atualizar((int) $this->contaFormRecordId, [
                     'emissao' => $this->contaFormEmissao,
                     'documento' => $this->contaFormDocumento,
                     'fornecedor_id' => (int) $this->contaFormFornecedorId,
@@ -170,6 +172,7 @@ trait ManagesContaPagarFormModal
                     'historico' => $this->contaFormHistorico,
                     'valor' => $valor,
                 ]);
+                $idSelecionar = (int) $conta->getKey();
                 $mensagem = 'Conta alterada.';
             } else {
                 $criadas = app(ContaPagarCadastroService::class)->criar([
@@ -182,6 +185,8 @@ trait ManagesContaPagarFormModal
                     'parcelas' => (int) $this->contaFormParcelas,
                 ]);
                 $qtd = count($criadas);
+                $primeira = $criadas[0] ?? null;
+                $idSelecionar = $primeira ? (int) $primeira->getKey() : null;
                 $mensagem = $qtd === 1 ? 'Conta cadastrada.' : "{$qtd} parcelas cadastradas.";
             }
         } catch (InvalidArgumentException $e) {
@@ -201,10 +206,13 @@ trait ManagesContaPagarFormModal
             return;
         }
 
+        // Fechar + redesenhar a página: resetTable()/pushContaPagarListRefresh()
+        // usava skipRender e o modal ficava aberto mesmo com contaFormModalOpen=false.
         $this->closeContaFormModal();
         $this->situacaoFilter = 'a_pagar';
-        $this->clearListSelection();
-        $this->resetTable();
+        $this->selecionadosParaBaixa = [];
+        $this->highlightedRecordId = $idSelecionar;
+        $this->pushContaPagarListRefresh(renderPage: true);
 
         Notification::make()
             ->title($mensagem)

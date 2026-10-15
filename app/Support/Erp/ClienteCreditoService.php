@@ -264,7 +264,11 @@ final class ClienteCreditoService
             }
 
             if ($estornaId === null && ! $this->pessoaPodeReceber($cliente)) {
-                throw new DomainException('Consumidor final não recebe crédito. Selecione o cliente.');
+                throw new DomainException(
+                    $cliente->isCadastroConsumidorFinal()
+                        ? ConsumidorFinalGuard::mensagemPagamentoBloqueado()
+                        : 'Cliente inválido para crédito. Selecione um cliente cadastrado.'
+                );
             }
 
             // Trava os movimentos desta empresa+cliente. O lock da pessoa cobre a inserção
@@ -401,13 +405,8 @@ final class ClienteCreditoService
 
     private function pessoaPodeReceber(Person $person): bool
     {
-        if (Person::isCodigoConsumidorFinal($person->codigo)) {
-            return false;
-        }
-
-        $nome = mb_strtoupper(trim((string) $person->nome_razao), 'UTF-8');
-
-        if ($nome === 'CONSUMIDOR FINAL') {
+        // Identificação segura pelo código (CF/000001), não só pelo nome.
+        if ($person->isCadastroConsumidorFinal()) {
             return false;
         }
 

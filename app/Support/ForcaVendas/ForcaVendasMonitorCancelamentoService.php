@@ -4,15 +4,11 @@ namespace App\Support\ForcaVendas;
 
 use App\Models\ForcaVendasOrder;
 use App\Models\Pedido;
-use App\Models\PixCobranca;
 use App\Models\Venda;
 use App\Support\Erp\Boleto\Api\BoletoApi;
-use App\Support\Erp\Financeiro\ComissaoPeriodoService;
 use App\Support\Erp\Vendas\EstornarVendaService;
-use App\Support\Logistica\ExpedicaoService;
 use App\Support\VendasInternas\VendasInternasMonitorHookService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
@@ -123,14 +119,28 @@ final class ForcaVendasMonitorCancelamentoService
 
         $avancar('Validando pedido');
 
-        if ($order->situacao === ForcaVendasOrder::SITUACAO_PENDENTE && ! $order->venda_id) {
+        $venda = $order->venda_id ? Venda::query()->find($order->venda_id) : null;
+
+        // Já reaberto (pendente + venda aberta): idempotente — não estorna de novo.
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_PENDENTE
+            && $venda instanceof Venda
+            && $venda->status === Venda::STATUS_ABERTO) {
+            $avancar('Reabrindo pedido');
+
+            return ['sem_venda' => false, 'tem_boleto' => false];
+        }
+
+        if ($order->situacao === ForcaVendasOrder::SITUACAO_PENDENTE) {
             throw new RuntimeException('Pedido já está pendente.');
         }
 
-        $venda = $order->venda_id ? Venda::query()->find($order->venda_id) : null;
-        $vendaViva = $venda instanceof Venda && $venda->status !== Venda::STATUS_CANCELADO;
+        if ($venda instanceof Venda && $venda->status === Venda::STATUS_ABERTO) {
+            throw new RuntimeException('Pedido já está reaberto (venda aberta).');
+        }
 
-        if (! $vendaViva) {
+        $vendaFechada = $venda instanceof Venda && $venda->status === Venda::STATUS_FECHADO;
+
+        if (! $vendaFechada) {
             $this->reabrirSemEstorno($order, $avancar);
 
             return ['sem_venda' => true, 'tem_boleto' => false];
@@ -183,14 +193,18 @@ final class ForcaVendasMonitorCancelamentoService
                 throw new RuntimeException('Pedido não encontrado.');
             }
 
-            if ($locked->situacao === ForcaVendasOrder::SITUACAO_PENDENTE && ! $locked->venda_id) {
+            if ($locked->situacao === ForcaVendasOrder::SITUACAO_PENDENTE) {
                 throw new RuntimeException('Pedido já está pendente.');
             }
 
             $venda = $locked->venda_id ? Venda::query()->whereKey((int) $locked->venda_id)->lockForUpdate()->first() : null;
 
-            if ($venda instanceof Venda && $venda->status !== Venda::STATUS_CANCELADO) {
+            if ($venda instanceof Venda && $venda->status === Venda::STATUS_FECHADO) {
                 throw new RuntimeException('Pedido mudou durante a reabertura. Tente novamente.');
+            }
+
+            if ($venda instanceof Venda && $venda->status === Venda::STATUS_ABERTO) {
+                throw new RuntimeException('Pedido já está reaberto (venda aberta).');
             }
 
             $avancar('Recriando reserva');
@@ -200,22 +214,7 @@ final class ForcaVendasMonitorCancelamentoService
                 (new \App\Support\Erp\EstoqueReservaService())->reservarPedido($locked, $locked->pedido, $locked->user);
             }
 
-            if ($venda instanceof Venda) {
-                try {
-                    (new ComissaoPeriodoService())->liberarVendaEstornada((int) $venda->id);
-                } catch (\InvalidArgumentException $e) {
-                    throw new RuntimeException($e->getMessage(), 0, $e);
-                }
-
-                (new ExpedicaoService())->removerVendaDeCargasAbertas($venda);
-
-                if (Schema::hasTable((new PixCobranca)->getTable())) {
-                    PixCobranca::query()
-                        ->where('venda_id', (int) $venda->id)
-                        ->update(['venda_id' => null]);
-                }
-            }
-
+            // Venda cancelada definitiva não é revivida — próximo faturar cria outra.
             $avancar('Reabrindo pedido');
             $locked->forceFill([
                 'situacao' => ForcaVendasOrder::SITUACAO_PENDENTE,

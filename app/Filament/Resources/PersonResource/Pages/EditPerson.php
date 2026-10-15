@@ -4,7 +4,9 @@ namespace App\Filament\Resources\PersonResource\Pages;
 
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\PersonResource\Pages\Concerns\ErpPersonFormPage;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\ErpScreen;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditPerson extends EditRecord
@@ -24,6 +26,17 @@ class EditPerson extends EditRecord
         }
 
         parent::mount($record);
+
+        if (ConsumidorFinalGuard::isCadastro($this->record)) {
+            Notification::make()
+                ->title(ConsumidorFinalGuard::mensagemCadastroProtegido())
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getPersonListRedirectUrl());
+
+            return;
+        }
 
         if (blank($this->data['regime_tributario'] ?? null)) {
             $this->data['regime_tributario'] = '';

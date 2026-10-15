@@ -9,6 +9,7 @@
         :skip-fornecedor-search="$this->shouldSkipContaPagarFornecedorSearch()"
         :per-page="(int) ($this->tableRecordsPerPage ?? 50)"
         :selecionados-para-baixa="$this->selecionadosParaBaixa"
+        :highlighted-record-id="$this->highlightedRecordId !== null ? (int) $this->highlightedRecordId : null"
         wire:key="erp-pagar-list-table-host"
     />
 </div>

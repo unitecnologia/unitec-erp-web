@@ -7,6 +7,7 @@
         ['key' => 'fornecedor', 'label' => 'Fornecedor', 'sortable' => false, 'align' => 'start'],
         ['key' => 'chave_nfe', 'label' => 'Chave', 'sortable' => false, 'align' => 'start'],
         ['key' => 'status', 'label' => 'Situação', 'sortable' => false, 'align' => 'center', 'html' => true],
+        ['key' => 'valor_devolvido', 'label' => 'V. Devolvido', 'sortable' => false, 'align' => 'end', 'html' => true],
         ['key' => 'total', 'label' => 'Total', 'sortable' => false, 'align' => 'end', 'html' => true],
         ['key' => 'ver_itens', 'label' => '', 'sortable' => false, 'align' => 'center', 'html' => true],
     ];
@@ -46,7 +47,14 @@
             @forelse ($records as $index => $record)
                 @php
                     $cells = $formatter->format($record);
-                    $rowClass = 'fi-ta-row' . ($index % 2 === 1 ? ' fi-striped' : '');
+                    $temDevolucao = (float) ($record->valor_devolvido ?? 0) > 0.00005
+                        || (bool) ($record->tem_devolucao_finalizada ?? false);
+                    $statusRow = (string) ($record->status ?? '');
+                    $rowClass = 'fi-ta-row'
+                        . ($index % 2 === 1 ? ' fi-striped' : '')
+                        . ($temDevolucao ? ' erp-compra-row--devolvida' : '')
+                        . ($statusRow === 'fechada' ? ' erp-compra-row--fechada' : '')
+                        . ($statusRow === 'cancelada' ? ' erp-compra-row--cancelada' : '');
                 @endphp
                 <tr class="{{ $rowClass }}" data-record-key="{{ $record->getKey() }}">
                     @foreach ($columns as $column)

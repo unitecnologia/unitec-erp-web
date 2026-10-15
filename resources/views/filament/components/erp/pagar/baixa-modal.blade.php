@@ -58,6 +58,10 @@
                             <strong>{{ $this->baixaDados['vencimento'] }}</strong>
                         </div>
                         <div class="erp-pagar-baixa-modal__kv">
+                            <span>Multa paga</span>
+                            <strong>{{ $this->baixaDados['multa_paga'] ?? '0,00' }}</strong>
+                        </div>
+                        <div class="erp-pagar-baixa-modal__kv">
                             <span>Desconto concedido</span>
                             <strong>{{ $this->baixaDados['desconto_recebido'] }}</strong>
                         </div>
@@ -85,7 +89,15 @@
 
                     <label class="erp-pagar-baixa-modal__field">
                         <span>Conta de destino</span>
-                        <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--ro" value="{{ $this->baixaContaDestino }}" readonly tabindex="-1">
+                        @if ($this->baixaMovimentaCaixa)
+                            <select class="erp-pagar-baixa-modal__input" wire:model="baixaCaixaContaId">
+                                @foreach ($this->baixaCaixasOptions as $caixa)
+                                    <option value="{{ $caixa['id'] }}">{{ $caixa['label'] }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--ro" value="Não movimenta o caixa" readonly tabindex="-1">
+                        @endif
                     </label>
 
                     <label class="erp-pagar-baixa-modal__field">
@@ -102,19 +114,31 @@
                         <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--ro" value="{{ $this->baixaSaldo }}" readonly tabindex="-1">
                     </label>
 
-                    <div class="erp-pagar-baixa-modal__field erp-pagar-baixa-modal__field--pair">
+                    <div class="erp-pagar-baixa-modal__field erp-pagar-baixa-modal__field--dual">
                         <span>Juros</span>
-                        <div class="erp-pagar-baixa-modal__pair">
-                            <div class="erp-pagar-baixa-modal__pct">
-                                <input type="text" class="erp-pagar-baixa-modal__input" wire:model.live.blur="baixaPercJuros" inputmode="decimal">
-                                <em>%</em>
+                        <div class="erp-pagar-baixa-modal__dual">
+                            <div class="erp-pagar-baixa-modal__pair erp-pagar-baixa-modal__pair--compact">
+                                <div class="erp-pagar-baixa-modal__pct">
+                                    <input type="text" class="erp-pagar-baixa-modal__input" wire:model.live.blur="baixaPercJuros" inputmode="decimal">
+                                    <em>%</em>
+                                </div>
+                                <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--money" wire:model.live.blur="baixaJuros" inputmode="decimal">
                             </div>
-                            <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--money" wire:model.live.blur="baixaJuros" inputmode="decimal">
+                            <div class="erp-pagar-baixa-modal__dual-item">
+                                <span>Multa</span>
+                                <div class="erp-pagar-baixa-modal__pair erp-pagar-baixa-modal__pair--compact">
+                                    <div class="erp-pagar-baixa-modal__pct">
+                                        <input type="text" class="erp-pagar-baixa-modal__input" wire:model.live.blur="baixaPercMulta" inputmode="decimal">
+                                        <em>%</em>
+                                    </div>
+                                    <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--money" wire:model.live.blur="baixaMulta" inputmode="decimal">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <label class="erp-pagar-baixa-modal__field">
-                        <span>Saldo com juros</span>
+                        <span>Saldo c/ juros/multa</span>
                         <input type="text" class="erp-pagar-baixa-modal__input erp-pagar-baixa-modal__input--ro erp-pagar-baixa-modal__input--money" value="{{ $this->baixaSaldoComJuros }}" readonly tabindex="-1">
                     </label>
 

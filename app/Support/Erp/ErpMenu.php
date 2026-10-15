@@ -359,6 +359,11 @@ class ErpMenu
         return ErpContext::currentEmpresa()?->tipo_atividade === 'restaurante_lanchonete';
     }
 
+    protected static function prestadorServicosHabilitado(): bool
+    {
+        return EmpresaModulos::empresaPrestadorServicos(ErpContext::currentEmpresa());
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -472,7 +477,9 @@ class ErpMenu
      */
     protected static function relatoriosItems(): array
     {
-        return [
+        $prestadorServicos = static::prestadorServicosHabilitado();
+
+        $items = [
             static::group('Produtos', [
                 static::link('Curva ABC', route('erp.reports.tabular', ['slug' => 'curva-abc']), permission: 'produtos.print', icon: 'heroicon-o-chart-bar', iconColor: 'erp-menu-bar__icon--blue'),
                 static::link('Histórico de Produtos', route('erp.reports.tabular', ['slug' => 'historico-produtos']), permission: 'produtos.print', icon: 'heroicon-o-clock', iconColor: 'erp-menu-bar__icon--teal'),
@@ -506,21 +513,51 @@ class ErpMenu
                 static::link('Relatório de Vendas Por CFOP/CSOSN', route('erp.reports.tabular', ['slug' => 'vendas-cfop-csosn']), permission: 'vendas.print', icon: 'heroicon-o-hashtag', iconColor: 'erp-menu-bar__icon--teal'),
                 static::link('Visitas realizadas sem venda', route('erp.reports.tabular', ['slug' => 'visitas-realizadas-sem-venda']), permission: 'vendas.print', icon: 'heroicon-o-map-pin', iconColor: 'erp-menu-bar__icon--slate'),
             ], icon: 'heroicon-o-shopping-cart', iconColor: 'erp-menu-bar__icon--red'),
-            static::group('Financeiro', [
-                static::link('Relatório Comissão de Operadores', route('erp.reports.comissao-vendedores'), permission: 'vendas.print', icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green'),
-                static::link('Relatório de Contas a Receber', route('erp.reports.tabular', ['slug' => 'contas-receber']), permission: 'contas_receber.print', icon: 'heroicon-o-arrow-down-circle', iconColor: 'erp-menu-bar__icon--teal'),
-                static::link('Relatório de Contas a Pagar', route('erp.reports.tabular', ['slug' => 'contas-pagar']), permission: 'contas_pagar.print', icon: 'heroicon-o-arrow-up-circle', iconColor: 'erp-menu-bar__icon--red'),
-                static::link('Relatório Resumo Caixa', route('erp.reports.tabular', ['slug' => 'resumo-caixa']), permission: 'caixa.print', icon: 'heroicon-o-chart-pie', iconColor: 'erp-menu-bar__icon--blue'),
-                static::link('Relatório de Movimento Caixa', route('erp.reports.tabular', ['slug' => 'movimento-caixa']), permission: 'caixa.print', icon: 'heroicon-o-arrows-right-left', iconColor: 'erp-menu-bar__icon--amber'),
-                static::link('Relatório Balanço Financeiro', route('erp.reports.tabular', ['slug' => 'balanco-financeiro']), permission: 'caixa.print', icon: 'heroicon-o-scale', iconColor: 'erp-menu-bar__icon--indigo'),
-                static::link('Relatório Resumo Financeiro p/ Conta', route('erp.reports.tabular', ['slug' => 'resumo-financeiro-conta']), permission: 'contas_caixa.print', icon: 'heroicon-o-building-library', iconColor: 'erp-menu-bar__icon--orange'),
-                static::link('Relatório Financeiro - Cartão', route('erp.reports.contas-receber-cartoes'), permission: 'contas_receber.print', icon: 'heroicon-o-credit-card', iconColor: 'erp-menu-bar__icon--purple'),
-                static::link('Relatório por Plano de Contas', route('erp.reports.tabular', ['slug' => 'plano-contas']), permission: 'planos_contas.print', icon: 'heroicon-o-queue-list', iconColor: 'erp-menu-bar__icon--green'),
-            ], icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green'),
-            static::group('Auditoria', [
-                static::link('Log de Operações', ErpOperacaoLogResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate'),
-            ], icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate'),
         ];
+
+        if ($prestadorServicos) {
+            $items[] = static::group('Ordem de Serviço', [
+                static::link('Geral de Ordens de Serviço', route('erp.reports.tabular', ['slug' => 'geral-ordens-servico']), permission: 'ordens_servico.print', icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--amber'),
+                static::link('Serviços Prestados', route('erp.reports.tabular', ['slug' => 'servicos-prestados']), permission: 'ordens_servico.print', icon: 'heroicon-o-wrench', iconColor: 'erp-menu-bar__icon--teal'),
+                static::link('Peças Utilizadas nas OS', route('erp.reports.tabular', ['slug' => 'pecas-utilizadas-os']), permission: 'ordens_servico.print', icon: 'heroicon-o-cube', iconColor: 'erp-menu-bar__icon--orange'),
+                static::link('Lucratividade das OS', route('erp.reports.tabular', ['slug' => 'lucratividade-os']), permission: 'ordens_servico.print', icon: 'heroicon-o-currency-dollar', iconColor: 'erp-menu-bar__icon--green'),
+                static::link('Produtividade por Técnico', route('erp.reports.tabular', ['slug' => 'produtividade-por-tecnico']), permission: 'ordens_servico.print', icon: 'heroicon-o-chart-bar', iconColor: 'erp-menu-bar__icon--indigo'),
+                static::link('OS Pendentes e Atrasadas', route('erp.reports.tabular', ['slug' => 'os-pendentes-atrasadas']), permission: 'ordens_servico.print', icon: 'heroicon-o-exclamation-triangle', iconColor: 'erp-menu-bar__icon--red'),
+            ], icon: 'heroicon-o-wrench-screwdriver', iconColor: 'erp-menu-bar__icon--amber');
+        }
+
+        $financeiroItems = [
+            static::link('Relatório Comissão de Operadores', route('erp.reports.comissao-vendedores'), permission: 'vendas.print', icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green'),
+            static::link('Relatório de Contas a Receber', route('erp.reports.tabular', ['slug' => 'contas-receber']), permission: 'contas_receber.print', icon: 'heroicon-o-arrow-down-circle', iconColor: 'erp-menu-bar__icon--teal'),
+            static::link('Relatório de Contas a Pagar', route('erp.reports.tabular', ['slug' => 'contas-pagar']), permission: 'contas_pagar.print', icon: 'heroicon-o-arrow-up-circle', iconColor: 'erp-menu-bar__icon--red'),
+            static::link('Relatório Resumo Caixa', route('erp.reports.tabular', ['slug' => 'resumo-caixa']), permission: 'caixa.print', icon: 'heroicon-o-chart-pie', iconColor: 'erp-menu-bar__icon--blue'),
+            static::link('Relatório de Movimento Caixa', route('erp.reports.tabular', ['slug' => 'movimento-caixa']), permission: 'caixa.print', icon: 'heroicon-o-arrows-right-left', iconColor: 'erp-menu-bar__icon--amber'),
+            static::link('Relatório Balanço Financeiro', route('erp.reports.tabular', ['slug' => 'balanco-financeiro']), permission: 'caixa.print', icon: 'heroicon-o-scale', iconColor: 'erp-menu-bar__icon--indigo'),
+            static::link('Relatório Resumo Financeiro p/ Conta', route('erp.reports.tabular', ['slug' => 'resumo-financeiro-conta']), permission: 'contas_caixa.print', icon: 'heroicon-o-building-library', iconColor: 'erp-menu-bar__icon--orange'),
+            static::link('Relatório Financeiro - Cartão', route('erp.reports.contas-receber-cartoes'), permission: 'contas_receber.print', icon: 'heroicon-o-credit-card', iconColor: 'erp-menu-bar__icon--purple'),
+            static::link('Relatório por Plano de Contas', route('erp.reports.tabular', ['slug' => 'plano-contas']), permission: 'planos_contas.print', icon: 'heroicon-o-queue-list', iconColor: 'erp-menu-bar__icon--green'),
+        ];
+
+        if ($prestadorServicos) {
+            $financeiroItems[] = static::sep();
+            $financeiroItems[] = static::link('Financeiro por OS', route('erp.reports.tabular', ['slug' => 'financeiro-por-os']), permission: 'ordens_servico.print', icon: 'heroicon-o-calculator', iconColor: 'erp-menu-bar__icon--teal');
+            $financeiroItems[] = static::link('Faturamento de Serviços', route('erp.reports.tabular', ['slug' => 'faturamento-servicos']), permission: 'ordens_servico.print', icon: 'heroicon-o-receipt-percent', iconColor: 'erp-menu-bar__icon--purple');
+            $financeiroItems[] = static::link('OS por Forma de Pagamento', route('erp.reports.tabular', ['slug' => 'os-por-forma-pagamento']), permission: 'ordens_servico.print', icon: 'heroicon-o-credit-card', iconColor: 'erp-menu-bar__icon--green');
+        }
+
+        $items[] = static::group('Financeiro', $financeiroItems, icon: 'heroicon-o-banknotes', iconColor: 'erp-menu-bar__icon--green');
+
+        if ($prestadorServicos) {
+            $items[] = static::group('Fiscal', [
+                static::link('Documentos Fiscais por OS (NF-e / NFS-e)', route('erp.reports.tabular', ['slug' => 'documentos-fiscais-por-os']), permission: 'ordens_servico.print', icon: 'heroicon-o-document-text', iconColor: 'erp-menu-bar__icon--indigo'),
+            ], icon: 'heroicon-o-document-check', iconColor: 'erp-menu-bar__icon--indigo');
+        }
+
+        $items[] = static::group('Auditoria', [
+            static::link('Log de Operações', ErpOperacaoLogResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate'),
+        ], icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate');
+
+        return $items;
     }
 
     /**
@@ -684,9 +721,9 @@ class ErpMenu
     /**
      * Item de menu ainda não implementado — exibido como "Em breve", sem toast.
      *
-     * @return array{label: string, pending: true, shortcut?: string}
+     * @return array{label: string, pending: true, shortcut?: string, icon?: string, icon_color?: string, permission?: string}
      */
-    protected static function stub(string $label, ?string $shortcut = null, ?string $icon = null, ?string $iconColor = null): array
+    protected static function stub(string $label, ?string $shortcut = null, ?string $icon = null, ?string $iconColor = null, ?string $permission = null): array
     {
         $item = [
             'label' => $label,
@@ -703,6 +740,10 @@ class ErpMenu
 
         if ($iconColor !== null) {
             $item['icon_color'] = $iconColor;
+        }
+
+        if ($permission !== null) {
+            $item['permission'] = $permission;
         }
 
         return $item;

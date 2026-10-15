@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CaixaResource\Pages\Concerns;
 use App\Models\CaixaLancamento;
 use App\Support\Erp\CaixaListRowFormatter;
 use App\Support\Erp\ContaReceberPedidoExibicao;
+use App\Support\Erp\Financeiro\CaixaLancamentoOrigemResolver;
 use App\Support\Erp\Queries\CaixaListQueryBuilder;
 use Filament\Notifications\Notification;
 
@@ -12,7 +13,7 @@ trait ManagesCaixaViewModal
 {
     public bool $viewModalOpen = false;
 
-    /** @var array<string, string> */
+    /** @var array<string, mixed> */
     public array $viewModalData = [];
 
     public function openCaixaView(int $lancamentoId): void
@@ -35,6 +36,8 @@ trait ManagesCaixaViewModal
             return;
         }
 
+        $origem = app(CaixaLancamentoOrigemResolver::class)->resolver($lancamento);
+
         $this->viewModalData = [
             'codigo' => (string) $lancamento->codigo,
             'emissao' => $lancamento->emissao?->format('d/m/Y') ?? '—',
@@ -50,6 +53,8 @@ trait ManagesCaixaViewModal
             'conta' => mb_strtoupper($lancamento->conta?->nome ?? '—', 'UTF-8'),
             'entrada' => number_format((float) $lancamento->entrada, 2, ',', '.'),
             'saida' => number_format((float) $lancamento->saida, 2, ',', '.'),
+            'tem_detalhe' => (bool) ($origem['tem_detalhe'] ?? false),
+            'detalhes' => $origem['linhas'] ?? [],
         ];
 
         $this->viewModalOpen = true;

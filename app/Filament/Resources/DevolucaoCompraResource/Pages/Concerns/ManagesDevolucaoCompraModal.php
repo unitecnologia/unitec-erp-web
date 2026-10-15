@@ -218,15 +218,11 @@ trait ManagesDevolucaoCompraModal
     {
         $term = trim($this->compraSelecionarBusca);
         $empresaId = ErpContext::currentEmpresaId();
+        $indicadores = app(\App\Support\Erp\Compras\CompraDevolucaoIndicadorService::class);
         $query = Compra::query()
             ->with('fornecedor')
-            ->where('status', Compra::STATUS_FECHADA)
-            ->whereDoesntHave(
-                'devolucoes',
-                fn ($devolucao) => $devolucao
-                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
-                    ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
-            );
+            ->where('status', Compra::STATUS_FECHADA);
+        $indicadores->aplicarFiltroComQuantidadeDevolvivel($query);
 
         if ($empresaId) {
             $query->where('empresa_id', $empresaId);
@@ -285,15 +281,12 @@ trait ManagesDevolucaoCompraModal
         $like = '%'.mb_strtoupper($term, 'UTF-8').'%';
         $empresaId = ErpContext::currentEmpresaId();
 
+        $indicadores = app(\App\Support\Erp\Compras\CompraDevolucaoIndicadorService::class);
         $query = Compra::query()
             ->with('fornecedor')
-            ->where('status', Compra::STATUS_FECHADA)
-            ->whereDoesntHave(
-                'devolucoes',
-                fn ($devolucao) => $devolucao
-                    ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
-                    ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
-            )
+            ->where('status', Compra::STATUS_FECHADA);
+        $indicadores->aplicarFiltroComQuantidadeDevolvivel($query);
+        $query
             ->where(function ($q) use ($like, $term): void {
                 $q->where('numero', 'like', $like);
                 if (is_numeric($term)) {
@@ -360,15 +353,12 @@ trait ManagesDevolucaoCompraModal
             $numero = trim($this->formCompraNumero);
             $empresaId = ErpContext::currentEmpresaId();
 
+            $indicadores = app(\App\Support\Erp\Compras\CompraDevolucaoIndicadorService::class);
             $query = Compra::query()
                 ->with(['itens.product', 'itens.notaFornecedorItem', 'fornecedor', 'empresa'])
-                ->where('status', Compra::STATUS_FECHADA)
-                ->whereDoesntHave(
-                    'devolucoes',
-                    fn ($devolucao) => $devolucao
-                        ->where('situacao', DevolucaoCompra::SITUACAO_FINALIZADA)
-                        ->where('tipo_devolucao', DevolucaoCompra::TIPO_TOTAL),
-                )
+                ->where('status', Compra::STATUS_FECHADA);
+            $indicadores->aplicarFiltroComQuantidadeDevolvivel($query);
+            $query
                 ->where(function ($q) use ($numero): void {
                     $q->where('numero', $numero);
                     if (is_numeric($numero)) {
@@ -593,12 +583,22 @@ trait ManagesDevolucaoCompraModal
         try {
             DB::transaction(function () use ($empresaId, &$recordId): void {
                 $momento = ErpTimezone::toLocal();
-                $isTotal = collect($this->formItens)->every(function (array $row): bool {
-                    $qtd = round((float) ($row['qtd'] ?? 0), 3);
-                    $comprada = round((float) ($row['qtd_comprada'] ?? 0), 3);
+                $qtdPorItem = [];
+                foreach ($this->formItens as $row) {
+                    $compraItemId = filled($row['compra_item_id'] ?? null) ? (int) $row['compra_item_id'] : 0;
+                    $qtd = round((float) ($row['qtd'] ?? 0), 4);
+                    if ($compraItemId <= 0 || $qtd <= 0) {
+                        continue;
+                    }
+                    $qtdPorItem[$compraItemId] = round(($qtdPorItem[$compraItemId] ?? 0) + $qtd, 4);
+                }
 
-                    return $comprada > 0 && abs($qtd - $comprada) < 0.0005;
-                });
+                $tipoDevolucao = app(\App\Support\Erp\Compras\CompraDevolucaoIndicadorService::class)
+                    ->classificarTipo(
+                        (int) $this->formCompraId,
+                        $qtdPorItem,
+                        $this->lancamentoId ? (int) $this->lancamentoId : null,
+                    );
 
                 $attributes = [
                     'empresa_id' => $empresaId,
@@ -609,9 +609,7 @@ trait ManagesDevolucaoCompraModal
                     'usuario_id' => Auth::id(),
                     'data' => $this->formData ?: $momento->format('Y-m-d'),
                     'hora' => $momento->format('H:i:s'),
-                    'tipo_devolucao' => $isTotal
-                        ? DevolucaoCompra::TIPO_TOTAL
-                        : DevolucaoCompra::TIPO_PARCIAL,
+                    'tipo_devolucao' => $tipoDevolucao,
                     'observacoes' => trim($this->formObservacoes) ?: null,
                     'troca_em_garantia' => (bool) $this->formTrocaEmGarantia,
                     'total' => $this->formTotal,

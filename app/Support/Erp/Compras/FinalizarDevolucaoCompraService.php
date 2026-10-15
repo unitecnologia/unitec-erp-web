@@ -75,11 +75,28 @@ final class FinalizarDevolucaoCompraService
             : ($compra->empresa_id ? (int) $compra->empresa_id : ErpContext::currentEmpresaId());
         $estoqueId = $this->resolveEstoqueId($empresaId);
 
-        DB::transaction(function () use ($devolucao, $estoqueId, $empresaId): void {
+        DB::transaction(function () use ($devolucao, $estoqueId, $empresaId, $compra): void {
             $this->baixarEstoque($devolucao, $estoqueId, $empresaId);
+
+            $qtdPorItem = [];
+            foreach ($devolucao->itens as $item) {
+                $compraItemId = $item->compra_item_id ? (int) $item->compra_item_id : 0;
+                $qtd = round((float) $item->qtd, 4);
+                if ($compraItemId <= 0 || $qtd <= 0) {
+                    continue;
+                }
+                $qtdPorItem[$compraItemId] = round(($qtdPorItem[$compraItemId] ?? 0) + $qtd, 4);
+            }
+
+            $tipo = app(CompraDevolucaoIndicadorService::class)->classificarTipo(
+                (int) $compra->id,
+                $qtdPorItem,
+                (int) $devolucao->id,
+            );
 
             $devolucao->update([
                 'situacao' => DevolucaoCompra::SITUACAO_FINALIZADA,
+                'tipo_devolucao' => $tipo,
             ]);
         });
 

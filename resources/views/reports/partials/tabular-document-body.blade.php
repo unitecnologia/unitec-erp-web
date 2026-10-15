@@ -39,11 +39,18 @@
             </div>
         @endif
 
-        <table class="tabular-doc__table">
+        <table class="tabular-doc__table{{ ! empty($columnWidths) ? ' tabular-doc__table--compact' : '' }}">
+            @if (! empty($columnWidths))
+                <colgroup>
+                    @foreach ($columns as $column)
+                        <col @if (! empty($columnWidths[$column])) style="width: {{ $columnWidths[$column] }}" @endif>
+                    @endforeach
+                </colgroup>
+            @endif
             <thead>
                 <tr>
                     @foreach ($columns as $column)
-                        <th class="{{ in_array($column, $numericColumns ?? [], true) ? 'num' : '' }}">
+                        <th class="{{ trim((in_array($column, $numericColumns ?? [], true) ? 'num' : '').' '.(in_array($column, $nowrapColumns ?? [], true) ? 'col-nowrap' : '')) }}">
                             {{ $columnLabels[$column] ?? $column }}
                         </th>
                     @endforeach
@@ -53,7 +60,7 @@
                 @forelse ($rows as $row)
                     <tr>
                         @foreach ($columns as $column)
-                            <td class="{{ in_array($column, $numericColumns ?? [], true) ? 'num' : '' }}">
+                            <td class="{{ trim((in_array($column, $numericColumns ?? [], true) ? 'num' : '').' '.(in_array($column, $nowrapColumns ?? [], true) ? 'col-nowrap' : '')) }}">
                                 {{ $row[$column] ?? '' }}
                             </td>
                         @endforeach
@@ -70,7 +77,7 @@
                 <tfoot>
                     <tr>
                         @foreach ($columns as $column)
-                            <td class="{{ in_array($column, $numericColumns ?? [], true) ? 'num' : '' }} tabular-doc__strong">
+                            <td class="{{ trim((in_array($column, $numericColumns ?? [], true) ? 'num' : '').' '.(in_array($column, $nowrapColumns ?? [], true) ? 'col-nowrap' : '').' tabular-doc__strong') }}">
                                 {{ $totals[$column] ?? '' }}
                             </td>
                         @endforeach

@@ -112,12 +112,12 @@ class ForcaVendasMonitorResource extends Resource
                     ->view('filament.components.erp.forca-vendas.monitor-select-cell')
                     ->alignCenter(),
                 TextColumn::make('numero_pedido')
-                    ->label('Nº Pedido')
+                    ->label('Nº DAV')
                     ->state(fn (ForcaVendasOrder $record): string => self::formatNumeroDav($record))
                     ->alignCenter()
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('numero_venda')
-                    ->label('Nº Venda')
+                    ->label('Nº Pedido')
                     ->state(fn (ForcaVendasOrder $record): string => self::formatNumeroVenda($record))
                     ->alignCenter()
                     ->placeholder('—'),

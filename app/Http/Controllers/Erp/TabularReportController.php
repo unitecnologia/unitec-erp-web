@@ -30,6 +30,14 @@ class TabularReportController extends Controller
         $empresa = $this->currentEmpresa();
         $supportsChart = $report instanceof ChartableTabularReport;
 
+        $columnWidths = [];
+        foreach ($built['columns'] as $column) {
+            $percent = $report->columnWidthPercent($column, $built['columns']);
+            if ($percent !== null) {
+                $columnWidths[$column] = $percent;
+            }
+        }
+
         $data = [
             'empresa' => $empresa,
             'empresaEndereco' => $this->formatEmpresaEndereco($empresa),
@@ -38,6 +46,8 @@ class TabularReportController extends Controller
             'reportTitle' => $report->title(),
             'columnLabels' => $report->columns(),
             'columns' => $built['columns'],
+            'columnWidths' => $columnWidths,
+            'nowrapColumns' => $report->nowrapColumns(),
             'rows' => $built['rows'],
             'totals' => $built['totals'],
             'summary' => $built['summary'],

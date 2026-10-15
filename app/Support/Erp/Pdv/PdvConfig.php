@@ -3,9 +3,11 @@
 namespace App\Support\Erp\Pdv;
 
 use App\Models\Empresa;
+use App\Models\PlanoConta;
 use App\Models\PriceTable;
 use App\Models\Terminal;
 use App\Support\Erp\Balanca\BalancaEtiquetaLayout;
+use App\Support\Erp\EmpresaParametros;
 use Illuminate\Support\Facades\Auth;
 
 final class PdvConfig
@@ -218,17 +220,20 @@ final class PdvConfig
 
     public function planoContaCodigo(string $tipo): ?int
     {
-        // Códigos padrão do plano de contas (antes eram parâmetros da empresa).
-        $codigo = match ($tipo) {
-            'abertura', 'suprimento' => 14,
-            'venda' => 2,
-            'estorno' => 9,
-            'sangria' => 11,
-            'receber', 'recebimento' => 10,
+        // Venda / recebimento / estorno usam o plano de crédito da empresa.
+        // Abertura, suprimento e sangria não têm parâmetro dedicado — sem código legado.
+        $planoId = match ($tipo) {
+            'venda', 'estorno', 'receber', 'recebimento' => EmpresaParametros::planoVendaId(
+                $this->empresa?->id ? (int) $this->empresa->id : null
+            ),
             default => null,
         };
 
-        $codigo = (int) ($codigo ?? 0);
+        if (! $planoId) {
+            return null;
+        }
+
+        $codigo = (int) (PlanoConta::query()->whereKey($planoId)->value('codigo') ?? 0);
 
         return $codigo > 0 ? $codigo : null;
     }

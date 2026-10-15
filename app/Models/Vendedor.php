@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'codigo',
@@ -134,8 +135,9 @@ class Vendedor extends Model
 
     /**
      * Caixa amarrado ao colaborador na empresa informada (ou na principal).
-     * Fonte de verdade: Permissões → Caixas (caixa_conta_user do usuário vinculado).
-     * empresa_vendedor.caixa_conta_id só como fallback legado.
+     * Fonte de verdade exclusiva: linhas em `caixa_conta_user` (Permissões → Caixas).
+     * Sem linha no pivot → null (CAIXA GERAL no faturamento). Não usa o fallback
+     * de User::accessibleCaixaContaIds que libera todos os PDVs quando o pivot está vazio.
      */
     public function caixaContaDaEmpresa(?int $empresaId = null): ?CaixaConta
     {
@@ -149,23 +151,29 @@ class Vendedor extends Model
             ? $this->usuario
             : $this->usuario()->first();
 
-        // 1) is_padrao / primeiro liberado do usuário (Permissões → Caixas)
-        $caixaId = $usuario?->defaultCaixaContaId($empresaId);
+        if (! $usuario) {
+            return null;
+        }
 
-        // 2) Fallback legado: pivot empresa_vendedor (pode estar desatualizado)
+        $caixaId = DB::table('caixa_conta_user')
+            ->where('user_id', $usuario->getKey())
+            ->where('empresa_id', $empresaId)
+            ->where('is_padrao', true)
+            ->value('caixa_conta_id');
+
         if (! $caixaId) {
-            $empresa = $this->relationLoaded('empresas')
-                ? $this->empresas->firstWhere('id', $empresaId)
-                : $this->empresas()->where('empresas.id', $empresaId)->first();
-
-            $caixaId = $empresa?->pivot?->caixa_conta_id;
+            $caixaId = DB::table('caixa_conta_user')
+                ->where('user_id', $usuario->getKey())
+                ->where('empresa_id', $empresaId)
+                ->orderBy('caixa_conta_id')
+                ->value('caixa_conta_id');
         }
 
         if (! $caixaId) {
             return null;
         }
 
-        return CaixaConta::query()->find($caixaId);
+        return CaixaConta::query()->find((int) $caixaId);
     }
 
     /**

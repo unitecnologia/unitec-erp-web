@@ -145,6 +145,17 @@ trait ManagesForcaVendasTelaVendaParcelas
         $this->fvSelectedTabelaPredefinidaIndex = null;
     }
 
+    /** Ao ir para meio à vista: remove prazo/canhoto da UI (não afeta histórico financeiro). */
+    protected function limparPrazoVendaAVista(): void
+    {
+        $this->tabelaPrazoDias = null;
+        $this->resetFvParcelasFaturamento();
+
+        if (method_exists($this, 'resetFinalizarCartaoCanhoto')) {
+            $this->resetFinalizarCartaoCanhoto();
+        }
+    }
+
     /**
      * Crediário / cheque / boleto: abre Contas Receber | Parcelas (igual PDV).
      */

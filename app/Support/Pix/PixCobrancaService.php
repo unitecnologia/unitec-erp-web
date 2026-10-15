@@ -2,6 +2,7 @@
 
 namespace App\Support\Pix;
 
+use App\Models\CaixaConta;
 use App\Models\ContaReceber;
 use App\Models\FormaPagamento;
 use App\Models\PixCobranca;
@@ -350,7 +351,7 @@ class PixCobrancaService
         );
     }
 
-    private function resolveCaixaContaIdPix(PixCobranca $cobranca): ?int
+    private function resolveCaixaContaIdPix(PixCobranca $cobranca): int
     {
         $formaPix = FormaPagamento::query()
             ->where('ativo', true)
@@ -361,9 +362,10 @@ class PixCobrancaService
             ->orderBy('codigo')
             ->first();
 
-        $caixaId = (int) ($formaPix?->conta_destino_id ?? 0);
-
-        return $caixaId > 0 ? $caixaId : null;
+        return CaixaConta::resolverDestinoLivroCaixa(
+            null,
+            (int) ($formaPix?->conta_destino_id ?? 0) ?: null,
+        );
     }
 
     public function cancelar(PixCobranca $cobranca): PixCobranca

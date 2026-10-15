@@ -1593,8 +1593,7 @@ final class EmpresaParametros
     }
 
     /**
-     * Plano de venda da empresa para o Livro Caixa.
-     * Compra e taxa de cartão ainda não entram nos lançamentos.
+     * Plano de venda da empresa (crédito) para Livro Caixa e títulos a receber.
      *
      * @return array{id: int, nome: string}|null
      */
@@ -1631,6 +1630,16 @@ final class EmpresaParametros
     }
 
     /**
+     * Id do plano de venda (crédito) da empresa, ou null se inválido/ausente.
+     */
+    public static function planoVendaId(?int $empresaId): ?int
+    {
+        $plano = self::planoVendaLancamento($empresaId);
+
+        return $plano['id'] ?? null;
+    }
+
+    /**
      * Plano de compra da empresa (débito) para baixas geradas na finalização da compra.
      */
     public static function planoCompraId(?int $empresaId): ?int
@@ -1659,8 +1668,51 @@ final class EmpresaParametros
     }
 
     /**
+     * Plano de débito padrão para baixas de Contas a Pagar (sem código legado fixo).
+     * Ordem: parâmetro de compra da empresa → descrição com FORNECEDOR → primeiro débito ativo.
+     *
+     * @param  list<int>|null  $idsPermitidos  Quando informado, restringe aos ids da lista (ex.: opções da tela).
+     */
+    public static function planoDebitoPadraoId(?int $empresaId = null, ?array $idsPermitidos = null): ?int
+    {
+        $compraId = self::planoCompraId($empresaId);
+
+        if ($compraId && ($idsPermitidos === null || in_array($compraId, $idsPermitidos, true))) {
+            return $compraId;
+        }
+
+        $query = PlanoConta::query()
+            ->where('ativo', true)
+            ->where('dc', 'D')
+            ->orderBy('codigo');
+
+        if ($idsPermitidos !== null) {
+            if ($idsPermitidos === []) {
+                return null;
+            }
+
+            $query->whereIn('id', $idsPermitidos);
+        }
+
+        $planos = $query->get(['id', 'descricao']);
+
+        foreach ($planos as $plano) {
+            $descricao = mb_strtoupper((string) $plano->descricao, 'UTF-8');
+
+            if (str_contains($descricao, 'FORNECEDOR')) {
+                return (int) $plano->id;
+            }
+        }
+
+        $primeiro = $planos->first();
+
+        return $primeiro ? (int) $primeiro->id : null;
+    }
+
+    /**
      * Planos padrão gravados na empresa.
-     * O de venda entra no Livro Caixa das vendas. Compra e taxa de cartão ainda não.
+     * Venda: Livro Caixa e títulos a receber. Compra: compras à vista e sugestão de baixa a pagar.
+     * Taxa cartão: cadastrado para uso futuro nos lançamentos de taxa.
      *
      * @return array<string, array{label: string, hint: string, dc: string, default: null}>
      */

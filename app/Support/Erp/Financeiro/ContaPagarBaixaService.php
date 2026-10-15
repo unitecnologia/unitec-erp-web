@@ -8,6 +8,7 @@ use App\Models\ContaPagar;
 use App\Models\ContaPagarPagamento;
 use App\Models\FormaPagamento;
 use App\Models\PlanoConta;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
 use Illuminate\Support\Collection;
@@ -88,16 +89,25 @@ final class ContaPagarBaixaService
                 $movimenta = $this->formaMovimentaCaixa($forma);
                 $caixa = $forma->contaDestino;
                 $caixaAtivo = $caixa && (bool) $caixa->ativo;
-                $caixaId = $movimenta && $caixaAtivo ? (int) $caixa->id : null;
+                $caixaId = null;
+                $caixaLabel = 'Não movimenta o caixa';
+
+                if ($movimenta) {
+                    if ($caixaAtivo) {
+                        $caixaId = (int) $caixa->id;
+                        $caixaLabel = $this->rotuloCaixa($caixa);
+                    } else {
+                        $caixaId = (int) CaixaConta::ensureCaixaGeral()->id;
+                        $caixaLabel = CaixaConta::LABEL_CAIXA_GERAL_PADRAO;
+                    }
+                }
 
                 return [
                     'id' => (int) $forma->id,
                     'label' => $label,
                     'tipo' => $forma->tipo,
                     'caixa_conta_id' => $caixaId,
-                    'caixa_label' => $movimenta
-                        ? ($caixaAtivo ? $this->rotuloCaixa($caixa) : 'Sem conta de destino')
-                        : 'Não movimenta o caixa',
+                    'caixa_label' => $caixaLabel,
                     'movimenta_caixa' => $movimenta,
                     'exige_cheque' => $this->formaExigeCheque($forma),
                 ];
@@ -125,6 +135,19 @@ final class ContaPagarBaixaService
     }
 
     /**
+     * Sugestão de plano de débito para baixa (parâmetro de compra da empresa, sem código fixo).
+     */
+    public function sugerirPlanoPadrao(?int $empresaId = null): ?int
+    {
+        $ids = array_map(
+            fn (array $plano): int => (int) $plano['id'],
+            $this->planosDisponiveis(),
+        );
+
+        return EmpresaParametros::planoDebitoPadraoId($empresaId, $ids);
+    }
+
+    /**
      * Baixa total do saldo de um título a pagar (compatível com fluxo antigo).
      *
      * @return array{ok: int, total: float}
@@ -141,12 +164,14 @@ final class ContaPagarBaixaService
      *     caixa_conta_id?: int|null,
      *     perc_juros?: float,
      *     juros?: float,
+     *     perc_multa?: float,
+     *     multa?: float,
      *     perc_desconto?: float,
      *     desconto?: float,
      *     valor_pago?: float|null,
      *     pago_em?: string|null,
      *     numero_cheque?: string|null,
-     *     grupo?: array{juros_editado?: bool, desconto_editado?: bool, valor_editado?: bool}
+     *     grupo?: array{juros_editado?: bool, multa_editada?: bool, desconto_editado?: bool, valor_editado?: bool}
      * }  $opcoes
      * @return array{ok: int, total: float}
      */
@@ -186,14 +211,17 @@ final class ContaPagarBaixaService
         $caixaContaId = null;
 
         if ($movimentaCaixa) {
-            $caixaContaId = (int) ($opcoes['caixa_conta_id'] ?? 0) ?: (int) ($forma->conta_destino_id ?? 0);
-            if ($caixaContaId <= 0 || ! CaixaConta::query()->whereKey($caixaContaId)->where('ativo', true)->exists()) {
-                throw new InvalidArgumentException('A forma de pagamento não possui conta de destino válida para o caixa.');
-            }
+            $selecionada = (int) ($opcoes['caixa_conta_id'] ?? 0);
+            $caixaContaId = CaixaConta::resolverDestinoLivroCaixa(
+                $selecionada > 0 ? $selecionada : null,
+                (int) ($forma->conta_destino_id ?? 0) ?: null,
+            );
         }
 
         $percJuros = round((float) ($opcoes['perc_juros'] ?? 0), 4);
         $jurosInformado = round((float) ($opcoes['juros'] ?? 0), 2);
+        $percMulta = round((float) ($opcoes['perc_multa'] ?? 0), 4);
+        $multaInformada = round((float) ($opcoes['multa'] ?? 0), 2);
         $percDesconto = round((float) ($opcoes['perc_desconto'] ?? 0), 4);
         $descontoInformado = round((float) ($opcoes['desconto'] ?? 0), 2);
         $valorPagoInformado = array_key_exists('valor_pago', $opcoes) && $opcoes['valor_pago'] !== null
@@ -216,6 +244,8 @@ final class ContaPagarBaixaService
             $caixaContaId,
             $percJuros,
             $jurosInformado,
+            $percMulta,
+            $multaInformada,
             $percDesconto,
             $descontoInformado,
             $valorPagoInformado,
@@ -234,10 +264,12 @@ final class ContaPagarBaixaService
                 ? $this->ratearGrupo(
                     $contas,
                     $jurosInformado,
+                    $multaInformada,
                     $descontoInformado,
                     (float) ($valorPagoInformado ?? 0),
                     is_array($grupo) ? $grupo : [
                         'juros_editado' => $jurosInformado > 0 || $percJuros > 0,
+                        'multa_editada' => $multaInformada > 0 || $percMulta > 0,
                         'desconto_editado' => $descontoInformado > 0 || $percDesconto > 0,
                         'valor_editado' => $valorPagoInformado !== null,
                     ],
@@ -253,8 +285,10 @@ final class ContaPagarBaixaService
                     }
 
                     $juros = $item['juros'];
+                    $multa = $item['multa'];
                     $desconto = $item['desconto'];
                     $percJ = $item['perc_juros'];
+                    $percM = $item['perc_multa'];
                     $percD = $item['perc_desconto'];
                     $valorAPagar = $item['valor_a_pagar'];
                     $valorPago = $item['valor_pago'];
@@ -266,15 +300,21 @@ final class ContaPagarBaixaService
                     }
 
                     $juros = $jurosInformado;
+                    $multa = $multaInformada;
                     $desconto = $descontoInformado;
                     $percJ = $percJuros;
+                    $percM = $percMulta;
                     $percD = $percDesconto;
 
                     if ($juros <= 0 && $percJ > 0) {
                         $juros = round($saldo * ($percJ / 100), 2);
                     }
 
-                    $saldoComJuros = round($saldo + $juros, 2);
+                    if ($multa <= 0 && $percM > 0) {
+                        $multa = round($saldo * ($percM / 100), 2);
+                    }
+
+                    $saldoComJuros = round($saldo + $juros + $multa, 2);
 
                     if ($desconto <= 0 && $percD > 0) {
                         $desconto = round($saldoComJuros * ($percD / 100), 2);
@@ -300,6 +340,8 @@ final class ContaPagarBaixaService
                     'valor_parcela' => round((float) $conta->valor, 2),
                     'perc_juros' => $percJ,
                     'juros' => $juros,
+                    'perc_multa' => $percM,
+                    'multa' => $multa,
                     'perc_desconto' => $percD,
                     'desconto' => $desconto,
                     'valor_pago' => $valorPago,
@@ -311,6 +353,7 @@ final class ContaPagarBaixaService
                 ]);
 
                 $conta->juros = round((float) $conta->juros + $juros, 2);
+                $conta->multa = round((float) ($conta->multa ?? 0) + $multa, 2);
                 $conta->desconto = round((float) $conta->desconto + $desconto, 2);
                 $conta->valor_pago = round((float) $conta->valor_pago + $valorPago, 2);
                 $conta->pago_em = $pagoEm;
@@ -369,16 +412,17 @@ final class ContaPagarBaixaService
     }
 
     /**
-     * Reparte juros, desconto e valor do formulário entre os títulos do mesmo fornecedor.
-     * O que não foi editado permanece com a sugestão de cada título (juros e desconto zerados).
+     * Reparte juros, multa, desconto e valor do formulário entre os títulos do mesmo fornecedor.
+     * O que não foi editado permanece com a sugestão de cada título (zerados).
      *
      * @param  Collection<int, ContaPagar>  $contas
-     * @param  array{juros_editado?: bool, desconto_editado?: bool, valor_editado?: bool}  $flags
-     * @return array<int, array{juros: float, desconto: float, perc_juros: float, perc_desconto: float, valor_a_pagar: float, valor_pago: float}>
+     * @param  array{juros_editado?: bool, multa_editada?: bool, desconto_editado?: bool, valor_editado?: bool}  $flags
+     * @return array<int, array{juros: float, multa: float, desconto: float, perc_juros: float, perc_multa: float, perc_desconto: float, valor_a_pagar: float, valor_pago: float}>
      */
     private function ratearGrupo(
         Collection $contas,
         float $jurosTotal,
+        float $multaTotal,
         float $descontoTotal,
         float $valorTotal,
         array $flags,
@@ -395,6 +439,7 @@ final class ContaPagarBaixaService
                 'id' => (int) $conta->id,
                 'saldo' => $saldo,
                 'juros' => 0.0,
+                'multa' => 0.0,
             ];
         }
 
@@ -406,8 +451,12 @@ final class ContaPagarBaixaService
             $this->distribuirProporcional($linhas, 'juros', $jurosTotal, 'saldo');
         }
 
+        if (! empty($flags['multa_editada'])) {
+            $this->distribuirProporcional($linhas, 'multa', $multaTotal, 'saldo');
+        }
+
         foreach ($linhas as $i => $linha) {
-            $base = round((float) $linha['saldo'] + (float) $linha['juros'], 2);
+            $base = round((float) $linha['saldo'] + (float) $linha['juros'] + (float) $linha['multa'], 2);
             $linhas[$i]['base'] = $base;
             $linhas[$i]['desconto'] = 0.0;
         }
@@ -470,8 +519,10 @@ final class ContaPagarBaixaService
 
             $saida[(int) $linha['id']] = [
                 'juros' => round((float) $linha['juros'], 2),
+                'multa' => round((float) $linha['multa'], 2),
                 'desconto' => round((float) $linha['desconto'], 2),
                 'perc_juros' => (float) $linha['saldo'] > 0 ? round(((float) $linha['juros'] / (float) $linha['saldo']) * 100, 4) : 0.0,
+                'perc_multa' => (float) $linha['saldo'] > 0 ? round(((float) $linha['multa'] / (float) $linha['saldo']) * 100, 4) : 0.0,
                 'perc_desconto' => (float) $linha['base'] > 0 ? round(((float) $linha['desconto'] / (float) $linha['base']) * 100, 4) : 0.0,
                 'valor_a_pagar' => (float) $linha['devido'],
                 'valor_pago' => round((float) $linha['valor'], 2),

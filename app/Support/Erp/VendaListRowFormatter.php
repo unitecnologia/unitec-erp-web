@@ -89,6 +89,7 @@ final class VendaListRowFormatter
             match ($plataforma) {
                 Venda::PLATAFORMA_PDV => 'info',
                 Venda::PLATAFORMA_MOBILE => 'warning',
+                Venda::PLATAFORMA_OS => 'success',
                 default => 'gray',
             },
         ];
@@ -115,6 +116,14 @@ final class VendaListRowFormatter
             if ($numero !== null && $numero !== '') {
                 return str_pad((string) $numero, 6, '0', STR_PAD_LEFT);
             }
+        }
+
+        $osNumero = $record->relationLoaded('ordemServico')
+            ? $record->ordemServico?->numero
+            : null;
+
+        if ($osNumero !== null && $osNumero !== '') {
+            return str_pad((string) preg_replace('/\D/', '', (string) $osNumero), 6, '0', STR_PAD_LEFT);
         }
 
         return '—';

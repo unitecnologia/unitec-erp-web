@@ -33,6 +33,7 @@
                                 <th style="padding:6px 8px;">Data</th>
                                 <th style="padding:6px 8px; text-align:right;">Valor pago</th>
                                 <th style="padding:6px 8px; text-align:right;">Juros</th>
+                                <th style="padding:6px 8px; text-align:right;">Multa</th>
                                 <th style="padding:6px 8px; text-align:right;">Desconto</th>
                                 <th style="padding:6px 8px;">Forma</th>
                                 <th style="padding:6px 8px;">Plano</th>
@@ -46,6 +47,7 @@
                                     <td style="padding:6px 8px;">{{ $row['data'] }}</td>
                                     <td style="padding:6px 8px; text-align:right;">{{ $row['valor_pago'] }}</td>
                                     <td style="padding:6px 8px; text-align:right;">{{ $row['juros'] }}</td>
+                                    <td style="padding:6px 8px; text-align:right;">{{ $row['multa'] ?? '0,00' }}</td>
                                     <td style="padding:6px 8px; text-align:right;">{{ $row['desconto'] }}</td>
                                     <td style="padding:6px 8px;">{{ $row['forma'] }}</td>
                                     <td style="padding:6px 8px;">{{ $row['plano'] }}</td>

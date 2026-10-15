@@ -1,4 +1,8 @@
 @if ($this->viewModalOpen)
+    @php
+        $temDetalhe = (bool) ($this->viewModalData['tem_detalhe'] ?? false);
+        $detalhes = $this->viewModalData['detalhes'] ?? [];
+    @endphp
     <div
         class="erp-lookup-modal erp-caixa-view-modal"
         wire:keydown.escape.window="closeCaixaView"
@@ -56,6 +60,27 @@
                         <span class="erp-caixa-view-modal__value erp-caixa-view-modal__value--saida">{{ $this->viewModalData['saida'] ?? '0,00' }}</span>
                     </div>
                 </div>
+
+                @if ($temDetalhe && is_array($detalhes) && $detalhes !== [])
+                    <div class="erp-caixa-view-modal__origem">
+                        <h4 class="erp-caixa-view-modal__origem-title">Detalhes da origem</h4>
+                        <div class="erp-caixa-view-modal__grid erp-caixa-view-modal__grid--origem">
+                            @foreach ($detalhes as $linha)
+                                <div @class([
+                                    'erp-caixa-view-modal__field',
+                                    'erp-caixa-view-modal__field--wide' => ! empty($linha['wide']),
+                                ])>
+                                    <span class="erp-caixa-view-modal__label">{{ $linha['label'] ?? '' }}</span>
+                                    <span @class([
+                                        'erp-caixa-view-modal__value',
+                                        'erp-caixa-view-modal__value--money' => ! empty($linha['money']),
+                                        'erp-caixa-view-modal__value--estorno' => ($linha['destaque'] ?? null) === 'estorno',
+                                    ])>{{ $linha['value'] ?? '—' }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 <div class="erp-pcad-actions erp-caixa-view-modal__actions">
                     <button type="button" wire:click="closeCaixaView" class="erp-pcad-actions__btn" data-erp-key="Escape">

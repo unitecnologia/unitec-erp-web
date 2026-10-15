@@ -3,12 +3,15 @@
 namespace App\Support\Erp\Reports;
 
 use App\Models\ForcaVendasOrder;
+use App\Models\FormaPagamento;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
 use App\Models\Person;
 use App\Models\Venda;
 use App\Models\VendaItem;
 use App\Models\Vendedor;
+use App\Support\Erp\Financeiro\FormaPagamentoDestino;
+use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -348,6 +351,7 @@ final class MonitorPedidosReport
 
     /**
      * Monta "BOLETO 30 dias 25/09/2026" ou "BOLETO 2x — 30 dias 25/09/2026 · 60 dias 25/10/2026".
+     * Forma à vista/caixa: ignora prazos antigos do payload (não mascara carnê válido).
      */
     private static function formatCondicaoPagamentoComParcelas(
         string $forma,
@@ -355,7 +359,7 @@ final class MonitorPedidosReport
         mixed $baseDate,
     ): string {
         $forma = trim($forma);
-        $dias = self::parcelasDiasFromOrder($order);
+        $dias = self::parcelasDiasFromOrder($order, $forma);
 
         if ($dias === []) {
             return $forma;
@@ -397,28 +401,38 @@ final class MonitorPedidosReport
     }
 
     /**
+     * Dias de parcela compatíveis com a forma atual.
+     * - cartão: só canhoto
+     * - carnê/CR a prazo: condicao_pagamento / tabela_prazo_dias
+     * - à vista / caixa / depósito: nenhum (descarta lixo do payload)
+     *
      * @return list<int>
      */
-    private static function parcelasDiasFromOrder(?ForcaVendasOrder $order): array
+    private static function parcelasDiasFromOrder(?ForcaVendasOrder $order, string $forma = ''): array
     {
         if (! $order) {
             return [];
         }
 
         $payload = is_array($order->payload) ? $order->payload : [];
+        $modo = self::modoParcelasImpressao($forma, $payload);
 
-        $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
+        if ($modo === 'nenhum') {
+            return [];
+        }
 
-        if (is_array($canhotoDias) && $canhotoDias !== []) {
-            $dias = collect($canhotoDias)
+        if ($modo === 'canhoto') {
+            $canhotoDias = $payload['cartao_canhoto']['dias'] ?? null;
+
+            if (! is_array($canhotoDias) || $canhotoDias === []) {
+                return [];
+            }
+
+            return collect($canhotoDias)
                 ->map(static fn ($d): int => (int) $d)
                 ->filter(static fn (int $d): bool => $d >= 0)
                 ->values()
                 ->all();
-
-            if ($dias !== []) {
-                return $dias;
-            }
         }
 
         $avulso = self::diasDeStringParcelas((string) ($payload['condicao_pagamento'] ?? ''));
@@ -430,16 +444,60 @@ final class MonitorPedidosReport
         $prazoRaw = $payload['tabela_prazo_dias'] ?? '';
 
         if (is_array($prazoRaw)) {
-            $dias = collect($prazoRaw)
+            return collect($prazoRaw)
                 ->map(static fn ($d): int => (int) $d)
                 ->filter(static fn (int $d): bool => $d >= 0)
                 ->values()
                 ->all();
-
-            return $dias;
         }
 
         return self::diasDeStringParcelas((string) $prazoRaw);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return 'nenhum'|'canhoto'|'prazo'
+     */
+    private static function modoParcelasImpressao(string $forma, array $payload): string
+    {
+        $formaModel = null;
+        $formaId = (int) ($payload['forma_pagamento_id'] ?? 0);
+
+        if ($formaId > 0) {
+            $formaModel = FormaPagamento::query()->find($formaId);
+        }
+
+        if (! $formaModel && $forma !== '') {
+            $formaModel = FormaPagamento::query()
+                ->whereRaw('UPPER(TRIM(descricao)) = ?', [mb_strtoupper($forma, 'UTF-8')])
+                ->orderByDesc('ativo')
+                ->first();
+        }
+
+        $pagamento = [
+            'forma' => $forma !== '' ? $forma : (string) ($formaModel?->descricao ?? ''),
+            'tipo' => (string) ($formaModel?->tipo ?? ''),
+            'tipo_movimento' => (string) ($formaModel?->tipo_movimento ?? ''),
+            'aparece_contas_receber' => (bool) ($formaModel?->aparece_contas_receber ?? false),
+        ];
+
+        if (PdvFinalizarPagamentosHelper::isFormaCartao($pagamento)) {
+            return 'canhoto';
+        }
+
+        if (PdvFinalizarPagamentosHelper::precisaParcelasCarne($pagamento)) {
+            return 'prazo';
+        }
+
+        if ($formaModel !== null && FormaPagamentoDestino::geraContasReceber($formaModel)) {
+            return 'prazo';
+        }
+
+        if ($formaModel === null && FormaPagamentoDestino::geraContasReceber($pagamento)) {
+            return 'prazo';
+        }
+
+        return 'nenhum';
     }
 
     /**

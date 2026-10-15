@@ -30,6 +30,7 @@ trait ManagesContaPagarDesdobramentos
         'valor' => '0,00',
         'desconto' => '0,00',
         'juros' => '0,00',
+        'multa' => '0,00',
         'valor_pago' => '0,00',
         'saldo' => '0,00',
     ];
@@ -100,6 +101,7 @@ trait ManagesContaPagarDesdobramentos
             'valor' => '0,00',
             'desconto' => '0,00',
             'juros' => '0,00',
+            'multa' => '0,00',
             'valor_pago' => '0,00',
             'saldo' => '0,00',
         ];
@@ -229,6 +231,7 @@ trait ManagesContaPagarDesdobramentos
             'valor' => ErpMoney::formatBr((float) $conta->valor),
             'desconto' => ErpMoney::formatBr((float) $conta->desconto),
             'juros' => ErpMoney::formatBr((float) $conta->juros),
+            'multa' => ErpMoney::formatBr((float) ($conta->multa ?? 0)),
             'valor_pago' => ErpMoney::formatBr((float) $conta->valor_pago),
             'saldo' => ErpMoney::formatBr((float) $conta->saldo),
         ];
@@ -242,6 +245,7 @@ trait ManagesContaPagarDesdobramentos
                 'data' => optional($pagamento->data)?->format('d/m/Y') ?? '—',
                 'valor_parcela' => ErpMoney::formatBr((float) $pagamento->valor_parcela),
                 'juros' => ErpMoney::formatBr((float) $pagamento->juros),
+                'multa' => ErpMoney::formatBr((float) ($pagamento->multa ?? 0)),
                 'desconto' => ErpMoney::formatBr((float) $pagamento->desconto),
                 'valor_pago' => ErpMoney::formatBr((float) $pagamento->valor_pago),
                 'forma' => mb_strtoupper(trim((string) ($pagamento->formaPagamento?->descricao ?? '')), 'UTF-8') ?: '—',

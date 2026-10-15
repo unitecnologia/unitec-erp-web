@@ -177,9 +177,9 @@ class ErpDashboardDemoData
     public static function salesMixChart(): array
     {
         return [
-            'labels' => ['PDV', 'Pedidos'],
-            'values' => [42850.0, 91240.0],
-            'colors' => ['#1e5a9e', '#0d9488'],
+            'labels' => ['PDV', 'Pedidos', 'OS'],
+            'values' => [42850.0, 91240.0, 18600.0],
+            'colors' => ['#1e5a9e', '#0d9488', '#c2410c'],
             'unit' => 'money',
         ];
     }
@@ -190,9 +190,9 @@ class ErpDashboardDemoData
     public static function fiscalDocsChart(): array
     {
         return ErpDashboardFiscalDocsChart::withoutZeroSlices([
-            'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.'],
-            'values' => [42.0, 8.0, 186.0, 11.0],
-            'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b'],
+            'labels' => ['NFe Aut.', 'NFe Pend.', 'NFCe Aut.', 'NFCe Pend.', 'NFSe Aut.', 'NFSe Pend.'],
+            'values' => [42.0, 8.0, 186.0, 11.0, 24.0, 3.0],
+            'colors' => ['#1d4ed8', '#93c5fd', '#0f766e', '#f59e0b', '#7c3aed', '#c4b5fd'],
             'unit' => 'count',
         ]);
     }

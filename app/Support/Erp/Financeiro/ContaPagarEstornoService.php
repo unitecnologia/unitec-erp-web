@@ -46,6 +46,7 @@ final class ContaPagarEstornoService
 
             $valorPago = round((float) $pagamento->valor_pago, 2);
             $juros = round((float) $pagamento->juros, 2);
+            $multa = round((float) ($pagamento->multa ?? 0), 2);
             $desconto = round((float) $pagamento->desconto, 2);
 
             if ($valorPago <= 0) {
@@ -54,6 +55,7 @@ final class ContaPagarEstornoService
 
             $conta->valor_pago = round(max(0, (float) $conta->valor_pago - $valorPago), 2);
             $conta->juros = round(max(0, (float) $conta->juros - $juros), 2);
+            $conta->multa = round(max(0, (float) ($conta->multa ?? 0) - $multa), 2);
             $conta->desconto = round(max(0, (float) $conta->desconto - $desconto), 2);
 
             // Recalcula saldo no saving(); se ainda houver saldo, limpa pago_em.

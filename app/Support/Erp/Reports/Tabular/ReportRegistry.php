@@ -7,10 +7,14 @@ use App\Support\Erp\Reports\Tabular\Definitions\ConferenciaEstoqueReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ContasPagarReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ContasReceberReport;
 use App\Support\Erp\Reports\Tabular\Definitions\CurvaAbcReport;
+use App\Support\Erp\Reports\Tabular\Definitions\DocumentosFiscaisPorOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\EstoqueComposicaoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\EstoqueGradeReport;
 use App\Support\Erp\Reports\Tabular\Definitions\EstoqueMinimoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\EstoqueNegativoReport;
+use App\Support\Erp\Reports\Tabular\Definitions\FaturamentoServicosReport;
+use App\Support\Erp\Reports\Tabular\Definitions\FinanceiroPorOsReport;
+use App\Support\Erp\Reports\Tabular\Definitions\GeralOrdensServicoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoComprasFornecedorReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoComprasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoOrcamentosReport;
@@ -18,9 +22,14 @@ use App\Support\Erp\Reports\Tabular\Definitions\HistoricoProdutosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasClienteReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasVendedorReport;
+use App\Support\Erp\Reports\Tabular\Definitions\LucratividadeOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\MovimentoCaixaReport;
+use App\Support\Erp\Reports\Tabular\Definitions\OsPendentesAtrasadasReport;
+use App\Support\Erp\Reports\Tabular\Definitions\OsPorFormaPagamentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OutrasSaidasMovimentoReport;
+use App\Support\Erp\Reports\Tabular\Definitions\PecasUtilizadasOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PlanoContasReport;
+use App\Support\Erp\Reports\Tabular\Definitions\ProdutividadePorTecnicoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\PrecoAlteradoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosLucratividadeReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMaisLucrativosReport;
@@ -29,6 +38,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMenosLucrativosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMenosVendidosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoCaixaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoFinanceiroContaReport;
+use App\Support\Erp\Reports\Tabular\Definitions\ServicosPrestadosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ValidadeLotesReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ValidadeProdutosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasCfopCsosnReport;
@@ -76,6 +86,16 @@ class ReportRegistry
             'vendas-produtos-vendedores' => VendasProdutosVendedoresReport::class,
             'vendas-cfop-csosn' => VendasCfopCsosnReport::class,
             'visitas-realizadas-sem-venda' => VisitasRealizadasSemVendaReport::class,
+            'geral-ordens-servico' => GeralOrdensServicoReport::class,
+            'servicos-prestados' => ServicosPrestadosReport::class,
+            'pecas-utilizadas-os' => PecasUtilizadasOsReport::class,
+            'lucratividade-os' => LucratividadeOsReport::class,
+            'produtividade-por-tecnico' => ProdutividadePorTecnicoReport::class,
+            'os-pendentes-atrasadas' => OsPendentesAtrasadasReport::class,
+            'financeiro-por-os' => FinanceiroPorOsReport::class,
+            'faturamento-servicos' => FaturamentoServicosReport::class,
+            'documentos-fiscais-por-os' => DocumentosFiscaisPorOsReport::class,
+            'os-por-forma-pagamento' => OsPorFormaPagamentoReport::class,
             'contas-receber' => ContasReceberReport::class,
             'contas-pagar' => ContasPagarReport::class,
             'resumo-caixa' => ResumoCaixaReport::class,

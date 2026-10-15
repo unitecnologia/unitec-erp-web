@@ -387,20 +387,15 @@ final class FinalizarCompraLancamentoService
                 throw new DomainException('Parcela em dinheiro ou PIX com valor inválido.');
             }
 
-            $caixaId = (int) ($parcela['caixa_conta_id'] ?? 0);
-            if ($caixaId > 0) {
-                $caixaOk = CaixaConta::query()
-                    ->whereKey($caixaId)
-                    ->where('ativo', true)
-                    ->where('tipo', CaixaConta::TIPO_SUBCAIXA)
-                    ->exists();
-            } else {
-                $caixaId = (int) ($forma->conta_destino_id ?? 0);
-                $caixaOk = $caixaId > 0 && CaixaConta::query()->whereKey($caixaId)->where('ativo', true)->exists();
-            }
+            $selecionada = (int) ($parcela['caixa_conta_id'] ?? 0);
 
-            if (! $caixaOk) {
-                throw new DomainException('Informe um subcaixa válido na parcela em dinheiro ou PIX.');
+            try {
+                $caixaId = CaixaConta::resolverDestinoLivroCaixa(
+                    $selecionada > 0 ? $selecionada : null,
+                    (int) ($forma->conta_destino_id ?? 0) ?: null,
+                );
+            } catch (\InvalidArgumentException $e) {
+                throw new DomainException($e->getMessage(), 0, $e);
             }
 
             $formaNome = mb_strtoupper(trim((string) ($forma->descricao ?? '')), 'UTF-8');

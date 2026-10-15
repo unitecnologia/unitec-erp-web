@@ -79,10 +79,11 @@
 
         tick = window.setInterval(() => {
             if (shown < target) {
-                shown += 1;
+                // Sobe mais rápido quando está atrasada em relação ao alvo.
+                shown += shown < target - 8 ? 3 : 1;
                 setBar(shown);
             }
-        }, 28);
+        }, 16);
     }
 
     function stopTick() {
@@ -135,7 +136,7 @@
                 false,
             );
             target = Math.max(target, capFor(atual, total, step));
-        }, 420);
+        }, 220);
     }
 
     function etapaIndex(etapa) {
@@ -147,13 +148,13 @@
 
         return new Promise((resolve) => {
             const timer = window.setInterval(() => {
-                if (shown >= target || Date.now() - start > 4000) {
+                if (shown >= target || Date.now() - start > 1800) {
                     window.clearInterval(timer);
                     shown = target;
                     setBar(shown);
                     resolve();
                 }
-            }, 40);
+            }, 24);
         });
     }
 
@@ -212,7 +213,7 @@
                         + (result.erro ? ': ' + result.erro : '');
                     setStatus(msg, true);
                     addLog(msg, false);
-                    await new Promise((resolve) => setTimeout(resolve, 1100));
+                    await new Promise((resolve) => setTimeout(resolve, 550));
                 }
 
                 if (result.done) {
@@ -225,7 +226,7 @@
                 ensureTick();
                 setStatus('Faturamento concluído.', false);
                 await waitBar();
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 220));
             }
 
             await wire.concluirFaturamentoMonitor();

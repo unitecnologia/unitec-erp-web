@@ -21,6 +21,9 @@ class CaixaConta extends Model
 {
     public const NOME_CAIXA_GERAL = 'CAIXA GERAL';
 
+    /** Rótulo de UI quando o destino cai no padrão do sistema. */
+    public const LABEL_CAIXA_GERAL_PADRAO = 'Caixa Geral (padrão)';
+
     public const TIPO_BANCO = 'BANCO';
 
     public const TIPO_PDV = 'PDV';
@@ -37,6 +40,43 @@ class CaixaConta extends Model
     public const SITUACAO_FECHADO = 'fechado';
 
     protected $table = 'caixa_contas';
+
+    /**
+     * Destino do Livro Caixa (regra global):
+     * 1) conta selecionada válida e ativa
+     * 2) conta de destino da forma, se ativa
+     * 3) CAIXA GERAL padrão
+     *
+     * Conta explicitamente selecionada e inválida/inativa → erro (não redireciona em silêncio).
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function resolverDestinoLivroCaixa(?int $selecionadaId = null, ?int $contaDestinoFormaId = null): int
+    {
+        $selecionadaId = (int) ($selecionadaId ?? 0);
+
+        if ($selecionadaId > 0) {
+            if (! self::query()->whereKey($selecionadaId)->where('ativo', true)->exists()) {
+                throw new \InvalidArgumentException(
+                    'A conta de caixa selecionada é inválida ou está inativa.'
+                );
+            }
+
+            return $selecionadaId;
+        }
+
+        $destinoId = (int) ($contaDestinoFormaId ?? 0);
+
+        if ($destinoId > 0) {
+            $destino = self::query()->whereKey($destinoId)->where('ativo', true)->first();
+
+            if ($destino) {
+                return (int) $destino->id;
+            }
+        }
+
+        return (int) self::ensureCaixaGeral()->id;
+    }
 
     /**
      * Garante a conta protegida do sistema (destino do fechamento/sangria do PDV).

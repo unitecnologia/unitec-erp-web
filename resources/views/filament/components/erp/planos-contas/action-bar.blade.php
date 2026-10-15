@@ -5,6 +5,9 @@
     <button type="button" wire:click="editPlanoConta" class="erp-unidades-actions__btn" data-erp-key="F3">
         <span class="erp-unidades-actions__label"><kbd>F3</kbd> | Alterar</span>
     </button>
+    <button type="button" wire:click="deletePlanoConta" class="erp-unidades-actions__btn" data-erp-key="F4">
+        <span class="erp-unidades-actions__label"><kbd>F4</kbd> | Excluir</span>
+    </button>
     <button type="button" wire:click="closeScreen" class="erp-unidades-actions__btn erp-unidades-actions__btn--close">
         <span class="erp-unidades-actions__label">Fechar</span>
     </button>

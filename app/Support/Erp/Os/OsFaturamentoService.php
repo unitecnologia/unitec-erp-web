@@ -8,7 +8,9 @@ use App\Models\Empresa;
 use App\Models\EstoqueMovimentacao;
 use App\Models\FormaPagamento;
 use App\Models\OrdemServico;
+use App\Models\Person;
 use App\Models\Product;
+use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
@@ -99,6 +101,9 @@ final class OsFaturamentoService
             }
 
             $os->forceFill($payload)->save();
+
+            // Espelho comercial na Lista de Vendas (sem estoque/financeiro/caixa/comissão).
+            app(OsVendaEspelhoService::class)->sincronizarAoFaturar($os, $linhas);
         });
 
         return $contasCriadas;
@@ -228,6 +233,13 @@ final class OsFaturamentoService
         $valorFloat = (float) $valor;
         $planoVenda = EmpresaParametros::planoVendaLancamento($empresaId);
 
+        ConsumidorFinalGuard::assertPagamentoPermitido(
+            $os->relationLoaded('cliente')
+                ? $os->cliente
+                : Person::query()->find((int) $os->cliente_id),
+            $forma,
+        );
+
         if (FormaPagamentoDestino::semLancamento($movimento)) {
             if ($this->formaAvistaSemMovimentoVaiParaCaixa($forma)) {
                 $baixa->registrarEntradaCaixa(
@@ -287,6 +299,7 @@ final class OsFaturamentoService
             hoje: $hoje,
             empresaId: $empresaId,
             baixa: $baixa,
+            planoContaId: $planoVenda['id'] ?? null,
             chequeNumeros: PdvFinalizarPagamentosHelper::isFormaCheque($pdvMeta['forma'])
                 || mb_strtolower($pdvMeta['tipo'], 'UTF-8') === 'cheque'
                 ? ($chequeNumeros ?? [])
@@ -333,6 +346,7 @@ final class OsFaturamentoService
         string $hoje,
         ?int $empresaId,
         ContaReceberBaixaService $baixa,
+        ?int $planoContaId = null,
         ?array $chequeNumeros = null,
     ): array {
         $n = count($dias);
@@ -360,7 +374,7 @@ final class OsFaturamentoService
 
             $formaConta = $baixa->mapFormaConta($forma);
 
-            $criadas[] = ContaReceber::query()->create([
+            $payload = [
                 'empresa_id' => $empresaId,
                 'numero' => ContaReceber::nextNumero(),
                 'emissao' => $hoje,
@@ -371,7 +385,13 @@ final class OsFaturamentoService
                 'valor' => $valor,
                 'forma' => $formaConta,
                 ...ContaReceberJurosCarteira::atributosParaCreate($formaConta, $empresaId),
-            ]);
+            ];
+
+            if ($planoContaId) {
+                $payload['plano_conta_id'] = $planoContaId;
+            }
+
+            $criadas[] = ContaReceber::query()->create($payload);
         }
 
         return $criadas;

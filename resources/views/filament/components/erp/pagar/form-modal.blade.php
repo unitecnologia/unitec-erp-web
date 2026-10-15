@@ -4,10 +4,15 @@
         class="erp-pagar-form-modal"
         x-data="{ saving: false }"
         x-on:keydown.window="
-            if ($event.key === 'Escape') { $event.preventDefault(); $wire.closeContaFormModal(); }
+            if (! $wire.contaFormModalOpen) return;
+            if ($event.key === 'Escape') {
+                $event.preventDefault();
+                if (saving || $wire.contaFormSalvando) return;
+                $wire.closeContaFormModal();
+            }
             if ($event.key === 'F5') {
                 $event.preventDefault();
-                if (saving) return;
+                if ($event.repeat || saving || $wire.contaFormSalvando) return;
                 saving = true;
                 Promise.resolve($wire.salvarContaForm()).finally(() => { saving = false });
             }
@@ -30,6 +35,9 @@
                     type="button"
                     class="erp-pagar-form-modal__close"
                     wire:click="closeContaFormModal"
+                    x-bind:disabled="saving"
+                    wire:loading.attr="disabled"
+                    wire:target="salvarContaForm"
                     title="ESC | Sair"
                     aria-label="Fechar"
                 >&times;</button>
@@ -108,8 +116,10 @@
                     type="button"
                     class="erp-pagar-form-modal__btn erp-pagar-form-modal__btn--save"
                     x-bind:disabled="saving"
+                    wire:loading.attr="disabled"
+                    wire:target="salvarContaForm"
                     x-on:click="
-                        if (saving) return;
+                        if (saving || $wire.contaFormSalvando) return;
                         saving = true;
                         Promise.resolve($wire.salvarContaForm()).finally(() => { saving = false });
                     "
@@ -120,6 +130,9 @@
                     type="button"
                     class="erp-pagar-form-modal__btn erp-pagar-form-modal__btn--exit"
                     wire:click="closeContaFormModal"
+                    x-bind:disabled="saving"
+                    wire:loading.attr="disabled"
+                    wire:target="salvarContaForm"
                 >
                     <kbd>ESC</kbd> | Sair
                 </button>

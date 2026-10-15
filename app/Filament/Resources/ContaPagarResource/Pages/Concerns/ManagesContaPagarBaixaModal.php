@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\ContaPagarResource\Pages\Concerns;
 
+use App\Models\CaixaConta;
 use App\Models\ContaPagar;
-use App\Models\PlanoConta;
+use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
@@ -28,6 +29,9 @@ trait ManagesContaPagarBaixaModal
 
     public bool $baixaMovimentaCaixa = false;
 
+    /** @var list<array{id: int, label: string}> */
+    public array $baixaCaixasOptions = [];
+
     public bool $baixaExigeCheque = false;
 
     public string $baixaCheque = '';
@@ -37,6 +41,8 @@ trait ManagesContaPagarBaixaModal
     public bool $baixaValorPagoEditado = false;
 
     public bool $baixaJurosEditado = false;
+
+    public bool $baixaMultaEditada = false;
 
     public bool $baixaDescontoEditado = false;
 
@@ -52,6 +58,7 @@ trait ManagesContaPagarBaixaModal
         'vencimento' => '',
         'valor' => '0,00',
         'juros_pago' => '0,00',
+        'multa_paga' => '0,00',
         'desconto_recebido' => '0,00',
         'valor_pago_acumulado' => '0,00',
         'valor_a_pagar_titulo' => '0,00',
@@ -62,6 +69,10 @@ trait ManagesContaPagarBaixaModal
     public string $baixaPercJuros = '0,00';
 
     public string $baixaJuros = '0,00';
+
+    public string $baixaPercMulta = '0,00';
+
+    public string $baixaMulta = '0,00';
 
     public string $baixaSaldoComJuros = '0,00';
 
@@ -92,6 +103,7 @@ trait ManagesContaPagarBaixaModal
         $service = app(ContaPagarBaixaService::class);
         $this->baixaFormasOptions = $service->formasDisponiveis();
         $this->baixaPlanosOptions = $service->planosDisponiveis();
+        $this->baixaCaixasOptions = $this->caixasAtivasBaixaOptions();
 
         if ($this->baixaFormasOptions === []) {
             Notification::make()
@@ -127,6 +139,7 @@ trait ManagesContaPagarBaixaModal
         $this->baixaPlanoContaId = $this->resolvePlanoContaPadraoFornecedores();
         $this->baixaValorPagoEditado = false;
         $this->baixaJurosEditado = false;
+        $this->baixaMultaEditada = false;
         $this->baixaDescontoEditado = false;
         $this->baixaCheque = '';
         $this->preencherDadosBaixa($contas, $saldo);
@@ -135,6 +148,8 @@ trait ManagesContaPagarBaixaModal
         $this->baixaSaldo = ErpMoney::formatBr($saldo);
         $this->baixaPercJuros = '0,00';
         $this->baixaJuros = '0,00';
+        $this->baixaPercMulta = '0,00';
+        $this->baixaMulta = '0,00';
         $this->baixaPercDesconto = '0,00';
         $this->baixaDesconto = '0,00';
         $this->baixaPagoEm = ErpTimezone::toLocal()->toDateString();
@@ -181,6 +196,40 @@ trait ManagesContaPagarBaixaModal
         $this->recalcularBaixaTotais();
     }
 
+    public function updatingBaixaPercMulta(mixed $value): void
+    {
+        if ($this->dinheiroBaixaMudou($value, $this->baixaPercMulta)) {
+            $this->baixaMultaEditada = true;
+        }
+    }
+
+    public function updatedBaixaPercMulta(mixed $value): void
+    {
+        $saldo = ErpMoney::parseBr($this->baixaSaldo);
+        $perc = ErpMoney::parseBr($value);
+        $this->baixaPercMulta = ErpMoney::formatBr($perc);
+        $this->baixaMulta = ErpMoney::formatBr(round($saldo * ($perc / 100), 2));
+        $this->recalcularBaixaTotais();
+    }
+
+    public function updatingBaixaMulta(mixed $value): void
+    {
+        if ($this->dinheiroBaixaMudou($value, $this->baixaMulta)) {
+            $this->baixaMultaEditada = true;
+        }
+    }
+
+    public function updatedBaixaMulta(mixed $value): void
+    {
+        $saldo = ErpMoney::parseBr($this->baixaSaldo);
+        $multa = ErpMoney::parseBr($value);
+        $this->baixaMulta = ErpMoney::formatBr($multa);
+        $this->baixaPercMulta = $saldo > 0
+            ? ErpMoney::formatBr(round(($multa / $saldo) * 100, 2))
+            : '0,00';
+        $this->recalcularBaixaTotais();
+    }
+
     public function updatingBaixaPercDesconto(mixed $value): void
     {
         if ($this->dinheiroBaixaMudou($value, $this->baixaPercDesconto)) {
@@ -190,7 +239,9 @@ trait ManagesContaPagarBaixaModal
 
     public function updatedBaixaPercDesconto(mixed $value): void
     {
-        $base = ErpMoney::parseBr($this->baixaSaldo) + ErpMoney::parseBr($this->baixaJuros);
+        $base = ErpMoney::parseBr($this->baixaSaldo)
+            + ErpMoney::parseBr($this->baixaJuros)
+            + ErpMoney::parseBr($this->baixaMulta);
         $perc = ErpMoney::parseBr($value);
         $this->baixaPercDesconto = ErpMoney::formatBr($perc);
         $this->baixaDesconto = ErpMoney::formatBr(round($base * ($perc / 100), 2));
@@ -206,7 +257,9 @@ trait ManagesContaPagarBaixaModal
 
     public function updatedBaixaDesconto(mixed $value): void
     {
-        $base = ErpMoney::parseBr($this->baixaSaldo) + ErpMoney::parseBr($this->baixaJuros);
+        $base = ErpMoney::parseBr($this->baixaSaldo)
+            + ErpMoney::parseBr($this->baixaJuros)
+            + ErpMoney::parseBr($this->baixaMulta);
         $desconto = ErpMoney::parseBr($value);
         $this->baixaDesconto = ErpMoney::formatBr($desconto);
         $this->baixaPercDesconto = $base > 0
@@ -231,8 +284,9 @@ trait ManagesContaPagarBaixaModal
     {
         $saldo = ErpMoney::parseBr($this->baixaSaldo);
         $juros = ErpMoney::parseBr($this->baixaJuros);
+        $multa = ErpMoney::parseBr($this->baixaMulta);
         $desconto = ErpMoney::parseBr($this->baixaDesconto);
-        $saldoComJuros = round($saldo + $juros, 2);
+        $saldoComJuros = round($saldo + $juros + $multa, 2);
         $desconto = min($desconto, $saldoComJuros);
         $valorAPagar = round(max(0, $saldoComJuros - $desconto), 2);
 
@@ -257,11 +311,13 @@ trait ManagesContaPagarBaixaModal
         $this->baixaCaixaContaId = null;
         $this->baixaContaDestino = '—';
         $this->baixaMovimentaCaixa = false;
+        $this->baixaCaixasOptions = [];
         $this->baixaExigeCheque = false;
         $this->baixaCheque = '';
         $this->baixaUnica = true;
         $this->baixaValorPagoEditado = false;
         $this->baixaJurosEditado = false;
+        $this->baixaMultaEditada = false;
         $this->baixaDescontoEditado = false;
         $this->baixaResumoQtd = '0';
         $this->baixaResumoTotal = '0,00';
@@ -274,6 +330,7 @@ trait ManagesContaPagarBaixaModal
             'vencimento' => '',
             'valor' => '0,00',
             'juros_pago' => '0,00',
+            'multa_paga' => '0,00',
             'desconto_recebido' => '0,00',
             'valor_pago_acumulado' => '0,00',
             'valor_a_pagar_titulo' => '0,00',
@@ -281,6 +338,8 @@ trait ManagesContaPagarBaixaModal
         $this->baixaSaldo = '0,00';
         $this->baixaPercJuros = '0,00';
         $this->baixaJuros = '0,00';
+        $this->baixaPercMulta = '0,00';
+        $this->baixaMulta = '0,00';
         $this->baixaSaldoComJuros = '0,00';
         $this->baixaPercDesconto = '0,00';
         $this->baixaDesconto = '0,00';
@@ -291,28 +350,16 @@ trait ManagesContaPagarBaixaModal
 
     protected function resolvePlanoContaPadraoFornecedores(): ?int
     {
-        $ids = array_map(fn (array $plano): int => (int) $plano['id'], $this->baixaPlanosOptions);
+        $empresaId = null;
 
-        $porCodigo = (int) PlanoConta::query()
-            ->where('codigo', 1)
-            ->where('ativo', true)
-            ->where('dc', 'D')
-            ->value('id');
-
-        if ($porCodigo > 0 && in_array($porCodigo, $ids, true)) {
-            return $porCodigo;
+        if ($this->baixaContaIds !== []) {
+            $empresaId = (int) (ContaPagar::query()
+                ->whereKey($this->baixaContaIds[0])
+                ->value('empresa_id') ?? 0) ?: null;
         }
 
-        foreach ($this->baixaPlanosOptions as $plano) {
-            $label = mb_strtoupper((string) ($plano['label'] ?? ''), 'UTF-8');
-            $id = (int) ($plano['id'] ?? 0);
-
-            if ($id > 0 && str_contains($label, 'FORNECEDOR')) {
-                return $id;
-            }
-        }
-
-        return (int) ($this->baixaPlanosOptions[0]['id'] ?? 0) ?: null;
+        return app(ContaPagarBaixaService::class)
+            ->sugerirPlanoPadrao($empresaId ?: ErpContext::currentEmpresaId());
     }
 
     public function confirmarBaixaConta(): void
@@ -339,30 +386,26 @@ trait ManagesContaPagarBaixaModal
             return;
         }
 
-        if ($this->baixaMovimentaCaixa && (int) $this->baixaCaixaContaId <= 0) {
-            Notification::make()
-                ->title('A forma de pagamento não possui conta de destino.')
-                ->body('Cadastre a conta de destino na forma para lançar no caixa.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
         $opcoes = [
             'plano_conta_id' => (int) $this->baixaPlanoContaId,
             'perc_juros' => ErpMoney::parseBr($this->baixaPercJuros),
             'juros' => ErpMoney::parseBr($this->baixaJuros),
+            'perc_multa' => ErpMoney::parseBr($this->baixaPercMulta),
+            'multa' => ErpMoney::parseBr($this->baixaMulta),
             'perc_desconto' => ErpMoney::parseBr($this->baixaPercDesconto),
             'desconto' => ErpMoney::parseBr($this->baixaDesconto),
             'valor_pago' => ErpMoney::parseBr($this->baixaValorPago),
             'pago_em' => $this->baixaPagoEm,
             'numero_cheque' => $this->baixaExigeCheque ? $this->baixaCheque : '',
+            'caixa_conta_id' => $this->baixaMovimentaCaixa
+                ? ((int) ($this->baixaCaixaContaId ?? 0) ?: null)
+                : null,
         ];
 
         if (! $this->baixaUnica) {
             $opcoes['grupo'] = [
                 'juros_editado' => $this->baixaJurosEditado,
+                'multa_editada' => $this->baixaMultaEditada,
                 'desconto_editado' => $this->baixaDescontoEditado,
                 'valor_editado' => $this->baixaValorPagoEditado,
             ];
@@ -532,6 +575,7 @@ trait ManagesContaPagarBaixaModal
             'vencimento' => $vencimento,
             'valor' => ErpMoney::formatBr(round($contas->sum(fn (ContaPagar $conta): float => (float) $conta->valor), 2)),
             'juros_pago' => ErpMoney::formatBr(round($contas->sum(fn (ContaPagar $conta): float => (float) $conta->juros), 2)),
+            'multa_paga' => ErpMoney::formatBr(round($contas->sum(fn (ContaPagar $conta): float => (float) ($conta->multa ?? 0)), 2)),
             'desconto_recebido' => ErpMoney::formatBr(round($contas->sum(fn (ContaPagar $conta): float => (float) $conta->desconto), 2)),
             'valor_pago_acumulado' => ErpMoney::formatBr(round($contas->sum(fn (ContaPagar $conta): float => (float) $conta->valor_pago), 2)),
             'valor_a_pagar_titulo' => ErpMoney::formatBr($saldo),
@@ -552,14 +596,53 @@ trait ManagesContaPagarBaixaModal
 
         $this->baixaMovimentaCaixa = (bool) ($forma['movimenta_caixa'] ?? false);
         $this->baixaExigeCheque = (bool) ($forma['exige_cheque'] ?? false);
-        $this->baixaCaixaContaId = $this->baixaMovimentaCaixa
-            ? ((int) ($forma['caixa_conta_id'] ?? 0) ?: null)
-            : null;
-        $this->baixaContaDestino = (string) ($forma['caixa_label'] ?? '—');
 
         if (! $this->baixaExigeCheque) {
             $this->baixaCheque = '';
         }
+
+        if (! $this->baixaMovimentaCaixa) {
+            $this->baixaCaixaContaId = null;
+            $this->baixaContaDestino = 'Não movimenta o caixa';
+
+            return;
+        }
+
+        $sugerida = (int) ($forma['caixa_conta_id'] ?? 0);
+        if ($sugerida <= 0 || ! collect($this->baixaCaixasOptions)->contains(fn (array $c): bool => (int) $c['id'] === $sugerida)) {
+            $sugerida = (int) CaixaConta::ensureCaixaGeral()->id;
+        }
+
+        $this->baixaCaixaContaId = $sugerida;
+        $this->baixaContaDestino = (string) ($forma['caixa_label'] ?? CaixaConta::LABEL_CAIXA_GERAL_PADRAO);
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    protected function caixasAtivasBaixaOptions(): array
+    {
+        CaixaConta::ensureCaixaGeral();
+
+        return CaixaConta::query()
+            ->where('ativo', true)
+            ->orderBy('codigo')
+            ->orderBy('nome')
+            ->get(['id', 'codigo', 'nome'])
+            ->map(function (CaixaConta $caixa): array {
+                $codigo = trim((string) ($caixa->codigo ?? ''));
+                $nome = mb_strtoupper(trim((string) ($caixa->nome ?? '')), 'UTF-8');
+                $label = $codigo !== '' && $nome !== ''
+                    ? $codigo.' — '.$nome
+                    : ($nome !== '' ? $nome : ($codigo !== '' ? $codigo : 'Caixa #'.$caixa->id));
+
+                return [
+                    'id' => (int) $caixa->id,
+                    'label' => $label,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function dinheiroBaixaMudou(mixed $novo, string $atual): bool

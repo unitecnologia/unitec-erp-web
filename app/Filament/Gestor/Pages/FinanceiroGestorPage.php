@@ -6,6 +6,7 @@ use App\Filament\Gestor\Concerns\InteractsWithGestorShell;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
 use App\Models\PlanoConta;
+use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Financeiro\ContaPagarBaixaService;
@@ -276,7 +277,12 @@ class FinanceiroGestorPage extends Page
         }
 
         $opcoes = [];
-        if (! $isReceber) {
+        if ($isReceber) {
+            $planoId = $this->planoCreditoPadraoReceber((int) $this->pagamentoContaId);
+            if ($planoId !== null) {
+                $opcoes['plano_conta_id'] = $planoId;
+            }
+        } else {
             $planoId = $this->planoDebitoPadrao();
             if ($planoId === null) {
                 Notification::make()
@@ -295,6 +301,7 @@ class FinanceiroGestorPage extends Page
                 ? app(ContaReceberBaixaService::class)->baixarMuitas(
                     [(int) $this->pagamentoContaId],
                     (int) $this->pagamentoFormaId,
+                    $opcoes,
                 )
                 : app(ContaPagarBaixaService::class)->baixarUma(
                     (int) $this->pagamentoContaId,
@@ -375,35 +382,30 @@ class FinanceiroGestorPage extends Page
         return $query->exists();
     }
 
-    /**
-     * Mesma ordem da tela de Contas a Pagar: código 1, senão descrição com FORNECEDOR, senão o primeiro débito ativo.
-     */
     private function planoDebitoPadrao(): ?int
     {
-        $planos = app(ContaPagarBaixaService::class)->planosDisponiveis();
-        if ($planos === []) {
-            return null;
+        return app(ContaPagarBaixaService::class)
+            ->sugerirPlanoPadrao($this->empresaIdAtiva());
+    }
+
+    private function planoCreditoPadraoReceber(int $contaId): ?int
+    {
+        $conta = ContaReceber::query()->find($contaId);
+        $empresaId = $conta?->empresa_id
+            ? (int) $conta->empresa_id
+            : $this->empresaIdAtiva();
+
+        $doTitulo = (int) ($conta?->plano_conta_id ?? 0);
+        if ($doTitulo > 0
+            && PlanoConta::query()
+                ->whereKey($doTitulo)
+                ->where('ativo', true)
+                ->where('dc', 'C')
+                ->exists()
+        ) {
+            return $doTitulo;
         }
 
-        $ids = array_map(fn (array $plano): int => (int) $plano['id'], $planos);
-        $porCodigo = (int) PlanoConta::query()
-            ->where('codigo', 1)
-            ->where('ativo', true)
-            ->where('dc', 'D')
-            ->value('id');
-
-        if ($porCodigo > 0 && in_array($porCodigo, $ids, true)) {
-            return $porCodigo;
-        }
-
-        foreach ($planos as $plano) {
-            $label = mb_strtoupper((string) ($plano['label'] ?? ''), 'UTF-8');
-            $id = (int) ($plano['id'] ?? 0);
-            if ($id > 0 && str_contains($label, 'FORNECEDOR')) {
-                return $id;
-            }
-        }
-
-        return (int) ($planos[0]['id'] ?? 0) ?: null;
+        return EmpresaParametros::planoVendaId($empresaId);
     }
 }
