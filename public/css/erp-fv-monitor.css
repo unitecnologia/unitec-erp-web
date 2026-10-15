@@ -1561,6 +1561,28 @@
     border-color: #2563eb;
 }
 
+/* Emitir NF-e / Lote: amarelo quando há pendência fiscal no cadastro do cliente */
+.erp-fv-monitor-page .erp-fv-mon-actions .erp-nfe-actions__btn.is-warning:not(:disabled) {
+    border-color: #d97706;
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #78350f;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-actions .erp-nfe-actions__btn.is-warning:not(:disabled):hover {
+    border-color: #b45309;
+    background: linear-gradient(180deg, #fcd34d 0%, #b45309 100%);
+    color: #451a03;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-actions .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__label,
+.erp-fv-monitor-page .erp-fv-mon-actions .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__icon {
+    color: inherit;
+}
+
+.erp-fv-monitor-page .erp-fv-mon-actions .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__icon svg {
+    stroke: currentColor;
+}
+
 .erp-fv-mon-nfe-lote-resumo {
     position: fixed;
     inset: 0;

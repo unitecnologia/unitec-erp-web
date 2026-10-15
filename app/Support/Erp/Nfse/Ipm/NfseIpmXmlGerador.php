@@ -7,6 +7,7 @@ use App\Models\Nfse;
 use App\Models\NfseItem;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseObra;
+use App\Support\Erp\Nfse\NfseTomadorCadastro;
 use DOMDocument;
 use DOMElement;
 
@@ -387,8 +388,16 @@ class NfseIpmXmlGerador
             return null;
         }
 
-        if ($logradouro === '' || $bairro === '' || strlen($municipio) !== 7 || strlen($uf) !== 2 || strlen($cep) !== 8) {
-            throw new NfseNaoTransmitida('Complete o endereço do tomador: logradouro, bairro, município, UF e CEP com 8 dígitos.');
+        $motivoEndereco = NfseTomadorCadastro::motivoEnderecoIncompleto([
+            'endereco' => $logradouro,
+            'bairro' => $bairro,
+            'cidade_codigo' => $municipio,
+            'uf' => $uf,
+            'cep' => $cep,
+        ]);
+
+        if ($motivoEndereco !== null) {
+            throw new NfseNaoTransmitida($motivoEndereco);
         }
 
         $endereco = $doc->createElementNS(self::NS, 'Endereco');

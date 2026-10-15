@@ -149,11 +149,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   " if($c -notmatch '(?m)^SESSION_SECURE_COOKIE='){ $c += \"`r`nSESSION_SECURE_COOKIE=false\" };" ^
   " [IO.File]::WriteAllText($f,$c,(New-Object Text.UTF8Encoding $false)) }"
 
-echo [6/8] Migrate + config:cache...
-"%PHPEXE%" artisan migrate --force
-"%PHPEXE%" artisan config:cache >nul 2>&1
-
-echo [7/8] Iniciando MySQL + servidor web...
+echo [6/8] Iniciando MySQL + servidor web...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "Set-Location '%APP%'; . '%APP%\scripts\unitec-install-lib.ps1';" ^
   "Ensure-UnitecStorageStructure -AppPath '%APP%';" ^
@@ -165,6 +161,16 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+
+REM Migrate DEPOIS do MySQL subir (passo 1 encerra o mysqld).
+echo [7/8] Migrate + config:cache...
+"%PHPEXE%" artisan migrate --force
+if errorlevel 1 (
+  echo [ERRO] Migrate falhou. Veja a mensagem acima.
+  pause
+  exit /b 1
+)
+"%PHPEXE%" artisan config:cache >nul 2>&1
 
 echo [8/8] Testando login...
 timeout /t 2 /nobreak >nul

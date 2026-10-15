@@ -9,6 +9,7 @@ use App\Models\EstoqueMovimentacao;
 use App\Models\Nfe;
 use App\Models\Nfse;
 use App\Models\OrdemServico;
+use App\Models\PdvVendaNfce;
 use App\Models\Product;
 use App\Support\Erp\Audit\ErpOperacaoLogService;
 use App\Support\Erp\ErpContext;
@@ -91,6 +92,26 @@ final class OsReabrirService
             $numero = trim((string) ($nfe->numero ?? ''));
 
             return 'Esta OS tem NF-e emitida'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Cancele a NF-e antes de '.$acao.' a OS.';
+        }
+
+        $nfce = PdvVendaNfce::query()
+            ->where('ordem_servico_id', (int) $os->id)
+            ->where(fn ($q) => $q->where('simulada', false)->orWhereNull('simulada'))
+            ->whereIn('status', [
+                PdvVendaNfce::STATUS_AUTORIZADA,
+                PdvVendaNfce::STATUS_CONTINGENCIA,
+                PdvVendaNfce::STATUS_DUPLICIDADE,
+                PdvVendaNfce::STATUS_PENDENTE,
+                PdvVendaNfce::STATUS_REJEITADA,
+                PdvVendaNfce::STATUS_DENEGADA,
+            ])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($nfce instanceof PdvVendaNfce) {
+            $numero = trim((string) ($nfce->numero ?? ''));
+
+            return 'Esta OS tem NFC-e emitida'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Cancele a NFC-e antes de '.$acao.' a OS.';
         }
 
         if ($this->boletosRegistrados($os)->isNotEmpty()) {

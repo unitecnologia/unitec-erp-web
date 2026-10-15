@@ -16,6 +16,11 @@ class PdvVenda extends Model
      */
     public const ORIGEM_REGULARIZACAO_FISCAL = 'regularizacao_fiscal';
 
+    /**
+     * Espelho só fiscal das peças da OS para emitir NFC-e (sem estoque/caixa/financeiro).
+     */
+    public const ORIGEM_OS_NFCE_PECAS = 'os_nfce_pecas';
+
     protected $table = 'pdv_vendas';
 
     protected $fillable = [
@@ -115,14 +120,22 @@ class PdvVenda extends Model
         return (string) ($this->origem ?? '') === self::ORIGEM_REGULARIZACAO_FISCAL;
     }
 
+    public function isEspelhoFiscalOsNfce(): bool
+    {
+        return (string) ($this->origem ?? '') === self::ORIGEM_OS_NFCE_PECAS;
+    }
+
     /**
-     * Vendas reais do PDV (exclui registros só fiscais da regularização).
+     * Vendas reais do PDV (exclui registros só fiscais da regularização / OS NFC-e).
      */
     public function scopeComercial(Builder $query): Builder
     {
         return $query->where(function (Builder $q): void {
             $q->whereNull($q->qualifyColumn('origem'))
-                ->orWhere($q->qualifyColumn('origem'), '!=', self::ORIGEM_REGULARIZACAO_FISCAL);
+                ->orWhereNotIn($q->qualifyColumn('origem'), [
+                    self::ORIGEM_REGULARIZACAO_FISCAL,
+                    self::ORIGEM_OS_NFCE_PECAS,
+                ]);
         });
     }
 

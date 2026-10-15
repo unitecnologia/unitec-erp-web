@@ -51,6 +51,7 @@ class ListForcaVendasMonitor extends ListRecords
 {
     use InteractsWithErpListPage;
     use Concerns\ManagesForcaVendasMonitorEmailModal;
+    use Concerns\ManagesForcaVendasMonitorNfeClienteIncompleto;
     use Concerns\ManagesForcaVendasMonitorNfeEmitenteModal;
     use Concerns\ProvidesForcaVendasMonitorSelecaoUi;
 
@@ -564,6 +565,7 @@ class ListForcaVendasMonitor extends ListRecords
                 View::make('filament.components.erp.forca-vendas.monitor-reabrir-progress'),
                 View::make('filament.components.erp.forca-vendas.monitor-nfe-emitente-modal'),
                 View::make('filament.components.erp.forca-vendas.monitor-email-modal'),
+                View::make('filament.components.erp.forca-vendas.monitor-nfe-cliente-incompleto-modal'),
             ]);
     }
 
@@ -2110,6 +2112,17 @@ class ListForcaVendasMonitor extends ListRecords
     public function emitirNfeDoBotao(): void
     {
         $estado = $this->nfeEmitirEstado;
+        $pendencias = array_values($estado['cliente_pendencias'] ?? []);
+
+        // Cadastro incompleto: modal (padrão OS) — sem toast e sem emissão parcial no lote.
+        if ($pendencias !== []) {
+            $this->abrirModalClienteNfeIncompleto(
+                $pendencias,
+                (string) ($estado['mode'] ?? 'single'),
+            );
+
+            return;
+        }
 
         if (! ($estado['enabled'] ?? false)) {
             Notification::make()

@@ -19,7 +19,17 @@
         <span class="erp-orcamentos-actions__icon">🖨</span>
         <span class="erp-orcamentos-actions__label"><kbd>F6</kbd> | Imprimir</span>
     </button>
-    <button type="button" wire:click="emitirNfeDevolucaoCompra" class="erp-orcamentos-actions__btn" data-erp-key="F7">
+    <button
+        type="button"
+        wire:click="emitirNfeDevolucaoCompra"
+        @class([
+            'erp-orcamentos-actions__btn',
+            'is-warning' => $this->devolucaoSelecionadaNfeFornecedorIncompleto(),
+        ])
+        data-erp-key="F7"
+        data-erp-warn-on-row="erp-devcompra-row--nfe-fornecedor-incompleto"
+        title="Emitir NF-e de devolução (amarelo: cadastro do fornecedor incompleto)"
+    >
         <span class="erp-orcamentos-actions__icon">📄</span>
         <span class="erp-orcamentos-actions__label"><kbd>F7</kbd> | NF-e</span>
     </button>

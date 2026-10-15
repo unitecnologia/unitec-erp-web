@@ -136,15 +136,28 @@ trait ManagesOrdemServicoEmailModal
             $this->emailMessage = $report->defaultTecnicaEmailMessage($numero, $ordem);
         } else {
             $cliente = $ordem->cliente;
-            $phoneRaw = trim((string) (
-                $ordem->fone1
-                ?: $ordem->fone2
-                ?: ($cliente?->celular1 ?? '')
-                ?: ($cliente?->fone1 ?? '')
-            ));
+            // CONSUMIDOR FINAL é cadastro genérico — não pré-preencher e-mail/WhatsApp
+            // (costuma ter o telefone do suporte da empresa no cadastro).
+            $consumidorFinal = $cliente !== null && (
+                $cliente->isCadastroConsumidorFinal()
+                || strtoupper(trim((string) ($cliente->nome_razao ?? ''))) === 'CONSUMIDOR FINAL'
+            );
 
-            $this->emailTo = trim((string) ($cliente?->email ?? ''));
-            $this->whatsAppTo = WhatsAppPhone::formatDisplay($phoneRaw);
+            if ($consumidorFinal) {
+                $this->emailTo = '';
+                $this->whatsAppTo = '';
+            } else {
+                $phoneRaw = trim((string) (
+                    $ordem->fone1
+                    ?: $ordem->fone2
+                    ?: ($cliente?->celular1 ?? '')
+                    ?: ($cliente?->fone1 ?? '')
+                ));
+
+                $this->emailTo = trim((string) ($cliente?->email ?? ''));
+                $this->whatsAppTo = WhatsAppPhone::formatDisplay($phoneRaw);
+            }
+
             $this->emailSubject = $report->defaultEmailSubject($numero);
             $this->emailMessage = $report->defaultEmailMessage($numero, [], $ordem);
         }

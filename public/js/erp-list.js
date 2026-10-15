@@ -239,6 +239,16 @@ function selectErpListRow(page, row) {
             .filter(Boolean);
         button.disabled = classes.length > 0 && ! classes.some((cls) => row.classList.contains(cls));
     });
+
+    document.querySelectorAll('[data-erp-warn-on-row]').forEach((button) => {
+        const classes = String(button.dataset.erpWarnOnRow || '')
+            .split(/\s+/)
+            .filter(Boolean);
+        button.classList.toggle(
+            'is-warning',
+            classes.length > 0 && classes.some((cls) => row.classList.contains(cls)),
+        );
+    });
 }
 
 function getRecordKeyFromRow(row) {

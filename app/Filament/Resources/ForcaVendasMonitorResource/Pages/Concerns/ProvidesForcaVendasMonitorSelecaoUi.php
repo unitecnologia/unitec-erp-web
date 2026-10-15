@@ -9,6 +9,7 @@ use App\Models\PixCobranca;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpTimezone;
+use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\ForcaVendas\ForcaVendasFaturamentoService;
 use App\Support\ForcaVendas\ForcaVendasMargemVendaCalculator;
@@ -261,17 +262,27 @@ trait ProvidesForcaVendasMonitorSelecaoUi
     }
 
     /**
-     * @return array{enabled: bool, label: string, title: string, mode: string, venda_ids: list<int>}
+     * @return array{
+     *     enabled: bool,
+     *     warning: bool,
+     *     label: string,
+     *     title: string,
+     *     mode: string,
+     *     venda_ids: list<int>,
+     *     cliente_pendencias: list<array{cliente_id: ?int, nome: string, campos: list<string>}>
+     * }
      */
     #[Computed]
     public function nfeEmitirEstado(): array
     {
         $disabled = [
             'enabled' => false,
+            'warning' => false,
             'label' => 'Emitir NF-e',
             'title' => 'Selecione pedido(s) faturado(s) com cliente apto à NF-e.',
             'mode' => 'disabled',
             'venda_ids' => [],
+            'cliente_pendencias' => [],
         ];
 
         if (! ErpAccess::currentCan('nfe.access') || ! ErpAccess::currentCan('nfe.emit')) {
@@ -296,10 +307,14 @@ trait ProvidesForcaVendasMonitorSelecaoUi
         $serv = app(NfeVendaMercadoriaService::class);
         $vendaIds = [];
         $motivos = [];
+        /** @var array<int|string, array{cliente_id: ?int, nome: string, campos: list<string>}> $pendencias */
+        $pendencias = [];
 
         foreach ($orders as $order) {
+            $dav = 'DAV '.($order->pedido?->numero ?? $order->id);
+
             if ($order->situacao !== ForcaVendasOrder::SITUACAO_FATURADO || ! $order->venda_id) {
-                $motivos[] = 'DAV '.($order->pedido?->numero ?? $order->id).': não faturado.';
+                $motivos[] = $dav.': não faturado.';
 
                 continue;
             }
@@ -307,7 +322,43 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             $venda = $order->venda;
 
             if (! $venda) {
-                $motivos[] = 'DAV '.($order->pedido?->numero ?? $order->id).': venda não encontrada.';
+                $motivos[] = $dav.': venda não encontrada.';
+
+                continue;
+            }
+
+            // Cliente: NfeClienteCadastro (inclui IE) sobre relação já eager-loaded — sem query extra.
+            $faltando = NfeClienteCadastro::camposFaltantesDoCliente($venda->cliente);
+
+            if ($faltando !== []) {
+                if ($venda->itens->isEmpty()) {
+                    $motivos[] = $dav.': a venda não possui itens para emitir NF-e.';
+
+                    continue;
+                }
+
+                if ($serv->temNfeAtiva($venda)) {
+                    $motivos[] = $dav.': esta venda já possui NF-e vinculada.';
+
+                    continue;
+                }
+
+                $clienteId = (int) ($venda->cliente_id ?? 0);
+                $chave = $clienteId > 0 ? $clienteId : 'dav-'.$order->id;
+                $nome = trim((string) ($venda->cliente?->nome_razao ?? '—')) ?: '—';
+
+                if (! isset($pendencias[$chave])) {
+                    $pendencias[$chave] = [
+                        'cliente_id' => $clienteId > 0 ? $clienteId : null,
+                        'nome' => $nome,
+                        'campos' => $faltando,
+                    ];
+                } else {
+                    $pendencias[$chave]['campos'] = array_values(array_unique([
+                        ...$pendencias[$chave]['campos'],
+                        ...$faltando,
+                    ]));
+                }
 
                 continue;
             }
@@ -315,7 +366,7 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             $motivo = $serv->motivoInaptoParaNfe($venda);
 
             if ($motivo !== null) {
-                $motivos[] = 'DAV '.($order->pedido?->numero ?? $order->id).': '.$motivo;
+                $motivos[] = $dav.': '.$motivo;
 
                 continue;
             }
@@ -323,26 +374,52 @@ trait ProvidesForcaVendasMonitorSelecaoUi
             $vendaIds[] = (int) $venda->id;
         }
 
-        if ($motivos !== [] || $vendaIds === []) {
+        $labelLote = count($orders) > 1;
+
+        // Bloqueios estruturais prevalecem (botão desabilitado, como antes).
+        if ($motivos !== []) {
             return [
                 'enabled' => false,
-                'label' => count($orders) > 1 ? 'Emitir NF-e Lote' : 'Emitir NF-e',
-                'title' => $motivos[0] ?? $disabled['title'],
+                'warning' => false,
+                'label' => $labelLote ? 'Emitir NF-e Lote' : 'Emitir NF-e',
+                'title' => $motivos[0],
                 'mode' => 'disabled',
                 'venda_ids' => [],
+                'cliente_pendencias' => [],
             ];
+        }
+
+        // Só pendência de cadastro: botão amarelo/clicável; lote não emite parcialmente.
+        if ($pendencias !== []) {
+            $lote = $labelLote || count($pendencias) > 1;
+
+            return [
+                'enabled' => true,
+                'warning' => true,
+                'label' => $lote ? 'Emitir NF-e Lote' : 'Emitir NF-e',
+                'title' => 'Cadastro do cliente incompleto para NF-e. Clique para ver os campos faltantes.',
+                'mode' => $lote ? 'lote' : 'single',
+                'venda_ids' => [],
+                'cliente_pendencias' => array_values($pendencias),
+            ];
+        }
+
+        if ($vendaIds === []) {
+            return $disabled;
         }
 
         $lote = count($vendaIds) > 1;
 
         return [
             'enabled' => true,
+            'warning' => false,
             'label' => $lote ? 'Emitir NF-e Lote' : 'Emitir NF-e',
             'title' => $lote
                 ? 'Transmitir '.count($vendaIds).' NF-e automaticamente (permanece no Monitor).'
                 : 'Abrir emissão de NF-e da venda selecionada.',
             'mode' => $lote ? 'lote' : 'single',
             'venda_ids' => $vendaIds,
+            'cliente_pendencias' => [],
         ];
     }
 

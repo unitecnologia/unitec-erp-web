@@ -3,14 +3,21 @@
 namespace App\Filament\Resources\OrdemServicoResource\Pages;
 
 use App\Filament\Concerns\InteractsWithErpListPage;
+use App\Filament\Concerns\InteractsWithErpPermissions;
 use App\Filament\Pages\NfsePage;
 use App\Filament\Resources\NfeResource;
+use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceClienteEmail;
 use App\Filament\Resources\OrdemServicoResource;
+use App\Filament\Resources\PersonResource;
 use App\Models\OrdemServico;
+use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
+use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeOrdemServicoService;
+use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use App\Support\Erp\Nfse\NfseFromOrdemServico;
+use App\Support\Erp\Nfse\NfseTomadorCadastro;
 use App\Support\Erp\Os\OrdemServicoRetorno;
 use App\Support\Erp\Os\OsReabrirService;
 use DomainException;
@@ -34,8 +41,11 @@ use Livewire\Attributes\Url;
 class ListOrdensServico extends ListRecords
 {
     use InteractsWithErpListPage;
+    use InteractsWithErpPermissions;
+    use ManagesNfceClienteEmail;
     use Concerns\ManagesOrdemServicoEmailModal;
     use Concerns\ManagesOrdemServicoEspelhoModal;
+    use Concerns\ManagesOrdemServicoNfcePecas;
 
     protected static string $resource = OrdemServicoResource::class;
 
@@ -87,6 +97,23 @@ class ListOrdensServico extends ListRecords
     #[Locked]
     public string $osConfirmMensagem = '';
 
+    public bool $osClienteFiscalIncompletoOpen = false;
+
+    /** @var list<string> */
+    public array $osClienteFiscalIncompletoCampos = [];
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoNome = '';
+
+    #[Locked]
+    public ?int $osClienteFiscalIncompletoId = null;
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoDocumento = '';
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoAtalho = '';
+
     public function mount(): void
     {
         parent::mount();
@@ -135,11 +162,14 @@ class ListOrdensServico extends ListRecords
             'create' => 'createOrdem',
             'edit' => 'editOrdem',
             'delete' => 'cancelOrdem',
+            'blockingSelector' => '.erp-os-nfce-emitir-modal, .erp-nfe-fiscal-overlay.is-visible, .erp-nfe-danfe-email-modal, .erp-orc-email-modal, [data-erp-sefaz-progress].is-visible',
             'extraKeys' => [
                 'F6' => ['method' => 'openPrintModal'],
+                'F7' => ['method' => 'emitirNfseDaOs'],
                 'F8' => ['method' => 'reabrirOrdem'],
                 'F9' => ['method' => 'openSendModal'],
                 'F10' => ['method' => 'emitirNfePecasDaOs'],
+                'F11' => ['method' => 'emitirNfcePecasDaOs'],
             ],
             'searchFocusKey' => 'F12',
         ];
@@ -158,7 +188,16 @@ class ListOrdensServico extends ListRecords
     protected function buildListQuery(): Builder
     {
         $query = parent::getTableQuery()
-            ->with(['cliente', 'atendente', 'nfseAutorizada', 'nfseItemAutorizado.nfse', 'nfeAutorizada', 'nfePecasEmitida']);
+            ->with([
+                'cliente',
+                'atendente',
+                'nfseAutorizada',
+                'nfseItemAutorizado.nfse',
+                'nfeAutorizada',
+                'nfePecasEmitida',
+                'nfceAutorizada',
+                'nfcePecasEmitida',
+            ]);
 
         if ($this->statusFilter === OrdemServico::SITUACAO_ABERTA) {
             $query->whereIn('situacao', [
@@ -250,7 +289,33 @@ class ListOrdensServico extends ListRecords
                 View::make('filament.components.erp.ordens-servico.email-modal'),
                 View::make('filament.components.erp.ordens-servico.espelho-modal'),
                 View::make('filament.components.erp.ordens-servico.confirm-modal'),
+                View::make('filament.components.erp.ordens-servico.os-cliente-fiscal-incompleto-modal'),
+                View::make('filament.components.erp.ordens-servico.os-nfce-emitir-modal'),
+                View::make('filament.components.erp.ordens-servico.os-nfce-fiscal-overlays'),
+                View::make('filament.components.erp.nfce.enviar-modal'),
             ]);
+    }
+
+    protected function empresaIdAtiva(): ?int
+    {
+        return NfceEmpresaEscopo::empresaIdAtiva();
+    }
+
+    protected function nfcePodeExecutar(?string $permissao = null): bool
+    {
+        if (! $this->erpAuthorizeOrNotify('nfce.access')) {
+            return false;
+        }
+
+        return $permissao === null || $this->erpAuthorizeOrNotify($permissao);
+    }
+
+    /**
+     * @param  list<string>  $with
+     */
+    protected function findNfceNoEscopo(?int $id, array $with = []): ?PdvVendaNfce
+    {
+        return NfceEmpresaEscopo::find($id, $this->empresaIdAtiva(), $with);
     }
 
     public function openPrintModal(): void
@@ -339,8 +404,6 @@ class ListOrdensServico extends ListRecords
 
     /**
      * Notas com validade fiscal vinculadas à OS selecionada, já com a URL da rotina de impressão existente.
-     * NFC-e ainda não tem vínculo com a OS (ver OrdemServico::nfceNumeroLista), por isso não entra.
-     *
      * @return array<string, array{rotulo: string, url: string}>
      */
     private function documentosFiscaisImprimiveis(OrdemServico $ordem): array
@@ -355,12 +418,21 @@ class ListOrdensServico extends ListRecords
             ];
         }
 
-        $nfe = $ordem->nfeAutorizada()->first();
+        $nfe = $ordem->relationLoaded('nfeAutorizada') ? $ordem->nfeAutorizada : $ordem->nfeAutorizada()->first();
 
         if ($nfe !== null && (filled($nfe->xml) || filled($nfe->chave))) {
             $documentos['nfe'] = [
                 'rotulo' => 'NF-e nº '.(ltrim((string) $nfe->numero, '0') ?: (string) $nfe->numero),
                 'url' => route('erp.reports.nfe-danfe', ['nfe' => $nfe->id]),
+            ];
+        }
+
+        $nfce = $ordem->relationLoaded('nfceAutorizada') ? $ordem->nfceAutorizada : $ordem->nfceAutorizada()->first();
+
+        if ($nfce !== null && ErpAccess::currentCan('nfce.access') && (int) ($nfce->pdv_venda_id ?? 0) > 0) {
+            $documentos['nfce'] = [
+                'rotulo' => 'NFC-e nº '.(ltrim((string) $nfce->numero, '0') ?: (string) $nfce->numero),
+                'url' => route('erp.reports.nfce-cupom', ['venda' => $nfce->pdv_venda_id, 'auto' => 0, 'copias' => 1]),
             ];
         }
 
@@ -538,10 +610,35 @@ class ListOrdensServico extends ListRecords
 
         if (! $record->possuiNfseAutorizada()) {
             $classes[] = 'erp-os-row--nfse-pendente';
+
+            // Usa o cliente já eager-loaded — sem consulta extra por linha.
+            if (NfseTomadorCadastro::camposFaltantesDoCliente($record->cliente) !== []) {
+                $classes[] = 'erp-os-row--nfse-cliente-incompleto';
+            }
         }
 
-        if (! $record->possuiNfePecasEmitida()) {
-            $classes[] = 'erp-os-row--nfe-pendente';
+        // F10 / F11: peças na grade; exclusão mútua NF-e ↔ NFC-e.
+        if ($this->osListaIndicaPecas($record)) {
+            if (! $record->possuiNfePecasEmitida() && ! $record->possuiNfcePecasDocumentada()) {
+                $classes[] = 'erp-os-row--nfe-pendente';
+
+                if (NfeClienteCadastro::camposFaltantesDoCliente($record->cliente) !== []) {
+                    $classes[] = 'erp-os-row--nfe-cliente-incompleto';
+                }
+            }
+
+            if (
+                ! $record->possuiNfePecasEmitida()
+                && ! $record->possuiNfceAutorizada()
+                && ! $this->osClienteTemCnpj($record->cliente)
+            ) {
+                $nfce = $record->nfcePecasEmitida;
+                $denegada = $nfce !== null && (string) $nfce->status === \App\Models\PdvVendaNfce::STATUS_DENEGADA;
+
+                if (! $denegada) {
+                    $classes[] = 'erp-os-row--nfce-pendente';
+                }
+            }
         }
 
         return $classes;
@@ -554,11 +651,104 @@ class ListOrdensServico extends ListRecords
         return $ordem !== null && ! $ordem->possuiNfseAutorizada();
     }
 
+    /**
+     * Amarelo no F7: cadastro incompleto na linha já carregada (sem query extra).
+     */
+    public function osSelecionadaNfseClienteIncompleto(): bool
+    {
+        if (! $this->highlightedRecordId) {
+            return false;
+        }
+
+        try {
+            $records = $this->getTableRecords();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        foreach ($records as $record) {
+            if (! $record instanceof OrdemServico || (int) $record->getKey() !== (int) $this->highlightedRecordId) {
+                continue;
+            }
+
+            if (! $this->osFaturada($record) || $record->possuiNfseAutorizada()) {
+                return false;
+            }
+
+            return NfseTomadorCadastro::camposFaltantesDoCliente($record->cliente) !== [];
+        }
+
+        return false;
+    }
+
     public function osSelecionadaPodeEmitirNfePecas(): bool
     {
-        $ordem = $this->osSelecionadaFaturadaModel();
+        $ordem = $this->osSelecionadaNaGrade();
 
-        return $ordem !== null && ! $ordem->possuiNfePecasEmitida();
+        if ($ordem === null) {
+            return false;
+        }
+
+        return $this->osFaturada($ordem)
+            && ! $ordem->possuiNfePecasEmitida()
+            && ! $ordem->possuiNfcePecasDocumentada()
+            && $this->osListaIndicaPecas($ordem);
+    }
+
+    /**
+     * Amarelo no F10: só com peças + cadastro incompleto (dados da grade, sem query extra).
+     */
+    public function osSelecionadaNfeClienteIncompleto(): bool
+    {
+        $ordem = $this->osSelecionadaNaGrade();
+
+        if (
+            $ordem === null
+            || ! $this->osFaturada($ordem)
+            || $ordem->possuiNfePecasEmitida()
+            || $ordem->possuiNfcePecasDocumentada()
+        ) {
+            return false;
+        }
+
+        if (! $this->osListaIndicaPecas($ordem)) {
+            return false;
+        }
+
+        return NfeClienteCadastro::camposFaltantesDoCliente($ordem->cliente) !== [];
+    }
+
+    /**
+     * OS selecionada a partir dos registros já carregados da grade (sem query).
+     */
+    protected function osSelecionadaNaGrade(): ?OrdemServico
+    {
+        if (! $this->highlightedRecordId) {
+            return null;
+        }
+
+        try {
+            $records = $this->getTableRecords();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        foreach ($records as $record) {
+            if ($record instanceof OrdemServico && (int) $record->getKey() === (int) $this->highlightedRecordId) {
+                return $record;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Indica peças pelos totais já presentes na OS — sem carregar itens.
+     */
+    protected function osListaIndicaPecas(OrdemServico $ordem): bool
+    {
+        return (float) ($ordem->subtotal_pecas ?? 0) > 0.0001
+            || (float) ($ordem->total_produtos ?? 0) > 0.0001;
     }
 
     private function osSelecionadaFaturadaModel(): ?OrdemServico
@@ -679,7 +869,7 @@ class ListOrdensServico extends ListRecords
         $this->osConfirmMensagem = $mensagem;
     }
 
-    private function osFaturada(OrdemServico $ordem): bool
+    protected function osFaturada(OrdemServico $ordem): bool
     {
         return in_array($ordem->situacao, [OrdemServico::SITUACAO_FINALIZADA, OrdemServico::SITUACAO_ENTREGUE], true);
     }
@@ -845,7 +1035,68 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
+        $faltando = NfseTomadorCadastro::camposFaltantesDoCliente($ordem->cliente);
+
+        if ($faltando !== []) {
+            $this->abrirOsClienteFiscalIncompleto(
+                'NFS-e',
+                'F7',
+                $faltando,
+                trim((string) ($ordem->cliente?->nome_razao ?? $ordem->nome ?? '—')),
+                $ordem->cliente_id !== null ? (int) $ordem->cliente_id : null,
+            );
+
+            return;
+        }
+
         $this->redirect(OrdemServicoRetorno::anexar(NfsePage::getUrl().'?os='.$ordem->id), navigate: false);
+    }
+
+    public function fecharOsClienteFiscalIncompleto(): void
+    {
+        $this->osClienteFiscalIncompletoOpen = false;
+        $this->osClienteFiscalIncompletoCampos = [];
+        $this->osClienteFiscalIncompletoNome = '';
+        $this->osClienteFiscalIncompletoId = null;
+        $this->osClienteFiscalIncompletoDocumento = '';
+        $this->osClienteFiscalIncompletoAtalho = '';
+    }
+
+    public function abrirCadastroClienteFiscalIncompleto(): void
+    {
+        $clienteId = $this->osClienteFiscalIncompletoId;
+
+        $this->fecharOsClienteFiscalIncompleto();
+
+        if ($clienteId === null || $clienteId < 1) {
+            Notification::make()->title('Cliente da OS não encontrado para correção.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'pessoas.update')) {
+            return;
+        }
+
+        $this->redirect(PersonResource::getUrl('edit', ['record' => $clienteId]), navigate: false);
+    }
+
+    /**
+     * @param  list<string>  $campos
+     */
+    private function abrirOsClienteFiscalIncompleto(
+        string $documento,
+        string $atalho,
+        array $campos,
+        string $nome,
+        ?int $clienteId,
+    ): void {
+        $this->osClienteFiscalIncompletoOpen = true;
+        $this->osClienteFiscalIncompletoCampos = $campos;
+        $this->osClienteFiscalIncompletoNome = $nome;
+        $this->osClienteFiscalIncompletoId = $clienteId;
+        $this->osClienteFiscalIncompletoDocumento = $documento;
+        $this->osClienteFiscalIncompletoAtalho = $atalho;
     }
 
     public function emitirNfePecasDaOs(): void
@@ -856,19 +1107,13 @@ class ListOrdensServico extends ListRecords
             return;
         }
 
-        $ordem = $this->ordemSelecionadaParaFiscal();
-
-        if ($ordem === null) {
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfe.access')) {
             return;
         }
 
-        if (! $this->osFaturada($ordem)) {
-            Notification::make()
-                ->title('NF-e das peças só para OS finalizada.')
-                ->body('Finalize a OS antes de emitir a NF-e das peças.')
-                ->warning()
-                ->send();
+        $ordem = $this->ordemSelecionadaParaFiscal();
 
+        if ($ordem === null) {
             return;
         }
 
@@ -877,20 +1122,48 @@ class ListOrdensServico extends ListRecords
 
             Notification::make()
                 ->title('Esta OS já possui NF-e das peças'.($numero !== '' ? ' (nº '.$numero.')' : '').'.')
-                ->body('Para emitir outra, cancele a nota existente no módulo NF-e.')
                 ->warning()
                 ->send();
 
             return;
         }
 
-        if (! NfeOrdemServicoService::osTemPecasParaNfe($ordem)) {
-            Notification::make()->title('Esta OS não possui peças para emissão de NF-e.')->warning()->send();
+        if ($ordem->possuiNfcePecasDocumentada()) {
+            $numero = ltrim((string) ($ordem->nfceAutorizada?->numero ?? $ordem->nfcePecasEmitida?->numero ?? ''), '0');
+
+            Notification::make()
+                ->title('Esta OS já possui NFC-e das peças'.($numero !== '' ? ' (nº '.$numero.')' : '').'. Emita NF-e somente se cancelar a NFC-e.')
+                ->warning()
+                ->send();
 
             return;
         }
 
-        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'nfe.access')) {
+        if (! $this->osFaturada($ordem)) {
+            Notification::make()
+                ->title('NF-e das peças só para OS finalizada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        // Sem peças: indisponível (botão desabilitado na grade). Sem toast de cadastro.
+        if (! NfeOrdemServicoService::osTemPecasParaNfe($ordem)) {
+            return;
+        }
+
+        $faltando = NfeClienteCadastro::camposFaltantesDoCliente($ordem->cliente);
+
+        if ($faltando !== []) {
+            $this->abrirOsClienteFiscalIncompleto(
+                'NF-e Peças',
+                'F10',
+                $faltando,
+                trim((string) ($ordem->cliente?->nome_razao ?? $ordem->nome ?? '—')),
+                $ordem->cliente_id !== null ? (int) $ordem->cliente_id : null,
+            );
+
             return;
         }
 
@@ -900,11 +1173,11 @@ class ListOrdensServico extends ListRecords
         );
     }
 
-    private function ordemSelecionadaParaFiscal(): ?OrdemServico
+    protected function ordemSelecionadaParaFiscal(): ?OrdemServico
     {
         $empresaId = ErpContext::currentEmpresaId();
         $ordem = OrdemServico::query()
-            ->with(['cliente', 'itens.product'])
+            ->with(['cliente', 'itens.product', 'nfcePecasEmitida', 'nfceAutorizada', 'nfePecasEmitida'])
             ->when($empresaId !== null, fn ($query) => $query->where(function ($query) use ($empresaId): void {
                 $query->whereNull('empresa_id')->orWhere('empresa_id', $empresaId);
             }))

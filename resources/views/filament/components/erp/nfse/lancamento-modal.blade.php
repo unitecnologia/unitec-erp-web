@@ -760,9 +760,14 @@
                             wire:click="transmitirNfse"
                             wire:loading.attr="disabled"
                             wire:target="transmitirNfse,confirmarTransmissaoProducao"
-                            class="erp-nfe-actions__btn"
+                            @class([
+                                'erp-nfe-actions__btn',
+                                'is-warning' => $this->nfseModalTransmitTomadorIncompleto(),
+                            ])
                             data-erp-nfse-transmit-btn
-                            title="{{ $this->podeTransmitirNfse() ? 'Transmitir' : ($this->motivoBloqueioTransmissaoUi() ?? 'Transmitir') }}"
+                            title="{{ $this->nfseModalTransmitTomadorIncompleto()
+                                ? 'Tomador incompleto — corrija o cadastro antes de transmitir'
+                                : ($this->podeTransmitirNfse() ? 'Transmitir' : ($this->motivoBloqueioTransmissaoUi() ?? 'Transmitir')) }}"
                             data-erp-key="F3"
                             @disabled(! $this->nfseId || $this->nfseSomenteLeitura())
                         >

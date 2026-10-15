@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\OrdemServicoResource\Pages\Concerns\ManagesEquipamentoVeiculo;
+use App\Filament\Resources\PersonResource;
 use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\OrdemServico;
@@ -30,6 +31,7 @@ use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Erp\Nfse\Ipm\NfseIpmCliente;
 use App\Support\Erp\Nfse\Ipm\NfseIpmEmitirService;
+use App\Support\Erp\Nfse\NfseTomadorCadastro;
 use App\Support\Erp\Nfse\NfseTransmissaoResultado;
 use App\Support\Erp\Nfse\NfseTransmitirService;
 use App\Support\Erp\Os\OrdemServicoRetorno;
@@ -172,6 +174,15 @@ class NfsePage extends Page
     public string $nfseTomadorCidadeCodigo = '';
 
     public string $nfseTomadorEmail = '';
+
+    public bool $nfseTomadorFiscalIncompletoOpen = false;
+
+    /** @var list<string> */
+    public array $nfseTomadorFiscalIncompletoCampos = [];
+
+    public string $nfseTomadorFiscalIncompletoNome = '';
+
+    public ?int $nfseTomadorFiscalIncompletoId = null;
 
     /** @var list<array<string, mixed>> */
     public array $nfseTomadorSugestoes = [];
@@ -362,6 +373,7 @@ class NfsePage extends Page
                 View::make('filament.components.erp.nfse.footer-total'),
                 View::make('filament.components.erp.nfse.action-bar'),
                 View::make('filament.components.erp.nfse.lancamento-modal'),
+                View::make('filament.components.erp.nfse.tomador-fiscal-incompleto-modal'),
                 View::make('filament.components.erp.nfse.import-os-modal'),
                 View::make('filament.components.erp.nfse.espelho-modal'),
                 View::make('filament.components.erp.nfse.fiscal-overlays'),
@@ -634,6 +646,15 @@ class NfsePage extends Page
         if ($this->nfseSomenteLeitura()) {
             $this->dispatch('erp-nfse-hide-fiscal-progress');
             $this->mostrarNfseJaAutorizadaOuErro();
+
+            return;
+        }
+
+        $faltandoTomador = $this->nfseTomadorCamposFaltantes();
+
+        if ($faltandoTomador !== []) {
+            $this->dispatch('erp-nfse-hide-fiscal-progress');
+            $this->abrirNfseTomadorFiscalIncompleto($faltandoTomador);
 
             return;
         }
@@ -1228,8 +1249,85 @@ class NfsePage extends Page
             return;
         }
 
+        $this->fecharNfseTomadorFiscalIncompleto();
         $this->nfseModalOpen = false;
         $this->resetNfseModalForm();
+    }
+
+    /**
+     * Amarelo no F3 do modal: tomador incompleto (dados já no formulário, sem query).
+     */
+    public function nfseModalTransmitTomadorIncompleto(): bool
+    {
+        if (! $this->nfseId || $this->nfseSomenteLeitura()) {
+            return false;
+        }
+
+        return $this->nfseTomadorCamposFaltantes() !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function nfseTomadorCamposFaltantes(): array
+    {
+        if ($this->nfseTomadorId === null) {
+            return ['tomador'];
+        }
+
+        return NfseTomadorCadastro::camposFaltantes([
+            'nome' => $this->nfseTomadorSelecionadoLabel !== ''
+                ? $this->nfseTomadorSelecionadoLabel
+                : $this->nfseTomador,
+            'cpf_cnpj' => $this->nfseTomadorCpfCnpj,
+            'endereco' => $this->nfseTomadorEndereco,
+            'bairro' => $this->nfseTomadorBairro,
+            'cidade_codigo' => $this->nfseTomadorCidadeCodigo,
+            'uf' => $this->nfseTomadorUf,
+            'cep' => $this->nfseTomadorCep,
+        ], NfseTomadorCadastro::provedorExigeEndereco());
+    }
+
+    public function fecharNfseTomadorFiscalIncompleto(): void
+    {
+        $this->nfseTomadorFiscalIncompletoOpen = false;
+        $this->nfseTomadorFiscalIncompletoCampos = [];
+        $this->nfseTomadorFiscalIncompletoNome = '';
+        $this->nfseTomadorFiscalIncompletoId = null;
+    }
+
+    public function abrirCadastroNfseTomadorFiscalIncompleto(): void
+    {
+        $tomadorId = $this->nfseTomadorFiscalIncompletoId;
+
+        $this->fecharNfseTomadorFiscalIncompleto();
+
+        if ($tomadorId === null || $tomadorId < 1) {
+            Notification::make()->title('Tomador não encontrado para correção.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'pessoas.update')) {
+            return;
+        }
+
+        $this->redirect(PersonResource::getUrl('edit', ['record' => $tomadorId]), navigate: false);
+    }
+
+    /**
+     * @param  list<string>  $campos
+     */
+    protected function abrirNfseTomadorFiscalIncompleto(array $campos): void
+    {
+        $nome = trim((string) ($this->nfseTomadorSelecionadoLabel !== ''
+            ? $this->nfseTomadorSelecionadoLabel
+            : $this->nfseTomador));
+
+        $this->nfseTomadorFiscalIncompletoOpen = true;
+        $this->nfseTomadorFiscalIncompletoCampos = $campos;
+        $this->nfseTomadorFiscalIncompletoNome = $nome !== '' ? $nome : '—';
+        $this->nfseTomadorFiscalIncompletoId = $this->nfseTomadorId;
     }
 
     public function updatedNfseTomador(string $value): void

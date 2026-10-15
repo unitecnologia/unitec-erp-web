@@ -148,9 +148,9 @@ class ConfigFiscaisPage extends Page
             : 'Homologação';
 
         $this->terminais = $this->terminaisEmissores($empresaId)
-            ->map(function (Terminal $t) use ($params): array {
+            ->map(function (Terminal $t) use ($params, $empresaId): array {
                 $serie = trim((string) ($t->serie ?: ''));
-                $proximo = NfceTerminalSequencia::proximoPiso($t, $params);
+                $proximo = $this->proximoNumeroConfigurado($t, $params, $empresaId);
 
                 return [
                     'id' => (int) $t->id,
@@ -197,7 +197,7 @@ class ConfigFiscaisPage extends Page
         $params = VendasParametro::forEmpresa($empresaId);
         $serie = preg_replace('/\D/', '', (string) $value) ?? '';
         $terminal->serie = $serie !== '' ? $serie : null;
-        $proximo = NfceTerminalSequencia::proximoPiso($terminal, $params);
+        $proximo = $this->proximoNumeroConfigurado($terminal, $params, $empresaId);
 
         $this->terminais[$index]['serie'] = $serie;
         $this->terminais[$index]['serie_efetiva'] = (string) NfceTerminalSequencia::serieEfetivaInt($terminal, $params);
@@ -228,6 +228,20 @@ class ConfigFiscaisPage extends Page
             (string) NfceTerminalSequencia::serieEfetivaInt($terminal, $params),
             NfceNumeracao::ambiente($params),
         ) ?? 0;
+    }
+
+    /** Próx. nº configurado do caixa (contador / numeração inicial), sem forçar piso do último usado. */
+    protected function proximoNumeroConfigurado(Terminal $terminal, VendasParametro $params, int $empresaId): int
+    {
+        if (NfceNumeracao::disponivel()) {
+            return max(1, NfceNumeracao::proximo(
+                $empresaId,
+                NfceTerminalSequencia::serieEfetivaInt($terminal, $params),
+                $params,
+            ));
+        }
+
+        return max(1, (int) ($terminal->numeracao_inicial ?: 1));
     }
 
     protected function aplicarAlertasSeries(VendasParametro $params): void
@@ -326,9 +340,10 @@ class ConfigFiscaisPage extends Page
     }
 
     /**
-     * Persiste série / próximo nº dos caixas emissores. Retorna false se bloqueou (série inválida,
-     * repetição criada agora ou próximo abaixo do já usado). Nada é gravado se algum caixa bloquear.
-     * Repetições que já existiam no banco só geram aviso (não travam o F2 das demais configurações).
+     * Persiste série / próximo nº dos caixas emissores. Retorna false se bloqueou (série inválida
+     * ou repetição criada agora). O Próx. nº digitado é gravado como informado.
+     * Nada é gravado se algum caixa bloquear. Repetições que já existiam no banco só geram aviso
+     * (não travam o F2 das demais configurações).
      */
     protected function persistTerminaisSeries(int $empresaId): bool
     {
@@ -394,19 +409,11 @@ class ConfigFiscaisPage extends Page
                 || ($linha['serie'] === '') !== ($linha['serie_banco'] === '');
 
             $terminal->serie = $linha['serie'] !== '' ? $linha['serie'] : null;
-            $piso = NfceTerminalSequencia::proximoPiso($terminal, $params);
+            $atual = NfceNumeracao::disponivel()
+                ? NfceNumeracao::proximo($empresaId, NfceTerminalSequencia::serieEfetivaInt($terminal, $params), $params)
+                : max(1, (int) ($terminal->numeracao_inicial ?: 1));
 
-            if ($linha['proximo'] < $piso) {
-                Notification::make()
-                    ->title('Próx. nº inválido')
-                    ->body('O caixa '.$linha['nome'].' não pode usar próximo '.$linha['proximo'].' na série '.NfceTerminalSequencia::serieEfetivaInt($terminal, $params).'. O mínimo é '.$piso.' (último número já usado + 1).')
-                    ->danger()
-                    ->send();
-
-                return false;
-            }
-
-            if ($serieMudou || $linha['proximo'] > $piso) {
+            if ($serieMudou || $linha['proximo'] !== $atual) {
                 $gravar[] = [$terminal, $linha['serie'], $linha['proximo']];
             }
         }
@@ -419,7 +426,7 @@ class ConfigFiscaisPage extends Page
             ]);
 
             if (NfceNumeracao::disponivel()) {
-                NfceNumeracao::garantirPeloMenos(
+                NfceNumeracao::definirProximo(
                     $empresaId,
                     NfceTerminalSequencia::serieEfetivaInt($terminal, $params),
                     $params,

@@ -915,6 +915,7 @@ class ListNfes extends ListRecords
                 View::make('filament.components.erp.nfe.footer-total'),
                 View::make('filament.components.erp.nfe.action-bar'),
                 View::make('filament.components.erp.nfe.lancamento-modal'),
+                View::make('filament.components.erp.nfe.cliente-fiscal-incompleto-modal'),
                 View::make('filament.components.erp.nfe.fiscal-whatsapp-modal'),
                 View::make('filament.components.erp.nfe.fiscal-danfe-email-modal'),
                 View::make('filament.components.erp.nfe.fiscal-cancel-modal'),

@@ -69,7 +69,11 @@
     <button
         type="button"
         wire:click="{{ $actionWire }}emitirNfeDoBotao"
-        class="erp-nfe-actions__btn {{ ($nfeBtn['mode'] ?? '') === 'lote' ? 'erp-fv-mon-actions__btn--lote' : '' }}"
+        @class([
+            'erp-nfe-actions__btn',
+            'erp-fv-mon-actions__btn--lote' => ($nfeBtn['mode'] ?? '') === 'lote' && ! ($nfeBtn['warning'] ?? false),
+            'is-warning' => (bool) ($nfeBtn['warning'] ?? false),
+        ])
         @disabled(! ($nfeBtn['enabled'] ?? false) || $this->nfeLoteProgressOpen)
         title="{{ $nfeBtn['title'] ?? '' }}"
     >

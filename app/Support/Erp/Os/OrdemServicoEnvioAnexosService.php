@@ -4,24 +4,29 @@ namespace App\Support\Erp\Os;
 
 use App\Models\Boleto;
 use App\Models\ContaReceber;
+use App\Models\Empresa;
 use App\Models\Nfe;
 use App\Models\Nfse;
 use App\Models\OrdemServico;
+use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpMoney;
+use App\Support\Erp\Nfce\NfceCupomReportService;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfse\NfseImpressao;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Throwable;
 
 /**
- * Anexos do envio F9 da OS: OS + NFS-e + NF-e + boletos (quando existirem).
+ * Anexos do envio F9 da OS: OS + NFS-e + NF-e + NFC-e + boletos (quando existirem).
  */
 final class OrdemServicoEnvioAnexosService
 {
     public function __construct(
         private readonly OrdemServicoReportService $osReport = new OrdemServicoReportService,
         private readonly NfeDanfeReportService $nfeDanfe = new NfeDanfeReportService,
+        private readonly NfceCupomReportService $nfceCupom = new NfceCupomReportService,
     ) {}
 
     /**
@@ -116,6 +121,45 @@ final class OrdemServicoEnvioAnexosService
             }
         }
 
+        foreach ($this->nfcesAutorizadas($ordem) as $nfce) {
+            $venda = $nfce->pdvVenda;
+
+            if ($venda === null || $this->nfceCupom->motivoBloqueioEnvio($nfce) !== null) {
+                continue;
+            }
+
+            $empresa = $this->empresaDaOs($ordem);
+            $numeroNfce = ltrim((string) ($nfce->numero ?? ''), '0') ?: (string) $nfce->numero;
+
+            try {
+                $pdf = $this->nfceCupom->storeDanfeEnvioAttachment($venda, $empresa);
+                $anexos[] = [
+                    'id' => 'nfce-pdf-'.$nfce->id,
+                    'name' => $pdf['name'],
+                    'path' => $pdf['path'],
+                    'display' => ($pdf['a4'] ?? false)
+                        ? 'DANFE NFC-e '.$numeroNfce
+                        : 'NFC-e '.$numeroNfce,
+                ];
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+
+            try {
+                $xml = $this->nfceCupom->storeXmlAttachment($nfce);
+                if (is_array($xml)) {
+                    $anexos[] = [
+                        'id' => 'nfce-xml-'.$nfce->id,
+                        'name' => $xml['name'],
+                        'path' => $xml['path'],
+                        'display' => 'XML NFC-e '.$numeroNfce,
+                    ];
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
         foreach ($this->boletosDaOs($ordem) as $boleto) {
             try {
                 $pdf = $this->storeBoletoPdf($boleto, $numero);
@@ -196,6 +240,45 @@ final class OrdemServicoEnvioAnexosService
             ->limit(1);
 
         return $query->get()->all();
+    }
+
+    /**
+     * @return list<PdvVendaNfce>
+     */
+    private function nfcesAutorizadas(OrdemServico $ordem): array
+    {
+        if (! $ordem->relationLoaded('nfceAutorizada')) {
+            $ordem->load(['nfceAutorizada.pdvVenda']);
+        } elseif ($ordem->nfceAutorizada !== null && ! $ordem->nfceAutorizada->relationLoaded('pdvVenda')) {
+            $ordem->nfceAutorizada->load('pdvVenda');
+        }
+
+        $linked = $ordem->nfceAutorizada;
+
+        if ($linked instanceof PdvVendaNfce
+            && (string) $linked->status === PdvVendaNfce::STATUS_AUTORIZADA
+        ) {
+            return [$linked];
+        }
+
+        return PdvVendaNfce::query()
+            ->with('pdvVenda')
+            ->where('ordem_servico_id', (int) $ordem->id)
+            ->where('status', PdvVendaNfce::STATUS_AUTORIZADA)
+            ->where(function ($q): void {
+                $q->where('simulada', false)->orWhereNull('simulada');
+            })
+            ->orderByDesc('id')
+            ->limit(1)
+            ->get()
+            ->all();
+    }
+
+    private function empresaDaOs(OrdemServico $ordem): ?Empresa
+    {
+        $empresaId = (int) ($ordem->empresa_id ?? session('erp_empresa_id', Auth::user()?->empresa_id) ?? 0);
+
+        return $empresaId > 0 ? Empresa::query()->find($empresaId) : null;
     }
 
     /**

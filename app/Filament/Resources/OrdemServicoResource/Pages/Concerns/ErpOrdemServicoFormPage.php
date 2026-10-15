@@ -788,7 +788,10 @@ trait ErpOrdemServicoFormPage
 
         $this->nome = mb_strtoupper((string) $person->nome_razao, 'UTF-8');
         $this->documento = (string) ($person->cpf_cnpj ?? '');
-        $this->fone1 = (string) ($person->fone1 ?? '');
+        // CONSUMIDOR FINAL é cadastro genérico — não trazer telefone/contato do suporte.
+        $this->fone1 = $person->isCadastroConsumidorFinal()
+            ? ''
+            : (string) ($person->fone1 ?? '');
         $this->endereco = mb_strtoupper((string) ($person->endereco ?? ''), 'UTF-8');
         $this->bairro = mb_strtoupper((string) ($person->bairro ?? ''), 'UTF-8');
         $this->cidade = mb_strtoupper((string) ($person->cidade_nome ?? ''), 'UTF-8');

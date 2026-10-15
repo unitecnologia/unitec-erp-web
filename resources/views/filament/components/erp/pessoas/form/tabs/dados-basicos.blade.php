@@ -87,7 +87,7 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-cpf">CPF/CNPJ</label>
+        <label class="erp-pcad-form__label" for="pcad-cpf">CPF/CNPJ<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-cpf" type="text" wire:model="data.cpf_cnpj" data-mask="cpf-cnpj" data-erp-pessoa-enter x-on:blur="$wire.finalizarDocumentoPessoa($event.target.value)" class="erp-pcad-form__input erp-pcad-form__input--doc">
         @error('data.cpf_cnpj')
             <span class="erp-pcad-form__error">{{ $message }}</span>
@@ -103,12 +103,12 @@
             <span wire:loading.remove wire:target="searchPessoaJuridica">Pesquisar Pessoa Jurídica</span>
             <span wire:loading wire:target="searchPessoaJuridica">Consultando...</span>
         </button>
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-rg">RG/IE</label>
+        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-rg">RG/IE<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-rg" type="text" wire:model="data.rg_ie" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--sm">
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-nome">Nome</label>
+        <label class="erp-pcad-form__label" for="pcad-nome">Nome<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-nome" type="text" wire:model="data.nome_razao" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--grow">
     </div>
 
@@ -118,7 +118,7 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-cep">CEP</label>
+        <label class="erp-pcad-form__label" for="pcad-cep">CEP<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-cep" type="text" wire:model="data.cep" data-mask="cep" data-erp-pessoa-enter x-on:blur="$wire.buscarCepPessoa(true)" class="erp-pcad-form__input erp-pcad-form__input--cep">
         <button type="button" wire:click="buscarCepPessoa" wire:loading.attr="disabled" wire:target="buscarCepPessoa" class="erp-pcad-form__btn">
             <span class="erp-pcad-form__btn-icon">🔍</span> Pesquisar CEP
@@ -126,9 +126,9 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-endereco">Endereço</label>
+        <label class="erp-pcad-form__label" for="pcad-endereco">Endereço<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-endereco" type="text" wire:model="data.endereco" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--grow">
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-numero">Número</label>
+        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-numero">Número<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-numero" type="text" wire:model="data.numero" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--xs">
     </div>
 
@@ -138,12 +138,12 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-bairro">Bairro</label>
+        <label class="erp-pcad-form__label" for="pcad-bairro">Bairro<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-bairro" type="text" wire:model="data.bairro" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--grow">
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-cidade-cod">Cidade</label>
+        <label class="erp-pcad-form__label" for="pcad-cidade-cod">Cidade<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-cidade-cod" type="text" wire:model="data.cidade_codigo" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--city-code" title="Código IBGE" maxlength="7">
         <div class="erp-pcad-form__city-wrap" @if ($this->pessoaCidadeSugestoesOpen && $this->pessoaCidadeSugestoes !== []) data-lookup-open="1" @endif>
             <input
@@ -182,7 +182,7 @@
                 </ul>
             @endif
         </div>
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-uf">UF</label>
+        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-uf">UF<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <select id="pcad-uf" wire:model.live="data.uf" data-erp-pessoa-enter class="erp-pcad-form__select erp-pcad-form__select--uf">
             <option value="">—</option>
             @foreach (Person::ufs() as $value => $label)
@@ -202,7 +202,7 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-fone1">WhatsApp</label>
+        <label class="erp-pcad-form__label" for="pcad-fone1">WhatsApp<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <input id="pcad-fone1" type="text" wire:model="data.fone1" data-mask="mobile-phone" data-erp-pessoa-enter class="erp-pcad-form__input erp-pcad-form__input--phone">
         @error('data.fone1')
             <span class="erp-pcad-form__error">{{ $message }}</span>
@@ -225,7 +225,7 @@
     </div>
 
     <div class="erp-pcad-form__row">
-        <label class="erp-pcad-form__label" for="pcad-regime">Regime Trib.</label>
+        <label class="erp-pcad-form__label" for="pcad-regime">Regime Trib.<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <select id="pcad-regime" wire:model="data.regime_tributario" data-erp-pessoa-enter class="erp-pcad-form__select erp-pcad-form__select--md">
             <option value="">NÃO INFORMADO</option>
             @foreach (Person::regimesTributarios() as $value => $label)
@@ -238,7 +238,7 @@
                 <option value="{{ $value }}">{{ $label }}</option>
             @endforeach
         </select>
-        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-cont">Tipo de Cont.</label>
+        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="pcad-cont">Tipo de Cont.<span class="erp-pcad-form__req" aria-hidden="true">*</span></label>
         <select id="pcad-cont" wire:model="data.tipo_contribuinte" data-erp-pessoa-enter class="erp-pcad-form__select erp-pcad-form__select--contrib">
             @foreach (Person::tiposContribuinte() as $value => $label)
                 <option value="{{ $value }}">{{ $label }}</option>

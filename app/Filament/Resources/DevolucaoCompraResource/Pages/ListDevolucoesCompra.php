@@ -6,11 +6,14 @@ use App\Filament\Concerns\InteractsWithErpListPage;
 use App\Filament\Resources\DevolucaoCompraResource;
 use App\Filament\Resources\DevolucaoCompraResource\Pages\Concerns\ManagesDevolucaoCompraModal;
 use App\Filament\Resources\NfeResource;
+use App\Filament\Resources\PersonResource;
 use App\Models\DevolucaoCompra;
+use App\Models\Nfe;
 use App\Support\Erp\Compras\ReabrirDevolucaoCompraService;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
 use DomainException;
 use Filament\Notifications\Notification;
@@ -20,9 +23,11 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 
 class ListDevolucoesCompra extends ListRecords
@@ -54,6 +59,23 @@ class ListDevolucoesCompra extends ListRecords
     public bool $reabrirConfirmOpen = false;
 
     public ?int $reabrirConfirmId = null;
+
+    public bool $osClienteFiscalIncompletoOpen = false;
+
+    /** @var list<string> */
+    public array $osClienteFiscalIncompletoCampos = [];
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoNome = '';
+
+    #[Locked]
+    public ?int $osClienteFiscalIncompletoId = null;
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoDocumento = 'NF-e';
+
+    #[Locked]
+    public string $osClienteFiscalIncompletoAtalho = 'F7';
 
     public function mount(): void
     {
@@ -163,7 +185,123 @@ class ListDevolucoesCompra extends ListRecords
             return;
         }
 
+        $faltando = NfeClienteCadastro::camposFaltantesDoFornecedor($devolucao->fornecedor);
+
+        if ($faltando !== []) {
+            $this->osClienteFiscalIncompletoOpen = true;
+            $this->osClienteFiscalIncompletoCampos = $faltando;
+            $this->osClienteFiscalIncompletoNome = trim((string) (
+                $devolucao->fornecedor?->nome_razao
+                ?? $devolucao->fornecedor_nome
+                ?? '—'
+            )) ?: '—';
+            $this->osClienteFiscalIncompletoId = $devolucao->fornecedor_id !== null
+                ? (int) $devolucao->fornecedor_id
+                : null;
+            $this->osClienteFiscalIncompletoDocumento = 'NF-e';
+            $this->osClienteFiscalIncompletoAtalho = 'F7';
+
+            return;
+        }
+
         $this->redirect(NfeResource::getUrl('index').'?devolucao_compra_id='.$devolucao->id);
+    }
+
+    public function fecharOsClienteFiscalIncompleto(): void
+    {
+        $this->osClienteFiscalIncompletoOpen = false;
+        $this->osClienteFiscalIncompletoCampos = [];
+        $this->osClienteFiscalIncompletoNome = '';
+        $this->osClienteFiscalIncompletoId = null;
+        $this->osClienteFiscalIncompletoDocumento = 'NF-e';
+        $this->osClienteFiscalIncompletoAtalho = 'F7';
+    }
+
+    public function abrirCadastroClienteFiscalIncompleto(): void
+    {
+        $fornecedorId = $this->osClienteFiscalIncompletoId;
+
+        $this->fecharOsClienteFiscalIncompleto();
+
+        if ($fornecedorId === null || $fornecedorId < 1) {
+            Notification::make()->title('Fornecedor não encontrado para correção.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'pessoas.update')) {
+            return;
+        }
+
+        $this->redirect(PersonResource::getUrl('edit', ['record' => $fornecedorId]), navigate: false);
+    }
+
+    /**
+     * Amarelo no F7: fornecedor incompleto na linha já carregada (sem query extra).
+     */
+    public function devolucaoSelecionadaNfeFornecedorIncompleto(): bool
+    {
+        if (! $this->highlightedRecordId) {
+            return false;
+        }
+
+        try {
+            $records = $this->getTableRecords();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        foreach ($records as $record) {
+            if (! $record instanceof DevolucaoCompra || (int) $record->getKey() !== (int) $this->highlightedRecordId) {
+                continue;
+            }
+
+            if (! $this->devolucaoListaPodeEmitirNfe($record)) {
+                return false;
+            }
+
+            return NfeClienteCadastro::camposFaltantesDoFornecedor($record->fornecedor) !== [];
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function erpListRecordClasses(Model $record): array
+    {
+        if (! $record instanceof DevolucaoCompra || ! $this->devolucaoListaPodeEmitirNfe($record)) {
+            return [];
+        }
+
+        $classes = ['erp-devcompra-row--nfe-pendente'];
+
+        // Usa fornecedor já eager-loaded — sem consulta extra por linha.
+        if (NfeClienteCadastro::camposFaltantesDoFornecedor($record->fornecedor) !== []) {
+            $classes[] = 'erp-devcompra-row--nfe-fornecedor-incompleto';
+        }
+
+        return $classes;
+    }
+
+    /**
+     * Finalizada e sem NF-e impeditiva (relação nfe já carregada na grade).
+     */
+    private function devolucaoListaPodeEmitirNfe(DevolucaoCompra $devolucao): bool
+    {
+        if ($devolucao->situacao !== DevolucaoCompra::SITUACAO_FINALIZADA) {
+            return false;
+        }
+
+        $nfe = $devolucao->nfe;
+
+        if ($nfe === null) {
+            return true;
+        }
+
+        // Mesma ideia de temNfeImpeditiva: ABERTA ainda permite seguir; demais bloqueiam.
+        return (string) $nfe->status === Nfe::STATUS_ABERTA;
     }
 
     public function table(Table $table): Table
@@ -181,7 +319,7 @@ class ListDevolucoesCompra extends ListRecords
         $query = parent::getTableQuery()
             ->with([
                 'fornecedor',
-                'nfe:id,devolucao_compra_id,numero',
+                'nfe:id,devolucao_compra_id,numero,status',
             ]);
 
         $empresaId = ErpContext::currentEmpresaId();
@@ -254,6 +392,7 @@ class ListDevolucoesCompra extends ListRecords
                 View::make('filament.components.erp.devolucoes-compra.action-bar'),
                 View::make('filament.components.erp.devolucoes-compra.lancamento-modal'),
                 View::make('filament.components.erp.devolucoes-compra.reabrir-confirm-modal'),
+                View::make('filament.components.erp.devolucoes-compra.nfe-fornecedor-incompleto-modal'),
             ]);
     }
 

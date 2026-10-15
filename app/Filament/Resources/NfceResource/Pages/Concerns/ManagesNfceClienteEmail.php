@@ -44,6 +44,19 @@ trait ManagesNfceClienteEmail
             return;
         }
 
+        $this->openNfceEnviarModalPorId((int) $id);
+    }
+
+    /**
+     * Abre o modal Enviar (e-mail/WhatsApp) para uma NFC-e já conhecida
+     * (lista NFC-e, sucesso pós-emissão na OS, etc.).
+     */
+    public function openNfceEnviarModalPorId(int $id): void
+    {
+        if ($id <= 0 || ! $this->nfcePodeExecutar()) {
+            return;
+        }
+
         $nfce = $this->findNfceNoEscopo($id, ['pdvVenda.person', 'pdvVenda.nfce']);
         $venda = $nfce?->pdvVenda;
         $service = app(NfceCupomReportService::class);

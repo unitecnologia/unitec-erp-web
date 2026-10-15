@@ -153,6 +153,39 @@ final class NfceNumeracao
         }, 3);
     }
 
+    /**
+     * Define o próximo número exatamente como informado na configuração (pode subir ou descer).
+     * Usado pelo ajuste manual de Próx. nº por caixa — grava o valor digitado.
+     */
+    public static function definirProximo(int $empresaId, int $serie, VendasParametro $parametros, int $proximo, ?int $terminalId = null): void
+    {
+        $proximo = max(1, $proximo);
+        $ambiente = self::ambiente($parametros);
+        $conexao = NfceTerminalSequencia::sequenciaConnectionName();
+
+        DB::connection($conexao)->transaction(function () use ($conexao, $empresaId, $serie, $ambiente, $parametros, $proximo, $terminalId): void {
+            $db = DB::connection($conexao);
+            $contador = self::contadorTravado($db, $empresaId, $serie, $ambiente, $parametros);
+
+            $db->table(self::CONTADOR)->where('id', $contador->id)->update([
+                'ultimo_numero' => $proximo - 1,
+                'updated_at' => now(),
+            ]);
+
+            if ($terminalId !== null) {
+                $db->table('terminais')
+                    ->where('id', $terminalId)
+                    ->update(['numeracao_inicial' => $proximo, 'usar_numero_inicial' => true]);
+            }
+
+            if (NfceTerminalSequencia::mesmaSerie((string) $serie, (string) $parametros->serie)) {
+                $db->table('vendas_parametros')
+                    ->where('empresa_id', $empresaId)
+                    ->update(['numero' => $proximo]);
+            }
+        }, 3);
+    }
+
     /** Próximo número previsto (sem consumir, sem travar) — exibição, carga do PDV offline. */
     public static function proximo(int $empresaId, int $serie, VendasParametro $parametros): int
     {

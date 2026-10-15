@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\NfeResource\Pages\Concerns;
 
+use App\Filament\Resources\PersonResource;
 use App\Models\Cfop;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
@@ -18,9 +19,11 @@ use App\Models\Transportadora;
 use App\Models\VendasParametro;
 use App\Rules\CelularBrasileiroValido;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeCalculoService;
+use App\Support\Erp\Nfe\NfeClienteCadastro;
 use App\Support\Erp\Nfe\NfeDanfeReportService;
 use App\Support\Erp\Nfe\NfeEspelhoReportService;
 use App\Support\Erp\Nfe\NfeEventoLogger;
@@ -159,6 +162,22 @@ trait ManagesNfeEmissaoModal
 
     public string $nfeClienteCidade = '';
 
+    /**
+     * Campos fiscais faltantes do destinatário (cache ao selecionar/carregar cliente).
+     *
+     * @var list<string>
+     */
+    public array $nfeClienteFiscalCamposFaltantes = [];
+
+    public bool $nfeClienteFiscalIncompletoOpen = false;
+
+    /** @var list<string> */
+    public array $nfeClienteFiscalIncompletoCampos = [];
+
+    public string $nfeClienteFiscalIncompletoNome = '';
+
+    public ?int $nfeClienteFiscalIncompletoId = null;
+
     public string $nfeTransportadoraBusca = '';
 
     /** @var list<array{id: int, codigo: string, nome: string, cpf_cnpj: string, doc_tipo: string}> */
@@ -248,6 +267,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeItemDeleteConfirmIndex = null;
         $this->fecharNfeModalDescontoItem();
         $this->fecharNfeInfoAdicionaisModal();
+        $this->fecharNfeClienteFiscalIncompleto();
         $this->nfeModalOpen = false;
         $this->nfeModalRecordId = null;
         $this->nfeModalStatus = 'ABERTA';
@@ -468,6 +488,9 @@ trait ManagesNfeEmissaoModal
 
             return false;
         }
+
+        // Mantém o amarelo do F3 alinhado ao destinatário já carregado no save (sem query extra depois).
+        $this->nfeClienteFiscalCamposFaltantes = NfeClienteCadastro::camposFaltantesDoCliente($cliente);
 
         if ($this->nfeModalRows === []) {
             Notification::make()->title('Informe os Itens da NF-e!')->warning()->send();
@@ -992,6 +1015,20 @@ trait ManagesNfeEmissaoModal
                 ->warning()
                 ->send();
             $this->dispatch('erp-nfe-hide-fiscal-progress');
+
+            return;
+        }
+
+        $faltandoCliente = NfeClienteCadastro::camposFaltantesDoCliente($nfe->cliente);
+        $this->nfeClienteFiscalCamposFaltantes = $faltandoCliente;
+
+        if ($faltandoCliente !== []) {
+            $this->dispatch('erp-nfe-hide-fiscal-progress');
+            $this->abrirNfeClienteFiscalIncompleto(
+                $faltandoCliente,
+                trim((string) ($nfe->cliente?->nome_razao ?? $this->nfeClienteNome ?: '—')) ?: '—',
+                $nfe->cliente_id !== null ? (int) $nfe->cliente_id : null,
+            );
 
             return;
         }
@@ -2954,6 +2991,7 @@ trait ManagesNfeEmissaoModal
         $this->nfeClienteBairro = (string) ($person->bairro ?? '');
         $this->nfeClienteCep = (string) ($person->cep ?? '');
         $this->nfeClienteCidade = (string) ($person->cidade_nome ?? '');
+        $this->nfeClienteFiscalCamposFaltantes = NfeClienteCadastro::camposFaltantesDoCliente($person);
 
         if ($syncBusca) {
             $this->nfeClienteBusca = $this->formatarNfeClienteBusca($person);
@@ -2974,7 +3012,58 @@ trait ManagesNfeEmissaoModal
         $this->nfeClienteBairro = '';
         $this->nfeClienteCep = '';
         $this->nfeClienteCidade = '';
+        $this->nfeClienteFiscalCamposFaltantes = ['cliente'];
         $this->fecharNfeSugestoesCliente();
+    }
+
+    /**
+     * Amarelo no F3 do modal: destinatário incompleto (cache do cliente já carregado).
+     */
+    public function nfeModalTransmitClienteIncompleto(): bool
+    {
+        if (! $this->nfeModalRecordId || $this->nfeModalStatus !== 'ABERTA') {
+            return false;
+        }
+
+        return $this->nfeClienteFiscalCamposFaltantes !== [];
+    }
+
+    public function fecharNfeClienteFiscalIncompleto(): void
+    {
+        $this->nfeClienteFiscalIncompletoOpen = false;
+        $this->nfeClienteFiscalIncompletoCampos = [];
+        $this->nfeClienteFiscalIncompletoNome = '';
+        $this->nfeClienteFiscalIncompletoId = null;
+    }
+
+    public function abrirCadastroNfeClienteFiscalIncompleto(): void
+    {
+        $clienteId = $this->nfeClienteFiscalIncompletoId;
+
+        $this->fecharNfeClienteFiscalIncompleto();
+
+        if ($clienteId === null || $clienteId < 1) {
+            Notification::make()->title('Cliente não encontrado para correção.')->warning()->send();
+
+            return;
+        }
+
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'pessoas.update')) {
+            return;
+        }
+
+        $this->redirect(PersonResource::getUrl('edit', ['record' => $clienteId]), navigate: false);
+    }
+
+    /**
+     * @param  list<string>  $campos
+     */
+    protected function abrirNfeClienteFiscalIncompleto(array $campos, string $nome, ?int $clienteId): void
+    {
+        $this->nfeClienteFiscalIncompletoOpen = true;
+        $this->nfeClienteFiscalIncompletoCampos = $campos;
+        $this->nfeClienteFiscalIncompletoNome = $nome;
+        $this->nfeClienteFiscalIncompletoId = $clienteId;
     }
 
     protected function formatarNfeClienteBusca(Person $person): string

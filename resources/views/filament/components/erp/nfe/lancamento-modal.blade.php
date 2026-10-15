@@ -649,10 +649,13 @@
                         <button
                             type="button"
                             wire:click="transmitNfe"
-                            class="erp-nfe-actions__btn"
+                            @class([
+                                'erp-nfe-actions__btn',
+                                'is-warning' => $this->nfeModalTransmitClienteIncompleto(),
+                            ])
                             data-erp-nfe-transmit-btn
                             @disabled(! $this->nfeModalRecordId || $this->nfeModalStatus !== 'ABERTA')
-                            title="Transmitir"
+                            title="{{ $this->nfeModalTransmitClienteIncompleto() ? 'Cliente incompleto — corrija o cadastro antes de transmitir' : 'Transmitir' }}"
                             data-erp-key="F3"
                         >
                             <span class="erp-nfe-actions__icon">📡</span>

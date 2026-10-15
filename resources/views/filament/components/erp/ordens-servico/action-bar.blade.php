@@ -29,10 +29,14 @@
     <button
         type="button"
         wire:click="emitirNfseDaOs"
-        class="erp-orcamentos-actions__btn"
+        @class([
+            'erp-orcamentos-actions__btn',
+            'is-warning' => $this->osSelecionadaNfseClienteIncompleto(),
+        ])
         data-erp-key="F7"
         data-erp-enable-on-row="erp-os-row--nfse-pendente"
-        title="Abrir NFS-e com os dados desta OS finalizada (desativado se a OS já tem NFS-e emitida)"
+        data-erp-warn-on-row="erp-os-row--nfse-cliente-incompleto"
+        title="Abrir NFS-e com os dados desta OS finalizada (amarelo: cadastro do cliente incompleto; desativado se a OS já tem NFS-e emitida)"
         @disabled(! $this->osSelecionadaPodeEmitirNfse())
     >
         <span class="erp-orcamentos-actions__icon">🧾</span>
@@ -41,14 +45,30 @@
     <button
         type="button"
         wire:click="emitirNfePecasDaOs"
-        class="erp-orcamentos-actions__btn"
+        @class([
+            'erp-orcamentos-actions__btn',
+            'is-warning' => $this->osSelecionadaNfeClienteIncompleto(),
+        ])
         data-erp-key="F10"
         data-erp-enable-on-row="erp-os-row--nfe-pendente"
-        title="Emitir NF-e somente com as peças desta OS finalizada (desativado se a OS já tem NF-e das peças)"
+        data-erp-warn-on-row="erp-os-row--nfe-cliente-incompleto"
+        title="Emitir NF-e somente com as peças desta OS finalizada (amarelo: cadastro do cliente incompleto; desativado sem peças, com NFC-e das peças ou se a OS já tem NF-e das peças)"
         @disabled(! $this->osSelecionadaPodeEmitirNfePecas())
     >
         <span class="erp-orcamentos-actions__icon">📦</span>
         <span class="erp-orcamentos-actions__label"><kbd>F10</kbd> | NF-e Peças</span>
+    </button>
+    <button
+        type="button"
+        wire:click="emitirNfcePecasDaOs"
+        class="erp-orcamentos-actions__btn"
+        data-erp-key="F11"
+        data-erp-enable-on-row="erp-os-row--nfce-pendente"
+        title="Emitir NFC-e somente com as peças desta OS (abre modal de consumidor; desativado para CNPJ — use F10; ou se já houver NF-e/NFC-e das peças)"
+        @disabled(! $this->osSelecionadaPodeEmitirNfcePecas())
+    >
+        <span class="erp-orcamentos-actions__icon">🧾</span>
+        <span class="erp-orcamentos-actions__label"><kbd>F11</kbd> | NFC-e Peças</span>
     </button>
     <button
         type="button"

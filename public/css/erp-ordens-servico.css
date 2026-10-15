@@ -116,7 +116,7 @@
     padding-inline: 0.12rem !important;
 }
 
-/* NFS-e, NF-e e NFC-e: estreitas, do tamanho do título */
+/* NFS-e, NF-e e NFC-e: estreitas (ganham do nth-child de Orçamentos, ex. col 4 = auto). */
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell:is(.erp-os-col-nfse, .erp-os-col-nfe, .erp-os-col-nfce),
 .erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-nfse, .erp-os-col-nfe, .erp-os-col-nfce) {
     width: 3.6rem !important;
@@ -124,6 +124,7 @@
     max-width: 4rem !important;
     padding-inline: 0.15rem !important;
     text-align: center;
+    box-sizing: border-box !important;
 }
 
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-data,
@@ -134,6 +135,7 @@
     padding-inline: 0.15rem !important;
 }
 
+/* H.Aber./H.Fech.: estreitas — não herdam a largura da “cidade” (nth-child 6) de Orçamentos. */
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell:is(.erp-os-col-hora-abertura, .erp-os-col-hora-fechamento),
 .erp-orcamentos-page.erp-os-page .fi-ta-row .fi-ta-cell:is(.erp-os-col-hora-abertura, .erp-os-col-hora-fechamento) {
     width: 3.85rem !important;
@@ -141,6 +143,7 @@
     max-width: 4.1rem !important;
     padding-inline: 0.1rem !important;
     text-align: center;
+    box-sizing: border-box !important;
 }
 
 .erp-orcamentos-page.erp-os-page .fi-ta-header-cell.erp-os-col-cliente,
@@ -467,4 +470,112 @@
 .erp-os-print-docs__btn--print:hover {
     background: var(--erp-brand-primary, #1e5a9e);
     color: #fff;
+}
+
+/* F7 NFS-e: amarelo quando o cliente da OS selecionada está incompleto para emissão */
+.erp-orcamentos-page.erp-os-page .erp-orcamentos-actions__btn.is-warning {
+    border-color: #d97706;
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #78350f;
+}
+
+.erp-orcamentos-page.erp-os-page .erp-orcamentos-actions__btn.is-warning:hover:not(:disabled) {
+    border-color: #b45309;
+    background: linear-gradient(180deg, #fcd34d 0%, #b45309 100%);
+    color: #451a03;
+}
+
+.erp-orcamentos-page.erp-os-page .erp-orcamentos-actions__btn.is-warning:disabled {
+    opacity: 0.55;
+}
+
+.erp-orcamentos-page.erp-os-page .erp-orcamentos-actions__btn.is-warning .erp-orcamentos-actions__label,
+.erp-orcamentos-page.erp-os-page .erp-orcamentos-actions__btn.is-warning .erp-orcamentos-actions__label kbd {
+    color: inherit;
+}
+
+/* Overlays fiscais NFC-e Peças (F11) acima da listagem */
+.erp-orcamentos-page.erp-os-page .erp-nfe-fiscal-overlay,
+.erp-orcamentos-page.erp-os-page .erp-os-nfce-emitir-modal {
+    z-index: 320;
+}
+
+/* Modal Enviar NFC-e (e-mail/WhatsApp) acima do overlay de sucesso */
+.erp-orcamentos-page.erp-os-page .erp-nfe-whatsapp-modal.erp-nfe-danfe-email-modal {
+    z-index: 350;
+}
+
+/*
+ * Overlay SEFAZ = mesmo do PDV (erp-pdv.css + erp-sefaz-progress.css).
+ * Aqui só garante viewport inteiro / z-index — nunca caixa no rodapé da listagem.
+ */
+.erp-orcamentos-page.erp-os-page .erp-pdv-fiscal-progress {
+    position: fixed;
+    inset: 0;
+    z-index: 340;
+}
+
+.erp-orcamentos-page.erp-os-page .erp-pdv-fiscal-progress.is-visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.erp-os-nfce-emitir-modal__window {
+    width: min(92vw, 28rem);
+}
+
+.erp-os-nfce-emitir-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem 1.15rem 0.5rem;
+}
+
+.erp-os-nfce-emitir-modal__hint {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #475569;
+}
+
+.erp-os-nfce-emitir-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.erp-os-nfce-emitir-modal__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.erp-os-nfce-emitir-modal__input,
+.erp-os-nfce-emitir-modal__textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.9rem;
+    color: #0f172a;
+    background: #fff;
+}
+
+.erp-os-nfce-emitir-modal__input:focus,
+.erp-os-nfce-emitir-modal__textarea:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    border-color: #2563eb;
+}
+
+.erp-os-nfce-emitir-modal__textarea {
+    resize: vertical;
+    min-height: 4.5rem;
+}
+
+.erp-os-nfce-emitir-modal__actions {
+    padding: 0.75rem 1.15rem 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
 }

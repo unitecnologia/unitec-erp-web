@@ -1179,3 +1179,25 @@
         gap: 0.15rem;
     }
 }
+
+/* F7 NF-e: amarelo quando o fornecedor da devolução selecionada está incompleto */
+.erp-devolucao-compra-page .erp-orcamentos-actions__btn.is-warning {
+    border-color: #d97706;
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #78350f;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos-actions__btn.is-warning:hover:not(:disabled) {
+    border-color: #b45309;
+    background: linear-gradient(180deg, #fcd34d 0%, #b45309 100%);
+    color: #451a03;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos-actions__btn.is-warning:disabled {
+    opacity: 0.55;
+}
+
+.erp-devolucao-compra-page .erp-orcamentos-actions__btn.is-warning .erp-orcamentos-actions__label,
+.erp-devolucao-compra-page .erp-orcamentos-actions__btn.is-warning .erp-orcamentos-actions__label kbd {
+    color: inherit;
+}

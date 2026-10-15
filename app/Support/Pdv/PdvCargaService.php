@@ -18,6 +18,7 @@ use App\Support\Erp\EstoqueReservaService;
 use App\Support\Erp\Nfe\NfeFiscalConfig;
 use App\Support\Erp\Pdv\PdvProductSearchRanking;
 use App\Support\Erp\Terminais\TerminalFormOptions;
+use App\Support\Fiscal\NfceNumeracao;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -693,13 +694,17 @@ class PdvCargaService
 
         $params = VendasParametro::forEmpresa($empresaId);
         $serie = NfceTerminalSequencia::serieEfetiva($model, $params);
+        $serieInt = NfceTerminalSequencia::serieEfetivaInt($model, $params);
+        $numeroInicial = NfceNumeracao::disponivel()
+            ? max(1, NfceNumeracao::proximo($empresaId, $serieInt, $params))
+            : max(1, (int) ($model->numeracao_inicial ?: 1));
 
         return [
             'id' => (int) $model->id,
             'nome' => (string) ($model->nome ?: 'Caixa'),
             'terminal' => (string) ($model->numero_logico_terminal ?: $model->id),
             'serie' => $serie,
-            'numero_inicial' => NfceTerminalSequencia::proximoPiso($model, $params),
+            'numero_inicial' => $numeroInicial,
             'usar_numero_inicial' => true,
             // Comportamento por caixa (espelha o que o PdvConfig do ERP lê do terminal).
             'config' => [

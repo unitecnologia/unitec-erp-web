@@ -247,11 +247,55 @@ class OrdemServico extends Model
     }
 
     /**
-     * NFC-e ainda não tem vínculo com a OS (PDV "F4 — Importar Ordem de Serviço" pendente).
+     * Última NFC-e das peças vinculada à OS (qualquer status fiscal relevante).
+     */
+    public function nfcePecasEmitida(): HasOne
+    {
+        return $this->hasOne(PdvVendaNfce::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], function ($query): void {
+                $query->where(function ($q): void {
+                    $q->where('simulada', false)->orWhereNull('simulada');
+                })->where('status', '!=', PdvVendaNfce::STATUS_SIMULADA);
+            });
+    }
+
+    public function nfceAutorizada(): HasOne
+    {
+        return $this->hasOne(PdvVendaNfce::class, 'ordem_servico_id')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('status', PdvVendaNfce::STATUS_AUTORIZADA));
+    }
+
+    public function possuiNfcePecasDocumentada(): bool
+    {
+        $nfce = $this->relationLoaded('nfcePecasEmitida') ? $this->nfcePecasEmitida : $this->nfcePecasEmitida()->first();
+
+        if (! $nfce instanceof PdvVendaNfce) {
+            return false;
+        }
+
+        return in_array((string) $nfce->status, [
+            PdvVendaNfce::STATUS_AUTORIZADA,
+            PdvVendaNfce::STATUS_CONTINGENCIA,
+            PdvVendaNfce::STATUS_DUPLICIDADE,
+        ], true);
+    }
+
+    public function possuiNfceAutorizada(): bool
+    {
+        $nfce = $this->relationLoaded('nfceAutorizada') ? $this->nfceAutorizada : $this->nfceAutorizada()->first();
+
+        return $nfce instanceof PdvVendaNfce;
+    }
+
+    /**
+     * Só NFC-e autorizada das peças da OS.
      */
     public function nfceNumeroLista(): string
     {
-        return '—';
+        $nfce = $this->relationLoaded('nfceAutorizada') ? $this->nfceAutorizada : $this->nfceAutorizada()->first();
+        $numero = ltrim(trim((string) ($nfce?->numero ?? '')), '0');
+
+        return $numero !== '' ? $numero : '—';
     }
 
     /**

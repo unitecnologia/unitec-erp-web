@@ -101,11 +101,11 @@
                 <div class="erp-nfe-whatsapp-modal__attachments">
                     @if ($this->emailAttachmentsLoading)
                         <span class="erp-nfe-whatsapp-modal__attachments-empty" data-erp-os-anexos-loading>
-                            Preparando {{ $envioTecnica ? 'OS Técnica' : 'anexos (OS, NFS-e, NF-e, boleto)' }}…
+                            Preparando {{ $envioTecnica ? 'OS Técnica' : 'anexos (OS, NFS-e, NF-e, NFC-e, boleto)' }}…
                         </span>
                     @else
                         <span class="erp-nfe-whatsapp-modal__attachments-empty" data-erp-os-anexos-shell-loading hidden>
-                            Preparando {{ $envioTecnica ? 'OS Técnica' : 'anexos (OS, NFS-e, NF-e, boleto)' }}…
+                            Preparando {{ $envioTecnica ? 'OS Técnica' : 'anexos (OS, NFS-e, NF-e, NFC-e, boleto)' }}…
                         </span>
                         @forelse ($this->emailAttachments as $attachment)
                             <span class="erp-os-anexo-chip" wire:key="os-anexo-{{ $attachment['id'] }}" title="{{ $attachment['display'] }}">
@@ -153,7 +153,7 @@
                     @if ($envioTecnica)
                         Anexa somente a OS Técnica (sem valores). Informe o WhatsApp do mecânico nesta tela; o número não é gravado no cadastro nem na OS.
                     @else
-                        Anexa automaticamente OS, NFS-e, NF-e e boleto quando existirem; use o × para tirar um anexo só deste envio.
+                        Anexa automaticamente OS, NFS-e, NF-e, NFC-e e boleto quando existirem; use o × para tirar um anexo só deste envio.
                         Pode enviar por e-mail e depois por WhatsApp sem fechar esta tela.
                     @endif
                 </p>

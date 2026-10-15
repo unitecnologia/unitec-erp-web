@@ -4508,7 +4508,7 @@
     text-align: center;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay {
     position: fixed;
     inset: 0;
     z-index: 420;
@@ -4520,11 +4520,11 @@
 }
 
 /* Erro/sucesso sempre montados: blade usa style display; .is-visible reforça após js(). */
-.erp-nfe-page .erp-nfe-fiscal-overlay.is-visible {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay.is-visible {
     display: grid;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__box {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__box {
     width: min(92vw, 36rem);
     padding: 1.8rem 2rem 1.5rem;
     border: 3px solid #dc2626;
@@ -4534,7 +4534,7 @@
     text-align: center;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__icon {
     width: 3.2rem;
     height: 3.2rem;
     margin: 0 auto 0.6rem;
@@ -4546,7 +4546,7 @@
     line-height: 3.2rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__title {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__title {
     margin: 0 0 0.45rem;
     color: #b91c1c;
     font-size: 1.25rem;
@@ -4555,13 +4555,13 @@
     line-height: 1.25;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__codigo {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__codigo {
     margin: 0 0 0.35rem;
     color: #0f172a;
     font-size: 0.92rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__text {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__text {
     margin: 0.35rem 0 0.5rem;
     color: #334155;
     font-size: 0.88rem;
@@ -4575,14 +4575,14 @@
     background: #fef2f2;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__origem {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__origem {
     margin: 0.35rem 0 0;
     color: #64748b;
     font-size: 0.78rem;
     font-weight: 600;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__btn {
     margin-top: 0.75rem;
     min-width: 8rem;
     padding: 0.6rem 1.4rem;
@@ -4596,44 +4596,44 @@
     font-family: inherit;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__btn:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__btn:hover {
     background: #b91c1c;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__hint {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__hint {
     margin: 0.7rem 0 0;
     color: #64748b;
     font-size: 0.78rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__box {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__box {
     border-color: #16a34a;
     box-shadow: 0 22px 60px rgb(22 163 74 / 35%);
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__icon {
     background: #16a34a;
     font-size: 1.6rem;
     line-height: 3.2rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__title {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__title {
     color: #15803d;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn {
     background: #16a34a;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn:hover {
     background: #15803d;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__codigo {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__codigo {
     margin: 0.35rem 0 0.15rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__actions {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -4641,56 +4641,56 @@
     margin-top: 0.85rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn {
     min-width: 7.5rem;
     margin-top: 0;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--print {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--print {
     background: #1d4ed8;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--print:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--print:hover {
     background: #1e40af;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--whatsapp {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--whatsapp {
     background: #16a34a;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--whatsapp:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--whatsapp:hover {
     background: #15803d;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--email {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--email {
     background: #0f766e;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--email:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--email:hover {
     background: #0d5f59;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe {
     background: #7c3aed;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--nfe:hover {
     background: #6d28d9;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__actions--cce .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__actions--cce .erp-nfe-fiscal-overlay__btn {
     min-width: 6.75rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--exit {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--exit {
     background: #64748b;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--exit:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--sucesso .erp-nfe-fiscal-overlay__btn--exit:hover {
     background: #475569;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal {
     z-index: 320;
 }
 
@@ -4789,7 +4789,7 @@
     color: #b45309;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-lookup-modal__window {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-lookup-modal__window {
     position: relative;
     z-index: 1;
     display: flex;
@@ -4803,7 +4803,7 @@
     overflow: hidden;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-lookup-modal__body {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-lookup-modal__body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -4813,7 +4813,7 @@
     overflow: auto;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-lookup-modal__actions {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-lookup-modal__actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -4823,7 +4823,7 @@
     border-top: 1px solid var(--erp-border-light, #c7d5e8);
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -4839,23 +4839,23 @@
     font-family: inherit;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn:hover:not(:disabled) {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn:hover:not(:disabled) {
     border-color: var(--erp-brand-primary, #1e5a9e);
     background: #fff;
     transform: translateY(-1px);
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary {
     background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
     border-color: #86efac;
     color: #fff;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary:hover:not(:disabled) {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary:hover:not(:disabled) {
     background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4866,36 +4866,36 @@
     font-weight: 800;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__label {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__label {
     font-size: 0.72rem;
     font-weight: 700;
     line-height: 1.2;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary .erp-pcad-actions__label,
-.erp-nfe-page .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary .erp-pcad-actions__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary .erp-pcad-actions__label,
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal .erp-pcad-actions__btn--primary .erp-pcad-actions__icon {
     color: #fff;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__field {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__field {
     display: grid;
     grid-template-columns: 5.5rem minmax(0, 1fr);
     gap: 0.45rem 0.65rem;
     align-items: center;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__field--message {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__field--message {
     align-items: start;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__label {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__label {
     font-size: 0.78rem;
     font-weight: 700;
     color: #334155;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__input,
-.erp-nfe-page .erp-nfe-whatsapp-modal__textarea {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__input,
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__textarea {
     width: 100%;
     padding: 0.45rem 0.55rem;
     border: 1px solid #94a3b8;
@@ -4906,33 +4906,33 @@
     font-family: inherit;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__textarea {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__textarea {
     min-height: 8.5rem;
     resize: vertical;
     line-height: 1.45;
     white-space: pre-wrap;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__input:focus,
-.erp-nfe-page .erp-nfe-whatsapp-modal__textarea:focus {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__input:focus,
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__textarea:focus {
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 2px rgb(37 99 235 / 18%);
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__error {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__error {
     grid-column: 2;
     font-size: 0.72rem;
     color: #b91c1c;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__attachments {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__attachments {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__attachment {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__attachment {
     display: inline-flex;
     align-items: center;
     padding: 0.28rem 0.55rem;
@@ -4943,29 +4943,29 @@
     color: #0f172a;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__attachment.is-selected {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__attachment.is-selected {
     border-color: #16a34a;
     background: #ecfdf5;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__attachments-empty {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__attachments-empty {
     font-size: 0.75rem;
     color: #64748b;
 }
 
-.erp-nfe-page .erp-nfe-whatsapp-modal__hint {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-whatsapp-modal__hint {
     grid-column: 2;
     margin: 0;
     font-size: 0.72rem;
     color: #64748b;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__box {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__box {
     border-color: #2563eb;
     box-shadow: 0 22px 60px rgb(37 99 235 / 28%);
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__icon {
     background: #2563eb;
     font-size: 1.35rem;
     font-style: italic;
@@ -4973,61 +4973,61 @@
     line-height: 3.2rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__title {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__title {
     color: #1d4ed8;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__btn {
     background: #2563eb;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__btn:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--info .erp-nfe-fiscal-overlay__btn:hover {
     background: #1d4ed8;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__box {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__box {
     border-color: #d97706;
     box-shadow: 0 22px 60px rgb(217 119 6 / 32%);
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__icon {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__icon {
     background: #d97706;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__title {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__title {
     color: #b45309;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn {
     background: #d97706;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn:hover {
     background: #b45309;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__actions .erp-nfe-fiscal-overlay__btn {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__actions .erp-nfe-fiscal-overlay__btn {
     margin-top: 0;
     min-width: 8rem;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--confirm {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--confirm {
     background: #dc2626;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--confirm:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--confirm:hover {
     background: #b91c1c;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--exit {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--exit {
     background: #64748b;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--exit:hover {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay--warning .erp-nfe-fiscal-overlay__btn--exit:hover {
     background: #475569;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay__text--info {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay__text--info {
     margin: 0.5rem 0 0;
     text-align: center;
 }
@@ -6707,7 +6707,7 @@
     font-weight: 600;
 }
 
-.erp-nfe-page .erp-nfe-fiscal-overlay.erp-nfe-item-delete-modal {
+:is(.erp-nfe-page, .erp-os-page) .erp-nfe-fiscal-overlay.erp-nfe-item-delete-modal {
     z-index: 460;
 }
 
@@ -6990,4 +6990,28 @@
     .erp-nfe-page.erp-nfce-page .erp-nfe__page-size-group {
         padding-left: 0;
     }
+}
+
+/* Aviso de cadastro incompleto acima do modal de lançamento (z-index 250) */
+.erp-nfe-page .erp-aviso-modal {
+    z-index: 320;
+}
+
+/* F3 Transmitir: amarelo quando destinatário/tomador está incompleto */
+.erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) {
+    border-color: #d97706;
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    color: #78350f;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled):hover {
+    border-color: #b45309;
+    background: linear-gradient(180deg, #fcd34d 0%, #b45309 100%);
+    color: #451a03;
+}
+
+.erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__label,
+.erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__label kbd,
+.erp-nfe-page .erp-nfe-lancamento-modal__toolbar--bottom .erp-nfe-actions__btn.is-warning:not(:disabled) .erp-nfe-actions__icon {
+    color: inherit;
 }

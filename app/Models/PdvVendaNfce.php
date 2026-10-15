@@ -54,6 +54,7 @@ class PdvVendaNfce extends Model
 
     protected $fillable = [
         'pdv_venda_id',
+        'ordem_servico_id',
         'empresa_id',
         'nfe_id',
         'operacao',
@@ -113,6 +114,11 @@ class PdvVendaNfce extends Model
     public function pdvVenda(): BelongsTo
     {
         return $this->belongsTo(PdvVenda::class);
+    }
+
+    public function ordemServico(): BelongsTo
+    {
+        return $this->belongsTo(OrdemServico::class, 'ordem_servico_id');
     }
 
     public function empresa(): BelongsTo
