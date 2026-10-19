@@ -56,6 +56,9 @@ const sessions = new Map();
  * @property {string|null} qr
  * @property {import('@whiskeysockets/baileys').WASocket|null} sock
  * @property {boolean} starting
+ * @property {number} generation
+ * @property {number|null} lastCloseCode
+ * @property {string} errorMessage
  */
 
 function createSessionState() {
@@ -65,6 +68,9 @@ function createSessionState() {
     qr: null,
     sock: null,
     starting: false,
+    generation: 0,
+    lastCloseCode: null,
+    errorMessage: '',
   };
 }
 
@@ -284,52 +290,249 @@ function settleAfterSend(sock, jid, ms = 800) {
   });
 }
 
-async function resolveBaileysVersion() {
+const WA_VERSION_CACHE_MS = 15 * 60 * 1000;
+
+function readWaVersionCache(ignoreAge = false) {
+  try {
+    if (!fs.existsSync(BAILEYS_VERSION_CACHE)) {
+      return null;
+    }
+
+    const cached = JSON.parse(fs.readFileSync(BAILEYS_VERSION_CACHE, 'utf8'));
+
+    if (cached?.source !== 'wa-web' || !Array.isArray(cached.version) || cached.version.length !== 3) {
+      return null;
+    }
+
+    const ageMs = Date.now() - Number(cached.cachedAt ?? 0);
+
+    if (!ignoreAge && (ageMs < 0 || ageMs >= WA_VERSION_CACHE_MS)) {
+      return null;
+    }
+
+    return {
+      version: cached.version,
+      isLatest: Boolean(cached.isLatest),
+      source: 'wa-web',
+    };
+  } catch (error) {
+    logger.warn({ err: error }, 'Falha ao ler cache de versão do WhatsApp');
+
+    return null;
+  }
+}
+
+function writeWaVersionCache(resolved) {
+  fs.mkdirSync(runtimeConfig.sessionsPath, { recursive: true });
+  fs.writeFileSync(BAILEYS_VERSION_CACHE, JSON.stringify({
+    version: resolved.version,
+    isLatest: resolved.isLatest,
+    source: resolved.source,
+    cachedAt: Date.now(),
+  }));
+}
+
+function invalidateBaileysVersionCache() {
   try {
     if (fs.existsSync(BAILEYS_VERSION_CACHE)) {
-      const cached = JSON.parse(fs.readFileSync(BAILEYS_VERSION_CACHE, 'utf8'));
-
-      if (Array.isArray(cached?.version) && cached.version.length === 3) {
-        const ageMs = Date.now() - Number(cached.cachedAt ?? 0);
-
-        if (ageMs >= 0 && ageMs < 86_400_000) {
-          return { version: cached.version, isLatest: Boolean(cached.isLatest) };
-        }
-      }
+      fs.rmSync(BAILEYS_VERSION_CACHE, { force: true });
     }
   } catch (error) {
-    logger.warn({ err: error }, 'Falha ao ler cache de versão do Baileys');
+    logger.warn({ err: error }, 'Falha ao descartar cache de versão do WhatsApp');
+  }
+}
+
+function isUsableWaVersion(resolved) {
+  if (!Array.isArray(resolved?.version) || resolved.version.length !== 3) {
+    return false;
+  }
+
+  const [major, minor, revision] = resolved.version.map((part) => Number(part));
+
+  return Number.isFinite(major)
+    && Number.isFinite(minor)
+    && Number.isFinite(revision)
+    && major === 2
+    && minor === 3000
+    && revision > 0;
+}
+
+function versionKey(resolved) {
+  return isUsableWaVersion(resolved) ? resolved.version.join('.') : '';
+}
+
+function acceptWaVersion(resolved, rejectedVersion, skipReason) {
+  if (!isUsableWaVersion(resolved)) {
+    return null;
+  }
+
+  const key = versionKey(resolved);
+
+  if (rejectedVersion && key === String(rejectedVersion)) {
+    logger.warn({
+      version: key,
+      source: resolved.source ?? null,
+      rejectedVersion: String(rejectedVersion),
+      reason: 'revision_already_rejected_405',
+    }, skipReason || 'Revisão já rejeitada pelo WhatsApp (405); ignorando');
+
+    return null;
+  }
+
+  return {
+    version: resolved.version.map((part) => Number(part)),
+    isLatest: Boolean(resolved.isLatest),
+    source: String(resolved.source ?? 'unknown'),
+  };
+}
+
+async function fetchLiveWaWebVersion() {
+  const response = await fetch('https://web.whatsapp.com/sw.js', {
+    headers: { 'user-agent': 'Mozilla/5.0' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`WhatsApp Web respondeu ${response.status}`);
+  }
+
+  const data = await response.text();
+  const match = data.match(/\\?"client_revision\\?":\s*(\d+)/);
+  const revision = Number(match?.[1]);
+
+  if (!Number.isFinite(revision) || revision <= 0) {
+    throw new Error('client_revision ausente no WhatsApp Web');
+  }
+
+  return {
+    version: [2, 3000, revision],
+    isLatest: true,
+    source: 'wa-web',
+  };
+}
+
+async function resolveBaileysVersion({ refresh = false, rejectedVersion = null } = {}) {
+  const rejectedKey = rejectedVersion ? String(rejectedVersion) : '';
+
+  if (!refresh) {
+    const cached = acceptWaVersion(readWaVersionCache(false), rejectedKey, 'Cache com revisão rejeitada pelo WhatsApp');
+
+    if (cached) {
+      logger.warn({
+        version: cached.version.join('.'),
+        source: cached.source,
+      }, 'Usando revisão em cache do WhatsApp Web');
+
+      return cached;
+    }
   }
 
   try {
-    const resolved = await Promise.race([
-      fetchLatestBaileysVersion(),
+    const live = await Promise.race([
+      fetchLiveWaWebVersion(),
       new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout ao consultar versão do WhatsApp.')), 8000);
+        setTimeout(() => reject(new Error('Timeout ao consultar versão do WhatsApp Web.')), 8000);
       }),
     ]);
 
-    fs.mkdirSync(runtimeConfig.sessionsPath, { recursive: true });
-    fs.writeFileSync(BAILEYS_VERSION_CACHE, JSON.stringify({
-      version: resolved.version,
-      isLatest: resolved.isLatest,
-      cachedAt: Date.now(),
-    }));
+    const resolved = acceptWaVersion(live, rejectedKey, 'Revisão ao vivo do WhatsApp Web já rejeitada (405)');
 
-    return resolved;
-  } catch (error) {
-    logger.warn({ err: error }, 'Usando versão em cache/fallback do Baileys');
+    if (resolved) {
+      writeWaVersionCache(resolved);
+      logger.warn({
+        version: resolved.version.join('.'),
+        source: resolved.source,
+      }, 'Revisão obtida do WhatsApp Web');
 
-    if (fs.existsSync(BAILEYS_VERSION_CACHE)) {
-      const cached = JSON.parse(fs.readFileSync(BAILEYS_VERSION_CACHE, 'utf8'));
-
-      if (Array.isArray(cached?.version) && cached.version.length === 3) {
-        return { version: cached.version, isLatest: Boolean(cached.isLatest) };
-      }
+      return resolved;
     }
 
-    return { version: [2, 3000, 1023223821], isLatest: false };
+    logger.warn({
+      version: versionKey(live) || null,
+      rejectedVersion: rejectedKey || null,
+      reason: 'wa_web_revision_rejected_or_invalid',
+    }, 'Versão ao vivo do WhatsApp Web indisponível para uso');
+  } catch (error) {
+    logger.warn({
+      err: error,
+      reason: 'wa_web_fetch_failed',
+    }, 'Falha ao consultar a versão ao vivo do WhatsApp Web');
   }
+
+  try {
+    const repo = await Promise.race([
+      fetchLatestBaileysVersion(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao consultar versão do Baileys.')), 8000);
+      }),
+    ]);
+
+    if (repo?.error) {
+      logger.warn({
+        err: repo.error,
+        reason: 'baileys_github_error',
+      }, 'GitHub Baileys indisponível');
+    } else if (repo?.isLatest) {
+      const resolved = acceptWaVersion({
+        version: repo.version,
+        isLatest: true,
+        source: 'baileys-github',
+      }, rejectedKey, 'Revisão do GitHub já rejeitada pelo WhatsApp (405)');
+
+      if (resolved) {
+        // Alternativa apenas: não grava como cache wa-web.
+        logger.warn({
+          version: resolved.version.join('.'),
+          source: resolved.source,
+        }, 'Revisão obtida do GitHub (alternativa)');
+
+        return resolved;
+      }
+    } else {
+      logger.warn({
+        version: Array.isArray(repo?.version) ? repo.version.join('.') : null,
+        isLatest: Boolean(repo?.isLatest),
+        reason: 'baileys_embedded_or_stale',
+      }, 'GitHub/Baileys devolveu revisão embutida/desatualizada; ignorando');
+    }
+  } catch (error) {
+    logger.warn({
+      err: error,
+      reason: 'baileys_github_fetch_failed',
+    }, 'Falha ao consultar a versão publicada do Baileys no GitHub');
+  }
+
+  const stale = acceptWaVersion(readWaVersionCache(true), rejectedKey, 'Cache antigo com revisão rejeitada pelo WhatsApp');
+
+  if (stale) {
+    logger.warn({
+      version: stale.version.join('.'),
+      source: 'wa-web-stale',
+    }, 'Usando cache antigo do WhatsApp Web');
+
+    return { ...stale, source: 'wa-web-stale' };
+  }
+
+  const fallback = acceptWaVersion({
+    version: [2, 3000, 1023223821],
+    isLatest: false,
+    source: 'fallback',
+  }, rejectedKey, 'Fallback embutido já rejeitado pelo WhatsApp (405)');
+
+  if (fallback) {
+    logger.error({
+      version: fallback.version.join('.'),
+      source: fallback.source,
+      reason: 'using_embedded_fallback',
+    }, 'Usando revisão embutida antiga; conexão pode falhar com 405');
+
+    return fallback;
+  }
+
+  throw new Error(
+    rejectedKey
+      ? `Nenhuma revisão utilizável do WhatsApp (já rejeitada: ${rejectedKey}).`
+      : 'Nenhuma revisão utilizável do WhatsApp.',
+  );
 }
 
 async function sendTextMessage(sock, jid, text) {
@@ -363,6 +566,7 @@ function publicStatus(state) {
     status: state.status,
     number: state.number,
     qr: state.qr,
+    errorMessage: state.errorMessage || '',
   };
 }
 
@@ -474,16 +678,32 @@ async function startSession(empresaId, options = {}) {
     sessions.set(key, state);
   }
 
+  const generation = (state.generation ?? 0) + 1;
+  state.generation = generation;
   state.starting = true;
   state.status = 'aguardando_qr';
   state.qr = null;
+  state.lastCloseCode = null;
+  state.errorMessage = '';
 
   try {
     const dir = sessionDir(empresaId);
     fs.mkdirSync(dir, { recursive: true });
 
     const { state: authState, saveCreds } = await useMultiFileAuthState(dir);
-    const { version } = await resolveBaileysVersion();
+    const resolvedVersion = await resolveBaileysVersion({
+      refresh: Boolean(options.refreshVersion),
+      rejectedVersion: options.rejectedVersion ?? null,
+    });
+    const { version } = resolvedVersion;
+
+    logger.warn({
+      empresaId: key,
+      version: version.join('.'),
+      source: resolvedVersion.source,
+      refresh: Boolean(options.refreshVersion),
+      rejectedVersion: options.rejectedVersion ?? null,
+    }, 'Versão da sessão WhatsApp');
 
     const sock = makeWASocket({
       version,
@@ -501,7 +721,7 @@ async function startSession(empresaId, options = {}) {
     sock.ev.on('connection.update', async (update) => {
       const current = sessions.get(key);
 
-      if (!current) {
+      if (!current || current.generation !== generation) {
         return;
       }
 
@@ -512,6 +732,7 @@ async function startSession(empresaId, options = {}) {
         hasQr: Boolean(update.qr),
         statusCode: statusCode ?? null,
         isNewLogin: update.isNewLogin ?? null,
+        version: version.join('.'),
       }, 'connection.update');
 
       if (update.qr) {
@@ -523,6 +744,7 @@ async function startSession(empresaId, options = {}) {
         }
 
         current.status = 'aguardando_qr';
+        current.errorMessage = '';
         current.starting = false;
       }
 
@@ -532,13 +754,19 @@ async function startSession(empresaId, options = {}) {
         current.number = normalizeNumber(rawNumber) ?? rawNumber;
         current.status = 'conectado';
         current.qr = null;
+        current.errorMessage = '';
+        current.lastCloseCode = null;
         current.starting = false;
       }
 
       if (update.connection === 'close') {
+        if (current.sock === sock) {
+          current.sock = null;
+        }
+
         current.starting = false;
         current.qr = null;
-        current.sock = null;
+        current.lastCloseCode = statusCode ?? null;
 
         if (statusCode === DisconnectReason.loggedOut) {
           current.status = 'desconectado';
@@ -554,21 +782,39 @@ async function startSession(empresaId, options = {}) {
           return;
         }
 
+        // 405 = client_too_old. Não reabrir em loop; retry único fica após waitUntilSessionReady.
+        if (statusCode === 405) {
+          invalidateBaileysVersionCache();
+          current.status = 'erro';
+          current.errorMessage = 'O WhatsApp recusou a versão do cliente (405).';
+          logger.error({
+            empresaId: key,
+            version: version.join('.'),
+            source: resolvedVersion.source,
+            reason: 'client_too_old',
+            retried405: Boolean(options.retried405),
+          }, 'WhatsApp recusou a versão do cliente (405)');
+
+          return;
+        }
+
         current.status = 'desconectado';
 
-        if (statusCode !== DisconnectReason.loggedOut) {
-          setTimeout(() => {
-            const live = sessions.get(key);
+        setTimeout(() => {
+          const live = sessions.get(key);
 
-            if (live?.status === 'conectado' || live?.starting || live?.qr) {
-              return;
-            }
+          if (!live || live.generation !== generation) {
+            return;
+          }
 
-            startSession(empresaId).catch((error) => {
-              logger.error({ err: error }, 'Falha ao reconectar sessão');
-            });
-          }, 1500);
-        }
+          if (live.status === 'conectado' || live.starting || live.qr || live.status === 'erro') {
+            return;
+          }
+
+          startSession(empresaId).catch((error) => {
+            logger.error({ err: error }, 'Falha ao reconectar sessão');
+          });
+        }, 1500);
       }
     });
 
@@ -576,14 +822,49 @@ async function startSession(empresaId, options = {}) {
 
     const afterWait = sessions.get(key);
 
+    if (afterWait?.generation === generation && afterWait.lastCloseCode === 405 && !options.retried405) {
+      invalidateBaileysVersionCache();
+      logger.warn({
+        empresaId: key,
+        rejectedVersion: version.join('.'),
+        rejectedSource: resolvedVersion.source,
+        reason: 'retry_once_after_405',
+      }, 'Nova tentativa única com revisão atualizada após 405');
+      afterWait.status = 'desconectado';
+      afterWait.errorMessage = '';
+      afterWait.lastCloseCode = null;
+
+      return startSession(empresaId, {
+        ...options,
+        refreshVersion: true,
+        retried405: true,
+        rejectedVersion: version.join('.'),
+      });
+    }
+
     if (
       afterWait
+      && afterWait.generation === generation
       && !afterWait.qr
       && afterWait.status !== 'conectado'
       && !sessionHasCredentials(empresaId)
     ) {
       afterWait.status = 'erro';
-      logger.error({ empresaId: key }, 'Sessão iniciada sem QR — possível bloqueio de rede/firewall ao WhatsApp');
+
+      if (!afterWait.errorMessage) {
+        afterWait.errorMessage = afterWait.lastCloseCode === 405
+          ? 'O WhatsApp recusou a conexão (405). Tente novamente em alguns minutos.'
+          : 'Não foi possível gerar o QR Code. Verifique a internet e tente novamente.';
+      }
+
+      logger.error({
+        empresaId: key,
+        statusCode: afterWait.lastCloseCode ?? null,
+        version: version.join('.'),
+        source: resolvedVersion.source,
+        rejectedVersion: options.rejectedVersion ?? null,
+        reason: afterWait.lastCloseCode === 405 ? 'client_too_old_final' : 'qr_not_generated',
+      }, afterWait.errorMessage);
     }
   } finally {
     const current = sessions.get(key);
@@ -667,7 +948,7 @@ app.post('/sessions/:empresaId/start', requireAuth, async (req, res) => {
         ? 'WhatsApp já conectado.'
         : (payload.qr
           ? 'Leia o QR Code no ERP para conectar.'
-          : 'Gateway não gerou QR a tempo. Verifique internet/firewall e tente novamente.'),
+          : (payload.errorMessage || 'Gateway não gerou QR a tempo. Verifique a internet e tente novamente.')),
     });
   } catch (error) {
     logger.error({ err: error, empresaId, elapsedMs: Date.now() - startedAt }, 'Erro ao iniciar sessão');
