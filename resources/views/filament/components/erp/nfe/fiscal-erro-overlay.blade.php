@@ -36,7 +36,7 @@
         <p
             class="erp-nfe-fiscal-overlay__origem"
             style="display: {{ filled($this->nfeFiscalOverlayCodigo) ? 'block' : 'none' }};"
-        >Esta é uma mensagem da SEFAZ — Santa Catarina.</p>
+        >Esta é uma mensagem da SEFAZ — {{ $this->nfeSefazOrigemLabel }}.</p>
 
         <button
             type="button"

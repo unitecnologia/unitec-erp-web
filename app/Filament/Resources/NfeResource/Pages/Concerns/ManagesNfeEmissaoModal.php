@@ -588,7 +588,7 @@ trait ManagesNfeEmissaoModal
                         (string) ($this->nfeForm['obs_contribuinte'] ?? ''),
                         (string) ($totais['ibpt_texto'] ?? ''),
                     ),
-                    'tipo_frete' => (string) ($this->nfeForm['tipo_frete'] ?? '9'),
+                    'tipo_frete' => $this->normalizeNfeTipoFrete($this->nfeForm['tipo_frete'] ?? null),
                     'transportadora_id' => ((int) ($this->nfeForm['transportadora_id'] ?? 0)) ?: null,
                     'placa' => filled($this->nfeForm['placa'] ?? null)
                         ? mb_strtoupper(trim((string) $this->nfeForm['placa']), 'UTF-8')
@@ -1172,6 +1172,17 @@ trait ManagesNfeEmissaoModal
             '3' => '3 - PRÓPRIO REMETENTE',
             '4' => '4 - PRÓPRIO DESTINATÁRIO',
         ];
+    }
+
+    /** SEFAZ só aceita 0–4 e 9; legado Delphi usava 5 = sem frete. */
+    private function normalizeNfeTipoFrete(mixed $tipoFrete): string
+    {
+        $raw = trim((string) ($tipoFrete ?? ''));
+        if ($raw === '' || ! in_array($raw, ['0', '1', '2', '3', '4', '9'], true)) {
+            return '9';
+        }
+
+        return $raw;
     }
 
     /**
@@ -2222,7 +2233,7 @@ trait ManagesNfeEmissaoModal
             'meio_pgto' => $this->normalizeNfeMeioPgto($nfe->meio_pgto ?? null),
             'obs_fisco' => $nfe->obs_fisco ?? '',
             'obs_contribuinte' => $nfe->obs_contribuinte ?? '',
-            'tipo_frete' => (string) ($nfe->tipo_frete ?: '9'),
+            'tipo_frete' => $this->normalizeNfeTipoFrete($nfe->tipo_frete ?? null),
             'transportadora_id' => (string) ($nfe->transportadora_id ?? ''),
             'transportadora_codigo' => (string) ($nfe->transportadora?->codigo ?: '0'),
             'placa' => (string) ($nfe->placa ?? ''),
@@ -3552,7 +3563,8 @@ trait ManagesNfeEmissaoModal
         $this->closeNfeFiscalSucessoOverlay();
         $this->closeNfeFiscalInfoOverlay();
 
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe');
+        $uf = $this->nfeSefazUfEmitente();
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe', $uf);
         $mensagemExcecao = trim($exception->getMessage());
 
         // Pré-SEFAZ (ex.: NCM): título padrão + texto no corpo — overlay vermelho do meio da tela.
@@ -3577,6 +3589,7 @@ trait ManagesNfeEmissaoModal
                 'titulo' => $this->nfeFiscalOverlayTitulo,
                 'mensagem' => $this->nfeFiscalOverlayMensagem,
                 'codigo' => $this->nfeFiscalOverlayCodigo,
+                'origem' => $this->nfeSefazOrigemLabel,
             ])
             .')'
         );
@@ -3599,6 +3612,7 @@ trait ManagesNfeEmissaoModal
                 'titulo' => $this->nfeFiscalOverlayTitulo,
                 'mensagem' => $this->nfeFiscalOverlayMensagem,
                 'codigo' => null,
+                'origem' => $this->nfeSefazOrigemLabel,
             ])
             .')'
         );

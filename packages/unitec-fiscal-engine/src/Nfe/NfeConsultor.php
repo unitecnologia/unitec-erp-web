@@ -29,7 +29,7 @@ final class NfeConsultor
 
         $xml = $this->buildConsSitNfe($request->tpAmb, $chave);
         $cUf = substr($chave, 0, 2);
-        $endpoint = ScNfeEndpoints::consultaProtocolo($request->tpAmb);
+        $endpoint = NfeSoapUrls::consultaProtocolo($chave, $request->tpAmb);
 
         $soapResponse = $this->soapClient->consultaProtocolo(
             $endpoint,

@@ -20,6 +20,14 @@ final class PdvNfceConsultaService
     /** cStat da consulta: chave não consta na base da SEFAZ (nota não recebida). */
     public const CSTAT_NAO_CONSTA = '217';
 
+    /**
+     * cStat que comprovam que a chave não está autorizada — libera remontagem/reenvio (F5).
+     * 217: não consta; 464: hash QR inválido; 703/704: dhEmi futuro/atrasado.
+     *
+     * @var list<string>
+     */
+    public const CSTAT_LIBERA_REENVIO = ['217', '464', '703', '704'];
+
     public function __construct(
         private readonly PdvNfceFiscalPayloadBuilder $payloadBuilder = new PdvNfceFiscalPayloadBuilder(),
         private readonly FiscalEngine $engine = new FiscalEngine(),

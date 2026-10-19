@@ -32,7 +32,7 @@ final class NfeCanceller
         $envEvento = $this->xmlBuilder->finalizeEnvEvento($dom);
         $chave = preg_replace('/\D/', '', $request->chave) ?? '';
         $cUf = substr($chave, 0, 2);
-        $endpoint = ScNfeEndpoints::recepcaoEvento($request->tpAmb);
+        $endpoint = NfeSoapUrls::recepcaoEvento($chave, $request->tpAmb);
 
         $soapResponse = $this->soapClient->recepcaoEvento(
             $endpoint,

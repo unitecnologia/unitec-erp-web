@@ -3,7 +3,12 @@
         <legend class="erp-pcad__group-title">Responsável técnico (infRespTec)</legend>
 
         <p class="erp-config-fiscais-form__hint erp-config-fiscais-form__hint--compact">
-            Dados fixos do software UniTecnologia. Obrigatório para autorização de NFC-e/NF-e em Santa Catarina (rejeição 972 quando ausente).
+            @php
+                $ufRespTec = strtoupper((string) ($this->form['uf'] ?? 'SC'));
+            @endphp
+            Dados fixos do software UniTecnologia. Obrigatório para autorização de NFC-e/NF-e
+            {{ $ufRespTec === 'PR' ? 'no Paraná' : 'em Santa Catarina' }}
+            (rejeição 972 quando ausente).
         </p>
 
         <div class="erp-pcad-form__row">

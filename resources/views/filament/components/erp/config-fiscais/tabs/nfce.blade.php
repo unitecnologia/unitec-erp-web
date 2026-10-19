@@ -24,7 +24,7 @@
                     autocomplete="off"
                     spellcheck="false"
                     data-erp-preserve-case="1"
-                    placeholder="Token informado pela SEFAZ SC"
+                    placeholder="Token informado pela SEFAZ {{ strtoupper((string) ($this->form['uf'] ?? 'SC')) === 'PR' ? 'PR' : 'SC' }}"
                 >
             </div>
         </fieldset>

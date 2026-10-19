@@ -66,7 +66,7 @@ final class NfeEmitter
         int $cNf,
     ): EmitirNfeResponse {
         $enviNfe = $this->xmlBuilder->wrapEnviNfe($nfeXml);
-        $endpoint = ScNfeEndpoints::autorizacao($tpAmb);
+        $endpoint = NfeSoapUrls::autorizacao($chave, $tpAmb);
         $cUf = substr($chave, 0, 2);
         $soapResponse = $this->soapClient->autorizar($endpoint, $enviNfe, $certificate, $cUf);
         $parsed = $this->parser->parse($soapResponse);

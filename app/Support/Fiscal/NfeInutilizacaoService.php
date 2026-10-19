@@ -125,6 +125,7 @@ final class NfeInutilizacaoService
             numeroInicial: $numeroInicial,
             numeroFinal: $numeroFinal,
             justificativa: $justificativa,
+            uf: FiscalEmitenteUf::resolve($empresa, $parametros),
         ));
     }
 

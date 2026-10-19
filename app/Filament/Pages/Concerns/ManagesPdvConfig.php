@@ -217,7 +217,9 @@ trait ManagesPdvConfig
 
     protected function notifyPdvFiscalError(FiscalEngineException $exception): void
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $empresa = \App\Support\Erp\ErpContext::currentEmpresa();
+        $uf = \App\Support\Fiscal\FiscalEmitenteUf::tryResolve($empresa);
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfce', $uf);
 
         if ($resolvido['modal']) {
             $this->showPdvFiscalOverlayErro(

@@ -18,6 +18,7 @@ use App\Support\Erp\Nfe\NfeOrdemServicoService;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Pdv\TerminalResolver;
+use App\Support\Fiscal\FiscalEmitenteUf;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use App\Support\Fiscal\PdvNfceEmissionService;
 use App\Support\Fiscal\PdvNfceFiscalPayloadBuilder;
@@ -234,11 +235,14 @@ final class NfceOrdemServicoService
                 ->with(['itens.product', 'pagamentos', 'person'])
                 ->findOrFail((int) $preparado['pdv_venda_id']);
 
+            $parametros = VendasParametro::forEmpresa((int) $empresa->id);
+            FiscalEmitenteUf::tryResolve($empresa, $parametros);
+
             try {
                 $nfce = $this->emissionService->emitir(
                     $pdvVenda,
                     $empresa,
-                    VendasParametro::forEmpresa((int) $empresa->id),
+                    $parametros,
                     PdvFinalizarOperacao::NFCE_TRANSMITIR,
                     dataEmissao: now(),
                     permitirContingencia: false,
@@ -259,14 +263,15 @@ final class NfceOrdemServicoService
             return $this->finalizarResultado($nfce, (int) $pdvVenda->id);
         } catch (FiscalEngineException $exception) {
             $this->avancarNumeroAposDuplicidade($exception, $empresa);
-            $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+            $uf = FiscalEmitenteUf::tryResolve($empresa);
+            $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfce', $uf);
             $nfceId = isset($preparado['pdv_venda_id'])
                 ? (int) (PdvVendaNfce::query()->where('pdv_venda_id', (int) $preparado['pdv_venda_id'])->value('id') ?? 0)
                 : 0;
 
             return $this->resultado(
                 self::STATUS_REJEITADA,
-                $this->mensagemFiscal($exception),
+                $this->mensagemFiscal($exception, $empresa),
                 $nfceId > 0 ? $nfceId : null,
                 null,
                 isset($preparado['pdv_venda_id']) ? (int) $preparado['pdv_venda_id'] : null,
@@ -294,11 +299,12 @@ final class NfceOrdemServicoService
             $nfce = $this->transmissaoService->transmitir($nfce, $empresa);
         } catch (FiscalEngineException $exception) {
             $this->avancarNumeroAposDuplicidade($exception, $empresa);
-            $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+            $uf = FiscalEmitenteUf::tryResolve($empresa);
+            $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfce', $uf);
 
             return $this->resultado(
                 self::STATUS_REJEITADA,
-                $this->mensagemFiscal($exception),
+                $this->mensagemFiscal($exception, $empresa),
                 (int) $nfce->id,
                 $nfce->numero !== null ? (int) $nfce->numero : null,
                 (int) $nfce->pdv_venda_id,
@@ -617,9 +623,13 @@ final class NfceOrdemServicoService
         return $numero !== '' ? $numero : (string) ($ordem->codigo_legado ?: $ordem->id);
     }
 
-    private function mensagemFiscal(FiscalEngineException $exception): string
+    private function mensagemFiscal(FiscalEngineException $exception, ?Empresa $empresa = null): string
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $resolvido = PdvNfceFiscalMensagens::resolver(
+            $exception,
+            'nfce',
+            FiscalEmitenteUf::tryResolve($empresa),
+        );
         $titulo = trim((string) $resolvido['titulo']);
         $corpo = trim((string) ($resolvido['corpo'] ?? ''));
 

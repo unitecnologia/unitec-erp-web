@@ -69,7 +69,7 @@ final class PdvNfceInutilizacaoService
                 numeroInicial: $numeroInicial,
                 numeroFinal: $numeroFinal,
                 justificativa: $justificativa,
-                uf: strtoupper((string) ($parametros->uf ?: $empresa->uf ?: 'SC')),
+                uf: FiscalEmitenteUf::resolve($empresa, $parametros),
             ));
         } catch (Throwable $exception) {
             NfceNumeracao::liberarReservaInutilizacao((int) $empresa->id, $serie, $parametros, $reservados, trim($exception->getMessage()));

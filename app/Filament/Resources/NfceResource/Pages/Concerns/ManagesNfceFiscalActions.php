@@ -611,7 +611,9 @@ trait ManagesNfceFiscalActions
 
     protected function notifyNfceFiscalError(FiscalEngineException $exception): void
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $empresa = $this->resolveNfceEmpresa();
+        $uf = \App\Support\Fiscal\FiscalEmitenteUf::tryResolve($empresa);
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfce', $uf);
 
         $this->sinalizarSefazFalha(
             trim($resolvido['titulo'].($resolvido['corpo'] !== null ? ' — '.$resolvido['corpo'] : '')),

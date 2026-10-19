@@ -691,6 +691,12 @@ function showNfeFiscalErroOverlayUi(payload) {
 
     if (origemEl) {
         // Só marca como SEFAZ quando há cStat; validação local (NCM etc.) não é SEFAZ.
+        const origem = String(data.origem ?? '').trim();
+        if (origem !== '') {
+            origemEl.textContent = origem.startsWith('Esta é')
+                ? origem
+                : ('Esta é uma mensagem da SEFAZ — ' + origem + '.');
+        }
         origemEl.style.display = codigo !== '' ? 'block' : 'none';
     }
 

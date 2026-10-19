@@ -436,7 +436,7 @@ trait ManagesNfeCancelamento
 
     protected function notifyNfeCancelFiscalError(FiscalEngineException $exception): void
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe');
+        $resolvido = PdvNfceFiscalMensagens::resolver($exception, 'nfe', $this->nfeSefazUfEmitente());
 
         if ($this->nfeModalOpen) {
             $this->closeNfeFiscalOverlay();

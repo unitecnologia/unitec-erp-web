@@ -7,6 +7,7 @@ use App\Models\PdvVenda;
 use App\Models\PdvVendaNfce;
 use App\Models\VendasParametro;
 use App\Support\ContadorCloud\ContadorCloudPortalHookService;
+use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfce\NfceTentativaHistorico;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\TerminalResolver;
@@ -160,6 +161,10 @@ final class PdvNfceEmissionService
             $cNf = ((int) ltrim((string) $nfce->cnf, '0')) ?: null;
         }
 
+        // Rejeição 704 (PR e demais): dhEmi do fechamento da venda fica atrasado vs SEFAZ.
+        // Remontar sempre com horário atual (mesmo número/cNF no mês).
+        $dataEmissao = ErpTimezone::nowLocal();
+
         $request = $this->payloadBuilder->build(
             $venda,
             $empresa,
@@ -168,12 +173,13 @@ final class PdvNfceEmissionService
             $numero,
             $cNf,
             serieNfce: $serie,
+            dataEmissao: $dataEmissao,
         );
 
         FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_ASSINAR, 'nfce');
 
         $prepared = $this->engine->prepararNfceAssinada($request);
-        $nfce = $this->gravarAntesDoEnvio($nfce, $venda, $empresa, $operacao, $request, $prepared, $parametros, null);
+        $nfce = $this->gravarAntesDoEnvio($nfce, $venda, $empresa, $operacao, $request, $prepared, $parametros, $dataEmissao);
 
         return $this->enviarRegistro($nfce, $empresa, $parametros, $onProgress, false, $request->certificate);
     }

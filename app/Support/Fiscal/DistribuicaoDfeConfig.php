@@ -88,7 +88,7 @@ final class DistribuicaoDfeConfig
 
     public static function cUfAutor(Empresa $empresa, VendasParametro $parametros): string
     {
-        $uf = strtoupper((string) ($parametros->uf ?: $empresa->uf ?: 'SC'));
+        $uf = FiscalEmitenteUf::resolve($empresa, $parametros);
 
         return ChaveAcesso::cUfFromSigla($uf);
     }

@@ -21,6 +21,7 @@ use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Pdv\TerminalResolver;
+use App\Support\Fiscal\FiscalEmitenteUf;
 use App\Support\Fiscal\NfceTerminalSequencia;
 use App\Support\Fiscal\PdvNfceEmissionService;
 use App\Support\Fiscal\PdvNfceFiscalPayloadBuilder;
@@ -180,10 +181,13 @@ final class NfceRegularizacaoService
             // Só em memória (vai para infCpl); a venda original não é alterada.
             $pdvVenda->observacoes = $this->observacoesComReferencia($pdvVenda, $venda);
 
+            $parametros = VendasParametro::forEmpresa((int) $empresa->id);
+            FiscalEmitenteUf::tryResolve($empresa, $parametros);
+
             $nfce = $this->emissionService->emitir(
                 $pdvVenda,
                 $empresa,
-                VendasParametro::forEmpresa((int) $empresa->id),
+                $parametros,
                 PdvFinalizarOperacao::NFCE_TRANSMITIR,
                 dataEmissao: now(),
                 permitirContingencia: false,
@@ -192,7 +196,7 @@ final class NfceRegularizacaoService
             return $this->resultado(self::STATUS_REJEITADA, $exception->getMessage());
         } catch (FiscalEngineException $exception) {
             $this->avancarNumeroAposDuplicidade($exception, $empresa);
-            $mensagem = $this->mensagemFiscal($exception);
+            $mensagem = $this->mensagemFiscal($exception, $empresa);
             $this->registrarLog($vendaId, $empresa, 'erro', $mensagem);
 
             return $this->resultado(self::STATUS_REJEITADA, $mensagem);
@@ -751,9 +755,13 @@ final class NfceRegularizacaoService
         return $obs !== '' ? $obs.' | '.$referencia : $referencia;
     }
 
-    private function mensagemFiscal(FiscalEngineException $exception): string
+    private function mensagemFiscal(FiscalEngineException $exception, ?Empresa $empresa = null): string
     {
-        $resolvido = PdvNfceFiscalMensagens::resolver($exception);
+        $resolvido = PdvNfceFiscalMensagens::resolver(
+            $exception,
+            'nfce',
+            FiscalEmitenteUf::tryResolve($empresa),
+        );
         $titulo = trim((string) $resolvido['titulo']);
         $corpo = trim((string) ($resolvido['corpo'] ?? ''));
 

@@ -34,6 +34,8 @@ final class InutilizarNfeRequest
 
         public readonly ?\DateTimeInterface $dataEvento = null,
 
+        public readonly string $uf = 'SC',
+
     ) {}
 
 }

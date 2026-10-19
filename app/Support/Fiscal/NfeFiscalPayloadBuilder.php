@@ -60,8 +60,8 @@ final class NfeFiscalPayloadBuilder
             );
         }
 
-        $empresaUf = strtoupper((string) ($empresa->uf ?? 'SC'));
-        $clienteUf = strtoupper((string) ($cliente->uf ?? $empresaUf));
+        $empresaUf = FiscalEmitenteUf::resolve($empresa, $parametros);
+        $clienteUf = strtoupper(trim((string) ($cliente->uf ?? ''))) ?: $empresaUf;
         $idDest = $this->resolveIdDest($empresaUf, $clienteUf);
 
         if (! $nfe->data_emissao) {
@@ -96,13 +96,26 @@ final class NfeFiscalPayloadBuilder
             $emissao = ErpTimezone::nowLocal();
         }
 
-        $dataSaida = $nfe->data_saida;
-
-        if ($nfe->hora_saida && $dataSaida) {
+        // dhSaiEnt: date cast sem hora vira 00:00; com dhEmi às 12:00 no mesmo dia → cStat 506.
+        $dataSaida = null;
+        if ($nfe->data_saida) {
             $dataSaida = \Carbon\Carbon::parse(
-                $dataSaida->format('Y-m-d'),
+                $nfe->data_saida->format('Y-m-d'),
                 ErpTimezone::DEFAULT,
-            )->setTimeFromTimeString((string) $nfe->hora_saida);
+            )->startOfDay();
+
+            $horaSaida = trim((string) ($nfe->hora_saida ?? ''));
+            if ($horaSaida !== '') {
+                $dataSaida = $dataSaida->setTimeFromTimeString($horaSaida);
+            } elseif ($dataSaida->toDateString() === $emissao->toDateString()) {
+                $dataSaida = $emissao->copy();
+            } else {
+                $dataSaida = $dataSaida->setTime(12, 0, 0);
+            }
+
+            if ($dataSaida->lt($emissao)) {
+                $dataSaida = $emissao->copy();
+            }
         }
 
         $crt = $this->mapCrt((string) ($empresa->regime_tributario ?? 'simples'));
@@ -188,7 +201,7 @@ final class NfeFiscalPayloadBuilder
 
         return new EmitirNfeRequest(
             certificate: $certificate,
-            emitente: $this->buildEmitente($empresa),
+            emitente: $this->buildEmitente($empresa, $empresaUf),
             ide: new IdeDto(
                 serie: (int) ltrim((string) ($nfe->serie ?: '1'), '0') ?: 1,
                 numero: (int) ltrim((string) $nfe->numero, '0'),
@@ -199,14 +212,14 @@ final class NfeFiscalPayloadBuilder
                 codigoMunicipioFg: (string) ($empresa->cidade_codigo ?: ''),
                 dataEmissao: $emissao,
             ),
-            destinatario: $this->buildDestinatario($cliente),
+            destinatario: $this->buildDestinatario($cliente, $empresaUf),
             itens: $itens,
             valorProdutos: $valorProdutos,
             valorNota: round((float) $nfe->total, 2),
             idDest: $idDest,
             indFinal: $this->resolveIndFinal($nfe, $cliente),
             finNFe: $finNFe,
-            modFrete: (int) ltrim((string) ($nfe->tipo_frete ?? '9'), '0'),
+            modFrete: $this->resolveModFrete($nfe),
             valorDesconto: $valorDesconto,
             valorFrete: $this->sumItensCampo($nfe, 'frete'),
             valorSeguro: $this->sumItensCampo($nfe, 'seguro'),
@@ -226,7 +239,10 @@ final class NfeFiscalPayloadBuilder
 
     public function podeEmitirReal(VendasParametro $parametros, Empresa $empresa): bool
     {
-        if (strtoupper((string) ($parametros->uf ?: $empresa->uf)) !== 'SC') {
+        $uf = strtoupper(trim((string) ($parametros->uf ?: $empresa->uf)));
+
+        // SC (SVRS) e PR (SEFAZ-PR própria) — demais UFs ainda não roteadas no motor.
+        if (! in_array($uf, ['SC', 'PR'], true)) {
             return false;
         }
 
@@ -247,6 +263,8 @@ final class NfeFiscalPayloadBuilder
 
     private function validarPreRequisitos(Empresa $empresa, VendasParametro $parametros): void
     {
+        FiscalEmitenteUf::resolve($empresa, $parametros);
+
         if (! $this->podeEmitirReal($parametros, $empresa)) {
             throw new FiscalEngineException('Transmissão real de NF-e não está configurada para esta empresa/UF.');
         }
@@ -268,7 +286,7 @@ final class NfeFiscalPayloadBuilder
         return $ncm !== '' ? $ncm : '00000000';
     }
 
-    private function buildEmitente(Empresa $empresa): EmitenteDto
+    private function buildEmitente(Empresa $empresa, string $ufEmitente): EmitenteDto
     {
         return new EmitenteDto(
             cnpj: (string) $empresa->cnpj,
@@ -281,18 +299,19 @@ final class NfeFiscalPayloadBuilder
             bairro: (string) ($empresa->bairro ?? 'CENTRO'),
             codigoMunicipio: (string) $empresa->cidade_codigo,
             municipio: (string) ($empresa->cidade ?? ''),
-            uf: strtoupper((string) ($empresa->uf ?? 'SC')),
+            uf: $ufEmitente,
             cep: (string) ($empresa->cep ?? '00000000'),
             telefone: (string) ($empresa->telefone ?? ''),
         );
     }
 
-    private function buildDestinatario(Person $cliente): NfeDestinatarioDto
+    private function buildDestinatario(Person $cliente, string $ufEmitente): NfeDestinatarioDto
     {
         $digits = preg_replace('/\D/', '', (string) ($cliente->cpf_cnpj ?? '')) ?? '';
         $cpf = strlen($digits) === 11 ? $digits : null;
         $cnpj = strlen($digits) === 14 ? $digits : null;
         [$indIeDest, $ie] = $this->resolveIndIeDest($cliente);
+        $ufDest = strtoupper(trim((string) ($cliente->uf ?: ''))) ?: $ufEmitente;
 
         return new NfeDestinatarioDto(
             cpf: $cpf,
@@ -303,7 +322,7 @@ final class NfeFiscalPayloadBuilder
             bairro: (string) ($cliente->bairro ?: 'CENTRO'),
             codigoMunicipio: (string) ($cliente->cidade_codigo ?: '0000000'),
             municipio: (string) ($cliente->cidade_nome ?: 'NAO INFORMADO'),
-            uf: strtoupper((string) ($cliente->uf ?: 'SC')),
+            uf: $ufDest,
             cep: (string) ($cliente->cep ?: '00000000'),
             indIeDest: $indIeDest,
             ie: $ie,
@@ -623,12 +642,25 @@ final class NfeFiscalPayloadBuilder
         )];
     }
 
+    /**
+     * modFrete SEFAZ: 0–4 e 9. Legado Delphi usava 5 = “sem frete” (inválido no XSD → cStat 225).
+     */
+    private function resolveModFrete(Nfe $nfe): int
+    {
+        $raw = trim((string) ($nfe->tipo_frete ?? ''));
+        if ($raw === '') {
+            return 9;
+        }
+
+        // Não usar ltrim(..., '0'): apagaria o código 0 (frete por conta do emitente).
+        $mod = (int) $raw;
+
+        return in_array($mod, [0, 1, 2, 3, 4, 9], true) ? $mod : 9;
+    }
+
     private function buildTransporte(Nfe $nfe): ?NfeTransporteDto
     {
-        $modFrete = (int) ltrim((string) ($nfe->tipo_frete ?? '9'), '0');
-        if ($modFrete <= 0) {
-            $modFrete = 9;
-        }
+        $modFrete = $this->resolveModFrete($nfe);
 
         $transportadora = $modFrete === 9 ? null : $nfe->transportadora;
         $doc = null;

@@ -58,6 +58,7 @@ class ErpContext
         self::$memoEmpresaIdResolved = false;
         self::$memoEmpresa = null;
         self::$memoEmpresaResolved = false;
+        \App\Support\Fiscal\FiscalEmitenteUf::clearMemo();
     }
 
     /**

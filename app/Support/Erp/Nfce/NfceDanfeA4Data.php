@@ -17,6 +17,7 @@ use DOMNode;
 use DOMXPath;
 use Illuminate\Support\Carbon;
 use Throwable;
+use Unitec\FiscalEngine\Nfce\NfcePublicUrls;
 use Unitec\FiscalEngine\Nfce\ScNfceEndpoints;
 
 /**
@@ -224,11 +225,24 @@ final class NfceDanfeA4Data
     {
         $url = $this->v($x, $this->q('infNFeSupl', 'urlChave'));
 
-        if ($url === '' && strtoupper((string) ($empresa?->uf ?? '')) === 'SC' && class_exists(ScNfceEndpoints::class)) {
-            $url = ScNfceEndpoints::consultaQrCode($tpAmb === 1 ? 1 : 2);
+        if ($url !== '') {
+            return $url;
         }
 
-        return $url;
+        $uf = strtoupper(trim((string) ($empresa?->uf ?? '')));
+        $amb = $tpAmb === 1 ? 1 : 2;
+
+        // SC: comportamento histórico (portal SAT — mesma base usada antes).
+        if ($uf === 'SC' && class_exists(ScNfceEndpoints::class)) {
+            return ScNfceEndpoints::consultaQrCode($amb);
+        }
+
+        // PR: urlChave pública (não confundir com URL do QR Code).
+        if ($uf === 'PR') {
+            return NfcePublicUrls::urlChave('PR', $amb);
+        }
+
+        return '';
     }
 
     /**

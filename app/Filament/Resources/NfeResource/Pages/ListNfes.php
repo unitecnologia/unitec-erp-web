@@ -25,6 +25,7 @@ use App\Models\OrdemServico;
 use App\Models\OutrasSaidaMovimento;
 use App\Models\Person;
 use App\Models\Venda;
+use App\Models\VendasParametro;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Nfe\NfeDevolucaoCompraService;
@@ -872,6 +873,24 @@ class ListNfes extends ListRecords
         }
 
         return $empresa->fantasia ?: ($empresa->nome ?: $empresa->razao_social);
+    }
+
+    protected function nfeSefazUfEmitente(): ?string
+    {
+        $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
+        $empresa = $empresaId
+            ? Empresa::query()->whereKey($empresaId)->where('ativo', true)->first(['uf'])
+            : null;
+        $params = $empresaId ? VendasParametro::forEmpresa((int) $empresaId) : null;
+
+        return \App\Support\Fiscal\FiscalEmitenteUf::tryResolve($empresa, $params);
+    }
+
+    /** Rótulo do overlay fiscal (UF do emitente — não hardcoded SC). */
+    #[Computed]
+    public function nfeSefazOrigemLabel(): string
+    {
+        return \App\Support\Fiscal\FiscalEmitenteUf::sefazOrigemRotulo($this->nfeSefazUfEmitente());
     }
 
     #[Computed]

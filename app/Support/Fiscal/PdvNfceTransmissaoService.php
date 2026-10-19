@@ -213,7 +213,9 @@ final class PdvNfceTransmissaoService
     }
 
     /**
-     * Só libera reenvio com resposta conclusiva: autorizada/cancelada/denegada ou "não consta" (217).
+     * Só libera reenvio com resposta conclusiva: autorizada/cancelada/denegada,
+     * "não consta"/rejeições conhecidas (217, 464, 703, 704), ou qualquer retorno
+     * não definitivo quando a NFC-e local já está rejeitada/em duplicidade.
      */
     private function confirmarSituacao(PdvVendaNfce $nfce, Empresa $empresa, VendasParametro $parametros): ConsultarNfceResponse
     {
@@ -226,8 +228,14 @@ final class PdvNfceTransmissaoService
             );
         }
 
+        $jaRejeitadaLocal = in_array($nfce->status, [
+            PdvVendaNfce::STATUS_REJEITADA,
+            PdvVendaNfce::STATUS_DUPLICIDADE,
+        ], true);
+
         if ($consulta->autorizada || $consulta->cancelada || $consulta->denegada
-            || $consulta->statusCodigo === PdvNfceConsultaService::CSTAT_NAO_CONSTA) {
+            || in_array($consulta->statusCodigo, PdvNfceConsultaService::CSTAT_LIBERA_REENVIO, true)
+            || ($jaRejeitadaLocal && ! $consulta->autorizada && ! $consulta->cancelada && ! $consulta->denegada)) {
             return $consulta;
         }
 

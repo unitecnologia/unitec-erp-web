@@ -40,7 +40,7 @@
                 </div>
                 <p class="erp-pdv-naoencontrado__hint">Clique em Sair para voltar ao PDV.</p>
             @else
-                <p class="erp-pdv-fiscal-overlay__origem">Esta é uma mensagem da SEFAZ - SC.</p>
+                <p class="erp-pdv-fiscal-overlay__origem">Esta é uma mensagem da SEFAZ — {{ \App\Support\Fiscal\FiscalEmitenteUf::sefazOrigemRotulo(\App\Support\Fiscal\FiscalEmitenteUf::tryResolve(\App\Support\Erp\ErpContext::currentEmpresa())) }}.</p>
                 <button
                     type="button"
                     wire:click="sairPdvFiscalOverlay"

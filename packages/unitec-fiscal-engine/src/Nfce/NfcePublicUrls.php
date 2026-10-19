@@ -46,7 +46,7 @@ final class NfcePublicUrls
 
         if (! in_array($uf, self::SUPPORTED, true)) {
             throw new FiscalEngineException(
-                'NFC-e: UF "'.($uf !== '' ? $uf : '?').'" não suportada. Suportadas: SC e PR.',
+                'UF "'.($uf !== '' ? $uf : '?').'" não suportada para NF-e/NFC-e. Suportadas: SC e PR.',
             );
         }
 

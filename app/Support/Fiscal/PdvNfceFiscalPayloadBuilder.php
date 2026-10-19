@@ -36,6 +36,7 @@ final class PdvNfceFiscalPayloadBuilder
         ?\Carbon\CarbonInterface $dataEmissao = null,
     ): EmitirNfceRequest {
         $this->validarPreRequisitos($empresa, $parametros, $operacao);
+        $ufEmitente = FiscalEmitenteUf::resolve($empresa, $parametros);
 
         $certPath = NfeFiscalConfig::certificadoAbsolutePath($parametros);
         $senha = $parametros->safeSenhaCertificado();
@@ -51,6 +52,18 @@ final class PdvNfceFiscalPayloadBuilder
         // O banco conserva o instante em UTC; o XML fiscal exige data/hora local
         // e offset do estabelecimento para dhEmi/chave de acesso.
         $emissao = ErpTimezone::toLocal($dataEmissao ?? $venda->fechado_em ?? now());
+        // Emissão normal: SEFAZ rejeita cStat 704 se dhEmi atrasar além da tolerância
+        // (ex.: PR ≈ 5 min). Contingência (tpEmis=9) preserva o horário do fechamento.
+        if ($tpEmis === 1) {
+            $limiteAtraso = ErpTimezone::nowLocal()->subMinutes(4);
+            if ($emissao->lt($limiteAtraso)) {
+                $emissao = ErpTimezone::nowLocal();
+            }
+            $limiteFuturo = ErpTimezone::nowLocal()->addMinute();
+            if ($emissao->greaterThan($limiteFuturo)) {
+                $emissao = ErpTimezone::nowLocal();
+            }
+        }
         $justificativa = $tpEmis === 9
             ? NfceContingenciaJustificativa::normalize($justificativaContingencia)
             : null;
@@ -119,7 +132,7 @@ final class PdvNfceFiscalPayloadBuilder
             $descricao = (string) $item->descricao;
             $combustivel = ProdutoCombustivelFiscal::fromProduct(
                 $product,
-                strtoupper((string) ($empresa->uf ?? 'SC')),
+                $ufEmitente,
                 $descricao,
             );
 
@@ -192,7 +205,7 @@ final class PdvNfceFiscalPayloadBuilder
 
         return new EmitirNfceRequest(
             certificate: $certificate,
-            emitente: $this->buildEmitente($empresa),
+            emitente: $this->buildEmitente($empresa, $ufEmitente),
             ide: new IdeDto(
                 serie: $serieNfce ?? ((int) ltrim((string) ($parametros->serie ?: '1'), '0') ?: 1),
                 numero: $numeroNfce,
@@ -309,6 +322,8 @@ final class PdvNfceFiscalPayloadBuilder
 
     private function validarPreRequisitos(Empresa $empresa, VendasParametro $parametros, string $operacao): void
     {
+        FiscalEmitenteUf::resolve($empresa, $parametros);
+
         if (! $this->podeEmitirReal($parametros, $empresa, $operacao)) {
             throw new FiscalEngineException('Emissão real de NFC-e não está configurada para esta empresa/UF.');
         }
@@ -324,7 +339,7 @@ final class PdvNfceFiscalPayloadBuilder
         }
     }
 
-    private function buildEmitente(Empresa $empresa): EmitenteDto
+    private function buildEmitente(Empresa $empresa, string $ufEmitente): EmitenteDto
     {
         return new EmitenteDto(
             cnpj: (string) $empresa->cnpj,
@@ -337,7 +352,7 @@ final class PdvNfceFiscalPayloadBuilder
             bairro: (string) ($empresa->bairro ?? 'CENTRO'),
             codigoMunicipio: (string) $empresa->cidade_codigo,
             municipio: (string) ($empresa->cidade ?? ''),
-            uf: strtoupper((string) ($empresa->uf ?? 'SC')),
+            uf: $ufEmitente,
             cep: (string) ($empresa->cep ?? '00000000'),
             telefone: (string) ($empresa->telefone ?? ''),
         );
