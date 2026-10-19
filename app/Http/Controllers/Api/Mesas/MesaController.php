@@ -54,7 +54,9 @@ class MesaController
             'versao' => $versao,
             'campos' => MesasCatalogoService::CAMPOS,
             'produtos' => $this->catalogo->produtos($empresa, $versao),
+            'grupos' => $this->catalogo->grupos($empresa, $versao),
             'tab_preco' => $this->catalogo->tabPrecos($empresa, $versao),
+            'composicoes' => $this->catalogo->composicoes($empresa, $versao),
         ]);
     }
 

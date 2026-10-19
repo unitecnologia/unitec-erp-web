@@ -94,11 +94,8 @@
                             @endphp
                             <td @class(['fi-ta-cell', 'text-' . $column['align'] => filled($column['align'] ?? null)])>
                                 <div class="fi-ta-col">
-                                    @if ($column['html'] ?? false)
-                                        <span class="fi-ta-text">{!! $value !!}</span>
-                                    @else
-                                        <span class="fi-ta-text">{{ $value }}</span>
-                                    @endif
+                                    {{-- ProductListRowFormatter já aplica e() / HTML seguro --}}
+                                    <span class="fi-ta-text">{!! $value !!}</span>
                                 </div>
                             </td>
                         @endforeach

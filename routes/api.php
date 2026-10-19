@@ -282,6 +282,10 @@ Route::prefix('v1/mesas')->group(function (): void {
         Route::get('devices/status', [MesasDeviceController::class, 'status']);
     });
 
+    // Foto do produto (pública: Image.network não envia token). Mesmo controller do Força.
+    Route::get('produtos/{product}/foto', ProductPhotoController::class)
+        ->name('mesas.produto.foto');
+
     Route::middleware('mesas.device')->group(function (): void {
         Route::middleware('throttle:30,1')->group(function (): void {
             Route::get('info', [MesasInfoController::class, 'index']);

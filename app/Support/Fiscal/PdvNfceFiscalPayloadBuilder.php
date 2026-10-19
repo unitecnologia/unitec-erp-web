@@ -242,8 +242,8 @@ final class PdvNfceFiscalPayloadBuilder
             $motivos[] = 'Operação não é de emissão fiscal.';
         }
 
-        if (strtoupper((string) ($parametros->uf ?: $empresa->uf)) !== 'SC') {
-            $motivos[] = 'Emissão real disponível apenas para UF SC.';
+        foreach ($this->motivosBloqueioUfAmbiente($parametros, $empresa) as $motivoUf) {
+            $motivos[] = $motivoUf;
         }
 
         if (NfeFiscalConfig::certificadoAbsolutePath($parametros) === null) {
@@ -276,7 +276,7 @@ final class PdvNfceFiscalPayloadBuilder
 
     public function podeCancelarReal(VendasParametro $parametros, Empresa $empresa): bool
     {
-        if (strtoupper((string) ($parametros->uf ?: $empresa->uf)) !== 'SC') {
+        if ($this->motivosBloqueioUfAmbiente($parametros, $empresa) !== []) {
             return false;
         }
 
@@ -289,6 +289,22 @@ final class PdvNfceFiscalPayloadBuilder
         }
 
         return filled($empresa->cnpj);
+    }
+
+    /**
+     * SC e PR: produção e homologação (endpoints conforme tpAmb). Demais UFs: bloqueadas.
+     *
+     * @return list<string>
+     */
+    private function motivosBloqueioUfAmbiente(VendasParametro $parametros, Empresa $empresa): array
+    {
+        $uf = strtoupper(trim((string) ($parametros->uf ?: $empresa->uf)));
+
+        if (in_array($uf, ['SC', 'PR'], true)) {
+            return [];
+        }
+
+        return ['Emissão real de NFC-e disponível apenas para UF SC e PR.'];
     }
 
     private function validarPreRequisitos(Empresa $empresa, VendasParametro $parametros, string $operacao): void

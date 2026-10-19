@@ -482,8 +482,9 @@ final class PendingMigrationsGuard
             : 'Banco incompatível com esta versão do sistema.';
 
         return $prefix
-            .' Não use o ERP até corrigir. Se houver atualização pendente no login, aceite para aplicar o migrate.'
-            .' Caso contrário, execute Reparar Sistema.bat (aplica migrate --force sem apagar dados).';
+            .' Você pode continuar usando o ERP; alguns recursos podem falhar até corrigir.'
+            .' Se houver atualização pendente no login, aceite para aplicar o migrate.'
+            .' Caso contrário, execute Aplicar Migrations.bat ou Reparar Sistema.bat (não apaga dados).';
     }
 
     private function storeSessionError(string $message): void

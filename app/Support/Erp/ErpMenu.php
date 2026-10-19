@@ -43,6 +43,7 @@ use App\Filament\Pages\RhDashboardPage;
 use App\Filament\Pages\BackupPage;
 use App\Filament\Pages\LicencaSistemaPage;
 use App\Filament\Pages\BalancaConfigPage;
+use App\Filament\Pages\MesasConfigPage;
 use App\Filament\Resources\RhCargoResource;
 use App\Filament\Resources\RhDepartamentoResource;
 use App\Filament\Resources\RhFuncionarioResource;
@@ -557,6 +558,16 @@ class ErpMenu
             static::link('Log de Operações', ErpOperacaoLogResource::getUrl('index'), permission: 'vendas.access', icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate'),
         ], icon: 'heroicon-o-clipboard-document-list', iconColor: 'erp-menu-bar__icon--slate');
 
+        if (static::restauranteHabilitado()) {
+            $items[] = static::group('Restaurante', [
+                static::link('Movimento de Mesas', route('erp.reports.tabular', ['slug' => 'movimento-mesas']), permission: 'vendas.print', icon: 'heroicon-o-table-cells', iconColor: 'erp-menu-bar__icon--amber'),
+                static::link('Histórico de Fechamentos', route('erp.reports.tabular', ['slug' => 'historico-fechamentos-mesas']), permission: 'vendas.print', icon: 'heroicon-o-clipboard-document-check', iconColor: 'erp-menu-bar__icon--teal'),
+                static::link('Vendas por Horário', route('erp.reports.tabular', ['slug' => 'vendas-mesas-horario']), permission: 'vendas.print', icon: 'heroicon-o-clock', iconColor: 'erp-menu-bar__icon--blue'),
+                static::link('Tempo de Ocupação', route('erp.reports.tabular', ['slug' => 'tempo-ocupacao-mesas']), permission: 'vendas.print', icon: 'heroicon-o-arrow-path', iconColor: 'erp-menu-bar__icon--indigo'),
+                static::link('Cancelamentos e Descontos', route('erp.reports.tabular', ['slug' => 'cancelamentos-descontos-mesas']), permission: 'vendas.print', icon: 'heroicon-o-receipt-percent', iconColor: 'erp-menu-bar__icon--red'),
+            ], icon: 'heroicon-o-building-storefront', iconColor: 'erp-menu-bar__icon--amber');
+        }
+
         return $items;
     }
 
@@ -571,7 +582,13 @@ class ErpMenu
         ];
 
         if (static::restauranteHabilitado()) {
-            $items[] = static::stub('Mesas', icon: 'heroicon-o-table-cells', iconColor: 'erp-menu-bar__icon--slate');
+            $items[] = static::link(
+                'Mesas',
+                MesasConfigPage::getUrl(),
+                permission: 'empresa.access',
+                icon: 'heroicon-o-table-cells',
+                iconColor: 'erp-menu-bar__icon--amber',
+            );
         }
 
         return [

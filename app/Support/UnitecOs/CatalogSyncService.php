@@ -2,7 +2,6 @@
 
 namespace App\Support\UnitecOs;
 
-use App\Models\Grupo;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\User;
@@ -134,21 +133,7 @@ final class CatalogSyncService
      */
     private function grupos(): array
     {
-        $nomes = [];
-
-        if (Schema::hasTable('grupos')) {
-            $query = Grupo::query()->where('ativo', true);
-            if (Schema::hasColumn('grupos', 'mostrar_no_app')) {
-                $query->where('mostrar_no_app', true);
-            }
-            $nomes = $query
-                ->orderBy('nome')
-                ->pluck('nome')
-                ->map(static fn ($n): string => trim((string) $n))
-                ->filter(static fn (string $n): bool => $n !== '')
-                ->values()
-                ->all();
-        }
+        $nomes = \App\Support\Erp\GrupoAppCatalog::nomesVisiveis();
 
         if ($nomes === [] && Schema::hasColumn('products', 'grupo')) {
             $nomes = Product::query()

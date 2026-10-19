@@ -16,6 +16,22 @@ internal static class Program
         ApplicationConfiguration.Initialize();
 
         var appPath = ErpPaths.ResolveAppPath(GetArg(args, "--app"));
+
+        // Modo helper na sessão interativa: FolderBrowserDialog para o ERP (Session 0).
+        if (HasFlag(args, "--ui-helper"))
+        {
+            try
+            {
+                UiHelperHost.Run(appPath);
+            }
+            catch (Exception ex)
+            {
+                DesktopLog.Write(appPath, "UI Helper erro fatal: " + ex.Message);
+            }
+
+            return;
+        }
+
         var lockPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "UnitecERP",
@@ -62,6 +78,7 @@ internal static class Program
                 if (alreadyOpen)
                 {
                     OpeningSplash.Close();
+                    UiHelperHost.EnsureStarted(appPath);
                     return;
                 }
 
@@ -239,60 +256,68 @@ internal static class Program
 
     private static void OpenOrFocusBrowser(string appPath)
     {
-        if (FocusExistingBrowserApp(maximize: true))
-        {
-            OpeningSplash.Close();
-            return;
-        }
-
-        var browser = FindBrowser();
-        var url = ErpPaths.DefaultAppUrl.TrimEnd('/') + "/admin/login";
-        var profile = GetProfileDir();
-        Directory.CreateDirectory(profile);
-        ClearOrphanBrowserLocks(profile, appPath);
-
-        if (browser is null)
-        {
-            OpeningSplash.Close();
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-            DesktopLog.Write(appPath, "Navegador disparado");
-            return;
-        }
-
-        var args =
-            $"--app={url} --user-data-dir=\"{profile}\" --start-maximized " +
-            "--no-first-run --no-default-browser-check";
-
         try
         {
-            OpeningSplash.Close();
-            var started = Process.Start(new ProcessStartInfo
+            if (FocusExistingBrowserApp(maximize: true))
             {
-                FileName = browser,
-                Arguments = args,
-                UseShellExecute = true,
-            });
+                OpeningSplash.Close();
+                return;
+            }
 
-            DesktopLog.Write(appPath, "Navegador disparado");
-            DesktopLog.Write(appPath, "Browser iniciado: " + browser + " pid=" + (started?.Id.ToString() ?? "?"));
+            var browser = FindBrowser();
+            var url = ErpPaths.DefaultAppUrl.TrimEnd('/') + "/admin/login";
+            var profile = GetProfileDir();
+            Directory.CreateDirectory(profile);
+            ClearOrphanBrowserLocks(profile, appPath);
 
-            // Garante maximizar apos a janela --app aparecer.
-            _ = Task.Run(async () =>
+            if (browser is null)
             {
-                for (var i = 0; i < 20; i++)
+                OpeningSplash.Close();
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                DesktopLog.Write(appPath, "Navegador disparado");
+                return;
+            }
+
+            var args =
+                $"--app={url} --user-data-dir=\"{profile}\" --start-maximized " +
+                "--no-first-run --no-default-browser-check";
+
+            try
+            {
+                OpeningSplash.Close();
+                var started = Process.Start(new ProcessStartInfo
                 {
-                    await Task.Delay(250).ConfigureAwait(false);
-                    if (FocusExistingBrowserApp(maximize: true))
+                    FileName = browser,
+                    Arguments = args,
+                    UseShellExecute = true,
+                });
+
+                DesktopLog.Write(appPath, "Navegador disparado");
+                DesktopLog.Write(appPath, "Browser iniciado: " + browser + " pid=" + (started?.Id.ToString() ?? "?"));
+
+                // Garante maximizar apos a janela --app aparecer.
+                _ = Task.Run(async () =>
+                {
+                    for (var i = 0; i < 20; i++)
                     {
-                        return;
+                        await Task.Delay(250).ConfigureAwait(false);
+                        if (FocusExistingBrowserApp(maximize: true))
+                        {
+                            return;
+                        }
                     }
-                }
-            });
+                });
+            }
+            catch (Exception ex)
+            {
+                DesktopLog.Write(appPath, "Falha ao iniciar browser: " + ex.Message);
+                throw;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            DesktopLog.Write(appPath, "Falha ao iniciar browser: " + ex.Message);
-            throw;
+            // Helper na sessão do usuário: seletor de pasta do Backup sob o serviço (Session 0).
+            UiHelperHost.EnsureStarted(appPath);
         }
     }
 
@@ -478,6 +503,9 @@ internal static class Program
 
         return null;
     }
+
+    private static bool HasFlag(string[] args, string name)
+        => args.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>

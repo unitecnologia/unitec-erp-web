@@ -35,7 +35,7 @@ final class PdvVendaNfceService
             throw new FiscalEngineException(
                 'NFC-e real não configurada. '.($motivos !== []
                     ? implode(' ', $motivos)
-                    : 'Verifique certificado, CSC, responsável técnico e UF (SC).')
+                    : 'Verifique certificado, CSC, responsável técnico e UF (SC ou PR).')
                 .' Cupom simulado foi desativado.'
             );
         }

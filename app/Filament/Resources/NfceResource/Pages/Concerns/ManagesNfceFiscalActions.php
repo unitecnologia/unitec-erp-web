@@ -10,8 +10,10 @@ use App\Support\Erp\Pdv\PdvEstornoMotivo;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 use App\Support\Erp\Pdv\PdvNfceFiscalMensagens;
 use App\Support\Erp\Vendas\EstornarVendaService;
+use App\Support\ContadorCloud\ContadorCloudSyncService;
 use App\Support\Fiscal\NfceNumeracao;
 use App\Support\Fiscal\PdvNfceConsultaService;
+use App\Support\Fiscal\PdvNfceEmissionService;
 use App\Support\Fiscal\PdvNfceInutilizacaoService;
 use App\Support\Fiscal\PdvNfceTransmissaoService;
 use DomainException;
@@ -182,6 +184,16 @@ trait ManagesNfceFiscalActions
 
             try {
                 $nfce = $service->recuperar($nfce, $empresa);
+
+                // Duplicidade (539/613): F4 também tenta a chave conflitante e protege a numeração.
+                if ($nfce->status === PdvVendaNfce::STATUS_DUPLICIDADE) {
+                    $nfce = (new PdvNfceEmissionService())->tentarResolverDuplicidade(
+                        $nfce,
+                        $empresa,
+                        VendasParametro::forEmpresa((int) $empresa->id),
+                    );
+                }
+
                 $ok++;
                 $ultimoStatus = (string) $nfce->status;
                 $ultimoMotivo = trim((string) ($nfce->motivo_rejeicao ?? ''));
@@ -288,6 +300,9 @@ trait ManagesNfceFiscalActions
 
             return;
         }
+
+        // Internet voltou (usuário vai à SEFAZ): reenvia falhas do portal (contingência que não subiu).
+        ContadorCloudSyncService::agendarRetryAutomatico((int) $empresa->id);
 
         $service = new PdvNfceTransmissaoService();
         $transmitidas = 0;

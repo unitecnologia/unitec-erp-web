@@ -348,6 +348,15 @@ final class EstornarVendaService
                     $product = Product::query()->find($item->product_id);
 
                     if ($product) {
+                        $selecao = null;
+
+                        if (filled($item->composicao_json ?? null)) {
+                            $decoded = json_decode((string) $item->composicao_json, true);
+                            $selecao = is_array($decoded)
+                                ? \App\Support\Erp\Pdv\PdvComposicaoSelecao::fromArray($decoded)
+                                : null;
+                        }
+
                         $this->stockService->estornoItemVenda(
                             $product,
                             (float) $item->quantidade,
@@ -365,6 +374,7 @@ final class EstornarVendaService
                             ),
                             'pdv_venda_item',
                             (int) $item->id,
+                            $selecao,
                         );
                     }
                 }

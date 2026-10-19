@@ -3,6 +3,7 @@
 namespace App\Support\Erp\Reports\Tabular;
 
 use App\Support\Erp\Reports\Tabular\Definitions\BalancoFinanceiroReport;
+use App\Support\Erp\Reports\Tabular\Definitions\CancelamentosDescontosMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ConferenciaEstoqueReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ContasPagarReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ContasReceberReport;
@@ -17,6 +18,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\FinanceiroPorOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\GeralOrdensServicoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoComprasFornecedorReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoComprasReport;
+use App\Support\Erp\Reports\Tabular\Definitions\HistoricoFechamentosMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoOrcamentosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoProdutosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasClienteReport;
@@ -24,6 +26,7 @@ use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\HistoricoVendasVendedorReport;
 use App\Support\Erp\Reports\Tabular\Definitions\LucratividadeOsReport;
 use App\Support\Erp\Reports\Tabular\Definitions\MovimentoCaixaReport;
+use App\Support\Erp\Reports\Tabular\Definitions\MovimentoMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OsPendentesAtrasadasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OsPorFormaPagamentoReport;
 use App\Support\Erp\Reports\Tabular\Definitions\OutrasSaidasMovimentoReport;
@@ -39,10 +42,12 @@ use App\Support\Erp\Reports\Tabular\Definitions\ProdutosMenosVendidosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoCaixaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ResumoFinanceiroContaReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ServicosPrestadosReport;
+use App\Support\Erp\Reports\Tabular\Definitions\TempoOcupacaoMesasReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ValidadeLotesReport;
 use App\Support\Erp\Reports\Tabular\Definitions\ValidadeProdutosReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasCfopCsosnReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasFormaPagamentoReport;
+use App\Support\Erp\Reports\Tabular\Definitions\VendasMesasPorHorarioReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasPdvReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosClientesReport;
 use App\Support\Erp\Reports\Tabular\Definitions\VendasProdutosGeralReport;
@@ -80,6 +85,11 @@ class ReportRegistry
             'historico-vendas-cliente' => HistoricoVendasClienteReport::class,
             'historico-vendas-vendedor' => HistoricoVendasVendedorReport::class,
             'vendas-pdv' => VendasPdvReport::class,
+            'movimento-mesas' => MovimentoMesasReport::class,
+            'historico-fechamentos-mesas' => HistoricoFechamentosMesasReport::class,
+            'vendas-mesas-horario' => VendasMesasPorHorarioReport::class,
+            'tempo-ocupacao-mesas' => TempoOcupacaoMesasReport::class,
+            'cancelamentos-descontos-mesas' => CancelamentosDescontosMesasReport::class,
             'vendas-forma-pagamento' => VendasFormaPagamentoReport::class,
             'vendas-produtos-geral' => VendasProdutosGeralReport::class,
             'vendas-produtos-clientes' => VendasProdutosClientesReport::class,

@@ -16,7 +16,6 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 /**
  * Transfere o saldo da sessão PDV para o Livro Caixa no fechamento.
@@ -28,21 +27,13 @@ use Illuminate\Support\Str;
  * Caixa PDV durante a sessão: não movimenta o Livro Caixa; o valor retirado chega ao
  * CAIXA GERAL aqui, dentro das vendas/recebimentos integrais.
  *
- * Um lançamento por origem × forma no CAIXA GERAL, preservando a classificação:
- * - vendas − estornos → plano de venda da empresa   (PDV-CX-{s}[-FORMA]);
- * - recebimentos de CR → plano dos títulos, se único (PDV-CX-{s}-RC-FORMA).
- * Idempotente por `documento`. Sessões fechadas no modelo anterior podem ter
- * PDV-CX-{s}-SG{mov} (sangria na subcaixa) e PDV-CX-{s}-SD-FORMA: são preservados.
+ * Um único lançamento no CAIXA GERAL com o total transferível da sessão (PDV-CX-{s}),
+ * sem separar meios de pagamento. Idempotente por `documento`. Sessões fechadas no
+ * modelo anterior (PDV-CX-{s}-FORMA / -RC- / -SG / -SD-) são preservadas.
  */
 final class PdvCaixaFechamentoService
 {
     private const TIPOS_FORA_DA_TRANSFERENCIA = ['abertura', 'suprimento', 'sangria'];
-
-    private const ORIGEM_VENDA = 'venda';
-
-    private const ORIGEM_RECEBIMENTO = 'recebimento';
-
-    private const ORIGEM_OUTROS = 'outros';
 
     /**
      * @return list<CaixaLancamento>
@@ -55,44 +46,33 @@ final class PdvCaixaFechamentoService
 
         $usuario ??= Auth::user() ?? $sessao->user;
         $nome = mb_strtoupper(trim((string) ($usuario?->name ?? 'USUARIO')), 'UTF-8');
+        $operador = $this->nomeOperador($usuario, $nome);
+        $abertura = $sessao->aberto_em
+            ? ErpTimezone::toLocal($sessao->aberto_em)
+            : null;
         $fechamento = $sessao->fechado_em
             ? ErpTimezone::toLocal($sessao->fechado_em)
             : ErpTimezone::toLocal();
         $empresaId = $sessao->empresa_id ? (int) $sessao->empresa_id : ErpContext::currentEmpresaId();
 
         $movimentos = $sessao->movimentos()->orderBy('id')->get();
-        $caixaGeral = CaixaConta::ensureCaixaGeral();
-        $lancamentos = [];
+        $saldo = $this->saldoTransferivel($movimentos);
 
-        $planos = [
-            self::ORIGEM_VENDA => EmpresaParametros::planoVendaLancamento($empresaId),
-            self::ORIGEM_RECEBIMENTO => $this->planoDosTitulosRecebidos($movimentos, $empresaId),
-            self::ORIGEM_OUTROS => null,
-        ];
-
-        foreach ($this->saldosPorOrigemForma($movimentos) as $origem => $porForma) {
-            foreach ($porForma as $forma => $saldo) {
-                if (abs($saldo) < 0.005) {
-                    continue;
-                }
-
-                $lancamento = $this->lancar(
-                    documento: $this->documento($sessao, $origem, $forma),
-                    emissao: $fechamento->toDateString(),
-                    historico: $this->historicoFechamento($nome, $fechamento, $origem, $forma),
-                    contaId: (int) $caixaGeral->id,
-                    empresaId: $empresaId,
-                    valor: $saldo,
-                    plano: $planos[$origem] ?? null,
-                );
-
-                if ($lancamento) {
-                    $lancamentos[] = $lancamento;
-                }
-            }
+        if (abs($saldo) < 0.005) {
+            return [];
         }
 
-        return $lancamentos;
+        $lancamento = $this->lancar(
+            documento: 'PDV-CX-'.$sessao->id,
+            emissao: $fechamento->toDateString(),
+            historico: $this->historicoFechamento($nome, $operador, $abertura, $fechamento),
+            contaId: (int) CaixaConta::ensureCaixaGeral()->id,
+            empresaId: $empresaId,
+            valor: $saldo,
+            plano: $this->planoDoFechamento($movimentos, $empresaId),
+        );
+
+        return $lancamento ? [$lancamento] : [];
     }
 
     /**
@@ -137,7 +117,7 @@ final class PdvCaixaFechamentoService
     }
 
     /**
-     * Resultado líquido da sessão por origem e forma.
+     * Total líquido transferível da sessão (só movimentos de caixa já na sessão).
      *
      * Abertura e suprimento ficam fora: são fundo de troco que não gera saída em nenhuma
      * conta do Livro Caixa; transferi-los inflaria o CAIXA GERAL a cada fechamento.
@@ -145,11 +125,33 @@ final class PdvCaixaFechamentoService
      * faz parte das vendas/recebimentos que vão integrais ao CAIXA GERAL aqui.
      *
      * @param  iterable<PdvCaixaMovimento>  $movimentos
-     * @return array<string, array<string, float>>
      */
-    private function saldosPorOrigemForma(iterable $movimentos): array
+    private function saldoTransferivel(iterable $movimentos): float
     {
-        $saldos = [];
+        $saldo = 0.0;
+
+        foreach ($movimentos as $movimento) {
+            if (in_array((string) $movimento->tipo, self::TIPOS_FORA_DA_TRANSFERENCIA, true)) {
+                continue;
+            }
+
+            $saldo += (float) $movimento->entrada - (float) $movimento->saida;
+        }
+
+        return round($saldo, 2);
+    }
+
+    /**
+     * Plano do lançamento único: prioriza plano de venda; se só houver recebimentos de CR,
+     * usa o plano dos títulos quando for único e ativo.
+     *
+     * @param  iterable<PdvCaixaMovimento>  $movimentos
+     * @return array{id: int, nome: string}|null
+     */
+    private function planoDoFechamento(iterable $movimentos, ?int $empresaId): ?array
+    {
+        $temVenda = false;
+        $temRecebimento = false;
 
         foreach ($movimentos as $movimento) {
             $tipo = (string) $movimento->tipo;
@@ -158,44 +160,22 @@ final class PdvCaixaFechamentoService
                 continue;
             }
 
-            $origem = match ($tipo) {
-                'venda', 'estorno' => self::ORIGEM_VENDA,
-                'recebimento' => self::ORIGEM_RECEBIMENTO,
-                default => self::ORIGEM_OUTROS,
-            };
-
-            $forma = mb_strtoupper(trim((string) ($movimento->forma_pagamento ?? '')), 'UTF-8');
-
-            if ($forma === '') {
-                $forma = 'DINHEIRO';
+            if (in_array($tipo, ['venda', 'estorno'], true)) {
+                $temVenda = true;
+            } elseif ($tipo === 'recebimento') {
+                $temRecebimento = true;
             }
-
-            $saldos[$origem][$forma] = ($saldos[$origem][$forma] ?? 0.0)
-                + (float) $movimento->entrada
-                - (float) $movimento->saida;
         }
 
-        $ordemOrigem = [self::ORIGEM_VENDA, self::ORIGEM_RECEBIMENTO, self::ORIGEM_OUTROS];
-        $resultado = [];
-
-        foreach ($ordemOrigem as $origem) {
-            if (! isset($saldos[$origem])) {
-                continue;
-            }
-
-            $porForma = array_map(static fn (float $valor): float => round($valor, 2), $saldos[$origem]);
-
-            // Dinheiro primeiro, demais formas em ordem alfabética.
-            uksort($porForma, static fn (string $a, string $b): int => match (true) {
-                $a === 'DINHEIRO' => -1,
-                $b === 'DINHEIRO' => 1,
-                default => strcmp($a, $b),
-            });
-
-            $resultado[$origem] = $porForma;
+        if ($temVenda) {
+            return EmpresaParametros::planoVendaLancamento($empresaId);
         }
 
-        return $resultado;
+        if ($temRecebimento) {
+            return $this->planoDosTitulosRecebidos($movimentos, $empresaId);
+        }
+
+        return null;
     }
 
     /**
@@ -247,17 +227,39 @@ final class PdvCaixaFechamentoService
         ] : null;
     }
 
-    private function historicoFechamento(string $nome, CarbonInterface $fechamento, string $origem, string $forma): string
+    private function nomeOperador(?User $usuario, string $usuarioFallback): string
     {
-        $historico = sprintf('FECHAMENTO DO CX:CAIXA-%s-%s', $nome, $fechamento->format('d/m/Y H:i:s'));
+        if (! $usuario) {
+            return $usuarioFallback;
+        }
 
-        $historico .= match ($origem) {
-            self::ORIGEM_VENDA => ' - VENDAS',
-            self::ORIGEM_RECEBIMENTO => ' - RECEB. CR',
-            default => ' - OUTROS',
-        };
+        $vendedor = $usuario->relationLoaded('vendedor')
+            ? $usuario->vendedor
+            : $usuario->vendedor()->first();
 
-        return $forma !== 'DINHEIRO' ? $historico.' - '.$forma : $historico;
+        $operador = mb_strtoupper(trim((string) ($vendedor?->nome ?? '')), 'UTF-8');
+
+        return $operador !== '' ? $operador : $usuarioFallback;
+    }
+
+    private function historicoFechamento(
+        string $usuario,
+        string $operador,
+        ?CarbonInterface $abertura,
+        CarbonInterface $fechamento,
+    ): string {
+        $partes = [
+            'FECHAMENTO DO CX:CAIXA-'.$usuario,
+            'OP:'.$operador,
+        ];
+
+        if ($abertura) {
+            $partes[] = 'AB:'.$abertura->format('d/m/Y H:i:s');
+        }
+
+        $partes[] = 'FE:'.$fechamento->format('d/m/Y H:i:s');
+
+        return implode(' ', $partes);
     }
 
     /**
@@ -295,23 +297,5 @@ final class PdvCaixaFechamentoService
         }
 
         return CaixaLancamento::query()->create($payload);
-    }
-
-    /**
-     * Vendas mantêm o documento original (PDV-CX-{s} / PDV-CX-{s}-FORMA); demais origens
-     * levam prefixo próprio, que nunca colide com o sufixo de forma (sem hífen).
-     */
-    private function documento(PdvCaixaSessao $sessao, string $origem, string $forma): string
-    {
-        $base = 'PDV-CX-'.$sessao->id;
-        $sufixo = preg_replace('/[^A-Z0-9]+/', '', mb_strtoupper(Str::ascii($forma), 'UTF-8')) ?: 'OUTROS';
-
-        $documento = match ($origem) {
-            self::ORIGEM_VENDA => $forma === 'DINHEIRO' ? $base : $base.'-'.$sufixo,
-            self::ORIGEM_RECEBIMENTO => $base.'-RC-'.$sufixo,
-            default => $base.'-OU-'.$sufixo,
-        };
-
-        return mb_substr($documento, 0, 40);
     }
 }

@@ -5,11 +5,12 @@ namespace App\Http\Middleware;
 use App\Support\Erp\Database\PendingMigrationsGuard;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Painel Filament: bloqueia uso normal se o schema estiver atrás do código.
- * Não executa migrate — só verifica (leve + cache). Login/atualização/reparo ficam livres.
+ * Painel Filament: avisa se o schema estiver atrás do código, mas NÃO bloqueia o uso.
+ * Migrate fica no atualizador oficial / Reparar / Aplicar Migrations.
  */
 class EnsureDatabaseUpToDate
 {
@@ -26,20 +27,30 @@ class EnsureDatabaseUpToDate
             return $next($request);
         }
 
-        $result = $this->guard->check();
+        try {
+            $result = $this->guard->check();
 
-        for ($i = 0; $i < 3 && (($result['transient'] ?? false) === true); $i++) {
-            usleep(150_000);
-            $result = $this->guard->check(forceRefresh: true);
+            for ($i = 0; $i < 2 && (($result['transient'] ?? false) === true); $i++) {
+                usleep(100_000);
+                $result = $this->guard->check(forceRefresh: true);
+            }
+
+            if (! ($result['ok'] ?? false) && (($result['transient'] ?? false) !== true)) {
+                $pending = (int) ($result['pending'] ?? 0);
+                // Um aviso por request basta; não redireciona nem impede o painel.
+                Log::warning('Schema atrasado liberado para uso do painel.', [
+                    'pending' => $pending,
+                    'path' => $request->path(),
+                ]);
+                if ($pending > 0) {
+                    session()->now('erp_schema_warning', $result['message'] ?? null);
+                }
+            }
+        } catch (\Throwable) {
+            // Falha na verificação nunca pode impedir login/uso.
         }
 
-        if ($result['ok']) {
-            return $next($request);
-        }
-
-        // Lock ainda ocupado ou schema incompatível: nunca liberar o painel sem OK confirmado.
-        // Livewire/AJAX: redirect (não 503) para a tela de bloqueio/recuperação.
-        return redirect()->to(url('/admin/schema-incompativel'));
+        return $next($request);
     }
 
     private function isExempt(Request $request): bool
@@ -53,18 +64,13 @@ class EnsureDatabaseUpToDate
         $path = trim($request->path(), '/');
 
         if ($path === 'admin/schema-incompativel'
-            || str_starts_with($path, 'admin/schema-incompativel')) {
+            || str_starts_with($path, 'admin/schema-incompativel')
+            || str_contains($path, '/login')) {
             return true;
         }
 
-        // Livewire da tela de schema (e login com atualização) precisa passar.
         if ($this->isLivewirePath($path)) {
-            $referer = (string) $request->headers->get('referer', '');
-
-            return str_contains($referer, '/schema-incompativel')
-                || str_contains($referer, '/admin/login')
-                || str_contains($referer, '/gestor/login')
-                || str_contains($referer, '/inventario/login');
+            return true;
         }
 
         return false;

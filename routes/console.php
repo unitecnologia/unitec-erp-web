@@ -13,6 +13,11 @@ Schedule::command('erp:backup --scheduled')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/erp-backup-schedule.log'));
 
+Schedule::command('erp:backup-portal-upload')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/erp-backup-portal-upload.log'));
+
 Schedule::command('gestor:push-alertas')
     ->dailyAt('08:05')
     ->withoutOverlapping()
@@ -22,6 +27,12 @@ Schedule::command('pix:consultar-pendentes')
     ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/pix-consultar-pendentes.log'));
+
+// Portal do Contador: reenvia sozinho falhas/pendentes (contingência sem internet, DNS, etc.).
+Schedule::command('contador-cloud:retry --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/contador-cloud-retry.log'));
 
 // Exclusão mútua pelo flock do próprio comando (liberado pelo SO se o processo morrer);
 // o mutex de cache do withoutOverlapping/runInBackground podia ficar preso por 24h no Windows.

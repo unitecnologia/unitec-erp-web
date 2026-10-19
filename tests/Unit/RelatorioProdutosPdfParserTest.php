@@ -127,4 +127,153 @@ TXT;
         $eans = array_column($out['importar'], 'ean');
         $this->assertSame(['7896045103003', ''], $eans);
     }
+
+    public function test_importa_id_de_dois_digitos_e_ean_colado_na_descricao(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+82 47 78900066 CIGARRO MALBORO BLUE ICE -107 17,50 -1.872,50
+1092 1057 89550320000805CHIP TIM -12 30,00 -360,00
+TOTAL: 2 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(2, $out['importar']);
+        $this->assertSame('78900066', $out['importar'][0]['ean']);
+        $this->assertStringContainsString('CIGARRO', $out['importar'][0]['descricao']);
+        $this->assertEqualsWithDelta(17.50, $out['importar'][0]['preco'], 0.001);
+        $this->assertSame('89550320000805', $out['importar'][1]['ean']);
+        $this->assertStringContainsString('CHIP TIM', $out['importar'][1]['descricao']);
+        $this->assertEqualsWithDelta(30.00, $out['importar'][1]['preco'], 0.001);
+    }
+
+    public function test_separa_ean_partido_e_proximo_produto_na_continuacao(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+277 78910002501
+74 7891000242483 CALDO GALINHA MAGGI 19G -1 3,80 -3,80
+TOTAL: 2 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(2, $out['importar']);
+        $this->assertSame('7891000250174', $out['importar'][0]['ean']);
+        $this->assertEqualsWithDelta(0.0, $out['importar'][0]['preco'], 0.001);
+        $this->assertSame('7891000242483', $out['importar'][1]['ean']);
+        $this->assertStringContainsString('CALDO GALINHA MAGGI', $out['importar'][1]['descricao']);
+        $this->assertEqualsWithDelta(3.80, $out['importar'][1]['preco'], 0.001);
+    }
+
+    public function test_ignora_rodape_de_endereco_colado_no_preco(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+587 552 7896026850148 PAPEL HIGIENICO DUETTO FOLHA DUPLA NEUTRO 4UN -27 8,99 -242,73 RUA MONTE FRADE MACAÉ, 291 - MONTE ALEGRE - 88348-429 - CAMBORIU/SC
+TOTAL: 1 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(1, $out['importar']);
+        $this->assertSame('7896026850148', $out['importar'][0]['ean']);
+        $this->assertEqualsWithDelta(8.99, $out['importar'][0]['preco'], 0.001);
+        $this->assertStringContainsString('PAPEL HIGIENICO', $out['importar'][0]['descricao']);
+        $this->assertStringNotContainsString('RUA MONTE', $out['importar'][0]['descricao']);
+    }
+
+    public function test_junta_ean_em_tres_linhas_e_descricao_com_preco_na_seguinte(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+2128
+79084794044
+79
+ziggy burley mint	-4	14,00	-56,00
+TOTAL: 1 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(1, $out['importar']);
+        $this->assertSame('7908479404479', $out['importar'][0]['ean']);
+        $this->assertStringContainsString('ziggy burley mint', $out['importar'][0]['descricao']);
+        $this->assertEqualsWithDelta(14.00, $out['importar'][0]['preco'], 0.001);
+    }
+
+    public function test_nao_trata_linha_de_estoque_como_produto_novo(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+186 151 70847034803
+ENERGETICO MONSTER ENERGY DRAGON ICE TEA
+473ML
+20	11,00	220,00
+206 171 6740298416810 KALOUD	44,00	0,00
+TOTAL: 2 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(2, $out['importar']);
+        $this->assertSame('70847034803', $out['importar'][0]['ean']);
+        $this->assertStringContainsString('ENERGETICO MONSTER', $out['importar'][0]['descricao']);
+        $this->assertEqualsWithDelta(11.00, $out['importar'][0]['preco'], 0.001);
+        $this->assertSame('6740298416810', $out['importar'][1]['ean']);
+    }
+
+    public function test_fase2_remove_codigo_interno_da_descricao_sem_ean(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+2207 2207 ESFIRRA GRANDE 13,00 0,00
+TOTAL: 1 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(1, $out['importar']);
+        $this->assertSame('', $out['importar'][0]['ean']);
+        $this->assertSame('ESFIRRA GRANDE', $out['importar'][0]['descricao']);
+        $this->assertEqualsWithDelta(13.00, $out['importar'][0]['preco'], 0.001);
+    }
+
+    public function test_ignora_coluna_codigo_longo_e_usa_so_cod_barras(): void
+    {
+        $texto = <<<'TXT'
+Relatório de Produtos
+ID Código Cód. de Barras Descrição Estoque Custo Valor Custo totalB Valor total
+1722 79060297 7891079001004 NISSIN TURMA DA MÔNICA CARNE SUAVE -6 3,50 -21,00
+1744 79060319 7892840824648 RUFFLES SABOR CEBOLA E SALSA 33G 4 6,00 24,00
+495 460 7894900027013 COCA COLA 2 L -1096 13,50 -14.796,00
+TOTAL: 3 registro(s)
+TXT;
+
+        $parser = new RelatorioProdutosPdfParser();
+        $out = $parser->parseTexto($texto, 2);
+
+        $this->assertCount(3, $out['importar']);
+        $this->assertSame('7891079001004', $out['importar'][0]['ean']);
+        $this->assertSame('NISSIN TURMA DA MÔNICA CARNE SUAVE', $out['importar'][0]['descricao']);
+        $this->assertStringNotContainsString('79060297', $out['importar'][0]['descricao']);
+        $this->assertEqualsWithDelta(3.50, $out['importar'][0]['preco'], 0.001);
+        $this->assertSame('7892840824648', $out['importar'][1]['ean']);
+        $this->assertStringContainsString('RUFFLES', $out['importar'][1]['descricao']);
+        $this->assertSame('7894900027013', $out['importar'][2]['ean']);
+        $this->assertSame('COCA COLA 2 L', $out['importar'][2]['descricao']);
+    }
 }

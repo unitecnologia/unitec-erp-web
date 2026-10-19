@@ -600,6 +600,35 @@
     text-overflow: ellipsis;
 }
 
+/* Restaurante (mesa aberta): descrição + SEM/ADICIONAL com fonte compacta, sem cortar. */
+.erp-pdv__grid--mesa tbody tr:not(.erp-pdv__grid-empty) {
+    height: auto;
+    min-height: 1.41rem;
+}
+
+.erp-pdv__grid--mesa .erp-pdv__grid-col-descricao {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    vertical-align: top;
+    font-family: ui-monospace, 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.3;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    word-break: break-word;
+}
+
+.erp-pdv__grid--mesa .erp-pdv__item-obs {
+    margin-top: 0.15rem;
+    font-size: 0.95em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.28;
+}
+
 .erp-pdv__col-excluir {
     width: 2.1rem;
 }
@@ -4515,6 +4544,15 @@
     background: rgba(15, 52, 96, 0.35);
 }
 
+/* Modal Sair sempre no DOM: display:grid da base anula [hidden] — controla por .is-open. */
+#erp-pdv-sair-overlay {
+    display: none !important;
+}
+
+#erp-pdv-sair-overlay.is-open {
+    display: grid !important;
+}
+
 .erp-pdv-confirm-overlay .erp-pdv-naoencontrado__box {
     animation: erp-pdv-naoencontrado-pulse 0.9s ease-in-out infinite alternate;
 }
@@ -5198,6 +5236,104 @@
     text-overflow: ellipsis;
 }
 
+
+.erp-pdv-caixa-modal__meta-item--editable {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.erp-pdv-caixa-modal__meta-item--editable label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.erp-pdv-caixa-modal__select,
+.erp-pdv-caixa-modal__text-input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.4rem 0.55rem;
+    outline: none;
+}
+
+.erp-pdv-caixa-modal__select:focus,
+.erp-pdv-caixa-modal__text-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.erp-pdv-caixa-modal__password-wrap {
+    position: relative;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.erp-pdv-caixa-modal__text-input--password {
+    margin-bottom: 0 !important;
+    padding-right: 2.5rem !important;
+}
+
+.erp-pdv-caixa-modal__password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.erp-pdv-caixa-modal__password-toggle:hover {
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+
+.erp-pdv-caixa-modal__password-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.erp-pdv-caixa-modal__password-icon--hide {
+    display: none;
+}
+
+.erp-pdv-caixa-modal__password-toggle.is-visible .erp-pdv-caixa-modal__password-icon--show {
+    display: none;
+}
+
+.erp-pdv-caixa-modal__password-toggle.is-visible .erp-pdv-caixa-modal__password-icon--hide {
+    display: block;
+}
+
+.erp-pdv-caixa-modal__text-input {
+    margin-bottom: 0.75rem;
+}
+.erp-pdv-caixa-modal__meta-item--caixa {
+    grid-column: 1 / -1;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.erp-pdv-caixa-modal__meta-item--caixa strong {
+    color: #1d4ed8;
+}
+
 .erp-pdv-caixa-modal__field {
     margin-bottom: 0.35rem;
 }
@@ -5454,8 +5590,29 @@
 }
 
 /* Vendas em espera: privilegia cliente completo e leitura rápida no caixa. */
+.erp-pdv-suspender-venda__window {
+    width: min(26rem, calc(100vw - 1.5rem));
+}
+
+.erp-pdv-suspender-venda .erp-pdv-modal__input {
+    width: 100%;
+}
+
+.erp-pdv-suspender-venda__opcional {
+    font-weight: 500;
+    color: #64748b;
+    text-transform: none;
+}
+
+.erp-pdv-suspender-venda__hint {
+    margin: 0.45rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
 .erp-pdv-vendas-espera__window {
-    width: min(960px, calc(100vw - 2rem));
+    width: min(640px, calc(100vw - 2rem));
 }
 
 .erp-pdv-vendas-espera__grid {
@@ -5468,7 +5625,7 @@
 }
 
 .erp-pdv-vendas-espera__numero {
-    width: 74px;
+    width: 88px;
     font-weight: 800;
     color: #163967;
     white-space: nowrap;
@@ -5481,25 +5638,20 @@
 }
 
 .erp-pdv-vendas-espera__hora {
-    width: 62px;
+    width: 72px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
 .erp-pdv-vendas-espera__cliente {
-    width: 34%;
-    min-width: 230px;
+    width: auto;
+    min-width: 140px;
     white-space: normal;
     overflow-wrap: anywhere;
     font-weight: 750;
 }
 
-.erp-pdv-vendas-espera__grid td:nth-child(5) {
-    min-width: 105px;
-}
-
-.erp-pdv-vendas-espera__grid td:nth-child(6),
-.erp-pdv-vendas-espera__grid td:nth-child(7) {
+.erp-pdv-vendas-espera__grid td:nth-child(4) {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
@@ -5546,7 +5698,7 @@
     }
 
     .erp-pdv-vendas-espera__grid {
-        min-width: 780px;
+        min-width: 420px;
     }
 }
 

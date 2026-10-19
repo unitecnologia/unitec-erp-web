@@ -132,9 +132,12 @@ final class PdvMesaCupomPrintDocument implements PrintDocument
                 $lineSpacingAtual = $lineSpacing;
             }
 
+            $center = (bool) ($row['center'] ?? false);
             if ($grande) {
-                $p->setJustification(Printer::JUSTIFY_CENTER);
                 $p->setTextSize(2, 2);
+                if ($center) {
+                    $p->setJustification(Printer::JUSTIFY_CENTER);
+                }
             }
 
             $p->setEmphasis($bold);
@@ -143,7 +146,9 @@ final class PdvMesaCupomPrintDocument implements PrintDocument
 
             if ($grande) {
                 $p->setTextSize(1, 1);
-                $p->setJustification(Printer::JUSTIFY_LEFT);
+                if ($center) {
+                    $p->setJustification(Printer::JUSTIFY_LEFT);
+                }
             }
         }
 

@@ -91,7 +91,7 @@ final class NfceEmitter
         int $cNf,
     ): EmitirNfceResponse {
         $enviNfe = $this->xmlBuilder->wrapEnviNfe($nfeXml);
-        $endpoint = ScNfceEndpoints::autorizacao($tpAmb);
+        $endpoint = NfceSoapUrls::autorizacao($chave, $tpAmb);
         $cUf = substr($chave, 0, 2);
         $soapResponse = $this->soapClient->autorizar($endpoint, $enviNfe, $certificate, $cUf);
         $parsed = $this->parseAutorizacaoResponse($soapResponse);

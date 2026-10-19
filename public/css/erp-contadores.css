@@ -402,7 +402,7 @@
 }
 
 .erp-contadores-page .erp-contador-form-modal__window {
-    width: min(calc(34rem + var(--erp-contador-modal-bump) + 1cm), calc(100vw - 2rem));
+    width: min(calc(36rem + var(--erp-contador-modal-bump) + 1cm), calc(100vw - 2rem));
     max-height: calc(100vh - 2rem);
 }
 
@@ -494,8 +494,33 @@
 }
 
 .erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--doc {
-    width: calc(11.5rem + var(--erp-contador-modal-bump));
+    width: calc(10.5rem + var(--erp-contador-modal-bump));
     flex: 0 0 auto;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__row--doc-crc {
+    flex-wrap: nowrap;
+    gap: 0.28rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__btn--cnpj {
+    flex: 0 0 auto;
+    padding: 0.15rem 0.35rem;
+    font-size: 0.7rem;
+    min-width: 3.6rem;
+    justify-content: center;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__label--crc {
+    min-width: 2.2rem;
+    width: auto;
+    padding-left: 0.15rem;
+}
+
+.erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--crc {
+    width: calc(7.5rem + var(--erp-contador-modal-bump));
+    flex: 1 1 auto;
+    min-width: 5rem;
 }
 
 .erp-contadores-page .erp-contador-form-modal__form .erp-pcad-form__input--phone {

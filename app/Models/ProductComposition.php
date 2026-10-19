@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'quantidade',
     'preco',
     'total',
+    'is_adicional',
 ])]
 class ProductComposition extends Model
 {
@@ -21,6 +22,7 @@ class ProductComposition extends Model
             'quantidade' => 'decimal:3',
             'preco' => 'decimal:2',
             'total' => 'decimal:2',
+            'is_adicional' => 'boolean',
         ];
     }
 

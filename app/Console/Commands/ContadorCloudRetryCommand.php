@@ -15,51 +15,52 @@ class ContadorCloudRetryCommand extends Command
     public function handle(ContadorCloudSyncService $syncService): int
     {
         $force = (bool) $this->option('force');
+        $limit = max(1, (int) $this->option('limit'));
+        $empresaId = $this->option('empresa') ? (int) $this->option('empresa') : null;
 
-        $query = ContadorCloudSyncLog::query()
-            ->when(
-                $force,
-                fn ($builder) => $builder->whereIn('status', [
+        if ($force) {
+            $query = ContadorCloudSyncLog::query()
+                ->whereIn('status', [
                     ContadorCloudSyncLog::STATUS_FAILED,
                     ContadorCloudSyncLog::STATUS_PENDING,
                     ContadorCloudSyncLog::STATUS_SENT,
-                ]),
-                fn ($builder) => $builder->whereIn('status', [
-                    ContadorCloudSyncLog::STATUS_FAILED,
-                    ContadorCloudSyncLog::STATUS_PENDING,
-                ]),
-            )
-            ->orderBy('id');
+                ])
+                ->orderBy('id')
+                ->limit($limit);
 
-        if ($empresaId = $this->option('empresa')) {
-            $query->where('empresa_id', (int) $empresaId);
-        }
-
-        $logs = $query->limit((int) $this->option('limit'))->get();
-
-        if ($logs->isEmpty()) {
-            $this->info('Nenhum envio pendente de reenvio.');
-
-            return self::SUCCESS;
-        }
-
-        $enviados = 0;
-        $falhas = 0;
-
-        foreach ($logs as $log) {
-            $resultado = $syncService->retry($log);
-
-            if ($resultado->status === ContadorCloudSyncLog::STATUS_SENT) {
-                $enviados++;
-                $this->line('OK chave '.$resultado->chave);
-            } else {
-                $falhas++;
-                $this->error('Falha chave '.$resultado->chave.': '.$resultado->error_message);
+            if ($empresaId) {
+                $query->where('empresa_id', $empresaId);
             }
+
+            $logs = $query->get();
+            $enviados = 0;
+            $falhas = 0;
+
+            foreach ($logs as $log) {
+                $resultado = $syncService->retry($log);
+                if ($resultado->status === ContadorCloudSyncLog::STATUS_SENT) {
+                    $enviados++;
+                    $this->line('OK chave '.$resultado->chave);
+                } else {
+                    $falhas++;
+                    $this->error('Falha chave '.$resultado->chave.': '.$resultado->error_message);
+                }
+            }
+
+            $this->info("Reenvio concluído: {$enviados} enviado(s), {$falhas} falha(s).");
+
+            return $falhas > 0 ? self::FAILURE : self::SUCCESS;
         }
 
-        $this->info("Reenvio concluído: {$enviados} enviado(s), {$falhas} falha(s).");
+        $resultado = $syncService->processRetryable($empresaId, $limit);
+        $this->info(sprintf(
+            'Reenvio automático: %d enviado(s), %d falha(s), %d ignorado(s).',
+            $resultado['enviados'],
+            $resultado['falhas'],
+            $resultado['ignorados'] ?? 0,
+        ));
 
-        return $falhas > 0 ? self::FAILURE : self::SUCCESS;
+        // Sempre SUCCESS no agendamento: falha de rede é esperada e será retentada no próximo minuto.
+        return self::SUCCESS;
     }
 }

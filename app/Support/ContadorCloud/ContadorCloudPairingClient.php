@@ -4,14 +4,17 @@ namespace App\Support\ContadorCloud;
 
 use App\Models\Contador;
 use App\Models\Empresa;
+use App\Support\Erp\DocumentoBrasileiroValidator;
 use App\Support\Erp\License\LicencaHttpClient;
+use Illuminate\Http\Client\Response;
 
 final class ContadorCloudPairingClient
 {
     /**
-     * Vínculo automático: empresa + CNPJ do contador → credenciais na hora.
+     * Vínculo automático direto no portal:
+     * POST https://unitecnologiasc.com.br/api/portal/vinculos/auto
      *
-     * @return array{ok: bool, message: string, data: ?array, code: ?string}
+     * @return array{ok: bool, message: string, data: ?array, code: ?string, http_status: ?int}
      */
     public function vincularAutomatico(
         Empresa $empresa,
@@ -21,259 +24,223 @@ final class ContadorCloudPairingClient
         $secret = trim((string) config('contador-cloud.auto_vinculo_secret', ''));
 
         if ($secret === '') {
-            return [
-                'ok' => false,
-                'message' => 'Segredo ERP_AUTO_VINCULO_SECRET não configurado no ERP. Configure o mesmo valor do portal.',
-                'data' => null,
-                'code' => 'auto_secret_ausente',
-            ];
+            return $this->fail(
+                'auto_secret_ausente',
+                'Integração com o Portal do Contador indisponível (configuração interna). Contate o suporte Unitec.',
+                503,
+            );
         }
 
-        $endpoint = ContadorCloudHttpHelper::pairingAutoUrl((string) ($portalBaseUrl ?? ''));
+        $cnpjContador = $this->formatCnpj((string) $contador->cnpj_cpf);
+
+        if ($cnpjContador === null) {
+            $digits = DocumentoBrasileiroValidator::digits((string) $contador->cnpj_cpf);
+            $message = strlen($digits) === 11
+                ? 'Informe o CNPJ do escritório contábil. CPF não é aceito no Portal do Contador.'
+                : 'CNPJ do escritório contábil inválido. Confira os dígitos verificadores.';
+
+            return $this->fail('cnpj_contador_invalido', $message, 400);
+        }
+
         $payload = $this->buildEmpresaPayload($empresa);
-        $contadorDoc = $this->formatDocumento((string) $contador->cnpj_cpf);
-        // Portal espera cnpjContador; mantém contadorCnpj por compatibilidade com a spec.
-        $payload['cnpjContador'] = $contadorDoc;
-        $payload['contadorCnpj'] = $contadorDoc;
+        $payload['cnpjContador'] = $cnpjContador;
+        $payload['contadorCnpj'] = $cnpjContador;
+        $payload['nomeContador'] = mb_strtoupper(trim((string) $contador->nome), 'UTF-8');
+        $payload['contadorNome'] = $payload['nomeContador'];
+
         if (filled($contador->email)) {
             $email = trim((string) $contador->email);
             $payload['emailContador'] = $email;
             $payload['contadorEmail'] = $email;
         }
 
+        $endpoint = ContadorCloudHttpHelper::pairingAutoUrl((string) ($portalBaseUrl ?? ''));
+        $timeout = (int) config('contador-cloud.default_timeout', 30);
+
         try {
             $response = LicencaHttpClient::make()
-                ->timeout((int) config('contador-cloud.default_timeout', 30))
+                ->timeout($timeout)
                 ->withToken($secret)
                 ->acceptJson()
                 ->asJson()
                 ->post($endpoint, $payload);
 
-            $json = ContadorCloudHttpHelper::isJsonApiResponse($response) ? $response->json() : null;
-            $errorCode = is_array($json) ? (string) ($json['error'] ?? $json['code'] ?? '') : '';
+            return $this->interpretVinculoResponse($response);
+        } catch (\Throwable $exception) {
+            return $this->fail(
+                'exception',
+                'Não foi possível contactar o portal: '.$exception->getMessage(),
+                null,
+            );
+        }
+    }
 
-            if ($errorCode === 'contador_nao_encontrado') {
-                return [
-                    'ok' => false,
-                    'message' => 'Contador não encontrado no portal. Cadastre o escritório no portal primeiro.',
-                    'data' => is_array($json) ? $json : null,
-                    'code' => 'contador_nao_encontrado',
-                ];
-            }
+    /**
+     * @return array{ok: bool, message: string, data: ?array, code: ?string, http_status: ?int}
+     */
+    private function interpretVinculoResponse(Response $response): array
+    {
+        $status = $response->status();
+        $json = ContadorCloudHttpHelper::isJsonApiResponse($response) ? $response->json() : null;
+        $errorCode = is_array($json) ? (string) ($json['error'] ?? $json['code'] ?? '') : '';
 
-            if (in_array($response->status(), [401, 403], true)) {
-                return [
-                    'ok' => false,
-                    'message' => 'Segredo de auto-vínculo rejeitado; confira ERP_AUTO_VINCULO_SECRET.',
-                    'data' => is_array($json) ? $json : null,
-                    'code' => 'auto_secret_rejeitado',
-                ];
-            }
-
-            if ($response->status() === 404 || ! ContadorCloudHttpHelper::isJsonApiResponse($response)) {
-                return [
-                    'ok' => false,
-                    'message' => 'Portal ainda não disponibilizou o vínculo automático.',
-                    'data' => null,
-                    'code' => 'auto_indisponivel',
-                ];
-            }
-
-            if (! $response->successful()) {
-                $error = is_array($json) ? (string) ($json['error'] ?? $json['message'] ?? '') : trim($response->body());
-                $details = '';
-                if (is_array($json['details'] ?? null) && $json['details'] !== []) {
-                    $first = $json['details'][0] ?? null;
-                    if (is_array($first)) {
-                        $path = is_array($first['path'] ?? null) ? implode('.', $first['path']) : '';
-                        $details = trim(($path !== '' ? $path.': ' : '').(string) ($first['message'] ?? ''));
-                    }
-                }
-
-                return [
-                    'ok' => false,
-                    'message' => $error !== ''
-                        ? 'Portal respondeu: '.$error.($details !== '' ? ' ('.$details.')' : '')
-                        : 'Portal respondeu com status '.$response->status().'.',
-                    'data' => is_array($json) ? $json : null,
-                    'code' => $errorCode !== '' ? $errorCode : 'http_'.$response->status(),
-                ];
-            }
-
-            if (! is_array($json)) {
-                return [
-                    'ok' => false,
-                    'message' => 'Resposta inválida do portal no vínculo automático.',
-                    'data' => null,
-                    'code' => 'invalid_response',
-                ];
-            }
-
+        if (in_array($status, [200, 201], true) && is_array($json)) {
             $credenciais = is_array($json['credenciais'] ?? null)
                 ? $json['credenciais']
                 : (is_array($json['data']['credenciais'] ?? null) ? $json['data']['credenciais'] : null);
 
             if ($credenciais === null) {
-                return [
-                    'ok' => false,
-                    'message' => 'Portal não devolveu credenciais no vínculo automático.',
-                    'data' => $json,
-                    'code' => 'sem_credenciais',
-                ];
+                return $this->fail('sem_credenciais', 'Portal não devolveu credenciais no vínculo automático.', $status, is_array($json) ? $json : null);
             }
 
             $json['status'] = 'authorized';
             $json['credenciais'] = $credenciais;
 
             if (blank($credenciais['token'] ?? null)) {
-                return [
-                    'ok' => false,
-                    'message' => 'Portal autorizou, mas não enviou token.',
-                    'data' => $json,
-                    'code' => 'sem_token',
-                ];
+                return $this->fail(
+                    'sem_token',
+                    'Portal respondeu sem token (possível falha após criar o vínculo, ex.: SMTP). Não considere conectado — tente novamente depois.',
+                    $status,
+                    $json,
+                );
+            }
+
+            if (blank($credenciais['empresaId'] ?? null)) {
+                return $this->fail('sem_empresa_id', 'Portal autorizou, mas não enviou o ID da empresa na nuvem.', $status, $json);
             }
 
             return [
                 'ok' => true,
-                'message' => 'Empresa vinculada automaticamente ao portal.',
+                'message' => 'Empresa vinculada automaticamente ao Portal do Contador.',
                 'data' => $json,
                 'code' => 'authorized',
-            ];
-        } catch (\Throwable $exception) {
-            return [
-                'ok' => false,
-                'message' => 'Não foi possível contactar o portal: '.$exception->getMessage(),
-                'data' => null,
-                'code' => 'exception',
+                'http_status' => $status,
             ];
         }
+
+        if ($status === 400) {
+            $details = $this->formatValidationDetails($json);
+
+            return $this->fail(
+                $errorCode !== '' ? $errorCode : 'validacao',
+                'Pendências cadastrais no vínculo'
+                    .($details !== '' ? ': '.$details : '. Verifique nome, e-mail e CNPJ do contador.'),
+                $status,
+                is_array($json) ? $json : null,
+            );
+        }
+
+        if (in_array($status, [401, 403], true)) {
+            return $this->fail(
+                'auto_secret_rejeitado',
+                'Falha na autenticação da integração com o portal. Contate o suporte Unitec.',
+                $status,
+                is_array($json) ? $json : null,
+            );
+        }
+
+        if ($status === 409) {
+            return $this->fail(
+                $errorCode !== '' ? $errorCode : 'conflito',
+                'Contador ou empresa inativa no portal, ou empresa já vinculada a outro escritório. '
+                    .$this->extractErrorMessage($json),
+                $status,
+                is_array($json) ? $json : null,
+            );
+        }
+
+        if ($status === 503 || $status >= 500) {
+            return $this->fail(
+                $errorCode !== '' ? $errorCode : 'indisponivel',
+                'Portal indisponível ou configuração pendente (ex.: SMTP). '
+                    .'Se o contador acabou de ser criado, o vínculo pode existir sem token — tente novamente após a correção. '
+                    .$this->extractErrorMessage($json),
+                $status,
+                is_array($json) ? $json : null,
+            );
+        }
+
+        if ($status === 404 || ! ContadorCloudHttpHelper::isJsonApiResponse($response)) {
+            return $this->fail(
+                'auto_indisponivel',
+                'Portal ainda não disponibilizou o vínculo automático nesta URL.',
+                $status,
+            );
+        }
+
+        $error = $this->extractErrorMessage($json);
+
+        return $this->fail(
+            $errorCode !== '' ? $errorCode : 'http_'.$status,
+            $error !== ''
+                ? 'Portal respondeu: '.$error
+                : 'Portal respondeu com status '.$status.'.',
+            $status,
+            is_array($json) ? $json : null,
+        );
     }
 
     /**
-     * @return array{ok: bool, message: string, data: ?array}
+     * @return array{ok: bool, message: string, data: ?array, code: ?string, http_status: ?int}
      */
-    public function solicitarVinculo(Empresa $empresa, ?string $portalBaseUrl = null): array
+    private function fail(string $code, string $message, ?int $httpStatus, ?array $data = null): array
     {
-        $endpoint = ContadorCloudHttpHelper::pairingRequestUrl((string) ($portalBaseUrl ?? ''));
-
-        try {
-            $response = LicencaHttpClient::make()
-                ->timeout((int) config('contador-cloud.default_timeout', 30))
-                ->acceptJson()
-                ->asJson()
-                ->post($endpoint, $this->buildEmpresaPayload($empresa));
-
-            if ($response->status() === 404) {
-                return [
-                    'ok' => false,
-                    'message' => 'O portal ainda não disponibilizou o endpoint de vínculo. '
-                        .'Envie docs/portal-contador-vinculo-api.md para o time do portal.',
-                    'data' => null,
-                ];
-            }
-
-            if (! ContadorCloudHttpHelper::isJsonApiResponse($response)) {
-                return [
-                    'ok' => false,
-                    'message' => ContadorCloudHttpHelper::invalidApiMessage($response, $endpoint),
-                    'data' => null,
-                ];
-            }
-
-            if (! $response->successful()) {
-                $json = $response->json();
-                $error = is_array($json) ? (string) ($json['error'] ?? $json['message'] ?? '') : trim($response->body());
-
-                return [
-                    'ok' => false,
-                    'message' => $error !== ''
-                        ? 'Portal respondeu: '.$error
-                        : 'Portal respondeu com status '.$response->status().'.',
-                    'data' => null,
-                ];
-            }
-
-            $json = $response->json();
-
-            if (! is_array($json) || blank($json['vinculoId'] ?? null)) {
-                return [
-                    'ok' => false,
-                    'message' => 'Resposta inválida do portal ao solicitar vínculo.',
-                    'data' => null,
-                ];
-            }
-
-            return [
-                'ok' => true,
-                'message' => 'Solicitação enviada ao portal.',
-                'data' => $json,
-            ];
-        } catch (\Throwable $exception) {
-            return [
-                'ok' => false,
-                'message' => 'Não foi possível contactar o portal: '.$exception->getMessage(),
-                'data' => null,
-            ];
-        }
+        return [
+            'ok' => false,
+            'message' => $message,
+            'data' => $data,
+            'code' => $code,
+            'http_status' => $httpStatus,
+        ];
     }
 
     /**
-     * @return array{ok: bool, message: string, data: ?array}
+     * @param  mixed  $json
      */
-    public function consultarStatus(string $vinculoId, ?string $portalBaseUrl = null): array
+    private function extractErrorMessage(mixed $json): string
     {
-        $endpoint = ContadorCloudHttpHelper::pairingStatusUrl($vinculoId, (string) ($portalBaseUrl ?? ''));
-
-        try {
-            $response = LicencaHttpClient::make()
-                ->timeout((int) config('contador-cloud.default_timeout', 30))
-                ->acceptJson()
-                ->get($endpoint);
-
-            if ($response->status() === 404) {
-                return [
-                    'ok' => false,
-                    'message' => 'Solicitação de vínculo não encontrada ou expirada.',
-                    'data' => ['status' => 'expired'],
-                ];
-            }
-
-            if (! ContadorCloudHttpHelper::isJsonApiResponse($response)) {
-                return [
-                    'ok' => false,
-                    'message' => ContadorCloudHttpHelper::invalidApiMessage($response, $endpoint),
-                    'data' => null,
-                ];
-            }
-
-            if (! $response->successful()) {
-                $json = $response->json();
-                $error = is_array($json) ? (string) ($json['error'] ?? $json['message'] ?? '') : trim($response->body());
-
-                return [
-                    'ok' => false,
-                    'message' => $error !== ''
-                        ? 'Portal respondeu: '.$error
-                        : 'Portal respondeu com status '.$response->status().'.',
-                    'data' => is_array($json) ? $json : null,
-                ];
-            }
-
-            $json = $response->json();
-
-            return [
-                'ok' => true,
-                'message' => 'Status consultado.',
-                'data' => is_array($json) ? $json : null,
-            ];
-        } catch (\Throwable $exception) {
-            return [
-                'ok' => false,
-                'message' => 'Não foi possível consultar o portal: '.$exception->getMessage(),
-                'data' => null,
-            ];
+        if (! is_array($json)) {
+            return '';
         }
+
+        return trim((string) ($json['error'] ?? $json['message'] ?? ''));
+    }
+
+    /**
+     * @param  mixed  $json
+     */
+    private function formatValidationDetails(mixed $json): string
+    {
+        if (! is_array($json)) {
+            return $this->extractErrorMessage($json);
+        }
+
+        $parts = [];
+
+        if (is_array($json['details'] ?? null)) {
+            foreach ($json['details'] as $detail) {
+                if (! is_array($detail)) {
+                    continue;
+                }
+
+                $path = is_array($detail['path'] ?? null) ? implode('.', $detail['path']) : (string) ($detail['path'] ?? '');
+                $msg = trim((string) ($detail['message'] ?? ''));
+
+                if ($msg === '') {
+                    continue;
+                }
+
+                $parts[] = $path !== '' ? $path.': '.$msg : $msg;
+            }
+        }
+
+        $base = $this->extractErrorMessage($json);
+
+        if ($base !== '') {
+            array_unshift($parts, $base);
+        }
+
+        return implode('; ', array_unique($parts));
     }
 
     /**
@@ -282,7 +249,7 @@ final class ContadorCloudPairingClient
     private function buildEmpresaPayload(Empresa $empresa): array
     {
         return [
-            'cnpj' => $this->formatDocumento((string) $empresa->cnpj),
+            'cnpj' => $this->formatCnpj((string) $empresa->cnpj) ?? $this->onlyDigits((string) $empresa->cnpj),
             'razaoSocial' => mb_strtoupper(trim((string) ($empresa->razao_social ?: $empresa->nome)), 'UTF-8'),
             'nomeFantasia' => mb_strtoupper(trim((string) ($empresa->fantasia ?: $empresa->nome)), 'UTF-8'),
             'ie' => trim((string) ($empresa->ie ?? '')),
@@ -291,21 +258,26 @@ final class ContadorCloudPairingClient
             'uf' => strtoupper(trim((string) ($empresa->uf ?? ''))),
             'erpOrigem' => 'unitec-erp-web',
             'erpEmpresaId' => (string) $empresa->getKey(),
+            'sistemaContabil' => trim((string) ($empresa->param_portal_contador_sistema_contabil ?? '')),
         ];
     }
 
-    private function formatDocumento(string $value): string
+    /**
+     * Aceita somente CNPJ válido (tamanho + dígitos verificadores). CPF retorna null.
+     */
+    private function formatCnpj(string $value): ?string
     {
-        $digits = preg_replace('/\D/', '', $value) ?? '';
+        $digits = DocumentoBrasileiroValidator::digits($value);
 
-        if (strlen($digits) === 11) {
-            return preg_replace('/^(\d{3})(\d{3})(\d{3})(\d{2})$/', '$1.$2.$3-$4', $digits) ?: $value;
+        if (! DocumentoBrasileiroValidator::isValidCnpj($digits)) {
+            return null;
         }
 
-        if (strlen($digits) !== 14) {
-            return $value;
-        }
+        return preg_replace('/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/', '$1.$2.$3/$4-$5', $digits) ?: null;
+    }
 
-        return preg_replace('/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/', '$1.$2.$3/$4-$5', $digits) ?: $value;
+    private function onlyDigits(string $value): string
+    {
+        return DocumentoBrasileiroValidator::digits($value);
     }
 }

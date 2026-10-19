@@ -6,7 +6,10 @@ use App\Models\Empresa;
 use App\Models\PdvMesa;
 use App\Models\PdvMesaLancamento;
 use App\Models\Product;
+use App\Models\ProductComposition;
 use App\Models\User;
+use App\Support\Erp\Pdv\PdvComposicaoLinhas;
+use App\Support\Erp\Pdv\PdvComposicaoSelecao;
 use App\Support\Erp\Pdv\PdvMesaService;
 use App\Support\Erp\ProductTabelaPrecoService;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -90,7 +93,7 @@ final class MesasLancamentoService
                 ]);
 
                 if (! $reserva['ok']) {
-                    throw $this->ocupada(PdvMesaService::rotulo($numero), '');
+                    throw $this->ocupada(PdvMesaService::rotuloDaEmpresa($empresaId, $numero), '');
                 }
 
                 $mesa = $reserva['mesa'];
@@ -126,7 +129,7 @@ final class MesasLancamentoService
 
     private function validarMesa(?PdvMesa $mesa, int $numero, ?string $abertaVista, bool $confirmarMesa): void
     {
-        $rotulo = PdvMesaService::rotulo($numero);
+        $rotulo = $mesa?->rotulo() ?? PdvMesaService::rotuloPadrao($numero);
         $qtd = (int) ($mesa?->qtd_itens ?? 0);
         $abertaAtual = $qtd > 0 ? $mesa?->aberta_em?->format('Y-m-d H:i:s') : null;
 
@@ -259,7 +262,11 @@ final class MesasLancamentoService
                 $preco = $precosAplicados[(int) $product->id];
             }
 
-            $obs = $this->obs($item['obs'] ?? null);
+            $selecao = $this->resolverComposicaoSelecao($product, $item);
+            $composicaoLinhas = PdvComposicaoLinhas::montar((int) $product->id, $selecao);
+            $acrescimo = $this->acrescimoAdicionais($product, $selecao, $quantidade);
+            // Obs = só texto digitado; SEM/ADICIONAL ficam em composicao_linhas.
+            $obs = $this->obs(PdvComposicaoLinhas::limparObsManual((string) ($item['obs'] ?? '')));
 
             $linha = [
                 'product_id' => (int) $product->id,
@@ -275,8 +282,11 @@ final class MesasLancamentoService
                 'price_table_id' => $priceTableId,
                 'tabela_nivel' => $nivel,
                 'desconto' => 0.0,
-                'acrescimo' => 0.0,
-                'total' => round($quantidade * $preco, 2),
+                'acrescimo' => $acrescimo,
+                'total' => round(($quantidade * $preco) + $acrescimo, 2),
+                'composicao_removidos' => $selecao->removidos,
+                'composicao_adicionais' => $selecao->adicionais,
+                'composicao_linhas' => $composicaoLinhas,
             ];
 
             if ($obs !== '') {
@@ -287,6 +297,67 @@ final class MesasLancamentoService
         }
 
         return $itens;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function resolverComposicaoSelecao(Product $product, array $item): PdvComposicaoSelecao
+    {
+        $selecao = PdvComposicaoSelecao::fromArray($item);
+
+        if (! ($product->is_composicao ?? false)) {
+            return PdvComposicaoSelecao::vazia();
+        }
+
+        $componentes = ProductComposition::query()
+            ->where('product_id', $product->id)
+            ->get(['component_product_id', 'is_adicional']);
+
+        $baseIds = [];
+        $adicionalIds = [];
+
+        foreach ($componentes as $c) {
+            $id = (int) $c->component_product_id;
+
+            if ((bool) ($c->is_adicional ?? false)) {
+                $adicionalIds[$id] = $id;
+            } else {
+                $baseIds[$id] = $id;
+            }
+        }
+
+        $removidos = array_values(array_filter(
+            $selecao->removidos,
+            static fn (int $id): bool => isset($baseIds[$id]),
+        ));
+        $adicionais = array_values(array_filter(
+            $selecao->adicionais,
+            static fn (int $id): bool => isset($adicionalIds[$id]),
+        ));
+
+        return new PdvComposicaoSelecao($removidos, $adicionais);
+    }
+
+    private function acrescimoAdicionais(Product $product, PdvComposicaoSelecao $selecao, float $quantidadeKit): float
+    {
+        if ($selecao->adicionais === [] || ! ($product->is_composicao ?? false)) {
+            return 0.0;
+        }
+
+        $linhas = ProductComposition::query()
+            ->where('product_id', $product->id)
+            ->where('is_adicional', true)
+            ->whereIn('component_product_id', $selecao->adicionais)
+            ->get(['preco', 'quantidade', 'component_product_id']);
+
+        $total = 0.0;
+
+        foreach ($linhas as $linha) {
+            $total += ((float) $linha->preco) * ((float) $linha->quantidade) * $quantidadeKit;
+        }
+
+        return round($total, 2);
     }
 
     /**
@@ -308,11 +379,16 @@ final class MesasLancamentoService
                     && empty($item['product_serial_id'])
                     && round((float) ($item['preco'] ?? 0), 2) === round((float) $novo['preco'], 2)
                     && (float) ($item['desconto'] ?? 0) == 0.0
-                    && (float) ($item['acrescimo'] ?? 0) == 0.0
-                    && (string) ($item['obs'] ?? '') === (string) ($novo['obs'] ?? '')) {
-                    $quantidade = round((float) ($item['quantidade'] ?? 0) + $novo['quantidade'], 3);
+                    && (string) ($item['obs'] ?? '') === (string) ($novo['obs'] ?? '')
+                    && PdvComposicaoSelecao::fromArray($item)->chave() === PdvComposicaoSelecao::fromArray($novo)->chave()) {
+                    $quantidade = round((float) ($item['quantidade'] ?? 0) + (float) $novo['quantidade'], 3);
+                    $fatorNovo = (float) $novo['quantidade'] > 0
+                        ? ((float) ($novo['acrescimo'] ?? 0) / (float) $novo['quantidade'])
+                        : 0.0;
+                    $acrescimo = round($quantidade * $fatorNovo, 2);
                     $atuais[$index]['quantidade'] = $quantidade;
-                    $atuais[$index]['total'] = round($quantidade * (float) $novo['preco'], 2);
+                    $atuais[$index]['acrescimo'] = $acrescimo;
+                    $atuais[$index]['total'] = round(($quantidade * (float) $novo['preco']) + $acrescimo, 2);
                     $juntou = true;
 
                     break;

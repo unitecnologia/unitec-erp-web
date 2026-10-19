@@ -18,11 +18,14 @@
 <aside
     class="erp-pdv-mesas"
     wire:ignore
+    wire:key="pdv-mesas-{{ $painel['nomes_rev'] ?? '0' }}"
     data-erp-pdv-mesas
     data-quantidade="{{ $painel['quantidade'] }}"
     data-inatividade="{{ $painel['inatividade'] }}"
     data-url="{{ $painel['url'] }}"
     data-credencial="{{ $painel['credencial'] }}"
+    data-nomes-b64="{{ $painel['nomes_b64'] ?? '' }}"
+    data-nomes-rev="{{ $painel['nomes_rev'] ?? '' }}"
     data-mesa-numero="{{ $painel['mesa']['numero'] ?? '' }}"
     data-mesa-id="{{ $painel['mesa']['id'] ?? '' }}"
     data-mesa-token="{{ $painel['mesa']['token'] ?? '' }}"
@@ -69,11 +72,11 @@
         </div>
 
         <ul class="erp-pdv-mesas__legenda" aria-hidden="true">
-            <li><i class="is-livre"></i>Livre</li>
-            <li><i class="is-ocupada"></i>Ocupada</li>
-            <li><i class="is-selecionada"></i>Aberta aqui</li>
-            <li><i class="is-bloqueada"></i>Outro terminal</li>
-            <li class="is-largo"><i class="is-aguardando"></i>Aguardando fechamento</li>
+            <li><i class="is-livre"></i>Livre: <span data-mesas-legenda="livre">0</span></li>
+            <li><i class="is-ocupada"></i>Ocupada: <span data-mesas-legenda="ocupada">0</span></li>
+            <li><i class="is-selecionada"></i>Aberta aqui: <span data-mesas-legenda="aqui">0</span></li>
+            <li><i class="is-bloqueada"></i>Outro terminal: <span data-mesas-legenda="outro">0</span></li>
+            <li class="is-largo"><i class="is-aguardando"></i>Aguardando fechamento: <span data-mesas-legenda="aguardando">0</span></li>
         </ul>
     </div>
 </aside>

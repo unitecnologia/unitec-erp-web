@@ -24,7 +24,7 @@ final class NfceConsultor
 
         $xml = $this->buildConsSitNfe($request->tpAmb, $chave);
         $cUf = substr($chave, 0, 2);
-        $endpoint = ScNfceEndpoints::consultaProtocolo($request->tpAmb);
+        $endpoint = NfceSoapUrls::consultaProtocolo($chave, $request->tpAmb);
 
         $soapResponse = $this->soapClient->consultaProtocolo(
             $endpoint,

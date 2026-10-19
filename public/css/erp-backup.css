@@ -361,7 +361,7 @@
 /* Stats */
 .erp-backup__stats {
     display: grid;
-    grid-template-columns: 1.2fr 0.85fr 0.7fr;
+    grid-template-columns: 1.1fr 0.85fr 1fr 0.75fr;
     gap: 0.35rem;
     margin-top: 0.55rem;
     padding-top: 0.55rem;
@@ -434,6 +434,12 @@
 .erp-backup__chip--idle {
     background: #e2e8f0;
     color: #475569;
+}
+
+.erp-backup__text-btn--inline {
+    margin-top: 0.35rem;
+    align-self: flex-start;
+    font-size: 0.68rem;
 }
 
 /* Table */
@@ -950,6 +956,17 @@
 
 .erp-backup {
     position: relative;
+}
+
+.erp-backup__pick-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: rgba(148, 163, 184, 0.95);
+}
+
+.erp-backup__pick-hint[hidden] {
+    display: none !important;
 }
 
 @media (max-width: 640px) {

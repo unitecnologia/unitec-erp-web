@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('unitec_os_devices')) {
+            return;
+        }
+
         Schema::create('unitec_os_devices', function (Blueprint $table): void {
             $table->id();
             $table->string('device_uuid', 100)->unique();

@@ -71,10 +71,15 @@ function bindErpPdvLivewireEvents() {
 
     window.Livewire.on('erp-pdv-modal-opened', (payload) => {
         ensurePdvFullscreenFromUserGesture();
+
+        if (payload?.modal === 'sair') {
+            showPdvSairOverlay();
+
+            return;
+        }
+
         window.setTimeout(() => {
-            if (payload?.modal === 'sair') {
-                document.getElementById('erp-pdv-sair-sim')?.focus();
-            } else if (payload?.modal === 'excluir_item') {
+            if (payload?.modal === 'excluir_item') {
                 document.getElementById('erp-pdv-excluir-sim')?.focus();
             } else if (payload?.modal === 'remover_itens') {
                 document.getElementById('erp-pdv-remover-itens-search')?.focus()
@@ -87,6 +92,10 @@ function bindErpPdvLivewireEvents() {
                 focusPdvModalField();
             }
         }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-sair-closed', () => {
+        hidePdvSairOverlay();
     });
 
     window.Livewire.on('erp-pdv-caixa-opened', () => {
@@ -388,6 +397,12 @@ function bindErpPdvLivewireEvents() {
         }, 50);
     });
 
+    window.Livewire.on('erp-pdv-focus-abertura-senha', () => {
+        window.setTimeout(() => {
+            document.getElementById('erp-pdv-abertura-senha')?.focus();
+        }, 50);
+    });
+
     window.Livewire.on('erp-pdv-focus-busca-preco', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-busca-preco-search')?.focus();
@@ -436,6 +451,17 @@ function bindErpPdvLivewireEvents() {
     window.Livewire.on('erp-pdv-focus-vendas-espera', () => {
         window.setTimeout(() => {
             document.getElementById('erp-pdv-vendas-espera-search')?.focus();
+        }, 50);
+    });
+
+    window.Livewire.on('erp-pdv-focus-suspender-venda', () => {
+        window.setTimeout(() => {
+            const el = document.getElementById('erp-pdv-suspender-venda-identificador');
+            if (! el) {
+                return;
+            }
+            el.focus();
+            el.select?.();
         }, 50);
     });
 
@@ -948,6 +974,43 @@ function exitPdvFullscreen() {
         document.exitFullscreen().catch(() => {});
     }
 }
+
+function pdvSairOverlayEl() {
+    return document.getElementById('erp-pdv-sair-overlay');
+}
+
+function isPdvSairOverlayOpen() {
+    const el = pdvSairOverlayEl();
+
+    return !!(el && el.classList.contains('is-open'));
+}
+
+function showPdvSairOverlay() {
+    const el = pdvSairOverlayEl();
+
+    if (! el) {
+        return;
+    }
+
+    el.hidden = false;
+    el.classList.add('is-open');
+    window.requestAnimationFrame(() => {
+        document.getElementById('erp-pdv-sair-sim')?.focus();
+    });
+}
+
+function hidePdvSairOverlay() {
+    const el = pdvSairOverlayEl();
+
+    if (el) {
+        el.classList.remove('is-open');
+        el.hidden = true;
+    }
+}
+
+window.showPdvSairOverlay = showPdvSairOverlay;
+window.hidePdvSairOverlay = hidePdvSairOverlay;
+window.isPdvSairOverlayOpen = isPdvSairOverlayOpen;
 
 /** Garante fullscreen no gesto do operador (F2 / clique em Abrir caixa). */
 function ensurePdvFullscreenFromUserGesture() {
@@ -3502,6 +3565,11 @@ function handlePdvModalKeydown(event, component, isFormModal) {
 
     if (event.key === 'Escape') {
         event.preventDefault();
+
+        if (isPdvSairOverlayOpen()) {
+            hidePdvSairOverlay();
+        }
+
         component.call('handlePdvEscape');
 
         return;
@@ -3530,11 +3598,10 @@ function handlePdvModalKeydown(event, component, isFormModal) {
         return;
     }
 
-    const sairModal = document.getElementById('erp-pdv-sair-title');
-
-    if (sairModal) {
+    if (isPdvSairOverlayOpen()) {
         if (event.key === 'Enter') {
             event.preventDefault();
+            hidePdvSairOverlay();
             component.call('confirmSairPdv');
         }
 
@@ -4292,9 +4359,26 @@ function handlePdvListModalKeydown(event, component) {
         return false;
     }
 
-    const vendasEsperaSearch = document.getElementById('erp-pdv-vendas-espera-search');
+    const suspenderVendaIdentificador = document.getElementById('erp-pdv-suspender-venda-identificador');
 
-    if (vendasEsperaSearch) {
+    if (suspenderVendaIdentificador) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            component.call('cancelSuspenderVenda');
+
+            return true;
+        }
+
+        // Enter: wire:keydown.enter no input.
+        return false;
+    }
+
+    const vendasEsperaRoot = document.querySelector('.erp-pdv-vendas-espera');
+
+    if (vendasEsperaRoot) {
+        const activeId = document.activeElement?.id || '';
+        const inMotivo = activeId === 'erp-pdv-vendas-espera-motivo';
+
         if (event.key === 'Escape') {
             event.preventDefault();
             component.call('cancelVendaEmEspera');
@@ -4302,25 +4386,28 @@ function handlePdvListModalKeydown(event, component) {
             return true;
         }
 
-        if (document.activeElement?.id === 'erp-pdv-vendas-espera-search'
-            && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        // ↑/↓ locais (sem Livewire). No motivo, setas movem o cursor do texto.
+        if (! inMotivo && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
-            component.call('moveVendaEsperaSelection', event.key === 'ArrowDown' ? 1 : -1);
-            scrollPdvModalRowIntoView('erp-pdv-vendas-espera-row-');
+            moveVendasEsperaSelectionLocal(event.key === 'ArrowDown' ? 1 : -1);
 
             return true;
         }
 
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' && ! inMotivo) {
             event.preventDefault();
-            component.call('recuperarVendaEmEspera');
+            window.erpPdvRecuperarVendaEsperaSelecionada();
 
             return true;
         }
 
-        if (event.key === 'Delete') {
+        if (event.key === 'Delete' && ! inMotivo) {
             event.preventDefault();
-            component.call('requestExcluirVendaEmEspera');
+            const index = getVendasEsperaSelectedIndex();
+            if (index !== null) {
+                // Só sincroniza índice (foco no motivo); sem re-render da grade.
+                component.call('selectVendaEsperaRow', index);
+            }
 
             return true;
         }
@@ -4457,6 +4544,112 @@ function scrollPdvModalRowIntoView(prefix) {
         }
     });
 }
+
+function getVendasEsperaRoot() {
+    return document.querySelector('.erp-pdv-vendas-espera');
+}
+
+function getVendasEsperaRows() {
+    const root = getVendasEsperaRoot();
+    if (! root) {
+        return [];
+    }
+
+    return Array.from(root.querySelectorAll('[id^="erp-pdv-vendas-espera-row-"]'));
+}
+
+function getVendasEsperaSelectedIndex() {
+    const root = getVendasEsperaRoot();
+    const rows = getVendasEsperaRows();
+    if (! root || ! rows.length) {
+        return null;
+    }
+
+    if (root.dataset.selectedIndex !== undefined && root.dataset.selectedIndex !== '') {
+        const parsed = Number.parseInt(root.dataset.selectedIndex, 10);
+        if (Number.isFinite(parsed) && parsed >= 0 && parsed < rows.length) {
+            return parsed;
+        }
+    }
+
+    const marked = rows.findIndex((row) => row.classList.contains('erp-pdv__grid-row--marked'));
+
+    return marked >= 0 ? marked : 0;
+}
+
+function moveVendasEsperaSelectionLocal(delta) {
+    const root = getVendasEsperaRoot();
+    const rows = getVendasEsperaRows();
+    if (! root || ! rows.length) {
+        return;
+    }
+
+    const current = getVendasEsperaSelectedIndex() ?? 0;
+    const next = Math.max(0, Math.min(rows.length - 1, current + delta));
+
+    root.dataset.selectedIndex = String(next);
+    rows.forEach((row, index) => {
+        row.classList.toggle('erp-pdv__grid-row--marked', index === next);
+    });
+    rows[next].scrollIntoView({ block: 'nearest' });
+}
+
+function selectVendasEsperaRowLocal(index) {
+    const root = getVendasEsperaRoot();
+    const rows = getVendasEsperaRows();
+    if (! root || ! rows.length || index < 0 || index >= rows.length) {
+        return;
+    }
+
+    root.dataset.selectedIndex = String(index);
+    rows.forEach((row, i) => {
+        row.classList.toggle('erp-pdv__grid-row--marked', i === index);
+    });
+    rows[index].scrollIntoView({ block: 'nearest' });
+}
+
+function getErpPdvLivewireComponent() {
+    const page = document.querySelector('.erp-pdv-page') ?? document.querySelector('.erp-pdv');
+
+    return page ? getErpPdvComponent(page) : null;
+}
+
+window.erpPdvSelectVendaEsperaRow = function erpPdvSelectVendaEsperaRow(index) {
+    const idx = Number.parseInt(String(index), 10);
+    if (! Number.isFinite(idx)) {
+        return;
+    }
+
+    selectVendasEsperaRowLocal(idx);
+
+    const component = getErpPdvLivewireComponent();
+    // Livewire.find → component.$wire; Alpine fallback pode já devolver $wire.
+    const wire = component?.$wire ?? component;
+    // Sincroniza índice sem re-render (Enter/Descartar usam o índice local de qualquer forma).
+    if (wire && typeof wire.set === 'function') {
+        wire.set('selectedVendaEsperaIndex', idx, false);
+    }
+};
+
+window.erpPdvRecuperarVendaEsperaSelecionada = function erpPdvRecuperarVendaEsperaSelecionada() {
+    const component = getErpPdvLivewireComponent();
+    const index = getVendasEsperaSelectedIndex();
+    if (! component || index === null) {
+        return;
+    }
+
+    component.call('recuperarVendaEmEsperaAt', index);
+};
+
+window.erpPdvDescartarVendaEsperaSelecionada = function erpPdvDescartarVendaEsperaSelecionada() {
+    const component = getErpPdvLivewireComponent();
+    const index = getVendasEsperaSelectedIndex();
+    if (! component || index === null) {
+        return;
+    }
+
+    component.call('confirmarExcluirVendaEmEsperaAt', index);
+};
 
 let erpPdvConfirmTimer = null;
 /** @type {number|null} */
@@ -4833,6 +5026,7 @@ function focusPdvFinalizarPagamento(index, valor = null) {
 
 function focusPdvModalField() {
     const abertura = document.getElementById('erp-pdv-abertura-valor');
+    const senha = document.getElementById('erp-pdv-abertura-senha');
 
     if (abertura) {
         const modal = abertura.closest('.erp-pdv-caixa-modal')
@@ -4875,6 +5069,19 @@ function focusPdvModalField() {
                     selectAll();
                 }
             });
+        }
+
+        // Com troca de usuário: foco na senha; senão no valor de abertura.
+        if (senha) {
+            window.requestAnimationFrame(() => {
+                try {
+                    senha.focus({ preventScroll: true });
+                } catch (_) {
+                    senha.focus();
+                }
+            });
+            window.setTimeout(() => senha.focus(), 40);
+            return;
         }
 
         window.requestAnimationFrame(() => {

@@ -372,8 +372,8 @@ class PdvCargaService
 
     /**
      * Caixa padrão de cada usuário (pivot caixa_conta_user), mesma regra de
-     * User::defaultCaixaContaId: is_padrao, senão o primeiro liberado; sem
-     * vínculo, o primeiro caixa operacional da empresa.
+     * User::defaultCaixaContaId: is_padrao, senão o primeiro vínculo explícito;
+     * sem vínculo, CAIXA GERAL (não inventa outro PDV operacional).
      *
      * @param  Collection<int, User>  $users
      * @return array<int, array{id: int, nome: string}>
@@ -399,7 +399,7 @@ class PdvCargaService
             }
         }
 
-        $fallbackId = (int) (CaixaConta::query()->assignable()->orderBy('codigo')->value('id') ?? 0);
+        $fallbackId = (int) CaixaConta::ensureCaixaGeral()->id;
 
         foreach ($users as $user) {
             $uid = (int) $user->id;

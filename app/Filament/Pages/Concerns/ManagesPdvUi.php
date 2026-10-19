@@ -5,10 +5,13 @@ namespace App\Filament\Pages\Concerns;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PersonResource;
 use App\Filament\Resources\ProductResource;
+use App\Models\CaixaConta;
 use App\Support\Erp\CloudflaredStatus;
 use App\Support\Erp\ErpContext;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Pdv\PdvMesaService;
+use App\Support\Erp\Pdv\PdvMesaSessao;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 
@@ -238,6 +241,12 @@ trait ManagesPdvUi
         }
 
         $this->activeModal = $modal;
+
+        // Sair: modal já está no DOM; skipRender evita remontar o PDV inteiro.
+        if ($modal === 'sair') {
+            $this->skipRender();
+        }
+
         $this->dispatch('erp-pdv-modal-opened', modal: $modal);
     }
 
@@ -267,7 +276,15 @@ trait ManagesPdvUi
 
         $this->activeModal = null;
 
-        if ($wasSair || $wasFinalizar) {
+        if ($wasSair) {
+            $this->skipRender();
+            $this->dispatch('erp-pdv-sair-closed');
+            $this->dispatch('erp-pdv-focus-search');
+
+            return;
+        }
+
+        if ($wasFinalizar) {
             $this->dispatch('erp-pdv-focus-search');
         }
     }
@@ -394,6 +411,7 @@ trait ManagesPdvUi
                 'consulta_venda' => $this->cancelConsultaVenda(),
                 'estorno_venda' => $this->cancelEstornoVenda(),
                 'vendas_espera' => $this->cancelVendaEmEspera(),
+                'suspender_venda' => $this->cancelSuspenderVenda(),
                 'fiscal_aviso' => $this->sairPdvFiscalOverlay(),
                 'tabela_preco' => $this->cancelTabelaPreco(),
                 'remover_itens' => $this->cancelRemoverItens(),
@@ -440,13 +458,32 @@ trait ManagesPdvUi
 
     public function confirmSairPdv(): void
     {
-        if (\App\Support\Erp\Pdv\PdvMesaSessao::atual() !== null) {
-            $this->limparCupom();
-        }
+        // Saída imediata: sem re-render do PDV. Com mesa, só libera reserva/sessão
+        // (itens continuam na mesa); sem limparCupom (UI/hot-path desnecessários).
+        $this->prepararSaidaRapidaDoPdv();
 
         ErpScreen::set('Principal');
-
+        $this->skipRender();
         $this->redirect(Dashboard::getUrl(), navigate: false);
+    }
+
+    /**
+     * Cleanup mínimo ao sair do PDV. Preserva venda de balcão em sessão;
+     * com mesa aberta, libera a reserva e limpa o cupom local (itens ficam na mesa).
+     */
+    protected function prepararSaidaRapidaDoPdv(): void
+    {
+        $mesa = PdvMesaSessao::atual();
+
+        if ($mesa === null) {
+            return;
+        }
+
+        PdvMesaService::make()->liberar($mesa['id'], $mesa['token']);
+        PdvMesaSessao::esquecer();
+        session()->forget('erp.pdv.cupom');
+        $this->forgetCupomIniciadoEm();
+        $this->clearImportSession(true);
     }
 
     public function toggleCaixa(): void
@@ -462,8 +499,9 @@ trait ManagesPdvUi
             return;
         }
 
-        $this->aberturaForm['valor'] = '0,00';
+        $this->iniciarAberturaCaixaForm();
         $this->openPdvModal('abrir_caixa');
+        $this->dispatch('erp-pdv-focus-abertura-senha');
     }
 
     public function openPersonOverlay(): void
@@ -560,7 +598,7 @@ trait ManagesPdvUi
             'empresa' => $empresaNome !== ''
                 ? mb_strtoupper($empresaNome, 'UTF-8')
                 : '—',
-            'conta' => $conta !== '' ? $conta : 'CAIXA',
+            'conta' => $conta !== '' ? $conta : CaixaConta::NOME_CAIXA_GERAL,
             'usuario' => $user?->name ?? 'USUARIO',
             'vendedor' => $this->vendedor,
             'tabela_preco' => $this->pdvTabelaPrecoLabel,

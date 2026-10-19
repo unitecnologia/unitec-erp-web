@@ -38,7 +38,7 @@
                             }
                         @endphp
                         <tr class="fi-ta-row" data-record-key="{{ $nfse->getKey() }}" wire:key="nfse-lista-{{ $nfse->getKey() }}">
-                            <td class="fi-ta-cell">{{ $nfse->numero_dps }}</td>
+                            <td class="fi-ta-cell">{{ filled($nfse->numero_nfse) ? $nfse->numero_nfse : $nfse->numero_dps }}</td>
                             <td class="fi-ta-cell">{{ $osNumero }}</td>
                             <td class="fi-ta-cell">{{ $nfse->data_emissao?->format('d/m/Y') ?: '—' }}</td>
                             <td class="fi-ta-cell">{{ $nfse->competencia?->format('m/Y') ?: '—' }}</td>

@@ -80,11 +80,8 @@
                                 $value = $cells[$column['key']] ?? '';
                             @endphp
                             <td @class(['fi-ta-cell', 'text-' . $column['align'] => filled($column['align'] ?? null)])>
-                                @if ($column['html'] ?? false)
-                                    {!! $value !!}
-                                @else
-                                    {{ $value }}
-                                @endif
+                                {{-- ProductListRowFormatter já aplica e() / HTML seguro --}}
+                                {!! $value !!}
                             </td>
                         @endforeach
                     @endif

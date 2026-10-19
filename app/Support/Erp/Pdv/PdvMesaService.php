@@ -82,9 +82,218 @@ final class PdvMesaService
         return $qtd > 0 ? min($qtd, self::QTD_MAXIMA) : self::QTD_PADRAO;
     }
 
-    public static function rotulo(int $numero): string
+    public static function normalizarQuantidade(mixed $qtd): int
+    {
+        $qtd = (int) $qtd;
+
+        if ($qtd < 1) {
+            return self::QTD_PADRAO;
+        }
+
+        return min($qtd, self::QTD_MAXIMA);
+    }
+
+    public static function rotuloPadrao(int $numero): string
     {
         return 'Mesa '.str_pad((string) $numero, 2, '0', STR_PAD_LEFT);
+    }
+
+    public static function rotulo(int $numero, ?string $nome = null): string
+    {
+        $nome = trim((string) ($nome ?? ''));
+
+        return $nome !== '' ? $nome : self::rotuloPadrao($numero);
+    }
+
+    /** @var array<string, array<int, string>> */
+    private static array $rotulosCache = [];
+
+    public static function limparCacheRotulos(): void
+    {
+        self::$rotulosCache = [];
+    }
+
+    /**
+     * Rótulos 1..N da empresa (nome personalizado ou padrão). Cache por request.
+     *
+     * @return array<int, string>
+     */
+    public static function mapaRotulos(int $empresaId, ?int $quantidade = null): array
+    {
+        $quantidade ??= self::quantidade(
+            $empresaId > 0 ? Empresa::query()->whereKey($empresaId)->first(['id', 'param_pdv_qtd_mesas']) : null
+        );
+        $quantidade = self::normalizarQuantidade($quantidade);
+        $cacheKey = $empresaId.'|'.$quantidade;
+
+        if (isset(self::$rotulosCache[$cacheKey])) {
+            return self::$rotulosCache[$cacheKey];
+        }
+
+        $nomes = $empresaId > 0
+            ? PdvMesa::query()
+                ->toBase()
+                ->where('empresa_id', $empresaId)
+                ->where('numero', '<=', $quantidade)
+                ->pluck('nome', 'numero')
+                ->all()
+            : [];
+
+        $mapa = [];
+        for ($n = 1; $n <= $quantidade; $n++) {
+            $raw = $nomes[$n] ?? $nomes[(string) $n] ?? null;
+            $raw = is_string($raw) ? trim($raw) : null;
+            $mapa[$n] = self::rotulo($n, $raw !== null && $raw !== '' ? $raw : null);
+        }
+
+        return self::$rotulosCache[$cacheKey] = $mapa;
+    }
+
+    public static function rotuloDaEmpresa(int $empresaId, int $numero): string
+    {
+        if ($numero < 1) {
+            return self::rotuloPadrao($numero);
+        }
+
+        $mapa = self::mapaRotulos($empresaId);
+
+        return $mapa[$numero] ?? self::rotuloPadrao($numero);
+    }
+
+    /**
+     * Garante linhas 1..N (sem apagar mesas acima de N — histórico permanece).
+     */
+    public function garantirAte(int $empresaId, int $quantidade): void
+    {
+        if ($empresaId <= 0) {
+            return;
+        }
+
+        $quantidade = self::normalizarQuantidade($quantidade);
+        $existentes = PdvMesa::query()
+            ->toBase()
+            ->where('empresa_id', $empresaId)
+            ->where('numero', '<=', $quantidade)
+            ->pluck('numero')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+        $existentes = array_fill_keys($existentes, true);
+
+        for ($n = 1; $n <= $quantidade; $n++) {
+            if (isset($existentes[$n])) {
+                continue;
+            }
+
+            try {
+                PdvMesa::query()->create([
+                    'empresa_id' => $empresaId,
+                    'numero' => $n,
+                ]);
+            } catch (QueryException) {
+                // índice único — outro processo criou
+            }
+        }
+    }
+
+    /**
+     * Mesas com número > nova quantidade que ainda têm itens ou reserva ativa.
+     *
+     * @return list<array{numero: int, rotulo: string, motivo: string}>
+     */
+    public function mesasImpedemReducao(int $empresaId, int $novaQuantidade): array
+    {
+        if ($empresaId <= 0) {
+            return [];
+        }
+
+        $novaQuantidade = max(0, (int) $novaQuantidade);
+        $agora = now()->format('Y-m-d H:i:s');
+
+        return PdvMesa::query()
+            ->toBase()
+            ->where('empresa_id', $empresaId)
+            ->where('numero', '>', $novaQuantidade)
+            ->where(function ($query) use ($agora): void {
+                $query->where('qtd_itens', '>', 0)
+                    ->orWhere('reservado_ate', '>', $agora);
+            })
+            ->orderBy('numero')
+            ->get(['numero', 'nome', 'qtd_itens', 'reservado_ate', 'reservado_nome'])
+            ->map(function (object $row) use ($agora): array {
+                $numero = (int) $row->numero;
+                $ocupada = (int) $row->qtd_itens > 0;
+                $reservada = $row->reservado_ate !== null && (string) $row->reservado_ate > $agora;
+                $motivo = match (true) {
+                    $ocupada && $reservada => 'ocupada e em atendimento',
+                    $ocupada => 'ocupada (itens ou pré-conta pendente)',
+                    default => 'em atendimento'.(trim((string) ($row->reservado_nome ?? '')) !== ''
+                        ? ' ('.trim((string) $row->reservado_nome).')'
+                        : ''),
+                };
+
+                return [
+                    'numero' => $numero,
+                    'rotulo' => self::rotulo($numero, isset($row->nome) ? (string) $row->nome : null),
+                    'motivo' => $motivo,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Persiste quantidade (param_pdv_qtd_mesas) e nomes. Não apaga mesas ao reduzir.
+     *
+     * @param  array<int|string, string|null>  $nomesPorNumero
+     * @return array{ok: true}|array{ok: false, erro: string}
+     */
+    public function salvarConfiguracao(Empresa $empresa, int $quantidade, array $nomesPorNumero): array
+    {
+        $empresaId = (int) $empresa->id;
+        if ($empresaId <= 0) {
+            return ['ok' => false, 'erro' => 'Empresa inválida.'];
+        }
+
+        $quantidade = self::normalizarQuantidade($quantidade);
+        $bloqueadas = $this->mesasImpedemReducao($empresaId, $quantidade);
+
+        if ($bloqueadas !== []) {
+            $lista = implode(', ', array_map(
+                static fn (array $m): string => $m['rotulo'].' ('.$m['motivo'].')',
+                array_slice($bloqueadas, 0, 5)
+            ));
+            $mais = count($bloqueadas) > 5 ? '…' : '';
+
+            return [
+                'ok' => false,
+                'erro' => 'Não é possível reduzir para '.$quantidade.' mesa(s): '.$lista.$mais
+                    .'. Feche ou libere essas mesas antes.',
+            ];
+        }
+
+        $this->garantirAte($empresaId, $quantidade);
+
+        $empresa->forceFill(['param_pdv_qtd_mesas' => $quantidade])->save();
+
+        $agora = now();
+        for ($n = 1; $n <= $quantidade; $n++) {
+            $raw = $nomesPorNumero[$n] ?? $nomesPorNumero[(string) $n] ?? null;
+            $nome = trim((string) ($raw ?? ''));
+            if ($nome === '' || mb_strtolower($nome) === mb_strtolower(self::rotuloPadrao($n))) {
+                $nome = null;
+            } else {
+                $nome = mb_substr($nome, 0, 60);
+            }
+
+            $mesa = $this->localizarOuCriar($empresaId, $n);
+            if ((string) ($mesa->nome ?? '') !== (string) ($nome ?? '')) {
+                $mesa->forceFill(['nome' => $nome, 'updated_at' => $agora])->save();
+            }
+        }
+
+        self::limparCacheRotulos();
+
+        return ['ok' => true];
     }
 
     /**

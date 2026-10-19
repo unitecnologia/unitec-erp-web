@@ -24,7 +24,7 @@
     const STORAGE_RECOLHIDO = 'erp.pdv.mesas.recolhido';
 
     const moeda = (valor) => Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const rotulo = (numero) => 'Mesa ' + String(numero).padStart(2, '0');
+    const rotuloPadrao = (numero) => 'Mesa ' + String(numero).padStart(2, '0');
 
     function createPainel(root) {
         const grid = root.querySelector('[data-mesas-grid]');
@@ -43,6 +43,24 @@
         };
         const toggleBtn = root.querySelector('[data-mesas-toggle]');
         const miniEl = root.querySelector('[data-mesas-mini]');
+        const legendaEls = {
+            livre: root.querySelector('[data-mesas-legenda="livre"]'),
+            ocupada: root.querySelector('[data-mesas-legenda="ocupada"]'),
+            aqui: root.querySelector('[data-mesas-legenda="aqui"]'),
+            outro: root.querySelector('[data-mesas-legenda="outro"]'),
+            aguardando: root.querySelector('[data-mesas-legenda="aguardando"]'),
+        };
+
+        let nomesMap = lerNomesMap(root);
+
+        const rotulo = (numero) => {
+            const custom = nomesMap[String(numero)] ?? nomesMap[numero];
+            if (custom != null && String(custom).trim() !== '') {
+                return String(custom).trim();
+            }
+
+            return rotuloPadrao(numero);
+        };
 
         const painel = {
             quantidade: Math.max(1, parseInt(root.dataset.quantidade || '0', 10) || 20),
@@ -113,8 +131,16 @@
             tile.dataset.numero = String(numero);
             tile.setAttribute('role', 'option');
             tile.setAttribute('data-erp-pdv-clickable', '');
-            tile.innerHTML = '<span class="erp-pdv-mesas__tile-num"></span><span class="erp-pdv-mesas__tile-info"></span>';
-            tile.querySelector('.erp-pdv-mesas__tile-num').textContent = String(numero).padStart(2, '0');
+            tile.innerHTML =
+                '<span class="erp-pdv-mesas__tile-id" aria-hidden="true"></span>' +
+                '<span class="erp-pdv-mesas__tile-nome"></span>' +
+                '<span class="erp-pdv-mesas__tile-info" hidden></span>';
+            const rotuloMesa = rotulo(numero);
+            const idEl = tile.querySelector('.erp-pdv-mesas__tile-id');
+            idEl.textContent = String(numero).padStart(2, '0');
+            idEl.hidden = false;
+            tile.classList.toggle('has-nome-custom', rotuloMesa !== rotuloPadrao(numero));
+            tile.querySelector('.erp-pdv-mesas__tile-nome').textContent = rotuloMesa;
 
             return tile;
         }
@@ -131,6 +157,12 @@
             });
 
             let ocupadas = 0;
+            // Contagem exclusiva por situação visual (mesas exibidas; sem dupla contagem).
+            let legLivre = 0;
+            let legOcupada = 0;
+            let legAqui = 0;
+            let legOutro = 0;
+            let legAguardando = 0;
             const fragment = document.createDocumentFragment();
 
             numeros.forEach((numero) => {
@@ -155,17 +187,46 @@
                     ocupadas++;
                 }
 
+                // Mesma ordem de prioridade das classes do tile (sem sobrepor contagens).
+                if (aguardando) {
+                    legAguardando++;
+                } else if (bloqueada) {
+                    legOutro++;
+                } else if (minha) {
+                    legAqui++;
+                } else if (ocupada) {
+                    legOcupada++;
+                } else {
+                    legLivre++;
+                }
+
+                // Cores: livre / ocupada(+aberta aqui) / outro terminal / aguardando.
+                // "Aberta aqui" usa a mesma cor de ocupada; o selo vem da classe is-selecionada.
                 tile.classList.toggle('is-livre', ! ocupada && ! minha && ! bloqueada && ! aguardando);
-                tile.classList.toggle('is-ocupada', ocupada && ! minha && ! aguardando);
+                tile.classList.toggle('is-ocupada', (ocupada || minha) && ! bloqueada && ! aguardando);
                 tile.classList.toggle('is-selecionada', minha);
                 tile.classList.toggle('is-bloqueada', bloqueada && ! aguardando);
                 tile.classList.toggle('is-aguardando', aguardando);
                 tile.classList.toggle('is-cursor', painel.cursor === numero);
                 tile.setAttribute('aria-selected', minha ? 'true' : 'false');
 
-                tile.querySelector('.erp-pdv-mesas__tile-info').textContent = ocupada ? moeda(total) : '';
+                const rotuloMesa = rotulo(numero);
+                const customNome = rotuloMesa !== rotuloPadrao(numero);
+                const idEl = tile.querySelector('.erp-pdv-mesas__tile-id');
+                const infoEl = tile.querySelector('.erp-pdv-mesas__tile-info');
+                idEl.textContent = String(numero).padStart(2, '0');
+                idEl.hidden = false;
+                tile.classList.toggle('has-nome-custom', customNome);
+                tile.querySelector('.erp-pdv-mesas__tile-nome').textContent = rotuloMesa;
+                if (ocupada) {
+                    infoEl.textContent = 'R$ ' + moeda(total);
+                    infoEl.hidden = false;
+                } else {
+                    infoEl.textContent = '';
+                    infoEl.hidden = true;
+                }
 
-                let titulo = rotulo(numero) + (ocupada ? ' — ' + qtd + ' item(ns) · R$ ' + moeda(total) : ' — livre');
+                let titulo = rotuloMesa + (ocupada ? ' — ' + qtd + ' item(ns) · R$ ' + moeda(total) : ' — livre');
                 if (aguardando) {
                     titulo += '\nAguardando fechamento (pré-conta impressa)';
                 }
@@ -181,6 +242,21 @@
 
             grid.appendChild(fragment);
             countEl.textContent = String(ocupadas);
+            if (legendaEls.livre) {
+                legendaEls.livre.textContent = String(legLivre);
+            }
+            if (legendaEls.ocupada) {
+                legendaEls.ocupada.textContent = String(legOcupada);
+            }
+            if (legendaEls.aqui) {
+                legendaEls.aqui.textContent = String(legAqui);
+            }
+            if (legendaEls.outro) {
+                legendaEls.outro.textContent = String(legOutro);
+            }
+            if (legendaEls.aguardando) {
+                legendaEls.aguardando.textContent = String(legAguardando);
+            }
 
             if (painel.mesa) {
                 const row = painel.mapa.get(painel.mesa.numero);
@@ -196,10 +272,12 @@
                 atualBox.hidden = false;
                 miniEl.textContent = String(painel.mesa.numero).padStart(2, '0');
                 miniEl.title = rotulo(painel.mesa.numero) + ' aberta — clique para expandir o painel';
+                miniEl.classList.toggle('is-aguardando', aguardando);
                 miniEl.hidden = false;
             } else {
                 atualBox.hidden = true;
                 miniEl.hidden = true;
+                miniEl.classList.remove('is-aguardando');
             }
         }
 
@@ -333,12 +411,50 @@
             }
             painel.atividade = true;
             painel.ultimaAtividade = Date.now();
+            // Reinicia o temporizador na hora (não espera o timeout antigo disparar).
+            if (painel.mesa && ! painel.parado) {
+                agendarInatividade(painel.inatividadeMs);
+            }
+        }
+
+        /** Overlay/modal realmente visível (ignora nós hidden / Sair fechado no DOM). */
+        function elementoUiVisivel(el) {
+            if (! el || el.hidden || el.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            if (el.id === 'erp-pdv-sair-overlay' && ! el.classList.contains('is-open')) {
+                return false;
+            }
+
+            const style = window.getComputedStyle(el);
+
+            return style.display !== 'none'
+                && style.visibility !== 'hidden'
+                && style.opacity !== '0';
         }
 
         /** Modal/overlay aberto no PDV (Finalizar, confirmações, cadastros): não sair da mesa. */
         function operacaoEmAndamento() {
-            return painel.abrindo
-                || document.querySelector('.erp-pdv .erp-pdv-modal, .erp-pdv .erp-pdv-overlay, .erp-pdv .erp-pdv-confirm-overlay') !== null;
+            if (painel.abrindo || painel.saindo) {
+                return true;
+            }
+
+            if (typeof window.isPdvSairOverlayOpen === 'function' && window.isPdvSairOverlayOpen()) {
+                return true;
+            }
+
+            const candidatos = document.querySelectorAll(
+                '.erp-pdv .erp-pdv-modal, .erp-pdv .erp-pdv-overlay, .erp-pdv .erp-pdv-confirm-overlay, .erp-pdv .erp-pdv-fiscal-overlay, .erp-pdv [data-erp-pdv-fiscal-progress].is-visible',
+            );
+
+            for (const el of candidatos) {
+                if (elementoUiVisivel(el)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /** Um único timer: ao disparar, reagenda pelo tempo restante se houve atividade no meio. */
@@ -381,8 +497,19 @@
                 });
         }
 
+        function detalheEvento(event) {
+            const raw = event && event.detail !== undefined ? event.detail : event;
+
+            if (Array.isArray(raw)) {
+                return raw[0] && typeof raw[0] === 'object' ? raw[0] : {};
+            }
+
+            return raw && typeof raw === 'object' ? raw : {};
+        }
+
         function onContexto(event) {
-            const d = event.detail || {};
+            const tinhaMesa = !! painel.mesa;
+            const d = detalheEvento(event);
             painel.mesa = d.numero && d.token
                 ? { numero: Number(d.numero), id: Number(d.id), token: String(d.token), aguardando: d.aguardando === true }
                 : null;
@@ -392,6 +519,14 @@
             render();
             agendar(150);
             agendarInatividade();
+
+            // Saiu da mesa → balcão: cursor no Código (inatividade ou sair manual).
+            if (tinhaMesa && ! painel.mesa) {
+                refocusSearch();
+                window.setTimeout(refocusSearch, 80);
+                window.setTimeout(refocusSearch, 250);
+                window.setTimeout(refocusSearch, 600);
+            }
         }
 
         function onPoll() {
@@ -529,7 +664,7 @@
 
         /** Modais Pré-conta / Reabrir: foco no "Sim" e teclas S/N (Enter/Esc seguem o padrão do PDV). */
         function onModalAberto(event) {
-            const prefixo = MODAIS_CONFIRMAR[event.detail?.modal];
+            const prefixo = MODAIS_CONFIRMAR[detalheEvento(event).modal];
             if (! prefixo) {
                 return;
             }
@@ -572,11 +707,50 @@
         return painel;
     }
 
+    /**
+     * Nomes vêm de Configurações → Mesas (pdv_mesas.nome), embutidos em base64
+     * para não quebrar no atributo HTML / wire:ignore.
+     */
+    function lerNomesMap(root) {
+        const b64 = root.getAttribute('data-nomes-b64') || '';
+        if (b64) {
+            try {
+                const json = atob(b64);
+                const parsed = JSON.parse(json);
+                if (parsed && typeof parsed === 'object' && ! Array.isArray(parsed)) {
+                    return parsed;
+                }
+            } catch (e) {
+                // fallback abaixo
+            }
+        }
+
+        const raw = root.getAttribute('data-nomes') || root.dataset.nomes || '';
+        if (! raw) {
+            return {};
+        }
+
+        try {
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
     function init() {
         const root = document.querySelector('[data-erp-pdv-mesas]');
-        if (root && ! root.__erpPdvMesas) {
-            root.__erpPdvMesas = createPainel(root);
+        if (! root) {
+            return;
         }
+
+        const rev = root.getAttribute('data-nomes-rev') || '';
+        if (root.__erpPdvMesas && root.__erpPdvMesasRev === rev) {
+            return;
+        }
+
+        root.__erpPdvMesas = createPainel(root);
+        root.__erpPdvMesasRev = rev;
     }
 
     if (document.readyState === 'loading') {

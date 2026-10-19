@@ -16,5 +16,6 @@ final class InutilizarNfceRequest
         public readonly string $justificativa,
         public readonly string $modelo = '65',
         public readonly ?\DateTimeInterface $dataEvento = null,
+        public readonly string $uf = 'SC',
     ) {}
 }

@@ -5,6 +5,7 @@ namespace App\Support\Erp\Nfse;
 use App\Models\Empresa;
 use App\Models\Nfse;
 use App\Models\VendasParametro;
+use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\CepLookupService;
 use App\Support\Fiscal\NfceFiscalCertificateResolver;
 use Illuminate\Support\Facades\DB;
@@ -236,7 +237,13 @@ class NfseTransmitirService
         ]);
         $nfse->save();
 
-        return $nfse->fresh(['itens']) ?? $nfse;
+        $nfse = $nfse->fresh(['itens', 'empresa']) ?? $nfse;
+        $empresa = $nfse->empresa;
+        if ($empresa instanceof Empresa) {
+            (new ContadorCloudPortalHookService())->onNfseAutorizada($nfse, $empresa);
+        }
+
+        return $nfse;
     }
 
     private function exigirXmlValido(string $xml): void

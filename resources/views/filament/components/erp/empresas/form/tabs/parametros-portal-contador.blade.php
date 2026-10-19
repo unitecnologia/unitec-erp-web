@@ -2,12 +2,10 @@
     use App\Models\Contador;
     use App\Support\Erp\EmpresaParametros;
 
-    $fields = EmpresaParametros::portalContadorManualFields();
-    $booleans = EmpresaParametros::portalContadorBooleanFields();
-    $ambientes = EmpresaParametros::portalContadorAmbienteOptions();
+    $booleans = EmpresaParametros::portalContadorClientBooleanFields();
     $contadores = Contador::query()->orderBy('nome')->pluck('nome', 'id');
-    $conectado = filled($this->data['param_portal_contador_token'] ?? null);
-    $portalUrlPadrao = EmpresaParametros::defaultPortalContadorUrl();
+    $status = $this->portalContadorStatusView();
+    $conectado = $status['state'] === 'connected';
 
     $habilitar = $booleans['param_portal_contador_habilitar'] ?? null;
     unset($booleans['param_portal_contador_habilitar']);
@@ -27,10 +25,8 @@
         </div>
 
         <p class="erp-empresas-parametros__hint erp-empresas-api-servicos__status-msg">
-            Envio automático de documentos fiscais para o portal na nuvem.
-            Selecione o <strong>Contador vinculado</strong> e clique em <strong>Conectar ao Portal</strong> —
-            se o escritório já estiver no portal, o token é gravado na hora (sem “Autorizar”).
-            Sem contador cadastrado no portal, o fluxo manual (autorização) continua como fallback.
+            Ao habilitar, escolher o contador e <strong>salvar</strong> a empresa, o ERP vincula automaticamente
+            ao portal na nuvem (sem autorização manual). O contador precisa ter nome, e-mail e <strong>CNPJ válido</strong> no cadastro (CPF não é aceito).
         </p>
 
         <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field" style="max-width: 28rem; margin-bottom: 0.75rem;">
@@ -47,18 +43,17 @@
             </select>
         </div>
 
-        <div
-            class="erp-portal-contador-vinculo-panel"
-            @if ($this->portalContadorVinculoStatus === 'pending') wire:poll.3s="pollPortalContadorVinculo" @endif
-        >
+        <div class="erp-portal-contador-vinculo-panel">
             <div class="erp-portal-contador-vinculo-panel__status">
                 <span @class([
                     'erp-portal-contador-vinculo-panel__badge',
-                    'erp-portal-contador-vinculo-panel__badge--connected' => $conectado,
-                    'erp-portal-contador-vinculo-panel__badge--disconnected' => ! $conectado,
-                ])>{{ $conectado ? 'Conectado' : ($this->portalContadorVinculoStatus === 'pending' ? 'Aguardando' : 'Não conectado') }}</span>
-                <p>{{ $this->portalContadorVinculoResumo() }}</p>
-                @if (filled($this->data['param_portal_contador_contador_nome_portal'] ?? null))
+                    'erp-portal-contador-vinculo-panel__badge--connected' => $status['state'] === 'connected',
+                    'erp-portal-contador-vinculo-panel__badge--pending' => $status['state'] === 'pending',
+                    'erp-portal-contador-vinculo-panel__badge--error' => $status['state'] === 'error',
+                    'erp-portal-contador-vinculo-panel__badge--disconnected' => $status['state'] === 'disabled',
+                ])>{{ $status['label'] }}</span>
+                <p>{{ $status['resumo'] }}</p>
+                @if (filled($this->data['param_portal_contador_contador_nome_portal'] ?? null) && $conectado)
                     <p class="erp-portal-contador-vinculo-panel__meta">
                         Contador no portal: <strong>{{ $this->data['param_portal_contador_contador_nome_portal'] }}</strong>
                     </p>
@@ -66,142 +61,30 @@
             </div>
 
             <div class="erp-portal-contador-vinculo-panel__actions">
-                <button
-                    type="button"
-                    class="erp-pcad-form__btn erp-portal-contador-vinculo-panel__btn-primary"
-                    wire:click="startPortalContadorVinculo"
-                    wire:loading.attr="disabled"
-                    wire:target="startPortalContadorVinculo"
-                >
-                    <span wire:loading.remove wire:target="startPortalContadorVinculo">Conectar ao Portal</span>
-                    <span wire:loading wire:target="startPortalContadorVinculo">Conectando…</span>
-                </button>
+                @if (! $conectado && ($this->data['param_portal_contador_habilitar'] ?? false))
+                    <button
+                        type="button"
+                        class="erp-pcad-form__btn erp-portal-contador-vinculo-panel__btn-primary"
+                        wire:click="tentarVincularPortalContadorNovamente"
+                        wire:loading.attr="disabled"
+                        wire:target="tentarVincularPortalContadorNovamente"
+                    >
+                        <span wire:loading.remove wire:target="tentarVincularPortalContadorNovamente">Tentar vincular novamente</span>
+                        <span wire:loading wire:target="tentarVincularPortalContadorNovamente">Vinculando…</span>
+                    </button>
+                @endif
 
-                @if ($conectado)
+                @if ($conectado || filled($this->data['param_portal_contador_token'] ?? null))
                     <button
                         type="button"
                         class="erp-pcad-form__btn"
                         wire:click="desvincularPortalContador"
-                        wire:confirm="Remover o vínculo com o portal nesta empresa?"
+                        wire:confirm="Remover as credenciais do portal nesta empresa? O envio será desabilitado."
                     >Desvincular</button>
                 @endif
             </div>
         </div>
     </section>
-
-    <details class="erp-portal-contador-advanced erp-empresas-api-servicos__panel">
-        <summary class="erp-empresas-api-servicos__panel-title erp-portal-contador-advanced__summary">
-            Configuração manual (somente técnico)
-        </summary>
-
-        <p class="erp-empresas-parametros__hint">
-            Use só se precisar alterar URL, token ou ambiente manualmente. No uso normal, o vínculo automático basta.
-        </p>
-
-        <div class="erp-empresas-api-servicos__rows">
-            <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                <label class="erp-pcad-form__label" for="param-param_portal_contador_url">URL da API</label>
-                <input
-                    id="param-param_portal_contador_url"
-                    type="text"
-                    wire:model="data.param_portal_contador_url"
-                    class="erp-pcad-form__input erp-pcad-form__input--grow"
-                    placeholder="{{ $portalUrlPadrao }}"
-                    spellcheck="false"
-                    autocomplete="off"
-                >
-            </div>
-
-            <div class="erp-empresas-api-servicos__row erp-empresas-api-servicos__row--2">
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                    <label class="erp-pcad-form__label" for="param-param_portal_contador_empresa_id">ID empresa nuvem</label>
-                    <input
-                        id="param-param_portal_contador_empresa_id"
-                        type="text"
-                        wire:model="data.param_portal_contador_empresa_id"
-                        class="erp-pcad-form__input erp-pcad-form__input--grow"
-                        autocomplete="off"
-                        placeholder="Preenchido após o vínculo"
-                    >
-                </div>
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                    <label class="erp-pcad-form__label" for="param-param_portal_contador_token">Token / API Key</label>
-                    <input
-                        id="param-param_portal_contador_token"
-                        type="password"
-                        wire:model="data.param_portal_contador_token"
-                        class="erp-pcad-form__input erp-pcad-form__input--grow"
-                        autocomplete="off"
-                        placeholder="Preenchido após o vínculo"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        data-bwignore="true"
-                        data-google-password-manager="ignore"
-                    >
-                </div>
-            </div>
-
-            @php
-                $manualTimeout = $fields['param_portal_contador_timeout'] ?? null;
-                $manualAmbiente = $fields['param_portal_contador_ambiente'] ?? null;
-                $manualRest = collect($fields)->except([
-                    'param_portal_contador_timeout',
-                    'param_portal_contador_ambiente',
-                    'param_portal_contador_contador_id', // já no painel principal
-                ]);
-            @endphp
-
-            @if ($manualTimeout || $manualAmbiente)
-                <div class="erp-empresas-api-servicos__row erp-empresas-api-servicos__row--2">
-                    @if ($manualTimeout)
-                        <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                            <label class="erp-pcad-form__label" for="param-param_portal_contador_timeout">{{ $manualTimeout['label'] }}</label>
-                            <input
-                                id="param-param_portal_contador_timeout"
-                                type="number"
-                                min="1"
-                                max="300"
-                                wire:model="data.param_portal_contador_timeout"
-                                class="erp-pcad-form__input erp-pcad-form__input--xs"
-                            >
-                        </div>
-                    @endif
-                    @if ($manualAmbiente)
-                        <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                            <label class="erp-pcad-form__label" for="param-param_portal_contador_ambiente">{{ $manualAmbiente['label'] }}</label>
-                            <select id="param-param_portal_contador_ambiente" wire:model="data.param_portal_contador_ambiente" class="erp-pcad-form__select erp-pcad-form__select--md">
-                                @foreach ($ambientes as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    @endif
-                </div>
-            @endif
-
-            @foreach ($manualRest as $field => $meta)
-                <div class="erp-empresas-parametros__field erp-empresas-api-servicos__field">
-                    <label class="erp-pcad-form__label" for="param-{{ $field }}">{{ $meta['label'] }}</label>
-
-                    @if ($field === 'param_portal_contador_contador_id')
-                        <select id="param-{{ $field }}" wire:model="data.{{ $field }}" class="erp-pcad-form__select erp-pcad-form__select--md">
-                            <option value="">— Nenhum —</option>
-                            @foreach ($contadores as $id => $nome)
-                                <option value="{{ $id }}">{{ $nome }}</option>
-                            @endforeach
-                        </select>
-                    @else
-                        <input
-                            id="param-{{ $field }}"
-                            type="text"
-                            wire:model="data.{{ $field }}"
-                            class="erp-pcad-form__input erp-pcad-form__input--grow"
-                        >
-                    @endif
-                </div>
-            @endforeach
-        </div>
-    </details>
 
     <section class="erp-empresas-api-servicos__panel">
         <h3 class="erp-empresas-api-servicos__panel-title">O que enviar</h3>
@@ -223,8 +106,8 @@
                 wire:loading.attr="disabled"
                 wire:target="atualizarPortalContador"
             >
-                <span wire:loading.remove wire:target="atualizarPortalContador">Atualizar</span>
-                <span wire:loading wire:target="atualizarPortalContador">Atualizando…</span>
+                <span wire:loading.remove wire:target="atualizarPortalContador">Reenviar falhas</span>
+                <span wire:loading wire:target="atualizarPortalContador">Reenviando…</span>
             </button>
 
             <button
@@ -241,23 +124,24 @@
             <button
                 type="button"
                 class="erp-pcad-form__btn"
-                wire:click="testPortalContadorConnection"
+                wire:click="openPortalContadorLogModal"
                 wire:loading.attr="disabled"
-                wire:target="testPortalContadorConnection"
+                wire:target="openPortalContadorLogModal"
             >
-                <span wire:loading.remove wire:target="testPortalContadorConnection">Testar conexão</span>
-                <span wire:loading wire:target="testPortalContadorConnection">Testando…</span>
+                <span wire:loading.remove wire:target="openPortalContadorLogModal">Histórico</span>
+                <span wire:loading wire:target="openPortalContadorLogModal">Abrindo…</span>
             </button>
 
             <button
                 type="button"
                 class="erp-pcad-form__btn"
-                wire:click="openPortalContadorLogModal"
+                wire:click="testPortalContadorConnection"
                 wire:loading.attr="disabled"
-                wire:target="openPortalContadorLogModal"
+                wire:target="testPortalContadorConnection"
+                title="Diagnóstico técnico"
             >
-                <span wire:loading.remove wire:target="openPortalContadorLogModal">Log</span>
-                <span wire:loading wire:target="openPortalContadorLogModal">Abrindo…</span>
+                <span wire:loading.remove wire:target="testPortalContadorConnection">Testar conexão</span>
+                <span wire:loading wire:target="testPortalContadorConnection">Testando…</span>
             </button>
         </div>
     </section>
@@ -280,7 +164,7 @@
                 <div class="erp-empresas-atencao-overlay__icon" aria-hidden="true">!</div>
                 <h2 id="erp-portal-enviar-mes-title" class="erp-empresas-atencao-overlay__title">ATENÇÃO</h2>
                 <p class="erp-empresas-atencao-overlay__msg">
-                    Enviar ao portal NF-e, NFC-e (incl. contingência) e XMLs de compra do mês atual e do mês anterior?
+                    Enviar ao portal NF-e, NFC-e (incl. contingência), NFS-e e XMLs de compra do mês atual e do mês anterior?
                 </p>
                 <div class="erp-empresas-atencao-overlay__actions">
                     <button

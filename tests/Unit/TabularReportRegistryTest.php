@@ -29,7 +29,7 @@ class TabularReportRegistryTest extends TestCase
         $this->assertArrayHasKey('faturamento-servicos', $map);
         $this->assertArrayHasKey('documentos-fiscais-por-os', $map);
         $this->assertArrayHasKey('os-por-forma-pagamento', $map);
-        $this->assertCount(46, $map);
+        $this->assertCount(51, $map);
         $this->assertTrue(ReportRegistry::has('conferencia-estoque'));
         $this->assertFalse(ReportRegistry::has('inexistente'));
     }

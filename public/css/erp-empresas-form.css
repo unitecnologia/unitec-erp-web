@@ -2033,9 +2033,19 @@
     color: #166534;
 }
 
-.erp-portal-contador-vinculo-panel__badge--disconnected {
+.erp-portal-contador-vinculo-panel__badge--pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.erp-portal-contador-vinculo-panel__badge--error {
     background: #fee2e2;
     color: #b91c1c;
+}
+
+.erp-portal-contador-vinculo-panel__badge--disconnected {
+    background: #e2e8f0;
+    color: #475569;
 }
 
 .erp-portal-contador-vinculo-panel__actions {

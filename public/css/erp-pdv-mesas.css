@@ -1,10 +1,25 @@
 /* Painel Mesas do PDV — carregado só em terminais com a flag "Mesas". */
 
+/* Status (sólidos, mesmo significado no app Unitec Mesas):
+   Livre = verde | Ocupada / Aberta aqui = amarelo | Aguardando = vermelho | Outro terminal = cinza.
+   "Aberta aqui" diferencia por selo/anel, não por outra cor de fundo. */
 .erp-pdv__body.erp-pdv__body--mesas {
     grid-template-columns: auto minmax(0, 1fr) clamp(18rem, 24vw, 27rem);
 }
 
 .erp-pdv-mesas {
+    --mesa-livre-bg: #16a34a;
+    --mesa-livre-bd: #15803d;
+    --mesa-livre-fg: #ffffff;
+    --mesa-ocupada-bg: #eab308;
+    --mesa-ocupada-bd: #ca8a04;
+    --mesa-ocupada-fg: #422006;
+    --mesa-aguardando-bg: #dc2626;
+    --mesa-aguardando-bd: #b91c1c;
+    --mesa-aguardando-fg: #ffffff;
+    --mesa-bloqueada-bg: #64748b;
+    --mesa-bloqueada-bd: #475569;
+    --mesa-bloqueada-fg: #ffffff;
     order: -1;
     display: flex;
     flex-direction: column;
@@ -62,9 +77,9 @@
     min-width: 1.4rem;
     padding: 0.05rem 0.4rem;
     border-radius: 999px;
-    background: #fff7ed;
-    border: 1px solid #fdba74;
-    color: #9a3412;
+    background: var(--mesa-ocupada-bg);
+    border: 1px solid var(--mesa-ocupada-bd);
+    color: var(--mesa-ocupada-fg);
     font-size: 0.7rem;
     font-weight: 700;
     text-align: center;
@@ -84,6 +99,11 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    /* Não encolhe no flex: evita o campo cobrir a 1ª linha da grade. */
+    flex: 0 0 auto;
+    min-height: 1.85rem;
+    margin: 0;
+    padding-bottom: 0.1rem;
 }
 
 .erp-pdv-mesas__abrir-label {
@@ -116,88 +136,161 @@
 
 .erp-pdv-mesas__grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: start;
-    gap: 0.35rem;
+    gap: 0.4rem 0.35rem;
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.1rem;
+    overflow-x: hidden;
+    padding: 0.2rem 0.15rem 0.15rem;
     scrollbar-width: thin;
 }
 
+/* Card em formato de mesa (tampo arredondado + leve profundidade). */
 .erp-pdv-mesas__tile {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.05rem;
-    height: 2.9rem;
-    padding: 0 0.15rem;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: var(--erp-radius-sm, 6px);
+    gap: 0.08rem;
+    min-height: 3.55rem;
+    height: auto;
+    padding: 0.4rem 0.35rem 0.35rem;
+    border: 1.5px solid var(--erp-border-light, #c7d5e8);
+    border-radius: 1.15rem 1.15rem 0.7rem 0.7rem;
     background: #fff;
     color: #1e293b;
     cursor: pointer;
     user-select: none;
-    transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 2px 3px rgba(15, 23, 42, 0.08);
+    transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .erp-pdv-mesas__tile:hover {
-    border-color: var(--erp-brand-primary, #1e5a9e);
-    box-shadow: var(--erp-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.08));
+    filter: brightness(1.05);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.28) inset,
+        0 3px 6px rgba(15, 23, 42, 0.12);
 }
 
-.erp-pdv-mesas__tile-num {
-    font-size: 1rem;
+.erp-pdv-mesas__tile-id {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.32rem;
+    z-index: 1;
+    font-size: 0.58rem;
     font-weight: 800;
     line-height: 1;
+    opacity: 0.78;
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.erp-pdv-mesas__tile-id[hidden] {
+    display: none !important;
+}
+
+.erp-pdv-mesas__tile-nome {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    max-width: 100%;
+    margin-top: 0.35rem;
+    padding: 0 0.2rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.18;
+    text-align: center;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+}
+
+.erp-pdv-mesas__tile.has-nome-custom .erp-pdv-mesas__tile-nome {
+    font-size: 0.8rem;
+    letter-spacing: 0.01em;
 }
 
 .erp-pdv-mesas__tile-info {
     max-width: 100%;
     overflow: hidden;
-    font-size: 0.62rem;
-    font-weight: 600;
+    margin-top: 0.02rem;
+    font-size: 0.58rem;
+    font-weight: 700;
     line-height: 1.1;
     white-space: nowrap;
     text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
+    opacity: 0.92;
+}
+
+.erp-pdv-mesas__tile-info[hidden] {
+    display: none !important;
+}
+
+.erp-pdv-mesas__tile.is-livre {
+    background: var(--mesa-livre-bg);
+    border-color: var(--mesa-livre-bd);
+    color: var(--mesa-livre-fg);
 }
 
 .erp-pdv-mesas__tile.is-ocupada {
-    background: #fff7ed;
-    border-color: #fb923c;
-    color: #9a3412;
+    background: var(--mesa-ocupada-bg);
+    border-color: var(--mesa-ocupada-bd);
+    color: var(--mesa-ocupada-fg);
 }
 
 .erp-pdv-mesas__tile.is-bloqueada {
-    background: repeating-linear-gradient(135deg, #f1f5f9 0, #f1f5f9 6px, #e2e8f0 6px, #e2e8f0 12px);
-    border-color: #94a3b8;
-    color: #475569;
+    background: var(--mesa-bloqueada-bg);
+    border-color: var(--mesa-bloqueada-bd);
+    color: var(--mesa-bloqueada-fg);
     cursor: not-allowed;
 }
 
+/* Aberta neste terminal: mesma cor de Ocupada; selo "Aqui" + anel escuro. */
 .erp-pdv-mesas__tile.is-selecionada {
-    background: var(--erp-brand-primary, #1e5a9e);
-    border-color: var(--erp-brand-primary, #1e5a9e);
-    color: #fff;
-    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.25);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 0 0 2px var(--mesa-ocupada-fg);
+}
+
+.erp-pdv-mesas__tile.is-selecionada::after {
+    content: 'Aqui';
+    position: absolute;
+    top: 0.2rem;
+    right: 0.28rem;
+    padding: 1px 4px;
+    border-radius: 999px;
+    background: var(--mesa-ocupada-fg);
+    color: #fef08a;
+    font-size: 0.5rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.01em;
 }
 
 /* Pré-conta impressa: aguardando fechamento (vermelho em todos os terminais). */
 .erp-pdv-mesas__tile.is-aguardando {
-    background: #fee2e2;
-    border-color: #dc2626;
-    color: #991b1b;
+    background: var(--mesa-aguardando-bg);
+    border-color: var(--mesa-aguardando-bd);
+    color: var(--mesa-aguardando-fg);
 }
 
 .erp-pdv-mesas__tile.is-selecionada.is-aguardando {
-    background: #dc2626;
-    border-color: #b91c1c;
-    color: #fff;
-    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 0 0 2px #7f1d1d;
+}
+
+.erp-pdv-mesas__tile.is-selecionada.is-aguardando::after {
+    background: #7f1d1d;
+    color: #fecaca;
 }
 
 .erp-pdv-mesas__tile.is-cursor:not(.is-selecionada) {
@@ -209,10 +302,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    flex: 0 0 auto;
     padding: 0.45rem;
     border-radius: var(--erp-radius-sm, 6px);
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    background: var(--mesa-ocupada-bg);
+    border: 1px solid var(--mesa-ocupada-bd);
 }
 
 .erp-pdv-mesas__atual[hidden] {
@@ -222,23 +316,23 @@
 .erp-pdv-mesas__atual-label {
     font-size: 0.78rem;
     font-weight: 700;
-    color: var(--erp-brand-primary, #1e5a9e);
+    color: var(--mesa-ocupada-fg);
     font-variant-numeric: tabular-nums;
 }
 
 .erp-pdv-mesas__atual.is-aguardando {
-    background: #fef2f2;
-    border-color: #fecaca;
+    background: var(--mesa-aguardando-bg);
+    border-color: var(--mesa-aguardando-bd);
 }
 
 .erp-pdv-mesas__atual.is-aguardando .erp-pdv-mesas__atual-label {
-    color: #b91c1c;
+    color: var(--mesa-aguardando-fg);
 }
 
 .erp-pdv-mesas__atual-status {
     font-size: 0.68rem;
     font-weight: 700;
-    color: #b91c1c;
+    color: #fecaca;
 }
 
 .erp-pdv-mesas__atual-status[hidden] {
@@ -289,6 +383,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.2rem 0.4rem;
+    flex: 0 0 auto;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -303,6 +398,12 @@
     white-space: nowrap;
 }
 
+.erp-pdv-mesas__legenda [data-mesas-legenda] {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--erp-text, #334155);
+}
+
 .erp-pdv-mesas__legenda i {
     width: 0.65rem;
     height: 0.65rem;
@@ -312,10 +413,15 @@
     background: #fff;
 }
 
-.erp-pdv-mesas__legenda i.is-ocupada { background: #fff7ed; border-color: #fb923c; }
-.erp-pdv-mesas__legenda i.is-selecionada { background: var(--erp-brand-primary, #1e5a9e); border-color: var(--erp-brand-primary, #1e5a9e); }
-.erp-pdv-mesas__legenda i.is-bloqueada { background: repeating-linear-gradient(135deg, #f1f5f9 0, #f1f5f9 2px, #cbd5e1 2px, #cbd5e1 4px); border-color: #94a3b8; }
-.erp-pdv-mesas__legenda i.is-aguardando { background: #fee2e2; border-color: #dc2626; }
+.erp-pdv-mesas__legenda i.is-livre { background: var(--mesa-livre-bg); border-color: var(--mesa-livre-bd); }
+.erp-pdv-mesas__legenda i.is-ocupada { background: var(--mesa-ocupada-bg); border-color: var(--mesa-ocupada-bd); }
+.erp-pdv-mesas__legenda i.is-selecionada {
+    background: var(--mesa-ocupada-bg);
+    border-color: var(--mesa-ocupada-fg);
+    box-shadow: 0 0 0 1px var(--mesa-ocupada-fg);
+}
+.erp-pdv-mesas__legenda i.is-bloqueada { background: var(--mesa-bloqueada-bg); border-color: var(--mesa-bloqueada-bd); }
+.erp-pdv-mesas__legenda i.is-aguardando { background: var(--mesa-aguardando-bg); border-color: var(--mesa-aguardando-bd); }
 .erp-pdv-mesas__legenda li.is-largo { grid-column: 1 / -1; }
 
 /* Grade do cupom: impressão do item ao lado da lixeira (só com mesa aberta). */
@@ -377,12 +483,17 @@
     height: 1.9rem;
     border: 0;
     border-radius: var(--erp-radius-sm, 6px);
-    background: var(--erp-brand-primary, #1e5a9e);
-    color: #fff;
+    background: var(--mesa-ocupada-bg);
+    color: var(--mesa-ocupada-fg);
     font-size: 0.8rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
+}
+
+.erp-pdv-mesas.is-recolhido .erp-pdv-mesas__mini.is-aguardando:not([hidden]) {
+    background: var(--mesa-aguardando-bg);
+    color: var(--mesa-aguardando-fg);
 }
 
 /* Modal Transferir Mesa */
@@ -452,6 +563,6 @@
     }
 
     .erp-pdv-mesas__grid {
-        grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
     }
 }

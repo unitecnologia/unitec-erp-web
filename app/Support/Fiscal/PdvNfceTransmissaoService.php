@@ -249,9 +249,14 @@ final class PdvNfceTransmissaoService
         }
 
         $motivo = (string) $nfce->motivo_rejeicao;
+        $status = (string) $nfce->status;
+        $emDuplicidade = $status === PdvVendaNfce::STATUS_DUPLICIDADE;
+        // Após F4 o motivo pode virar 613 (chave citada) sem o texto "cStat 539" — ainda é conflito de número.
+        $pareceConflitoNumeracao = str_contains($motivo, 'cStat 539')
+            || str_contains($motivo, '539')
+            || (str_contains($motivo, '613') && NfceXmlProtocolo::chaveConflitante($motivo, (string) $nfce->chave) !== null);
 
-        if (! in_array((string) $nfce->status, [PdvVendaNfce::STATUS_REJEITADA, PdvVendaNfce::STATUS_DUPLICIDADE], true)
-            || ! str_contains($motivo, 'cStat 539')) {
+        if (! $emDuplicidade && ! ($status === PdvVendaNfce::STATUS_REJEITADA && $pareceConflitoNumeracao)) {
             return false;
         }
 

@@ -66,13 +66,13 @@ final class EmpresaParametros
             ],
             'param_pdv_qtd_mesas' => [
                 'label' => 'Quantidade de Mesas',
-                'hint' => 'Mesas exibidas no PDV dos terminais com a opção "Mesas" habilitada (1 a 300). Vazio ou zero usa 20.',
+                'hint' => 'Mesas exibidas no PDV (1 a 300). Vazio ou zero usa 20. Para renomear, use Configurações → Mesas (restaurante).',
                 'default' => 20,
                 'type' => 'integer',
             ],
             'param_pdv_mesa_inatividade_min' => [
-                'label' => 'Tempo de inatividade da mesa (minutos)',
-                'hint' => 'Sem tecla ou clique do operador por este tempo, a mesa aberta é salva, liberada para outros terminais e o PDV volta ao modo balcão (1 a 120). Vazio ou zero usa 1.',
+                'label' => 'Tempo de inatividade da mesa',
+                'hint' => 'Minutos sem tecla/clique com a mesa aberta na tela: salva a comanda, libera a reserva deste terminal e volta ao Balcão (itens permanecem na mesa). Padrão 1; faixa 1 a 120. Vazio ou zero usa 1.',
                 'default' => 1,
                 'type' => 'integer',
             ],
@@ -1099,6 +1099,7 @@ final class EmpresaParametros
             'param_portal_contador_ambiente' => ['label' => 'Ambiente', 'default' => 'homologacao', 'type' => 'string'],
             'param_portal_contador_timeout' => ['label' => 'Timeout (segundos)', 'default' => 30, 'type' => 'integer'],
             'param_portal_contador_contador_id' => ['label' => 'Contador vinculado', 'default' => null, 'type' => 'integer'],
+            'param_portal_contador_sistema_contabil' => ['label' => 'Sistema Contábil', 'default' => 'nao_definido', 'type' => 'string'],
             'param_portal_contador_email' => ['label' => 'E-mail do escritório contábil', 'default' => '', 'type' => 'string'],
             'param_portal_contador_vinculo_id' => ['label' => 'ID do vínculo no portal', 'default' => '', 'type' => 'string'],
             'param_portal_contador_contador_nome_portal' => ['label' => 'Contador no portal', 'default' => '', 'type' => 'string'],
@@ -1133,18 +1134,35 @@ final class EmpresaParametros
     }
 
     /**
+     * Todas as flags booleanas persistidas (inclui legados não exibidos na UI).
+     *
      * @return array<string, array{label: string, default: bool}>
      */
     public static function portalContadorBooleanFields(): array
     {
         return [
-            'param_portal_contador_habilitar' => ['label' => 'Habilitar envio para o Portal do Contador', 'default' => false],
+            'param_portal_contador_habilitar' => ['label' => 'Habilitar Portal do Contador', 'default' => false],
             'param_portal_contador_enviar_compras' => ['label' => 'Enviar compras (NF-e entrada)', 'default' => true],
             'param_portal_contador_enviar_vendas' => ['label' => 'Enviar vendas (NF-e / NFC-e saída)', 'default' => false],
+            'param_portal_contador_enviar_nfse' => ['label' => 'Enviar NFS-e (Notas de Serviço)', 'default' => true],
             'param_portal_contador_enviar_xml' => ['label' => 'Enviar XML completo', 'default' => true],
             'param_portal_contador_enviar_canceladas' => ['label' => 'Enviar cancelamentos', 'default' => true],
+            // Legado: ZIP por e-mail é outro fluxo (telas fiscais). Mantido no DB, fora da UI do portal.
             'param_portal_contador_enviar_pacote_mensal' => ['label' => 'Gerar pacote mensal (ZIP)', 'default' => false],
         ];
+    }
+
+    /**
+     * Flags exibidas na tela simplificada do Portal do Contador.
+     *
+     * @return array<string, array{label: string, default: bool}>
+     */
+    public static function portalContadorClientBooleanFields(): array
+    {
+        return array_diff_key(
+            self::portalContadorBooleanFields(),
+            array_flip(['param_portal_contador_enviar_pacote_mensal']),
+        );
     }
 
     /**
@@ -1156,6 +1174,29 @@ final class EmpresaParametros
             'homologacao' => 'Homologação',
             'producao' => 'Produção',
         ];
+    }
+
+    /**
+     * Identificadores internos estáveis do sistema contábil da empresa.
+     *
+     * @return array<string, string>
+     */
+    public static function portalContadorSistemaContabilOptions(): array
+    {
+        return [
+            'nao_definido' => 'Não definido',
+            'dominio' => 'Domínio Sistemas',
+            'sci' => 'SCI Sistemas',
+            'questor' => 'Questor',
+            'alterdata' => 'Alterdata',
+            'contmatic_phoenix' => 'Contmatic Phoenix',
+            'prosoft' => 'Prosoft',
+        ];
+    }
+
+    public static function portalContadorSistemaContabilDefault(): string
+    {
+        return 'nao_definido';
     }
 
     /**

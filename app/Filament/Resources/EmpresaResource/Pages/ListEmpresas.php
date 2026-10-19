@@ -61,12 +61,18 @@ class ListEmpresas extends ListRecords
         return 'uma empresa';
     }
 
+    protected function empresaListDirectEditUrl(): string
+    {
+        return EmpresaResource::getUrl('edit', ['record' => '__RECORD__']);
+    }
+
     protected function customErpListKeyboardConfig(): array
     {
         return [
             'searchInput' => '.erp-empresas__input',
             'create' => 'createEmpresa',
             'edit' => 'editEmpresa',
+            'editUrl' => $this->empresaListDirectEditUrl(),
             'refresh' => 'focusEmpresaSearch',
         ];
     }

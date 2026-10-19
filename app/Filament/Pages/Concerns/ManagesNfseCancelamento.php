@@ -117,7 +117,7 @@ trait ManagesNfseCancelamento
             return;
         }
 
-        unset($this->nfseRegistros, $this->nfseListagemTotalFormatado);
+        unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
 
         Notification::make()
             ->title('NFS-e nº '.$resultado['nfse']->numero_nfse.' cancelada.')

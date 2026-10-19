@@ -14,10 +14,13 @@
                         Banco de dados
                     </div>
                     <h1 style="margin:0;font-size:1.2rem;font-weight:800;line-height:1.2;color:#0f172a;">
-                        Sistema bloqueado — schema incompatível
+                        Banco desatualizado
                     </h1>
                     <p style="margin:.45rem 0 0;font-size:.8rem;line-height:1.4;color:#64748b;">
                         {{ $this->mensagem }}
+                    </p>
+                    <p style="margin:.45rem 0 0;font-size:.78rem;line-height:1.4;color:#b45309;font-weight:600;">
+                        O login e o uso do ERP estão liberados. Alguns recursos podem falhar até corrigir o banco.
                     </p>
 
                     @if ($this->pending > 0)
@@ -37,19 +40,26 @@
                             </li>
                         @endif
                         <li style="margin-bottom:.35rem;">
-                            Feche o ERP e execute <strong>Reparar Sistema.bat</strong> na pasta de instalação
-                            (aplica <code>migrate --force</code> sem apagar dados).
+                            Feche o ERP e execute <strong>Aplicar Migrations.bat</strong> ou <strong>Reparar Sistema.bat</strong>
+                            (não apaga dados).
                         </li>
                         <li>
-                            Depois abra o sistema de novo. Se o problema continuar, contate o suporte Unitec.
+                            Ou use <strong>Continuar mesmo assim</strong> para trabalhar agora e corrigir depois.
                         </li>
                     </ol>
 
                     <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;">
                         <button
                             type="button"
-                            wire:click="irParaLogin"
+                            wire:click="continuarMesmoAssim"
                             style="flex:1;min-width:8rem;padding:.55rem .75rem;border:0;border-radius:10px;background:#2563eb;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer;"
+                        >
+                            Continuar mesmo assim
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="irParaLogin"
+                            style="flex:1;min-width:8rem;padding:.55rem .75rem;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#334155;font-size:.8rem;font-weight:700;cursor:pointer;"
                         >
                             Ir ao login
                         </button>

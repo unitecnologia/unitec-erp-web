@@ -4,16 +4,20 @@ namespace App\Support\Mesas;
 
 use App\Models\Empresa;
 use App\Models\Product;
+use App\Models\ProductComposition;
 use App\Models\ProductEmpresaPreco;
 use App\Models\ProductPriceTableItem;
 use App\Models\Promocao;
 use App\Models\PromocaoItem;
 use App\Models\Terminal;
+use App\Support\Erp\GrupoAppCatalog;
 use App\Support\Erp\Pdv\PdvConfig;
 use App\Support\Erp\Pdv\PdvProductPriceService;
 use App\Support\Erp\ProductAppCatalog;
+use App\Support\Erp\ProductSalesQty;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -21,11 +25,21 @@ use Throwable;
 /**
  * Catálogo do garçom com o mesmo preço de venda do PDV (preço da empresa,
  * promoção de campanha e tabela de preço). Baixado inteiro só quando a versão muda.
+ *
+ * Grupos e "Mostrar no App" reutilizam GrupoAppCatalog / ProductAppCatalog
+ * (mesmas regras do Força de Vendas). Ordenação por vendas concluídas dos
+ * últimos 60 dias (canceladas ignoradas), calculada uma vez e cacheada.
  */
 final class MesasCatalogoService
 {
     /** Colunas de cada linha de `produtos` no JSON (lista compacta para celular fraco). */
-    public const CAMPOS = ['id', 'codigo', 'barras', 'descricao', 'unidade', 'preco', 'grupo', 'pesado'];
+    public const CAMPOS = [
+        'id', 'codigo', 'barras', 'descricao', 'unidade', 'preco', 'grupo', 'pesado',
+        'foto_url', 'qtd_vendida',
+    ];
+
+    /** Janela do ranking "mais vendidos" dentro de cada grupo. */
+    public const DIAS_RANKING = 60;
 
     private const CHUNK = 500;
 
@@ -39,9 +53,14 @@ final class MesasCatalogoService
             $this->assinaturaTabela((new ProductEmpresaPreco)->getTable(), $empresaId),
             $this->assinaturaTabela((new Promocao)->getTable(), $empresaId),
             $this->assinaturaTabela((new PromocaoItem)->getTable()),
+            $this->assinaturaTabela((new ProductPriceTableItem)->getTable()),
+            $this->assinaturaTabela((new ProductComposition)->getTable()),
+            $this->assinaturaTabela('grupos'),
+            // Ranking muda no máximo 1×/dia (today já no hash); evita invalidar a cada venda.
+            'ranking:'.self::DIAS_RANKING,
+            'campos:'.implode(',', self::CAMPOS),
+            'composicao:v1',
         ];
-
-        $partes[] = $this->assinaturaTabela((new ProductPriceTableItem)->getTable());
 
         return substr(md5(implode('|', $partes)), 0, 20);
     }
@@ -61,7 +80,21 @@ final class MesasCatalogoService
     }
 
     /**
-     * @return list<array{0: int, 1: string, 2: string, 3: string, 4: string, 5: float, 6: string, 7: int}>
+     * Componentes de composição dos produtos lançáveis (só kits com linhas).
+     *
+     * @return array<string, list<array{id: int, codigo: string, descricao: string, quantidade: float, preco: float, is_adicional: bool}>>
+     */
+    public function composicoes(Empresa $empresa, string $versao): array
+    {
+        return Cache::remember(
+            'mesas_composicao:'.$empresa->id.':'.$versao,
+            now()->addMinutes(15),
+            fn (): array => $this->montarComposicoes(),
+        );
+    }
+
+    /**
+     * @return list<array{0: int, 1: string, 2: string, 3: string, 4: string, 5: float, 6: string, 7: int, 8: string|null, 9: float}>
      */
     public function produtos(Empresa $empresa, string $versao): array
     {
@@ -69,6 +102,20 @@ final class MesasCatalogoService
             'mesas_catalogo:'.$empresa->id.':'.$versao,
             now()->addMinutes(15),
             fn (): array => $this->montarProdutos($empresa),
+        );
+    }
+
+    /**
+     * Mesmos grupos do Força (ativo + Mostrar no App).
+     *
+     * @return list<array{id: int, nome: string, ativo: bool, mostrar_no_app: bool, updated_at: string|null}>
+     */
+    public function grupos(Empresa $empresa, string $versao): array
+    {
+        return Cache::remember(
+            'mesas_grupos:'.$empresa->id.':'.$versao,
+            now()->addMinutes(15),
+            static fn (): array => GrupoAppCatalog::paraSync(),
         );
     }
 
@@ -112,21 +159,24 @@ final class MesasCatalogoService
     }
 
     /**
-     * @return list<array{0: int, 1: string, 2: string, 3: string, 4: string, 5: float, 6: string, 7: int}>
+     * @return list<array{0: int, 1: string, 2: string, 3: string, 4: string, 5: float, 6: string, 7: int, 8: string|null, 9: float}>
      */
     private function montarProdutos(Empresa $empresa): array
     {
         $linhas = [];
+        // Uma agregação por empresa/período (sem whereIn do catálogo inteiro).
+        $saidas = ProductSalesQty::byEmpresa((int) $empresa->id, self::DIAS_RANKING);
 
-        $this->comEmpresa($empresa, function () use ($empresa, &$linhas): void {
+        $this->comEmpresa($empresa, function () use ($empresa, &$linhas, $saidas): void {
             self::produtosLancaveis()
                 ->orderBy('id')
-                ->chunkById(self::CHUNK, function (Collection $chunk) use ($empresa, &$linhas): void {
+                ->chunkById(self::CHUNK, function (Collection $chunk) use ($empresa, &$linhas, $saidas): void {
                     $service = $this->carregarPrecos($empresa, $chunk);
 
                     foreach ($chunk as $product) {
+                        $id = (int) $product->id;
                         $linhas[] = [
-                            (int) $product->id,
+                            $id,
                             (string) ($product->codigo ?? ''),
                             (string) ($product->codigo_barras ?? ''),
                             mb_strtoupper(trim((string) $product->descricao), 'UTF-8'),
@@ -134,14 +184,43 @@ final class MesasCatalogoService
                             round($service->resolvePrecoVenda($product, 1), 2),
                             mb_strtoupper(trim((string) ($product->grupo ?? '')), 'UTF-8'),
                             $product->produto_pesado ? 1 : 0,
+                            $this->fotoApp($product),
+                            $saidas[$id] ?? 0.0,
                         ];
                     }
                 });
         });
 
-        usort($linhas, static fn (array $a, array $b): int => strcmp($a[3], $b[3]));
+        // Dentro do grupo: mais vendidos primeiro; empate por descrição.
+        usort($linhas, static function (array $a, array $b): int {
+            $g = strcmp($a[6], $b[6]);
+            if ($g !== 0) {
+                return $g;
+            }
+            if ($a[9] !== $b[9]) {
+                return $b[9] <=> $a[9];
+            }
+
+            return strcmp($a[3], $b[3]);
+        });
 
         return $linhas;
+    }
+
+    /**
+     * URL relativa da foto (Image.network no app não envia token).
+     * Mesmo padrão do Força: rota pública + ?v= para cache-bust.
+     */
+    private function fotoApp(Product $p): ?string
+    {
+        if (blank($p->foto_path)) {
+            return null;
+        }
+
+        $url = route('mesas.produto.foto', ['product' => $p->id], false);
+        $version = optional($p->updated_at)->timestamp;
+
+        return $version ? $url.'?v='.$version : $url;
     }
 
     /**
@@ -158,16 +237,23 @@ final class MesasCatalogoService
             return new PdvProductPriceService($config);
         }
 
-        $products->load([
+        // `precos()` recebe Support\Collection (ex.: collect([$product]));
+        // `load` / `modelKeys` existem só na Eloquent Collection.
+        /** @var EloquentCollection<int, Product> $eloquent */
+        $eloquent = $products instanceof EloquentCollection
+            ? $products
+            : new EloquentCollection($products->all());
+
+        $eloquent->load([
             'empresaPrecos' => fn ($q) => $q->where('empresa_id', $empresaId),
         ]);
 
-        app(\App\Support\Erp\ProductTabelaPrecoService::class)->carregarItens($products);
+        app(\App\Support\Erp\ProductTabelaPrecoService::class)->carregarItens($eloquent);
 
         $hoje = Carbon::today()->toDateString();
         $mins = PromocaoItem::query()
             ->selectRaw('product_id, MIN(preco_promocao) as preco_promocao')
-            ->whereIn('product_id', $products->modelKeys())
+            ->whereIn('product_id', $eloquent->modelKeys())
             ->whereHas('promocao', function ($q) use ($empresaId, $hoje): void {
                 $q->where('empresa_id', $empresaId)
                     ->where('ativa', true)
@@ -177,7 +263,7 @@ final class MesasCatalogoService
             ->groupBy('product_id')
             ->pluck('preco_promocao', 'product_id');
 
-        foreach ($products as $product) {
+        foreach ($eloquent as $product) {
             $min = $mins->get($product->id);
             $product->setRelation('precoPromocaoLote', $min === null ? null : (float) $min);
         }
@@ -248,6 +334,50 @@ final class MesasCatalogoService
                     }
                 });
         });
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, list<array{id: int, codigo: string, descricao: string, quantidade: float, preco: float, is_adicional: bool}>>
+     */
+    private function montarComposicoes(): array
+    {
+        $kitIds = self::produtosLancaveis()
+            ->where('is_composicao', true)
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        if ($kitIds === []) {
+            return [];
+        }
+
+        $out = [];
+
+        ProductComposition::query()
+            ->whereIn('product_id', $kitIds)
+            ->with('componentProduct:id,codigo,descricao,ativo')
+            ->orderBy('id')
+            ->get()
+            ->each(function (ProductComposition $item) use (&$out): void {
+                $comp = $item->componentProduct;
+
+                if (! $comp || ! ($comp->ativo ?? true)) {
+                    return;
+                }
+
+                $kitId = (string) (int) $item->product_id;
+                $out[$kitId] ??= [];
+                $out[$kitId][] = [
+                    'id' => (int) $comp->id,
+                    'codigo' => (string) ($comp->codigo ?? ''),
+                    'descricao' => mb_strtoupper(trim((string) $comp->descricao), 'UTF-8'),
+                    'quantidade' => round((float) $item->quantidade, 3),
+                    'preco' => round((float) $item->preco, 2),
+                    'is_adicional' => (bool) ($item->is_adicional ?? false),
+                ];
+            });
 
         return $out;
     }

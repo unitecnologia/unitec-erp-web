@@ -4,10 +4,6 @@ namespace App\Support\Erp\Pdv;
 
 use App\Models\Product;
 use App\Support\Erp\ErpMoney;
-use App\Support\Erp\Pdv\PdvConfig;
-use App\Support\Erp\Pdv\PdvItemValidator;
-use App\Support\Erp\Pdv\PdvProductPriceService;
-use App\Support\Erp\Pdv\PdvStockService;
 
 /**
  * Hot path do bip (Caixa Rápido): lookup + inclusão no cupom sem o Filament Page.

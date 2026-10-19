@@ -4,6 +4,7 @@ namespace App\Support\Erp\Nfse\Ipm;
 
 use App\Models\Empresa;
 use App\Models\Nfse;
+use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use App\Support\Erp\Nfse\NfseSefinAmbiente;
 use App\Support\Erp\Nfse\NfseTransmissaoResultado;
@@ -137,7 +138,12 @@ class NfseIpmEmitirService
         ]);
         $nfse->save();
 
-        return $nfse->fresh(['itens', 'empresa']) ?? $nfse;
+        $nfse = $nfse->fresh(['itens', 'empresa']) ?? $nfse;
+        if ($empresa instanceof Empresa) {
+            (new ContadorCloudPortalHookService())->onNfseAutorizada($nfse, $empresa);
+        }
+
+        return $nfse;
     }
 
     private function guardarRetorno(Nfse $nfse, string $xmlEnvio, string $xmlRetorno): void

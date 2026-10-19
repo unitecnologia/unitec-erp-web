@@ -59,10 +59,10 @@
                 <div class="unitec-login__form" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true">
                     @if (filled($schemaMigrateError))
                         <div class="unitec-login__schema-alert unitec-login__schema-alert--erro" role="alert">
-                            <strong>Banco incompatível com esta versão.</strong>
+                            <strong>Banco desatualizado — login liberado.</strong>
                             <span style="display:block;margin-top:.35rem;font-weight:500;">{{ $schemaMigrateError }}</span>
                             <span style="display:block;margin-top:.4rem;font-weight:600;">
-                                Se houver atualização pendente, aceite no login. Senão, execute Reparar Sistema.bat (não apaga dados).
+                                Você pode entrar normalmente. Para corrigir: aceite a atualização no login, ou rode Aplicar Migrations.bat / Reparar Sistema.bat (não apaga dados).
                             </span>
                         </div>
                     @elseif (filled($schemaMigrateOk))

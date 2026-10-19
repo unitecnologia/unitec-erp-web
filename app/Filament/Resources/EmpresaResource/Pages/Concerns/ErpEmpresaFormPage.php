@@ -236,6 +236,8 @@ trait ErpEmpresaFormPage
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->capturePortalContadorIdAntesDoSave();
+
         return $this->mergeLivewireFormData($data);
     }
 
@@ -511,6 +513,13 @@ trait ErpEmpresaFormPage
 
         foreach (EmpresaParametros::numericFields() as $field => $meta) {
             if (! array_key_exists($field, $data) || $data[$field] === '' || $data[$field] === null) {
+                // Inatividade da mesa: vazio/zero → padrão 1 (nunca remove o parâmetro).
+                if ($field === 'param_pdv_mesa_inatividade_min') {
+                    $data[$field] = (int) ($meta['default'] ?? 1);
+
+                    continue;
+                }
+
                 if (($meta['type'] ?? '') === 'integer' && ($meta['default'] ?? null) === null) {
                     $data[$field] = null;
                 }
@@ -520,6 +529,10 @@ trait ErpEmpresaFormPage
 
             if (($meta['type'] ?? '') === 'integer') {
                 $data[$field] = (int) $data[$field];
+
+                if ($field === 'param_pdv_mesa_inatividade_min') {
+                    $data[$field] = max(1, min(120, $data[$field] > 0 ? $data[$field] : (int) ($meta['default'] ?? 1)));
+                }
             } elseif (($meta['type'] ?? '') === 'decimal') {
                 $data[$field] = BrDecimal::parse($data[$field] ?? 0, $meta['decimals'] ?? 2);
             }
@@ -610,21 +623,10 @@ trait ErpEmpresaFormPage
                 ?? preg_replace('/\D/', '', $data['param_whatsapp_numero']);
         }
 
-        if (blank($data['param_portal_contador_url'] ?? null)) {
-            $data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
-        }
-
-        if (blank($data['param_portal_contador_ambiente'] ?? null)) {
-            $data['param_portal_contador_ambiente'] = 'producao';
-        }
-
-        if (array_key_exists('param_portal_contador_timeout', $data)) {
-            if ($data['param_portal_contador_timeout'] === '' || $data['param_portal_contador_timeout'] === null) {
-                $data['param_portal_contador_timeout'] = 30;
-            } else {
-                $data['param_portal_contador_timeout'] = (int) $data['param_portal_contador_timeout'];
-            }
-        }
+        // Integração global: URL/ambiente/timeout fixos — não vêm da UI do cliente.
+        $data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
+        $data['param_portal_contador_ambiente'] = 'producao';
+        $data['param_portal_contador_timeout'] = (int) config('contador-cloud.default_timeout', 30);
 
         if (array_key_exists('param_portal_contador_contador_id', $data)) {
             if ($data['param_portal_contador_contador_id'] === '' || $data['param_portal_contador_contador_id'] === null) {
@@ -632,6 +634,20 @@ trait ErpEmpresaFormPage
             } else {
                 $data['param_portal_contador_contador_id'] = (int) $data['param_portal_contador_contador_id'];
             }
+        }
+
+        $sistemaContabilOptions = EmpresaParametros::portalContadorSistemaContabilOptions();
+        $sistemaContabil = mb_strtolower(trim((string) ($data['param_portal_contador_sistema_contabil'] ?? '')), 'UTF-8');
+        $data['param_portal_contador_sistema_contabil'] = array_key_exists($sistemaContabil, $sistemaContabilOptions)
+            ? $sistemaContabil
+            : EmpresaParametros::portalContadorSistemaContabilDefault();
+
+        foreach (EmpresaParametros::portalContadorClientBooleanFields() as $field => $meta) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $data[$field] = filter_var($data[$field], FILTER_VALIDATE_BOOLEAN);
         }
 
         foreach (EmpresaParametros::impostoFields() as $field => $meta) {
@@ -752,26 +768,29 @@ trait ErpEmpresaFormPage
 
     protected function hydratePortalContadorFormDefaults(): void
     {
-        if (blank($this->data['param_portal_contador_url'] ?? null)) {
-            $this->data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
-        }
-
-        if (blank($this->data['param_portal_contador_ambiente'] ?? null)) {
-            $this->data['param_portal_contador_ambiente'] = 'producao';
-        }
+        // URL/ambiente/timeout globais — não sobrescrever preferências de envio salvas.
+        $this->data['param_portal_contador_url'] = EmpresaParametros::defaultPortalContadorUrl();
+        $this->data['param_portal_contador_ambiente'] = 'producao';
 
         if (
             ! array_key_exists('param_portal_contador_timeout', $this->data)
             || $this->data['param_portal_contador_timeout'] === ''
             || $this->data['param_portal_contador_timeout'] === null
         ) {
-            $this->data['param_portal_contador_timeout'] = 30;
+            $this->data['param_portal_contador_timeout'] = (int) config('contador-cloud.default_timeout', 30);
         }
 
-        // Empresa ainda sem vínculo: aplicar o pacote padrão (tudo marcado) na tela.
-        if (blank($this->data['param_portal_contador_token'] ?? null)) {
-            foreach (EmpresaParametros::portalContadorBooleanFields() as $field => $meta) {
-                $this->data[$field] = (bool) ($meta['default'] ?? true);
+        $sistemaContabilOptions = EmpresaParametros::portalContadorSistemaContabilOptions();
+        $sistemaContabil = mb_strtolower(trim((string) ($this->data['param_portal_contador_sistema_contabil'] ?? '')), 'UTF-8');
+        $this->data['param_portal_contador_sistema_contabil'] = array_key_exists($sistemaContabil, $sistemaContabilOptions)
+            ? $sistemaContabil
+            : EmpresaParametros::portalContadorSistemaContabilDefault();
+
+        foreach (EmpresaParametros::portalContadorClientBooleanFields() as $field => $meta) {
+            if (! array_key_exists($field, $this->data) || $this->data[$field] === null || $this->data[$field] === '') {
+                $this->data[$field] = (bool) ($meta['default'] ?? false);
+            } else {
+                $this->data[$field] = filter_var($this->data[$field], FILTER_VALIDATE_BOOLEAN);
             }
         }
     }

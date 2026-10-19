@@ -6,6 +6,7 @@ use App\Models\CaixaConta;
 use App\Models\Empresa;
 use App\Models\PdvCaixaMovimento;
 use App\Models\PdvCaixaSessao;
+use App\Models\User;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\ErpTimezone;
 use App\Support\Erp\Printing\Documents\PdvCaixaResumoCupomPrintDocument;
@@ -17,16 +18,23 @@ use App\Support\Erp\Pdv\TerminalResolver;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
 trait ManagesPdvCaixa
 {
     public ?int $caixaSessaoId = null;
 
-    /** @var array<string, string> */
+    /** @var array{valor: string, usuario_id: string, senha: string} */
     public array $aberturaForm = [
         'valor' => '0,00',
+        'usuario_id' => '',
+        'senha' => '',
     ];
+
+    public string $aberturaOperadorLabel = '—';
+
+    public string $aberturaCaixaLabel = 'CAIXA GERAL';
 
     /** @var array{dinheiro_informado: string} */
     public array $fechamentoForm = [
@@ -81,7 +89,7 @@ trait ManagesPdvCaixa
     /**
      * Contexto exibido no modal Abrir/Fechar Caixa.
      *
-     * @return array{usuario: string, operador: string, empresa: string, terminal: string}
+     * @return array{usuario: string, operador: string, empresa: string, terminal: string, caixa: string}
      */
     public function getCaixaModalContextoProperty(): array
     {
@@ -103,6 +111,25 @@ trait ManagesPdvCaixa
             $operador = trim((string) ($vendedor?->nome ?? ''));
         }
 
+        // Sessão aberta: conta já gravada. Abertura: mesma resolução de caixaContaPdvDaSessao().
+        $caixaContaId = null;
+        $sessao = $this->caixaSessaoAtual();
+
+        if ($sessao && Schema::hasColumn((new PdvCaixaSessao)->getTable(), 'caixa_conta_id')) {
+            $caixaContaId = $sessao->caixa_conta_id ? (int) $sessao->caixa_conta_id : null;
+        }
+
+        $caixaContaId ??= $this->caixaContaPdvDaSessao();
+        $caixaNome = '';
+
+        if ($caixaContaId) {
+            $caixaNome = trim((string) (CaixaConta::query()->whereKey($caixaContaId)->value('nome') ?? ''));
+        }
+
+        if ($caixaNome === '') {
+            $caixaNome = CaixaConta::NOME_CAIXA_GERAL;
+        }
+
         return [
             'usuario' => mb_strtoupper(trim((string) ($user?->name ?? '—')), 'UTF-8'),
             'operador' => $operador !== ''
@@ -112,6 +139,7 @@ trait ManagesPdvCaixa
                 ? mb_strtoupper($empresaNome, 'UTF-8')
                 : '—',
             'terminal' => mb_strtoupper(trim((string) ($terminal?->nome ?? 'PDV')), 'UTF-8'),
+            'caixa' => mb_strtoupper($caixaNome, 'UTF-8'),
         ];
     }
 
@@ -400,6 +428,85 @@ trait ManagesPdvCaixa
             '5' => '',
         ];
     }
+    /**
+     * @return array<string, string>
+     */
+    public function getAberturaUsuariosOptionsProperty(): array
+    {
+        $empresaId = $this->resolveEmpresaId();
+
+        if (! $empresaId) {
+            return [];
+        }
+
+        $logadoId = (int) (Auth::id() ?? 0);
+
+        return User::query()
+            ->where('ativo', true)
+            ->where(function ($query) use ($empresaId): void {
+                $query->where('is_admin', true)
+                    ->orWhere('empresa_id', $empresaId)
+                    ->orWhereHas('empresas', fn ($empresas) => $empresas->whereKey($empresaId));
+            })
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->sortBy(fn (User $user): array => [
+                (int) $user->id === $logadoId ? 0 : 1,
+                mb_strtoupper((string) $user->name, 'UTF-8'),
+            ])
+            ->values()
+            ->mapWithKeys(function (User $user): array {
+                $label = mb_strtoupper(trim((string) $user->name), 'UTF-8');
+
+                return [(string) $user->id => $label !== '' ? $label : 'USUARIO'];
+            })
+            ->all();
+    }
+
+    protected function iniciarAberturaCaixaForm(): void
+    {
+        $logadoId = (string) (Auth::id() ?? '');
+
+        $this->aberturaForm = [
+            'valor' => '0,00',
+            'usuario_id' => $logadoId,
+            'senha' => '',
+        ];
+        $this->syncAberturaUsuarioSelecionado();
+    }
+
+    public function updatedAberturaFormUsuarioId(): void
+    {
+        $this->aberturaForm['senha'] = '';
+        $this->syncAberturaUsuarioSelecionado();
+    }
+
+    public function syncAberturaUsuarioSelecionado(): void
+    {
+        $usuarioId = (int) ($this->aberturaForm['usuario_id'] ?? 0);
+        $user = $usuarioId > 0
+            ? User::query()->with('vendedor')->find($usuarioId)
+            : null;
+
+        $operador = trim((string) ($user?->vendedor?->nome ?? ''));
+        $this->aberturaOperadorLabel = $operador !== ''
+            ? mb_strtoupper($operador, 'UTF-8')
+            : '—';
+
+        if (! $user) {
+            $this->aberturaCaixaLabel = CaixaConta::NOME_CAIXA_GERAL;
+
+            return;
+        }
+
+        $caixaId = $this->caixaContaIdParaUsuario($user, $this->resolveEmpresaId());
+        $caixaNome = trim((string) (CaixaConta::query()->whereKey($caixaId)->value('nome') ?? ''));
+        $this->aberturaCaixaLabel = mb_strtoupper(
+            $caixaNome !== '' ? $caixaNome : CaixaConta::NOME_CAIXA_GERAL,
+            'UTF-8',
+        );
+    }
+
     public function confirmAbrirCaixa(): void
     {
         if ($this->caixaAberto) {
@@ -408,15 +515,52 @@ trait ManagesPdvCaixa
             return;
         }
 
-        if (! $this->garantirOperadorDoUsuarioLogado()) {
-            $this->closePdvModal();
+        $usuarioId = (int) ($this->aberturaForm['usuario_id'] ?? 0);
+        $senha = (string) ($this->aberturaForm['senha'] ?? '');
+
+        if ($usuarioId <= 0) {
+            Notification::make()
+                ->title('Selecione o usuário.')
+                ->warning()
+                ->send();
 
             return;
         }
 
-        if (! $this->aplicarVendedorDoUsuarioLogado() || ! $this->vendedorId) {
-            $this->notificarOperadorObrigatorio();
-            $this->closePdvModal();
+        if (trim($senha) === '') {
+            Notification::make()
+                ->title('Informe a senha do usuário.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $user = User::query()
+            ->with('vendedor')
+            ->whereKey($usuarioId)
+            ->where('ativo', true)
+            ->first();
+
+        if (! $user || ! Hash::check($senha, $user->password)) {
+            Notification::make()
+                ->title('Senha inválida.')
+                ->body('Confira a senha do usuário selecionado.')
+                ->danger()
+                ->send();
+            $this->aberturaForm['senha'] = '';
+
+            return;
+        }
+
+        $vendedor = $user->vendedor;
+
+        if (! $vendedor || ! $vendedor->ativo) {
+            Notification::make()
+                ->title('Operador não vinculado ao usuário.')
+                ->body('Em RH → Funcionários, vincule um Operador ativo a este usuário.')
+                ->danger()
+                ->send();
 
             return;
         }
@@ -432,15 +576,15 @@ trait ManagesPdvCaixa
             return;
         }
 
-        $terminal = TerminalResolver::make()->resolveOrCreateDefault($this->resolveEmpresaId());
+        $empresaId = $this->resolveEmpresaId();
+        $terminal = TerminalResolver::make()->resolveOrCreateDefault($empresaId);
 
-        $user = Auth::user();
-        if ($user && ! $user->podeOperarPdvNoTerminal($terminal)) {
+        if (! $user->podeOperarPdvNoTerminal($terminal)) {
             $nome = trim((string) ($terminal?->nome ?? '')) ?: 'este terminal';
 
             Notification::make()
                 ->title('PDV não liberado para este usuário.')
-                ->body('Você não tem permissão para operar no PDV "'.$nome.'".')
+                ->body('O usuário selecionado não tem permissão para operar no PDV "'.$nome.'".')
                 ->danger()
                 ->send();
 
@@ -449,25 +593,37 @@ trait ManagesPdvCaixa
 
         CaixaConta::ensurePdvOperacional();
 
-        if ($user && ! $user->podeOperarComCaixaPdv($this->resolveEmpresaId())) {
+        if (! $user->podeOperarComCaixaPdv($empresaId)) {
             Notification::make()
                 ->title('Sem caixa PDV liberado.')
-                ->body('O PDV só opera com conta tipo PDV. Libere um caixa PDV nas permissões do usuário.')
+                ->body('Libere um caixa PDV nas permissões do usuário selecionado.')
                 ->danger()
                 ->send();
 
             return;
         }
 
+        if ((int) Auth::id() !== (int) $user->id) {
+            Auth::login($user);
+        }
+
+        if (! $this->aplicarVendedorDoUsuarioLogado() || ! $this->vendedorId) {
+            $this->notificarOperadorObrigatorio();
+            $this->closePdvModal();
+
+            return;
+        }
+
+        $caixaContaId = $this->caixaContaIdParaUsuario($user, $empresaId);
         $criouAgora = false;
 
-        $sessao = DB::transaction(function () use ($valorAbertura, $terminal, &$criouAgora): PdvCaixaSessao {
+        $sessao = DB::transaction(function () use ($valorAbertura, $terminal, $user, $empresaId, $caixaContaId, &$criouAgora): PdvCaixaSessao {
             $sessaoAberta = PdvCaixaSessao::query()
-                ->where('user_id', Auth::id())
+                ->where('user_id', $user->id)
                 ->whereNull('fechado_em')
                 ->when(
-                    $this->resolveEmpresaId(),
-                    fn ($query) => $query->where('empresa_id', $this->resolveEmpresaId()),
+                    $empresaId,
+                    fn ($query) => $query->where('empresa_id', $empresaId),
                 )
                 ->when(
                     $terminal?->id,
@@ -482,15 +638,15 @@ trait ManagesPdvCaixa
             }
 
             $dadosSessao = [
-                'user_id' => Auth::id(),
-                'empresa_id' => $this->resolveEmpresaId(),
+                'user_id' => $user->id,
+                'empresa_id' => $empresaId,
                 'terminal_id' => $terminal?->id,
                 'valor_abertura' => $valorAbertura,
                 'aberto_em' => now(),
             ];
 
             if (Schema::hasColumn((new PdvCaixaSessao)->getTable(), 'caixa_conta_id')) {
-                $dadosSessao['caixa_conta_id'] = $this->caixaContaPdvDaSessao();
+                $dadosSessao['caixa_conta_id'] = $caixaContaId;
             }
 
             $sessao = PdvCaixaSessao::query()->create($dadosSessao);
@@ -514,8 +670,11 @@ trait ManagesPdvCaixa
         $this->caixaAberto = true;
         session(['erp.pdv.caixa_sessao_id' => $sessao->id]);
         $this->dispatch('erp-pdv-hot-sync-caixa', aberto: true)->to(\App\Livewire\Erp\PdvHotPath::class);
-        $this->aberturaForm['valor'] = ErpMoney::formatBr((float) $sessao->valor_abertura);
-        $this->aplicarVendedorDoUsuarioLogado();
+        $this->aberturaForm = [
+            'valor' => ErpMoney::formatBr((float) $sessao->valor_abertura),
+            'usuario_id' => (string) $user->id,
+            'senha' => '',
+        ];
         $this->closePdvModal();
 
         if (! $criouAgora) {
@@ -540,25 +699,39 @@ trait ManagesPdvCaixa
     }
 
     /**
-     * Caixa PDV (conta tipo PDV) do operador: padrão nas permissões, senão o primeiro liberado.
+     * Conta da sessão PDV: vínculo explícito (Permissões → Caixas) ou CAIXA GERAL.
+     *
+     * Sem linha em caixa_conta_user não inventa outro PDV liberado por
+     * compatibilidade — vendas/recebimentos/suprimentos/sangrias da sessão
+     * ficam amarrados ao Caixa Geral até o fechamento no Livro Caixa.
      */
-    protected function caixaContaPdvDaSessao(): ?int
+    protected function caixaContaPdvDaSessao(?User $user = null): ?int
     {
-        $user = Auth::user();
+        return $this->caixaContaIdParaUsuario($user ?? Auth::user(), $this->resolveEmpresaId());
+    }
+
+    protected function caixaContaIdParaUsuario(?User $user, ?int $empresaId): int
+    {
+        $geralId = (int) CaixaConta::ensureCaixaGeral()->id;
 
         if (! $user) {
-            return null;
+            return $geralId;
         }
 
-        $empresaId = $this->resolveEmpresaId();
-        $liberadas = $user->accessibleCaixaContaIds($empresaId);
         $padrao = $user->defaultCaixaContaId($empresaId);
 
-        if ($padrao && in_array($padrao, $liberadas, true)) {
+        if (! $padrao || $padrao === $geralId) {
+            return $geralId;
+        }
+
+        $liberadas = $user->accessibleCaixaContaIds($empresaId);
+
+        if (in_array($padrao, $liberadas, true)) {
             return $padrao;
         }
 
-        return $liberadas[0] ?? null;
+        // Vínculo aponta para conta inativa/não-PDV: não redirecionar a outro PDV.
+        return $geralId;
     }
 
     public function confirmFecharCaixa(): void

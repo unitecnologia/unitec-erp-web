@@ -1,10 +1,14 @@
 @php
     use App\Support\Erp\Backup\DatabaseBackupService;
+    use App\Support\Erp\Windows\WindowsUiHelperClient;
+
+    $uiHelperBase = WindowsUiHelperClient::baseUrl();
 @endphp
 
 <div
     class="erp-backup"
     wire:ignore.self
+    data-erp-ui-helper-base="{{ $uiHelperBase }}"
     x-data="{
         arquivos: $wire.entangle('arquivos'),
         listaAtualizando: false,
@@ -208,7 +212,7 @@
                     <span class="erp-backup__stat-value">{{ $this->ultimoEm !== '' ? $this->ultimoEm : '—' }}</span>
                 </div>
                 <div class="erp-backup__stat">
-                    <span class="erp-backup__stat-label">Status</span>
+                    <span class="erp-backup__stat-label">Status local</span>
                     <span @class([
                         'erp-backup__chip',
                         'erp-backup__chip--ok' => $this->ultimoStatus === 'ok',
@@ -217,8 +221,31 @@
                         'erp-backup__chip--idle' => ! in_array($this->ultimoStatus, ['ok', 'failed', 'running'], true) && ! $this->progressActive,
                     ])>{{ $this->progressActive ? 'Em andamento' : $this->statusLabel() }}</span>
                 </div>
+                <div class="erp-backup__stat" title="{{ $this->portalArquivoDetalhe }}">
+                    <span class="erp-backup__stat-label">Portal (arquivo)</span>
+                    <span @class([
+                        'erp-backup__chip',
+                        'erp-backup__chip--ok' => $this->portalArquivoStatus === 'confirmed',
+                        'erp-backup__chip--failed' => $this->portalArquivoStatus === 'failed',
+                        'erp-backup__chip--running' => in_array($this->portalArquivoStatus, ['pending', 'uploading'], true),
+                        'erp-backup__chip--idle' => ! in_array($this->portalArquivoStatus, ['confirmed', 'failed', 'pending', 'uploading'], true),
+                    ])>{{ $this->portalArquivoLabel !== '' ? $this->portalArquivoLabel : '—' }}</span>
+                    @if (in_array($this->portalArquivoStatus, ['pending', 'failed'], true) && erp_can('backup.access'))
+                        <button
+                            type="button"
+                            class="erp-backup__text-btn erp-backup__text-btn--inline"
+                            wire:click="reenviarArquivoPortal"
+                            wire:loading.attr="disabled"
+                            wire:target="reenviarArquivoPortal"
+                            @disabled($this->running || $this->progressActive)
+                        >
+                            <span wire:loading.remove wire:target="reenviarArquivoPortal">Tentar envio</span>
+                            <span wire:loading wire:target="reenviarArquivoPortal">Enviando…</span>
+                        </button>
+                    @endif
+                </div>
                 <div class="erp-backup__stat">
-                    <span class="erp-backup__stat-label">Retenção</span>
+                    <span class="erp-backup__stat-label">Retenção local</span>
                     <span class="erp-backup__stat-value">{{ DatabaseBackupService::KEEP_AUTOMATIC_BACKUPS }} backups</span>
                 </div>
                 <div class="erp-backup__stat erp-backup__stat--wide">
@@ -390,6 +417,7 @@
                             wire:click="selecionarPastaRestore"
                             wire:loading.attr="disabled"
                             wire:target="selecionarPastaRestore"
+                            title="Escolher pasta do backup"
                         >
                             <span wire:loading.remove wire:target="selecionarPastaRestore">Escolher…</span>
                             <span wire:loading wire:target="selecionarPastaRestore">Abrindo…</span>

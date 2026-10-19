@@ -31,7 +31,7 @@ final class NfceCanceller
         $envEvento = $this->xmlBuilder->finalizeEnvEvento($dom);
         $chave = preg_replace('/\D/', '', $request->chave) ?? '';
         $cUf = substr($chave, 0, 2);
-        $endpoint = ScNfceEndpoints::recepcaoEvento($request->tpAmb);
+        $endpoint = NfceSoapUrls::recepcaoEvento($chave, $request->tpAmb);
 
         $soapResponse = $this->soapClient->recepcaoEvento(
             $endpoint,

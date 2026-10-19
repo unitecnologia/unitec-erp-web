@@ -436,17 +436,31 @@ class NfsePage extends Page
             ->get();
     }
 
+    /**
+     * Totais da listagem: bruto, canceladas e líquido (bruto − canceladas).
+     *
+     * @return array{bruto: string, canceladas: string, liquido: string}
+     */
     #[Computed]
-    public function nfseListagemTotalFormatado(): string
+    public function nfseListagemTotaisFormatados(): array
     {
-        $soma = '0.00';
+        $bruto = '0.00';
+        $canceladas = '0.00';
 
         foreach ($this->nfseRegistros as $nfse) {
             $parcela = $this->nfseNormalizarDecimal($nfse->total, 2) ?? '0.00';
-            $soma = $this->nfseSomarDecimal($soma, $parcela);
+            $bruto = $this->nfseSomarDecimal($bruto, $parcela);
+
+            if ($nfse->status === Nfse::STATUS_CANCELADA) {
+                $canceladas = $this->nfseSomarDecimal($canceladas, $parcela);
+            }
         }
 
-        return $this->nfseFormatarDecimal($soma, 2);
+        return [
+            'bruto' => $this->nfseFormatarDecimal($bruto, 2),
+            'canceladas' => $this->nfseFormatarDecimal($canceladas, 2),
+            'liquido' => $this->nfseFormatarDecimal($this->nfseSubtrairDecimal($bruto, $canceladas), 2),
+        ];
     }
 
     public function formatarNfseListagemDinheiro(mixed $value): string
@@ -624,7 +638,7 @@ class NfsePage extends Page
         }
 
         $this->aplicarNfseGravada($nfse);
-        unset($this->nfseRegistros, $this->nfseListagemTotalFormatado);
+        unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
 
         // Garante F3 Transmitir liberado após F2 (nova ou edição).
         $this->dispatch('erp-nfse-sync-transmit-btn');
@@ -945,7 +959,7 @@ class NfsePage extends Page
             return;
         }
 
-        unset($this->nfseRegistros, $this->nfseListagemTotalFormatado);
+        unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
         $this->dispatch('erp-nfse-hide-fiscal-progress');
 
         if ($resultado->autorizada) {
@@ -3030,7 +3044,7 @@ class NfsePage extends Page
 
     public function refreshTable(): void
     {
-        unset($this->nfseRegistros, $this->nfseListagemTotalFormatado);
+        unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
 
         Notification::make()
             ->title('Lista atualizada.')
@@ -3880,7 +3894,11 @@ class NfsePage extends Page
         $like = '%'.mb_strtoupper($term, 'UTF-8').'%';
 
         match ($column) {
-            'numero' => $query->where('numero_dps', (int) preg_replace('/\D/', '', $term)),
+            'numero' => $query->where(function ($inner) use ($term): void {
+                $n = (int) preg_replace('/\D/', '', $term);
+                $inner->where('numero_nfse', (string) $n)
+                    ->orWhere('numero_dps', $n);
+            }),
             'tomador' => $query->whereRaw('UPPER(tomador_nome) LIKE ?', [$like]),
             'chave' => $query->where('chave', 'like', $like),
             'protocolo' => $query->where('protocolo', 'like', $like),

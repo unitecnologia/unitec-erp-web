@@ -711,6 +711,51 @@ final class PdvNfceEmissionService
     }
 
     /**
+     * Após F4 (ou consulta) em Duplicidade: tenta restaurar a chave conflitante autorizada na SEFAZ.
+     * Se o conflito for de outra nota, preserva a tentativa e garante que o próximo número do caixa
+     * fique acima deste (não reutiliza o número queimado nas próximas emissões).
+     */
+    public function tentarResolverDuplicidade(PdvVendaNfce $nfce, Empresa $empresa, VendasParametro $parametros): PdvVendaNfce
+    {
+        if ($nfce->status !== PdvVendaNfce::STATUS_DUPLICIDADE) {
+            return $nfce;
+        }
+
+        $motivoAtual = (string) ($nfce->motivo_rejeicao ?? '');
+        $conflitante = NfceXmlProtocolo::chaveConflitante($motivoAtual, (string) $nfce->chave);
+        $avaliacao = $this->avaliarConflito539($nfce, $conflitante, $empresa, $parametros);
+
+        if ($avaliacao['nfce'] instanceof PdvVendaNfce) {
+            return $avaliacao['nfce'];
+        }
+
+        $base = 'cStat 539: número já utilizado na SEFAZ com outra chave';
+        if ($conflitante !== null && ! str_contains($motivoAtual, $conflitante)) {
+            $base .= ' [chave conflitante '.$conflitante.']';
+        } elseif (str_contains($motivoAtual, '613') || str_contains($motivoAtual, '539')) {
+            $trecho = trim(explode('Status local', $motivoAtual)[0]);
+            if ($trecho !== '') {
+                $base .= ' — '.$trecho;
+            }
+        }
+
+        $this->marcar($nfce, PdvVendaNfce::STATUS_DUPLICIDADE, $this->motivo539($base, $conflitante, $avaliacao));
+
+        // Conflito confirmado: o número desta tentativa já está ocupado na SEFAZ — próximas emissões
+        // devem partir de numero+1 (não quebra a sequência das notas 60/61 já emitidas).
+        if ($avaliacao['confirmado'] === true && NfceNumeracao::disponivel() && filled($nfce->numero)) {
+            NfceNumeracao::garantirPeloMenos(
+                (int) $empresa->id,
+                self::serieInt($nfce),
+                $parametros,
+                (int) $nfce->numero + 1,
+            );
+        }
+
+        return $nfce->fresh() ?? $nfce;
+    }
+
+    /**
      * Motivo da 539 com a chave conflitante e o resultado da verificação (substitui verificação anterior).
      *
      * @param  array{confirmado: bool|null, detalhe: string}  $avaliacao

@@ -4,6 +4,7 @@ namespace App\Support\Erp\Nfse\Ipm;
 
 use App\Models\Empresa;
 use App\Models\Nfse;
+use App\Support\ContadorCloud\ContadorCloudPortalHookService;
 use App\Support\Erp\Nfse\NfseNaoTransmitida;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,13 @@ class NfseIpmCancelarService
         ]);
         $nfse->save();
 
-        return ['nfse' => $nfse->fresh() ?? $nfse, 'cancelada' => true, 'erros' => []];
+        $nfse = $nfse->fresh(['empresa']) ?? $nfse;
+        $empresaPortal = $nfse->empresa;
+        if ($empresaPortal instanceof Empresa) {
+            (new ContadorCloudPortalHookService())->onNfseCancelada($nfse, $empresaPortal);
+        }
+
+        return ['nfse' => $nfse, 'cancelada' => true, 'erros' => []];
     }
 
     public function xmlAssinado(Nfse $nfse, string $codigo): string

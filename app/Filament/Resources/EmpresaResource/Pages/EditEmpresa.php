@@ -60,6 +60,7 @@ class EditEmpresa extends EditRecord
         if ($empresa instanceof Empresa) {
             BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
             $this->syncEmpresaNfeEmitentes();
+            $this->syncPortalContadorAposSalvar($empresa);
         }
     }
 }

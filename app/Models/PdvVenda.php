@@ -34,6 +34,7 @@ class PdvVenda extends Model
         'vendedor_id',
         'vendedor_nome',
         'numero',
+        'pdv_mesa_numero',
         'subtotal',
         'desconto',
         'acrescimo',

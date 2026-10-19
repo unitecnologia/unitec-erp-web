@@ -126,11 +126,7 @@ class Login extends BaseLogin
                 $this->clearUpdatePromptSession();
                 // Evita loop schema → login → schema quando a licença impede instalar o pacote.
                 session(['erp_update_choice_skipped' => true]);
-                if (filled($this->schemaMigrateError)) {
-                    $this->redirect(url('/admin/schema-incompativel'));
-
-                    return;
-                }
+                // Schema atrasado: avisa no login, mas não bloqueia entrada no painel.
                 $this->finishLoginAfterUpdateChoice($snapshot);
 
                 return;
@@ -143,8 +139,8 @@ class Login extends BaseLogin
             return;
         }
 
-        // Autenticado sem prompt de update: se schema incompatível, bloqueia painel
-        // mas mantém caminho de correção (login / atualização / reparo).
+        // Autenticado sem prompt de update: se houver pacote pronto, oferece Sim/Não.
+        // Schema atrasado NÃO bloqueia — só mantém o aviso no formulário.
         if (filament()->auth()->check() && filled($this->schemaMigrateError)) {
             if (AtualizacaoPasta::ensurePendingReady()) {
                 $snapshot = $this->snapshotForAtualizacaoGate();
@@ -162,10 +158,6 @@ class Login extends BaseLogin
                 }
                 session(['erp_update_choice_skipped' => true]);
             }
-
-            $this->redirect(url('/admin/schema-incompativel'));
-
-            return;
         }
 
         // Já autenticado: vai para o painel. NÃO fazer logout aqui —
@@ -335,6 +327,9 @@ class Login extends BaseLogin
             ->type('text')
             ->autocomplete('off')
             ->required()
+            ->validationMessages([
+                'required' => 'Digite a senha.',
+            ])
             ->extraFieldWrapperAttributes([
                 'class' => 'unitec-login__senha-wrap',
             ])
@@ -503,12 +498,7 @@ class Login extends BaseLogin
             if ($this->shouldSkipAtualizacaoPrompt($snapshot)) {
                 session(['erp_update_choice_skipped' => true]);
                 $this->refreshSchemaCompatibilityAlert();
-                if (filled($this->schemaMigrateError)) {
-                    $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
-                    $this->redirect(url('/admin/schema-incompativel'));
-
-                    return null;
-                }
+                // Schema atrasado: avisa, mas libera o login.
                 $this->finishLoginAfterUpdateChoice($snapshot);
 
                 return null;
@@ -528,13 +518,7 @@ class Login extends BaseLogin
         }
 
         $this->refreshSchemaCompatibilityAlert();
-        if (filled($this->schemaMigrateError)) {
-            $this->js('window.UnitecLoginBoot && window.UnitecLoginBoot.hide && window.UnitecLoginBoot.hide()');
-            $this->redirect(url('/admin/schema-incompativel'));
-
-            return null;
-        }
-
+        // Schema atrasado: mantém alerta no login, mas não impede entrar no painel.
         $this->finishLoginAfterUpdateChoice();
 
         return null;

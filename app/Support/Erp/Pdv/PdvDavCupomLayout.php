@@ -208,7 +208,6 @@ final class PdvDavCupomLayout
     ): array {
         $at = $printedAt ?? now();
         $w = self::WIDTH;
-        $wItems = self::WIDTH_ITEMS;
         $mesaRotulo = 'MESA '.str_pad((string) $numero, 2, '0', STR_PAD_LEFT);
 
         $titulo = match ($tipo) {
@@ -245,9 +244,10 @@ final class PdvDavCupomLayout
             $lines[] = self::line(self::labelDots('Terminal', self::up($terminal), $w));
         }
 
-        $lines[] = self::line(self::dash($wItems), font: 'B');
-        $lines[] = self::line(self::itemHeaderLine($wItems), bold: true, font: 'B');
-        $lines[] = self::line(self::dash($wItems), font: 'B');
+        // Pedido de mesa (cozinha): fonte A — sem preços no pedido/item.
+        $lines[] = self::line(self::dash($w));
+        $lines[] = self::line(self::center('QTD  PRODUTO', $w), bold: true);
+        $lines[] = self::line(self::dash($w));
 
         $subtotal = 0.0;
         $descontos = 0.0;
@@ -257,45 +257,54 @@ final class PdvDavCupomLayout
 
         foreach (array_values($itens) as $index => $item) {
             $quantidade = (float) ($item['quantidade'] ?? 0);
-            $linha = (object) [
-                'codigo' => (string) ($item['codigo'] ?? ''),
-                'descricao' => (string) ($item['descricao'] ?? ''),
-                'unidade' => (string) ($item['unidade'] ?? 'UN'),
-                'quantidade' => $quantidade,
-                'preco_unitario' => (float) ($item['preco'] ?? 0),
-                'desconto' => round((float) ($item['desconto'] ?? 0), 2),
-                'acrescimo' => round((float) ($item['acrescimo'] ?? 0), 2),
-                'total' => (float) ($item['total'] ?? 0),
-            ];
+            $descricao = self::up((string) ($item['descricao'] ?? ''));
+            $acrescimoItem = round((float) ($item['acrescimo'] ?? 0), 2);
+            $totalItem = (float) ($item['total'] ?? 0);
+            $descontoItem = round((float) ($item['desconto'] ?? 0), 2);
 
-            foreach (self::formatItemLines($linha, $wItems, descricaoCompleta: true) as $linhaProduto) {
-                $lines[] = self::line($linhaProduto, font: 'B');
+            $qtdLabel = fmod($quantidade, 1.0) === 0.0
+                ? (string) (int) $quantidade
+                : number_format($quantidade, 3, ',', '');
+
+            // Mesma linha: "2 TESTE SISTEMAS" — um pouco maior (size 2), só qtd + nome.
+            $tituloItem = trim($qtdLabel.' '.$descricao);
+            $larguraTitulo = max(8, (int) floor($w / 2));
+            foreach (self::wrapText($tituloItem, $larguraTitulo) as $pedaco) {
+                $lines[] = [
+                    'text' => $pedaco,
+                    'bold' => true,
+                    'center' => false,
+                    'font' => 'A',
+                    'size' => 2,
+                ];
             }
 
-            $obs = self::up(trim((string) ($item['obs'] ?? '')));
+            // SEM / ADICIONAL: fonte A + negrito (sem valor no adicional).
+            foreach (PdvComposicaoLinhas::textosDoItem($item) as $textoComp) {
+                self::appendMesaCozinha($lines, self::semValorAdicional($textoComp), $w);
+            }
+
+            $obs = self::up(PdvComposicaoLinhas::limparObsManual((string) ($item['obs'] ?? '')));
             if ($obs !== '') {
-                $resto = 'OBS: '.$obs;
-                $larguraObs = max(8, $wItems - 5);
-                while ($resto !== '') {
-                    $pedaco = mb_substr($resto, 0, $larguraObs);
-                    $resto = mb_substr($resto, mb_strlen($pedaco));
-                    $lines[] = self::line(str_repeat(' ', 5).$pedaco, bold: true, font: 'B');
+                foreach (self::wrapText('OBS: '.$obs, $w) as $pedaco) {
+                    $lines[] = self::line($pedaco, bold: true, font: 'A');
                 }
             }
 
             if ($index < $ultimo) {
-                $lines[] = self::line('', font: 'B');
+                $lines[] = self::line('');
             }
 
             $subtotal += round((float) ($item['preco_base'] ?? $item['preco'] ?? 0) * $quantidade, 2);
-            $descontos += round($linha->desconto * $quantidade, 2);
-            $acrescimos += round($linha->acrescimo * $quantidade, 2);
-            $total += $linha->total;
+            $descontos += round($descontoItem * $quantidade, 2);
+            $acrescimos += round($acrescimoItem * $quantidade, 2);
+            $total += $totalItem;
         }
 
         $lines[] = self::line(self::dash($w));
         $lines[] = self::line(self::labelDots('Itens', (string) count($itens), $w));
 
+        // Pré-conta: mostra valores. Pedido/item da cozinha: só quantidade (sem preços).
         if ($tipo === self::MESA_PARCIAL) {
             $lines[] = self::line(self::moneyLine('SubtTotal', number_format(round($subtotal, 2), 2, ',', ''), $w));
             if (round($descontos, 2) > 0) {
@@ -304,12 +313,8 @@ final class PdvDavCupomLayout
             if (round($acrescimos, 2) > 0) {
                 $lines[] = self::line(self::moneyLine('Acrescimo', number_format(round($acrescimos, 2), 2, ',', ''), $w));
             }
-        }
-
-        $lines[] = self::line(self::moneyLine('Total', number_format(round($total, 2), 2, ',', ''), $w), bold: true);
-        $lines[] = self::line(self::dash($w));
-
-        if ($tipo === self::MESA_PARCIAL) {
+            $lines[] = self::line(self::moneyLine('Total', number_format(round($total, 2), 2, ',', ''), $w), bold: true);
+            $lines[] = self::line(self::dash($w));
             $lines[] = self::bigLine('PRÉ-CONTA');
             $lines[] = self::line(self::center('SEM VALOR FISCAL', $w), bold: true, center: true);
             $lines[] = self::line(self::center('Confira os itens antes do fechamento', $w), center: true);
@@ -324,6 +329,69 @@ final class PdvDavCupomLayout
             'lines' => $lines,
             'plain' => array_map(static fn (array $row): string => $row['text'], $lines),
         ];
+    }
+
+    /**
+     * @param  list<array{text: string, bold?: bool, center?: bool, font?: string}>  $lines
+     */
+    private static function appendIndented(array &$lines, string $texto, int $wItems, bool $bold = false): void
+    {
+        $texto = self::up(trim($texto));
+        if ($texto === '') {
+            return;
+        }
+
+        $resto = $texto;
+        $largura = max(8, $wItems - 5);
+        while ($resto !== '') {
+            $pedaco = mb_substr($resto, 0, $largura);
+            $resto = mb_substr($resto, mb_strlen($pedaco));
+            $lines[] = self::line(str_repeat(' ', 5).$pedaco, bold: $bold, font: 'B');
+        }
+    }
+
+    /**
+     * SEM / ADICIONAL na bobina da mesa: fonte A + negrito (maior que condensada, sem dobrar).
+     *
+     * @param  list<array{text: string, bold?: bool, center?: bool, font?: string, size?: int}>  $lines
+     */
+    private static function appendMesaCozinha(array &$lines, string $texto, int $w): void
+    {
+        $texto = self::up(trim($texto));
+        if ($texto === '') {
+            return;
+        }
+
+        foreach (self::wrapText($texto, $w) as $pedaco) {
+            $lines[] = self::line($pedaco, bold: true, font: 'A');
+        }
+    }
+
+    /** Cozinha: "ADICIONAL: BACON (+ R$ 10,00)" → "ADICIONAL: BACON". */
+    private static function semValorAdicional(string $texto): string
+    {
+        return trim((string) preg_replace('/\s*\(\+\s*R\$\s*[\d.,]+\)\s*$/iu', '', $texto));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function wrapText(string $texto, int $largura): array
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return [];
+        }
+
+        $out = [];
+        $resto = $texto;
+        while ($resto !== '') {
+            $pedaco = mb_substr($resto, 0, $largura);
+            $resto = mb_substr($resto, mb_strlen($pedaco));
+            $out[] = $pedaco;
+        }
+
+        return $out;
     }
 
     /**

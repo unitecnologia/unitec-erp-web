@@ -5,12 +5,16 @@ namespace App\Jobs;
 use App\Support\ContadorCloud\ContadorCloudSyncService;
 use Illuminate\Foundation\Bus\Dispatchable;
 
+/**
+ * Reenvia automaticamente pendentes/falhas do Portal do Contador
+ * (ex.: contingência emitida sem internet).
+ */
 class ContadorCloudProcessPendingJob
 {
     use Dispatchable;
 
     public function __construct(
-        public int $empresaId,
+        public int $empresaId = 0,
         public int $limit = 200,
     ) {}
 
@@ -20,6 +24,7 @@ class ContadorCloudProcessPendingJob
             @set_time_limit(0);
         }
 
-        $syncService->processPending($this->empresaId, $this->limit);
+        $empresaId = $this->empresaId > 0 ? $this->empresaId : null;
+        $syncService->processRetryable($empresaId, $this->limit);
     }
 }

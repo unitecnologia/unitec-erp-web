@@ -33,6 +33,8 @@ trait ManagesNfceBulkTransmit
         }
 
         $this->nfceSelecionadosTransmitir[] = $key;
+        $this->highlightedRecordId = $id;
+        unset($this->highlightedChave, $this->highlightedNfceAvisoRodape);
     }
 
     public function marcarDesmarcarNfcesContingencia(): void

@@ -9,13 +9,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('nfse_codigos_municipais', function (Blueprint $table): void {
-            $table->id();
-            $table->string('codigo', 20)->unique();
-            $table->string('descricao', 150);
-            $table->boolean('ativo')->default(true);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('nfse_codigos_municipais')) {
+            Schema::create('nfse_codigos_municipais', function (Blueprint $table): void {
+                $table->id();
+                $table->string('codigo', 20)->unique();
+                $table->string('descricao', 150);
+                $table->boolean('ativo')->default(true);
+                $table->timestamps();
+            });
+        }
 
         $agora = now();
         $existentes = DB::table('products')

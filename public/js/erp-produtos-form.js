@@ -13,6 +13,61 @@ const ERP_PRODUCT_LOOKUP_FIELDS = {
 /** Próximo campo a focar após morph do Livewire (Enter na precificação). */
 let erpPrecifPendingFocusId = null;
 
+/** Foco único da Composição (evita Livewire remount prender o cursor em Qtd). */
+let erpComposicaoPendingFocusId = null;
+let erpComposicaoFocusAttempts = [];
+
+function clearErpComposicaoFocusAttempts() {
+    erpComposicaoFocusAttempts.forEach((timer) => window.clearTimeout(timer));
+    erpComposicaoFocusAttempts = [];
+}
+
+function applyErpComposicaoPendingFocus() {
+    if (! erpComposicaoPendingFocusId) {
+        return false;
+    }
+
+    const el = document.getElementById(erpComposicaoPendingFocusId);
+
+    if (! el || ! el.isConnected) {
+        return false;
+    }
+
+    const targetId = erpComposicaoPendingFocusId;
+    erpComposicaoPendingFocusId = null;
+    clearErpComposicaoFocusAttempts();
+
+    el.removeAttribute('readonly');
+    el.focus({ preventScroll: true });
+    el.select?.();
+
+    return document.activeElement === el || document.activeElement?.id === targetId;
+}
+
+function focusErpComposicaoField(fieldId) {
+    clearErpComposicaoFocusAttempts();
+    erpComposicaoPendingFocusId = fieldId;
+
+    if (applyErpComposicaoPendingFocus()) {
+        return;
+    }
+
+    // Reaplica só enquanto o alvo ainda não existe no DOM (morph).
+    [30, 80, 160].forEach((delay) => {
+        erpComposicaoFocusAttempts.push(
+            window.setTimeout(() => {
+                if (! erpComposicaoPendingFocusId) {
+                    return;
+                }
+
+                applyErpComposicaoPendingFocus();
+            }, delay),
+        );
+    });
+}
+
+window.focusErpComposicaoField = focusErpComposicaoField;
+
 document.addEventListener('livewire:init', () => {
     initErpProdutosForm();
 
@@ -22,6 +77,14 @@ document.addEventListener('livewire:init', () => {
         if (page) {
             initErpProdutosFormInputs(page);
         }
+    });
+
+    window.Livewire.on('erp-composicao-focus-qtd', () => {
+        focusErpComposicaoField('pprod-comp-qtd');
+    });
+
+    window.Livewire.on('erp-composicao-focus-search', () => {
+        focusErpComposicaoField('pprod-comp-codigo');
     });
 
     window.Livewire.on('erp-lookup-opened', () => {
@@ -42,6 +105,10 @@ document.addEventListener('livewire:init', () => {
 
         if (page) {
             initErpProdutosFormInputs(page);
+        }
+
+        if (erpComposicaoPendingFocusId) {
+            window.requestAnimationFrame(() => applyErpComposicaoPendingFocus());
         }
     });
 });
@@ -133,9 +200,65 @@ function initErpProdutosForm() {
     bindErpProdutosFormKeys();
     bindErpProdutosSaveButtons(page);
     bindErpProdutosLocFields(page);
+    bindErpComposicaoKeyboard(page);
     bindSearchCodigoBarras(page);
     bindProductCadastroLookup(page);
     focusProdutoDescricaoOnCreate(page);
+}
+
+/**
+ * Enter na Composição: Qtd → Preço → incluir (sem wire:model.live prendendo o foco).
+ * Tab segue o comportamento nativo do browser.
+ */
+function bindErpComposicaoKeyboard(page) {
+    if (page.dataset.erpComposicaoKeysBound === '1') {
+        return;
+    }
+
+    page.dataset.erpComposicaoKeysBound = '1';
+
+    page.addEventListener(
+        'keydown',
+        (event) => {
+            if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey) {
+                return;
+            }
+
+            const target = event.target;
+
+            if (! (target instanceof HTMLInputElement)) {
+                return;
+            }
+
+            if (target.id === 'pprod-comp-qtd' || target.dataset.erpComposicaoField === 'qtd') {
+                event.preventDefault();
+                // Não usar stopImmediatePropagation: libera readonly e máscaras no mesmo keydown.
+                target.removeAttribute('readonly');
+
+                const component = getErpProdutosComponent();
+
+                if (component && typeof component.set === 'function') {
+                    component.set('compositionQuantidade', target.value);
+                }
+
+                focusErpComposicaoField('pprod-comp-preco');
+
+                return;
+            }
+
+            if (target.id === 'pprod-comp-preco' || target.dataset.erpComposicaoField === 'preco') {
+                event.preventDefault();
+                target.removeAttribute('readonly');
+
+                const component = getErpProdutosComponent();
+
+                if (component && typeof component.call === 'function') {
+                    component.call('confirmCompositionFromPreco', target.value);
+                }
+            }
+        },
+        true,
+    );
 }
 
 function initErpProdutosFormInputs(page) {

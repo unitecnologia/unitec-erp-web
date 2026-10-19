@@ -37,6 +37,7 @@
 @if (ErpPageAssets::resourceSegment() === 'permissoes')
     <script src="{{ asset('js/erp-permissoes.js') }}?v={{ $version }}-v1" defer></script>
 @endif
+{{-- Seletor de pasta do Backup usa wire:click + PowerShell (igual Balança). --}}
 
 @if (ErpPageAssets::resourceSegment() === 'products' || ErpPageAssets::resourceSegment() === 'compras')
     <script src="{{ asset('js/erp-precif-enter-v5.js') }}?v={{ $version }}-v38-local-enter"></script>

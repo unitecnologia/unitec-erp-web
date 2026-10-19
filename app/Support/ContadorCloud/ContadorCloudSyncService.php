@@ -2,12 +2,18 @@
 
 namespace App\Support\ContadorCloud;
 
+use App\Jobs\ContadorCloudProcessPendingJob;
 use App\Models\ContadorCloudSyncLog;
 use App\Models\Empresa;
+use App\Models\Nfe;
+use App\Models\PdvVendaNfce;
 use Illuminate\Support\Facades\Log;
 
 final class ContadorCloudSyncService
 {
+    /** Tentativas automáticas antes de deixar só o reenvio manual. */
+    private const MAX_AUTO_ATTEMPTS = 60;
+
     public function __construct(
         private readonly ContadorCloudDocumentPayloadBuilder $payloadBuilder = new ContadorCloudDocumentPayloadBuilder(),
         private readonly ContadorCloudClient $client = new ContadorCloudClient(),
@@ -16,7 +22,7 @@ final class ContadorCloudSyncService
     /**
      * @param  array<string, mixed>  $documento
      */
-    public function dispatch(Empresa $empresa, array $documento, bool $immediate = true): ?ContadorCloudSyncLog
+    public function dispatch(Empresa $empresa, array $documento, bool $immediate = true, bool $force = false): ?ContadorCloudSyncLog
     {
         $config = ContadorCloudConfig::fromEmpresa($empresa);
 
@@ -35,8 +41,13 @@ final class ContadorCloudSyncService
         $chave = (string) ($documento['chave'] ?? '');
         $evento = (string) ($documento['evento'] ?? ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO);
 
-        if ($chave !== '' && $this->jaRegistrado($empresa, $chave, $evento)) {
+        if ($chave !== '' && ! $force && $this->jaRegistrado($empresa, $chave, $evento)) {
             return null;
+        }
+
+        // Reenvio forçado (ex.: canceladas sem valorTotal): marca o envio anterior para não bloquear.
+        if ($force && $chave !== '') {
+            $this->marcarSuperseded($empresa, $chave, $evento);
         }
 
         if (! $immediate) {
@@ -44,8 +55,17 @@ final class ContadorCloudSyncService
         }
 
         $payload = $this->payloadBuilder->buildEnvelope($config, $documento);
+        $log = $this->enviar($empresa, $config, $documento, $payload, agendarRetrySeFalhar: true);
 
-        return $this->enviar($empresa, $config, $documento, $payload);
+        return $log;
+    }
+
+    /**
+     * Dispara reenvio em segundo plano (após a resposta HTTP ou no schedule).
+     */
+    public static function agendarRetryAutomatico(?int $empresaId = null, int $limit = 100): void
+    {
+        ContadorCloudProcessPendingJob::dispatch(max(0, (int) $empresaId), $limit)->afterResponse();
     }
 
     /**
@@ -55,8 +75,24 @@ final class ContadorCloudSyncService
      */
     public function processPending(?int $empresaId = null, int $limit = 200): array
     {
+        return $this->processRetryable($empresaId, $limit);
+    }
+
+    /**
+     * Reenvia pendentes e falhas (ex.: contingência criada sem internet).
+     *
+     * @return array{enviados: int, falhas: int, ignorados: int}
+     */
+    public function processRetryable(?int $empresaId = null, int $limit = 200): array
+    {
         $query = ContadorCloudSyncLog::query()
-            ->where('status', ContadorCloudSyncLog::STATUS_PENDING)
+            ->where(function ($q): void {
+                $q->where('status', ContadorCloudSyncLog::STATUS_PENDING)
+                    ->orWhere(function ($failed): void {
+                        $failed->where('status', ContadorCloudSyncLog::STATUS_FAILED)
+                            ->where('attempts', '<', self::MAX_AUTO_ATTEMPTS);
+                    });
+            })
             ->orderBy('id')
             ->limit(max(1, $limit));
 
@@ -66,18 +102,21 @@ final class ContadorCloudSyncService
 
         $enviados = 0;
         $falhas = 0;
+        $ignorados = 0;
 
         foreach ($query->get() as $log) {
             $resultado = $this->retry($log);
 
             if ($resultado->status === ContadorCloudSyncLog::STATUS_SENT) {
                 $enviados++;
+            } elseif ($resultado->status === ContadorCloudSyncLog::STATUS_SKIPPED) {
+                $ignorados++;
             } else {
                 $falhas++;
             }
         }
 
-        return ['enviados' => $enviados, 'falhas' => $falhas];
+        return ['enviados' => $enviados, 'falhas' => $falhas, 'ignorados' => $ignorados];
     }
 
     public function retry(ContadorCloudSyncLog $log): ContadorCloudSyncLog
@@ -94,6 +133,19 @@ final class ContadorCloudSyncService
         }
 
         $config = ContadorCloudConfig::fromEmpresa($empresa);
+
+        if (! $config->isActive()) {
+            return $log;
+        }
+
+        // Contingência antiga: se a nota já foi autorizada/cancelada, não reenviar XML de contingência.
+        if ((string) $log->evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CONTINGENCIA) {
+            $resolvido = $this->resolverRetryContingenciaObsoleta($empresa, $log);
+            if ($resolvido !== null) {
+                return $resolvido;
+            }
+        }
+
         $documento = json_decode((string) $log->payload_json, true);
 
         if (! is_array($documento)) {
@@ -111,7 +163,77 @@ final class ContadorCloudSyncService
 
         $payload = $this->payloadBuilder->buildEnvelope($config, $documento);
 
-        return $this->enviar($empresa, $config, $documento, $payload, $log);
+        return $this->enviar($empresa, $config, $documento, $payload, $log, agendarRetrySeFalhar: false);
+    }
+
+    /**
+     * Se a NFC-e/NF-e da contingência já foi autorizada, marca o log como ignorado e envia a emitida.
+     */
+    private function resolverRetryContingenciaObsoleta(Empresa $empresa, ContadorCloudSyncLog $log): ?ContadorCloudSyncLog
+    {
+        $refTipo = (string) ($log->referencia_type ?? '');
+        $refId = (int) ($log->referencia_id ?? 0);
+
+        if ($refId < 1) {
+            return null;
+        }
+
+        if ($refTipo === 'pdv_venda_nfce') {
+            $nfce = PdvVendaNfce::query()->find($refId);
+
+            if (! $nfce || $nfce->status === PdvVendaNfce::STATUS_CONTINGENCIA) {
+                return null;
+            }
+
+            $log->update([
+                'status' => ContadorCloudSyncLog::STATUS_SKIPPED,
+                'error_message' => 'Contingência não reenviada: nota já '.$nfce->status.'; envio da situação atual.',
+            ]);
+
+            if ($nfce->status === PdvVendaNfce::STATUS_AUTORIZADA && ! $nfce->simulada) {
+                $this->dispatch(
+                    $empresa,
+                    $this->payloadBuilder->fromNfce($nfce, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO),
+                    immediate: true,
+                    force: true,
+                );
+            } elseif ($nfce->status === PdvVendaNfce::STATUS_CANCELADA && ! $nfce->simulada) {
+                $this->dispatch(
+                    $empresa,
+                    $this->payloadBuilder->fromNfce($nfce, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO),
+                    immediate: true,
+                    force: true,
+                );
+            }
+
+            return $log->fresh() ?? $log;
+        }
+
+        if ($refTipo === 'nfe') {
+            $nfe = Nfe::query()->find($refId);
+
+            if (! $nfe || $nfe->status === Nfe::STATUS_CONTINGENCIA) {
+                return null;
+            }
+
+            $log->update([
+                'status' => ContadorCloudSyncLog::STATUS_SKIPPED,
+                'error_message' => 'Contingência não reenviada: NF-e já '.$nfe->status.'; envio da situação atual.',
+            ]);
+
+            if ($nfe->status === Nfe::STATUS_TRANSMITIDA) {
+                $this->dispatch(
+                    $empresa,
+                    $this->payloadBuilder->fromNfe($nfe, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO),
+                    immediate: true,
+                    force: true,
+                );
+            }
+
+            return $log->fresh() ?? $log;
+        }
+
+        return null;
     }
 
     /**
@@ -121,6 +243,14 @@ final class ContadorCloudSyncService
     {
         $tipo = (string) ($documento['tipo'] ?? '');
         $evento = (string) ($documento['evento'] ?? ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO);
+
+        if ($tipo === ContadorCloudDocumentPayloadBuilder::TIPO_NFSE) {
+            if ($evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO) {
+                return $config->enviarNfse && $config->enviarCanceladas;
+            }
+
+            return $config->enviarNfse;
+        }
 
         if ($evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO) {
             return $config->enviarCanceladas;
@@ -168,6 +298,7 @@ final class ContadorCloudSyncService
         array $documento,
         array $payload,
         ?ContadorCloudSyncLog $log = null,
+        bool $agendarRetrySeFalhar = false,
     ): ContadorCloudSyncLog {
         $log ??= $this->criarPendente($empresa, $documento);
 
@@ -201,6 +332,10 @@ final class ContadorCloudSyncService
                 'evento' => $documento['evento'] ?? null,
                 'message' => $resultado['message'],
             ]);
+
+            if ($agendarRetrySeFalhar) {
+                self::agendarRetryAutomatico((int) $empresa->id);
+            }
         }
 
         return $log->fresh() ?? $log;
@@ -235,5 +370,21 @@ final class ContadorCloudSyncService
                 ContadorCloudSyncLog::STATUS_PENDING,
             ])
             ->exists();
+    }
+
+    private function marcarSuperseded(Empresa $empresa, string $chave, string $evento): void
+    {
+        ContadorCloudSyncLog::query()
+            ->where('empresa_id', $empresa->id)
+            ->where('chave', $chave)
+            ->where('evento', $evento)
+            ->whereIn('status', [
+                ContadorCloudSyncLog::STATUS_SENT,
+                ContadorCloudSyncLog::STATUS_PENDING,
+            ])
+            ->update([
+                'status' => ContadorCloudSyncLog::STATUS_SKIPPED,
+                'error_message' => 'Substituído por reenvio atualizado.',
+            ]);
     }
 }

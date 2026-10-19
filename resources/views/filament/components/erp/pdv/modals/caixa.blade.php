@@ -28,7 +28,7 @@
                     <h2 id="erp-pdv-caixa-title">{{ $isAbrir ? 'Abrir Caixa' : 'Fechar Caixa' }}</h2>
                     <p class="erp-pdv-caixa-modal__subtitle">
                         {{ $isAbrir
-                            ? 'Confira o operador e informe o fundo de troco.'
+                            ? 'Selecione o usuário, informe a senha e o fundo de troco.'
                             : 'Nenhuma venda poderá ser feita até reabrir.' }}
                     </p>
                 </div>
@@ -36,26 +36,78 @@
             </header>
 
             <div class="erp-pdv-caixa-modal__body">
-                <div class="erp-pdv-caixa-modal__meta" aria-label="Contexto da sessão">
-                    <div class="erp-pdv-caixa-modal__meta-item">
-                        <span>Usuário</span>
-                        <strong>{{ $ctx['usuario'] }}</strong>
-                    </div>
-                    <div class="erp-pdv-caixa-modal__meta-item">
-                        <span>Operador</span>
-                        <strong>{{ $ctx['operador'] }}</strong>
-                    </div>
-                    <div class="erp-pdv-caixa-modal__meta-item">
-                        <span>Empresa</span>
-                        <strong>{{ $ctx['empresa'] }}</strong>
-                    </div>
-                    <div class="erp-pdv-caixa-modal__meta-item">
-                        <span>PDV</span>
-                        <strong>{{ $ctx['terminal'] }}</strong>
-                    </div>
-                </div>
-
                 @if ($isAbrir)
+                    <div class="erp-pdv-caixa-modal__meta" aria-label="Contexto da sessão">
+                        <div class="erp-pdv-caixa-modal__meta-item erp-pdv-caixa-modal__meta-item--editable">
+                            <label for="erp-pdv-abertura-usuario">Usuário</label>
+                            <select
+                                id="erp-pdv-abertura-usuario"
+                                class="erp-pdv-caixa-modal__select"
+                                wire:model.live="aberturaForm.usuario_id"
+                            >
+                                @foreach ($this->aberturaUsuariosOptions as $id => $label)
+                                    <option value="{{ $id }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>Operador</span>
+                            <strong>{{ $this->aberturaOperadorLabel }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>Empresa</span>
+                            <strong>{{ $ctx['empresa'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>PDV</span>
+                            <strong>{{ $ctx['terminal'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item erp-pdv-caixa-modal__meta-item--caixa">
+                            <span>Caixa</span>
+                            <strong>{{ $this->aberturaCaixaLabel }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="erp-pdv-caixa-modal__field">
+                        <label class="erp-pdv-caixa-modal__label" for="erp-pdv-abertura-senha">
+                            Senha do usuário
+                            <small>Obrigatória para abrir o caixa</small>
+                        </label>
+                        <div class="erp-pdv-caixa-modal__password-wrap">
+                            <input
+                                id="erp-pdv-abertura-senha"
+                                type="password"
+                                wire:model="aberturaForm.senha"
+                                wire:keydown.enter.prevent="confirmAbrirCaixa"
+                                class="erp-pdv-caixa-modal__text-input erp-pdv-caixa-modal__text-input--password"
+                                autocomplete="new-password"
+                                autocorrect="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                data-bwignore="true"
+                                data-form-type="other"
+                                placeholder="Digite a senha"
+                            >
+                            <button
+                                type="button"
+                                class="erp-pdv-caixa-modal__password-toggle"
+                                data-erp-password-toggle="erp-pdv-abertura-senha"
+                                aria-label="Exibir senha"
+                                title="Exibir senha"
+                            >
+                                <svg class="erp-pdv-caixa-modal__password-icon erp-pdv-caixa-modal__password-icon--show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                                </svg>
+                                <svg class="erp-pdv-caixa-modal__password-icon erp-pdv-caixa-modal__password-icon--hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="erp-pdv-caixa-modal__field">
                         <label class="erp-pdv-caixa-modal__label" for="erp-pdv-abertura-valor">
                             Valor de abertura
@@ -83,6 +135,29 @@
                         </div>
                     </div>
                 @else
+                    <div class="erp-pdv-caixa-modal__meta" aria-label="Contexto da sessão">
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>Usuário</span>
+                            <strong>{{ $ctx['usuario'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>Operador</span>
+                            <strong>{{ $ctx['operador'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>Empresa</span>
+                            <strong>{{ $ctx['empresa'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item">
+                            <span>PDV</span>
+                            <strong>{{ $ctx['terminal'] }}</strong>
+                        </div>
+                        <div class="erp-pdv-caixa-modal__meta-item erp-pdv-caixa-modal__meta-item--caixa">
+                            <span>Caixa</span>
+                            <strong>{{ $ctx['caixa'] ?? 'CAIXA GERAL' }}</strong>
+                        </div>
+                    </div>
+
                     <div class="erp-pdv-caixa-modal__alert" role="status">
                         <strong>Confirmar fechamento?</strong>
                         <p>O caixa será encerrado e o saldo em dinheiro irá para o Livro Caixa. Cartões continuam no Contas a Receber.</p>

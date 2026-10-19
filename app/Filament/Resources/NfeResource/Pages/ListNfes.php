@@ -891,6 +891,14 @@ class ListNfes extends ListRecords
         return (float) $this->buildListQuery()->sum('total');
     }
 
+    #[Computed]
+    public function filteredTotalCanceladas(): float
+    {
+        return (float) $this->buildListQuery()
+            ->where('status', Nfe::STATUS_CANCELADA)
+            ->sum('total');
+    }
+
     protected function erpListSelectPrompt(string $action): string
     {
         return match ($action) {

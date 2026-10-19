@@ -101,6 +101,8 @@
         if (abortCtrl) {
             const previous = abortCtrl;
             abortCtrl = null;
+            // Evita toast "Erro ao carregar a página" do abort intencional (Livewire → 503).
+            suppressFilamentAbortToast();
             previous.abort();
         }
 
@@ -163,6 +165,38 @@
         return null;
     }
 
+    /**
+     * Abort de pesquisa antiga vira status 503 no Livewire e o Filament
+     * mostra "Erro ao carregar a página" — mesmo com a busca nova ok.
+     * Desliga o toast 503 só nesses aborts intencionais.
+     */
+    function suppressFilamentAbortToast() {
+        const bag = window.filamentErrorNotifications;
+
+        if (!bag || typeof bag !== 'object') {
+            return;
+        }
+
+        const previous = bag[503];
+
+        // isHidden: Filament chama preventDefault e não mostra toast.
+        bag[503] = {
+            title: previous?.title ?? '',
+            body: previous?.body ?? '',
+            isHidden: true,
+            isDisabled: false,
+        };
+
+        // Macrotask: depois dos fail() do Livewire (microtask do fetch abortado).
+        setTimeout(() => {
+            if (previous !== undefined) {
+                bag[503] = previous;
+            } else {
+                delete bag[503];
+            }
+        }, 0);
+    }
+
     function registerAbort() {
         if (window.__erpProdutosSearchAbort === true || !window.Livewire?.hook) {
             return;
@@ -180,12 +214,20 @@
             abortCtrl = new AbortController();
             options.signal = abortCtrl.signal;
 
-            fail(() => {
-                if (seq !== latestSeq) {
+            // Registrar fail cedo: roda antes do Filament e evita o toast fantasma.
+            fail(({ status, preventDefault }) => {
+                const staleOrAborted = seq !== latestSeq;
+
+                if (staleOrAborted && (status === 503 || status === 0 || status == null)) {
+                    preventDefault();
+                    suppressFilamentAbortToast();
+
                     return;
                 }
 
-                lastSent = null;
+                if (seq === latestSeq) {
+                    lastSent = null;
+                }
             });
         });
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Erp\Pdv\PdvMesaService;
 use Illuminate\Database\Eloquent\Model;
 
 class PdvMesa extends Model
@@ -15,6 +16,7 @@ class PdvMesa extends Model
     protected $fillable = [
         'empresa_id',
         'numero',
+        'nome',
         'qtd_itens',
         'total',
         'situacao',
@@ -49,7 +51,7 @@ class PdvMesa extends Model
 
     public function rotulo(): string
     {
-        return 'Mesa '.str_pad((string) $this->numero, 2, '0', STR_PAD_LEFT);
+        return PdvMesaService::rotulo((int) $this->numero, $this->nome);
     }
 
     public function aguardandoFechamento(): bool

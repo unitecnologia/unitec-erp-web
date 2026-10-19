@@ -15,8 +15,11 @@
             </svg>
         </x-slot:icon>
 
-        <div class="erp-pdv-vendas-espera">
-            <label class="erp-pdv-modal__label" for="erp-pdv-vendas-espera-search">Número, cliente ou operador</label>
+        <div
+            class="erp-pdv-vendas-espera"
+            @if ($this->selectedVendaEsperaIndex !== null) data-selected-index="{{ $this->selectedVendaEsperaIndex }}" @endif
+        >
+            <label class="erp-pdv-modal__label" for="erp-pdv-vendas-espera-search">Número ou identificador</label>
             <input
                 id="erp-pdv-vendas-espera-search"
                 type="text"
@@ -30,12 +33,9 @@
                 <table class="erp-pdv__grid erp-pdv-modal__grid erp-pdv-vendas-espera__grid">
                     <thead>
                         <tr>
+                            <th>Identificador</th>
                             <th>Número</th>
-                            <th>Data</th>
                             <th>Hora</th>
-                            <th>Cliente</th>
-                            <th>Operador</th>
-                            <th class="erp-pdv__grid-col-num">Itens</th>
                             <th class="erp-pdv__grid-col-num">Total</th>
                         </tr>
                     </thead>
@@ -43,31 +43,29 @@
                         @forelse ($this->vendaEsperaResults as $index => $row)
                             <tr
                                 wire:key="pdv-venda-espera-{{ $row['id'] }}"
-                                wire:click="selectVendaEsperaRow({{ $index }})"
                                 id="erp-pdv-vendas-espera-row-{{ $index }}"
+                                onclick="window.erpPdvSelectVendaEsperaRow({{ $index }})"
+                                ondblclick="window.erpPdvRecuperarVendaEsperaSelecionada()"
                                 @class([
                                     'erp-pdv__grid-row',
                                     'erp-pdv__grid-row--marked' => $this->selectedVendaEsperaIndex === $index,
                                 ])
                             >
-                                <td class="erp-pdv-vendas-espera__numero">#{{ $row['numero'] }}</td>
-                                <td class="erp-pdv-vendas-espera__data">{{ $row['data'] }}</td>
-                                <td class="erp-pdv-vendas-espera__hora">{{ $row['hora'] }}</td>
                                 <td class="erp-pdv-vendas-espera__cliente" title="{{ $row['cliente'] }}">{{ $row['cliente'] }}</td>
-                                <td>{{ $row['operador'] }}</td>
-                                <td class="erp-pdv__grid-col-num">{{ $row['itens'] }}</td>
+                                <td class="erp-pdv-vendas-espera__numero">{{ $row['numero'] }}</td>
+                                <td class="erp-pdv-vendas-espera__hora" title="{{ $row['data'] }} {{ $row['hora'] }}">{{ $row['hora'] }}</td>
                                 <td class="erp-pdv__grid-col-num">R$ {{ $row['total'] }}</td>
                             </tr>
                         @empty
                             <tr class="erp-pdv__grid-empty">
-                                <td colspan="7">Nenhuma venda em espera neste caixa.</td>
+                                <td colspan="4">Nenhuma venda em espera neste caixa.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
 
-            @if ($this->selectedVendaEsperaIndex !== null)
+            @if ($this->vendaEsperaResults !== [])
                 @php
                     $motivoLength = mb_strlen(trim($this->vendaEsperaMotivoDescarte), 'UTF-8');
                     $minMotivo = 10;
@@ -105,16 +103,21 @@
             </button>
             <button
                 type="button"
-                wire:click="confirmarExcluirVendaEmEspera"
+                onclick="window.erpPdvDescartarVendaEsperaSelecionada()"
                 wire:loading.attr="disabled"
-                wire:target="confirmarExcluirVendaEmEspera"
+                wire:target="confirmarExcluirVendaEmEsperaAt,confirmarExcluirVendaEmEspera"
                 class="erp-pdv-caixa-modal__btn erp-pdv-caixa-modal__btn--danger"
-                @disabled($this->selectedVendaEsperaIndex === null || mb_strlen(trim($this->vendaEsperaMotivoDescarte)) < 10)
+                @disabled($this->vendaEsperaResults === [] || mb_strlen(trim($this->vendaEsperaMotivoDescarte)) < 10)
             >
-                <span wire:loading.remove wire:target="confirmarExcluirVendaEmEspera">Descartar</span>
-                <span wire:loading wire:target="confirmarExcluirVendaEmEspera">Descartando…</span>
+                <span wire:loading.remove wire:target="confirmarExcluirVendaEmEsperaAt,confirmarExcluirVendaEmEspera">Descartar</span>
+                <span wire:loading wire:target="confirmarExcluirVendaEmEsperaAt,confirmarExcluirVendaEmEspera">Descartando…</span>
             </button>
-            <button type="button" wire:click="recuperarVendaEmEspera" class="erp-pdv-caixa-modal__btn erp-pdv-caixa-modal__btn--primary" @disabled($this->selectedVendaEsperaIndex === null)>
+            <button
+                type="button"
+                onclick="window.erpPdvRecuperarVendaEsperaSelecionada()"
+                class="erp-pdv-caixa-modal__btn erp-pdv-caixa-modal__btn--primary"
+                @disabled($this->vendaEsperaResults === [])
+            >
                 Recuperar venda
             </button>
         </x-slot:footer>

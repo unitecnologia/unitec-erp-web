@@ -241,6 +241,13 @@ class User extends Authenticatable implements FilamentUser
         return $this->accessibleCaixaContaIds($empresaId) !== [];
     }
 
+    /**
+     * Caixa padrão do usuário na empresa (Permissões → Caixas).
+     *
+     * Prioridade: is_padrao → primeiro vínculo explícito → CAIXA GERAL.
+     * Não usa accessibleCaixaContaIds (que libera todos os PDVs quando o pivot
+     * está vazio): sem vínculo, o padrão financeiro é sempre o Caixa Geral.
+     */
     public function defaultCaixaContaId(?int $empresaId = null): ?int
     {
         $empresaId = $empresaId ?: (int) ($this->empresa_id ?? 0);
@@ -259,9 +266,17 @@ class User extends Authenticatable implements FilamentUser
             return (int) $padrao;
         }
 
-        $ids = $this->accessibleCaixaContaIds($empresaId);
+        $primeiro = DB::table('caixa_conta_user')
+            ->where('user_id', $this->getKey())
+            ->where('empresa_id', $empresaId)
+            ->orderBy('caixa_conta_id')
+            ->value('caixa_conta_id');
 
-        return $ids[0] ?? null;
+        if ($primeiro) {
+            return (int) $primeiro;
+        }
+
+        return (int) CaixaConta::ensureCaixaGeral()->id;
     }
 
     public function defaultCaixaContaNome(?int $empresaId = null): ?string

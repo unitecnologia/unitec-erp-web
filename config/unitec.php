@@ -2,7 +2,7 @@
 
 return [
     'app_name' => 'UNI SISTEMAS 3.0',
-    'versao' => '6.4.1.249',
+    'versao' => '6.4.1.251',
     'licenca' => env('UNITEC_LICENCA_LOCAL', ''),
 
     /*
@@ -111,6 +111,16 @@ return [
         'base_url' => env('UNITEC_DEVICE_SERVICE_URL', 'http://127.0.0.1:9330'),
         'api_key' => env('UNITEC_DEVICE_SERVICE_KEY', ''),
         'timeout_ms' => (int) env('UNITEC_DEVICE_SERVICE_TIMEOUT_MS', 2500),
+    ],
+
+    /*
+    | UI Helper — processo na sessão interativa (Unitec ERP.exe --ui-helper).
+    | FolderBrowserDialog para Backup quando o PHP roda sob UnitecErpServer (Session 0).
+    | Porta distinta do Device Service (9330).
+    */
+    'ui_helper' => [
+        'base_url' => env('UNITEC_UI_HELPER_URL', 'http://127.0.0.1:9331'),
+        'timeout_seconds' => (int) env('UNITEC_UI_HELPER_TIMEOUT_SECONDS', 300),
     ],
 
     /*

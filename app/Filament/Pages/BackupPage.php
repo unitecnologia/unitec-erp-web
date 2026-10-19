@@ -3,11 +3,14 @@
 namespace App\Filament\Pages;
 
 use App\Support\Erp\Backup\DatabaseBackupService;
+use App\Support\Erp\Backup\PortalBkpFileUploader;
 use App\Support\Erp\Backup\PortalBkpReporter;
+use App\Support\Erp\Backup\PortalBkpUploadStore;
 use App\Support\Erp\EmpresaParametros;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpScreen;
 use App\Support\Erp\ErpSystemConfig;
+use App\Support\Erp\Windows\WindowsUiHelperClient;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -36,6 +39,12 @@ class BackupPage extends Page
     public string $ultimoEm = '';
 
     public string $ultimoStatus = '';
+
+    public string $portalArquivoStatus = '';
+
+    public string $portalArquivoLabel = '—';
+
+    public string $portalArquivoDetalhe = '';
 
     public string $mysqldumpPath = '';
 
@@ -145,6 +154,8 @@ class BackupPage extends Page
                 $this->ultimoEm = (string) $empresa->param_backup_ultimo_em;
             }
         }
+
+        $this->loadPortalArquivoStatus();
     }
 
     /**
@@ -164,6 +175,8 @@ class BackupPage extends Page
             }
         }
 
+        $this->loadPortalArquivoStatus();
+
         $service = app(DatabaseBackupService::class);
         $pasta = trim($this->pastaDestino);
 
@@ -172,6 +185,59 @@ class BackupPage extends Page
             : $service->listBackups(Auth::user()?->empresa_id);
 
         return $this->arquivos;
+    }
+
+    protected function loadPortalArquivoStatus(): void
+    {
+        try {
+            $ui = app(PortalBkpUploadStore::class)->uiStatus();
+            $this->portalArquivoStatus = (string) ($ui['status'] ?? '');
+            $this->portalArquivoLabel = (string) ($ui['label'] ?? '—');
+            $this->portalArquivoDetalhe = (string) ($ui['detail'] ?? '');
+        } catch (Throwable) {
+            $this->portalArquivoStatus = '';
+            $this->portalArquivoLabel = '—';
+            $this->portalArquivoDetalhe = '';
+        }
+    }
+
+    /**
+     * @return array{ok: bool, message: string, status: string, label: string}
+     */
+    public function reenviarArquivoPortal(): array
+    {
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.access')) {
+            return [
+                'ok' => false,
+                'message' => 'Sem permissão para reenviar ao portal.',
+                'status' => '',
+                'label' => '—',
+            ];
+        }
+
+        try {
+            $result = app(PortalBkpFileUploader::class)->attemptDueJobs();
+            $this->loadPortalArquivoStatus();
+            $message = (string) ($result['message'] ?? $this->portalArquivoDetalhe);
+            $this->setFeedback(($result['ok'] ?? false) ? 'ok' : 'erro', $message !== '' ? $message : $this->portalArquivoLabel);
+
+            return [
+                'ok' => (bool) ($result['ok'] ?? false),
+                'message' => $message,
+                'status' => $this->portalArquivoStatus,
+                'label' => $this->portalArquivoLabel,
+            ];
+        } catch (Throwable $e) {
+            report($e);
+            $this->setFeedback('erro', 'Falha ao reenviar arquivo ao portal.');
+
+            return [
+                'ok' => false,
+                'message' => 'Falha ao reenviar arquivo ao portal.',
+                'status' => $this->portalArquivoStatus,
+                'label' => $this->portalArquivoLabel,
+            ];
+        }
     }
 
     public function resolveMysqldumpLabel(): void
@@ -378,6 +444,8 @@ class BackupPage extends Page
             return;
         }
 
+        $this->setFeedback('info', 'Abrindo seletor de pasta… Se não aparecer, use Alt+Tab (Unitec ERP).');
+
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
@@ -405,13 +473,7 @@ class BackupPage extends Page
             return;
         }
 
-        $this->pastaRestore = $selected;
-        $this->arquivoRestorePath = '';
-        $this->refreshArquivosRestore();
-
-        if ($this->arquivosRestore !== []) {
-            $this->arquivoRestorePath = (string) ($this->arquivosRestore[0]['path'] ?? '');
-        }
+        $this->aplicarPastaRestore($selected);
     }
 
     public function atualizarPastaRestore(): void
@@ -633,6 +695,156 @@ class BackupPage extends Page
         $this->setFeedback('ok', 'Configuração de backup salva (válida para todas as empresas).');
     }
 
+    /**
+     * Garante o UI Helper online (rápido). O seletor em si deve abrir no browser via JS
+     * para não travar o Livewire em "Abrindo…".
+     *
+     * @return array{ok: bool, online: bool, message: string, base_url: string}
+     */
+    public function prepararUiHelper(): array
+    {
+        $baseUrl = WindowsUiHelperClient::baseUrl();
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return [
+                'ok' => false,
+                'online' => false,
+                'message' => 'Seletor de pasta só no Windows.',
+                'base_url' => $baseUrl,
+            ];
+        }
+
+        try {
+            $result = WindowsUiHelperClient::ensureRunning();
+        } catch (Throwable $e) {
+            report($e);
+
+            return [
+                'ok' => false,
+                'online' => false,
+                'message' => 'Falha ao preparar o seletor: '.$e->getMessage(),
+                'base_url' => $baseUrl,
+            ];
+        }
+
+        return [
+            'ok' => (bool) ($result['ok'] ?? false),
+            'online' => (bool) ($result['online'] ?? false),
+            'message' => (string) ($result['message'] ?? ''),
+            'base_url' => $baseUrl,
+        ];
+    }
+
+    /**
+     * Aplica pasta escolhida no browser (UI Helper) e recarrega a lista de arquivos.
+     *
+     * @return array{ok: bool, path: string, count: int, arquivos: list<array<string, mixed>>, message: string}
+     */
+    public function aplicarPastaDestino(string $path): array
+    {
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.update')) {
+            return [
+                'ok' => false,
+                'path' => '',
+                'count' => 0,
+                'arquivos' => [],
+                'message' => 'Sem permissão para alterar a pasta.',
+            ];
+        }
+
+        $selected = $this->normalizeSelectedFolder($path);
+        if ($selected === null) {
+            $this->setFeedback('erro', 'Pasta inválida.');
+
+            return [
+                'ok' => false,
+                'path' => '',
+                'count' => 0,
+                'arquivos' => [],
+                'message' => 'Pasta inválida.',
+            ];
+        }
+
+        $this->pastaDestino = $selected;
+        $arquivos = $this->refreshArquivos();
+        $count = count($arquivos);
+        $message = $count > 0
+            ? 'Pasta selecionada: '.$selected.' ('.$count.' arquivo(s) de backup).'
+            : 'Pasta selecionada: '.$selected.'. Nenhum arquivo unitec_erp_*.sql/.env nesta pasta.';
+
+        $this->setFeedback($count > 0 ? 'ok' : 'info', $message);
+
+        return [
+            'ok' => true,
+            'path' => $selected,
+            'count' => $count,
+            'arquivos' => $arquivos,
+            'message' => $message,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, path: string, count: int, arquivos: list<array<string, mixed>>, message: string}
+     */
+    public function aplicarPastaRestore(string $path): array
+    {
+        if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.restore')) {
+            return [
+                'ok' => false,
+                'path' => '',
+                'count' => 0,
+                'arquivos' => [],
+                'message' => 'Sem permissão para restaurar.',
+            ];
+        }
+
+        $selected = $this->normalizeSelectedFolder($path);
+        if ($selected === null) {
+            $this->setFeedback('erro', 'Pasta inválida.');
+
+            return [
+                'ok' => false,
+                'path' => '',
+                'count' => 0,
+                'arquivos' => [],
+                'message' => 'Pasta inválida.',
+            ];
+        }
+
+        $this->pastaRestore = $selected;
+        $this->arquivoRestorePath = '';
+        $this->refreshArquivosRestore();
+        $count = count($this->arquivosRestore);
+
+        if ($this->arquivosRestore !== []) {
+            $this->arquivoRestorePath = (string) ($this->arquivosRestore[0]['path'] ?? '');
+        }
+
+        $message = $count > 0
+            ? 'Pasta de restauração: '.$selected.' ('.$count.' arquivo(s)).'
+            : 'Pasta de restauração: '.$selected.'. Nenhum backup encontrado nesta pasta.';
+
+        $this->setFeedback($count > 0 ? 'ok' : 'info', $message);
+
+        return [
+            'ok' => true,
+            'path' => $selected,
+            'count' => $count,
+            'arquivos' => $this->arquivosRestore,
+            'message' => $message,
+        ];
+    }
+
+    public function avisarSeletorPasta(string $message): void
+    {
+        $msg = trim($message);
+        if ($msg === '') {
+            return;
+        }
+
+        $this->setFeedback('erro', $msg);
+    }
+
     public function selecionarPasta(): void
     {
         if (! ErpAccess::authorizeOrNotify(Auth::user(), 'backup.update')) {
@@ -644,6 +856,8 @@ class BackupPage extends Page
 
             return;
         }
+
+        $this->setFeedback('info', 'Abrindo seletor de pasta… Se não aparecer, use Alt+Tab (Unitec ERP).');
 
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
@@ -666,11 +880,12 @@ class BackupPage extends Page
         }
 
         if ($selected === null) {
+            $this->setFeedback('info', 'Seleção de pasta cancelada.');
+
             return;
         }
 
-        $this->pastaDestino = $selected;
-        $this->setFeedback('ok', 'Pasta selecionada: '.$selected);
+        $this->aplicarPastaDestino($selected);
     }
 
     public function abrirPasta(): void
@@ -774,99 +989,149 @@ class BackupPage extends Page
         ]);
     }
 
+    protected function normalizeSelectedFolder(string $path): ?string
+    {
+        $selected = trim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, str_replace(['"', "'"], '', $path)));
+        $selected = rtrim($selected, " \t\n\r\0\x0B".DIRECTORY_SEPARATOR);
+
+        if ($selected === '' || ! is_dir($selected)) {
+            return null;
+        }
+
+        $real = realpath($selected);
+
+        return str_replace('/', '\\', $real !== false ? $real : $selected);
+    }
+
     /**
-     * Abre FolderBrowserDialog no monitor da janela ativa (ERP/browser),
-     * evitando coordenadas antigas de segundo monitor / fora da WorkingArea.
+     * Mesmo padrão da tela Balança (FolderBrowserDialog via PowerShell STA).
+     * Evita UI Helper no request Livewire (travava em "Abrindo…" sem janela).
      */
     protected function pickWindowsFolder(string $initialPath, string $description = 'Selecione a pasta para salvar os backups'): ?string
     {
         $initialPath = str_replace(['"', "'"], '', $initialPath);
         $description = str_replace(['"', "'"], '', $description);
+
+        // Sessão interativa (DEV): PowerShell STA — caminho que funciona (igual Balança).
+        // Session 0 (serviço): UI Helper na sessão do usuário.
+        try {
+            WindowsUiHelperClient::cancelPick(2);
+        } catch (Throwable) {
+            // ignore
+        }
+
+        if (! WindowsUiHelperClient::isInteractiveSession()) {
+            WindowsUiHelperClient::ensureRunning();
+
+            if (WindowsUiHelperClient::isOnline()) {
+                $timeout = max(30, (int) config('unitec.ui_helper.timeout_seconds', 300));
+                $result = WindowsUiHelperClient::pickFolder($initialPath, $description, $timeout);
+
+                if ($result['cancelled']) {
+                    return null;
+                }
+
+                if ($result['ok'] && is_string($result['path']) && $result['path'] !== '') {
+                    return $result['path'];
+                }
+
+                if (is_string($result['message'] ?? null) && $result['message'] !== '') {
+                    throw new \RuntimeException((string) $result['message']);
+                }
+            }
+
+            throw new \RuntimeException(
+                'Seletor de pasta indisponível. Digite o caminho no campo '
+                .'ou abra o Unitec ERP pelo atalho da área de trabalho.'
+            );
+        }
+
         $script = <<<'PS1'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-
-if (-not ('UnitecWin32' -as [type])) {
+if (-not ('UnitecFg' -as [type])) {
   Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class UnitecWin32 {
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-  [StructLayout(LayoutKind.Sequential)] public struct RECT {
-    public int Left; public int Top; public int Right; public int Bottom;
-  }
+public static class UnitecFg {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+  public const int SW_RESTORE = 9;
 }
 '@
 }
-
-$fg = [UnitecWin32]::GetForegroundWindow()
-$cx = 0
-$cy = 0
-if ($fg -ne [IntPtr]::Zero) {
-  $rect = New-Object UnitecWin32+RECT
-  if ([UnitecWin32]::GetWindowRect($fg, [ref]$rect)) {
-    $cx = [int](($rect.Left + $rect.Right) / 2)
-    $cy = [int](($rect.Top + $rect.Bottom) / 2)
-  }
-}
-if ($cx -eq 0 -and $cy -eq 0) {
-  $pt = [System.Windows.Forms.Cursor]::Position
-  $cx = [int]$pt.X
-  $cy = [int]$pt.Y
-}
-
-$point = New-Object System.Drawing.Point $cx, $cy
-$screen = [System.Windows.Forms.Screen]::FromPoint($point)
-$wa = $screen.WorkingArea
-# Nunca reutilizar centro fora da WorkingArea atual (ex.: monitor desconectado).
-if ($cx -lt $wa.Left -or $cx -ge $wa.Right -or $cy -lt $wa.Top -or $cy -ge $wa.Bottom) {
-  $cx = $wa.Left + [int]($wa.Width / 2)
-  $cy = $wa.Top + [int]($wa.Height / 2)
-}
-
 [void][System.Windows.Forms.Application]::EnableVisualStyles()
 
 $owner = New-Object System.Windows.Forms.Form
-$owner.Text = 'Unitec ERP'
-$owner.ShowInTaskbar = $false
-$owner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-$owner.Opacity = 0.01
-$owner.Width = 8
-$owner.Height = 8
-$owner.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$owner.Location = New-Object System.Drawing.Point ($cx - 4), ($cy - 4)
+$owner.Text = 'Unitec ERP — selecione a pasta'
 $owner.TopMost = $true
+$owner.ShowInTaskbar = $true
+$owner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedToolWindow
+$owner.MaximizeBox = $false
+$owner.MinimizeBox = $false
+$owner.Width = 420
+$owner.Height = 110
+$owner.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+$owner.BackColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
+$owner.ForeColor = [System.Drawing.Color]::White
+$lbl = New-Object System.Windows.Forms.Label
+$lbl.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lbl.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$lbl.Text = "Escolha a pasta na janela do Windows.`nSe nao aparecer, use Alt+Tab."
+$owner.Controls.Add($lbl)
 $owner.Show()
 [System.Windows.Forms.Application]::DoEvents()
+try {
+  [void][UnitecFg]::ShowWindow($owner.Handle, [UnitecFg]::SW_RESTORE)
+  [void][UnitecFg]::BringWindowToTop($owner.Handle)
+  [void][UnitecFg]::SetForegroundWindow($owner.Handle)
+  $owner.Activate()
+} catch { }
 
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $dialog.Description = $env:UNITEC_BACKUP_DIALOG_DESC
 $dialog.ShowNewFolderButton = $true
-try { $dialog.AutoUpgradeEnabled = $true } catch { }
 $initial = $env:UNITEC_BACKUP_INITIAL
 if ($initial -and (Test-Path -LiteralPath $initial)) {
-  $dialog.SelectedPath = $initial
+    $dialog.SelectedPath = $initial
 }
 
 try {
-  $result = $dialog.ShowDialog($owner)
-  if ($result -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.SelectedPath) {
-    [Console]::Out.Write($dialog.SelectedPath)
-  }
+    $result = $dialog.ShowDialog($owner)
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.SelectedPath) {
+        [Console]::Out.Write($dialog.SelectedPath)
+    }
 } finally {
-  $owner.Close()
-  $owner.Dispose()
-  $dialog.Dispose()
+    $owner.Close()
+    $owner.Dispose()
+    $dialog.Dispose()
 }
 PS1;
 
-        $output = $this->runWindowsStaPowerShell($script, [
+        $process = new \Symfony\Component\Process\Process([
+            'powershell.exe',
+            '-NoProfile',
+            '-STA',
+            '-ExecutionPolicy', 'Bypass',
+            '-Command', $script,
+        ]);
+        $process->setTimeout(300);
+        $process->setEnv([
             'UNITEC_BACKUP_INITIAL' => $initialPath,
             'UNITEC_BACKUP_DIALOG_DESC' => $description,
-        ], 300);
+            'SystemRoot' => (string) (getenv('SystemRoot') ?: 'C:\\Windows'),
+            'WINDIR' => (string) (getenv('WINDIR') ?: 'C:\\Windows'),
+        ]);
+        $process->run();
 
-        $path = trim($output);
+        if (! $process->isSuccessful()) {
+            $error = trim($process->getErrorOutput().' '.$process->getOutput());
+
+            throw new \RuntimeException($error !== '' ? $error : 'Falha ao abrir o diálogo de pasta.');
+        }
+
+        $path = trim($process->getOutput());
 
         if ($path === '') {
             return null;

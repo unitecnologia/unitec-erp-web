@@ -18,6 +18,7 @@ class PdvVendaItem extends Model
         'descricao',
         'unidade',
         'observacao',
+        'composicao_json',
         'quantidade',
         'preco_unitario',
         'desconto',

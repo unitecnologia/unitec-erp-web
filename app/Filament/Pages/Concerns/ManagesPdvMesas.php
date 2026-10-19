@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Livewire\Erp\PdvHotPath;
 use App\Models\PdvMesa;
+use App\Models\PdvVenda;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Pdv\PdvDavCupomLayout;
 use App\Support\Erp\Pdv\PdvMesaCredencial;
@@ -28,20 +29,56 @@ trait ManagesPdvMesas
     public string $mesaTransferirDestino = '';
 
     /**
-     * @return array{quantidade: int, inatividade: int, url: string, credencial: string, mesa: array{numero: int, id: int, token: string, aguardando: bool}|null}
+     * @return array{
+     *   quantidade: int,
+     *   inatividade: int,
+     *   url: string,
+     *   credencial: string,
+     *   nomes: array<string, string>,
+     *   nomes_b64: string,
+     *   nomes_rev: string,
+     *   mesa: array{numero: int, id: int, token: string, aguardando: bool}|null
+     * }
      */
     public function getPdvMesasPainelProperty(): array
     {
         $config = $this->pdvConfig();
+        $empresa = $config->empresa();
         $mesa = PdvMesaSessao::atual();
+        $quantidade = PdvMesaService::quantidade($empresa);
+        $nomes = [];
+
+        if ($empresa !== null) {
+            // Fonte única: pdv_mesas.nome (Configurações → Mesas). Número continua sendo o ID interno.
+            foreach (PdvMesaService::mapaRotulos((int) $empresa->id, $quantidade) as $numero => $rotulo) {
+                $nomes[(string) (int) $numero] = (string) $rotulo;
+            }
+        }
+
+        $nomesJson = json_encode($nomes, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT);
+        if (! is_string($nomesJson)) {
+            $nomesJson = '{}';
+        }
 
         return [
-            'quantidade' => PdvMesaService::quantidade($config->empresa()),
-            'inatividade' => PdvMesaService::inatividadeMinutos($config->empresa()),
+            'quantidade' => $quantidade,
+            'inatividade' => PdvMesaService::inatividadeMinutos($empresa),
             'url' => route('erp.pdv.mesas.pulso'),
             'credencial' => $this->emitirCredencialMesas(),
+            'nomes' => $nomes,
+            'nomes_b64' => base64_encode($nomesJson),
+            'nomes_rev' => substr(md5($quantidade.'|'.$nomesJson), 0, 12),
             'mesa' => $mesa ? ['numero' => $mesa['numero'], 'id' => $mesa['id'], 'token' => $mesa['token'], 'aguardando' => $mesa['aguardando']] : null,
         ];
+    }
+
+    private function rotuloMesa(int $numero): string
+    {
+        $empresaId = (int) ($this->pdvConfig()->empresa()?->id ?? 0);
+
+        return $empresaId > 0
+            ? PdvMesaService::rotuloDaEmpresa($empresaId, $numero)
+            : PdvMesaService::rotuloPadrao($numero);
     }
 
     public function renovarCredencialMesas(): string
@@ -141,12 +178,17 @@ trait ManagesPdvMesas
 
         $this->limparCupom();
         $this->dispatch('erp-pdv-focus-search');
+        $this->js(<<<'JS'
+            window.__erpPdvForceSearchFocusUntil = Date.now() + 5000;
+            window.dispatchEvent(new CustomEvent('erp-pdv-refocus-search'));
+            [0, 50, 150, 400, 900].forEach((ms) => setTimeout(() => window.dispatchEvent(new CustomEvent('erp-pdv-refocus-search')), ms));
+        JS);
 
         Notification::make()
             ->title('Balcão.')
             ->body($qtdItens > 0
-                ? PdvMesaService::rotulo($mesa['numero']).' mantida com '.$qtdItens.' item(ns).'
-                : PdvMesaService::rotulo($mesa['numero']).' liberada.')
+                ? $this->rotuloMesa($mesa['numero']).' mantida com '.$qtdItens.' item(ns).'
+                : $this->rotuloMesa($mesa['numero']).' liberada.')
             ->success()
             ->send();
     }
@@ -167,7 +209,14 @@ trait ManagesPdvMesas
             return;
         }
 
-        if ($this->activeModal !== null || $this->overlayPersonOpen || $this->overlayProductOpen) {
+        if ($this->activeModal !== null
+            || $this->overlayPersonOpen
+            || $this->overlayProductOpen
+            || ($this->pdvConfirmCancelarVenda ?? false)
+            || ($this->pdvConfirmImprimirPosVenda ?? false)
+            || ($this->pdvConfirmImprimirResumoCaixa ?? false)
+            || ($this->fechamentoMoedasModalOpen ?? false)
+        ) {
             $this->skipRender();
 
             return;
@@ -182,14 +231,21 @@ trait ManagesPdvMesas
             return;
         }
 
+        // limparCupom → desvincula (libera reserva) e limpa grade/campos; itens já gravados na mesa.
         $this->limparCupom();
         $this->dispatch('erp-pdv-focus-search');
+        // Garante Código após o morph/notificação (voltar ao balcão por inatividade).
+        $this->js(<<<'JS'
+            window.__erpPdvForceSearchFocusUntil = Date.now() + 5000;
+            window.dispatchEvent(new CustomEvent('erp-pdv-refocus-search'));
+            [0, 50, 150, 400, 900].forEach((ms) => setTimeout(() => window.dispatchEvent(new CustomEvent('erp-pdv-refocus-search')), ms));
+        JS);
 
         Notification::make()
-            ->title(PdvMesaService::rotulo($mesa['numero']).' fechada por inatividade.')
+            ->title($this->rotuloMesa($mesa['numero']).' — saída por inatividade.')
             ->body($qtdItens > 0
-                ? 'Comanda salva com '.$qtdItens.' item(ns). PDV em modo balcão.'
-                : 'PDV em modo balcão.')
+                ? 'Comanda preservada com '.$qtdItens.' item(ns). PDV em modo balcão.'
+                : 'PDV em modo balcão. A mesa permanece disponível para reabrir.')
             ->info()
             ->send();
     }
@@ -210,7 +266,7 @@ trait ManagesPdvMesas
 
         if ($mesa['aguardando']) {
             $this->notifyPdvError(
-                PdvMesaService::rotulo($mesa['numero']).' aguardando fechamento.',
+                $this->rotuloMesa($mesa['numero']).' aguardando fechamento.',
                 'Reabra a mesa para transferir.',
             );
 
@@ -275,7 +331,7 @@ trait ManagesPdvMesas
         $this->dispatch('erp-pdv-focus-search');
 
         Notification::make()
-            ->title(PdvMesaService::rotulo($mesa['numero']).' transferida para a '.$resultado['mesa']->rotulo().'.')
+            ->title($this->rotuloMesa($mesa['numero']).' transferida para a '.$resultado['mesa']->rotulo().'.')
             ->success()
             ->send();
     }
@@ -304,7 +360,7 @@ trait ManagesPdvMesas
         $this->limparCupom();
 
         Notification::make()
-            ->title(PdvMesaService::rotulo($mesa['numero']).' foi assumida por outro terminal.')
+            ->title($this->rotuloMesa($mesa['numero']).' foi assumida por outro terminal.')
             ->body('A reserva expirou por inatividade. Lançamentos feitos depois disso nesta tela não foram gravados; reabra a mesa para conferir.')
             ->warning()
             ->persistent()
@@ -432,7 +488,7 @@ trait ManagesPdvMesas
         $this->dispatch('erp-pdv-focus-search');
 
         Notification::make()
-            ->title(PdvMesaService::rotulo($mesa['numero']).' aguardando fechamento.')
+            ->title($this->rotuloMesa($mesa['numero']).' aguardando fechamento.')
             ->body('Itens bloqueados. Finalize (F7), reimprima a parcial ou reabra a mesa.')
             ->warning()
             ->send();
@@ -447,7 +503,7 @@ trait ManagesPdvMesas
 
         if ($mesa !== null && ! $mesa['aguardando']) {
             Notification::make()
-                ->title(PdvMesaService::rotulo($mesa['numero']).' continua em atendimento.')
+                ->title($this->rotuloMesa($mesa['numero']).' continua em atendimento.')
                 ->body('Imprima a parcial novamente quando a impressora estiver pronta.')
                 ->info()
                 ->send();
@@ -490,7 +546,7 @@ trait ManagesPdvMesas
         $this->dispatch('erp-pdv-focus-search');
 
         Notification::make()
-            ->title(PdvMesaService::rotulo($mesa['numero']).' reaberta.')
+            ->title($this->rotuloMesa($mesa['numero']).' reaberta.')
             ->body('A mesa voltou a receber lançamentos.')
             ->success()
             ->send();
@@ -533,7 +589,7 @@ trait ManagesPdvMesas
         $mesa = PdvMesaSessao::atual();
 
         return $mesa !== null
-            ? 'CAIXA ABERTO · '.mb_strtoupper(PdvMesaService::rotulo($mesa['numero']), 'UTF-8')
+            ? 'CAIXA ABERTO · '.mb_strtoupper($this->rotuloMesa($mesa['numero']), 'UTF-8')
             : 'CAIXA ABERTO';
     }
 
@@ -566,7 +622,7 @@ trait ManagesPdvMesas
             $this->cupomItens = [];
 
             Notification::make()
-                ->title(PdvMesaService::rotulo($mesa['numero']).' não pôde ser retomada.')
+                ->title($this->rotuloMesa($mesa['numero']).' não pôde ser retomada.')
                 ->body($resultado['erro'])
                 ->warning()
                 ->send();
@@ -617,6 +673,14 @@ trait ManagesPdvMesas
         $mesa = PdvMesaSessao::atual();
 
         if ($mesa !== null) {
+            $numero = (int) ($mesa['numero'] ?? 0);
+
+            if ($numero > 0) {
+                PdvVenda::query()->whereKey($pdvVendaId)->update([
+                    'pdv_mesa_numero' => $numero,
+                ]);
+            }
+
             PdvMesaService::make()->baixarNaVenda($mesa['id'], $mesa['token'], $pdvVendaId);
         }
     }
@@ -631,7 +695,7 @@ trait ManagesPdvMesas
 
         $this->notifyPdvError(
             $operacao.' indisponível com mesa aberta.',
-            PdvMesaService::rotulo($mesa['numero']).' está em atendimento. Use "Balcão" no painel Mesas.',
+            $this->rotuloMesa($mesa['numero']).' está em atendimento. Use "Balcão" no painel Mesas.',
         );
 
         return true;
@@ -650,7 +714,7 @@ trait ManagesPdvMesas
         }
 
         $this->notifyPdvError(
-            PdvMesaService::rotulo($mesa['numero']).' aguardando fechamento.',
+            $this->rotuloMesa($mesa['numero']).' aguardando fechamento.',
             'Itens bloqueados após a pré-conta. Use "Reabrir" no painel Mesas para alterar.',
         );
         $this->dispatch('erp-pdv-erro-beep');
@@ -697,7 +761,7 @@ trait ManagesPdvMesas
         $this->loadCupomFromSession();
 
         if (! $this->cupomTemItens()) {
-            $this->notifyPdvError(PdvMesaService::rotulo($atual['numero']).' sem itens para imprimir.');
+            $this->notifyPdvError($this->rotuloMesa($atual['numero']).' sem itens para imprimir.');
 
             return null;
         }
@@ -743,7 +807,7 @@ trait ManagesPdvMesas
         }
 
         $this->notifyPdvError(
-            PdvMesaService::rotulo($mesa['numero']).' aguardando fechamento.',
+            $this->rotuloMesa($mesa['numero']).' aguardando fechamento.',
             'Disponível: Finalizar (F7), Reimprimir Parcial ou Reabrir.',
         );
 
@@ -767,7 +831,7 @@ trait ManagesPdvMesas
             return;
         }
 
-        $this->notifyPdvError('Não foi possível atualizar a '.PdvMesaService::rotulo($mesa['numero']).'.', 'Confira os itens e tente novamente.');
+        $this->notifyPdvError('Não foi possível atualizar a '.$this->rotuloMesa($mesa['numero']).'.', 'Confira os itens e tente novamente.');
         $this->dispatch('erp-pdv-mesas-poll');
         $this->dispatch('erp-pdv-focus-search');
     }

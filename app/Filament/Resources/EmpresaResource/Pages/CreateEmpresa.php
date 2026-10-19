@@ -79,6 +79,7 @@ class CreateEmpresa extends CreateRecord
         // A flag "Habilitar API Boleto" permanece desligada até o cliente ativar.
         BoletoContaApiDefaults::ensureHomologContasForEmpresa($empresa);
         $this->syncEmpresaNfeEmitentes();
+        $this->syncPortalContadorAposSalvar($empresa);
         if (! filter_var($empresa->param_boleto_habilitar ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $empresa->forceFill(['param_boleto_habilitar' => false])->saveQuietly();
         }

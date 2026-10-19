@@ -1,6 +1,11 @@
 @if ($this->activeModal === 'mesa_parcial_confirmar' || $this->activeModal === 'mesa_reabrir')
-    <?php $mesaConfirmar = \App\Support\Erp\Pdv\PdvMesaSessao::atual(); ?>
-    <?php $mesaConfirmarRotulo = $mesaConfirmar ? \App\Support\Erp\Pdv\PdvMesaService::rotulo($mesaConfirmar['numero']) : 'mesa'; ?>
+    <?php
+        $mesaConfirmar = \App\Support\Erp\Pdv\PdvMesaSessao::atual();
+        $mesaConfirmarEmpresaId = (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+        $mesaConfirmarRotulo = $mesaConfirmar
+            ? \App\Support\Erp\Pdv\PdvMesaService::rotuloDaEmpresa($mesaConfirmarEmpresaId, (int) $mesaConfirmar['numero'])
+            : 'mesa';
+    ?>
 
     @if ($this->activeModal === 'mesa_parcial_confirmar')
         @include('pdvui::modals.partials.confirm', [

@@ -6,6 +6,7 @@ use DOMDocument;
 use Unitec\FiscalEngine\Dto\InutilizarNfceRequest;
 use Unitec\FiscalEngine\Dto\InutilizarNfceResponse;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
+use Unitec\FiscalEngine\Util\ChaveAcesso;
 use Unitec\FiscalEngine\Util\XmlHelper;
 use Unitec\FiscalEngine\Xml\NfceInutilizacaoXmlBuilder;
 use Unitec\FiscalEngine\Xml\XmlSigner;
@@ -29,13 +30,15 @@ final class NfceInutilizador
         $this->signer->signInfInut($dom, $request->certificate);
 
         $inutNfe = $this->xmlBuilder->finalizeInutNfe($dom);
-        $endpoint = ScNfceEndpoints::inutilizacao($request->tpAmb);
+        $uf = NfcePublicUrls::assertSupportedUf($request->uf);
+        $endpoint = NfceSoapUrls::inutilizacao($uf, $request->tpAmb);
+        $cUf = ChaveAcesso::cUfFromSigla($uf);
 
         $soapResponse = $this->soapClient->inutilizacao(
             $endpoint,
             $inutNfe,
             $request->certificate,
-            '42',
+            $cUf,
         );
 
         $parsed = $this->parseInutilizacaoResponse($soapResponse);

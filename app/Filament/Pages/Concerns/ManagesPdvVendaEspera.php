@@ -11,6 +11,7 @@ use App\Support\Erp\Pdv\PdvImportReserva;
 use App\Support\Erp\Pdv\PdvVendaEsperaService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 trait ManagesPdvVendaEspera
 {
@@ -23,7 +24,10 @@ trait ManagesPdvVendaEspera
 
     public string $vendaEsperaMotivoDescarte = '';
 
-    public function suspenderVendaEmEspera(): void
+    /** Identificador informado no modal Suspender (JOÃO, BALCÃO 01…). */
+    public string $vendaEsperaIdentificador = '';
+
+    public function openSuspenderVendaModal(): void
     {
         if (! $this->caixaAberto || ! $this->caixaSessaoId) {
             $this->notifyPdvError('Caixa fechado.');
@@ -35,7 +39,6 @@ trait ManagesPdvVendaEspera
             return;
         }
 
-        // Hot path grava o cupom na sessão; carregar antes de salvar a espera.
         $this->loadCupomFromSession();
 
         if (! $this->cupomTemItens()) {
@@ -46,6 +49,54 @@ trait ManagesPdvVendaEspera
 
             return;
         }
+
+        $this->vendaEsperaIdentificador = $this->resolverIdentificadorSuspenderPadrao();
+        $this->openPdvModal('suspender_venda');
+        $this->dispatch('erp-pdv-focus-suspender-venda');
+    }
+
+    public function updatedVendaEsperaIdentificador(string $value): void
+    {
+        $upper = mb_strtoupper(trim($value), 'UTF-8');
+        if ($this->vendaEsperaIdentificador !== $upper) {
+            $this->vendaEsperaIdentificador = $upper;
+        }
+    }
+
+    public function cancelSuspenderVenda(): void
+    {
+        $this->vendaEsperaIdentificador = '';
+        $this->closePdvModal();
+        $this->dispatch('erp-pdv-focus-search');
+    }
+
+    public function confirmarSuspenderVenda(): void
+    {
+        if (! $this->caixaAberto || ! $this->caixaSessaoId) {
+            $this->notifyPdvError('Caixa fechado.');
+
+            return;
+        }
+
+        if ($this->mesaBloqueiaOperacao('Venda em espera')) {
+            return;
+        }
+
+        $this->loadCupomFromSession();
+
+        if (! $this->cupomTemItens()) {
+            Notification::make()
+                ->title('Não há itens para suspender.')
+                ->warning()
+                ->send();
+            $this->closePdvModal();
+
+            return;
+        }
+
+        // Identificador opcional: vazio → lista mostra "SEM NOME"; ID/sequência identificam a espera.
+        $identificador = mb_strtoupper(trim($this->vendaEsperaIdentificador), 'UTF-8');
+        $identificadorSalvo = $identificador !== '' ? $identificador : null;
 
         $user = Auth::user();
         if (! $user) {
@@ -70,33 +121,63 @@ trait ManagesPdvVendaEspera
             ],
             'price_table_id' => session('erp.pdv.price_table_id'),
             'cupom_iniciado_em' => session('erp.pdv.cupom_iniciado_em'),
+            'identificador' => $identificadorSalvo,
         ];
 
-        $clienteNome = trim((string) ($contexto['import']['cliente_nome'] ?? ''));
         $total = (float) $this->cupomTotalValor();
         $itens = array_values($this->cupomItens);
-
-        $espera = PdvVendaEspera::query()->create([
-            'pdv_caixa_sessao_id' => $this->caixaSessaoId,
-            'user_id' => $user->id,
+        $payload = [
+            'cliente_nome' => $identificadorSalvo,
             'vendedor_id' => $this->vendedorId,
-            'sequencia' => $service->nextSequencia($this->caixaSessaoId),
-            'cliente_nome' => $clienteNome !== '' ? $clienteNome : null,
             'vendedor_nome' => $this->vendedor !== '' ? $this->vendedor : null,
             'qtd_itens' => count($itens),
             'total' => $total,
             'snapshot' => $service->encode($service->buildSnapshot($itens, $contexto)),
-        ]);
+            'status' => PdvVendaEspera::STATUS_PENDENTE,
+            'finalizada_em' => null,
+            'pdv_venda_id' => null,
+        ];
 
-        // Só limpa o cupom depois que a espera foi persistida. Documento importado segue reservado.
+        $esperaAtiva = $this->encontrarEsperaAtivaParaAtualizar((int) $user->id);
+        $atualizou = false;
+
+        if ($esperaAtiva !== null) {
+            $esperaAtiva->forceFill($payload)->save();
+            $espera = $esperaAtiva;
+            $atualizou = true;
+        } else {
+            $espera = PdvVendaEspera::query()->create([
+                'pdv_caixa_sessao_id' => $this->caixaSessaoId,
+                'user_id' => $user->id,
+                'sequencia' => $service->nextSequencia($this->caixaSessaoId),
+                ...$payload,
+            ]);
+        }
+
+        // Limpa vínculo da espera ativa antes do limparCupom (evita devolver como em_uso).
+        $this->forgetEsperaAtivaId();
+        $this->vendaEsperaIdentificador = '';
         $this->limparCupom(liberarImportacao: false);
+        $this->closePdvModal();
         $this->dispatch('erp-pdv-focus-search');
 
+        $rotulo = $identificadorSalvo ?? 'SEM NOME';
         Notification::make()
-            ->title('Venda em espera salva.')
-            ->body(sprintf('Espera #%d — R$ %s', $espera->sequencia, ErpMoney::formatBr($total)))
+            ->title($atualizou ? 'Venda em espera atualizada.' : 'Venda em espera salva.')
+            ->body(sprintf(
+                '%s — Espera #%d — R$ %s',
+                $rotulo,
+                $espera->sequencia,
+                ErpMoney::formatBr($total),
+            ))
             ->success()
             ->send();
+    }
+
+    /** @deprecated Use openSuspenderVendaModal + confirmarSuspenderVenda. */
+    public function suspenderVendaEmEspera(): void
+    {
+        $this->openSuspenderVendaModal();
     }
 
     public function openVendasEsperaModal(): void
@@ -111,6 +192,7 @@ trait ManagesPdvVendaEspera
             return;
         }
 
+        $this->recuperarEsperasOrfasEmUso();
         $this->vendaEsperaSearch = '';
         $this->selectedVendaEsperaIndex = null;
         $this->vendaEsperaMotivoDescarte = '';
@@ -150,6 +232,7 @@ trait ManagesPdvVendaEspera
         $query = PdvVendaEspera::query()
             ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
             ->where('user_id', $user->id)
+            ->pendentes()
             ->latest('id');
 
         if ($term !== '') {
@@ -165,12 +248,16 @@ trait ManagesPdvVendaEspera
             ->map(fn (PdvVendaEspera $espera): array => [
                 'id' => $espera->id,
                 'numero' => $espera->sequencia,
-                'cliente' => $espera->cliente_nome ?: 'Consumidor final',
+                'cliente' => $espera->cliente_nome ?: 'SEM NOME',
                 'operador' => $espera->vendedor_nome ?: '—',
                 'itens' => $espera->qtd_itens,
                 'total' => ErpMoney::formatBr((float) $espera->total),
-                'data' => $espera->created_at ? ErpTimezone::toLocal($espera->created_at)->format('d/m/Y') : '—',
-                'hora' => $espera->created_at ? ErpTimezone::toLocal($espera->created_at)->format('H:i') : '—',
+                'data' => $espera->updated_at
+                    ? ErpTimezone::toLocal($espera->updated_at)->format('d/m/Y')
+                    : ($espera->created_at ? ErpTimezone::toLocal($espera->created_at)->format('d/m/Y') : '—'),
+                'hora' => $espera->updated_at
+                    ? ErpTimezone::toLocal($espera->updated_at)->format('H:i')
+                    : ($espera->created_at ? ErpTimezone::toLocal($espera->created_at)->format('H:i') : '—'),
             ])
             ->values()
             ->all();
@@ -182,11 +269,13 @@ trait ManagesPdvVendaEspera
     {
         if (isset($this->vendaEsperaResults[$index])) {
             $this->selectedVendaEsperaIndex = $index;
-            $this->vendaEsperaMotivoDescarte = '';
             $this->dispatch('erp-pdv-focus-vendas-espera-motivo');
         }
     }
 
+    /**
+     * Navegação ↑/↓ é local (JS). Mantido só por compatibilidade / atalho Delete.
+     */
     public function moveVendaEsperaSelection(int $direction): void
     {
         $count = count($this->vendaEsperaResults);
@@ -196,6 +285,26 @@ trait ManagesPdvVendaEspera
 
         $current = $this->selectedVendaEsperaIndex ?? 0;
         $this->selectedVendaEsperaIndex = max(0, min($count - 1, $current + $direction));
+    }
+
+    public function recuperarVendaEmEsperaAt(int $index): void
+    {
+        if (! isset($this->vendaEsperaResults[$index])) {
+            return;
+        }
+
+        $this->selectedVendaEsperaIndex = $index;
+        $this->recuperarVendaEmEspera();
+    }
+
+    public function confirmarExcluirVendaEmEsperaAt(int $index): void
+    {
+        if (! isset($this->vendaEsperaResults[$index])) {
+            return;
+        }
+
+        $this->selectedVendaEsperaIndex = $index;
+        $this->confirmarExcluirVendaEmEspera();
     }
 
     public function recuperarVendaEmEspera(): void
@@ -228,10 +337,12 @@ trait ManagesPdvVendaEspera
             ->whereKey((int) $row['id'])
             ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
             ->where('user_id', $user->id)
+            ->pendentes()
             ->first();
 
         if (! $espera) {
             $this->refreshVendasEsperaResults();
+            $this->notifyPdvError('Esta venda em espera não está mais disponível.');
 
             return;
         }
@@ -282,13 +393,23 @@ trait ManagesPdvVendaEspera
             $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
         }
 
-        $espera->delete();
+        // Mantém o registro: re-suspender atualiza a mesma espera; F7 encerra.
+        $espera->forceFill(['status' => PdvVendaEspera::STATUS_EM_USO])->save();
+        $this->rememberEsperaAtivaId((int) $espera->id);
+
         $this->closePdvModal();
         $this->dispatch('erp-pdv-focus-search');
 
+        $identificador = trim((string) ($espera->cliente_nome ?: ''));
         Notification::make()
             ->title('Venda em espera recuperada.')
-            ->body(sprintf('%d item(ns) — R$ %s', count($itens), ErpMoney::formatBr($this->cupomTotalValor())))
+            ->body(sprintf(
+                '%sEspera #%d — %d item(ns) — R$ %s',
+                $identificador !== '' ? $identificador.' — ' : '',
+                $espera->sequencia,
+                count($itens),
+                ErpMoney::formatBr($this->cupomTotalValor()),
+            ))
             ->success()
             ->send();
 
@@ -356,6 +477,7 @@ trait ManagesPdvVendaEspera
             ->whereKey((int) $row['id'])
             ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
             ->where('user_id', $user->id)
+            ->pendentes()
             ->first();
 
         if (! $espera) {
@@ -410,7 +532,197 @@ trait ManagesPdvVendaEspera
         return $this->caixaSessaoId
             ? (int) PdvVendaEspera::query()
                 ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
+                ->pendentes()
                 ->count()
             : 0;
+    }
+
+    /**
+     * Após F7: encerra a espera ativa (histórico preservado, fora da lista de recuperação).
+     */
+    protected function encerrarEsperaAtivaAposVenda(?int $pdvVendaId): void
+    {
+        $id = $this->esperaAtivaId();
+        if ($id <= 0 || ! $this->esperaStatusDisponivel()) {
+            $this->forgetEsperaAtivaId();
+
+            return;
+        }
+
+        $payload = [
+            'status' => PdvVendaEspera::STATUS_FINALIZADA,
+            'finalizada_em' => now(),
+        ];
+        if ($pdvVendaId !== null && $pdvVendaId > 0) {
+            $payload['pdv_venda_id'] = $pdvVendaId;
+        }
+
+        PdvVendaEspera::query()
+            ->whereKey($id)
+            ->where('status', PdvVendaEspera::STATUS_EM_USO)
+            ->update($payload);
+
+        $this->forgetEsperaAtivaId();
+    }
+
+    /**
+     * F6 confirmado sobre venda recuperada: descarta a espera (histórico no caixa)
+     * para não voltar à lista de recuperação.
+     */
+    protected function descartarEsperaAtivaAposCancelamentoCupom(): void
+    {
+        $id = $this->esperaAtivaId();
+        if ($id <= 0 || ! $this->caixaSessaoId) {
+            return;
+        }
+
+        $user = Auth::user();
+        $query = PdvVendaEspera::query()
+            ->whereKey($id)
+            ->where('pdv_caixa_sessao_id', $this->caixaSessaoId);
+
+        if ($user) {
+            $query->where('user_id', $user->id);
+        }
+
+        if ($this->esperaStatusDisponivel()) {
+            $query->where('status', PdvVendaEspera::STATUS_EM_USO);
+        }
+
+        $espera = $query->first();
+        if (! $espera) {
+            $this->forgetEsperaAtivaId();
+
+            return;
+        }
+
+        $sessao = $this->caixaSessaoAtual();
+        $snapshot = app(PdvVendaEsperaService::class)->decode($espera);
+        $contexto = is_array($snapshot['contexto'] ?? null) ? $snapshot['contexto'] : [];
+        $import = is_array($contexto['import'] ?? null) ? $contexto['import'] : [];
+
+        if ($sessao && $sessao->fechado_em === null) {
+            (new PdvCaixaEsperaDescarteLog())->registrar(
+                $sessao,
+                $espera,
+                'CANCELADA NO PDV (F6)',
+            );
+        }
+
+        $espera->delete();
+
+        $this->liberarDocumentosImportados(
+            (int) ($import['orcamento_id'] ?? 0),
+            (int) ($import['venda_id'] ?? 0),
+        );
+
+        $this->forgetEsperaAtivaId();
+    }
+
+    /**
+     * Limpar cupom sem F6 (mesa/caixa): devolve a espera à lista com o último snapshot.
+     * F6 chama descartarEsperaAtivaAposCancelamentoCupom antes e este método vira no-op.
+     */
+    protected function devolverEsperaAtivaSeAbandonada(): void
+    {
+        $id = $this->esperaAtivaId();
+        if ($id <= 0) {
+            return;
+        }
+
+        if ($this->esperaStatusDisponivel()) {
+            PdvVendaEspera::query()
+                ->whereKey($id)
+                ->where('status', PdvVendaEspera::STATUS_EM_USO)
+                ->update(['status' => PdvVendaEspera::STATUS_PENDENTE]);
+        }
+
+        $this->forgetEsperaAtivaId();
+    }
+
+    protected function esperaStatusDisponivel(): bool
+    {
+        return Schema::hasColumn('pdv_venda_esperas', 'status');
+    }
+
+    protected function esperaAtivaId(): int
+    {
+        return (int) session('erp.pdv.espera_id', 0);
+    }
+
+    protected function rememberEsperaAtivaId(int $id): void
+    {
+        if ($id > 0) {
+            session(['erp.pdv.espera_id' => $id]);
+        } else {
+            $this->forgetEsperaAtivaId();
+        }
+    }
+
+    protected function forgetEsperaAtivaId(): void
+    {
+        session()->forget('erp.pdv.espera_id');
+    }
+
+    protected function encontrarEsperaAtivaParaAtualizar(int $userId): ?PdvVendaEspera
+    {
+        $id = $this->esperaAtivaId();
+        if ($id <= 0 || ! $this->caixaSessaoId) {
+            return null;
+        }
+
+        return PdvVendaEspera::query()
+            ->whereKey($id)
+            ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
+            ->where('user_id', $userId)
+            ->where('status', PdvVendaEspera::STATUS_EM_USO)
+            ->first();
+    }
+
+    protected function resolverIdentificadorSuspenderPadrao(): string
+    {
+        $ativa = null;
+        $user = Auth::user();
+        if ($user) {
+            $ativa = $this->encontrarEsperaAtivaParaAtualizar((int) $user->id);
+        }
+
+        // Re-suspender: preserva o valor anterior (inclusive vazio, se o usuário limpou).
+        if ($ativa !== null) {
+            return filled($ativa->cliente_nome)
+                ? mb_strtoupper(trim((string) $ativa->cliente_nome), 'UTF-8')
+                : '';
+        }
+
+        $importNome = trim((string) session('erp.pdv.import_cliente_nome', ''));
+        if ($importNome !== '') {
+            return mb_strtoupper($importNome, 'UTF-8');
+        }
+
+        return '';
+    }
+
+    /**
+     * Espera marcada em_uso sem sessão local (crash/aba fechada) volta a pendente.
+     */
+    protected function recuperarEsperasOrfasEmUso(): void
+    {
+        if (! $this->caixaSessaoId || ! Schema::hasColumn('pdv_venda_esperas', 'status')) {
+            return;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $ativaId = $this->esperaAtivaId();
+
+        PdvVendaEspera::query()
+            ->where('pdv_caixa_sessao_id', $this->caixaSessaoId)
+            ->where('user_id', $user->id)
+            ->where('status', PdvVendaEspera::STATUS_EM_USO)
+            ->when($ativaId > 0, fn ($q) => $q->where('id', '!=', $ativaId))
+            ->update(['status' => PdvVendaEspera::STATUS_PENDENTE]);
     }
 }

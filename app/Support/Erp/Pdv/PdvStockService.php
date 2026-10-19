@@ -31,6 +31,7 @@ final class PdvStockService
         ?EstoqueMovimentacaoContext $movimentacao = null,
         ?string $loteOrigemTipo = null,
         ?int $loteOrigemId = null,
+        ?PdvComposicaoSelecao $composicaoSelecao = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -50,6 +51,8 @@ final class PdvStockService
                 $movimentacao,
                 $loteOrigemTipo,
                 $loteOrigemId,
+                [],
+                $composicaoSelecao ?? PdvComposicaoSelecao::vazia(),
             );
 
             return;
@@ -109,11 +112,28 @@ final class PdvStockService
         });
     }
 
-    public function validaEstoqueComposicao(Product $product, float $quantidade, ?int $estoqueId = null): ?string
-    {
+    /**
+     * @param  array<int, true>  $visited
+     */
+    public function validaEstoqueComposicao(
+        Product $product,
+        float $quantidade,
+        ?int $estoqueId = null,
+        array $visited = [],
+        ?PdvComposicaoSelecao $composicaoSelecao = null,
+    ): ?string {
         if (! $product->is_composicao) {
             return null;
         }
+
+        $productId = (int) $product->id;
+
+        if (isset($visited[$productId])) {
+            return 'Composição circular detectada em: '.$product->descricao;
+        }
+
+        $visited[$productId] = true;
+        $selecao = $composicaoSelecao ?? PdvComposicaoSelecao::vazia();
 
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
@@ -121,6 +141,10 @@ final class PdvStockService
             ->get();
 
         foreach ($componentes as $componente) {
+            if (! $selecao->deveBaixar($componente)) {
+                continue;
+            }
+
             $comp = $componente->componentProduct;
 
             if (! $comp || $comp->is_servico) {
@@ -130,7 +154,13 @@ final class PdvStockService
             $qtdNecessaria = $quantidade * (float) $componente->quantidade;
 
             if ($comp->is_composicao) {
-                $erro = $this->validaEstoqueComposicao($comp, $qtdNecessaria, $estoqueId);
+                $erro = $this->validaEstoqueComposicao(
+                    $comp,
+                    $qtdNecessaria,
+                    $estoqueId,
+                    $visited,
+                    PdvComposicaoSelecao::vazia(),
+                );
 
                 if ($erro) {
                     return $erro;
@@ -185,6 +215,9 @@ final class PdvStockService
         return null;
     }
 
+    /**
+     * @param  array<int, true>  $visited
+     */
     private function baixaComposicao(
         Product $product,
         float $quantidade,
@@ -194,13 +227,30 @@ final class PdvStockService
         ?EstoqueMovimentacaoContext $movimentacao = null,
         ?string $loteOrigemTipo = null,
         ?int $loteOrigemId = null,
+        array $visited = [],
+        ?PdvComposicaoSelecao $composicaoSelecao = null,
     ): void {
+        $productId = (int) $product->id;
+
+        if (isset($visited[$productId])) {
+            throw new \RuntimeException(
+                'Composição circular detectada em: '.trim((string) ($product->descricao ?? $product->codigo ?? 'produto'))
+            );
+        }
+
+        $visited[$productId] = true;
+        $selecao = $composicaoSelecao ?? PdvComposicaoSelecao::vazia();
+
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
             ->with('componentProduct')
             ->get();
 
         foreach ($componentes as $componente) {
+            if (! $selecao->deveBaixar($componente)) {
+                continue;
+            }
+
             $comp = $componente->componentProduct;
 
             if (! $comp) {
@@ -208,6 +258,24 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
+
+            if ($comp->is_composicao) {
+                $this->baixaComposicao(
+                    $comp,
+                    $qtd,
+                    $docSaida,
+                    $estoqueId,
+                    $empresa,
+                    $movimentacao,
+                    $loteOrigemTipo,
+                    $loteOrigemId,
+                    $visited,
+                    PdvComposicaoSelecao::vazia(),
+                );
+
+                continue;
+            }
+
             $this->baixaItemVenda(
                 $comp,
                 $qtd,
@@ -317,6 +385,7 @@ final class PdvStockService
         ?EstoqueMovimentacaoContext $movimentacao = null,
         ?string $loteOrigemTipo = null,
         ?int $loteOrigemId = null,
+        ?PdvComposicaoSelecao $composicaoSelecao = null,
     ): void {
         if ($product->is_servico) {
             if ($productSerialId) {
@@ -334,6 +403,8 @@ final class PdvStockService
                 $movimentacao,
                 $loteOrigemTipo,
                 $loteOrigemId,
+                [],
+                $composicaoSelecao ?? PdvComposicaoSelecao::vazia(),
             );
 
             return;
@@ -378,6 +449,9 @@ final class PdvStockService
         });
     }
 
+    /**
+     * @param  array<int, true>  $visited
+     */
     private function estornoComposicao(
         Product $product,
         float $quantidade,
@@ -385,13 +459,28 @@ final class PdvStockService
         ?EstoqueMovimentacaoContext $movimentacao = null,
         ?string $loteOrigemTipo = null,
         ?int $loteOrigemId = null,
+        array $visited = [],
+        ?PdvComposicaoSelecao $composicaoSelecao = null,
     ): void {
+        $productId = (int) $product->id;
+
+        if (isset($visited[$productId])) {
+            return;
+        }
+
+        $visited[$productId] = true;
+        $selecao = $composicaoSelecao ?? PdvComposicaoSelecao::vazia();
+
         $componentes = ProductComposition::query()
             ->where('product_id', $product->id)
             ->with('componentProduct')
             ->get();
 
         foreach ($componentes as $componente) {
+            if (! $selecao->deveBaixar($componente)) {
+                continue;
+            }
+
             $comp = $componente->componentProduct;
 
             if (! $comp) {
@@ -399,6 +488,22 @@ final class PdvStockService
             }
 
             $qtd = $quantidade * (float) $componente->quantidade;
+
+            if ($comp->is_composicao) {
+                $this->estornoComposicao(
+                    $comp,
+                    $qtd,
+                    $estoqueId,
+                    $movimentacao,
+                    $loteOrigemTipo,
+                    $loteOrigemId,
+                    $visited,
+                    PdvComposicaoSelecao::vazia(),
+                );
+
+                continue;
+            }
+
             $this->estornoItemVenda(
                 $comp,
                 $qtd,

@@ -68,6 +68,16 @@ final class NfeEstoqueService
                 continue;
             }
 
+            if ($product->is_composicao) {
+                $erro = $this->stock->validaEstoqueComposicao($product, $qtd, $estoqueId);
+
+                if ($erro) {
+                    throw new \RuntimeException($erro);
+                }
+
+                continue;
+            }
+
             EstoqueNegativoPolicy::garantirSaidaPermitida($product, $qtd, $estoqueId, $empresa);
         }
     }

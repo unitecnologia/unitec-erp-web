@@ -143,7 +143,9 @@ final class AtualizacaoApplyService
                 'total' => 0,
                 'message' => 'Atualizando banco de dados…',
             ]);
-            // Migrate sempre via CLI: o processo do apply já bootou com código/vendor mistos.
+            // Migrate via CLI (código/vendor mistos no processo do apply).
+            // Com --force, App\Console\Commands\MigrateCommand (código novo após Copia)
+            // aplica modo tolerante a tabela/coluna já existente.
             app(PendingMigrationsGuard::class)->invalidate();
             $this->runCliArtisan($appPath, 'migrate --force');
             $this->assertSchemaFullyMigrated($appPath);

@@ -22,6 +22,7 @@
 @includeWhen(in_array($modal, ['abrir_caixa', 'fechar_caixa'], true), 'pdvui::modals.caixa')
 @includeWhen($this->fechamentoMoedasModalOpen ?? false, 'pdvui::modals.contar-moedas')
 @includeWhen($modal === 'vendas_espera', 'pdvui::modals.vendas-espera')
+@includeWhen($modal === 'suspender_venda', 'pdvui::modals.suspender-venda')
 @includeWhen($modal === 'acesso_rapido', 'pdvui::modals.acesso-rapido')
 @includeWhen($modal === 'finalizar', 'pdvui::modals.finalizar')
 @include('pdvui::fiscal-progress')
@@ -86,7 +87,8 @@
 @includeWhen(filled($this->pdvFiscalOverlayTipo ?? null), 'pdvui::modals.fiscal-mensagem')
 @includeWhen($modal === 'tabela_preco', 'pdvui::modals.tabela-preco')
 @includeWhen($modal === 'bloqueio' || ($this->pdvBloqueado ?? false), 'pdvui::modals.bloqueio')
-@includeWhen($modal === 'sair', 'pdvui::modals.sair')
+{{-- Modal Sair: sempre no DOM (hidden) para abrir sem re-render do PDV. --}}
+@include('pdvui::modals.sair')
 @includeWhen(($this->produtoNaoEncontradoCodigo ?? null) !== null, 'pdvui::modals.produto-nao-encontrado')
 
 @include('filament.components.erp.boleto-pos-documento')

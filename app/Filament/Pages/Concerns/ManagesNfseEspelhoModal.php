@@ -62,7 +62,7 @@ trait ManagesNfseEspelhoModal
         }
 
         $this->aplicarNfseGravada($nfse);
-        unset($this->nfseRegistros, $this->nfseListagemTotalFormatado);
+        unset($this->nfseRegistros, $this->nfseListagemTotaisFormatados);
 
         $this->nfseEspelhoModalId = (int) $nfse->id;
         $this->nfseEspelhoModalOpen = true;

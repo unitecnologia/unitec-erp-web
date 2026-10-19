@@ -89,10 +89,14 @@ class SchemaIncompativelPage extends Page
         return null;
     }
 
+    public function continuarMesmoAssim(): void
+    {
+        $this->redirect(url('/admin'));
+    }
+
     public function irParaLogin(): void
     {
         // Com pacote e sem skip de licença: manter sessão para o prompt Sim/Não.
-        // Caso contrário, sair evita loop login ↔ schema.
         $updateSkipped = (bool) session('erp_update_choice_skipped');
         if ($this->atualizacaoPendente && ! $updateSkipped) {
             session([
@@ -104,7 +108,7 @@ class SchemaIncompativelPage extends Page
             return;
         }
 
-        $this->sair();
+        $this->redirect(url('/admin/login'));
     }
 
     public function sair(): void

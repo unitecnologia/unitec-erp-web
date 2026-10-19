@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('forca_vendas_device_resets')) {
+            return;
+        }
+
         Schema::create('forca_vendas_device_resets', function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();

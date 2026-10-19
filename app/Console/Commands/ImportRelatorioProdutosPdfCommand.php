@@ -83,13 +83,17 @@ class ImportRelatorioProdutosPdfCommand extends Command
                 $descricao = mb_strtoupper($item['descricao'], 'UTF-8');
                 $product = Product::query()->create([
                     'codigo' => (string) $codigoSeq,
-                    'codigo_barras' => $item['ean'],
+                    'codigo_barras' => $item['ean'] !== '' ? $item['ean'] : null,
                     'descricao' => $descricao,
                     'unidade' => 'UN',
                     'preco_venda' => $item['preco'],
                     'estoque' => 0,
                     'ativo' => true,
                 ]);
+                if ((string) $product->codigo !== (string) $product->id) {
+                    $product->codigo = (string) $product->id;
+                    $product->saveQuietly();
+                }
 
                 $precos->replicate($product, [
                     'preco_compra' => 0,
@@ -166,13 +170,17 @@ class ImportRelatorioProdutosPdfCommand extends Command
                 $descricao = mb_strtoupper($item['descricao'], 'UTF-8');
                 $product = Product::query()->create([
                     'codigo' => (string) $proximoCodigo,
-                    'codigo_barras' => $ean,
+                    'codigo_barras' => $ean !== '' ? $ean : null,
                     'descricao' => $descricao,
                     'unidade' => 'UN',
                     'preco_venda' => $item['preco'],
                     'estoque' => 0,
                     'ativo' => true,
                 ]);
+                if ((string) $product->codigo !== (string) $product->id) {
+                    $product->codigo = (string) $product->id;
+                    $product->saveQuietly();
+                }
 
                 $precos->replicate($product, [
                     'preco_compra' => 0,

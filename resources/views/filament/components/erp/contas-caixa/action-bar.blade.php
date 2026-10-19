@@ -11,10 +11,10 @@
             <span class="erp-contas-caixa-actions__label"><kbd>F3</kbd> Alterar</span>
         </button>
     @endif
-    @if (erp_can('contas_caixa.print'))
-        <button type="button" wire:click="modulePending('Imprimir')" class="erp-contas-caixa-actions__btn" data-erp-key="F4" title="Imprimir (F4)">
-            <span class="erp-contas-caixa-actions__icon">P</span>
-            <span class="erp-contas-caixa-actions__label"><kbd>F4</kbd> Imprimir</span>
+    @if (erp_can('contas_caixa.delete'))
+        <button type="button" wire:click="deleteContaCaixa" class="erp-contas-caixa-actions__btn" data-erp-key="F4" title="Excluir (F4)">
+            <span class="erp-contas-caixa-actions__icon">E</span>
+            <span class="erp-contas-caixa-actions__label"><kbd>F4</kbd> Excluir</span>
         </button>
     @endif
     <button type="button" wire:click="closeScreen" class="erp-contas-caixa-actions__btn erp-contas-caixa-actions__btn--close" title="Fechar">

@@ -8,7 +8,7 @@ use Unitec\FiscalEngine\Dto\EmitirNfceRequest;
 use Unitec\FiscalEngine\Dto\ItemDto;
 use Unitec\FiscalEngine\Dto\RespTecnicoDto;
 use Unitec\FiscalEngine\Exception\FiscalEngineException;
-use Unitec\FiscalEngine\Nfce\ScNfceEndpoints;
+use Unitec\FiscalEngine\Nfce\NfcePublicUrls;
 use Unitec\FiscalEngine\Util\ChaveAcesso;
 use Unitec\FiscalEngine\Util\NumberFormatter;
 use Unitec\FiscalEngine\Util\XmlHelper;
@@ -423,9 +423,11 @@ final class NfceXmlBuilder
             throw new FiscalEngineException('NFe não encontrada para QR Code.');
         }
 
+        $chave = $this->chaveFromDom($dom);
+
         $supl = $dom->createElementNS(XmlHelper::NFE_NS, 'infNFeSupl');
         XmlHelper::append($supl, 'qrCode', $qrUrl);
-        XmlHelper::append($supl, 'urlChave', ScNfceEndpoints::consultaQrCode($tpAmb));
+        XmlHelper::append($supl, 'urlChave', NfcePublicUrls::urlChave($chave !== '' ? $chave : 'SC', $tpAmb));
 
         $signature = $dom->getElementsByTagName('Signature')->item(0);
 
@@ -434,5 +436,22 @@ final class NfceXmlBuilder
         } else {
             $nfe->appendChild($supl);
         }
+    }
+
+    private function chaveFromDom(DOMDocument $dom): string
+    {
+        $infNFe = $dom->getElementsByTagName('infNFe')->item(0);
+
+        if (! $infNFe instanceof DOMElement) {
+            return '';
+        }
+
+        $id = trim($infNFe->getAttribute('Id'));
+
+        if (str_starts_with($id, 'NFe') && strlen($id) >= 47) {
+            return substr($id, 3, 44);
+        }
+
+        return '';
     }
 }

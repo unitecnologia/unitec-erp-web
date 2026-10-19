@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Livewire\Erp\PdvHotPath;
 use Filament\Notifications\Notification;
 
 trait ManagesPdvRemoverItens
@@ -117,6 +118,9 @@ trait ManagesPdvRemoverItens
         }
 
         $this->persistCupomToSession();
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
         $this->dispatch('erp-pdv-beep');
 
         $descricao = (string) ($item['descricao'] ?? 'item');

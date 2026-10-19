@@ -1,9 +1,4 @@
 /*M!999999\- enable the sandbox mode */ 
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
 /*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
@@ -75,8 +70,8 @@ CREATE TABLE `unitec_boleto_contas_api` (
 LOCK TABLES `unitec_boleto_contas_api` WRITE;
 /*!40000 ALTER TABLE `unitec_boleto_contas_api` DISABLE KEYS */;
 INSERT INTO `unitec_boleto_contas_api` VALUES
-(1,1,'Ailos','085',1,1,'homologacao',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'DM',NULL,NULL,NULL,NULL,NULL,NULL,'nenhuma',1,'2026-09-16 18:27:29','2026-09-18 21:21:46'),
-(2,1,'Sicredi','748',1,0,'homologacao',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'DM',NULL,NULL,NULL,NULL,NULL,NULL,'nenhuma',0,'2026-09-16 18:46:10','2026-09-18 21:21:46');
+(1,1,'Ailos','085',1,1,'homologacao','2','1','9','','99516470',NULL,'','_4BfqhqA51q72rCI_oC4mjWjQ1ga','lBieybBTY5iiwXGfI4ft4fPueIAa','ca905590-e8da-029c-e053-0a2918728117','aaaaa11111@','https://apiendpointhml.ailos.coop.br','https://unitecnologia.unierp.uk/api/integracoes/ailos/auth/callback','DM',NULL,NULL,NULL,NULL,NULL,NULL,'nenhuma',1,'2026-09-16 18:27:29','2026-10-17 19:05:12'),
+(2,1,'Sicredi','748',1,0,'homologacao','','','6789','03','',NULL,'12345','1deded5c-457a-414d-a361-7a4393cf5abb','2aa11fc1-36cf-4fb4-ae20-8b59840f4833',NULL,'teste123','https://api-parceiro.sicredi.com.br/sb','https://unitecnologia.unierp.uk/api/integracoes/ailos/auth/callback','DM',NULL,NULL,NULL,NULL,NULL,NULL,'nenhuma',0,'2026-09-16 18:46:10','2026-10-17 19:05:12');
 /*!40000 ALTER TABLE `unitec_boleto_contas_api` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_boleto_parametros`;
@@ -134,11 +129,13 @@ CREATE TABLE `unitec_boleto_parametros` (
   UNIQUE KEY `unitec_boleto_parametros_empresa_id_unique` (`empresa_id`),
   UNIQUE KEY `unitec_boleto_parametros_codigo_legado_unique` (`codigo_legado`),
   CONSTRAINT `unitec_boleto_parametros_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_boleto_parametros` WRITE;
 /*!40000 ALTER TABLE `unitec_boleto_parametros` DISABLE KEYS */;
+INSERT INTO `unitec_boleto_parametros` VALUES
+(1,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,0,0,0,1,0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,'2026-10-17 19:57:36','2026-10-17 19:57:36');
 /*!40000 ALTER TABLE `unitec_boleto_parametros` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_boleto_remessa_titulos`;
@@ -453,10 +450,7 @@ CREATE TABLE `unitec_caixa_contas` (
 LOCK TABLES `unitec_caixa_contas` WRITE;
 /*!40000 ALTER TABLE `unitec_caixa_contas` DISABLE KEYS */;
 INSERT INTO `unitec_caixa_contas` VALUES
-(1,1,'CAIXA GERAL','SUBCAIXA','aberto',1,1,NULL,'2026-08-29 20:52:18','2026-08-29 20:52:18'),
-(2,2,'CAIXA PDV 1','PDV','aberto',1,0,NULL,'2026-08-30 14:22:54','2026-08-30 14:22:54'),
-(3,3,'CAIXA PDV 2','PDV','aberto',1,0,NULL,'2026-08-30 14:23:50','2026-08-30 14:23:50'),
-(4,4,'CAIXA PDV 3','PDV','aberto',1,0,NULL,'2026-08-30 14:24:34','2026-08-30 14:24:34');
+(1,1,'CAIXA GERAL','SUBCAIXA','aberto',1,1,NULL,'2026-08-29 20:52:18','2026-08-29 20:52:18');
 /*!40000 ALTER TABLE `unitec_caixa_contas` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_caixa_lancamentos`;
@@ -1439,6 +1433,8 @@ CREATE TABLE `unitec_conta_pagar_pagamentos` (
   `valor_parcela` decimal(15,2) NOT NULL DEFAULT 0.00,
   `perc_juros` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `juros` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `perc_multa` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `multa` decimal(15,2) NOT NULL DEFAULT 0.00,
   `perc_desconto` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `desconto` decimal(15,2) NOT NULL DEFAULT 0.00,
   `valor_pago` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -1480,6 +1476,7 @@ CREATE TABLE `unitec_conta_receber_pagamentos` (
   `valor_parcela` decimal(15,2) NOT NULL DEFAULT 0.00,
   `perc_juros` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `juros` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `multa` decimal(15,2) NOT NULL DEFAULT 0.00,
   `perc_desconto` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `desconto` decimal(15,2) NOT NULL DEFAULT 0.00,
   `valor_recebido` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -1584,6 +1581,7 @@ CREATE TABLE `unitec_contas_pagar` (
   `valor` decimal(15,2) NOT NULL DEFAULT 0.00,
   `desconto` decimal(15,2) NOT NULL DEFAULT 0.00,
   `juros` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `multa` decimal(15,2) NOT NULL DEFAULT 0.00,
   `valor_pago` decimal(15,2) NOT NULL DEFAULT 0.00,
   `pago_em` date DEFAULT NULL,
   `saldo` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -1615,6 +1613,7 @@ CREATE TABLE `unitec_contas_receber` (
   `emissao` date NOT NULL,
   `historico` varchar(500) NOT NULL,
   `documento` varchar(40) DEFAULT NULL,
+  `pdv_venda_id` bigint(20) unsigned DEFAULT NULL,
   `cliente_id` bigint(20) unsigned NOT NULL,
   `vencimento` date NOT NULL,
   `valor` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -1622,6 +1621,8 @@ CREATE TABLE `unitec_contas_receber` (
   `juros` decimal(15,2) NOT NULL DEFAULT 0.00,
   `juros_diario_pct` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `carencia_juros_dias` int(10) unsigned NOT NULL DEFAULT 0,
+  `multa_pct` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `multa` decimal(15,2) NOT NULL DEFAULT 0.00,
   `valor_recebido` decimal(15,2) NOT NULL DEFAULT 0.00,
   `recebido_em` date DEFAULT NULL,
   `saldo` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -1634,6 +1635,7 @@ CREATE TABLE `unitec_contas_receber` (
   `cartao_parcela` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `plano_conta_id` bigint(20) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unitec_contas_receber_numero_unique` (`numero`),
   KEY `unitec_contas_receber_cliente_id_foreign` (`cliente_id`),
@@ -1641,8 +1643,12 @@ CREATE TABLE `unitec_contas_receber` (
   KEY `unitec_contas_receber_vencimento_index` (`vencimento`),
   KEY `unitec_contas_receber_forma_index` (`forma`),
   KEY `unitec_contas_receber_empresa_id_index` (`empresa_id`),
+  KEY `unitec_contas_receber_plano_conta_id_foreign` (`plano_conta_id`),
+  KEY `unitec_contas_receber_pdv_venda_id_foreign` (`pdv_venda_id`),
   CONSTRAINT `unitec_contas_receber_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `unitec_people` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `unitec_contas_receber_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL
+  CONSTRAINT `unitec_contas_receber_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_contas_receber_pdv_venda_id_foreign` FOREIGN KEY (`pdv_venda_id`) REFERENCES `unitec_pdv_vendas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_contas_receber_plano_conta_id_foreign` FOREIGN KEY (`plano_conta_id`) REFERENCES `unitec_planos_contas` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1735,6 +1741,7 @@ CREATE TABLE `unitec_devolucoes_compra` (
   `fornecedor_nome` varchar(150) DEFAULT NULL,
   `usuario_id` bigint(20) unsigned DEFAULT NULL,
   `observacoes` varchar(250) DEFAULT NULL,
+  `troca_em_garantia` tinyint(1) NOT NULL DEFAULT 0,
   `total` decimal(15,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -1871,7 +1878,7 @@ CREATE TABLE `unitec_empresa_vendedor` (
 LOCK TABLES `unitec_empresa_vendedor` WRITE;
 /*!40000 ALTER TABLE `unitec_empresa_vendedor` DISABLE KEYS */;
 INSERT INTO `unitec_empresa_vendedor` VALUES
-(1,1,1,2,'2026-08-30 14:22:54','2026-09-19 16:51:54');
+(1,1,1,1,'2026-08-30 14:22:54','2026-10-17 19:55:16');
 /*!40000 ALTER TABLE `unitec_empresa_vendedor` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_empresas`;
@@ -1906,6 +1913,16 @@ CREATE TABLE `unitec_empresas` (
   `nfse_reg_esp_trib` varchar(1) DEFAULT NULL,
   `nfse_reg_ap_trib_sn` varchar(1) DEFAULT NULL,
   `nfse_ambiente` varchar(20) DEFAULT NULL,
+  `nfse_serie_dps` varchar(5) DEFAULT NULL,
+  `nfse_provedor` varchar(20) NOT NULL DEFAULT 'nacional',
+  `nfse_serie_rps` varchar(5) DEFAULT NULL,
+  `nfse_proximo_rps` bigint(20) unsigned DEFAULT NULL,
+  `nfse_tipo_rps` varchar(1) DEFAULT NULL,
+  `nfse_aliquota_iss` decimal(5,2) DEFAULT NULL,
+  `nfse_ws_usuario` varchar(20) DEFAULT NULL,
+  `nfse_ws_senha` varchar(120) DEFAULT NULL,
+  `nfse_url_producao` varchar(255) DEFAULT NULL,
+  `nfse_url_homologacao` varchar(255) DEFAULT NULL,
   `cep` varchar(10) DEFAULT NULL,
   `endereco` text DEFAULT NULL,
   `numero` varchar(20) DEFAULT NULL,
@@ -2001,9 +2018,6 @@ CREATE TABLE `unitec_empresas` (
   `param_pix_webhook_url` text DEFAULT NULL,
   `param_pix_habilitar` tinyint(1) NOT NULL DEFAULT 0,
   `param_api_servicos_url` text DEFAULT NULL,
-  `param_api_servicos_usuario` text DEFAULT NULL,
-  `param_api_servicos_senha` text DEFAULT NULL,
-  `param_api_servicos_token` text DEFAULT NULL,
   `param_api_servicos_timeout` int(10) unsigned NOT NULL DEFAULT 30,
   `param_api_servicos_habilitar` tinyint(1) NOT NULL DEFAULT 0,
   `param_portal_contador_url` text DEFAULT NULL,
@@ -2146,14 +2160,32 @@ CREATE TABLE `unitec_empresas` (
   `param_monitor_vendas_exibir_custo_produto` tinyint(1) NOT NULL DEFAULT 0,
   `param_monitor_vendas_desconto_reais_item_modo` varchar(20) NOT NULL DEFAULT 'unitario',
   `configuracao_inicial_concluida` tinyint(1) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`)
+  `param_multa_atraso_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
+  `param_plano_conta_venda_id` bigint(20) unsigned DEFAULT NULL,
+  `param_plano_conta_compra_id` bigint(20) unsigned DEFAULT NULL,
+  `param_plano_conta_taxa_cartao_id` bigint(20) unsigned DEFAULT NULL,
+  `param_consulta_placa_habilitar` tinyint(1) NOT NULL DEFAULT 0,
+  `param_consulta_placa_url` text DEFAULT NULL,
+  `param_consulta_placa_token` text DEFAULT NULL,
+  `param_consulta_placa_timeout` smallint(5) unsigned NOT NULL DEFAULT 10,
+  `param_api_servicos_serper_url` text DEFAULT NULL,
+  `param_api_servicos_serper_key` text DEFAULT NULL,
+  `param_pdv_qtd_mesas` smallint(5) unsigned NOT NULL DEFAULT 20,
+  `param_pdv_mesa_inatividade_min` smallint(5) unsigned DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `unitec_empresas_param_plano_conta_venda_id_foreign` (`param_plano_conta_venda_id`),
+  KEY `unitec_empresas_param_plano_conta_compra_id_foreign` (`param_plano_conta_compra_id`),
+  KEY `unitec_empresas_param_plano_conta_taxa_cartao_id_foreign` (`param_plano_conta_taxa_cartao_id`),
+  CONSTRAINT `unitec_empresas_param_plano_conta_compra_id_foreign` FOREIGN KEY (`param_plano_conta_compra_id`) REFERENCES `unitec_planos_contas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_empresas_param_plano_conta_taxa_cartao_id_foreign` FOREIGN KEY (`param_plano_conta_taxa_cartao_id`) REFERENCES `unitec_planos_contas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_empresas_param_plano_conta_venda_id_foreign` FOREIGN KEY (`param_plano_conta_venda_id`) REFERENCES `unitec_planos_contas` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_empresas` WRITE;
 /*!40000 ALTER TABLE `unitec_empresas` DISABLE KEYS */;
 INSERT INTO `unitec_empresas` VALUES
-(1,1,NULL,NULL,'juridica',NULL,'SC','1058','BRASIL',NULL,NULL,NULL,NULL,NULL,'informatica','','','','','',NULL,NULL,NULL,NULL,'normal',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,'2026-08-30 14:22:54','2026-09-30 19:00:32',0.00,0.00,0.00,0.00,0.00,0.00,0,1,1,0,0,1,0,0,0,1,0,0,NULL,1,0,0,0,0,1,1,1,1,0,1,'5102','0','000','102',0.00,'6102','000','102',0.00,'99','99','99',0.00,0.00,'99',0.00,'',0.00,0.00,0.00,0.00,'','',0.00,0.00,'0','000','000001',0.1000,0.9000,0.0000,0.0000,0.0000,0.0000,0.0000,'1102','',0.00,0.00,0.00,0.00,0,0,'ailos',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,'HTTPS://COSMOS.BLUESOFT.COM.BR/API',NULL,NULL,NULL,30,0,'https://unitecnologiasc.com.br',NULL,NULL,NULL,30,NULL,NULL,NULL,'',0,1,0,1,1,0,'HTTPS://GITHUB.COM/UNITECNOLOGIA/UNITEC-ERP-WEB/RELEASES/DOWNLOAD/UPDATE/UNITEC-ERP-UPDATE.ZIP',NULL,'MODFILIZOLA','C:\\UNITECNOLOGIA_WEB\\BALANCA',4,'2',6,1,NULL,NULL,NULL,'14',0,'085',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'DM','','','','','','','','',NULL,'',0,1,1,0,8091,NULL,NULL,NULL,30,100,0,NULL,0,1,1,1,0,0,1,1,1,1,5,'','','','','','','',NULL,0.00,100,0,'HUB',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,8,1,0,0,1,0,0,NULL,'HTTPS://UNITECNOLOGIASC.COM.BR',NULL,NULL,1,NULL,NULL,NULL,'unierp.uk',NULL,NULL,NULL,0,NULL,NULL,NULL,'SANDBOX',NULL,NULL,NULL,0,NULL,NULL,0,1,1,1,1,1,'unitario',0);
+(1,1,NULL,NULL,'juridica',NULL,'SC','1058','BRASIL',NULL,NULL,NULL,NULL,NULL,'mercado_mercearia','','','','','',NULL,NULL,NULL,NULL,'normal',NULL,NULL,NULL,NULL,'nacional',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,'2026-08-30 14:22:54','2026-10-17 19:53:37',0.00,0.00,0.00,0.00,0.00,0.00,0,1,1,0,0,1,1,0,0,1,0,0,NULL,1,0,0,0,0,1,1,1,1,1,1,'5102','0','000','102',0.00,'6102','000','102',0.00,'99','99','99',0.00,0.00,'99',0.00,'',0.00,0.00,0.00,0.00,'','',0.00,0.00,'0','000','000001',0.1000,0.9000,0.0000,0.0000,0.0000,0.0000,0.0000,'1102','',0.00,0.00,0.00,0.00,0,0,'ailos',NULL,NULL,NULL,NULL,NULL,NULL,'producao','https://unitecnologiasc.digital/api/webhooks/ailos',0,'https://dfe-servico.svrs.rs.gov.br/ws/ccgConsGTIN/ccgConsGTIN.asmx',30,1,'https://unitecnologiasc.com.br',NULL,NULL,'PRODUCAO',30,NULL,NULL,NULL,'',0,1,0,1,1,0,'HTTPS://GITHUB.COM/UNITECNOLOGIA/UNITEC-ERP-WEB/RELEASES/DOWNLOAD/UPDATE/UNITEC-ERP-UPDATE.ZIP',NULL,'MODFILIZOLA','C:\UNITECNOLOGIA_WEB\BALANCA',4,'2',6,1,NULL,NULL,NULL,'14',0,'085',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'DM','','','','','','','','',NULL,'',0,1,1,0,8091,'eEyXL1SraQV57BtDUpmmdqZ2i6eyjIb78tGG16z6WHnPMNO9qRlnSQ1dw7R5OqwF','desconectado',NULL,30,100,0,NULL,0,1,1,1,0,0,1,1,1,1,5,'','','','','','','',NULL,0.00,100,0,'HUB',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,8,1,0,0,1,0,0,'HTTP://127.0.0.1:8000','HTTPS://UNITECNOLOGIASC.COM.BR',NULL,NULL,0,NULL,'28103ae19943f8c0654a17b56e75b5da','a68a06560133f1b620e063cd0b0113ff','unierp.uk',NULL,NULL,NULL,0,NULL,NULL,NULL,'SANDBOX',NULL,NULL,NULL,1,NULL,NULL,0,1,1,0,1,1,'unitario',0,0.00,1,6,13,1,'https://api.verifica-online.com.br','eyJpdiI6IkMvbnRoMldQdmpyVld1Vy9YMklXeEE9PSIsInZhbHVlIjoiMXFkTnNRV2I1ajRYQVZUTGNhMzRTSFBkenJ3T3N4YXlmdndmY3BCbzVWc1JTVisyNHF5VFc2T2xKeGhpQk5IcjVsTVJndnF1NzMrRzBnb2lwL2VrMkFGQnUzSDhRK1g3N21TVVNXaEFJQkU9IiwibWFjIjoiMzFhYmYxMWViN2M2NTgxNDA1YzcxNGEyM2NlM2RlNWYxMTkwNjZhM2IyNjQxYzk2OWJhNjA3Y2NhMDkwNDFhMyIsInRhZyI6IiJ9',10,'https://google.serper.dev/images','e35fb260dfabd7d210870b966b01ed675d07f8b5',20,1);
 /*!40000 ALTER TABLE `unitec_empresas` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_entrega_eventos`;
@@ -15193,6 +15225,35 @@ LOCK TABLES `unitec_forca_vendas_cliente_imports` WRITE;
 /*!40000 ALTER TABLE `unitec_forca_vendas_cliente_imports` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_forca_vendas_cliente_imports` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_forca_vendas_device_resets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_forca_vendas_device_resets` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) NOT NULL,
+  `forca_vendas_device_id` bigint(20) unsigned DEFAULT NULL,
+  `device_uuid` varchar(100) NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'pendente',
+  `authorized_by` bigint(20) unsigned DEFAULT NULL,
+  `authorized_at` timestamp NOT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  `completed_app_version` varchar(40) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_forca_vendas_device_resets_uuid_unique` (`uuid`),
+  KEY `unitec_forca_vendas_device_resets_forca_vendas_device_id_foreign` (`forca_vendas_device_id`),
+  KEY `unitec_forca_vendas_device_resets_authorized_by_foreign` (`authorized_by`),
+  KEY `fv_device_resets_device_status_idx` (`device_uuid`,`status`),
+  CONSTRAINT `unitec_forca_vendas_device_resets_authorized_by_foreign` FOREIGN KEY (`authorized_by`) REFERENCES `unitec_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_forca_vendas_device_resets_forca_vendas_device_id_foreign` FOREIGN KEY (`forca_vendas_device_id`) REFERENCES `unitec_forca_vendas_devices` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_forca_vendas_device_resets` WRITE;
+/*!40000 ALTER TABLE `unitec_forca_vendas_device_resets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_forca_vendas_device_resets` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_forca_vendas_devices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -15363,21 +15424,16 @@ CREATE TABLE `unitec_formas_pagamento` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unitec_formas_pagamento_codigo_unique` (`codigo`),
   KEY `unitec_formas_pagamento_conta_destino_id_index` (`conta_destino_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_formas_pagamento` WRITE;
 /*!40000 ALTER TABLE `unitec_formas_pagamento` DISABLE KEYS */;
 INSERT INTO `unitec_formas_pagamento` VALUES
-(1,1,'DINHEIRO',1,'dinheiro',0.00,0,1,30,'tabela','A','caixa',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-09-26 20:43:11'),
-(2,2,'PIX',1,'pix',0.00,0,1,30,'tabela','P','caixa',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-09-26 20:43:16'),
-(3,3,'CARTAO',1,'cartao_credito',0.00,0,1,30,'tabela','D','contas_receber',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-09-26 20:43:32'),
-(4,4,'BOLETO 7',1,'boleto',0.00,0,1,7,'financeiro','C','contas_receber',0,0,1,1,0,1,0,'[\"7\"]',1,'2026-08-29 20:52:09','2026-09-30 16:07:36'),
-(5,5,'BOLETO 14',1,'boleto',0.00,0,1,14,'tabela','K','contas_receber',0,0,1,1,0,1,0,'[\"14\"]',1,'2026-09-15 03:27:33','2026-09-30 17:57:31'),
-(6,6,'BOLETO 7/14',1,'boleto',0.00,0,2,7,'financeiro',NULL,'contas_receber',0,0,1,1,0,1,0,'[\"7,14\"]',1,'2026-09-24 19:12:26','2026-09-30 16:08:06'),
-(7,7,'BOLETO 21',1,'boleto',0.00,0,1,21,'financeiro',NULL,'contas_receber',0,0,1,1,0,1,0,'[\"21\"]',1,'2026-09-24 19:14:48','2026-09-28 18:59:46'),
-(8,8,'BOLETO 28',1,'boleto',0.00,0,1,28,'financeiro',NULL,'contas_receber',0,0,1,1,0,1,0,'[\"28\"]',1,'2026-09-24 19:15:11','2026-09-28 19:00:06'),
-(9,9,'TROCA',1,'troca',0.00,0,1,30,'tabela',NULL,'troca',0,0,1,1,0,1,0,'[]',1,'2026-09-24 19:16:36','2026-09-24 19:16:36');
+(1,1,'DINHEIRO',NULL,'dinheiro',0.00,0,1,30,'tabela','A','caixa',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-10-17 19:38:50'),
+(2,2,'PIX',NULL,'pix',0.00,0,1,30,'tabela','P','caixa',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-10-17 19:38:57'),
+(3,3,'POS CREDITO',NULL,'cartao_credito',0.00,0,1,30,'tabela','C','contas_receber',0,0,1,1,0,1,0,'[]',1,'2026-08-29 20:52:09','2026-10-17 19:39:17'),
+(4,4,'POS DEBITO',NULL,'cartao_debito',0.00,0,1,30,'financeiro','D','caixa',0,0,1,1,0,1,0,'[]',1,'2026-10-17 19:38:25','2026-10-17 19:39:13');
 /*!40000 ALTER TABLE `unitec_formas_pagamento` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_gestor_push_subscriptions`;
@@ -16178,6 +16234,106 @@ INSERT INTO `unitec_icms_aliquotas` VALUES
 (729,'TO','TO',20.00,'2026-08-30 14:18:40','2026-08-30 14:18:40');
 /*!40000 ALTER TABLE `unitec_icms_aliquotas` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_inventario_contagem_itens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_inventario_contagem_itens` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `inventario_contagem_id` bigint(20) unsigned NOT NULL,
+  `product_id` bigint(20) unsigned NOT NULL,
+  `codigo` varchar(60) NOT NULL DEFAULT '',
+  `descricao` varchar(191) NOT NULL DEFAULT '',
+  `unidade` varchar(20) NOT NULL DEFAULT 'UN',
+  `quantidade_contada` decimal(12,3) NOT NULL,
+  `saldo_referencia` decimal(12,3) NOT NULL,
+  `movimento_referencia_id` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `diferenca` decimal(12,3) DEFAULT NULL,
+  `ajuste_estoque_id` bigint(20) unsigned DEFAULT NULL,
+  `situacao` varchar(20) NOT NULL DEFAULT 'contado',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `inventario_etapa_id` bigint(20) unsigned DEFAULT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `contado_em` timestamp NULL DEFAULT NULL,
+  `saldo_antes` decimal(12,3) DEFAULT NULL,
+  `saldo_depois` decimal(12,3) DEFAULT NULL,
+  `idempotencia` varchar(40) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `inventario_item_idempotencia_uq` (`idempotencia`),
+  KEY `unitec_inventario_contagem_itens_product_id_foreign` (`product_id`),
+  KEY `unitec_inventario_contagem_itens_ajuste_estoque_id_foreign` (`ajuste_estoque_id`),
+  KEY `inventario_item_situacao_idx` (`inventario_contagem_id`,`situacao`),
+  KEY `unitec_inventario_contagem_itens_inventario_etapa_id_foreign` (`inventario_etapa_id`),
+  KEY `unitec_inventario_contagem_itens_user_id_foreign` (`user_id`),
+  CONSTRAINT `unitec_inventario_contagem_itens_ajuste_estoque_id_foreign` FOREIGN KEY (`ajuste_estoque_id`) REFERENCES `unitec_ajustes_estoque` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_inventario_contagem_itens_inventario_contagem_id_foreign` FOREIGN KEY (`inventario_contagem_id`) REFERENCES `unitec_inventario_contagens` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `unitec_inventario_contagem_itens_inventario_etapa_id_foreign` FOREIGN KEY (`inventario_etapa_id`) REFERENCES `unitec_inventario_etapas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_inventario_contagem_itens_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `unitec_products` (`id`),
+  CONSTRAINT `unitec_inventario_contagem_itens_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_inventario_contagem_itens` WRITE;
+/*!40000 ALTER TABLE `unitec_inventario_contagem_itens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_inventario_contagem_itens` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_inventario_contagens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_inventario_contagens` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `estoque_id` bigint(20) unsigned NOT NULL,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `data` date NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'rascunho',
+  `finalizada_em` timestamp NULL DEFAULT NULL,
+  `finalizada_por` bigint(20) unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `unitec_inventario_contagens_estoque_id_foreign` (`estoque_id`),
+  KEY `unitec_inventario_contagens_user_id_foreign` (`user_id`),
+  KEY `unitec_inventario_contagens_finalizada_por_foreign` (`finalizada_por`),
+  KEY `inventario_contagens_escopo_idx` (`empresa_id`,`estoque_id`,`user_id`,`status`),
+  CONSTRAINT `unitec_inventario_contagens_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`),
+  CONSTRAINT `unitec_inventario_contagens_estoque_id_foreign` FOREIGN KEY (`estoque_id`) REFERENCES `unitec_estoques` (`id`),
+  CONSTRAINT `unitec_inventario_contagens_finalizada_por_foreign` FOREIGN KEY (`finalizada_por`) REFERENCES `unitec_users` (`id`),
+  CONSTRAINT `unitec_inventario_contagens_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_inventario_contagens` WRITE;
+/*!40000 ALTER TABLE `unitec_inventario_contagens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_inventario_contagens` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_inventario_etapas`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_inventario_etapas` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `inventario_contagem_id` bigint(20) unsigned NOT NULL,
+  `nome` varchar(80) NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'aberta',
+  `user_id` bigint(20) unsigned NOT NULL,
+  `fechada_em` timestamp NULL DEFAULT NULL,
+  `fechada_por` bigint(20) unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `unitec_inventario_etapas_user_id_foreign` (`user_id`),
+  KEY `unitec_inventario_etapas_fechada_por_foreign` (`fechada_por`),
+  KEY `inventario_etapas_status_idx` (`inventario_contagem_id`,`status`),
+  CONSTRAINT `unitec_inventario_etapas_fechada_por_foreign` FOREIGN KEY (`fechada_por`) REFERENCES `unitec_users` (`id`),
+  CONSTRAINT `unitec_inventario_etapas_inventario_contagem_id_foreign` FOREIGN KEY (`inventario_contagem_id`) REFERENCES `unitec_inventario_contagens` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `unitec_inventario_etapas_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_inventario_etapas` WRITE;
+/*!40000 ALTER TABLE `unitec_inventario_etapas` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_inventario_etapas` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_job_batches`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -16332,6 +16488,40 @@ LOCK TABLES `unitec_meli_hub_pairs` WRITE;
 /*!40000 ALTER TABLE `unitec_meli_hub_pairs` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_meli_hub_pairs` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_mesas_devices`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_mesas_devices` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `device_uuid` varchar(100) NOT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `empresa_id` bigint(20) unsigned DEFAULT NULL,
+  `device_name` varchar(191) DEFAULT NULL,
+  `platform` varchar(40) DEFAULT NULL,
+  `app_version` varchar(40) DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'pendente',
+  `pairing_code` varchar(12) DEFAULT NULL,
+  `current_token_id` bigint(20) unsigned DEFAULT NULL,
+  `last_seen_at` timestamp NULL DEFAULT NULL,
+  `registered_at` timestamp NULL DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `approved_by` bigint(20) unsigned DEFAULT NULL,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_mesas_devices_device_uuid_unique` (`device_uuid`),
+  KEY `unitec_mesas_devices_user_id_foreign` (`user_id`),
+  KEY `unitec_mesas_devices_empresa_id_index` (`empresa_id`),
+  KEY `unitec_mesas_devices_status_index` (`status`),
+  CONSTRAINT `unitec_mesas_devices_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_mesas_devices` WRITE;
+/*!40000 ALTER TABLE `unitec_mesas_devices` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_mesas_devices` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_migrations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -16340,7 +16530,7 @@ CREATE TABLE `unitec_migrations` (
   `migration` varchar(191) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=313 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=373 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_migrations` WRITE;
@@ -16656,7 +16846,67 @@ INSERT INTO `unitec_migrations` VALUES
 (308,'2026_09_25_210000_add_empresa_monitor_vendas_desconto_reais_item_modo',51),
 (309,'2026_09_29_120000_add_modo_prazo_to_formas_pagamento_table',52),
 (311,'2026_09_30_151000_create_conta_receber_pagamentos_table',53),
-(312,'2026_09_30_160000_add_configuracao_inicial_concluida_to_empresas',54);
+(312,'2026_09_30_160000_add_configuracao_inicial_concluida_to_empresas',54),
+(313,'2026_09_30_182000_add_plano_conta_id_to_contas_receber_table',55),
+(314,'2026_09_30_190000_add_multa_atraso_receber',55),
+(315,'2026_09_30_213500_add_empresa_plano_conta_parametros',55),
+(316,'2026_10_01_100000_add_obra_to_nfse_itens',55),
+(317,'2026_10_01_160000_add_nfse_serie_dps_to_empresas',55),
+(318,'2026_10_01_180000_add_nfse_provedor_ipm_to_empresas',55),
+(319,'2026_10_01_200000_add_compra_id_to_product_price_histories',55),
+(320,'2026_10_02_160000_add_empresa_consulta_placa_params',55),
+(321,'2026_10_02_170000_create_os_veiculos_table',55),
+(322,'2026_10_03_202500_copy_people_whatsapp_into_fone1',55),
+(323,'2026_10_04_110000_add_acesso_app_inventario_to_users_table',55),
+(324,'2026_10_04_110100_create_inventario_contagens_tables',55),
+(325,'2026_10_04_143000_add_movimento_referencia_to_inventario_itens',55),
+(326,'2026_10_04_160000_inventario_balanco_etapas',55),
+(327,'2026_10_04_190000_add_empresa_serper_imagens_params',55),
+(328,'2026_10_04_210000_drop_empresa_cosmos_api_servicos_params',55),
+(329,'2026_10_04_220000_create_forca_vendas_device_resets_table',55),
+(330,'2026_10_05_120000_add_aliquota_iss_to_nfses',55),
+(331,'2026_10_05_170000_add_nfse_aliquota_iss_to_empresas',55),
+(332,'2026_10_06_120000_add_orcamento_id_to_ordens_servico',55),
+(333,'2026_10_06_140000_add_equipamento_to_orcamentos',55),
+(334,'2026_10_06_180000_create_nfse_codigos_municipais_table',55),
+(335,'2026_10_06_183000_add_discriminacao_to_nfses',55),
+(336,'2026_10_06_190000_add_equipamento_to_nfses',55),
+(337,'2026_10_06_200000_add_ordem_servico_id_to_nfse_itens',55),
+(338,'2026_10_06_210000_add_servico_prestado_to_ordem_servico_itens',55),
+(339,'2026_10_06_213000_add_servico_prestado_to_nfse_itens',55),
+(340,'2026_10_06_220000_add_cancelamento_to_nfses',55),
+(341,'2026_10_06_223000_add_cancelada_por_to_nfses',55),
+(342,'2026_10_06_230000_add_ordem_servico_id_to_nfes',55),
+(343,'2026_10_07_120000_make_pdv_caixa_sessao_nullable_on_pdv_vendas',55),
+(344,'2026_10_07_190000_load_default_ibpt_table_when_empty',55),
+(345,'2026_10_07_200000_add_nome_nota_to_pdv_vendas',55),
+(346,'2026_10_07_210000_fill_empresa_id_on_pdv_fechamento_caixa_lancamentos',55),
+(347,'2026_10_07_220000_add_caixa_conta_id_to_pdv_caixa_sessoes',55),
+(348,'2026_10_07_230000_fill_plano_conta_venda_on_caixa_lancamentos',55),
+(349,'2026_10_07_240000_create_nfe_orcamentos_table',55),
+(350,'2026_10_07_250000_add_pdv_venda_id_to_contas_receber',55),
+(351,'2026_10_08_100000_create_nfce_numeracao_tables',55),
+(352,'2026_10_09_100000_create_pdv_mesas_table',55),
+(353,'2026_10_09_120000_add_param_pdv_mesa_inatividade_to_empresas',55),
+(354,'2026_10_09_140000_add_situacao_to_pdv_mesas',55),
+(355,'2026_10_11_100000_create_unitec_mesas_app_tables',55),
+(356,'2026_10_11_200000_drop_is_fiscal_and_tributacao_monofasica_from_products',55),
+(357,'2026_10_11_210000_restore_comissao_pct_on_products',55),
+(358,'2026_10_11_211000_add_comissao_pct_snapshot_to_venda_itens',55),
+(359,'2026_10_11_220000_create_product_lote_movimentos_table',55),
+(360,'2026_10_11_230000_simplify_product_price_table_items',55),
+(361,'2026_10_11_240000_add_tab_preco_to_pedido_orcamento_itens',55),
+(362,'2026_10_13_120000_replace_unique_devolucao_compra_id_on_nfes',55),
+(363,'2026_10_13_130000_add_natureza_operacao_to_nfes',55),
+(364,'2026_10_13_140000_add_troca_em_garantia_to_devolucoes_compra',55),
+(365,'2026_10_13_230000_add_venda_id_to_ordens_servico',55),
+(366,'2026_10_14_140000_add_multa_to_contas_pagar_and_pagamentos',55),
+(367,'2026_10_15_120000_add_ordem_servico_id_to_pdv_venda_nfce',55),
+(368,'2026_10_15_180000_add_is_adicional_to_product_compositions_table',55),
+(369,'2026_10_15_190000_add_composicao_json_to_pdv_venda_itens_table',55),
+(370,'2026_10_16_181000_add_nome_to_pdv_mesas_table',55),
+(371,'2026_10_16_200000_add_pdv_mesa_numero_to_pdv_vendas_table',55),
+(372,'2026_10_16_210000_add_status_to_pdv_venda_esperas_table',55);
 /*!40000 ALTER TABLE `unitec_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_ncms`;
@@ -27396,6 +27646,107 @@ INSERT INTO `unitec_ncms` VALUES
 (10716,'00000000','PRODUTO NAO ESPECIFICADO NA LISTA DE NCM',1,'2026-08-30 14:18:40','2026-08-30 14:18:40');
 /*!40000 ALTER TABLE `unitec_ncms` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfce_inutilizacoes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfce_inutilizacoes` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `modelo` varchar(2) NOT NULL DEFAULT '65',
+  `serie` smallint(5) unsigned NOT NULL,
+  `ambiente` tinyint(3) unsigned NOT NULL,
+  `numero_inicial` int(10) unsigned NOT NULL,
+  `numero_final` int(10) unsigned NOT NULL,
+  `protocolo` varchar(30) DEFAULT NULL,
+  `status_codigo` varchar(5) DEFAULT NULL,
+  `justificativa` varchar(255) DEFAULT NULL,
+  `xml` longtext DEFAULT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `nfce_inutilizacao_faixa_idx` (`empresa_id`,`serie`,`ambiente`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfce_inutilizacoes` WRITE;
+/*!40000 ALTER TABLE `unitec_nfce_inutilizacoes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfce_inutilizacoes` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfce_numeracoes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfce_numeracoes` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `modelo` varchar(2) NOT NULL DEFAULT '65',
+  `serie` smallint(5) unsigned NOT NULL,
+  `ambiente` tinyint(3) unsigned NOT NULL,
+  `ultimo_numero` int(10) unsigned NOT NULL DEFAULT 0,
+  `inicializado_em` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `nfce_numeracao_uq` (`empresa_id`,`modelo`,`serie`,`ambiente`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfce_numeracoes` WRITE;
+/*!40000 ALTER TABLE `unitec_nfce_numeracoes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfce_numeracoes` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfce_numeros_usados`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfce_numeros_usados` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `modelo` varchar(2) NOT NULL DEFAULT '65',
+  `serie` smallint(5) unsigned NOT NULL,
+  `ambiente` tinyint(3) unsigned NOT NULL,
+  `numero` int(10) unsigned NOT NULL,
+  `origem` varchar(20) NOT NULL,
+  `terminal_id` bigint(20) unsigned DEFAULT NULL,
+  `pdv_venda_nfce_id` bigint(20) unsigned DEFAULT NULL,
+  `observacao` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `nfce_numero_usado_uq` (`empresa_id`,`modelo`,`serie`,`ambiente`,`numero`),
+  KEY `nfce_numero_usado_nfce_idx` (`pdv_venda_nfce_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfce_numeros_usados` WRITE;
+/*!40000 ALTER TABLE `unitec_nfce_numeros_usados` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfce_numeros_usados` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfce_tentativas`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfce_tentativas` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `pdv_venda_nfce_id` bigint(20) unsigned NOT NULL,
+  `pdv_venda_id` bigint(20) unsigned DEFAULT NULL,
+  `empresa_id` bigint(20) unsigned DEFAULT NULL,
+  `chave` varchar(44) DEFAULT NULL,
+  `serie` varchar(3) DEFAULT NULL,
+  `numero` int(10) unsigned DEFAULT NULL,
+  `status` varchar(20) DEFAULT NULL,
+  `protocolo` varchar(30) DEFAULT NULL,
+  `motivo` varchar(500) NOT NULL,
+  `registro` longtext NOT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `arquivado_em` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `nfce_tentativa_nfce_chave_idx` (`pdv_venda_nfce_id`,`chave`),
+  KEY `nfce_tentativa_chave_idx` (`chave`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfce_tentativas` WRITE;
+/*!40000 ALTER TABLE `unitec_nfce_tentativas` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfce_tentativas` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_nfe_cartas_correcao`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -27556,6 +27907,28 @@ LOCK TABLES `unitec_nfe_itens` WRITE;
 /*!40000 ALTER TABLE `unitec_nfe_itens` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_nfe_itens` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfe_orcamentos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfe_orcamentos` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `nfe_id` bigint(20) unsigned NOT NULL,
+  `orcamento_id` bigint(20) unsigned NOT NULL,
+  `status_anterior` varchar(20) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_nfe_orcamentos_nfe_id_orcamento_id_unique` (`nfe_id`,`orcamento_id`),
+  KEY `unitec_nfe_orcamentos_orcamento_id_index` (`orcamento_id`),
+  CONSTRAINT `unitec_nfe_orcamentos_nfe_id_foreign` FOREIGN KEY (`nfe_id`) REFERENCES `unitec_nfes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `unitec_nfe_orcamentos_orcamento_id_foreign` FOREIGN KEY (`orcamento_id`) REFERENCES `unitec_orcamentos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfe_orcamentos` WRITE;
+/*!40000 ALTER TABLE `unitec_nfe_orcamentos` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfe_orcamentos` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_nfe_referencias`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -27593,6 +27966,7 @@ CREATE TABLE `unitec_nfes` (
   `venda_id` bigint(20) unsigned DEFAULT NULL,
   `pdv_venda_id` bigint(20) unsigned DEFAULT NULL,
   `devolucao_compra_id` bigint(20) unsigned DEFAULT NULL,
+  `ordem_servico_id` bigint(20) unsigned DEFAULT NULL,
   `chave` varchar(44) DEFAULT NULL,
   `chave_nfe_referenciada` varchar(44) DEFAULT NULL,
   `protocolo` varchar(30) DEFAULT NULL,
@@ -27653,11 +28027,11 @@ CREATE TABLE `unitec_nfes` (
   `consumidor_final` varchar(1) NOT NULL DEFAULT '0',
   `tipo_emissao` varchar(1) DEFAULT NULL,
   `cfop` int(10) unsigned DEFAULT NULL,
+  `natureza_operacao` varchar(120) DEFAULT NULL,
   `npedido` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unitec_nfes_devolucao_compra_id_unique` (`devolucao_compra_id`),
   KEY `unitec_nfes_empresa_id_foreign` (`empresa_id`),
   KEY `unitec_nfes_cliente_id_foreign` (`cliente_id`),
   KEY `unitec_nfes_venda_id_foreign` (`venda_id`),
@@ -27666,9 +28040,12 @@ CREATE TABLE `unitec_nfes` (
   KEY `unitec_nfes_numero_index` (`numero`),
   KEY `unitec_nfes_situacao_index` (`situacao`),
   KEY `unitec_nfes_pdv_venda_id_foreign` (`pdv_venda_id`),
+  KEY `nfes_ordem_servico_status_index` (`ordem_servico_id`,`status`),
+  KEY `nfes_devolucao_compra_id_index` (`devolucao_compra_id`),
   CONSTRAINT `unitec_nfes_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `unitec_people` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfes_devolucao_compra_id_foreign` FOREIGN KEY (`devolucao_compra_id`) REFERENCES `unitec_devolucoes_compra` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfes_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_nfes_ordem_servico_id_foreign` FOREIGN KEY (`ordem_servico_id`) REFERENCES `unitec_ordens_servico` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfes_pdv_venda_id_foreign` FOREIGN KEY (`pdv_venda_id`) REFERENCES `unitec_pdv_vendas` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfes_venda_id_foreign` FOREIGN KEY (`venda_id`) REFERENCES `unitec_vendas` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -27677,6 +28054,25 @@ CREATE TABLE `unitec_nfes` (
 LOCK TABLES `unitec_nfes` WRITE;
 /*!40000 ALTER TABLE `unitec_nfes` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_nfes` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_nfse_codigos_municipais`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_nfse_codigos_municipais` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `codigo` varchar(20) NOT NULL,
+  `descricao` varchar(150) NOT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_nfse_codigos_municipais_codigo_unique` (`codigo`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_nfse_codigos_municipais` WRITE;
+/*!40000 ALTER TABLE `unitec_nfse_codigos_municipais` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_nfse_codigos_municipais` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_nfse_dps_sequencias`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -27704,10 +28100,12 @@ DROP TABLE IF EXISTS `unitec_nfse_itens`;
 CREATE TABLE `unitec_nfse_itens` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `nfse_id` bigint(20) unsigned NOT NULL,
+  `ordem_servico_id` bigint(20) unsigned DEFAULT NULL,
   `product_id` bigint(20) unsigned DEFAULT NULL,
   `ordem` smallint(5) unsigned NOT NULL,
   `codigo` varchar(191) NOT NULL,
   `descricao` varchar(191) NOT NULL,
+  `servico_prestado` text DEFAULT NULL,
   `unidade` varchar(191) DEFAULT NULL,
   `quantidade` decimal(15,3) NOT NULL,
   `valor` decimal(15,2) NOT NULL,
@@ -27716,12 +28114,23 @@ CREATE TABLE `unitec_nfse_itens` (
   `c_nbs` varchar(9) DEFAULT NULL,
   `c_trib_mun` varchar(20) DEFAULT NULL,
   `c_ind_op` varchar(6) DEFAULT NULL,
+  `obra_insc_imob_fisc` varchar(30) DEFAULT NULL,
+  `obra_tipo` varchar(8) DEFAULT NULL,
+  `obra_c_obra` varchar(30) DEFAULT NULL,
+  `obra_c_cib` varchar(8) DEFAULT NULL,
+  `obra_cep` varchar(8) DEFAULT NULL,
+  `obra_logradouro` varchar(255) DEFAULT NULL,
+  `obra_numero` varchar(60) DEFAULT NULL,
+  `obra_complemento` varchar(156) DEFAULT NULL,
+  `obra_bairro` varchar(60) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `unitec_nfse_itens_product_id_foreign` (`product_id`),
   KEY `unitec_nfse_itens_nfse_id_ordem_index` (`nfse_id`,`ordem`),
+  KEY `unitec_nfse_itens_ordem_servico_id_foreign` (`ordem_servico_id`),
   CONSTRAINT `unitec_nfse_itens_nfse_id_foreign` FOREIGN KEY (`nfse_id`) REFERENCES `unitec_nfses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `unitec_nfse_itens_ordem_servico_id_foreign` FOREIGN KEY (`ordem_servico_id`) REFERENCES `unitec_ordens_servico` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfse_itens_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `unitec_products` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -27757,6 +28166,8 @@ CREATE TABLE `unitec_nfses` (
   `municipio_prestacao_uf` varchar(2) DEFAULT NULL,
   `trib_issqn` varchar(1) NOT NULL DEFAULT '1',
   `tp_ret_issqn` varchar(1) NOT NULL DEFAULT '1',
+  `aliquota_iss` decimal(5,2) DEFAULT NULL,
+  `discriminacao` text DEFAULT NULL,
   `serie_dps` varchar(10) NOT NULL,
   `numero_dps` bigint(20) unsigned NOT NULL,
   `numero_nfse` varchar(30) DEFAULT NULL,
@@ -27767,6 +28178,7 @@ CREATE TABLE `unitec_nfses` (
   `versao_aplicativo` varchar(40) DEFAULT NULL,
   `data_hora_processamento` varchar(64) DEFAULT NULL,
   `xml_nfse` longtext DEFAULT NULL,
+  `xml_cancelamento` longtext DEFAULT NULL,
   `xml_dps` longtext DEFAULT NULL,
   `alertas` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`alertas`)),
   `transmitindo_em` timestamp NULL DEFAULT NULL,
@@ -27776,15 +28188,30 @@ CREATE TABLE `unitec_nfses` (
   `iss` decimal(15,2) NOT NULL DEFAULT 0.00,
   `total` decimal(15,2) NOT NULL DEFAULT 0.00,
   `status` varchar(20) NOT NULL DEFAULT 'aberta',
+  `cancelada_em` datetime DEFAULT NULL,
+  `cancelada_por` varchar(120) DEFAULT NULL,
+  `cancelamento_codigo` varchar(2) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `os_veiculo_id` bigint(20) unsigned DEFAULT NULL,
+  `numero_serie` varchar(60) DEFAULT NULL,
+  `descricao` varchar(150) DEFAULT NULL,
+  `descricao2` varchar(150) DEFAULT NULL,
+  `modelo` varchar(80) DEFAULT NULL,
+  `ano` varchar(10) DEFAULT NULL,
+  `placa` varchar(15) DEFAULT NULL,
+  `km` int(10) unsigned DEFAULT NULL,
+  `cor_veiculo` varchar(40) DEFAULT NULL,
+  `chassi_veiculo` varchar(40) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `nfses_empresa_serie_numero_unique` (`empresa_id`,`serie_dps`,`numero_dps`),
   KEY `unitec_nfses_tomador_id_foreign` (`tomador_id`),
   KEY `nfses_empresa_status_emissao_index` (`empresa_id`,`status`,`data_emissao`),
   KEY `nfses_ordem_servico_status_index` (`ordem_servico_id`,`status`),
+  KEY `unitec_nfses_os_veiculo_id_foreign` (`os_veiculo_id`),
   CONSTRAINT `unitec_nfses_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`),
   CONSTRAINT `unitec_nfses_ordem_servico_id_foreign` FOREIGN KEY (`ordem_servico_id`) REFERENCES `unitec_ordens_servico` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_nfses_os_veiculo_id_foreign` FOREIGN KEY (`os_veiculo_id`) REFERENCES `unitec_os_veiculos` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_nfses_tomador_id_foreign` FOREIGN KEY (`tomador_id`) REFERENCES `unitec_people` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -27914,6 +28341,8 @@ CREATE TABLE `unitec_orcamento_itens` (
   `item` smallint(5) unsigned NOT NULL DEFAULT 1,
   `product_id` bigint(20) unsigned NOT NULL,
   `product_grade_id` bigint(20) unsigned DEFAULT NULL,
+  `price_table_id` bigint(20) unsigned DEFAULT NULL,
+  `tabela_nivel` varchar(20) DEFAULT NULL,
   `quantidade` decimal(12,3) NOT NULL,
   `preco_unitario` decimal(12,2) NOT NULL,
   `total` decimal(12,2) NOT NULL,
@@ -27961,11 +28390,21 @@ CREATE TABLE `unitec_orcamentos` (
   `forma_pagamento` varchar(120) DEFAULT NULL,
   `validade_dias` smallint(5) unsigned NOT NULL DEFAULT 0,
   `observacoes` text DEFAULT NULL,
+  `os_veiculo_id` bigint(20) unsigned DEFAULT NULL,
   `total` decimal(15,2) NOT NULL DEFAULT 0.00,
   `status` varchar(20) NOT NULL DEFAULT 'aberto',
   `plataforma` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `numero_serie` varchar(60) DEFAULT NULL,
+  `descricao` varchar(150) DEFAULT NULL,
+  `descricao2` varchar(150) DEFAULT NULL,
+  `modelo` varchar(80) DEFAULT NULL,
+  `ano` varchar(10) DEFAULT NULL,
+  `placa` varchar(15) DEFAULT NULL,
+  `km` int(10) unsigned DEFAULT NULL,
+  `cor_veiculo` varchar(40) DEFAULT NULL,
+  `chassi_veiculo` varchar(40) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unitec_orcamentos_numero_unique` (`numero`),
   KEY `unitec_orcamentos_cliente_id_foreign` (`cliente_id`),
@@ -27973,7 +28412,9 @@ CREATE TABLE `unitec_orcamentos` (
   KEY `unitec_orcamentos_status_index` (`status`),
   KEY `unitec_orcamentos_vendedor_id_foreign` (`vendedor_id`),
   KEY `unitec_orcamentos_plataforma_index` (`plataforma`),
+  KEY `unitec_orcamentos_os_veiculo_id_foreign` (`os_veiculo_id`),
   CONSTRAINT `unitec_orcamentos_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `unitec_people` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `unitec_orcamentos_os_veiculo_id_foreign` FOREIGN KEY (`os_veiculo_id`) REFERENCES `unitec_os_veiculos` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_orcamentos_vendedor_id_foreign` FOREIGN KEY (`vendedor_id`) REFERENCES `unitec_vendedores` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -28027,6 +28468,7 @@ CREATE TABLE `unitec_ordem_servico_itens` (
   `tipo` varchar(1) DEFAULT NULL,
   `situacao` varchar(20) DEFAULT NULL,
   `discriminacao` varchar(250) DEFAULT NULL,
+  `servico_prestado` text DEFAULT NULL,
   `data_inicio` date DEFAULT NULL,
   `hora_inicio` time DEFAULT NULL,
   `data_termino` date DEFAULT NULL,
@@ -28086,6 +28528,8 @@ CREATE TABLE `unitec_ordens_servico` (
   `proxima_revisao` date DEFAULT NULL,
   `avisar_revisao` tinyint(1) NOT NULL DEFAULT 0,
   `cliente_id` bigint(20) unsigned DEFAULT NULL,
+  `orcamento_id` bigint(20) unsigned DEFAULT NULL,
+  `venda_id` bigint(20) unsigned DEFAULT NULL,
   `atendente_id` bigint(20) unsigned DEFAULT NULL,
   `usuario_id` bigint(20) unsigned DEFAULT NULL,
   `produto_id` bigint(20) unsigned DEFAULT NULL,
@@ -28139,6 +28583,7 @@ CREATE TABLE `unitec_ordens_servico` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unitec_ordens_servico_empresa_id_codigo_legado_unique` (`empresa_id`,`codigo_legado`),
   UNIQUE KEY `os_empresa_app_local_uuid_unique` (`empresa_id`,`app_local_uuid`),
+  UNIQUE KEY `unitec_ordens_servico_venda_id_unique` (`venda_id`),
   KEY `unitec_ordens_servico_cliente_id_foreign` (`cliente_id`),
   KEY `unitec_ordens_servico_atendente_id_foreign` (`atendente_id`),
   KEY `unitec_ordens_servico_usuario_id_foreign` (`usuario_id`),
@@ -28148,17 +28593,61 @@ CREATE TABLE `unitec_ordens_servico` (
   KEY `unitec_ordens_servico_situacao_index` (`situacao`),
   KEY `unitec_ordens_servico_data_inicio_index` (`data_inicio`),
   KEY `unitec_ordens_servico_placa_index` (`placa`),
+  KEY `unitec_ordens_servico_orcamento_id_foreign` (`orcamento_id`),
   CONSTRAINT `unitec_ordens_servico_atendente_id_foreign` FOREIGN KEY (`atendente_id`) REFERENCES `unitec_vendedores` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_ordens_servico_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `unitec_people` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_ordens_servico_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_ordens_servico_orcamento_id_foreign` FOREIGN KEY (`orcamento_id`) REFERENCES `unitec_orcamentos` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_ordens_servico_produto_id_foreign` FOREIGN KEY (`produto_id`) REFERENCES `unitec_products` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `unitec_ordens_servico_usuario_id_foreign` FOREIGN KEY (`usuario_id`) REFERENCES `unitec_users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `unitec_ordens_servico_usuario_id_foreign` FOREIGN KEY (`usuario_id`) REFERENCES `unitec_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_ordens_servico_venda_id_foreign` FOREIGN KEY (`venda_id`) REFERENCES `unitec_vendas` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_ordens_servico` WRITE;
 /*!40000 ALTER TABLE `unitec_ordens_servico` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_ordens_servico` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_os_veiculos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_os_veiculos` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `placa` varchar(10) NOT NULL,
+  `placa_alternativa` varchar(10) DEFAULT NULL,
+  `descricao` varchar(160) DEFAULT NULL,
+  `marca` varchar(80) DEFAULT NULL,
+  `modelo` varchar(80) DEFAULT NULL,
+  `submodelo` varchar(80) DEFAULT NULL,
+  `versao` varchar(80) DEFAULT NULL,
+  `ano_fabricacao` varchar(4) DEFAULT NULL,
+  `ano_modelo` varchar(4) DEFAULT NULL,
+  `cidade` varchar(80) DEFAULT NULL,
+  `uf` varchar(2) DEFAULT NULL,
+  `renavam` varchar(20) DEFAULT NULL,
+  `chassi` varchar(30) DEFAULT NULL,
+  `cor` varchar(40) DEFAULT NULL,
+  `combustivel` varchar(40) DEFAULT NULL,
+  `tipo` varchar(60) DEFAULT NULL,
+  `especie` varchar(60) DEFAULT NULL,
+  `carroceria` varchar(60) DEFAULT NULL,
+  `origem` varchar(60) DEFAULT NULL,
+  `nacionalidade` varchar(60) DEFAULT NULL,
+  `segmento` varchar(60) DEFAULT NULL,
+  `subsegmento` varchar(60) DEFAULT NULL,
+  `consultado_em` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_os_veiculos_empresa_id_placa_unique` (`empresa_id`,`placa`),
+  CONSTRAINT `unitec_os_veiculos_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_os_veiculos` WRITE;
+/*!40000 ALTER TABLE `unitec_os_veiculos` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_os_veiculos` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_outras_saida_movimento_itens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -28299,6 +28788,7 @@ CREATE TABLE `unitec_pdv_caixa_sessoes` (
   `user_id` bigint(20) unsigned NOT NULL,
   `empresa_id` bigint(20) unsigned DEFAULT NULL,
   `terminal_id` bigint(20) unsigned DEFAULT NULL,
+  `caixa_conta_id` bigint(20) unsigned DEFAULT NULL,
   `valor_abertura` decimal(12,2) NOT NULL DEFAULT 0.00,
   `valor_fechamento` decimal(12,2) DEFAULT NULL,
   `aberto_em` timestamp NOT NULL,
@@ -28311,6 +28801,8 @@ CREATE TABLE `unitec_pdv_caixa_sessoes` (
   KEY `unitec_pdv_caixa_sessoes_empresa_id_foreign` (`empresa_id`),
   KEY `unitec_pdv_caixa_sessoes_user_id_fechado_em_index` (`user_id`,`fechado_em`),
   KEY `unitec_pdv_caixa_sessoes_terminal_id_foreign` (`terminal_id`),
+  KEY `unitec_pdv_caixa_sessoes_caixa_conta_id_foreign` (`caixa_conta_id`),
+  CONSTRAINT `unitec_pdv_caixa_sessoes_caixa_conta_id_foreign` FOREIGN KEY (`caixa_conta_id`) REFERENCES `unitec_caixa_contas` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_pdv_caixa_sessoes_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_pdv_caixa_sessoes_terminal_id_foreign` FOREIGN KEY (`terminal_id`) REFERENCES `unitec_terminais` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_pdv_caixa_sessoes_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`) ON DELETE CASCADE
@@ -28320,6 +28812,63 @@ CREATE TABLE `unitec_pdv_caixa_sessoes` (
 LOCK TABLES `unitec_pdv_caixa_sessoes` WRITE;
 /*!40000 ALTER TABLE `unitec_pdv_caixa_sessoes` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_pdv_caixa_sessoes` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_pdv_mesa_lancamentos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_pdv_mesa_lancamentos` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` varchar(36) NOT NULL,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `numero` smallint(5) unsigned NOT NULL,
+  `pdv_mesa_id` bigint(20) unsigned DEFAULT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `device_uuid` varchar(100) DEFAULT NULL,
+  `qtd_itens` int(10) unsigned NOT NULL DEFAULT 0,
+  `total` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `itens` longtext DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unitec_pdv_mesa_lancamentos_uuid_unique` (`uuid`),
+  KEY `unitec_pdv_mesa_lancamentos_empresa_id_numero_index` (`empresa_id`,`numero`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_pdv_mesa_lancamentos` WRITE;
+/*!40000 ALTER TABLE `unitec_pdv_mesa_lancamentos` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_pdv_mesa_lancamentos` ENABLE KEYS */;
+UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_pdv_mesas`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_pdv_mesas` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint(20) unsigned NOT NULL,
+  `numero` smallint(5) unsigned NOT NULL,
+  `nome` varchar(60) DEFAULT NULL,
+  `qtd_itens` int(10) unsigned NOT NULL DEFAULT 0,
+  `total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `situacao` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `parcial_em` timestamp NULL DEFAULT NULL,
+  `itens` longtext DEFAULT NULL,
+  `aberta_em` timestamp NULL DEFAULT NULL,
+  `reserva_token` varchar(64) DEFAULT NULL,
+  `reservado_user_id` bigint(20) unsigned DEFAULT NULL,
+  `reservado_terminal_id` bigint(20) unsigned DEFAULT NULL,
+  `reservado_nome` varchar(120) DEFAULT NULL,
+  `reservado_ate` timestamp NULL DEFAULT NULL,
+  `ultima_pdv_venda_id` bigint(20) unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `pdv_mesas_empresa_numero_uq` (`empresa_id`,`numero`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_pdv_mesas` WRITE;
+/*!40000 ALTER TABLE `unitec_pdv_mesas` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_pdv_mesas` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_pdv_venda_esperas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -28335,6 +28884,9 @@ CREATE TABLE `unitec_pdv_venda_esperas` (
   `qtd_itens` int(10) unsigned NOT NULL DEFAULT 0,
   `total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `snapshot` longtext NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'pendente',
+  `finalizada_em` timestamp NULL DEFAULT NULL,
+  `pdv_venda_id` bigint(20) unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -28342,6 +28894,7 @@ CREATE TABLE `unitec_pdv_venda_esperas` (
   KEY `unitec_pdv_venda_esperas_user_id_foreign` (`user_id`),
   KEY `unitec_pdv_venda_esperas_vendedor_id_foreign` (`vendedor_id`),
   KEY `pdv_espera_sessao_user_idx` (`pdv_caixa_sessao_id`,`user_id`,`created_at`),
+  KEY `pdv_espera_status_idx` (`pdv_caixa_sessao_id`,`user_id`,`status`),
   CONSTRAINT `unitec_pdv_venda_esperas_pdv_caixa_sessao_id_foreign` FOREIGN KEY (`pdv_caixa_sessao_id`) REFERENCES `unitec_pdv_caixa_sessoes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `unitec_pdv_venda_esperas_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `unitec_users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `unitec_pdv_venda_esperas_vendedor_id_foreign` FOREIGN KEY (`vendedor_id`) REFERENCES `unitec_vendedores` (`id`) ON DELETE SET NULL
@@ -28365,6 +28918,7 @@ CREATE TABLE `unitec_pdv_venda_itens` (
   `descricao` varchar(191) NOT NULL,
   `unidade` varchar(10) NOT NULL DEFAULT 'UN',
   `observacao` text DEFAULT NULL,
+  `composicao_json` text DEFAULT NULL,
   `quantidade` decimal(12,3) NOT NULL,
   `preco_unitario` decimal(12,2) NOT NULL,
   `desconto` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -28394,6 +28948,7 @@ DROP TABLE IF EXISTS `unitec_pdv_venda_nfce`;
 CREATE TABLE `unitec_pdv_venda_nfce` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `pdv_venda_id` bigint(20) unsigned NOT NULL,
+  `ordem_servico_id` bigint(20) unsigned DEFAULT NULL,
   `empresa_id` bigint(20) unsigned DEFAULT NULL,
   `nfe_id` bigint(20) unsigned DEFAULT NULL,
   `operacao` varchar(32) NOT NULL,
@@ -28424,9 +28979,11 @@ CREATE TABLE `unitec_pdv_venda_nfce` (
   KEY `unitec_pdv_venda_nfce_status_simulada_index` (`status`,`simulada`),
   KEY `unitec_pdv_venda_nfce_chave_index` (`chave`),
   KEY `unitec_pdv_venda_nfce_numero_index` (`numero`),
+  KEY `pdv_venda_nfce_ordem_servico_status_index` (`ordem_servico_id`,`status`),
   CONSTRAINT `unitec_pdv_venda_nfce_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_pdv_venda_nfce_nfe_id_foreign` FOREIGN KEY (`nfe_id`) REFERENCES `unitec_nfes` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `unitec_pdv_venda_nfce_pdv_venda_id_foreign` FOREIGN KEY (`pdv_venda_id`) REFERENCES `unitec_pdv_vendas` (`id`) ON DELETE CASCADE
+  CONSTRAINT `unitec_pdv_venda_nfce_ordem_servico_id_foreign` FOREIGN KEY (`ordem_servico_id`) REFERENCES `unitec_ordens_servico` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `unitec_pdv_venda_nfce_pdv_venda_id_foreign` FOREIGN KEY (`pdv_venda_id`) REFERENCES `unitec_pdv_vendas` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -28464,15 +29021,17 @@ DROP TABLE IF EXISTS `unitec_pdv_vendas`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `unitec_pdv_vendas` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `pdv_caixa_sessao_id` bigint(20) unsigned NOT NULL,
+  `pdv_caixa_sessao_id` bigint(20) unsigned DEFAULT NULL,
   `user_id` bigint(20) unsigned NOT NULL,
   `orcamento_id` bigint(20) unsigned DEFAULT NULL,
   `venda_id` bigint(20) unsigned DEFAULT NULL,
   `person_id` bigint(20) unsigned DEFAULT NULL,
   `cpf_nota` varchar(20) DEFAULT NULL,
+  `nome_nota` varchar(60) DEFAULT NULL,
   `vendedor_id` bigint(20) unsigned DEFAULT NULL,
   `vendedor_nome` varchar(191) DEFAULT NULL,
   `numero` int(10) unsigned NOT NULL,
+  `pdv_mesa_numero` smallint(5) unsigned DEFAULT NULL,
   `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
   `desconto` decimal(12,2) NOT NULL DEFAULT 0.00,
   `acrescimo` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -28502,6 +29061,7 @@ CREATE TABLE `unitec_pdv_vendas` (
   KEY `unitec_pdv_vendas_vendedor_id_foreign` (`vendedor_id`),
   KEY `unitec_pdv_vendas_orcamento_id_foreign` (`orcamento_id`),
   KEY `unitec_pdv_vendas_venda_id_foreign` (`venda_id`),
+  KEY `pdv_vendas_mesa_fechado_idx` (`pdv_mesa_numero`,`fechado_em`),
   CONSTRAINT `unitec_pdv_vendas_orcamento_id_foreign` FOREIGN KEY (`orcamento_id`) REFERENCES `unitec_orcamentos` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_pdv_vendas_pdv_caixa_sessao_id_foreign` FOREIGN KEY (`pdv_caixa_sessao_id`) REFERENCES `unitec_pdv_caixa_sessoes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `unitec_pdv_vendas_person_id_foreign` FOREIGN KEY (`person_id`) REFERENCES `unitec_people` (`id`) ON DELETE SET NULL,
@@ -28524,6 +29084,8 @@ CREATE TABLE `unitec_pedido_itens` (
   `item` smallint(5) unsigned NOT NULL DEFAULT 1,
   `product_id` bigint(20) unsigned NOT NULL,
   `product_grade_id` bigint(20) unsigned DEFAULT NULL,
+  `price_table_id` bigint(20) unsigned DEFAULT NULL,
+  `tabela_nivel` varchar(20) DEFAULT NULL,
   `quantidade` decimal(12,3) NOT NULL,
   `preco_unitario` decimal(12,2) NOT NULL,
   `desconto` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -28807,11 +29369,32 @@ CREATE TABLE `unitec_planos_contas` (
   UNIQUE KEY `unitec_planos_contas_codigo_unique` (`codigo`),
   KEY `unitec_planos_contas_descricao_index` (`descricao`),
   KEY `unitec_planos_contas_pai_codigo_index` (`pai_codigo`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_planos_contas` WRITE;
 /*!40000 ALTER TABLE `unitec_planos_contas` DISABLE KEYS */;
+INSERT INTO `unitec_planos_contas` VALUES
+(1,101,'VENDAS DE MERCADORIAS','C',NULL,NULL,NULL,'1.01',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(2,102,'PRESTAÇÃO DE SERVIÇOS','C',NULL,NULL,NULL,'1.02',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(3,103,'RECEBIMENTO DE CLIENTES','C',NULL,NULL,NULL,'1.03',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(4,104,'JUROS RECEBIDOS','C',NULL,NULL,NULL,'1.04',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(5,105,'OUTRAS RECEITAS','C',NULL,NULL,NULL,'1.05',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(6,201,'COMPRA DE MERCADORIAS','D',NULL,NULL,NULL,'2.01',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(7,202,'FORNECEDORES','D',NULL,NULL,NULL,'2.02',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(8,203,'ALUGUEL','D',NULL,NULL,NULL,'2.03',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(9,204,'ENERGIA ELÉTRICA','D',NULL,NULL,NULL,'2.04',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(10,205,'ÁGUA','D',NULL,NULL,NULL,'2.05',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(11,206,'TELEFONE / INTERNET','D',NULL,NULL,NULL,'2.06',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(12,207,'SALÁRIOS / PRÓ-LABORE','D',NULL,NULL,NULL,'2.07',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(13,208,'IMPOSTOS / TAXAS','D',NULL,NULL,NULL,'2.08',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(14,209,'TARIFAS BANCÁRIAS','D',NULL,NULL,NULL,'2.09',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(15,210,'FRETES / TRANSPORTES','D',NULL,NULL,NULL,'2.10',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(16,211,'MANUTENÇÃO / REPAROS','D',NULL,NULL,NULL,'2.11',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(17,212,'MATERIAL DE USO / CONSUMO','D',NULL,NULL,NULL,'2.12',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(18,213,'MARKETING / PUBLICIDADE','D',NULL,NULL,NULL,'2.13',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(19,214,'DESPESAS ADMINISTRATIVAS','D',NULL,NULL,NULL,'2.14',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30'),
+(20,215,'OUTRAS DESPESAS','D',NULL,NULL,NULL,'2.15',NULL,0,0,0,NULL,1,'2026-10-17 19:51:30','2026-10-17 19:51:30');
 /*!40000 ALTER TABLE `unitec_planos_contas` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_price_tables`;
@@ -28832,9 +29415,9 @@ CREATE TABLE `unitec_price_tables` (
 LOCK TABLES `unitec_price_tables` WRITE;
 /*!40000 ALTER TABLE `unitec_price_tables` DISABLE KEYS */;
 INSERT INTO `unitec_price_tables` VALUES
-(1,'1','VAREJO',1,'2026-08-29 20:51:58','2026-09-20 20:30:39'),
-(2,'2','ATACADO',1,'2026-08-29 20:51:58','2026-09-20 20:30:39'),
-(3,'3','ESPECIAL',1,'2026-08-29 20:51:58','2026-09-20 20:30:39');
+(1,'1','VAREJO',1,'2026-08-29 20:51:58','2026-10-17 19:14:05'),
+(2,'2','ATACADO',1,'2026-08-29 20:51:58','2026-10-17 19:14:05'),
+(3,'3','ESPECIAL',1,'2026-08-29 20:51:58','2026-10-17 19:14:05');
 /*!40000 ALTER TABLE `unitec_price_tables` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_product_compositions`;
@@ -28847,6 +29430,7 @@ CREATE TABLE `unitec_product_compositions` (
   `quantidade` decimal(12,3) NOT NULL DEFAULT 1.000,
   `preco` decimal(12,2) NOT NULL DEFAULT 0.00,
   `total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `is_adicional` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -28882,7 +29466,7 @@ CREATE TABLE `unitec_product_empresa_precos` (
   KEY `unitec_product_empresa_precos_empresa_id_foreign` (`empresa_id`),
   CONSTRAINT `unitec_product_empresa_precos_empresa_id_foreign` FOREIGN KEY (`empresa_id`) REFERENCES `unitec_empresas` (`id`) ON DELETE CASCADE,
   CONSTRAINT `unitec_product_empresa_precos_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `unitec_products` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_product_empresa_precos` WRITE;
@@ -28997,6 +29581,35 @@ LOCK TABLES `unitec_product_imeis` WRITE;
 /*!40000 ALTER TABLE `unitec_product_imeis` DISABLE KEYS */;
 /*!40000 ALTER TABLE `unitec_product_imeis` ENABLE KEYS */;
 UNLOCK TABLES;
+DROP TABLE IF EXISTS `unitec_product_lote_movimentos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `unitec_product_lote_movimentos` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` bigint(20) unsigned NOT NULL,
+  `product_lote_id` bigint(20) unsigned DEFAULT NULL,
+  `lote` varchar(60) NOT NULL,
+  `data_validade` date NOT NULL,
+  `quantidade` decimal(12,3) NOT NULL,
+  `sentido` varchar(10) NOT NULL,
+  `origem_tipo` varchar(40) NOT NULL,
+  `origem_id` bigint(20) unsigned NOT NULL,
+  `referencia_movimento_id` bigint(20) unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `unitec_product_lote_movimentos_origem_tipo_origem_id_index` (`origem_tipo`,`origem_id`),
+  KEY `unitec_product_lote_movimentos_product_id_sentido_index` (`product_id`,`sentido`),
+  KEY `unitec_product_lote_movimentos_product_lote_id_index` (`product_lote_id`),
+  KEY `unitec_product_lote_movimentos_referencia_movimento_id_index` (`referencia_movimento_id`),
+  CONSTRAINT `unitec_product_lote_movimentos_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `unitec_products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `unitec_product_lote_movimentos` WRITE;
+/*!40000 ALTER TABLE `unitec_product_lote_movimentos` DISABLE KEYS */;
+/*!40000 ALTER TABLE `unitec_product_lote_movimentos` ENABLE KEYS */;
+UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_product_lotes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -29032,10 +29645,13 @@ CREATE TABLE `unitec_product_price_histories` (
   `registrado_em` date NOT NULL,
   `usuario` varchar(120) DEFAULT NULL,
   `forma_alteracao` varchar(20) DEFAULT NULL,
+  `compra_id` bigint(20) unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `unitec_product_price_histories_product_id_registrado_em_index` (`product_id`,`registrado_em`),
+  KEY `unitec_product_price_histories_compra_id_foreign` (`compra_id`),
+  CONSTRAINT `unitec_product_price_histories_compra_id_foreign` FOREIGN KEY (`compra_id`) REFERENCES `unitec_compras` (`id`) ON DELETE SET NULL,
   CONSTRAINT `unitec_product_price_histories_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `unitec_products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -29051,8 +29667,6 @@ CREATE TABLE `unitec_product_price_table_items` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `product_id` bigint(20) unsigned NOT NULL,
   `price_table_id` bigint(20) unsigned NOT NULL,
-  `valor` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `fator` decimal(12,3) NOT NULL DEFAULT 0.000,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -29150,7 +29764,6 @@ CREATE TABLE `unitec_products` (
   `aliq_adrem_cbs` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `reducao_cbs` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `reducao_ibs` decimal(8,4) NOT NULL DEFAULT 0.0000,
-  `tributacao_monofasica` tinyint(1) NOT NULL DEFAULT 0,
   `glp_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
   `gnn_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
   `gni_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
@@ -29195,6 +29808,7 @@ CREATE TABLE `unitec_products` (
   `qtd_atacado` decimal(12,3) NOT NULL DEFAULT 0.000,
   `preco_atacado` decimal(12,2) NOT NULL DEFAULT 0.00,
   `preco_especial` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `comissao_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
   `estoque` decimal(12,3) NOT NULL DEFAULT 0.000,
   `estoque_minimo` decimal(12,3) NOT NULL DEFAULT 1.000,
   `peso_kg` decimal(12,3) NOT NULL DEFAULT 0.000,
@@ -29207,7 +29821,6 @@ CREATE TABLE `unitec_products` (
   `controla_lote_validade` tinyint(1) NOT NULL DEFAULT 0,
   `info_adicionais` varchar(500) DEFAULT NULL,
   `ativo` tinyint(1) NOT NULL DEFAULT 1,
-  `is_fiscal` tinyint(1) NOT NULL DEFAULT 1,
   `paga_comissao` tinyint(1) NOT NULL DEFAULT 0,
   `preco_variavel` tinyint(1) NOT NULL DEFAULT 0,
   `is_composicao` tinyint(1) NOT NULL DEFAULT 0,
@@ -29235,7 +29848,7 @@ CREATE TABLE `unitec_products` (
   KEY `products_ativo_grupo_idx` (`ativo`,`grupo`),
   KEY `products_codigo_barras_caixa_idx` (`codigo_barras_caixa`),
   CONSTRAINT `unitec_products_ult_fornecedor_id_foreign` FOREIGN KEY (`ult_fornecedor_id`) REFERENCES `unitec_people` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 LOCK TABLES `unitec_products` WRITE;
@@ -29551,12 +30164,6 @@ CREATE TABLE `unitec_tabelas_prazo` (
 
 LOCK TABLES `unitec_tabelas_prazo` WRITE;
 /*!40000 ALTER TABLE `unitec_tabelas_prazo` DISABLE KEYS */;
-INSERT INTO `unitec_tabelas_prazo` VALUES
-(1,7,'21',1,'2026-09-28 18:59:46','2026-09-28 18:59:46'),
-(2,8,'28',1,'2026-09-28 19:00:06','2026-09-28 19:00:06'),
-(3,4,'7',1,'2026-09-30 16:07:36','2026-09-30 16:07:36'),
-(4,6,'7,14',1,'2026-09-30 16:08:06','2026-09-30 16:08:06'),
-(5,5,'14',1,'2026-09-30 17:57:31','2026-09-30 17:57:31');
 /*!40000 ALTER TABLE `unitec_tabelas_prazo` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_terminais`;
@@ -29652,7 +30259,7 @@ CREATE TABLE `unitec_terminais` (
 LOCK TABLES `unitec_terminais` WRITE;
 /*!40000 ALTER TABLE `unitec_terminais` DISABLE KEYS */;
 INSERT INTO `unitec_terminais` VALUES
-(1,1,'ERP1','127.0.0.1',NULL,NULL,1,1,1,1,'computador','[\"erp_web\"]','084bf3c8-e5af-46ba-bdd3-a66ec193484c','DESKTOP-41RVKA4','web-desktop','2026-09-30 19:01:21','2026-09-30 19:01:21',0,0,0,0,0,0,0,0,0,0,0,1,NULL,0,0,NULL,1,0,1,NULL,NULL,NULL,9600,1,NULL,NULL,0,'0',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'COM3','9600','balToledo','None','8','1','None',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,0,NULL,NULL,NULL,NULL,'2026-09-30 19:01:21','2026-09-30 19:01:21');
+(1,1,'ERP1','192.168.0.52',NULL,NULL,1,1,1,1,'computador','[\"erp_web\"]','084bf3c8-e5af-46ba-bdd3-a66ec193484c','DESKTOP-41RVKA4','web-desktop','2026-09-30 19:01:21','2026-10-17 19:56:57',0,0,0,0,0,0,0,0,0,0,0,1,NULL,0,0,NULL,1,0,1,NULL,NULL,NULL,9600,1,NULL,NULL,0,'0',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'COM3','9600','balToledo','None','8','1','None',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,0,NULL,NULL,NULL,NULL,'2026-09-30 19:01:21','2026-10-17 19:56:57');
 /*!40000 ALTER TABLE `unitec_terminais` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_terminal_vendedor`;
@@ -29851,6 +30458,8 @@ CREATE TABLE `unitec_users` (
   `acesso_app_unitec_os` tinyint(1) NOT NULL DEFAULT 0,
   `acesso_app_entregas` tinyint(1) NOT NULL DEFAULT 0,
   `acesso_app_gestao` tinyint(1) NOT NULL DEFAULT 0,
+  `acesso_app_inventario` tinyint(1) NOT NULL DEFAULT 0,
+  `acesso_app_mesas` tinyint(1) NOT NULL DEFAULT 0,
   `remember_token` varchar(100) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -29868,7 +30477,7 @@ CREATE TABLE `unitec_users` (
 LOCK TABLES `unitec_users` WRITE;
 /*!40000 ALTER TABLE `unitec_users` DISABLE KEYS */;
 INSERT INTO `unitec_users` VALUES
-(1,1,1,1,1,1,'USUARIO','$2y$04$8ZYlZq/yadmyBGjhvN0J6.eNf.gFwIekyCRdfNrLhcTs2lNj6b4A2','01','01',1,1,1,1,1,NULL,'2026-08-30 14:18:41','2026-09-30 15:30:12');
+(1,1,1,1,1,1,'USUARIO','$2y$04$8ZYlZq/yadmyBGjhvN0J6.eNf.gFwIekyCRdfNrLhcTs2lNj6b4A2','01','01',1,1,1,1,1,0,0,NULL,'2026-08-30 14:18:41','2026-10-17 19:55:16');
 /*!40000 ALTER TABLE `unitec_users` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_veiculos`;
@@ -29902,6 +30511,7 @@ CREATE TABLE `unitec_venda_itens` (
   `quantidade` decimal(12,3) NOT NULL,
   `valor_item` decimal(12,2) NOT NULL,
   `total` decimal(12,2) NOT NULL,
+  `comissao_pct` decimal(8,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -30123,8 +30733,6 @@ CREATE TABLE `unitec_vendas_parametros` (
 
 LOCK TABLES `unitec_vendas_parametros` WRITE;
 /*!40000 ALTER TABLE `unitec_vendas_parametros` DISABLE KEYS */;
-INSERT INTO `unitec_vendas_parametros` VALUES
-(1,NULL,1,4,1,1,NULL,NULL,NULL,NULL,'1','3','4',5,5,5,10,'S',NULL,NULL,NULL,NULL,'nfe/1/xml','nfe/1/schemas','nfe/1/enviadas','nfe/1/canceladas','nfe/1/inutilizadas','nfe/1/eventos','nfe/1/pdf',NULL,1,'1',1,1,'000000000000000',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,'N','N','smtp','brevo',NULL,'22469772000100','unitecnologia sistemas','sac@unitecnologiasc.com','47984002117',NULL,NULL,'2026-08-30 14:26:55','2026-09-21 16:29:24');
 /*!40000 ALTER TABLE `unitec_vendas_parametros` ENABLE KEYS */;
 UNLOCK TABLES;
 DROP TABLE IF EXISTS `unitec_vendedores`;
@@ -30191,7 +30799,7 @@ CREATE TABLE `unitec_vendedores` (
 LOCK TABLES `unitec_vendedores` WRITE;
 /*!40000 ALTER TABLE `unitec_vendedores` DISABLE KEYS */;
 INSERT INTO `unitec_vendedores` VALUES
-(1,1,'1','USUARIO','OPERADOR',1,0.00,0.00,'2026-08-30 14:22:54','2026-09-14 03:28:51',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-30',NULL,NULL,0.00,NULL,'LOJA',1,1,1,0,0.00,1,0.00,0,1,0,0,1,NULL);
+(1,1,'1','USUARIO','OPERADOR',1,0.00,0.00,'2026-08-30 14:22:54','2026-10-17 19:55:16','00000000000',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-30',NULL,NULL,0.00,NULL,'LOJA',1,1,1,0,0.00,1,0.00,0,1,0,0,1,NULL);
 /*!40000 ALTER TABLE `unitec_vendedores` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -30199,8 +30807,6 @@ UNLOCK TABLES;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
+
 

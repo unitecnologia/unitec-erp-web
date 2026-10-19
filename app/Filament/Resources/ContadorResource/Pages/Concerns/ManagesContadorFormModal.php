@@ -6,6 +6,7 @@ use App\Models\Contador;
 use App\Models\Person;
 use App\Rules\DocumentoBrasileiroValido;
 use App\Support\Erp\CepLookupService;
+use App\Support\Erp\CnpjLookupService;
 use App\Support\Erp\ErpUppercase;
 use App\Support\Erp\MunicipioLookupService;
 use Filament\Notifications\Notification;
@@ -130,6 +131,106 @@ trait ManagesContadorFormModal
         }
 
         $this->fecharContadorCidadeSugestoes();
+    }
+
+    public function searchContadorCnpj(bool $silentIncomplete = false): void
+    {
+        if (! $this->contadorModalOpen) {
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', (string) ($this->contadorForm['cnpj_cpf'] ?? '')) ?? '';
+
+        if (strlen($digits) === 11) {
+            if (! $silentIncomplete) {
+                Notification::make()
+                    ->title('Preenchimento automático só para CNPJ.')
+                    ->body('CPF não possui consulta pública de endereço. Complete os dados manualmente.')
+                    ->warning()
+                    ->send();
+            }
+
+            return;
+        }
+
+        if (strlen($digits) !== 14) {
+            if (! $silentIncomplete) {
+                Notification::make()
+                    ->title('Informe um CNPJ completo.')
+                    ->warning()
+                    ->send();
+            }
+
+            return;
+        }
+
+        // No blur: não sobrescreve cadastro já preenchido (botão sempre consulta).
+        if ($silentIncomplete) {
+            $hasNome = filled(trim((string) ($this->contadorForm['nome'] ?? '')));
+            $hasEndereco = filled(trim((string) ($this->contadorForm['endereco'] ?? '')));
+
+            if ($hasNome && $hasEndereco) {
+                return;
+            }
+        }
+
+        try {
+            $fields = app(CnpjLookupService::class)->fetch($digits);
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Consulta de CNPJ')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $nome = trim((string) ($fields['nome_razao'] ?? ''));
+        if ($nome === '') {
+            $nome = trim((string) ($fields['apelido_fantasia'] ?? ''));
+        }
+
+        $mapped = array_filter([
+            'cnpj_cpf' => Contador::formatCnpjCpf((string) ($fields['cpf_cnpj'] ?? $digits)),
+            'nome' => $nome !== '' ? ErpUppercase::uppercase($nome) : null,
+            'cep' => Contador::formatCep((string) ($fields['cep'] ?? '')),
+            'endereco' => filled($fields['endereco'] ?? null)
+                ? ErpUppercase::uppercase((string) $fields['endereco'])
+                : null,
+            'numero' => filled($fields['numero'] ?? null)
+                ? ErpUppercase::uppercase((string) $fields['numero'])
+                : null,
+            'bairro' => filled($fields['bairro'] ?? null)
+                ? ErpUppercase::uppercase((string) $fields['bairro'])
+                : null,
+            'cidade' => filled($fields['cidade_nome'] ?? null)
+                ? ErpUppercase::uppercase((string) $fields['cidade_nome'])
+                : null,
+            'uf' => filled($fields['uf'] ?? null) ? strtoupper((string) $fields['uf']) : null,
+            'email' => filled($fields['email'] ?? null) ? trim((string) $fields['email']) : null,
+            'fone' => Contador::formatFone((string) ($fields['fone1'] ?? ($fields['fone2'] ?? ''))),
+        ], fn (?string $value): bool => filled($value));
+
+        $this->contadorCidadeLookupLocked = true;
+        $this->contadorForm = [
+            ...$this->contadorForm,
+            ...$mapped,
+        ];
+        $this->contadorCidadeLookupLocked = false;
+        $this->fecharContadorCidadeSugestoes();
+
+        $missingAddress = blank($mapped['endereco'] ?? null) || blank($mapped['cep'] ?? null);
+
+        Notification::make()
+            ->title('Contador encontrado')
+            ->body($missingAddress
+                ? 'Dados parciais preenchidos. Confira endereço e contatos se necessário.'
+                : 'Dados preenchidos automaticamente. Confira e complete CRC/e-mail se necessário.')
+            ->success()
+            ->send();
+
+        $this->dispatch('erp-masks-refresh');
     }
 
     public function buscarCepContador(bool $silentIncompleteCep = false): void

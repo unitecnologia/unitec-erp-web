@@ -2811,13 +2811,25 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     padding: 0.55rem;
 }
 
-.erp-produtos-composicao__form,
 .erp-produtos-tabpreco__form {
     border: 1px solid #8fa8c8;
     border-radius: 5px;
     background: linear-gradient(180deg, #f8fbff 0%, #e4edf8 100%);
     padding: 0.28rem 0.35rem;
     box-shadow: 0 1px 0 rgb(255 255 255 / 75%) inset;
+}
+
+.erp-produtos-composicao {
+    gap: 0.45rem;
+    height: 100%;
+    min-height: 0;
+}
+
+.erp-produtos-composicao__form {
+    border: 1px solid #d0dbe8;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 0.55rem 0.65rem;
 }
 
 .erp-produtos-tabpreco__hint {
@@ -2867,7 +2879,6 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     font-variant-numeric: tabular-nums;
 }
 
-.erp-produtos-composicao__fields,
 .erp-produtos-tabpreco__fields {
     display: flex;
     flex-wrap: wrap;
@@ -2875,7 +2886,6 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     align-items: flex-end;
 }
 
-.erp-produtos-composicao__field,
 .erp-produtos-tabpreco__field {
     display: flex;
     flex-direction: column;
@@ -2883,14 +2893,12 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     min-width: 6.5rem;
 }
 
-.erp-produtos-composicao__field label,
 .erp-produtos-tabpreco__field label {
     font-size: 0.66rem;
     font-weight: 700;
     color: #334155;
 }
 
-.erp-produtos-composicao__field .erp-pcad-form__input,
 .erp-produtos-tabpreco__field .erp-pcad-form__input,
 .erp-produtos-tabpreco__field .erp-pcad-form__select {
     min-height: 1.2rem !important;
@@ -2898,6 +2906,307 @@ html:has(.erp-produtos-form-page.erp-pdv-embed) {
     font-size: 0.72rem !important;
     border: 1px solid #8fa8c8 !important;
     border-radius: 3px !important;
+}
+
+.erp-produtos-composicao__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.45rem 0.55rem;
+}
+
+.erp-produtos-composicao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.erp-produtos-composicao__field label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.01em;
+}
+
+.erp-produtos-composicao__field .erp-pcad-form__input {
+    min-height: 2rem !important;
+    padding: 0.28rem 0.5rem !important;
+    font-size: 0.8125rem !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+}
+
+.erp-produtos-composicao__field .erp-pcad-form__input:focus {
+    border-color: #3b82f6 !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 15%);
+}
+
+.erp-produtos-composicao__field--produto {
+    flex: 1 1 28rem;
+    min-width: 22rem;
+    max-width: none;
+}
+
+.erp-produtos-composicao__field--produto .erp-pcad-form__input,
+.erp-produtos-composicao__lookup {
+    width: 100%;
+}
+
+.erp-produtos-composicao__field--qtd {
+    flex: 0 0 6.5rem;
+    width: 6.5rem;
+}
+
+.erp-produtos-composicao__field--preco {
+    flex: 0 0 7.5rem;
+    width: 7.5rem;
+}
+
+.erp-produtos-composicao__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    padding-bottom: 0.05rem;
+}
+
+.erp-produtos-composicao__actions .erp-produtos-child-grid__btn {
+    min-height: 2rem;
+    padding: 0.28rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.erp-produtos-composicao__btn--primary {
+    border-color: #2563eb !important;
+    background: #2563eb !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+
+.erp-produtos-composicao__btn--primary:hover {
+    border-color: #1d4ed8 !important;
+    background: #1d4ed8 !important;
+    color: #fff !important;
+}
+
+.erp-produtos-composicao__btn--ghost {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.erp-produtos-composicao__total {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.1rem;
+    flex: 0 0 auto;
+    min-width: 7.5rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+}
+
+.erp-produtos-composicao__total-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+}
+
+.erp-produtos-composicao__total-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.erp-produtos-composicao__editing {
+    margin: 0.4rem 0 0;
+    padding: 0.28rem 0.45rem;
+    border-radius: 5px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    font-size: 0.75rem;
+    color: #1e40af;
+}
+
+.erp-produtos-composicao__editing strong {
+    font-weight: 700;
+}
+
+.erp-produtos-composicao__lookup {
+    position: relative;
+}
+
+.erp-produtos-composicao__suggest-wrap {
+    position: absolute;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 22rem;
+}
+
+.erp-produtos-composicao__suggest {
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    max-height: 14rem;
+    overflow: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgb(15 23 42 / 12%);
+}
+
+.erp-produtos-composicao__suggest--empty {
+    position: absolute;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.78rem;
+    color: #64748b;
+    box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
+}
+
+.erp-produtos-composicao__suggest button {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: center;
+    width: 100%;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 0.4rem 0.45rem;
+    text-align: left;
+    cursor: pointer;
+    color: #0f172a;
+}
+
+.erp-produtos-composicao__suggest button:hover {
+    background: #eff6ff;
+}
+
+.erp-produtos-composicao__suggest button.is-selected {
+    background: #2563eb;
+    color: #fff;
+}
+
+.erp-produtos-composicao__suggest button.is-selected .erp-produtos-composicao__suggest-code,
+.erp-produtos-composicao__suggest button.is-selected .erp-produtos-composicao__suggest-nome,
+.erp-produtos-composicao__suggest button.is-selected .erp-produtos-composicao__suggest-preco {
+    color: #fff;
+}
+
+.erp-produtos-composicao__suggest-code {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #2563eb;
+    white-space: nowrap;
+}
+
+.erp-produtos-composicao__suggest-nome {
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-produtos-composicao__suggest-preco {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-produtos-composicao__grid {
+    flex: 1 1 auto;
+    min-height: 10rem;
+    border-color: #d0dbe8;
+    border-radius: 8px;
+}
+
+.erp-produtos-composicao__table {
+    table-layout: fixed;
+    width: 100%;
+    font-size: 0.8125rem;
+}
+
+.erp-produtos-composicao__table th {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.4rem 0.55rem;
+    border-color: #e2e8f0;
+}
+
+.erp-produtos-composicao__table td {
+    padding: 0.4rem 0.55rem;
+    border-color: #e2e8f0;
+    vertical-align: middle;
+}
+
+.erp-produtos-composicao__col-codigo {
+    width: 7.5rem;
+    white-space: nowrap;
+}
+
+.erp-produtos-composicao__col-produto {
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-produtos-composicao__col-adicional {
+    width: 5.5rem;
+    text-align: center;
+}
+
+.erp-produtos-composicao__col-adicional input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #2563eb;
+}
+
+.erp-produtos-composicao__col-num {
+    width: 6.5rem;
+    text-align: right;
+}
+
+.erp-produtos-composicao__table .erp-produtos-child-grid__row:hover {
+    background: #f8fafc;
+}
+
+.erp-produtos-composicao__table .erp-produtos-child-grid__row--selected {
+    background: #dbeafe;
+}
+
+.erp-produtos-composicao__table .erp-produtos-child-grid__empty {
+    padding: 1.4rem 0.75rem;
+    color: #64748b;
+    font-style: normal;
 }
 
 .erp-produtos-child-grid__check {

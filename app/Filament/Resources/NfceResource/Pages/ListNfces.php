@@ -15,6 +15,7 @@ use App\Support\Erp\ErpScreen;
 use App\Support\Erp\Nfce\NfceEmpresaEscopo;
 use App\Support\Erp\Nfce\NfceImpressaoFiscal;
 use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
+use App\Support\Fiscal\NfceContingenciaJustificativa;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -128,6 +129,7 @@ class ListNfces extends ListRecords
             // Pesquisa só pelo campo: sem tecla de foco (o padrão F6 conflitava com Imprimir).
             'searchInput' => null,
             'searchFocusKey' => false,
+            'doubleClickEdit' => false,
             'create' => 'modulePending',
             'edit' => 'imprimirNfce',
             'delete' => null,
@@ -278,7 +280,76 @@ class ListNfces extends ListRecords
     {
         $id = (int) $recordId;
         $this->highlightedRecordId = NfceEmpresaEscopo::filtrarIds([$id], $this->empresaIdAtiva()) !== [] ? $id : null;
+
+        // Contingência / Duplicidade: remonta o rodapé (aviso amarelo + chave). Demais abas: só destaque.
+        if (in_array($this->statusFilter, [PdvVendaNfce::TAB_CONTINGENCIA, PdvVendaNfce::TAB_DUPLICIDADE], true)) {
+            unset($this->highlightedChave, $this->highlightedNfceAvisoRodape);
+
+            return;
+        }
+
         $this->skipRender();
+    }
+
+    /**
+     * Motivo e orientação da NFC-e selecionada (rodapé amarelo) — Contingência ou Duplicidade.
+     *
+     * @return array{titulo: string, motivo: string, ajuda: string}|null
+     */
+    #[Computed]
+    public function highlightedNfceAvisoRodape(): ?array
+    {
+        $id = $this->highlightedRecordId;
+
+        if (! $id && $this->statusFilter === PdvVendaNfce::TAB_CONTINGENCIA && $this->nfceSelecionadosTransmitir !== []) {
+            $id = (int) $this->nfceSelecionadosTransmitir[array_key_last($this->nfceSelecionadosTransmitir)];
+        }
+
+        if (! $id) {
+            return null;
+        }
+
+        $record = $this->findNfceNoEscopo((int) $id);
+
+        if (! $record) {
+            return null;
+        }
+
+        $numero = str_pad((string) $record->numero, 6, '0', STR_PAD_LEFT);
+
+        if ($this->statusFilter === PdvVendaNfce::TAB_CONTINGENCIA
+            && $record->status === PdvVendaNfce::STATUS_CONTINGENCIA) {
+            $motivo = trim((string) ($record->motivo_contingencia ?? ''));
+            if ($motivo === '') {
+                $motivo = NfceContingenciaJustificativa::PADRAO;
+            }
+
+            return [
+                'titulo' => 'NFC-e '.$numero.' em contingência',
+                'motivo' => $motivo,
+                'ajuda' => 'A nota foi emitida sem autorização da SEFAZ. Selecione-a e use F5 | Transmitir para regularizar. Se a SEFAZ estiver fora do ar, aguarde e tente de novo.',
+            ];
+        }
+
+        if ($this->statusFilter === PdvVendaNfce::TAB_DUPLICIDADE
+            && $record->status === PdvVendaNfce::STATUS_DUPLICIDADE) {
+            $motivo = trim((string) ($record->motivo_rejeicao ?? ''));
+            if ($motivo === '') {
+                $motivo = 'Rejeição 539: este número já foi autorizado na SEFAZ com outra chave.';
+            }
+
+            $conflitoConfirmado = str_contains(mb_strtolower($motivo, 'UTF-8'), 'conflito confirmado');
+
+            return [
+                'titulo' => 'NFC-e '.$numero.' em duplicidade (539)',
+                'motivo' => $motivo,
+                'ajuda' => $conflitoConfirmado
+                    ? 'Conflito confirmado: a SEFAZ já tem outra NFC-e com este número (conteúdo diferente desta venda). O F4 não pode restaurar. Use F5 | Transmitir — o sistema emite com número novo e não reutiliza este nas próximas notas.'
+                    : 'O número pode já ter sido usado na SEFAZ com outra chave. Use F4 | Recuperar para tentar restaurar a nota autorizada. Se o conflito for confirmado como outra emissão, use F5 | Transmitir (novo número).',
+            ];
+        }
+
+        return null;
     }
 
     #[Computed]

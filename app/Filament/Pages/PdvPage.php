@@ -108,7 +108,7 @@ class PdvPage extends Page
         }
 
         if (! $this->caixaAberto) {
-            $this->aberturaForm['valor'] = '0,00';
+            $this->iniciarAberturaCaixaForm();
             $this->openPdvModal('abrir_caixa');
         }
     }

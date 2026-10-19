@@ -205,10 +205,21 @@ final class EstoqueReservaService
     }
 
     /**
+     * @param  array<int, true>  $visited
      * @return array<int, array{product: Product, quantidade: float}>
      */
-    private function expandirComposicao(Product $kit, float $quantidadeKit): array
+    private function expandirComposicao(Product $kit, float $quantidadeKit, array $visited = []): array
     {
+        $kitId = (int) $kit->id;
+
+        if (isset($visited[$kitId])) {
+            throw new \RuntimeException(
+                'Composição circular detectada em: '.trim((string) ($kit->descricao ?? $kit->codigo ?? 'produto'))
+            );
+        }
+
+        $visited[$kitId] = true;
+
         $linhas = [];
         $componentes = ProductComposition::query()
             ->where('product_id', $kit->id)
@@ -225,7 +236,7 @@ final class EstoqueReservaService
             $qtd = $quantidadeKit * (float) $componente->quantidade;
 
             if ($comp->is_composicao) {
-                foreach ($this->expandirComposicao($comp, $qtd) as $sub) {
+                foreach ($this->expandirComposicao($comp, $qtd, $visited) as $sub) {
                     $linhas[] = $sub;
                 }
 

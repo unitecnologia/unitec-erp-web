@@ -165,12 +165,40 @@ final class DatabaseBackupService
                 'pre_update' => $preUpdate,
             ]);
 
+            $generatedAtUtc = gmdate('Y-m-d\TH:i:s.v\Z');
+            $portalUpload = null;
+
+            // Registra o envio ao portal antes da rotação, para não apagar o arquivo em trânsito.
+            if (! $preUpdate) {
+                try {
+                    app(PortalBkpFileUploader::class)->registerForBackup($targetPath, $generatedAtUtc);
+                } catch (Throwable $e) {
+                    report($e);
+                    Log::warning('Falha ao enfileirar envio de backup ao portal.', [
+                        'path' => $targetPath,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Rotação somente após dump confirmado (tamanho > 0). Falha na exclusão não invalida o backup.
             $removed = $preUpdate
                 ? 0
                 : $this->rotateAutomaticBackups($destination, self::KEEP_AUTOMATIC_BACKUPS);
 
             $this->markStatus($empresaId, 'ok', 'Backup concluído - '.$this->formatBytes($size));
+
+            if (! $preUpdate) {
+                try {
+                    $portalUpload = app(PortalBkpFileUploader::class)->attemptDueJobs();
+                } catch (Throwable $e) {
+                    report($e);
+                    $portalUpload = [
+                        'ok' => false,
+                        'message' => 'Backup local ok; falha ao iniciar envio ao portal.',
+                    ];
+                }
+            }
 
             $label = $preUpdate ? 'Backup pré-update' : 'Backup';
             $message = $label.' gerado: '.$filename.' ('.$this->formatBytes($size).').';
@@ -188,12 +216,22 @@ final class DatabaseBackupService
                 $message .= ' Rotação: '.$removed.' arquivo(s) antigo(s) removido(s).';
             }
 
+            if (is_array($portalUpload)) {
+                $portalMsg = trim((string) ($portalUpload['message'] ?? ''));
+                if (($portalUpload['ok'] ?? false) === true) {
+                    $message .= ' Arquivo recebido no portal.';
+                } elseif ($portalMsg !== '') {
+                    $message .= ' Portal: '.$portalMsg;
+                }
+            }
+
             return [
                 'ok' => true,
                 'path' => $targetPath,
                 'env_path' => $envPath,
                 'size' => $size,
                 'files_removed' => $removed,
+                'portal_upload' => $portalUpload,
                 'message' => $message,
             ];
         } catch (Throwable $e) {
@@ -555,41 +593,12 @@ final class DatabaseBackupService
      */
     public function listSqlBackupsInDirectory(string $directory, int $limit = 80): array
     {
-        $directory = $this->normalizePath(trim($directory));
+        $rows = $this->listBackupsInPath($directory, $limit);
 
-        if ($directory === '' || str_contains($directory, '..') || ! is_dir($directory)) {
-            return [];
-        }
-
-        $files = collect(File::files($directory))
-            ->filter(function ($file): bool {
-                $name = $file->getFilename();
-                $lower = mb_strtolower($name);
-
-                $isBackup = str_starts_with($name, self::FILE_PREFIX)
-                    || str_starts_with($name, self::PRE_UPDATE_PREFIX);
-
-                return $isBackup && str_ends_with($lower, '.sql') && $file->getSize() >= 32;
-            })
-            ->sortByDesc(fn ($file): int => $file->getMTime())
-            ->take($limit)
-            ->values();
-
-        return $files->map(function ($file): array {
-            $size = (int) $file->getSize();
-
-            return [
-                'name' => $file->getFilename(),
-                'path' => $file->getPathname(),
-                'kind' => 'sql',
-                'size' => $size,
-                'size_label' => $this->formatBytes($size),
-                'modified_at' => ErpTimezone::toLocal(
-                    \Illuminate\Support\Carbon::createFromTimestamp($file->getMTime())
-                )->format('d/m/Y H:i'),
-                'modified_ts' => $file->getMTime(),
-            ];
-        })->all();
+        return array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => ($row['kind'] ?? '') === 'sql' && (int) ($row['size'] ?? 0) >= 32
+        ));
     }
 
     /**
@@ -781,20 +790,48 @@ final class DatabaseBackupService
     public function listBackupsInPath(string $directory, int $limit = 40): array
     {
         $destination = $this->normalizePath(trim($directory));
+        $destination = rtrim($destination, " \t\n\r\0\x0B".DIRECTORY_SEPARATOR);
 
-        if ($destination === '' || str_contains($destination, '..') || ! is_dir($destination)) {
+        if ($destination === '' || ! is_dir($destination)) {
             return [];
+        }
+
+        $real = realpath($destination);
+        if ($real !== false) {
+            $destination = $this->normalizePath($real);
         }
 
         clearstatcache(true, $destination);
 
-        $files = collect(File::files($destination))
-            ->filter(function ($file): bool {
+        try {
+            $scanned = File::files($destination);
+        } catch (Throwable) {
+            $scanned = [];
+        }
+
+        // Fallback se File::files falhar (permissão / path Unicode).
+        if ($scanned === [] && is_readable($destination)) {
+            foreach (scandir($destination) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+                $full = $destination.DIRECTORY_SEPARATOR.$entry;
+                if (is_file($full)) {
+                    $scanned[] = new \SplFileInfo($full);
+                }
+            }
+        }
+
+        $prefix = mb_strtolower(self::FILE_PREFIX);
+        $preUpdatePrefix = mb_strtolower(self::PRE_UPDATE_PREFIX);
+
+        $files = collect($scanned)
+            ->filter(function ($file) use ($prefix, $preUpdatePrefix): bool {
                 $name = $file->getFilename();
                 $lower = mb_strtolower($name);
 
-                $isBackup = str_starts_with($name, self::FILE_PREFIX)
-                    || str_starts_with($name, self::PRE_UPDATE_PREFIX);
+                $isBackup = str_starts_with($lower, $prefix)
+                    || str_starts_with($lower, $preUpdatePrefix);
 
                 return $isBackup && (str_ends_with($lower, '.sql') || str_ends_with($lower, '.env'));
             })
@@ -872,9 +909,29 @@ final class DatabaseBackupService
         $toRemove = array_slice($automatic, $keep);
         $removed = 0;
 
+        $protected = [];
+        try {
+            foreach (app(PortalBkpUploadStore::class)->protectedPaths() as $protectedPath) {
+                $key = realpath($protectedPath) ?: $protectedPath;
+                $protected[$key] = true;
+            }
+        } catch (Throwable) {
+            $protected = [];
+        }
+
         foreach ($toRemove as $item) {
             $path = (string) $item['path'];
             $name = (string) $item['name'];
+            $pathKey = realpath($path) ?: $path;
+
+            if (isset($protected[$pathKey])) {
+                Log::info('erp.backup.rotation.skipped_portal_upload', [
+                    'file' => $name,
+                    'path' => $path,
+                ]);
+
+                continue;
+            }
 
             try {
                 if (is_file($path)) {

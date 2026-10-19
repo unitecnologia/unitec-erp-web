@@ -81,6 +81,8 @@ final class MesasPainelService
 
         $itens = array_map(static function (array $item): array {
             $nivel = trim((string) ($item['tabela_nivel'] ?? $item['nivel'] ?? ''));
+            $selecao = \App\Support\Erp\Pdv\PdvComposicaoSelecao::fromArray($item);
+            $linhas = \App\Support\Erp\Pdv\PdvComposicaoLinhas::textosDoItem($item);
 
             return [
                 'product_id' => (int) ($item['product_id'] ?? 0),
@@ -89,9 +91,13 @@ final class MesasPainelService
                 'quantidade' => round((float) ($item['quantidade'] ?? 0), 3),
                 'preco' => round((float) ($item['preco'] ?? 0), 2),
                 'total' => round((float) ($item['total'] ?? 0), 2),
-                'obs' => (string) ($item['obs'] ?? ''),
+                'acrescimo' => round((float) ($item['acrescimo'] ?? 0), 2),
+                'obs' => \App\Support\Erp\Pdv\PdvComposicaoLinhas::limparObsManual((string) ($item['obs'] ?? '')),
                 'tabela_nivel' => $nivel !== '' ? $nivel : null,
                 'price_table_id' => isset($item['price_table_id']) ? (int) $item['price_table_id'] : null,
+                'composicao_removidos' => $selecao->removidos,
+                'composicao_adicionais' => $selecao->adicionais,
+                'composicao_linhas' => $linhas,
             ];
         }, PdvMesaService::make()->itens($mesa));
 
@@ -111,7 +117,7 @@ final class MesasPainelService
 
         return [
             'numero' => $numero,
-            'rotulo' => PdvMesaService::rotulo($numero),
+            'rotulo' => $mesa?->rotulo() ?? PdvMesaService::rotuloPadrao($numero),
             'qtd_itens' => $qtd,
             'total' => round((float) ($mesa?->total ?? 0), 2),
             'situacao' => $this->situacao($qtd, (int) ($mesa?->situacao ?? 0)),

@@ -714,6 +714,31 @@
     content: ' |';
 }
 
+.erp-nfe-page .erp-nfe__total-value--bruto::after,
+.erp-nfe-page .erp-nfe__total-value--canceladas::after {
+    content: '  ·  ';
+    color: var(--erp-text-muted, #64748b);
+    font-weight: 500;
+}
+
+.erp-nfe-page .erp-nfe__total-label--canceladas {
+    color: #991b1b;
+}
+
+.erp-nfe-page .erp-nfe__total-value--canceladas {
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.erp-nfe-page .erp-nfe__total-label--liquido {
+    color: #166534;
+}
+
+.erp-nfe-page .erp-nfe__total-value--liquido {
+    color: #166534;
+    font-weight: 800;
+}
+
 .erp-nfe-page .erp-nfe-actions {
     flex-shrink: 0;
     gap: 0.35rem;
@@ -6859,6 +6884,64 @@
     letter-spacing: 0;
     cursor: text;
     user-select: all;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total--nfce {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.55rem 0.75rem;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso {
+    flex: 1 1 18rem;
+    min-width: 14rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #eab308;
+    border-radius: 6px;
+    background: #fef9c3;
+    color: #713f12;
+    line-height: 1.25;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso__titulo {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #854d0e;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso__motivo {
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfce__contingencia-aviso__ajuda {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #a16207;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde {
+    flex: 0 0 auto;
+    margin-left: auto;
+    justify-content: flex-end;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #86efac;
+    border-radius: 6px;
+    background: #ecfdf5;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde .erp-nfe__total-label {
+    color: #166534;
+    font-weight: 700;
+}
+
+.erp-nfe-page.erp-nfce-page .erp-nfe__total-summary--nfce-verde .erp-nfe__total-value {
+    color: #15803d;
+    font-weight: 800;
 }
 
 /* ── NFC-e — barra de filtros (padrão de pesquisa de Produtos) ── */

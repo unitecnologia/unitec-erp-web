@@ -1,5 +1,11 @@
 @if ($this->activeModal === 'mesa_transferir')
-    <?php $mesaOrigem = \App\Support\Erp\Pdv\PdvMesaSessao::atual(); ?>
+    <?php
+        $mesaOrigem = \App\Support\Erp\Pdv\PdvMesaSessao::atual();
+        $mesaOrigemEmpresaId = (int) (\App\Support\Erp\ErpContext::currentEmpresaId() ?? 0);
+        $mesaOrigemRotulo = $mesaOrigem
+            ? \App\Support\Erp\Pdv\PdvMesaService::rotuloDaEmpresa($mesaOrigemEmpresaId, (int) $mesaOrigem['numero'])
+            : '—';
+    ?>
     <div class="erp-pdv-modal" role="dialog" aria-label="Transferir mesa">
         <div class="erp-pdv-modal__backdrop" wire:click="cancelTransferirMesa"></div>
         <div class="erp-pdv-modal__window erp-pdv-modal__window--small erp-pdv-mesas-transferir">
@@ -9,7 +15,7 @@
             <form class="erp-pdv-modal__body" wire:submit.prevent="confirmarTransferirMesa">
                 <div class="erp-pdv-mesas-transferir__origem">
                     <span class="erp-pdv-mesas-transferir__k">Origem</span>
-                    <strong>{{ $mesaOrigem ? \App\Support\Erp\Pdv\PdvMesaService::rotulo($mesaOrigem['numero']) : '—' }}</strong>
+                    <strong>{{ $mesaOrigemRotulo }}</strong>
                     <span class="erp-pdv-mesas-transferir__meta">{{ count($this->cupomItens) }} item(ns) · R$ {{ $this->cupomTotal }}</span>
                 </div>
                 <label class="erp-pdv-mesas-transferir__campo" for="erp-pdv-mesa-transferir-destino">

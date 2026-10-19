@@ -34,7 +34,7 @@ final class RelatorioProdutosPdfParser
         $fase = $fase === 2 ? 2 : 1;
 
         $linhas = preg_split("/\r\n|\n|\r/", $texto) ?: [];
-        $linhas = array_map(trim(...), $linhas);
+        $linhas = array_map(fn (string $linha): string => $this->normalizarLinha($linha), $linhas);
 
         $blocos = $this->blocos($linhas);
         $importar = [];
@@ -105,7 +105,27 @@ final class RelatorioProdutosPdfParser
             while ($i < $n) {
                 $prox = $linhas[$i];
 
-                if ($prox === '' || $this->eCabecalho($prox) || $this->eInicioProduto($prox)) {
+                if ($prox === '' || $this->eCabecalho($prox)) {
+                    break;
+                }
+
+                $restoAposSufixo = $this->restoAposSufixoEanPartido($bloco, $prox);
+                if ($restoAposSufixo !== null) {
+                    if (preg_match('/^(\d{1,7})\s+/', $prox, $mSufixo) === 1) {
+                        $bloco[] = $mSufixo[1];
+                    }
+                    if ($restoAposSufixo !== '') {
+                        $linhas[$i] = $restoAposSufixo;
+                    } else {
+                        $i++;
+                    }
+                    break;
+                }
+
+                if ($this->eInicioProduto($prox)
+                    && ! $this->eContinuacaoEanPartido($bloco, $prox)
+                    && ! $this->blocoEsperaContinuacao($bloco, $prox)
+                ) {
                     break;
                 }
 
@@ -119,10 +139,19 @@ final class RelatorioProdutosPdfParser
         return $blocos;
     }
 
+    private function normalizarLinha(string $linha): string
+    {
+        $linha = trim(preg_replace('/[ \t]+/u', ' ', $linha) ?? $linha);
+        // Rodapé do relatório colado no último item da página.
+        $linha = preg_replace('/\s+RUA\s+\S.*$/iu', '', $linha) ?? $linha;
+
+        return trim($linha);
+    }
+
     private function eCabecalho(string $linha): bool
     {
         return (bool) preg_match(
-            '/^(Mercado |Data:|Hora:|Página:|Relatório|ID Código|Avenida |TOTAL:|-- |\d+\/\d+$)/u',
+            '/^(Mercado |JMS |Data:|Hora:|Página:|Relatório|ID Código|Avenida |RUA |TOTAL:|-- |\d+\/\d+$)/u',
             $linha,
         );
     }
@@ -130,18 +159,107 @@ final class RelatorioProdutosPdfParser
     private function eInicioProduto(string $linha): bool
     {
         // ID sozinho (EAN partido multi-linha) ou ID + resto na mesma linha.
-        // Não usa só \d{3,6}\s — senão "123265" sozinho não abre bloco e cola no anterior.
-        if (preg_match('/^\d{3,6}$/', $linha)) {
+        if (preg_match('/^[1-9]\d{0,5}$/', $linha)) {
             return true;
         }
 
-        // Evita sufixos curtos de EAN partido ("93", "99") e continuações "001 PLAX...".
-        if (preg_match('/^\d{1,2}[\s\t]/', $linha)) {
+        // Continuação de EAN partido virando o próximo item (linha começa no código de barras).
+        if (preg_match('/^\d{8,14}(?=\s|$|[A-Za-zÀ-ÿ])/u', $linha)) {
+            return true;
+        }
+
+        if (! preg_match('/^([1-9]\d{0,5})[\s\t]+(.+)$/', $linha, $m)) {
             return false;
         }
 
-        // IDs do relatório não têm zero à esquerda (ex.: 5601, 123265).
-        return (bool) preg_match('/^[1-9]\d{2,5}[\s\t]/', $linha);
+        $resto = ltrim($m[2]);
+
+        // Linha de estoque/preços (ex.: "20 11,00 220,00") não é um produto novo.
+        if (preg_match('/^-?\d{1,3}(?:\.\d{3})*,\d{2}/', $resto)) {
+            return false;
+        }
+        if (preg_match('/^-?\d+\s+-?\d{1,3}(?:\.\d{3})*,\d{2}/', $resto)) {
+            return false;
+        }
+
+        // IDs do relatório não têm zero à esquerda (ex.: 82, 5601, 123265).
+        return true;
+    }
+
+    /**
+     * @param  list<string>  $bloco
+     */
+    private function blocoEsperaContinuacao(array $bloco, string $prox): bool
+    {
+        if (count($bloco) !== 1 || ! preg_match('/^[1-9]\d{0,5}$/', $bloco[0])) {
+            return false;
+        }
+
+        if (preg_match('/^\d{8,14}(\s|$)/', $prox)) {
+            return true;
+        }
+
+        return (bool) preg_match('/^[A-Za-zÀ-ÿ]/u', $prox);
+    }
+
+    /**
+     * @param  list<string>  $bloco
+     */
+    private function prefixoEanIncompleto(array $bloco): ?string
+    {
+        $ultima = trim((string) ($bloco[count($bloco) - 1] ?? ''));
+        $resto = preg_replace('/^\d{1,6}\s+/', '', $ultima, 1) ?? $ultima;
+        $resto = trim($resto);
+
+        if (preg_match('/(?:^|\s)(\d{8,12})$/', $resto, $m) !== 1) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
+    /**
+     * @param  list<string>  $bloco
+     */
+    private function eContinuacaoEanPartido(array $bloco, string $prox): bool
+    {
+        $prefixo = $this->prefixoEanIncompleto($bloco);
+        if ($prefixo === null) {
+            return false;
+        }
+
+        if (preg_match('/^(\d{1,7})(?:\s|$)/', $prox, $m2) !== 1) {
+            return false;
+        }
+
+        $juntado = $prefixo.$m2[1];
+
+        return strlen($juntado) >= 13 && strlen($juntado) <= 14;
+    }
+
+    /**
+     * Sufixo que completa o EAN + outro produto na mesma linha de continuação.
+     *
+     * @param  list<string>  $bloco
+     */
+    private function restoAposSufixoEanPartido(array $bloco, string $prox): ?string
+    {
+        if (! $this->eContinuacaoEanPartido($bloco, $prox)) {
+            return null;
+        }
+
+        if (preg_match('/^(\d{1,7})\s+(\d{8,14})(?=\s|$|[A-Za-zÀ-ÿ])/u', $prox, $m) !== 1) {
+            return null;
+        }
+
+        $prefixo = $this->prefixoEanIncompleto($bloco);
+        $juntado = ($prefixo ?? '').$m[1];
+        // Mesma linha só repete o EAN já juntado (não é outro produto).
+        if ($m[2] === $juntado || $m[2] === $prefixo) {
+            return null;
+        }
+
+        return trim(substr($prox, strlen($m[1])));
     }
 
     /**
@@ -159,14 +277,13 @@ final class RelatorioProdutosPdfParser
 
             $ean = $partido['ean'];
             $preco = $this->precoValor(implode(' ', $bloco));
-
-            if ($preco === null) {
-                return ['status' => 'sem_preco'];
-            }
-
             $descricao = $partido['descricao'];
             if ($descricao === '') {
                 $descricao = $ean;
+            }
+
+            if ($preco === null) {
+                $preco = 0.0;
             }
 
             return [
@@ -180,12 +297,17 @@ final class RelatorioProdutosPdfParser
         $primeira = $bloco[0];
         $resto = preg_replace('/^\d{1,6}\s+/', '', $primeira, 1) ?? $primeira;
         // ID sozinho na 1ª linha: EAN pode estar na 2ª (completo, multi-linha descrição).
-        if (preg_match('/^\d{3,6}$/', $primeira) && isset($bloco[1])) {
+        if (preg_match('/^\d{1,6}$/', $primeira) && isset($bloco[1])) {
             $resto = $bloco[1];
         }
 
+        // Colunas: ID | Código | Cód. de Barras | Descrição
+        // Nunca importar "Código". Se houver dois números longos, o 2º é o código de barras
+        // (ex.: "1722 79060297 7891079001004 NISSIN..." → EAN = 7891079001004).
         $ean = null;
-        if (preg_match('/^(?:\d{1,6}\s+)?(\d{8,14})(?:\s|$)/', $resto, $m)) {
+        if (preg_match('/^(?:\d{1,6}\s+)?(\d{8,14})\s+(\d{8,14})(?=\s|$|[A-Za-zÀ-ÿ])/u', $resto, $m)) {
+            $ean = $m[2];
+        } elseif (preg_match('/^(?:\d{1,6}\s+)?(\d{8,14})(?=\s|$|[A-Za-zÀ-ÿ])/u', $resto, $m)) {
             $ean = $m[1];
         } elseif (preg_match('/^\d{8,14}$/', trim($resto))) {
             $ean = trim($resto);
@@ -201,13 +323,17 @@ final class RelatorioProdutosPdfParser
 
         $preco = $this->precoValor(implode(' ', $bloco));
 
-        if ($preco === null) {
-            return ['status' => 'sem_preco'];
-        }
-
         $descricao = $ean !== ''
             ? $this->descricao($bloco, $ean)
             : $this->descricaoSemEan($bloco);
+
+        if ($preco === null) {
+            if ($ean === '' && $descricao === '') {
+                return ['status' => 'sem_preco'];
+            }
+
+            $preco = 0.0;
+        }
 
         if ($descricao === '') {
             $descricao = $ean !== '' ? $ean : 'PRODUTO SEM DESCRICAO';
@@ -312,15 +438,12 @@ final class RelatorioProdutosPdfParser
         $junto = implode(' ', $bloco);
         $junto = $this->removerCaudaNumerica($junto);
         $junto = preg_replace('/^\d{1,6}\s+/', '', $junto, 1) ?? $junto;
+        // Remove "Código" interno (curto ou longo) antes do Cód. de Barras.
+        $junto = preg_replace('/^\d{1,14}\s+(?='.preg_quote($ean, '/').'\b)/', '', $junto) ?? $junto;
 
-        if (preg_match('/^(\d{1,6})\s+'.preg_quote($ean, '/').'\b/', $junto, $m) === 1) {
-            $junto = substr($junto, strlen($m[0]));
-        } else {
-            $pos = strpos($junto, $ean);
-
-            if ($pos !== false) {
-                $junto = substr($junto, $pos + strlen($ean));
-            }
+        $pos = strpos($junto, $ean);
+        if ($pos !== false) {
+            $junto = substr($junto, $pos + strlen($ean));
         }
 
         $junto = trim(preg_replace('/\s+/u', ' ', $junto) ?? $junto);
@@ -336,6 +459,10 @@ final class RelatorioProdutosPdfParser
         $junto = implode(' ', $bloco);
         $junto = $this->removerCaudaNumerica($junto);
         $junto = preg_replace('/^\d{1,6}\s+/', '', $junto, 1) ?? $junto;
+        // Código interno do relatório antigo (não importar): "2207 ESFIRRA GRANDE".
+        if (! preg_match('/^\d{8,}/', $junto)) {
+            $junto = preg_replace('/^\d{1,6}\s+(?=\D)/u', '', $junto, 1) ?? $junto;
+        }
         $junto = trim(preg_replace('/\s+/u', ' ', $junto) ?? $junto);
 
         return $junto;

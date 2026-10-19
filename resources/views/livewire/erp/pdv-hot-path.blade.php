@@ -4,7 +4,7 @@
     wire:key="erp-pdv-hot-path"
 >
     <div class="erp-pdv__grid-wrap" id="erp-pdv-grid-wrap">
-        <table class="erp-pdv__grid erp-pdv__grid--cupom">
+        <table @class(['erp-pdv__grid', 'erp-pdv__grid--cupom', 'erp-pdv__grid--mesa' => $mesaAberta])>
             <colgroup>
                 <col class="erp-pdv__col-excluir">
                 <col class="erp-pdv__col-item">
@@ -67,8 +67,14 @@
                         <td class="erp-pdv__grid-col-codigo">{{ ($item['codigo_barras'] ?? '') !== '' ? $item['codigo_barras'] : '—' }}</td>
                         <td class="erp-pdv__grid-col-descricao">
                             {{ $item['descricao'] ?? '—' }}
-                            @if (($item['obs'] ?? '') !== '')
-                                <small class="erp-pdv__item-obs">Obs: {{ $item['obs'] }}</small>
+                            @foreach (\App\Support\Erp\Pdv\PdvComposicaoLinhas::textosDoItem($item) as $linhaComp)
+                                <small class="erp-pdv__item-obs">{{ $linhaComp }}</small>
+                            @endforeach
+                            @php
+                                $obsItem = \App\Support\Erp\Pdv\PdvComposicaoLinhas::limparObsManual((string) ($item['obs'] ?? ''));
+                            @endphp
+                            @if ($obsItem !== '')
+                                <small class="erp-pdv__item-obs">Obs: {{ $obsItem }}</small>
                             @endif
                         </td>
                         <td class="erp-pdv__grid-col-center">{{ $this->formatCupomQuantidade((float) ($item['quantidade'] ?? 0)) }}</td>

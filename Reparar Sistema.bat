@@ -163,13 +163,45 @@ if errorlevel 1 (
 )
 
 REM Migrate DEPOIS do MySQL subir (passo 1 encerra o mysqld).
-echo [7/8] Migrate + config:cache...
-"%PHPEXE%" artisan migrate --force
+REM Isto corrige "BD: Pendente (N)" / banco incompativel apos update.
+echo [7/8] Aplicando migrations pendentes...
+cd /d "%APP%"
+echo.
+echo --- unitec:migrate-tolerante ---
+"%PHPEXE%" artisan unitec:migrate-tolerante
 if errorlevel 1 (
+  echo.
+  echo Tentando migrate --force simples...
+  "%PHPEXE%" artisan migrate --force
+)
+if errorlevel 1 (
+  echo.
   echo [ERRO] Migrate falhou. Veja a mensagem acima.
+  echo Se persistir, envie ao suporte: %LARALOG%
   pause
   exit /b 1
 )
+echo.
+echo --- migrate:status (conferencia) ---
+"%PHPEXE%" artisan migrate:status > "%TEMP%\unitec-migrate-status.txt" 2>&1
+if errorlevel 1 (
+  echo [AVISO] Nao foi possivel listar migrate:status.
+  type "%TEMP%\unitec-migrate-status.txt"
+) else (
+  findstr /I /C:"Pending" "%TEMP%\unitec-migrate-status.txt" >nul
+  if not errorlevel 1 (
+    echo.
+    echo [ERRO] Ainda ha migration^(s^) Pending apos o migrate:
+    findstr /I /C:"Pending" "%TEMP%\unitec-migrate-status.txt"
+    echo.
+    echo Envie ao suporte este resultado e: %LARALOG%
+    pause
+    exit /b 1
+  )
+  echo [OK] Nenhuma migration Pending.
+)
+REM Limpa cache do indicador BD (PendingMigrationsGuard) + config
+"%PHPEXE%" artisan optimize:clear >nul 2>&1
 "%PHPEXE%" artisan config:cache >nul 2>&1
 
 echo [8/8] Testando login...

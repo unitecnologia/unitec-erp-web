@@ -5,6 +5,7 @@ namespace App\Support\ContadorCloud;
 use App\Models\Compra;
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\Nfse;
 use App\Models\NotaFornecedor;
 use App\Models\PdvVendaNfce;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +80,26 @@ final class ContadorCloudPortalHookService
         $this->safeDispatch(
             $empresa,
             $this->payloadBuilder->fromNfe($nfe, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_CONTINGENCIA),
+        );
+    }
+
+    public function onNfseAutorizada(Nfse $nfse, Empresa $empresa): void
+    {
+        if (blank($nfse->xml_nfse)) {
+            return;
+        }
+
+        $this->safeDispatch(
+            $empresa,
+            $this->payloadBuilder->fromNfse($nfse, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO),
+        );
+    }
+
+    public function onNfseCancelada(Nfse $nfse, Empresa $empresa): void
+    {
+        $this->safeDispatch(
+            $empresa,
+            $this->payloadBuilder->fromNfse($nfse, $empresa, ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO),
         );
     }
 

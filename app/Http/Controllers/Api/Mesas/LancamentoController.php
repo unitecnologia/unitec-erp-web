@@ -10,7 +10,9 @@ use App\Support\Mesas\MesasConflito;
 use App\Support\Mesas\MesasLancamentoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class LancamentoController
 {
@@ -26,6 +28,10 @@ class LancamentoController
             'itens.*.nivel' => ['nullable', 'string', 'in:varejo,atacado,especial'],
             'itens.*.price_table_id' => ['nullable', 'integer', 'min:1'],
             'itens.*.obs' => ['nullable', 'string', 'max:140'],
+            'itens.*.composicao_removidos' => ['nullable', 'array'],
+            'itens.*.composicao_removidos.*' => ['integer', 'min:1'],
+            'itens.*.composicao_adicionais' => ['nullable', 'array'],
+            'itens.*.composicao_adicionais.*' => ['integer', 'min:1'],
             'aberta_em_vista' => ['nullable', 'string', 'max:30'],
             'confirmar_mesa' => ['nullable', 'boolean'],
             'aceitar_precos' => ['nullable', 'boolean'],
@@ -49,6 +55,26 @@ class LancamentoController
             return response()->json($service->lancar($empresa, $user, (string) $device->device_uuid, $dados));
         } catch (MesasConflito $conflito) {
             return response()->json($conflito->toArray(), 409);
+        } catch (Throwable $e) {
+            Log::error('mesas.lancamento_falhou', [
+                'uuid' => $dados['uuid'] ?? null,
+                'numero' => $dados['numero'] ?? null,
+                'device' => $device->device_uuid,
+                'erro' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            $detalhe = trim($e->getMessage());
+            if ($detalhe === '') {
+                $detalhe = $e::class;
+            }
+
+            return response()->json([
+                'message' => 'Falha ao lançar pedido: '.$detalhe,
+                'code' => 'lancamento_falhou',
+                'retry' => true,
+                'exception' => class_basename($e),
+            ], 500);
         }
     }
 }

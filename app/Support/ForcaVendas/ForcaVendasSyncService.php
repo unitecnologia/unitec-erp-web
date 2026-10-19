@@ -10,7 +10,6 @@ use App\Models\ForcaVendasClienteImport;
 use App\Models\ForcaVendasOrder;
 use App\Models\ForcaVendasVisitaSemVenda;
 use App\Models\FormaPagamento;
-use App\Models\Grupo;
 use App\Models\Orcamento;
 use App\Models\OrcamentoItem;
 use App\Models\Pedido;
@@ -114,14 +113,7 @@ class ForcaVendasSyncService
             'transportadoras' => Schema::hasTable('transportadoras')
                 ? Transportadora::query()->where('ativo', true)
                 : null,
-            'grupos' => Schema::hasTable('grupos')
-                ? Grupo::query()
-                    ->where('ativo', true)
-                    ->when(
-                        Schema::hasColumn('grupos', 'mostrar_no_app'),
-                        fn ($query) => $query->where('mostrar_no_app', true),
-                    )
-                : null,
+            'grupos' => \App\Support\Erp\GrupoAppCatalog::queryVisivel(),
             'contas_receber' => $this->financeiroSignatureQuery($carteiraVendedorId),
             'vendas' => Venda::query(),
             'orcamentos' => Orcamento::query(),
@@ -579,26 +571,7 @@ class ForcaVendasSyncService
      */
     private function grupos(): array
     {
-        if (! Schema::hasTable('grupos')) {
-            return [];
-        }
-
-        return Grupo::query()
-            ->where('ativo', true)
-            ->when(
-                Schema::hasColumn('grupos', 'mostrar_no_app'),
-                fn ($query) => $query->where('mostrar_no_app', true),
-            )
-            ->orderBy('nome')
-            ->get()
-            ->map(fn (Grupo $g): array => [
-                'id' => $g->id,
-                'nome' => $g->nome,
-                'ativo' => (bool) $g->ativo,
-                'mostrar_no_app' => (bool) ($g->mostrar_no_app ?? false),
-                'updated_at' => optional($g->updated_at)->toIso8601String(),
-            ])
-            ->all();
+        return \App\Support\Erp\GrupoAppCatalog::paraSync();
     }
 
     /**

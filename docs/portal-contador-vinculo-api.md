@@ -284,16 +284,53 @@ Rota: `/portal/vincular?codigo=A7B9-C3D2`
 | `NF_EMITIDA` | NF-e / NFC-e autorizada na SEFAZ |
 | `NF_CANCELADA` | NF-e / NFC-e cancelada |
 | `NF_CONTINGENCIA` | Ainda em contingência — **avisar o contador** |
+| `NFSE_EMITIDA` | NFS-e autorizada (Nacional SEFIN ou IPM) |
+| `NFSE_CANCELADA` | NFS-e cancelada |
 | `XML_COMPRA` | XML de compra / nota de fornecedor |
+
+### NFS-e (contrato ERP → Portal)
+
+```json
+{
+  "cnpj": "54.644.503/0001-29",
+  "tipo": "NFSE_EMITIDA",
+  "numero": "123",
+  "dataEmissao": "2026-10-15",
+  "competencia": "2026-10",
+  "modelo": "55",
+  "contingencia": false,
+  "tpEmis": 1,
+  "status": "autorizada",
+  "chaveAcesso": "…",
+  "valorTotal": 1500.00,
+  "xmlContent": "<NFSe>…</NFSe>",
+  "nomeArquivo": "doc_NF123.xml",
+  "xmlCancelamento": "…opcional no cancelamento…"
+}
+```
+
+| Campo | Emitida | Cancelada |
+|-------|---------|-----------|
+| `tipo` | `NFSE_EMITIDA` | `NFSE_CANCELADA` |
+| `status` | `autorizada` | `cancelada` |
+| `xmlContent` | XML da NFS-e (`xml_nfse`) | Preferir XML autorizado (valor); evento em `xmlCancelamento` |
+| `modelo` | `55` (Zod do portal; NFS-e é pelo `tipo`) | `55` |
+| `chaveAcesso` | chave nacional (dígitos) ou código verificação IPM (alfanumérico) | mesma chave da emitida |
+| `valorTotal` | total da nota | total da nota (não duplicar card se já somou emitida) |
+
+Deduplicação sugerida no portal: chave (`chaveAcesso`) + `tipo` (ou chave + evento). Cancelamento atualiza/substitui sem criar segunda nota “emitida”. Aceitar `chaveAcesso` alfanumérica em NFS-e IPM.
 
 ### Campos extras (ERP já envia)
 
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
-| `modelo` | string | `55` = NF-e, `65` = NFC-e |
+| `modelo` | string | `55` = NF-e (e NFS-e no Zod atual do portal), `65` = NFC-e. NFS-e distingue-se por `tipo` `NFSE_*` |
 | `contingencia` | bool | `true` se contingência |
 | `tpEmis` | int | `1` normal, `9` contingência |
 | `motivoContingencia` | string | Justificativa |
+| `valorTotal` | number | Valor da nota (R$). **Obrigatório para somar o card Canceladas NF-e/NFC-e** — o XML de evento de cancelamento não traz `vNF`. |
+| `status` | string | `autorizada` / `cancelada` / `contingencia` |
+| `xmlCancelamento` | string | XML do evento de cancelamento (quando houver) |
 
 ### Pedidos de UI no portal
 

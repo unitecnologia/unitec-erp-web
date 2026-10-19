@@ -69,6 +69,7 @@ final class PdvVendaEsperaService
         return PdvVendaEspera::query()
             ->where('pdv_caixa_sessao_id', $caixaSessaoId)
             ->where('user_id', $userId)
+            ->pendentes()
             ->latest('id')
             ->get();
     }

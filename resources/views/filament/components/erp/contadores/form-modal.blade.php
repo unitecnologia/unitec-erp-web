@@ -68,21 +68,35 @@
                         <span class="erp-contador-form-modal__error">{{ $message }}</span>
                     @enderror
 
-                    <div class="erp-pcad-form__row">
+                    <div class="erp-pcad-form__row erp-pcad-form__row--doc-crc">
                         <label class="erp-pcad-form__label" for="contador-cnpj">CNPJ/CPF *</label>
                         <input
                             id="contador-cnpj"
                             type="text"
                             wire:model="contadorForm.cnpj_cpf"
                             data-mask="cpf-cnpj"
+                            x-on:blur="$wire.searchContadorCnpj(true)"
                             class="erp-pcad-form__input erp-pcad-form__input--doc"
+                            title="Ao sair do campo com CNPJ completo, busca e preenche automaticamente"
                         >
-                        <label class="erp-pcad-form__label erp-pcad-form__label--inline" for="contador-crc">CRC</label>
+                        <button
+                            type="button"
+                            wire:click="searchContadorCnpj"
+                            wire:loading.attr="disabled"
+                            wire:target="searchContadorCnpj"
+                            class="erp-pcad-form__btn erp-pcad-form__btn--cnpj"
+                            title="Pesquisar CNPJ e preencher automaticamente"
+                        >
+                            <span class="erp-pcad-form__btn-icon" aria-hidden="true">⌕</span>
+                            <span wire:loading.remove wire:target="searchContadorCnpj">CNPJ</span>
+                            <span wire:loading wire:target="searchContadorCnpj">…</span>
+                        </button>
+                        <label class="erp-pcad-form__label erp-pcad-form__label--inline erp-pcad-form__label--crc" for="contador-crc">CRC</label>
                         <input
                             id="contador-crc"
                             type="text"
                             wire:model="contadorForm.crc"
-                            class="erp-pcad-form__input erp-pcad-form__input--md"
+                            class="erp-pcad-form__input erp-pcad-form__input--crc"
                         >
                     </div>
                     @error('contadorForm.cnpj_cpf')

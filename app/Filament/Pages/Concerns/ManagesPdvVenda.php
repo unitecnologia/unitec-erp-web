@@ -16,6 +16,7 @@ use App\Support\Erp\ConsumidorFinalGuard;
 use App\Support\Erp\ErpMoney;
 use App\Support\Erp\Pdv\PdvFinalizarOperacao;
 use App\Support\Erp\Pdv\PdvFinalizarPagamentosHelper;
+use App\Support\Erp\Pdv\PdvMesaSessao;
 use App\Support\Erp\Pdv\PdvNotaClienteService;
 use App\Support\Erp\Pdv\PdvProductSearchRanking;
 use App\Support\Erp\Pdv\PdvVendaNfceService;
@@ -786,6 +787,8 @@ trait ManagesPdvVenda
      */
     protected function limparCupom(bool $liberarImportacao = true): void
     {
+        // Sem espera ativa (F6 já descartou / F7 já encerrou) isto é no-op; demais limpezas devolvem à lista.
+        $this->devolverEsperaAtivaSeAbandonada();
         $this->desvincularMesaAtual();
         $this->cupomItens = [];
         $this->selectedCupomIndex = null;
@@ -1321,6 +1324,9 @@ trait ManagesPdvVenda
         }
 
         $this->persistCupomToSession();
+        if ($this->pdvHotPathEnabled ?? false) {
+            $this->dispatch('erp-pdv-hot-reload-cupom')->to(PdvHotPath::class);
+        }
         $this->dispatch('erp-pdv-hot-set-selection', index: $this->selectedCupomIndex)->to(PdvHotPath::class);
         $this->closePdvModal();
         $this->clearPdvAutorizacao();
@@ -2000,21 +2006,9 @@ trait ManagesPdvVenda
     protected function queryProductsForPdv(string $term, int $limit = 100): array
     {
         $config = $this->pdvConfig();
-        $like = $config->pesquisaPartesDescricao() ? '%' . $term . '%' : $term . '%';
         $empresaId = $config->empresa()?->id ? (int) $config->empresa()->id : null;
 
-        $candidates = Product::query()
-            ->where('ativo', true)
-            ->where(function ($query) use ($like): void {
-                $query->where('codigo', 'like', $like)
-                    ->orWhere('codigo_barras', 'like', $like)
-                    ->orWhere('codigo_barras_caixa', 'like', $like)
-                    ->orWhere('referencia', 'like', $like)
-                    ->orWhere('descricao', 'like', $like);
-            })
-            ->orderBy('descricao')
-            ->limit(PdvProductSearchRanking::CANDIDATE_LIMIT)
-            ->get();
+        $candidates = PdvProductSearchRanking::fetchCandidates($term);
 
         $ranked = PdvProductSearchRanking::rankProducts(
             $candidates,
@@ -2264,6 +2258,8 @@ trait ManagesPdvVenda
         $this->pdvConfirmCancelarVenda = false;
         $this->registrarItensCanceladosCupom($this->cupomItens);
         $this->zerarItensMesaAtual();
+        // Venda recuperada da espera: F6 descarta o registro (não devolve à lista).
+        $this->descartarEsperaAtivaAposCancelamentoCupom();
         $this->limparCupom();
 
         Notification::make()
@@ -2768,6 +2764,11 @@ trait ManagesPdvVenda
                 }
             }
 
+            $mesaAtual = PdvMesaSessao::atual();
+            $mesaNumero = ($mesaAtual !== null && (int) ($mesaAtual['numero'] ?? 0) > 0)
+                ? (int) $mesaAtual['numero']
+                : null;
+
             $venda = PdvVenda::query()->create([
                 'pdv_caixa_sessao_id' => $this->caixaSessaoId,
                 'user_id' => Auth::id(),
@@ -2777,6 +2778,7 @@ trait ManagesPdvVenda
                 'vendedor_id' => $this->vendedorId,
                 'vendedor_nome' => $this->vendedor,
                 'numero' => $numero,
+                'pdv_mesa_numero' => $mesaNumero,
                 'subtotal' => $subtotal,
                 'desconto' => $desconto,
                 'acrescimo' => $acrescimo,
@@ -2795,6 +2797,11 @@ trait ManagesPdvVenda
             $this->baixarMesaNaVenda((int) $venda->id);
 
             foreach ($this->cupomItens as $item) {
+                $composicaoSelecao = \App\Support\Erp\Pdv\PdvComposicaoSelecao::fromArray($item);
+                $composicaoJson = ($composicaoSelecao->removidos !== [] || $composicaoSelecao->adicionais !== [])
+                    ? json_encode($composicaoSelecao->toArray(), JSON_UNESCAPED_UNICODE)
+                    : null;
+
                 $pdvItem = PdvVendaItem::query()->create([
                     'pdv_venda_id' => $venda->id,
                     'product_id' => $item['product_id'] ?? null,
@@ -2803,6 +2810,8 @@ trait ManagesPdvVenda
                     'codigo' => $item['codigo'] ?? null,
                     'descricao' => $item['descricao'] ?? '',
                     'unidade' => $item['unidade'] ?? 'UN',
+                    'observacao' => filled($item['obs'] ?? null) ? (string) $item['obs'] : null,
+                    'composicao_json' => $composicaoJson,
                     'quantidade' => $item['quantidade'] ?? 1,
                     'preco_unitario' => $item['preco'] ?? 0,
                     'desconto' => round((float) ($item['desconto'] ?? 0), 2),
@@ -2831,6 +2840,7 @@ trait ManagesPdvVenda
                             ),
                             'pdv_venda_item',
                             (int) $pdvItem->id,
+                            $composicaoSelecao,
                         );
                     }
                 }
@@ -2952,6 +2962,7 @@ trait ManagesPdvVenda
                 $this->dispatch('erp-pdv-hide-fiscal-progress');
                 $this->avancarNumeroNfceAposDuplicidade($e);
 
+                $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
                 $this->limparCupom();
                 $this->closePdvModal();
 
@@ -2971,6 +2982,7 @@ trait ManagesPdvVenda
             } catch (\Throwable $e) {
                 $this->dispatch('erp-pdv-hide-fiscal-progress');
 
+                $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
                 $this->limparCupom();
                 $this->closePdvModal();
 
@@ -2993,6 +3005,7 @@ trait ManagesPdvVenda
 
         $totalFormatado = ErpMoney::formatBr($total);
 
+        $this->encerrarEsperaAtivaAposVenda($vendaId ? (int) $vendaId : null);
         $this->limparCupom();
         $this->closePdvModal();
 

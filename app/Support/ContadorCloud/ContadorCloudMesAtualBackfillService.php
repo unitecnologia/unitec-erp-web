@@ -5,6 +5,7 @@ namespace App\Support\ContadorCloud;
 use App\Jobs\ContadorCloudProcessPendingJob;
 use App\Models\Empresa;
 use App\Models\Nfe;
+use App\Models\Nfse;
 use App\Models\NotaFornecedor;
 use App\Models\PdvVendaNfce;
 use Carbon\Carbon;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Enfileira e envia ao Portal do Contador os documentos fiscais
- * do mês atual e do mês anterior (NF-e, NFC-e, contingência, compras).
+ * do mês atual e do mês anterior (NF-e, NFC-e, NFS-e, contingência, compras).
  */
 final class ContadorCloudMesAtualBackfillService
 {
@@ -63,6 +64,7 @@ final class ContadorCloudMesAtualBackfillService
         $enfileirados = 0;
         $enfileirados += $this->enfileirarNfes($empresa, $inicio, $fim);
         $enfileirados += $this->enfileirarNfces($empresa, $inicio, $fim);
+        $enfileirados += $this->enfileirarNfses($empresa, $inicio, $fim);
         $enfileirados += $this->enfileirarNotasFornecedor($empresa, $inicio, $fim);
 
         $resultado = $this->syncService->processPending((int) $empresa->id, max(1, $processLimit));
@@ -85,7 +87,7 @@ final class ContadorCloudMesAtualBackfillService
         ]);
 
         $message = sprintf(
-            'Período %s (NF-e, NFC-e, contingência e compras): %d documento(s) preparado(s), %d enviado(s), %d falha(s).',
+            'Período %s (NF-e, NFC-e, NFS-e, contingência e compras): %d documento(s) preparado(s), %d enviado(s), %d falha(s).',
             $competenciaLabel,
             $enfileirados,
             $resultado['enviados'],
@@ -135,6 +137,8 @@ final class ContadorCloudMesAtualBackfillService
                     $empresa,
                     $this->payloadBuilder->fromNfe($nfe, $empresa, $evento),
                     immediate: false,
+                    // Canceladas: reenvia com valorTotal (XML de evento não traz vNF).
+                    force: $evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO,
                 );
 
                 if ($log !== null && $log->status === \App\Models\ContadorCloudSyncLog::STATUS_PENDING) {
@@ -183,6 +187,63 @@ final class ContadorCloudMesAtualBackfillService
                     $empresa,
                     $this->payloadBuilder->fromNfce($nfce, $empresa, $evento),
                     immediate: false,
+                    force: $evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO,
+                );
+
+                if ($log !== null && $log->status === \App\Models\ContadorCloudSyncLog::STATUS_PENDING) {
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    private function enfileirarNfses(Empresa $empresa, Carbon $inicio, Carbon $fim): int
+    {
+        $count = 0;
+        $inicioData = $inicio->toDateString();
+        $fimData = $fim->toDateString();
+        $compInicio = $inicio->format('Y-m');
+        $compFim = $fim->format('Y-m');
+
+        Nfse::query()
+            ->where('empresa_id', $empresa->id)
+            ->whereIn('status', [Nfse::STATUS_AUTORIZADA, Nfse::STATUS_CANCELADA])
+            ->where(function ($query) use ($inicio, $fim, $inicioData, $fimData, $compInicio, $compFim): void {
+                $query
+                    ->whereBetween('data_emissao', [$inicioData, $fimData])
+                    ->orWhereBetween('cancelada_em', [$inicio, $fim])
+                    ->orWhere(function ($inner) use ($compInicio, $compFim): void {
+                        $inner
+                            ->whereNotNull('competencia')
+                            ->where('competencia', '!=', '')
+                            ->where('competencia', '>=', $compInicio)
+                            ->where('competencia', '<=', $compFim);
+                    });
+            })
+            ->where(function ($query): void {
+                $query
+                    ->where(function ($xml): void {
+                        $xml->whereNotNull('xml_nfse')->where('xml_nfse', '!=', '');
+                    })
+                    ->orWhere(function ($canc): void {
+                        $canc->where('status', Nfse::STATUS_CANCELADA)
+                            ->whereNotNull('xml_cancelamento')
+                            ->where('xml_cancelamento', '!=', '');
+                    });
+            })
+            ->orderBy('id')
+            ->cursor()
+            ->each(function (Nfse $nfse) use ($empresa, &$count): void {
+                $evento = $nfse->status === Nfse::STATUS_CANCELADA
+                    ? ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO
+                    : ContadorCloudDocumentPayloadBuilder::EVENTO_AUTORIZADO;
+
+                $log = $this->syncService->dispatch(
+                    $empresa,
+                    $this->payloadBuilder->fromNfse($nfse, $empresa, $evento),
+                    immediate: false,
+                    force: $evento === ContadorCloudDocumentPayloadBuilder::EVENTO_CANCELADO,
                 );
 
                 if ($log !== null && $log->status === \App\Models\ContadorCloudSyncLog::STATUS_PENDING) {

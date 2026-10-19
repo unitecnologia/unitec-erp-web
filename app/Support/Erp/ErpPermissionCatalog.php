@@ -798,6 +798,7 @@ class ErpPermissionCatalog
             'actions' => [
               ['label' => 'Incluir', 'key' => 'contas_caixa.create'],
               ['label' => 'Alterar', 'key' => 'contas_caixa.update'],
+              ['label' => 'Excluir', 'key' => 'contas_caixa.delete'],
               ['label' => 'Imprimir', 'key' => 'contas_caixa.print'],
             ],
           ],

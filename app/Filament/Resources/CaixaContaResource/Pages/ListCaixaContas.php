@@ -8,6 +8,7 @@ use App\Filament\Concerns\NormalizesErpUppercaseFormData;
 use App\Filament\Resources\CaixaContaResource;
 use App\Models\CaixaConta;
 use App\Support\Erp\ErpScreen;
+use App\Support\Erp\Financeiro\CaixaContaExclusaoGuard;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -16,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Url;
 
@@ -38,6 +40,12 @@ class ListCaixaContas extends ListRecords
     public bool $showForm = false;
 
     public ?int $formId = null;
+
+    public bool $deleteConfirmOpen = false;
+
+    public ?int $deleteConfirmRecordId = null;
+
+    public string $deleteConfirmLabel = '';
 
     /** @var array<string, mixed> */
     public array $form = [];
@@ -84,8 +92,11 @@ class ListCaixaContas extends ListRecords
     {
         return [
             ...$this->buildSimpleListKeyboardConfig(),
-            'delete' => null,
             'refresh' => null,
+            'blockingSelector' => '.erp-contas-caixa-modal, .erp-plano-conta-confirm',
+            'extraKeys' => [
+                'F4' => ['method' => 'deleteContaCaixa'],
+            ],
         ];
     }
 
@@ -115,11 +126,18 @@ class ListCaixaContas extends ListRecords
                 EmbeddedTable::make()->columnSpanFull(),
                 View::make('filament.components.erp.contas-caixa.action-bar'),
                 View::make('filament.components.erp.contas-caixa.modal'),
+                View::make('filament.components.erp.contas-caixa.confirm-delete-modal'),
             ]);
     }
 
     public function handleContasCaixaEscape(): void
     {
+        if ($this->deleteConfirmOpen) {
+            $this->cancelDeleteContaCaixa();
+
+            return;
+        }
+
         if ($this->showForm) {
             $this->closeForm();
 
@@ -131,7 +149,7 @@ class ListCaixaContas extends ListRecords
 
     public function createContaCaixa(): void
     {
-        if ($this->showForm) {
+        if ($this->showForm || $this->deleteConfirmOpen) {
             return;
         }
 
@@ -142,7 +160,7 @@ class ListCaixaContas extends ListRecords
 
     public function editContaCaixa(): void
     {
-        if ($this->showForm) {
+        if ($this->showForm || $this->deleteConfirmOpen) {
             return;
         }
 
@@ -183,6 +201,10 @@ class ListCaixaContas extends ListRecords
 
     public function saveContaCaixa(): void
     {
+        if ($this->deleteConfirmOpen) {
+            return;
+        }
+
         if ($this->formId) {
             $existing = CaixaConta::find($this->formId);
 
@@ -259,11 +281,128 @@ class ListCaixaContas extends ListRecords
 
     public function deleteContaCaixa(): void
     {
+        if ($this->showForm || $this->deleteConfirmOpen) {
+            return;
+        }
+
+        if (! erp_can('contas_caixa.delete')) {
+            Notification::make()
+                ->title('Sem permissão para excluir contas caixa.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $recordId = $this->highlightedRecordIdOrNotify('delete');
+
+        if (! $recordId) {
+            return;
+        }
+
+        $record = CaixaConta::query()->find($recordId);
+
+        if (! $record) {
+            Notification::make()
+                ->title('Conta caixa não encontrada.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $motivo = CaixaContaExclusaoGuard::motivoBloqueio($record);
+
+        if ($motivo !== null) {
+            Notification::make()
+                ->title('Exclusão não permitida.')
+                ->body($motivo)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->deleteConfirmRecordId = (int) $record->id;
+        $this->deleteConfirmLabel = trim(
+            (string) $record->codigo.' — '.mb_strtoupper((string) $record->nome, 'UTF-8')
+        );
+        $this->deleteConfirmOpen = true;
+    }
+
+    public function confirmDeleteContaCaixa(): void
+    {
+        if (! $this->deleteConfirmRecordId) {
+            $this->cancelDeleteContaCaixa();
+
+            return;
+        }
+
+        if (! erp_can('contas_caixa.delete')) {
+            $this->cancelDeleteContaCaixa();
+            Notification::make()
+                ->title('Sem permissão para excluir contas caixa.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            DB::transaction(function (): void {
+                $conta = CaixaConta::query()
+                    ->whereKey($this->deleteConfirmRecordId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $conta) {
+                    throw new \RuntimeException('Conta caixa não encontrada.');
+                }
+
+                $motivo = CaixaContaExclusaoGuard::motivoBloqueio($conta);
+
+                if ($motivo !== null) {
+                    throw new \DomainException($motivo);
+                }
+
+                $conta->delete();
+            });
+        } catch (\DomainException $e) {
+            $this->cancelDeleteContaCaixa();
+            Notification::make()
+                ->title('Exclusão não permitida.')
+                ->body($e->getMessage())
+                ->warning()
+                ->send();
+
+            return;
+        } catch (\Throwable $e) {
+            report($e);
+            $this->cancelDeleteContaCaixa();
+            Notification::make()
+                ->title('Não foi possível excluir a conta caixa.')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->cancelDeleteContaCaixa();
+        $this->clearListSelection();
+        $this->resetTable();
+
         Notification::make()
-            ->title('Exclusão desabilitada.')
-            ->body('Contas caixa não podem ser excluídas nesta tela. Desative a conta se necessário.')
-            ->warning()
+            ->title('Conta caixa excluída.')
+            ->success()
             ->send();
+    }
+
+    public function cancelDeleteContaCaixa(): void
+    {
+        $this->deleteConfirmOpen = false;
+        $this->deleteConfirmRecordId = null;
+        $this->deleteConfirmLabel = '';
     }
 
     protected function resetForm(): void

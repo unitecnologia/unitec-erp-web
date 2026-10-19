@@ -405,7 +405,7 @@
             @include('pdvui::partials.tool-icon', ['name' => 'finish'])
             <span class="erp-pdv__tool-label"><kbd>F7</kbd> - Finaliza</span>
         </button>
-        <button type="button" wire:click="suspenderVendaEmEspera" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
+        <button type="button" wire:click="openSuspenderVendaModal" class="erp-pdv__tool-btn" @disabled(! $caixaAberto) title="{{ $caixaAberto ? '' : 'Abra o caixa (F2) para usar' }}">
             @include('pdvui::partials.tool-icon', ['name' => 'pause'])
             <span class="erp-pdv__tool-label">Suspender venda</span>
         </button>

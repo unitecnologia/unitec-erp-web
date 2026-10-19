@@ -101,11 +101,9 @@ trait ManagesEmpresaPortalContadorLog
             $this->refreshPortalContadorLog();
         }
 
-        $mensagem = 'Dados do portal recarregados.';
-
-        if ($reenviados > 0 || $falhas > 0) {
-            $mensagem .= sprintf(' Reenvio: %d enviado(s), %d falha(s).', $reenviados, $falhas);
-        }
+        $mensagem = $reenviados > 0 || $falhas > 0
+            ? sprintf('Reenvio de falhas: %d enviado(s), %d falha(s).', $reenviados, $falhas)
+            : 'Nenhuma falha recente para reenviar.';
 
         Notification::make()
             ->title('Portal do Contador')
@@ -244,8 +242,10 @@ trait ManagesEmpresaPortalContadorLog
             $this->data[$field] = $empresa->getAttribute($field);
         }
 
-        foreach (array_keys(EmpresaParametros::portalContadorBooleanFields()) as $field) {
-            $this->data[$field] = (bool) $empresa->getAttribute($field);
+        foreach (EmpresaParametros::portalContadorBooleanFields() as $field => $meta) {
+            $raw = $empresa->getAttribute($field);
+            // null (coluna nova / nunca salva) → default do catálogo, sem gravar no banco.
+            $this->data[$field] = $raw === null ? (bool) ($meta['default'] ?? false) : (bool) $raw;
         }
     }
 }

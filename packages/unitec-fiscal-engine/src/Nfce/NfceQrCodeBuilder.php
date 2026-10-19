@@ -48,7 +48,7 @@ final class NfceQrCodeBuilder
 
     ): string {
 
-        $urlBase = $this->normalizeConsultaUrl(ScNfceEndpoints::consultaQrCode($tpAmb));
+        $urlBase = $this->normalizeConsultaUrl(NfcePublicUrls::consultaQrCode($chave, $tpAmb));
 
         $versao = max(2, $versaoQrcode);
 
