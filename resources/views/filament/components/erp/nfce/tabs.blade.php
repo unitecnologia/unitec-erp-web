@@ -18,7 +18,12 @@
                 type="button"
                 class="erp-nfe__tab"
                 :class="{ 'erp-nfe__tab--active': statusAtivo === @js($value) }"
-                @click="statusAtivo = @js($value); $wire.setStatusFilter(@js($value))"
+                @click="
+                    statusAtivo = @js($value);
+                    window.dispatchEvent(new CustomEvent('erp-nfce-status', { detail: @js($value) }));
+                    const t = (window.Livewire?.getByName?.('erp.nfce-list-table') || [])[0];
+                    if (t) t.call('setStatusFilter', @js($value));
+                "
             >{{ $label }}</button>
         @endforeach
     </div>

@@ -29,7 +29,7 @@
                     'erp-nfe__tab--' . $value,
                 ])
                 :class="{ 'erp-nfe__tab--active': statusAtivo === @js($value) }"
-                @click="statusAtivo = @js($value); $wire.setStatusFilter(@js($value))"
+                @click="statusAtivo = @js($value); const t = (window.Livewire?.getByName?.('erp.nfe-list-table') || [])[0]; if (t) t.call('setStatusFilter', @js($value))"
             >{{ $label }}</button>
         @endforeach
     </div>

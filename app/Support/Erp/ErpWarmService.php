@@ -328,8 +328,8 @@ class ErpWarmService
             '/admin/orcamentos',
             '/admin/caixa',
             '/admin/pdv',
-            '/admin/nfces',
-            '/admin/nfes',
+            '/admin/nfce',
+            '/admin/nfe',
             '/admin/contas-receber',
             '/admin/contas-pagar',
         ];

@@ -9,6 +9,8 @@ class ErpUserPreference extends Model
 {
     public const KEY_MONITOR_VENDAS_SITUACAO_FILTER = 'monitor_vendas.situacao_filter';
 
+    public const KEY_CARGAS_LIST = 'cargas.list';
+
     protected $table = 'erp_user_preferences';
 
     protected $fillable = [

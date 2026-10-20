@@ -1,4 +1,4 @@
-/* ERP — Carga / Romaneio */
+/* ERP — Carga / Romaneio (toolbar no padrão Produtos / erp-list-ui) */
 
 .erp-cargas-page .fi-header,
 .erp-cargas-page .fi-page-header {
@@ -21,173 +21,165 @@
     margin-bottom: 0;
 }
 
-.erp-cargas-root {
-    margin-top: 0;
-}
-
 .erp-cargas-page .erp-cargas {
-    width: calc(100% - 4mm);
-    margin-left: 2mm;
-    margin-bottom: 2mm;
-    border: 1px solid var(--erp-border-light, #c7d5e8);
-    border-radius: var(--erp-radius-md, 8px);
-    box-shadow: var(--erp-shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
-    background: var(--erp-bg-panel, #fff);
+    padding: 0.5rem 0.65rem 0;
+    margin: -1mm 0 0;
+    background: var(--erp-bg-app);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    flex-shrink: 0;
 }
 
-.erp-cargas__topbar {
+.erp-cargas-page .erp-cargas__filters {
+    flex-shrink: 0;
+    padding: calc(0.35rem - 0.15cm) 0.75rem !important;
+    margin: 0 0 0.25rem !important;
+    background: var(--erp-bg-toolbar) !important;
+    border: 1px solid var(--erp-border-light) !important;
+    border-top: none !important;
+    border-radius: var(--erp-radius-md) !important;
+    box-shadow: var(--erp-shadow-md) !important;
+    font-family: var(--erp-font);
+    display: block !important;
+}
+
+.erp-cargas-page .erp-cargas__filters-row {
     display: flex;
+    flex-wrap: nowrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: calc(0.35rem - 1mm) 0.75rem;
-    border-top-left-radius: var(--erp-radius-md, 8px);
-    border-top-right-radius: var(--erp-radius-md, 8px);
-    border-bottom: 1px solid var(--erp-border-light, #c7d5e8);
-    background: var(--erp-bg-header, linear-gradient(180deg, #1e5a9e 0%, #164a85 100%));
-    color: var(--erp-text-on-brand, #fff);
-    font-size: var(--erp-font-size-sm, 0.875rem);
-    font-weight: 700;
-}
-
-.erp-cargas__consulta {
-    margin: 0;
-    border: 0;
-    border-top: 1px solid var(--erp-border-light, #c7d5e8);
-    border-bottom: 1px solid var(--erp-border, #94a3b8);
-    padding: 0.4rem 0.85rem 0.5rem;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
-}
-
-.erp-cargas-page .erp-cargas__consulta > legend {
-    display: block;
+    gap: 0.35rem 0.5rem;
     width: 100%;
-    padding: 0 0 0.2rem;
-    margin-bottom: 0.1rem;
-    font-size: 0.8125rem;
-    font-weight: 800;
-    color: var(--erp-brand-primary-dark, #0f3460);
+}
+
+.erp-cargas-page .erp-cargas__search-group {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.erp-cargas-page .erp-cargas__search-label {
+    font-size: var(--erp-font-size-xs);
+    font-weight: 700;
+    color: var(--erp-brand-primary);
+    white-space: nowrap;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    flex-shrink: 0;
 }
 
-.erp-cargas__consulta-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+.erp-cargas-page .erp-cargas__search-text {
+    flex: 0 0 auto;
+    width: 14rem;
+    min-width: 11rem;
+    max-width: 18rem;
 }
 
-.erp-cargas__inputs {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.45rem 0.85rem;
-    width: 100%;
-}
-
-.erp-cargas__field {
+.erp-cargas-page .erp-cargas__period-group {
     display: inline-flex;
-    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.55rem;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--erp-border-light);
+}
+
+.erp-cargas-page .erp-cargas__period-label,
+.erp-cargas-page .erp-cargas__field {
+    display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-width: 0;
+    margin: 0;
+    font-size: var(--erp-font-size-xs);
+    color: var(--erp-text);
+    white-space: nowrap;
     flex: 0 0 auto;
 }
 
-.erp-cargas__label,
-.erp-cargas__field > span {
-    flex-shrink: 0;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--erp-text, #0f172a);
-    letter-spacing: 0.01em;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.erp-cargas__periodo {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: nowrap;
-}
-
-.erp-cargas__periodo-sep {
-    flex-shrink: 0;
-    min-width: 1.75rem;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--erp-text, #0f172a);
-    text-align: center;
-    white-space: nowrap;
-}
-
-.erp-cargas__field--status {
-    min-width: 0;
-}
-
-.erp-cargas__field--numero {
-    flex: 0 1 11rem;
-}
-
-.erp-cargas__select {
-    min-width: 8.5rem;
-}
-
-.erp-cargas__numero-input {
-    width: 7.5rem;
-    min-width: 6.5rem;
-}
-
-.erp-cargas-page .erp-cargas__field .erp-nfe__select,
-.erp-cargas-page .erp-cargas__field .erp-nfe__input,
-.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input {
-    height: 2.125rem;
-    min-height: 2.125rem;
-    box-sizing: border-box;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.875rem;
+.erp-cargas-page .erp-cargas__field-label {
+    font-size: var(--erp-font-size-xs);
     font-weight: 600;
-    line-height: 1.25;
-    color: var(--erp-text, #0f172a);
-    background: #fff;
-    border: 1px solid var(--erp-border, #94a3b8);
-    border-radius: var(--erp-radius-sm, 6px);
-    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+    color: var(--erp-text);
+    white-space: nowrap;
 }
 
-.erp-cargas-page .erp-cargas__field .erp-nfe__select:focus,
-.erp-cargas-page .erp-cargas__field .erp-nfe__input:focus,
-.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input:focus {
-    outline: none;
-    border-color: #1e5a9e;
-    box-shadow: 0 0 0 2px rgba(30, 90, 158, 0.18);
+.erp-cargas-page .erp-cargas__period-input,
+.erp-cargas-page .erp-cargas__period-input.erp-date-input,
+.erp-cargas-page .erp-cargas__period-group .erp-date-field {
+    width: calc(11ch + 2.35rem);
+    min-width: calc(11ch + 2.35rem);
+    max-width: calc(11ch + 2.35rem);
+    box-sizing: border-box;
 }
 
-.erp-cargas-page .erp-cargas__periodo .erp-nfe__period-input {
-    width: 8.25rem;
+.erp-cargas-page .erp-cargas__period-input,
+.erp-cargas-page .erp-cargas__period-input.erp-date-input {
+    padding-inline: 0.35rem 2.25rem !important;
 }
 
-.erp-cargas__btn-consultar {
+.erp-cargas-page .erp-cargas__status-select {
+    min-width: 7.5rem;
+    width: auto;
+}
+
+.erp-cargas-page .erp-cargas__page-size-group {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    height: 2.125rem;
-    min-height: 2.125rem;
-    padding: 0 0.95rem;
-    border: 1px solid #94a3b8;
-    border-radius: var(--erp-radius-sm, 6px);
-    background: linear-gradient(180deg, #ffffff 0%, #e8eef7 100%);
-    color: #0f3460;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    cursor: pointer;
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--erp-border-light);
 }
 
-.erp-cargas__btn-consultar:hover {
-    border-color: #1e5a9e;
-    background: #fff;
+.erp-cargas-page .erp-cargas__page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--erp-font-size-xs);
+    font-weight: 600;
+    color: var(--erp-text);
+    white-space: nowrap;
+}
+
+.erp-cargas-page .erp-cargas__page-size-select {
+    width: auto;
+    min-width: 4.25rem;
+}
+
+.erp-cargas-page .fi-pagination .fi-pagination-records-per-page-select-ctn {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    .erp-cargas-page .erp-cargas__period-group,
+    .erp-cargas-page .erp-cargas__page-size-group {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .erp-cargas-page .erp-cargas__filters-row {
+        flex-wrap: wrap;
+    }
+
+    .erp-cargas-page .erp-cargas__period-group {
+        width: 100%;
+        padding-bottom: 0.25rem;
+        margin-bottom: 0.1rem;
+        border-bottom: 1px solid var(--erp-border-light);
+    }
 }
 
 .erp-cargas-page .erp-cargas__check {
@@ -1010,6 +1002,101 @@ body:has(.erp-carga-form-modal) [data-filament-notifications] {
         inset 0 1px 0 rgba(255, 255, 255, 0.9),
         inset 0 -2px 3px rgba(15, 23, 42, 0.22),
         0 2px 3px rgba(15, 40, 71, 0.30);
+}
+
+/* Grade listagem: larguras + setas de ordenação (padrão Produtos/Monitor) */
+.erp-cargas-page .fi-ta-ctn {
+    overflow-x: auto;
+}
+
+.erp-cargas-page .fi-ta-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.erp-cargas-page .fi-ta-header-cell-selecionar,
+.erp-cargas-page .fi-ta-table tbody .fi-ta-cell:first-child {
+    width: 2.35rem;
+    min-width: 2.35rem;
+    max-width: 2.35rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell-numero {
+    width: 4.75rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell-data {
+    width: 6.25rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell-motorista,
+.erp-cargas-page .fi-ta-header-cell-motorista\.proprietario {
+    width: 16%;
+}
+
+.erp-cargas-page .fi-ta-header-cell-entregador,
+.erp-cargas-page .fi-ta-header-cell-entregador\.name {
+    width: 15%;
+}
+
+.erp-cargas-page .fi-ta-header-cell-veiculo,
+.erp-cargas-page .fi-ta-header-cell-veiculo\.placa {
+    width: 14%;
+}
+
+.erp-cargas-page .fi-ta-header-cell-pedidos_count {
+    width: 6.5rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell-valor_total {
+    width: 8.5rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell-status {
+    width: 7.25rem;
+}
+
+.erp-cargas-page .fi-ta-header-cell,
+.erp-cargas-page .fi-ta-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-cargas-page .fi-ta-header-cell-sort-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.2rem;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    box-shadow: none;
+}
+
+.erp-cargas-page .fi-ta-header-cell-sort-btn svg,
+.erp-cargas-page .fi-ta-header-cell-sort-btn .fi-loading-indicator {
+    display: none !important;
+}
+
+.erp-cargas-page .fi-ta-header-cell-sorted[aria-sort='ascending'] .fi-ta-header-cell-sort-btn::after {
+    content: '↑';
+    margin-left: 0.15rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.erp-cargas-page .fi-ta-header-cell-sorted[aria-sort='descending'] .fi-ta-header-cell-sort-btn::after {
+    content: '↓';
+    margin-left: 0.15rem;
+    font-weight: 800;
+    color: #fff;
 }
 
 @media (max-width: 1100px) {

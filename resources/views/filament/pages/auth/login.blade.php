@@ -526,19 +526,14 @@
             }
 
             const logoUrl = @json(asset('img/erp/brand/unitecnologia-logo.png'));
-            const messages = [
-                'Validando acesso...',
-                'Verificando atualização na pasta...',
-                'Conferindo licença...',
-                'Preparando ambiente...',
-                'Abrindo o sistema...',
-            ];
+            // Etapas reais já expostas pelo fluxo (sem inventar progresso parcial):
+            // - show(): autenticação Livewire em andamento
+            // - succeed(): redirect autorizado pelo servidor
+            // - hide(): erro de validação / falha de rede / prompt de atualização
+            const MSG_VALIDATING = 'Validando acesso...';
+            const MSG_OPENING = 'Abrindo o sistema...';
 
-            let progress = 0;
-            let raf = 0;
-            let messageTimer = 0;
             let stuckTimer = 0;
-            let messageIndex = 0;
             let finishing = false;
             let active = false;
             let overlay = null;
@@ -561,11 +556,11 @@
                     '<img src="' + logoUrl + '" alt="" class="unitec-login-boot__logo" width="280" height="94" decoding="async">' +
                     '<p class="unitec-login-boot__eyebrow">Unitec ERP</p>' +
                     '<h2 class="unitec-login-boot__title">Abrindo o sistema</h2>' +
-                    '<p class="unitec-login-boot__status" data-unitec-boot-status>Validando acesso...</p>' +
+                    '<p class="unitec-login-boot__status" data-unitec-boot-status>' + MSG_VALIDATING + '</p>' +
                     '<div class="unitec-login-boot__track" aria-hidden="true">' +
                     '<div class="unitec-login-boot__bar" data-unitec-boot-bar></div>' +
                     '</div>' +
-                    '<p class="unitec-login-boot__percent"><span data-unitec-boot-pct>0</span>%</p>' +
+                    '<p class="unitec-login-boot__percent" data-unitec-boot-hint aria-hidden="true"></p>' +
                     '</div>';
 
                 document.body.appendChild(overlay);
@@ -576,39 +571,15 @@
                 return ensureOverlay().querySelector(sel);
             }
 
-            function paint() {
-                const b = qs('[data-unitec-boot-bar]');
-                const p = qs('[data-unitec-boot-pct]');
-                if (b) b.style.width = Math.max(0, Math.min(100, progress)) + '%';
-                if (p) p.textContent = String(Math.round(Math.max(0, Math.min(100, progress))));
-            }
-
             function setMessage(text) {
                 const s = qs('[data-unitec-boot-status]');
                 if (s) s.textContent = text;
             }
 
-            function tick() {
-                if (!active || finishing) return;
-
-                const ceiling = 90;
-                if (progress < ceiling) {
-                    progress = Math.min(ceiling, progress + 0.55);
-                    paint();
-                }
-
-                raf = window.requestAnimationFrame(tick);
-            }
-
-            function startMessages() {
-                messageIndex = 0;
-                setMessage(messages[0]);
-                window.clearInterval(messageTimer);
-                messageTimer = window.setInterval(function () {
-                    if (!active || finishing) return;
-                    messageIndex = Math.min(messages.length - 1, messageIndex + 1);
-                    setMessage(messages[messageIndex]);
-                }, 1500);
+            function setProgressMode(mode) {
+                const el = ensureOverlay();
+                el.classList.toggle('is-indeterminate', mode === 'indeterminate');
+                el.classList.toggle('is-complete', mode === 'complete');
             }
 
             function armStuckWatchdog() {
@@ -626,14 +597,11 @@
                 if (!active) {
                     active = true;
                     finishing = false;
-                    progress = 6;
-                    startMessages();
-                    window.cancelAnimationFrame(raf);
-                    raf = window.requestAnimationFrame(tick);
+                    setMessage(MSG_VALIDATING);
+                    setProgressMode('indeterminate');
                     armStuckWatchdog();
                 }
 
-                paint();
                 el.hidden = false;
                 el.setAttribute('aria-hidden', 'false');
                 el.setAttribute('aria-busy', 'true');
@@ -648,18 +616,17 @@
 
                 active = false;
                 finishing = false;
-                window.cancelAnimationFrame(raf);
-                window.clearInterval(messageTimer);
                 window.clearTimeout(stuckTimer);
 
                 const el = ensureOverlay();
                 el.classList.remove('is-visible');
+                el.classList.remove('is-indeterminate');
+                el.classList.remove('is-complete');
                 el.hidden = true;
                 el.setAttribute('aria-hidden', 'true');
                 el.setAttribute('aria-busy', 'false');
                 document.documentElement.classList.remove('unitec-login-booting');
-                progress = 0;
-                paint();
+                setMessage(MSG_VALIDATING);
             }
 
             function hasLoginErrors() {
@@ -713,12 +680,9 @@
             function succeed(url) {
                 show();
                 finishing = true;
-                window.clearInterval(messageTimer);
                 window.clearTimeout(stuckTimer);
-                window.cancelAnimationFrame(raf);
-                setMessage('Abrindo o sistema...');
-                progress = 100;
-                paint();
+                setMessage(MSG_OPENING);
+                setProgressMode('complete');
 
                 const target = (function (raw) {
                     const fallback = '/admin';
@@ -776,6 +740,12 @@
                 }
 
                 Livewire.hook('request', function ({ fail }) {
+                    // Request Livewire real em voo: mantém etapa conhecida (sem inventar subetapas).
+                    if (active && !finishing) {
+                        setMessage(MSG_VALIDATING);
+                        setProgressMode('indeterminate');
+                    }
+
                     fail(function () {
                         if (active && !finishing) {
                             hide(true);

@@ -24,6 +24,7 @@ trait ManagesNfceBulkTransmit
                 $this->nfceSelecionadosTransmitir,
                 fn (string $value): bool => $value !== $key,
             ));
+            $this->nfceTransmitSelecaoChanged();
 
             return;
         }
@@ -35,6 +36,7 @@ trait ManagesNfceBulkTransmit
         $this->nfceSelecionadosTransmitir[] = $key;
         $this->highlightedRecordId = $id;
         unset($this->highlightedChave, $this->highlightedNfceAvisoRodape);
+        $this->nfceTransmitSelecaoChanged();
     }
 
     public function marcarDesmarcarNfcesContingencia(): void
@@ -59,6 +61,7 @@ trait ManagesNfceBulkTransmit
                 $this->nfceSelecionadosTransmitir,
                 $ids,
             ));
+            $this->nfceTransmitSelecaoChanged();
 
             return;
         }
@@ -67,6 +70,14 @@ trait ManagesNfceBulkTransmit
             ...$this->nfceSelecionadosTransmitir,
             ...$ids,
         ]));
+        $this->nfceTransmitSelecaoChanged();
+    }
+
+    /**
+     * Hook para telas com grade Livewire filha (ex.: ListNfces).
+     */
+    protected function nfceTransmitSelecaoChanged(): void
+    {
     }
 
     protected function clearNfceTransmitirSelecao(): void

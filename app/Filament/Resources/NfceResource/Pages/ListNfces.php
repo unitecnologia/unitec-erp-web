@@ -9,6 +9,7 @@ use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceClienteEmail;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceContadorEmail;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceFiscalActions;
 use App\Filament\Resources\NfceResource\Pages\Concerns\ManagesNfceRelatorio;
+use App\Livewire\Erp\NfceListTable;
 use App\Models\Empresa;
 use App\Models\PdvVendaNfce;
 use App\Support\Erp\ErpScreen;
@@ -18,18 +19,16 @@ use App\Support\Erp\Pdv\PdvNfceCupomPrinter;
 use App\Support\Fiscal\NfceContingenciaJustificativa;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DbSchema;
 use Livewire\Attributes\Computed;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ListNfces extends ListRecords
 {
@@ -73,6 +72,10 @@ class ListNfces extends ListRecords
 
         ErpScreen::set('NFC-e');
 
+        if (! in_array((int) $this->tableRecordsPerPage, [25, 50, 100], true)) {
+            $this->tableRecordsPerPage = 50;
+        }
+
         if ($this->periodoDe === '') {
             $this->periodoDe = now()->startOfMonth()->format('Y-m-d');
         }
@@ -90,6 +93,14 @@ class ListNfces extends ListRecords
         }
 
         $this->statusFilter = PdvVendaNfce::normalizeTabFilter($this->statusFilter);
+    }
+
+    /**
+     * A grade é renderizada pelo Livewire filho {@see NfceListTable}.
+     * Evita o EmbeddedTable Filament (HTML ~28 KB/linha).
+     */
+    public function mountInteractsWithTable(): void
+    {
     }
 
     protected static function erpListPageClass(): string
@@ -151,21 +162,8 @@ class ListNfces extends ListRecords
 
     public function table(Table $table): Table
     {
+        // Mantido por compatibilidade Filament; a UI usa {@see NfceListTable}.
         return $this->applyErpListSelection(NfceResource::table($table));
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function erpListRecordClasses(Model $record): array
-    {
-        $classes = [];
-
-        if (in_array((string) $record->getKey(), $this->nfceSelecionadosTransmitir, true)) {
-            $classes[] = 'erp-nfce-row--checked';
-        }
-
-        return $classes;
     }
 
     protected function clearListSelection(): void
@@ -179,21 +177,64 @@ class ListNfces extends ListRecords
         return $this->buildListQuery();
     }
 
-    protected function buildListQuery(): Builder
+    /**
+     * Filtros da listagem / totais / bulk.
+     * A grade leve aplica o mesmo filtro em {@see NfceListTable} com SELECT enxuto (sem XML).
+     *
+     * @param  bool  $withListRelations  eager load só quando for materializar linhas (não para SUM/pluck).
+     */
+    protected function buildListQuery(bool $withListRelations = false): Builder
     {
-        $query = parent::getTableQuery()
-            ->with([
-                'pdvVenda.sessao.terminal',
-                'pdvVenda.user',
-                'pdvVenda.vendedor',
-                'pdvVenda.venda',
-                'pdvVenda.person',
-            ]);
+        $table = (new PdvVendaNfce)->getTable();
+        $query = PdvVendaNfce::query();
+
+        if ($withListRelations) {
+            $query
+                ->select([
+                    "{$table}.id",
+                    "{$table}.pdv_venda_id",
+                    "{$table}.empresa_id",
+                    "{$table}.serie",
+                    "{$table}.numero",
+                    "{$table}.chave",
+                    "{$table}.protocolo",
+                    "{$table}.status",
+                    "{$table}.simulada",
+                    "{$table}.motivo_rejeicao",
+                    "{$table}.motivo_contingencia",
+                ])
+                ->with([
+                    'pdvVenda' => static function ($q): void {
+                        $q->select([
+                            'id',
+                            'pdv_caixa_sessao_id',
+                            'user_id',
+                            'vendedor_id',
+                            'venda_id',
+                            'person_id',
+                            'fechado_em',
+                            'cpf_nota',
+                            'nome_nota',
+                            'acrescimo',
+                            'desconto',
+                            'numero',
+                            'vendedor_nome',
+                            'total',
+                        ]);
+                    },
+                    'pdvVenda.sessao' => static fn ($q) => $q->select(['id', 'terminal_id', 'empresa_id']),
+                    'pdvVenda.sessao.terminal' => static fn ($q) => $q->select(['id', 'nome']),
+                    'pdvVenda.user' => static fn ($q) => $q->select(['id', 'name']),
+                    'pdvVenda.vendedor' => static fn ($q) => $q->select(['id', 'nome']),
+                    'pdvVenda.venda' => static fn ($q) => $q->select(['id', 'numero']),
+                    'pdvVenda.person' => static fn ($q) => $q->select(['id', 'nome_razao', 'cpf_cnpj']),
+                ]);
+        }
 
         NfceEmpresaEscopo::aplicar($query, $this->empresaIdAtiva());
 
         $statuses = PdvVendaNfce::statusesForTab($this->statusFilter);
-        $query->whereIn('status', $statuses);
+        $query->whereIn("{$table}.status", $statuses);
         PdvVendaNfce::excluirSimuladasForaTransmitidos($query, $this->statusFilter);
 
         if (filled($this->periodoDeApplied)) {
@@ -208,7 +249,7 @@ class ListNfces extends ListRecords
 
         if (filled($this->chaveFilterApplied)) {
             $digits = preg_replace('/\D/', '', $this->chaveFilterApplied) ?? '';
-            $query->where('chave', 'like', '%'.$digits.'%');
+            $query->where("{$table}.chave", 'like', '%'.$digits.'%');
         }
 
         if (filled($this->localSearch)) {
@@ -216,6 +257,53 @@ class ListNfces extends ListRecords
         }
 
         return $query;
+    }
+
+    protected function pushNfceListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
+    {
+        $this->dispatch(
+            'erp-nfce-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            localSearch: $this->localSearch,
+            periodoDeApplied: $this->periodoDeApplied,
+            periodoAteApplied: $this->periodoAteApplied,
+            chaveFilterApplied: $this->chaveFilterApplied,
+            perPage: (int) ($this->tableRecordsPerPage ?: 50),
+            resetSort: $resetSort,
+            selectedTransmitIds: $this->nfceSelecionadosTransmitir,
+            highlightedRecordId: $this->highlightedRecordId,
+        )->to(NfceListTable::class);
+
+        if ($skipParentRender) {
+            $this->skipRender();
+        }
+    }
+
+    protected function nfceTransmitSelecaoChanged(): void
+    {
+        $this->pushNfceListRefresh(skipParentRender: false);
+    }
+
+    #[On('erp-nfce-toggle-transmit')]
+    public function onErpNfceToggleTransmit(int $id): void
+    {
+        $this->toggleNfceTransmitirSelecionado($id);
+    }
+
+    public function resetTable(): void
+    {
+        $this->pushNfceListRefresh(skipParentRender: false);
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushNfceListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
     }
 
     protected function applyLocalSearch(Builder $query, string $term): void
@@ -387,7 +475,8 @@ class ListNfces extends ListRecords
     #[Computed]
     public function filteredTotal(): float
     {
-        $query = clone $this->buildListQuery();
+        // Sem eager load / SELECT de listagem — só o agregado do filtro atual.
+        $query = $this->buildListQuery(withListRelations: false);
 
         return (float) $query
             ->join('pdv_vendas as pv_total', 'pv_total.id', '=', 'pdv_venda_nfce.pdv_venda_id')
@@ -482,9 +571,8 @@ class ListNfces extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.nfce.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.nfce.table-host')
                     ->columnSpanFull(),
-                View::make('filament.components.erp.nfce.inutilizacoes-faixas'),
                 View::make('filament.components.erp.nfce.footer-total'),
                 View::make('filament.components.erp.nfce.action-bar'),
                 View::make('filament.components.erp.nfce.fiscal-modals'),
@@ -510,15 +598,25 @@ class ListNfces extends ListRecords
         $this->nfceRegularizacaoOpen = false;
 
         if ($houveEmissao) {
-            $this->resetTable();
+            $this->pushNfceListRefresh(skipParentRender: false);
         }
     }
 
     public function setStatusFilter(string $filter): void
     {
-        $this->statusFilter = PdvVendaNfce::normalizeTabFilter($filter);
+        // Atalho/compatibilidade: a UI das abas chama NfceListTable::setStatusFilter (sem remount do pai).
+        $normalized = PdvVendaNfce::normalizeTabFilter($filter);
+
+        if ($normalized === $this->statusFilter) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->statusFilter = $normalized;
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->highlightedChave, $this->highlightedNfceAvisoRodape, $this->nfceInutilizacoesFaixas);
+        $this->pushNfceListRefresh(skipParentRender: true);
     }
 
     public function applyPeriodFilter(): void
@@ -526,7 +624,7 @@ class ListNfces extends ListRecords
         $this->periodoDeApplied = $this->periodoDe;
         $this->periodoAteApplied = $this->periodoAte;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushNfceListRefresh(skipParentRender: false);
 
         Notification::make()
             ->title('Período filtrado.')
@@ -545,14 +643,14 @@ class ListNfces extends ListRecords
         $this->periodoDeApplied = $this->periodoDe;
         $this->periodoAteApplied = $this->periodoAte;
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushNfceListRefresh(skipParentRender: false);
     }
 
     public function applyChaveFilter(): void
     {
         $this->chaveFilterApplied = trim($this->chaveFilter);
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushNfceListRefresh(skipParentRender: false);
     }
 
     public function applyChaveFilterValue(string $chave = ''): void
@@ -573,25 +671,25 @@ class ListNfces extends ListRecords
     {
         $this->localSearch = '';
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushNfceListRefresh(resetSort: true, skipParentRender: false);
     }
 
     public function updatedLocalSearch(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushNfceListRefresh(skipParentRender: false);
     }
 
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushNfceListRefresh(skipParentRender: false);
     }
 
     public function applyFooterSearch(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        $this->pushNfceListRefresh(skipParentRender: false);
     }
 
     public function imprimirNfce(): void

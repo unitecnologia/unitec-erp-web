@@ -104,11 +104,11 @@ class NfceResource extends Resource
                     ->weight(FontWeight::SemiBold),
                 TextColumn::make('cliente_nome')
                     ->label('Cliente')
-                    ->placeholder('—')
-                    ->getStateUsing(function (PdvVendaNfce $record): ?string {
+                    ->placeholder('CONSUMIDOR FINAL')
+                    ->getStateUsing(function (PdvVendaNfce $record): string {
                         $venda = $record->pdvVenda;
                         if ($venda === null) {
-                            return null;
+                            return 'CONSUMIDOR FINAL';
                         }
 
                         $nota = trim((string) ($venda->nome_nota ?? ''));
@@ -116,7 +116,7 @@ class NfceResource extends Resource
                             return $nota;
                         }
 
-                        return NfceConsumidorIdentificado::nome($venda->person);
+                        return NfceConsumidorIdentificado::nome($venda->person) ?: 'CONSUMIDOR FINAL';
                     })
                     ->tooltip(fn (?string $state): ?string => filled($state) ? $state : null)
                     ->weight(FontWeight::SemiBold),

@@ -1,4 +1,8 @@
-<div class="erp-nfe-actions">
+<div
+    class="erp-nfe-actions"
+    x-data="{ statusAtivo: @js($this->statusFilter) }"
+    x-on:erp-nfce-status.window="statusAtivo = $event.detail"
+>
     <button type="button" wire:click="cancelarNfce" class="erp-nfe-actions__btn" data-erp-key="F2">
         <span class="erp-nfe-actions__icon erp-nfe-actions__icon--cancel">✕</span>
         <span class="erp-nfe-actions__label"><kbd>F2</kbd> | Cancelar</span>
@@ -11,12 +15,16 @@
         <span class="erp-nfe-actions__icon">↩</span>
         <span class="erp-nfe-actions__label"><kbd>F4</kbd> | Recuperar</span>
     </button>
-    @if ($this->statusFilter === \App\Models\PdvVendaNfce::TAB_CONTINGENCIA)
-        <button type="button" wire:click="marcarDesmarcarNfcesContingencia" class="erp-nfe-actions__btn">
-            <span class="erp-nfe-actions__icon">☑</span>
-            <span class="erp-nfe-actions__label">Marcar/desmarcar todos</span>
-        </button>
-    @endif
+    <button
+        type="button"
+        wire:click="marcarDesmarcarNfcesContingencia"
+        class="erp-nfe-actions__btn"
+        x-show="statusAtivo === 'contingencia'"
+        x-cloak
+    >
+        <span class="erp-nfe-actions__icon">☑</span>
+        <span class="erp-nfe-actions__label">Marcar/desmarcar todos</span>
+    </button>
     <button
         type="button"
         wire:click="transmitirNfce"

@@ -733,8 +733,21 @@ html.unitec-login-booting body {
     border-radius: inherit;
     background: linear-gradient(90deg, #1e5a9e 0%, #2f6fbf 45%, #84cc16 100%);
     box-shadow: 0 0 18px rgba(47, 111, 191, 0.45);
-    transition: width 0.08s linear;
     overflow: hidden;
+    will-change: transform, width;
+}
+
+.unitec-login-boot.is-indeterminate .unitec-login-boot__bar {
+    width: 38%;
+    transition: none;
+    animation: unitec-login-boot-indeterminate 1.45s ease-in-out infinite;
+}
+
+.unitec-login-boot.is-complete .unitec-login-boot__bar {
+    width: 100%;
+    transform: none;
+    animation: none;
+    transition: width 0.28s ease;
 }
 
 .unitec-login-boot__bar::after {
@@ -751,13 +764,19 @@ html.unitec-login-booting body {
     animation: unitec-login-boot-shimmer 1.35s ease-in-out infinite;
 }
 
+.unitec-login-boot.is-complete .unitec-login-boot__bar::after {
+    animation: none;
+    opacity: 0;
+}
+
+/* Espaço visual preservado; sem porcentagem inventada. */
 .unitec-login-boot__percent {
     margin: 0.75rem 0 0;
+    min-height: 1.1em;
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: rgba(186, 230, 253, 0.9);
-    font-variant-numeric: tabular-nums;
 }
 
 @keyframes unitec-login-boot-rise {
@@ -781,6 +800,11 @@ html.unitec-login-booting body {
     100% { transform: translateX(160%); }
 }
 
+@keyframes unitec-login-boot-indeterminate {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(280%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .unitec-login-boot,
     .unitec-login-boot__card,
@@ -789,6 +813,11 @@ html.unitec-login-booting body {
     .unitec-login-boot__bar::after {
         animation: none !important;
         transition: none !important;
+    }
+
+    .unitec-login-boot.is-indeterminate .unitec-login-boot__bar {
+        width: 45%;
+        transform: none;
     }
 }
 

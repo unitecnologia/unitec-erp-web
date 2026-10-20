@@ -17,6 +17,7 @@ use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeHistoricoModal;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeImportacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeInutilizacao;
 use App\Filament\Resources\NfeResource\Pages\Concerns\ManagesNfeRelatorio;
+use App\Livewire\Erp\NfeListTable;
 use App\Models\DevolucaoCompra;
 use App\Models\Empresa;
 use App\Models\Nfe;
@@ -34,7 +35,6 @@ use App\Support\Erp\Nfe\NfeVendaMercadoriaService;
 use App\Support\Erp\Os\OrdemServicoRetorno;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -145,6 +145,14 @@ class ListNfes extends ListRecords
     protected static function erpListPageClass(): string
     {
         return 'erp-nfe-page';
+    }
+
+    /**
+     * A grade é renderizada pelo Livewire filho {@see NfeListTable}.
+     * Evita o EmbeddedTable Filament (HTML pesado + mountTableAction por célula).
+     */
+    public function mountInteractsWithTable(): void
+    {
     }
 
     private function abrirNfeDeOutrasSaida(int $movimentoId): void
@@ -664,6 +672,7 @@ class ListNfes extends ListRecords
 
     public function table(Table $table): Table
     {
+        // Mantido por compatibilidade Filament; a UI usa {@see NfeListTable}.
         return $this->applyErpListSelection(NfeResource::table($table));
     }
 
@@ -671,11 +680,11 @@ class ListNfes extends ListRecords
     {
         if ((int) $this->highlightedRecordId === $recordId) {
             $this->highlightedRecordId = null;
-
-            return;
+        } else {
+            $this->highlightedRecordId = $recordId;
         }
 
-        $this->highlightedRecordId = $recordId;
+        $this->pushNfeListRefresh(skipParentRender: true);
     }
 
     protected function getTableQuery(): Builder
@@ -683,10 +692,13 @@ class ListNfes extends ListRecords
         return $this->buildListQuery();
     }
 
+    /**
+     * Filtros da listagem / totais.
+     * A grade leve aplica o mesmo filtro em {@see NfeListTable} com SELECT enxuto (sem XML).
+     */
     protected function buildListQuery(): Builder
     {
-        $query = parent::getTableQuery()
-            ->with(['cliente', 'venda']);
+        $query = parent::getTableQuery();
 
         $empresaId = \App\Support\Erp\ErpContext::currentEmpresaId();
 
@@ -727,6 +739,43 @@ class ListNfes extends ListRecords
         }
 
         return $query;
+    }
+
+    protected function pushNfeListRefresh(bool $resetSort = false, bool $skipParentRender = true): void
+    {
+        $this->dispatch(
+            'erp-nfe-list-refresh',
+            statusFilter: $this->statusFilter,
+            searchColumn: $this->searchColumn,
+            searchFieldsActive: $this->normalizedSearchFieldsActive(),
+            localSearchByField: $this->localSearchByField,
+            clienteFilter: $this->clienteFilter,
+            localSearchDe: $this->localSearchDe,
+            localSearchAte: $this->localSearchAte,
+            skipLocalClienteSearch: $this->shouldSkipLocalSearchWhileTyping(),
+            perPage: (int) ($this->tableRecordsPerPage ?: 50),
+            resetSort: $resetSort,
+            highlightedRecordId: $this->highlightedRecordId,
+        )->to(NfeListTable::class);
+
+        if ($skipParentRender) {
+            $this->skipRender();
+        }
+    }
+
+    public function resetTable(): void
+    {
+        $this->pushNfeListRefresh(skipParentRender: false);
+    }
+
+    public function refreshTable(): void
+    {
+        $this->pushNfeListRefresh();
+
+        Notification::make()
+            ->title('Lista atualizada.')
+            ->success()
+            ->send();
     }
 
     /**
@@ -937,7 +986,7 @@ class ListNfes extends ListRecords
             ->gap(false)
             ->components([
                 View::make('filament.components.erp.nfe.screen'),
-                EmbeddedTable::make()
+                View::make('filament.components.erp.nfe.table-host')
                     ->columnSpanFull(),
                 View::make('filament.components.erp.nfe.footer-total'),
                 View::make('filament.components.erp.nfe.action-bar'),
@@ -964,9 +1013,19 @@ class ListNfes extends ListRecords
 
     public function setStatusFilter(string $filter): void
     {
-        $this->statusFilter = $this->normalizeStatusFilter($filter);
+        // Atalho/compatibilidade (ex.: pós-inutilização). Abas chamam NfeListTable direto (sem remount do pai).
+        $normalized = $this->normalizeStatusFilter($filter);
+
+        if ($normalized === $this->statusFilter) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->statusFilter = $normalized;
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function setSearchColumn(string $column): void
@@ -1140,37 +1199,42 @@ class ListNfes extends ListRecords
 
         $this->syncLegacyLocalSearch();
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function updatedLocalSearch(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function updatedLocalSearchDe(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function updatedLocalSearchAte(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function updatedTableRecordsPerPage(): void
     {
         $this->clearListSelection();
-        $this->resetPage();
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function search(): void
     {
         $this->clearListSelection();
-        $this->resetTable();
+        unset($this->filteredTotal, $this->filteredTotalCanceladas);
+        $this->pushNfeListRefresh(skipParentRender: false);
     }
 
     public function modulePending(string $module): void

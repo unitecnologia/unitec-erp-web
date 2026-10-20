@@ -25,6 +25,7 @@
 .erp-terminais,
 .erp-aniversariantes,
 .erp-produtos,
+.erp-cargas,
 .erp-usuarios,
 .erp-empresas {
     font-family: var(--erp-font);
@@ -133,6 +134,7 @@
 .erp-terminais__locate-label,
 .erp-aniversariantes__locate-label,
 .erp-produtos__locate-label,
+.erp-cargas__locate-label,
 .erp-usuarios__locate-label,
 .erp-empresas__locate-label,
 .erp-veiculos__locate-label {
@@ -173,7 +175,8 @@
 .erp-compras__period-label,
 .erp-receber__period-label,
 .erp-ajustes-estoque__period-label,
-.erp-pagar__period-label {
+.erp-pagar__period-label,
+.erp-cargas__period-label {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -221,6 +224,7 @@
 .erp-receber__period-input,
 .erp-ajustes-estoque__period-input,
 .erp-pagar__period-input,
+.erp-cargas__period-input,
 .erp-orcamentos__input,
 .erp-vendas__input,
 .erp-caixa__input,
@@ -271,6 +275,8 @@
 .erp-veiculos__input,
 .erp-produtos__select,
 .erp-produtos__input,
+.erp-cargas__select,
+.erp-cargas__input,
 .erp-usuarios__select,
 .erp-usuarios__input,
 .erp-empresas__input {
@@ -339,6 +345,9 @@
 .erp-veiculos__input:focus,
 .erp-produtos__select:focus,
 .erp-produtos__input:focus,
+.erp-cargas__select:focus,
+.erp-cargas__input:focus,
+.erp-cargas__period-input:focus,
 .erp-usuarios__input:focus,
 .erp-usuarios__select:focus,
 .erp-empresas__input:focus {
@@ -356,6 +365,7 @@
 .erp-pessoas__select,
 .erp-vendedores__select,
 .erp-produtos__select,
+.erp-cargas__select,
 .erp-ajusta-precos__select,
 .erp-impressao-etiquetas__select,
 .erp-ajusta-estoque-grupo__select {
@@ -371,6 +381,7 @@
 .erp-pessoas__input,
 .erp-vendedores__input,
 .erp-produtos__input,
+.erp-cargas__input,
 .erp-empresas__input {
     flex: 1;
     min-width: 0;
