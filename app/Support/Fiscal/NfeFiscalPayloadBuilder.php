@@ -68,8 +68,8 @@ final class NfeFiscalPayloadBuilder
             throw new FiscalEngineException('Data de emissão da NF-e não informada.');
         }
 
-        // data_emissao/hora_emissao são campos de calendário do usuário brasileiro,
-        // portanto devem formar o dhEmi fiscal já no fuso do estabelecimento.
+        // Na 1ª transmissão, NfeTransmissaoDatasService já persiste data/hora atuais.
+        // Aqui montamos dhEmi a partir dos campos persistidos (fuso do estabelecimento).
         $emissao = \Carbon\Carbon::parse(
             $nfe->data_emissao->format('Y-m-d'),
             ErpTimezone::DEFAULT,

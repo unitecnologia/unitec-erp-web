@@ -109,7 +109,7 @@ class NfeResource extends Resource
                 ViewColumn::make('historico')
                     ->label('')
                     ->state(fn (): bool => true)
-                    ->width('1.35rem')
+                    ->width('38px')
                     ->view('filament.components.erp.nfe.columns.historico')
                     ->alignCenter()
                     ->disabledClick(),

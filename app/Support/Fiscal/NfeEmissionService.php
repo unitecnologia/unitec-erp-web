@@ -18,6 +18,7 @@ final class NfeEmissionService
     public function __construct(
         private readonly NfeFiscalPayloadBuilder $payloadBuilder = new NfeFiscalPayloadBuilder(),
         private readonly FiscalEngine $engine = new FiscalEngine(),
+        private readonly NfeTransmissaoDatasService $datasService = new NfeTransmissaoDatasService(),
     ) {}
 
     /**
@@ -62,6 +63,10 @@ final class NfeEmissionService
         CaBundleResolver::setProjectRoot(base_path());
 
         (new NfeEstoqueService())->validarAntesDeTransmitir($nfe, $empresa);
+
+        // 1ª transmissão (aberta, sem chave/protocolo): dhEmi/dhSaiEnt = agora (fuso ERP).
+        // Persistido antes do XML para bater com assinatura, chave (AAMM) e DANFE.
+        $nfe = $this->datasService->sincronizarNaPrimeiraTransmissao($nfe);
 
         FiscalTransmitProgress::report($onProgress, FiscalTransmitProgress::STEP_XML);
 

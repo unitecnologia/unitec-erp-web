@@ -822,13 +822,29 @@
     max-width: 6.25rem;
 }
 
+/* Cliente: única coluna flexível — absorve o espaço livre da grade. */
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(6),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6),
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-cliente\.nome-razao,
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao {
     width: auto !important;
-    min-width: 10rem;
+    min-width: 14rem !important;
     max-width: none !important;
+    overflow: hidden;
+}
+
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-col,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-text,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(6) .fi-ta-text-item,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-col,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-text,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-cliente\.nome-razao .fi-ta-text-item {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(7),
@@ -899,6 +915,20 @@
 .erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-total {
     width: 6.5rem;
     max-width: 7.5rem;
+}
+
+/* Visualizar (olho): largura fixa 38px — sem sobra (table-layout:fixed). */
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell:nth-child(12),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-row .fi-ta-cell:nth-child(12),
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-header-cell-historico,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-historico {
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    text-align: center;
+    overflow: hidden;
 }
 
 /* NFC-e — 12 colunas (nth-child dedicado; não herda NF-e) */
@@ -5710,11 +5740,11 @@
 
 /* ── Coluna histórico (olho) ───────────────────────────────────── */
 
-.erp-nfe-page .fi-ta-cell-historico .fi-ta-col,
-.erp-nfe-page .fi-ta-col:has(.erp-nfe__eye-btn) {
-    width: auto !important;
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-cell-historico .fi-ta-col,
+.erp-nfe-page:not(.erp-nfce-page) .fi-ta-col:has(.erp-nfe__eye-btn) {
+    width: 100% !important;
     min-width: 0 !important;
-    max-width: none !important;
+    max-width: 100% !important;
     justify-content: center !important;
 }
 
