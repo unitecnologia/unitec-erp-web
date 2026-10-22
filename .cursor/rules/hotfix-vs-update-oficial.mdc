@@ -1,0 +1,65 @@
+---
+description: HOTFIX vs atualização oficial — nunca trocar o canal de publicação
+alwaysApply: true
+---
+
+# HOTFIX × Atualização oficial (canais distintos)
+
+Há **dois** mecanismos. São canais GitHub, scripts e efeitos diferentes.
+**Nunca** interpretar HOTFIX como atualização oficial, nem o contrário.
+**Nunca** trocar automaticamente o canal de publicação.
+
+Detalhes do pacote FULL e do fluxo no cliente: ver `atualizacao-clientes.mdc` (só o canal `update`).
+
+## Escolha do canal (obrigatória)
+
+| Pedido do usuário (exemplos) | Canal | Scripts exclusivos |
+|------------------------------|-------|--------------------|
+| "hotfix", "HF", "publicar hotfix", "subir hotfix", "HF1/HF2" | **HOTFIX** | `scripts/criar-hotfix.ps1` + `scripts/publicar-hotfix-github.ps1` |
+| "atualização oficial", "publicar update", "nova versão oficial", "suba o update", "atualização para o cliente" | **OFICIAL** | `scripts/criar-pacote-update.ps1` + `scripts/publicar-update-github.ps1` |
+
+Se o tipo estiver **indefinido**, **perguntar** antes de gerar ou publicar.
+Não inventar o canal.
+
+## HOTFIX — o que fazer / o que é proibido
+
+Fazer:
+- Gerar/publicar **somente** com `criar-hotfix.ps1` e `publicar-hotfix-github.ps1`
+- Release GitHub: tag `hotfix-{versaoBase}` (ex.: `hotfix-6.4.1.253`)
+- Artefatos: `Unitec-ERP-Hotfix.zip` + `.sha256` (com `size=` e `sig=`)
+- Manter a **mesma** versão do ERP no cliente (indicador na barra: `| HFn`)
+- Revisões **cumulativas**; respeitar prefixos/assinatura/validações do mecanismo existente
+
+Proibido no caminho hotfix:
+- Incrementar `config/unitec.php` (`versao`)
+- Rodar `criar-pacote-update.ps1` / `publicar-update-github.ps1`
+- Gerar ou publicar ZIP FULL (`Unitec-ERP-Update.zip`)
+- Alterar o release **`update`**
+- Executar migrations / `unitec:apply-atualizacao` como parte da publicação
+- Incluir arquivos fora do que o `criar-hotfix.ps1` e o `HotfixService` permitem
+
+## Atualização oficial — o que fazer / o que é proibido
+
+Fazer:
+- Gerar/publicar **somente** com `criar-pacote-update.ps1` e `publicar-update-github.ps1`
+- Release GitHub: canal estável **`update`** (+ tag `v{versão}` só notes)
+- Artefatos: `Unitec-ERP-Update.zip` + `.sha256` (hash + `size=`)
+- Incrementar `config/unitec.php` **somente** quando o usuário autorizar o bump/versão
+- Seguir o padrão travado de `atualizacao-clientes.mdc` (sem redesenhar o fluxo)
+
+Proibido no caminho oficial (quando o pedido foi hotfix):
+- Usar scripts ou release de hotfix
+- Tratar "hotfix" / "HF" como sinônimo de update FULL
+
+## Autorização para publicar
+
+1. Perguntas do tipo **"isso pode ser feito por hotfix?"** / "serve como hotfix?" são **só consulta**. **Não** publicam nada.
+2. **"Pode fazer"** / "faça" / "publique" mantém **exatamente** o tipo de atualização já definido na conversa (hotfix continua hotfix; oficial continua oficial).
+3. Se na conversa ainda não houver tipo claro, **perguntar** o canal antes de qualquer generate/publish.
+4. **Antes** de gerar ou publicar, informar claramente:
+   - tipo (HOTFIX ou ATUALIZAÇÃO OFICIAL)
+   - versão base (hotfix) **ou** versão nova (oficial)
+   - tag/release GitHub
+   - artefatos (nomes dos arquivos)
+5. Só seguir se a autorização do usuário corresponder ao **mesmo** canal informado no passo anterior.
+6. Alterar código **não** implica publicar em nenhum dos canais.

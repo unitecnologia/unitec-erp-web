@@ -1,0 +1,78 @@
+---
+description: Atualização oficial (canal update) — padrão travado; nunca quebrar o fluxo
+alwaysApply: true
+---
+
+# Atualização oficial para clientes (pacote FULL / canal `update`)
+
+> **HOTFIX é outro canal.** Pedidos com "hotfix", "HF", "publicar/subir hotfix" **não** usam este fluxo.
+> Separação de canais, autorização e scripts: ver `hotfix-vs-update-oficial.mdc`.
+
+## PADRÃO TRAVADO — NÃO QUEBRAR
+
+Este fluxo é a **atualização oficial** e **não pode ser alterado** sem solicitação **explícita** do usuário.
+
+Proibido sem pedido explícito:
+- Mudar canal/URL/nome do ZIP/assinatura
+- Mudar o fluxo login → `atualizacao/` → `unitec:apply-atualizacao`
+- Reativar delta, MEGA, `update-files`, staging paralelo, apply direto por Ajuda
+- Apagar `.env` / `storage/` / `tools/` no cliente
+- Incluir sujeira de DEV no ZIP
+- Refatorar Launcher/`UnitecErpServer`/Apply só “por limpeza”
+
+**Nunca quebrar as atualizações dos clientes.** Em dúvida: não mexer; perguntar.
+
+## Objetivo
+
+Publicar **um** ZIP FULL no GitHub Releases (canal `update`), com instalação previsível e segura no PC do cliente.
+
+Esta máquina é **somente desenvolvimento**. Não há pasta `C:\UNITECNOLOGIA_WEB` aqui para sincronizar.
+
+**No PC do cliente**, a produção continua sendo **`C:\UNITECNOLOGIA_WEB`** (porta 8765). O ZIP do GitHub atualiza essa instalação.
+
+## Pacote
+
+| Item | Valor |
+|------|-------|
+| ZIP | `Unitec-ERP-Update.zip` |
+| Assinatura | `Unitec-ERP-Update.zip.sha256` (hash + `size=`) |
+| Canal | release `update` |
+| URL do cliente | `.../releases/download/update/Unitec-ERP-Update.zip` |
+| Tag `v{versão}` | só release notes (sem ZIP) |
+
+Delta / `Unitec-ERP-Update-full.zip` / dual-upload: **removidos**.
+
+## Segurança do pacote (obrigatório — zero sujeira de DEV)
+
+O ZIP que vai ao GitHub **é o que o cliente aplica**. Tem de funcionar à risca.
+
+1. **Nunca** incluir: `.env`, `storage/`, `tools/`, `installer/`, `node_modules/`, `.git/`, `.cursor/`, `tests/`, `docs/`, caches de bootstrap com path de `C:\Projetos\...`, `.bak`, `_tmp_*`, emuladores de balança, scripts só-DEV (`Desenvolver.bat`, `dev-windows.ps1`, Gerar/Publicar bats).
+2. **Nunca** apagar no cliente: `.env`, `storage/`, `tools/`.
+3. Fluxo canônico (desde **6.4.1.135**): `UnitecErpServer`/Launcher valida conexão, espaço, tamanho e SHA256, baixa com HTTP Range e extrai em `atualizacao/` com `ready.json`.
+4. O usuário confirma no login (**Sim/Não**); somente então `unitec:apply-atualizacao` copia, migra e limpa caches.
+5. É proibido criar ou reativar aplicação direta de ZIP, staging paralelo, MEGA, `update-files` ou download pela tela Ajuda.
+6. Antes de publicar: o staging deve passar nas checagens de `criar-pacote-update.ps1` (manifest = `config/unitec.php` `versao`, sem cache apontando para pasta de DEV).
+
+## Publicar só quando o usuário pedir atualização oficial
+
+- **Só** gerar/publicar (`criar-pacote-update.ps1`, `publicar-update-github.ps1`) com pedido explícito de **atualização oficial** / update / nova versão (ver gatilhos em `hotfix-vs-update-oficial.mdc`).
+- **Não** usar estes scripts quando o pedido for hotfix/HF.
+- Alterar código **não** implica publicar.
+- Antes de publicar: informar tipo (OFICIAL), versão, tag `update` / `vX` e artefatos; autorização deve bater com esse canal.
+
+## Fluxo ao pedir update oficial para clientes
+
+1. Bump em `config/unitec.php` → `versao` (somente se autorizado).
+2. `scripts/criar-pacote-update.ps1` → 1 ZIP + `.sha256` (pacote limpo).
+3. `scripts/publicar-update-github.ps1` → assets só no release `update`; tag `vX` só notes.
+4. Informar versão e URL ao usuário.
+
+## O que o agente NÃO deve fazer
+
+- Publicar update sem pedido explícito de **atualização oficial**.
+- Tratar pedido de **hotfix** como update FULL (proibido).
+- Assumir pasta `C:\UNITECNOLOGIA_WEB` nesta máquina.
+- Meter sujeira de DEV no ZIP.
+- Alterar o padrão de update sem solicitação explícita.
+- Voltar a publicar 2 ZIPs FULL ou reativar delta.
+- Usar PowerShell `Set-Content` em PHP/Blade com acentos (corrompe UTF-8).

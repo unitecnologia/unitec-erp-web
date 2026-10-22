@@ -96,7 +96,7 @@ Prefixo típico: `/api/...`
 7. **Não inventar** funções, tabelas, rotas ou campos que não existem.
 8. Se faltar informação, **perguntar** antes de programar.
 9. Preferir **alterações pequenas e seguras**; preservar a arquitetura existente.
-10. **Não publicar** pacote de update no GitHub sem pedido explícito; o ZIP do cliente deve sair **limpo** (sem sujeira de DEV).
+10. **Não publicar** pacote de update **nem hotfix** no GitHub sem pedido explícito do **canal correto**; o ZIP FULL do cliente deve sair **limpo** (sem sujeira de DEV). Hotfix ≠ atualização oficial (ver §3 Atualização / §8 e `.cursor/rules/hotfix-vs-update-oficial.mdc`).
 11. Em commits Git do dia a dia: seguir a política do time (em geral, push/commit do app Android é repo separado; ERP só quando pedido explicitamente).
 
 ---
@@ -123,12 +123,30 @@ Qualquer mudança que toque estes eixos exige plano explícito, autorização e 
 - **API:** `api/v1/vendas-internas`
 - **Regra:** aparelhos em campo dependem do contrato atual (device + Sanctum). Quebra = app parado na rua.
 
-## Atualização
+## Atualização (dois canais — nunca misturar)
+
+### Atualização oficial
 
 - **Canal:** GitHub Releases tag/canal `update`
 - **Artefato:** `Unitec-ERP-Update.zip` (+ `.sha256`)
 - **Scripts:** `scripts/criar-pacote-update.ps1`, `scripts/publicar-update-github.ps1`
-- **Regra:** um ZIP FULL; não reativar dual-upload/delta sem decisão formal.
+- **Efeito:** sobe `config/unitec.php` → `versao`; árvore FULL; migrate no cliente após confirmação no login
+- **Regra:** um ZIP FULL; não reativar dual-upload/delta sem decisão formal
+
+### Hotfix
+
+- **Canal:** GitHub Releases tag `hotfix-{versaoBase}` (ex.: `hotfix-6.4.1.253`)
+- **Artefato:** `Unitec-ERP-Hotfix.zip` (+ `.sha256` com `size=` e `sig=`)
+- **Scripts:** `scripts/criar-hotfix.ps1`, `scripts/publicar-hotfix-github.ps1`
+- **Efeito:** **não** altera a versão do ERP; só arquivos permitidos; indicador `| HFn` na barra
+- **Regra:** nunca publicar hotfix no release `update`; nunca tratar pedido de hotfix como update FULL
+
+### Autorização (IA / publicação)
+
+- “Pode ser hotfix?” = **consulta**, não autorização para publicar
+- “Pode fazer” mantém o **mesmo** canal já definido na conversa
+- Antes de publicar: declarar tipo, versão/base, tag e artefatos; autorização deve bater com esse canal
+- Detalhe operacional: `.cursor/rules/hotfix-vs-update-oficial.mdc` e `.cursor/rules/atualizacao-clientes.mdc`
 
 ## Impressão
 
@@ -164,7 +182,7 @@ Qualquer mudança que toque estes eixos exige plano explícito, autorização e 
 
 - Informar **testes realizados** (telas, usuários, URLs).
 - Informar **possíveis impactos** e regressões.
-- Se a mudança for para clientes: update **somente** com pedido explícito e bump de versão combinado.
+- Se a mudança for para clientes: publicar **somente** com pedido explícito do canal correto (hotfix **ou** atualização oficial); bump de versão **só** no canal oficial e quando autorizado.
 
 ---
 
@@ -207,13 +225,26 @@ Qualquer mudança que toque estes eixos exige plano explícito, autorização e 
 
 ---
 
-# 8. Atualização dos clientes
+# 8. Atualização dos clientes (oficial × hotfix)
 
-### Padrão travado — não alterar sem autorização explícita
+Existem **dois** mecanismos. **Nunca** trocar o canal automaticamente.
+
+| | Atualização oficial | Hotfix |
+|--|---------------------|--------|
+| Pedido típico | “atualização oficial”, “publicar update”, “nova versão oficial” | “hotfix”, “HF”, “publicar/subir hotfix” |
+| Scripts | `criar-pacote-update.ps1`, `publicar-update-github.ps1` | `criar-hotfix.ps1`, `publicar-hotfix-github.ps1` |
+| Release | `update` (+ `v{versão}` só notes) | `hotfix-{versaoBase}` |
+| Artefato | `Unitec-ERP-Update.zip` + `.sha256` | `Unitec-ERP-Hotfix.zip` + `.sha256` (com `sig=`) |
+| Versão do ERP | sobe (`config/unitec.php`) | **não** muda |
+| No cliente | `atualizacao/` → confirmação login → `unitec:apply-atualizacao` | `unitec:hotfix` (portal `modo_atualizacao=hotfix`) |
+
+Regras Cursor: `.cursor/rules/hotfix-vs-update-oficial.mdc` (escolha do canal) e `.cursor/rules/atualizacao-clientes.mdc` (detalhe do FULL).
+
+### 8.1 Atualização oficial — padrão travado
 
 O fluxo canônico (ZIP único no canal `update` → `atualizacao/` no cliente → confirmação no login → `unitec:apply-atualizacao`) **não pode ser quebrado nem redesenhado** sem pedido explícito. No cliente a pasta de produção é **`C:\UNITECNOLOGIA_WEB`**.
 
-### Não alterar sem decisão formal e autorização explícita
+Não alterar sem decisão formal e autorização explícita:
 
 - Formato do **ZIP FULL** (`Unitec-ERP-Update.zip`) e assinatura `.sha256`
 - URL/canal estável do release **`update`**
@@ -222,15 +253,22 @@ O fluxo canônico (ZIP único no canal `update` → `atualizacao/` no cliente �
 - Scripts oficiais de gerar/publicar pacote
 - Caminho de produção no cliente: `C:\UNITECNOLOGIA_WEB`
 
-### O que o pacote **não** deve incluir
+O pacote **não** deve incluir: `.env`, `storage/`, `tools/`, `installer/`, `node_modules/` (e demais exclusões do processo oficial).
 
-- `.env`, `storage/`, `tools/`, `installer/`, `node_modules/` (e demais exclusões do processo oficial)
+Publicação oficial:
 
-### Publicação
-
-- Só gerar/publicar update quando o responsável pedir (“publique”, “suba o update”, etc.).
+- Só gerar/publicar quando o responsável pedir **atualização oficial** / update / nova versão.
+- **Não** usar estes scripts se o pedido for hotfix/HF.
 - Alterar código **não** implica publicar.
+- Antes de publicar: declarar tipo OFICIAL, versão, tags e artefatos.
 - O ZIP no canal `update` é o artefato de produção do cliente: validar exclusões e versão antes de publicar.
+
+### 8.2 Hotfix
+
+- Só gerar/publicar com `criar-hotfix.ps1` e `publicar-hotfix-github.ps1`.
+- **Não** incrementar `config/unitec.php`; **não** gerar FULL; **não** alterar o release `update`; **não** rodar migrations como parte da publicação.
+- Revisões cumulativas; respeitar validações/assinatura do mecanismo (`HotfixService`).
+- “Pode ser hotfix?” = consulta. “Pode fazer” após um pedido de hotfix **não** autoriza update oficial.
 
 ---
 
@@ -256,7 +294,7 @@ DOCUMENTAR
 |-------|-------------|
 | **ANALISAR** | Causa raiz, arquivos, impacto em componentes da seção 3 |
 | **EXPLICAR** | Problema, plano, arquivos, riscos |
-| **AGUARDAR AUTORIZAÇÃO** | Especialmente: DB, API v1, update, fiscal, Enter, remoções |
+| **AGUARDAR AUTORIZAÇÃO** | Especialmente: DB, API v1, update/hotfix (canal correto), fiscal, Enter, remoções |
 | **ALTERAR** | Diff mínimo; sem refatoração paralela |
 | **TESTAR** | Telas/APIs afetadas; usuário com e sem permissão quando for ACL |
 | **DOCUMENTAR** | O que mudou, como testar, impactos; changelog/versão se for release |
@@ -269,14 +307,14 @@ DOCUMENTAR
 - [ ] Sem remoção não comprovada
 - [ ] Lista de arquivos + riscos informada
 - [ ] Testes manuais (ou automatizados) descritos
-- [ ] Update/produção **não** disparados sem pedido
+- [ ] Update oficial **nem** hotfix disparados sem pedido do **canal correto**
 
 ---
 
 ## Referências internas úteis
 
 - `docs/` — instalação no cliente, desenvolvimento local, tunnel, portal contador
-- `.cursor/rules/` — UI moderna, portas, update, Enter em grades, Git do app Android
+- `.cursor/rules/` — UI moderna, portas, update oficial, hotfix vs oficial, Enter em grades, Git do app Android
 - `config/unitec.php` — versão, update URL, device service, licença
 - `routes/web.php` / `routes/api.php` — superfície HTTP
 - `app/Providers/Filament/*` — painéis e hooks de UI

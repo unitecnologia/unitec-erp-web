@@ -6,7 +6,12 @@
 .phpactor.json
 .phpunit.result.cache
 /.codex
-/.cursor/
+# Cursor: versionar só as rules de atualização (hotfix vs oficial)
+/.cursor/*
+!/.cursor/rules/
+/.cursor/rules/*
+!/.cursor/rules/hotfix-vs-update-oficial.mdc
+!/.cursor/rules/atualizacao-clientes.mdc
 /.idea
 /.nova
 /.phpunit.cache
