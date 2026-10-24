@@ -33,9 +33,8 @@ class VendaListTable extends Component
 
     public string $localSearchHoraAte = '';
 
-    public string $searchColumn2 = '';
-
-    public string $localSearch2 = '';
+    /** @var list<string> */
+    public array $searchFieldsActive = ['data'];
 
     public int $perPage = 50;
 
@@ -63,12 +62,12 @@ class VendaListTable extends Component
         $this->statusFilter = $filter;
         $this->resetPage();
 
-        $total = $this->queryBuilder()->sumFilteredTotal();
+        $ui = $this->queryBuilder()->indicatorsUi();
 
         $this->js(sprintf(
             '(() => {
                 const status = %s;
-                const totalLabel = %s;
+                const indicators = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
@@ -84,18 +83,18 @@ class VendaListTable extends Component
                     }
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
-                const el = document.querySelector(".erp-vendas__total-value");
-                if (el) el.textContent = totalLabel;
+                window.ErpVendasIndicators && window.ErpVendasIndicators.apply(indicators);
+                window.ErpVendasStatusFilter && window.ErpVendasStatusFilter.syncUI(status);
             })()',
             json_encode($filter, JSON_UNESCAPED_UNICODE),
-            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode($ui, JSON_UNESCAPED_UNICODE),
             json_encode('app.filament.resources.venda-resource.pages.list-vendas', JSON_UNESCAPED_UNICODE),
         ));
     }
 
     public function setTipoFilter(string $filter): void
     {
-        $allowed = ['todos', Venda::TIPO_PEDIDO, Venda::TIPO_CUPOM];
+        $allowed = VendaListQueryBuilder::documentTabKeys();
 
         if (! in_array($filter, $allowed, true)) {
             return;
@@ -104,12 +103,12 @@ class VendaListTable extends Component
         $this->tipoFilter = $filter;
         $this->resetPage();
 
-        $total = $this->queryBuilder()->sumFilteredTotal();
+        $ui = $this->queryBuilder()->indicatorsUi();
 
         $this->js(sprintf(
             '(() => {
                 const tipo = %s;
-                const totalLabel = %s;
+                const indicators = %s;
                 const parents = window.Livewire?.getByName?.(%s) || [];
                 const parent = parents[0] || null;
                 if (parent) {
@@ -125,11 +124,10 @@ class VendaListTable extends Component
                     }
                     window.history.replaceState({}, "", url);
                 } catch (e) {}
-                const el = document.querySelector(".erp-vendas__total-value");
-                if (el) el.textContent = totalLabel;
+                window.ErpVendasIndicators && window.ErpVendasIndicators.apply(indicators);
             })()',
             json_encode($filter, JSON_UNESCAPED_UNICODE),
-            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            json_encode($ui, JSON_UNESCAPED_UNICODE),
             json_encode('app.filament.resources.venda-resource.pages.list-vendas', JSON_UNESCAPED_UNICODE),
         ));
     }
@@ -146,8 +144,7 @@ class VendaListTable extends Component
         string $localSearchHoraAte = '',
         ?int $perPage = null,
         bool $resetSort = false,
-        string $searchColumn2 = '',
-        string $localSearch2 = '',
+        array $searchFieldsActive = [],
     ): void {
         $this->statusFilter = $statusFilter;
         $this->tipoFilter = $tipoFilter;
@@ -157,8 +154,10 @@ class VendaListTable extends Component
         $this->localSearchAte = $localSearchAte;
         $this->localSearchHoraDe = $localSearchHoraDe;
         $this->localSearchHoraAte = $localSearchHoraAte;
-        $this->searchColumn2 = $searchColumn2;
-        $this->localSearch2 = $localSearch2;
+        $this->searchFieldsActive = array_values(array_filter(
+            $searchFieldsActive,
+            fn (mixed $column): bool => is_string($column) && $column !== '',
+        ));
 
         if ($perPage !== null && $perPage > 0) {
             $this->perPage = $perPage;
@@ -204,8 +203,7 @@ class VendaListTable extends Component
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
             applyDefaultOrder: $applyDefaultOrder,
-            searchColumn2: $this->searchColumn2,
-            localSearch2: $this->localSearch2,
+            searchFieldsActive: $this->searchFieldsActive,
         );
     }
 

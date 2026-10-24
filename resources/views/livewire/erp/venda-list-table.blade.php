@@ -20,7 +20,7 @@
     ];
 @endphp
 
-<div class="fi-ta-ctn overflow-x-auto">
+<div class="fi-ta-ctn erp-vendas__table-ctn">
     <table class="fi-ta-table">
         <thead>
             <tr>
@@ -37,6 +37,7 @@
                             $column['headerClass'] ?? null,
                         ]))
                         aria-sort="{{ $ariaSort }}"
+                        @if (filled($column['label'] ?? null)) title="{{ $column['label'] }}" @endif
                     >
                         @if ($column['sortable'] ?? false)
                             <button
@@ -61,6 +62,7 @@
                     @foreach ($columns as $column)
                         @php
                             $value = $cells[$column['key']] ?? '';
+                            $plainTitle = trim(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
                         @endphp
                         <td @class(array_filter([
                             'fi-ta-cell',
@@ -70,7 +72,7 @@
                             @if ($column['html'] ?? false)
                                 {!! $value !!}
                             @else
-                                {{ $value }}
+                                <span class="erp-vendas__cell-text" @if ($plainTitle !== '' && $plainTitle !== '—') title="{{ $plainTitle }}" @endif>{{ $value }}</span>
                             @endif
                         </td>
                     @endforeach

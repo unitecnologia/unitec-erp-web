@@ -46,11 +46,11 @@ final class VendaListRowFormatter
             'hora' => $this->formatHora($record->hora),
             'cliente' => (string) ($record->cliente?->nome_razao ?? '—'),
             'vendedor' => $record->vendedorNome(),
-            'plataforma' => '<span class="fi-badge fi-color-' . e($plataformaClass) . '">' . e($plataformaLabel) . '</span>',
+            'plataforma' => '<span class="fi-badge fi-color-' . e($plataformaClass) . '" title="' . e($plataformaLabel) . '">' . e($plataformaLabel) . '</span>',
             'forma_pagamento' => filled($record->forma_pagamento) ? (string) $record->forma_pagamento : '—',
-            'total' => '<span class="erp-vendas-total-cell"><span class="erp-vendas-total-cell__currency">R$</span>'
-                . '<span class="erp-vendas-total-cell__amount" title="R$ ' . e($valor) . '">' . e($valor) . '</span></span>',
-            'status' => '<span class="erp-vendas-status erp-vendas-status--' . e($status) . '">' . e($statusLabel) . '</span>',
+            'total' => '<span class="erp-vendas-total-cell" title="R$ ' . e($valor) . '"><span class="erp-vendas-total-cell__currency">R$</span>'
+                . '<span class="erp-vendas-total-cell__amount">' . e($valor) . '</span></span>',
+            'status' => '<span class="erp-vendas-status erp-vendas-status--' . e($status) . '" title="' . e($statusLabel) . '">' . e($statusLabel) . '</span>',
             'entrega' => $entregaLabel,
             'tipo' => Venda::tipoLabels()[(string) $record->tipo] ?? (string) $record->tipo,
             'pdv_numero' => $pdvLabel,
@@ -197,15 +197,19 @@ final class VendaListRowFormatter
         }
 
         if ($state instanceof \DateTimeInterface) {
-            return $state->format('H:i:s');
+            return $state->format('H:i');
         }
 
         try {
-            return Carbon::parse((string) $state)->format('H:i:s');
+            return Carbon::parse((string) $state)->format('H:i');
         } catch (\Throwable) {
             $raw = (string) $state;
 
-            return strlen($raw) >= 8 ? substr($raw, 0, 8) : $raw;
+            if (preg_match('/^\d{1,2}:\d{2}/', $raw, $m) === 1) {
+                return $m[0];
+            }
+
+            return strlen($raw) >= 5 ? substr($raw, 0, 5) : $raw;
         }
     }
 

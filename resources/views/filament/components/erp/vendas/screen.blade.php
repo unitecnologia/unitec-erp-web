@@ -18,10 +18,6 @@
 
             @include('filament.components.erp.vendas.toolbar-filters')
 
-            <div class="erp-vendas__search-actions">
-                <button type="button" wire:click="clearSearch" class="erp-vendas__btn erp-vendas__btn--secondary">Limpar</button>
-            </div>
-
             <div class="erp-vendas__page-size-group">
                 <label class="erp-vendas__page-size-label">
                     por página
@@ -38,7 +34,7 @@
     @include('filament.components.erp.vendas.tabs')
 
     <p class="erp-vendas__hint">
-        A pesquisa é automática (até 2 campos combinados). Use as setas para navegar na lista.
+        A pesquisa é automática (vários campos, combinação OR). Use as setas para navegar na lista.
     </p>
 
     @include('filament.components.erp.list-scripts', [
@@ -46,4 +42,6 @@
     ])
 
     @include('filament.components.erp.form-scripts')
+
+    <script src="{{ asset('js/erp-vendas-indicators.js') }}?v=4"></script>
 </div>

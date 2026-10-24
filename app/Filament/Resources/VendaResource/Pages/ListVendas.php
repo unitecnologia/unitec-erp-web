@@ -52,9 +52,8 @@ class ListVendas extends ListRecords
     #[Url(as: 'campo')]
     public string $searchColumn = 'data';
 
-    public string $searchColumn2 = '';
-
-    public string $localSearch2 = '';
+    /** @var list<string> */
+    public array $searchFieldsActive = ['data'];
 
     public string $searchSignatureApplied = '';
 
@@ -104,16 +103,22 @@ class ListVendas extends ListRecords
 
     public function booted(): void
     {
-        if (! in_array('data', [$this->searchColumn, $this->searchColumn2], true)
+        $this->searchFieldsActive = $this->normalizeSearchFieldsActive($this->searchFieldsActive);
+
+        if ($this->searchFieldsActive === [] && $this->searchColumn !== '') {
+            $this->searchFieldsActive = [$this->normalizeSearchColumn($this->searchColumn)];
+        }
+
+        if ($this->searchFieldsActive !== [] && ! in_array($this->searchColumn, $this->searchFieldsActive, true)) {
+            $this->searchColumn = $this->searchFieldsActive[array_key_last($this->searchFieldsActive)];
+        }
+
+        if (! in_array('data', $this->searchFieldsActive, true)
             || ($this->localSearchDe !== '' && $this->localSearchAte !== '')) {
             return;
         }
 
-        if ($this->searchColumn2 === '') {
-            $this->applyTodayDateFilter();
-        } else {
-            $this->applyTodayDates();
-        }
+        $this->applyTodayDates();
     }
 
     public function mountInteractsWithTable(): void
@@ -132,9 +137,8 @@ class ListVendas extends ListRecords
     protected function applyTodayDateFilter(): void
     {
         $this->searchColumn = 'data';
+        $this->searchFieldsActive = ['data'];
         $this->localSearch = '';
-        $this->searchColumn2 = '';
-        $this->localSearch2 = '';
         $this->applyTodayDates();
         $this->localSearchHoraDe = '';
         $this->localSearchHoraAte = '';
@@ -202,8 +206,7 @@ class ListVendas extends ListRecords
             localSearchHoraDe: $this->localSearchHoraDe,
             localSearchHoraAte: $this->localSearchHoraAte,
             applyDefaultOrder: $applyDefaultOrder,
-            searchColumn2: $this->searchColumn2,
-            localSearch2: $this->localSearch2,
+            searchFieldsActive: $this->normalizeSearchFieldsActive($this->searchFieldsActive),
         );
     }
 
@@ -258,7 +261,35 @@ class ListVendas extends ListRecords
     #[Computed]
     public function filteredTotal(): float
     {
-        return $this->listQueryBuilder()->sumFilteredTotal();
+        return (float) ($this->vendaIndicators['current']['total'] ?? 0);
+    }
+
+    /**
+     * @return array{
+     *     status: array<string, array{qtd: int, total: float}>,
+     *     tipo: array<string, array{qtd: int, total: float}>,
+     *     current: array{qtd: int, total: float}
+     * }
+     */
+    #[Computed]
+    public function vendaIndicators(): array
+    {
+        return $this->listQueryBuilder()->indicators();
+    }
+
+    /**
+     * @return array{
+     *     statusCounts: array<string, string>,
+     *     statusValues: array<string, string>,
+     *     tipoCounts: array<string, string>,
+     *     totalCount: string,
+     *     totalValue: string
+     * }
+     */
+    #[Computed]
+    public function vendaIndicatorsUi(): array
+    {
+        return $this->listQueryBuilder()->indicatorsUi($this->vendaIndicators);
     }
 
     public function content(Schema $schema): Schema
@@ -372,7 +403,7 @@ class ListVendas extends ListRecords
 
     protected function normalizeTipoFilter(mixed $value): string
     {
-        $allowed = ['todos', Venda::TIPO_PEDIDO, Venda::TIPO_CUPOM];
+        $allowed = VendaListQueryBuilder::documentTabKeys();
 
         return in_array($value, $allowed, true) ? (string) $value : 'todos';
     }
@@ -391,25 +422,27 @@ class ListVendas extends ListRecords
         $this->pushVendaListRefresh();
     }
 
+    /**
+     * Define um único campo (URL / legado). O dropdown usa toggleSearchField.
+     */
     public function setSearchColumn(string $column): void
     {
         $normalized = $this->normalizeSearchColumn($column);
         $hadSearch = filled($this->localSearch)
             || filled($this->localSearchDe)
             || filled($this->localSearchAte);
-        $wasData = $this->searchColumn === 'data';
-        $changed = $normalized !== $this->searchColumn;
+        $wasData = in_array('data', $this->activeSearchColumns(), true);
+        $changed = $this->searchFieldsActive !== [$normalized];
 
         $this->searchColumn = $normalized;
+        $this->searchFieldsActive = [$normalized];
         $this->localSearch = '';
-        $this->searchColumn2 = '';
-        $this->localSearch2 = '';
         $this->localSearchDe = '';
         $this->localSearchAte = '';
         $this->localSearchHoraDe = '';
         $this->localSearchHoraAte = '';
 
-        if ($this->searchColumn === 'data') {
+        if ($normalized === 'data') {
             $this->applyTodayDateFilter();
             $this->clearListSelection();
             $this->dispatch('erp-masks-refresh');
@@ -438,7 +471,7 @@ class ListVendas extends ListRecords
     }
 
     /**
-     * Marca/desmarca campo de pesquisa (até 2 combinados). Ao marcar um 3º, sai o mais antigo.
+     * Marca/desmarca campo de pesquisa (seleção múltipla livre).
      */
     public function toggleSearchField(string $column): void
     {
@@ -448,28 +481,35 @@ class ListVendas extends ListRecords
             return;
         }
 
-        $active = $this->activeSearchColumns();
+        $active = $this->normalizeSearchFieldsActive($this->searchFieldsActive);
 
         if (in_array($column, $active, true)) {
-            if (count($active) < 2) {
-                $this->skipRender();
+            $active = array_values(array_filter(
+                $active,
+                fn (string $item): bool => $item !== $column,
+            ));
 
-                return;
+            if ($column === 'data') {
+                $this->localSearchDe = '';
+                $this->localSearchAte = '';
             }
 
-            $this->removeSearchField($column);
+            if ($column === 'hora') {
+                $this->localSearchHoraDe = '';
+                $this->localSearchHoraAte = '';
+            }
         } else {
-            if (count($active) >= 2) {
-                $this->removeSearchField($this->searchColumn);
-            }
-
-            $this->searchColumn2 = $column;
-            $this->localSearch2 = '';
+            $active[] = $column;
 
             if ($column === 'data' && ($this->localSearchDe === '' || $this->localSearchAte === '')) {
                 $this->applyTodayDates();
             }
         }
+
+        $this->searchFieldsActive = $active;
+        $this->searchColumn = $active !== []
+            ? $active[array_key_last($active)]
+            : '';
 
         $this->dispatch('erp-masks-refresh');
 
@@ -481,37 +521,25 @@ class ListVendas extends ListRecords
         $this->pushVendaListRefresh(resetSort: true, renderPage: true);
     }
 
-    protected function removeSearchField(string $column): void
-    {
-        if ($this->searchColumn2 === $column) {
-            $this->searchColumn2 = '';
-            $this->localSearch2 = '';
-        } elseif ($this->searchColumn === $column && $this->searchColumn2 !== '') {
-            $this->searchColumn = $this->searchColumn2;
-            $this->localSearch = $this->localSearch2;
-            $this->searchColumn2 = '';
-            $this->localSearch2 = '';
-        }
-
-        if ($column === 'data') {
-            $this->localSearchDe = '';
-            $this->localSearchAte = '';
-        }
-
-        if ($column === 'hora') {
-            $this->localSearchHoraDe = '';
-            $this->localSearchHoraAte = '';
-        }
-    }
-
     /**
      * @return list<string>
      */
-    protected function activeSearchColumns(): array
+    public function activeSearchColumns(): array
     {
+        return $this->normalizeSearchFieldsActive($this->searchFieldsActive);
+    }
+
+    /**
+     * @param  list<mixed>  $fields
+     * @return list<string>
+     */
+    protected function normalizeSearchFieldsActive(array $fields): array
+    {
+        $allowed = $this->localSearchColumns();
+
         return array_values(array_unique(array_filter(
-            [$this->searchColumn, $this->searchColumn2],
-            fn (string $column): bool => $column !== '',
+            $fields,
+            fn (mixed $column): bool => is_string($column) && $column !== '' && in_array($column, $allowed, true),
         )));
     }
 
@@ -520,7 +548,7 @@ class ListVendas extends ListRecords
      */
     protected function localSearchColumns(): array
     {
-        return ['numero', 'data', 'cliente', 'vendedor', 'plataforma', 'meio_pagamento', 'total', 'situacao', 'tipo', 'hora'];
+        return ['numero', 'data', 'cliente', 'vendedor', 'plataforma', 'meio_pagamento', 'total', 'tipo', 'hora'];
     }
 
     /**
@@ -529,23 +557,19 @@ class ListVendas extends ListRecords
     protected function searchSignature(): string
     {
         $active = $this->activeSearchColumns();
-        $terms = [];
-
-        foreach ([[$this->searchColumn, $this->localSearch], [$this->searchColumn2, $this->localSearch2]] as [$column, $term]) {
-            $term = trim($term);
-
-            if ($column !== '' && ! in_array($column, ['data', 'hora'], true) && $term !== '') {
-                $terms[] = $column.'='.$term;
-            }
-        }
-
-        sort($terms);
+        $textColumns = array_values(array_filter(
+            $active,
+            fn (string $column): bool => ! in_array($column, ['data', 'hora'], true),
+        ));
+        $term = trim($this->localSearch);
+        $hasText = $textColumns !== [] && $term !== '';
 
         $hasData = in_array('data', $active, true);
-        $hasTime = $hasData || in_array('hora', $active, true);
+        $hasTime = in_array('hora', $active, true);
 
         return json_encode([
-            $terms,
+            $active,
+            $hasText ? $term : null,
             $hasData ? [$this->localSearchDe, $this->localSearchAte] : null,
             $hasTime ? [$this->localSearchHoraDe, $this->localSearchHoraAte] : null,
         ], JSON_UNESCAPED_UNICODE) ?: '';
@@ -567,11 +591,6 @@ class ListVendas extends ListRecords
     }
 
     public function updatedLocalSearch(): void
-    {
-        $this->applySearchIfChanged();
-    }
-
-    public function updatedLocalSearch2(): void
     {
         $this->applySearchIfChanged();
     }
@@ -604,9 +623,11 @@ class ListVendas extends ListRecords
     public function clearSearch(): void
     {
         $this->applyTodayDateFilter();
+        $this->statusFilter = 'todos';
         $this->clearListSelection();
         $this->dispatch('erp-masks-refresh');
         $this->pushVendaListRefresh(resetSort: true, renderPage: true);
+        $this->js("window.ErpVendasStatusFilter && window.ErpVendasStatusFilter.syncUI('todos')");
     }
 
     public function updatedSearchColumn(): void
@@ -636,7 +657,6 @@ class ListVendas extends ListRecords
             'plataforma',
             'meio_pagamento',
             'total',
-            'situacao',
             'tipo',
             'hora',
         ];
@@ -944,7 +964,9 @@ class ListVendas extends ListRecords
 
     protected function pushVendaListRefresh(bool $resetSort = false, bool $renderPage = false): void
     {
-        $total = $this->listQueryBuilder()->sumFilteredTotal();
+        unset($this->vendaIndicators, $this->vendaIndicatorsUi, $this->filteredTotal);
+
+        $ui = $this->listQueryBuilder()->indicatorsUi();
         $this->searchSignatureApplied = $this->searchSignature();
 
         $this->dispatch(
@@ -959,8 +981,7 @@ class ListVendas extends ListRecords
             localSearchHoraAte: $this->localSearchHoraAte,
             perPage: (int) ($this->tableRecordsPerPage ?? 50),
             resetSort: $resetSort,
-            searchColumn2: $this->searchColumn2,
-            localSearch2: $this->localSearch2,
+            searchFieldsActive: $this->normalizeSearchFieldsActive($this->searchFieldsActive),
         )->to(VendaListTable::class);
 
         if (! $renderPage) {
@@ -968,8 +989,9 @@ class ListVendas extends ListRecords
         }
 
         $this->js(sprintf(
-            '(() => { const el = document.querySelector(".erp-vendas__total-value"); if (el) el.textContent = %s; })()',
-            json_encode('R$ '.number_format($total, 2, ',', '.'), JSON_UNESCAPED_UNICODE),
+            'window.ErpVendasIndicators && window.ErpVendasIndicators.apply(%s); window.ErpVendasStatusFilter && window.ErpVendasStatusFilter.syncUI(%s);',
+            json_encode($ui, JSON_UNESCAPED_UNICODE),
+            json_encode($this->statusFilter, JSON_UNESCAPED_UNICODE),
         ));
     }
 }
