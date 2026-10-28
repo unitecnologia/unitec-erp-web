@@ -74,16 +74,21 @@ window.ErpUppercase = {
 function initErpUppercase() {
     window.ErpUppercase?.bind(document);
 }
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initErpUppercase);
+if (! window.__erpUppercaseBooted) {
+    window.__erpUppercaseBooted = true;
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initErpUppercase);
+    } else {
+        initErpUppercase();
+    }
+    document.addEventListener("livewire:navigated", initErpUppercase);
+    if (window.Livewire) {
+        window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
+    } else {
+        document.addEventListener("livewire:init", () => {
+            window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
+        });
+    }
 } else {
     initErpUppercase();
-}
-document.addEventListener("livewire:navigated", initErpUppercase);
-if (window.Livewire) {
-    window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
-} else {
-    document.addEventListener("livewire:init", () => {
-        window.Livewire.hook("morph.updated", ({ el }) => { window.ErpUppercase?.bind(el); });
-    });
 }

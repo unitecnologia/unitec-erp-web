@@ -4,6 +4,12 @@ let erpPdvIdleTimer = null;
 let erpPdvIdleBound = false;
 let erpPdvClockTimer = null;
 let erpPdvStatusBarSync = null;
+/** @type {number|null} */
+let erpPdvSearchFocusTrapTimer = null;
+/** @type {number|null} */
+let erpPdvPersonOverlayHeightTimer = null;
+/** @type {MutationObserver|null} */
+let erpPdvPersonOverlayObserver = null;
 /** @type {boolean|null} */
 let erpPdvCapsLockOn = null;
 /** @type {boolean|null} */
@@ -51,6 +57,9 @@ const ERP_PDV_CTRL_SHORTCUTS = {
 document.addEventListener('DOMContentLoaded', initErpPdv);
 document.addEventListener('livewire:navigated', initErpPdv);
 document.addEventListener('livewire:init', bindErpPdvLivewireEvents);
+if (window.Livewire) {
+    bindErpPdvLivewireEvents();
+}
 window.addEventListener('focus', () => {
     const pdv = document.querySelector('.erp-pdv');
     if (pdv?.dataset.caixaAberto === '1' && ! pdvHasBlockingUi(pdv)) {
@@ -666,7 +675,58 @@ window.addEventListener('message', (event) => {
     component.call('closePersonOverlay');
 });
 
+/**
+ * Para timers/observers do PDV ao sair da tela (SPA). Listeners de atalho
+ * permanecem, mas já fazem early-return sem .erp-pdv — custo desprezível.
+ */
+function teardownErpPdvRuntime() {
+    if (erpPdvSearchFocusTrapTimer !== null) {
+        window.clearInterval(erpPdvSearchFocusTrapTimer);
+        erpPdvSearchFocusTrapTimer = null;
+    }
+
+    window.__erpPdvSearchFocusTrapBound = false;
+
+    if (erpPdvPersonOverlayHeightTimer !== null) {
+        window.clearInterval(erpPdvPersonOverlayHeightTimer);
+        erpPdvPersonOverlayHeightTimer = null;
+    }
+
+    if (erpPdvPersonOverlayObserver) {
+        try {
+            erpPdvPersonOverlayObserver.disconnect();
+        } catch (_) {
+            // ignore
+        }
+
+        erpPdvPersonOverlayObserver = null;
+    }
+
+    window.__erpPdvPersonOverlayHeightBound = false;
+
+    if (erpPdvClockTimer !== null) {
+        window.clearInterval(erpPdvClockTimer);
+        erpPdvClockTimer = null;
+    }
+
+    if (erpPdvIdleTimer !== null) {
+        window.clearTimeout(erpPdvIdleTimer);
+        erpPdvIdleTimer = null;
+    }
+
+    exitPdvFullscreen();
+}
+
 function initErpPdv() {
+    const page = document.querySelector('.erp-pdv-page');
+
+    if (! page) {
+        // Saiu do PDV (navegou para outra tela): libera timers e a barra do Windows.
+        teardownErpPdvRuntime();
+
+        return;
+    }
+
     bindErpPdvKeys();
     bindPdvIdleMonitor();
     bindPdvStatusBar();
@@ -675,15 +735,6 @@ function initErpPdv() {
     bindPdvLaunchStepBack();
     bindPdvSearchFocusTrap();
     bindPdvPersonOverlayHeight();
-
-    const page = document.querySelector('.erp-pdv-page');
-
-    if (! page) {
-        // Saiu do PDV (navegou para outra tela): devolve a barra do Windows.
-        exitPdvFullscreen();
-
-        return;
-    }
 
     armPdvKioskFullscreen();
 
@@ -704,32 +755,34 @@ function initErpPdv() {
     resetPdvIdleTimer();
 }
 
+window.initErpPdv = initErpPdv;
+window.teardownErpPdvRuntime = teardownErpPdvRuntime;
+window.bindErpPdvLivewireEvents = bindErpPdvLivewireEvents;
+
 /**
  * Clientes no PDV: listagem usa painel alto; create/edit acompanha a altura do formulário.
  * Detecta o estado pela URL do iframe (same-origin) — sem postMessage.
  */
 function bindPdvPersonOverlayHeight() {
-    if (window.__erpPdvPersonOverlayHeightBound) {
-        syncPdvPersonOverlays();
-
-        return;
-    }
-
-    window.__erpPdvPersonOverlayHeightBound = true;
-
     const sync = () => {
         window.requestAnimationFrame(() => syncPdvPersonOverlays());
     };
 
-    window.setInterval(sync, 320);
-    document.addEventListener('load', (event) => {
-        if (event.target?.matches?.('iframe.erp-pdv-overlay__iframe, iframe[data-erp-pdv-overlay-iframe]')) {
-            sync();
-        }
-    }, true);
+    if (erpPdvPersonOverlayHeightTimer === null) {
+        erpPdvPersonOverlayHeightTimer = window.setInterval(sync, 320);
+    }
 
-    if (document.body) {
-        const mo = new MutationObserver((mutations) => {
+    if (! window.__erpPdvPersonOverlayLoadBound) {
+        window.__erpPdvPersonOverlayLoadBound = true;
+        document.addEventListener('load', (event) => {
+            if (event.target?.matches?.('iframe.erp-pdv-overlay__iframe, iframe[data-erp-pdv-overlay-iframe]')) {
+                sync();
+            }
+        }, true);
+    }
+
+    if (! erpPdvPersonOverlayObserver && document.body) {
+        erpPdvPersonOverlayObserver = new MutationObserver((mutations) => {
             const relevant = mutations.some((mutation) => {
                 if (mutation.type !== 'childList') {
                     return false;
@@ -752,9 +805,10 @@ function bindPdvPersonOverlayHeight() {
             }
         });
 
-        mo.observe(document.body, { childList: true, subtree: true });
+        erpPdvPersonOverlayObserver.observe(document.body, { childList: true, subtree: true });
     }
 
+    window.__erpPdvPersonOverlayHeightBound = true;
     sync();
 }
 
@@ -2076,13 +2130,13 @@ function restorePdvBuscaAvancadaFocus() {
  * Não interfere em inputs/botões/modais em uso.
  */
 function bindPdvSearchFocusTrap() {
-    if (window.__erpPdvSearchFocusTrapBound) {
+    if (erpPdvSearchFocusTrapTimer !== null) {
         return;
     }
 
     window.__erpPdvSearchFocusTrapBound = true;
 
-    window.setInterval(() => {
+    erpPdvSearchFocusTrapTimer = window.setInterval(() => {
         const pdv = document.querySelector('.erp-pdv');
 
         if (! pdv || pdv.dataset.caixaAberto !== '1' || pdvHasBlockingUi(pdv)) {

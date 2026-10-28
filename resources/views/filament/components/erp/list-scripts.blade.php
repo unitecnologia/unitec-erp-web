@@ -14,6 +14,6 @@
         window.initErpListPages();
     }
 </script>
-<script src="{{ asset('js/erp-uppercase.js') }}?v={{ $jsVersion }}" defer data-navigate-track></script>
+{{-- erp-uppercase.js já vem do shell via form-scripts; não recarregar (evita hooks Livewire duplicados). --}}
 <script src="{{ asset('js/erp-list.js') }}?v={{ $jsVersion }}" defer data-navigate-track></script>
 @include('filament.components.erp.grid-sort-script')

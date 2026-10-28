@@ -10,11 +10,11 @@
 @endphp
 
 <meta name="erp-asset-version" content="{{ $version }}-{{ \App\Support\Erp\ErpUpdateService::readInstalledVersion() }}">
-@include('filament.components.erp.no-browser-hints')
-<script src="{{ asset('js/erp-compras.js') }}?v={{ $version }}" defer></script>
+{{-- no-browser-hints: só em SCRIPTS_AFTER (AdminPanelProvider) — evita parse/download duplicado. --}}
 @if (ErpPageAssets::resourceSegment() === 'compras')
-    <script src="{{ asset('js/erp-compras-lanc-enter.js') }}?v={{ $version }}-v9"></script>
-    <script src="{{ asset('js/erp-compras-parcelas.js') }}?v={{ $version }}-v5"></script>
+    <script src="{{ asset('js/erp-compras.js') }}?v={{ $version }}" defer data-navigate-track></script>
+    <script src="{{ asset('js/erp-compras-lanc-enter.js') }}?v={{ $version }}-v9" data-navigate-track></script>
+    <script src="{{ asset('js/erp-compras-parcelas.js') }}?v={{ $version }}-v5" data-navigate-track></script>
 @endif
 @if (ErpPageAssets::resourceSegment() === 'contas-receber')
     <script src="{{ asset('js/erp-receber-form-enter.js') }}?v={{ $version }}"></script>
