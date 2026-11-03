@@ -855,4 +855,240 @@
             }
         })();
     </script>
+
+    <script>
+        (function bindUnitecLoginFocus() {
+            if (window.__unitecLoginFocusBound) {
+                return;
+            }
+            window.__unitecLoginFocusBound = true;
+
+            var focusTarget = null; // 'senha' | 'usuario'
+            var initialApplied = false;
+            var lastUserChangeAt = 0;
+            var lastUserKey = null;
+
+            function formRoot() {
+                return document.querySelector('.unitec-login__form');
+            }
+
+            function isSetupMode(root) {
+                return !!(root && root.querySelector('.unitec-login__setup'));
+            }
+
+            function userControl(root) {
+                if (!root) {
+                    return null;
+                }
+
+                var selects = root.querySelectorAll('select');
+                if (selects.length > 0) {
+                    return selects[0];
+                }
+
+                return root.querySelector(
+                    'input[id*="user_id"], .fi-select-input input, [role="combobox"] input, [role="combobox"]'
+                );
+            }
+
+            function senhaInput(root) {
+                return document.getElementById('unitec-login-senha')
+                    || (root ? root.querySelector('.unitec-login__senha-wrap input') : null);
+            }
+
+            function userHasValue(el) {
+                if (!el) {
+                    return false;
+                }
+
+                if (el.tagName === 'SELECT') {
+                    var v = String(el.value || '').trim();
+                    return v !== '' && v !== 'null' && v !== '0';
+                }
+
+                return String(el.value || '').trim() !== '';
+            }
+
+            function focusEl(el) {
+                if (!el) {
+                    return;
+                }
+
+                el.removeAttribute('readonly');
+                try {
+                    el.focus({ preventScroll: true });
+                } catch (e) {
+                    el.focus();
+                }
+            }
+
+            function applyFocus() {
+                var root = formRoot();
+                if (!root || isSetupMode(root) || !focusTarget) {
+                    return;
+                }
+
+                var user = userControl(root);
+                var senha = senhaInput(root);
+                var active = document.activeElement;
+                var now = Date.now();
+
+                // Não roubar foco se o usuário já está em outro campo (empresa, lembrar, etc.).
+                if (
+                    active
+                    && root.contains(active)
+                    && active !== user
+                    && active !== senha
+                    && now - lastUserChangeAt > 350
+                ) {
+                    focusTarget = null;
+                    return;
+                }
+
+                if (focusTarget === 'senha') {
+                    if (!senha) {
+                        return;
+                    }
+                    if (active === senha) {
+                        focusTarget = null;
+                        return;
+                    }
+                    focusEl(senha);
+                    if (document.activeElement === senha) {
+                        focusTarget = null;
+                    }
+                    return;
+                }
+
+                if (focusTarget === 'usuario') {
+                    if (!user) {
+                        return;
+                    }
+                    if (active === user) {
+                        focusTarget = null;
+                        return;
+                    }
+                    focusEl(user);
+                    if (document.activeElement === user) {
+                        focusTarget = null;
+                    }
+                }
+            }
+
+            function userKey(el) {
+                if (!el) {
+                    return '';
+                }
+
+                return String(el.value || '').trim();
+            }
+
+            function planInitialFocus() {
+                if (initialApplied) {
+                    return;
+                }
+
+                var root = formRoot();
+                if (!root || isSetupMode(root)) {
+                    return;
+                }
+
+                var user = userControl(root);
+                var senha = senhaInput(root);
+                if (!user || !senha) {
+                    return;
+                }
+
+                initialApplied = true;
+                lastUserKey = userKey(user);
+                focusTarget = userHasValue(user) ? 'senha' : 'usuario';
+                applyFocus();
+            }
+
+            function syncUserChangeFocus() {
+                var root = formRoot();
+                if (!root || isSetupMode(root) || !initialApplied) {
+                    return;
+                }
+
+                var user = userControl(root);
+                if (!user) {
+                    return;
+                }
+
+                var key = userKey(user);
+                if (key === lastUserKey) {
+                    return;
+                }
+
+                lastUserKey = key;
+                if (userHasValue(user)) {
+                    onUserChanged();
+                }
+            }
+
+            function onUserChanged() {
+                lastUserChangeAt = Date.now();
+                lastUserKey = userKey(userControl(formRoot()));
+                focusTarget = 'senha';
+                applyFocus();
+            }
+
+            document.addEventListener('change', function (event) {
+                var target = event.target;
+                if (!(target instanceof Element)) {
+                    return;
+                }
+
+                var root = formRoot();
+                if (!root || !root.contains(target)) {
+                    return;
+                }
+
+                var user = userControl(root);
+                if (user && (target === user || user.contains(target))) {
+                    onUserChanged();
+                }
+            }, true);
+
+            // Select searchable (Filament): valor muda via Livewire sem change nativo confiável.
+            document.addEventListener('livewire:init', function () {
+                window.Livewire?.hook?.('commit', function ({ succeed }) {
+                    succeed(function () {
+                        window.setTimeout(function () {
+                            planInitialFocus();
+                            syncUserChangeFocus();
+                            applyFocus();
+                        }, 30);
+                    });
+                });
+
+                window.Livewire?.hook?.('morph.updated', function () {
+                    window.setTimeout(function () {
+                        planInitialFocus();
+                        syncUserChangeFocus();
+                        applyFocus();
+                    }, 30);
+                });
+            });
+
+            function boot() {
+                planInitialFocus();
+                applyFocus();
+                // Filament/Livewire pode montar o select depois do DOMContentLoaded.
+                window.setTimeout(planInitialFocus, 80);
+                window.setTimeout(planInitialFocus, 250);
+                window.setTimeout(applyFocus, 320);
+            }
+
+            document.addEventListener('DOMContentLoaded', boot);
+            document.addEventListener('livewire:navigated', function () {
+                initialApplied = false;
+                boot();
+            });
+            if (document.readyState !== 'loading') {
+                boot();
+            }
+        })();
+    </script>
 </div>
