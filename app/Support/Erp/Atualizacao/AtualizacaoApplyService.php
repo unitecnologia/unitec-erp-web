@@ -4,6 +4,7 @@ namespace App\Support\Erp\Atualizacao;
 
 use App\Support\Erp\Database\PendingMigrationsGuard;
 use App\Support\Erp\ErpUpdateProcessLauncher;
+use App\Support\Erp\ErpUpdateService;
 use App\Support\Erp\Printing\DeviceServiceLauncher;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +37,7 @@ final class AtualizacaoApplyService
     ];
 
     /**
-     * @return array{state: string, percent: int, done: int, total: int, message: string, error?: string}
+     * @return array{state: string, percent: int, done: int, total: int, message: string, run_id?: string, target_version?: string, error?: string}
      */
     public static function readProgress(?string $appPath = null): array
     {
@@ -57,6 +58,8 @@ final class AtualizacaoApplyService
                 'done' => max(0, (int) ($data['done'] ?? 0)),
                 'total' => max(0, (int) ($data['total'] ?? 0)),
                 'message' => (string) ($data['message'] ?? ''),
+                ...(isset($data['run_id']) ? ['run_id' => (string) $data['run_id']] : []),
+                ...(isset($data['target_version']) ? ['target_version' => (string) $data['target_version']] : []),
                 ...(isset($data['error']) ? ['error' => (string) $data['error']] : []),
             ];
         } catch (\Throwable) {
@@ -64,15 +67,46 @@ final class AtualizacaoApplyService
         }
     }
 
-    public static function initializeProgress(?string $appPath = null): void
+    /**
+     * Inicia progresso com run_id exclusivo desta tentativa (evita completed stale na UI).
+     */
+    public static function initializeProgress(?string $appPath = null, ?string $targetVersion = null): string
     {
+        $runId = bin2hex(random_bytes(8));
         self::writeProgress($appPath, [
             'state' => 'starting',
             'percent' => 1,
             'done' => 0,
             'total' => 0,
             'message' => 'Preparando atualização…',
-        ]);
+            'run_id' => $runId,
+            'target_version' => trim((string) $targetVersion),
+        ], preserveIdentity: false);
+
+        return $runId;
+    }
+
+    public static function writeFailedProgress(
+        ?string $appPath,
+        string $error,
+        ?string $runId = null,
+        ?string $targetVersion = null,
+    ): void {
+        $payload = [
+            'state' => 'failed',
+            'percent' => (int) (self::readProgress($appPath)['percent'] ?? 0),
+            'done' => 0,
+            'total' => 0,
+            'message' => 'Falha ao aplicar atualização.',
+            'error' => $error,
+        ];
+        if ($runId !== null && trim($runId) !== '') {
+            $payload['run_id'] = trim($runId);
+        }
+        if ($targetVersion !== null && trim($targetVersion) !== '') {
+            $payload['target_version'] = trim($targetVersion);
+        }
+        self::writeProgress($appPath, $payload, preserveIdentity: $runId === null);
     }
 
     public function apply(?string $appPath = null): string
@@ -111,7 +145,7 @@ final class AtualizacaoApplyService
 
             $this->etapa = 'Runtime';
             AtualizacaoLog::line('Runtime', 'inicio', $appPath);
-            $runtimePending = $this->stageDesktopRuntimeUpdate($source, $appPath);
+            $runtimePending = $this->stageDesktopRuntimeUpdate($source, $appPath, $version);
             AtualizacaoLog::line('Runtime', $runtimePending ? 'staged' : 'ausente (ok)', $appPath);
 
             $this->etapa = 'Pacotes';
@@ -192,14 +226,25 @@ final class AtualizacaoApplyService
             }
             AtualizacaoLog::line('Caches', 'ok', $appPath);
 
-            // Health so depois do restart: o script de runtime espera ~8s e troca o processo.
+            $installedAfterCopy = ErpUpdateService::readInstalledVersion($appPath);
+            if ($version !== 'desconhecida' && strcasecmp($installedAfterCopy, $version) !== 0) {
+                throw new RuntimeException(
+                    'Versão em disco ('.$installedAfterCopy.') difere do pacote ('.$version.') após a cópia.'
+                );
+            }
+            AtualizacaoLog::line('Versao', 'disco='.$installedAfterCopy.' pacote='.$version, $appPath);
+
+            // Runtime obrigatório: só conclui após status.json completed/skipped_newer do PS1.
             if ($runtimePending) {
-                $this->etapa = 'RuntimeRestart';
-                $this->launchDesktopRuntimeUpdateScript($appPath);
-                AtualizacaoLog::line('Runtime', 'reinicio do UnitecErpServer agendado — aguardando novo runtime', $appPath);
-                // Janela inicial alinhada ao Start-Sleep 8s do apply-desktop-runtime-update.ps1
-                // antes de derrubar o servico (evita aceitar health do processo antigo).
-                sleep(10);
+                $this->etapa = 'RuntimeApply';
+                self::writeProgress($appPath, [
+                    'state' => 'runtime',
+                    'percent' => 97,
+                    'done' => 0,
+                    'total' => 0,
+                    'message' => 'Aplicando runtime desktop (reinício do serviço)…',
+                ]);
+                $this->applyAndWaitDesktopRuntime($appPath, $version);
             }
 
             $this->etapa = 'Health';
@@ -210,7 +255,15 @@ final class AtualizacaoApplyService
                 'total' => 0,
                 'message' => 'Verificando saúde do ERP (versão '.$version.')…',
             ]);
-            $this->ensureHealthyOrRecover($appPath, $version, $runtimePending);
+            // Runtime já aplicado (ou ausente): não reagendar PS1 no recover.
+            $this->ensureHealthyOrRecover($appPath, $version, false);
+
+            $installedFinal = ErpUpdateService::readInstalledVersion($appPath);
+            if ($version !== 'desconhecida' && strcasecmp($installedFinal, $version) !== 0) {
+                throw new RuntimeException(
+                    'Versão final em disco ('.$installedFinal.') difere do pacote ('.$version.').'
+                );
+            }
 
             $this->etapa = 'Limpeza';
             AtualizacaoLog::line('Limpeza', 'inicio', $appPath);
@@ -223,6 +276,7 @@ final class AtualizacaoApplyService
                 'done' => 0,
                 'total' => 0,
                 'message' => 'Atualização concluída.',
+                'target_version' => $version,
             ]);
 
             if (! ErpUpdateProcessLauncher::launchFilamentCaches($appPath)) {
@@ -374,13 +428,29 @@ final class AtualizacaoApplyService
     }
 
     /**
-     * @param  array{state: string, percent: int, done: int, total: int, message: string, error?: string}  $progress
+     * @param  array{state: string, percent: int, done: int, total: int, message: string, run_id?: string, target_version?: string, error?: string}  $progress
      */
-    private static function writeProgress(?string $appPath, array $progress): void
+    private static function writeProgress(?string $appPath, array $progress, bool $preserveIdentity = true): void
     {
         try {
             $path = self::progressPath($appPath);
             File::ensureDirectoryExists(dirname($path));
+
+            if ($preserveIdentity && is_file($path)) {
+                try {
+                    $current = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                    if (is_array($current)) {
+                        if (! isset($progress['run_id']) && isset($current['run_id'])) {
+                            $progress['run_id'] = (string) $current['run_id'];
+                        }
+                        if (! array_key_exists('target_version', $progress) && isset($current['target_version'])) {
+                            $progress['target_version'] = (string) $current['target_version'];
+                        }
+                    }
+                } catch (\Throwable) {
+                }
+            }
+
             $progress['updated_at'] = now()->toIso8601String();
             file_put_contents(
                 $path,
@@ -629,9 +699,12 @@ final class AtualizacaoApplyService
             }
 
             if ($runtimePending) {
-                $this->launchDesktopRuntimeUpdateScript($appPath);
-                AtualizacaoLog::line('Health', 'reinicio runtime reagendado apos recuperacao', $appPath);
-                sleep(10);
+                AtualizacaoLog::line('Health', 'recuperacao com runtime pendente — aguardando PS1', $appPath);
+                try {
+                    $this->applyAndWaitDesktopRuntime($appPath, $expectedVersion);
+                } catch (\Throwable $e) {
+                    AtualizacaoLog::line('Health', 'runtime na recuperacao: '.$e->getMessage(), $appPath);
+                }
             }
 
             $maxAttempts = $runtimePending ? 60 : 30;
@@ -779,10 +852,10 @@ final class AtualizacaoApplyService
 
     /**
      * Prepara FrankenPHP + binários do UnitecErpServer em pasta pendente.
-     * Não sobrescreve tools/frankenphp nem bin/ ao vivo (DLLs em uso, ex. brotlicommon.dll).
-     * O script apply-desktop-runtime-update.ps1 aplica após parar o serviço.
+     * Não sobrescreve tools/frankenphp nem bin/ ao vivo (DLLs em uso).
+     * Nunca substitui pending/manifesto mais novo por pacote mais antigo.
      */
-    private function stageDesktopRuntimeUpdate(string $sourceRoot, string $appPath): bool
+    private function stageDesktopRuntimeUpdate(string $sourceRoot, string $appPath, string $packageVersion): bool
     {
         $runtime = rtrim($sourceRoot, '\\/').DIRECTORY_SEPARATOR.'runtime-update';
         $frankenSrc = $runtime.DIRECTORY_SEPARATOR.'frankenphp';
@@ -796,6 +869,33 @@ final class AtualizacaoApplyService
             return false;
         }
 
+        $installedRuntime = $this->readDesktopRuntimeMarkerVersion($appPath);
+        if ($installedRuntime !== '' && $packageVersion !== 'desconhecida'
+            && AtualizacaoPasta::compareVersions($installedRuntime, $packageVersion) > 0) {
+            AtualizacaoLog::line(
+                'Runtime',
+                'instalado '.$installedRuntime.' > pacote '.$packageVersion.' — nao empilha runtime antigo',
+                $appPath,
+            );
+
+            return false;
+        }
+
+        $pendingRoot = $this->desktopPendingRoot($appPath);
+        $existingPendingVersion = $this->readDesktopPendingManifestVersion($appPath);
+        $existingServer = $pendingRoot.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'UnitecErpServer.exe';
+
+        if (is_file($existingServer) && $existingPendingVersion !== '' && $packageVersion !== 'desconhecida'
+            && AtualizacaoPasta::compareVersions($existingPendingVersion, $packageVersion) > 0) {
+            AtualizacaoLog::line(
+                'Runtime',
+                'pending '.$existingPendingVersion.' > pacote '.$packageVersion.' — mantem pending mais novo',
+                $appPath,
+            );
+
+            return true;
+        }
+
         self::writeProgress($appPath, [
             'state' => 'copying',
             'percent' => 84,
@@ -804,8 +904,6 @@ final class AtualizacaoApplyService
             'message' => 'Preparando runtime HTTP (FrankenPHP)…',
         ]);
 
-        $pendingRoot = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
-            .DIRECTORY_SEPARATOR.'unitec-desktop-pending';
         $pendingFranken = $pendingRoot.DIRECTORY_SEPARATOR.'frankenphp';
         $pendingBin = $pendingRoot.DIRECTORY_SEPARATOR.'bin';
 
@@ -817,7 +915,87 @@ final class AtualizacaoApplyService
         $this->copyDirectoryRecursive($binSrc, $pendingBin);
         AtualizacaoLog::line('Runtime', 'bin pendente em storage/app/unitec-desktop-pending/bin', $appPath);
 
+        $this->writeDesktopPendingManifest($appPath, $packageVersion);
+        $this->writeDesktopRuntimeStatus($appPath, [
+            'state' => 'waiting',
+            'message' => 'Runtime staged; aguardando apply.',
+            'expected_version' => $packageVersion,
+            'health_version' => '',
+        ]);
+
         return true;
+    }
+
+    /**
+     * Sinaliza o PS1, aguarda status.json e falha sem apagar pending.
+     */
+    private function applyAndWaitDesktopRuntime(string $appPath, string $expectedVersion): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            AtualizacaoLog::line('Runtime', 'plataforma nao Windows — skip runtime desktop', $appPath);
+
+            return;
+        }
+
+        $pendingRoot = $this->desktopPendingRoot($appPath);
+        $serverExe = $pendingRoot.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'UnitecErpServer.exe';
+        if (! is_file($serverExe)) {
+            throw new RuntimeException('Runtime pendente incompleto (falta UnitecErpServer.exe). Pending preservado.');
+        }
+
+        $this->writeDesktopRuntimeStatus($appPath, [
+            'state' => 'waiting',
+            'message' => 'Aguardando script de runtime.',
+            'expected_version' => $expectedVersion,
+            'health_version' => '',
+        ]);
+
+        File::ensureDirectoryExists($pendingRoot);
+        File::put($pendingRoot.DIRECTORY_SEPARATOR.'ready.signal', now()->toIso8601String());
+
+        if (! $this->launchDesktopRuntimeUpdateScript($appPath, $expectedVersion)) {
+            throw new RuntimeException(
+                'Nao foi possivel iniciar apply-desktop-runtime-update.ps1. Pending preservado em storage/app/unitec-desktop-pending.'
+            );
+        }
+
+        AtualizacaoLog::line('Runtime', 'script iniciado — aguardando status.json (versao='.$expectedVersion.')', $appPath);
+
+        $deadline = time() + 360;
+        while (time() < $deadline) {
+            $status = $this->readDesktopRuntimeStatus($appPath);
+            $state = (string) ($status['state'] ?? '');
+            $message = trim((string) ($status['message'] ?? ''));
+
+            self::writeProgress($appPath, [
+                'state' => 'runtime',
+                'percent' => 97,
+                'done' => 0,
+                'total' => 0,
+                'message' => $message !== ''
+                    ? $message
+                    : 'Aplicando runtime desktop (reinício do serviço)…',
+            ]);
+
+            if (in_array($state, ['completed', 'skipped_newer'], true)) {
+                AtualizacaoLog::line('Runtime', 'status='.$state.' '.$message, $appPath);
+
+                return;
+            }
+
+            if ($state === 'failed') {
+                throw new RuntimeException(
+                    ($message !== '' ? $message : 'Falha ao aplicar runtime desktop.')
+                    .' Pending preservado em storage/app/unitec-desktop-pending.'
+                );
+            }
+
+            usleep(500_000);
+        }
+
+        throw new RuntimeException(
+            'Timeout aguardando runtime desktop (status.json). Pending preservado — tente novamente a mesma atualização.'
+        );
     }
 
     private function copyDirectoryRecursive(string $sourceDir, string $destDir): void
@@ -848,10 +1026,10 @@ final class AtualizacaoApplyService
         }
     }
 
-    private function launchDesktopRuntimeUpdateScript(string $appPath): void
+    private function launchDesktopRuntimeUpdateScript(string $appPath, string $expectedVersion = ''): bool
     {
         if (PHP_OS_FAMILY !== 'Windows') {
-            return;
+            return false;
         }
 
         $script = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'scripts'
@@ -860,7 +1038,7 @@ final class AtualizacaoApplyService
             Log::warning('apply-desktop-runtime-update.ps1 ausente apos copia — reinicie o UnitecErpServer manualmente.');
             AtualizacaoLog::line('Runtime', 'script ausente — reinicio manual necessario', $appPath);
 
-            return;
+            return false;
         }
 
         $logFile = rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'logs'
@@ -871,10 +1049,16 @@ final class AtualizacaoApplyService
             .DIRECTORY_SEPARATOR.'private'.DIRECTORY_SEPARATOR.'erp-desktop-runtime-update.bat';
         $quote = static fn (string $value): string => str_replace('"', '""', $value);
         File::ensureDirectoryExists(dirname($batch));
+
+        $psArgs = '-NoProfile -ExecutionPolicy Bypass -File "'.$quote($script).'" -AppPath "'.$quote($appPath).'"';
+        if (trim($expectedVersion) !== '' && $expectedVersion !== 'desconhecida') {
+            $psArgs .= ' -ExpectedVersion "'.$quote($expectedVersion).'"';
+        }
+
         File::put($batch, implode("\r\n", [
             '@echo off',
             'chcp 65001 >nul',
-            'powershell -NoProfile -ExecutionPolicy Bypass -File "'.$quote($script).'" -AppPath "'.$quote($appPath).'" >> "'.$quote($logFile).'" 2>&1',
+            'powershell '.$psArgs.' >> "'.$quote($logFile).'" 2>&1',
         ])."\r\n");
 
         $handle = @popen('start "" /B cmd /C '.escapeshellarg($batch), 'r');
@@ -882,10 +1066,99 @@ final class AtualizacaoApplyService
             Log::warning('Nao foi possivel agendar apply-desktop-runtime-update.ps1');
             AtualizacaoLog::line('Runtime', 'falha ao agendar reinicio do servico', $appPath);
 
-            return;
+            return false;
         }
 
         pclose($handle);
+
+        return true;
+    }
+
+    private function desktopPendingRoot(string $appPath): string
+    {
+        return rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
+            .DIRECTORY_SEPARATOR.'unitec-desktop-pending';
+    }
+
+    private function desktopRuntimeMarkerPath(string $appPath): string
+    {
+        return rtrim($appPath, '\\/').DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'app'
+            .DIRECTORY_SEPARATOR.'unitec-desktop-runtime.json';
+    }
+
+    private function writeDesktopPendingManifest(string $appPath, string $packageVersion): void
+    {
+        $root = $this->desktopPendingRoot($appPath);
+        File::ensureDirectoryExists($root);
+        File::put($root.DIRECTORY_SEPARATOR.'manifest.json', json_encode([
+            'erp_version' => $packageVersion,
+            'staged_at' => now()->toIso8601String(),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+
+    private function readDesktopPendingManifestVersion(string $appPath): string
+    {
+        $path = $this->desktopPendingRoot($appPath).DIRECTORY_SEPARATOR.'manifest.json';
+        if (! is_file($path)) {
+            return '';
+        }
+
+        try {
+            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+            return is_array($data) ? trim((string) ($data['erp_version'] ?? '')) : '';
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function readDesktopRuntimeMarkerVersion(string $appPath): string
+    {
+        $path = $this->desktopRuntimeMarkerPath($appPath);
+        if (! is_file($path)) {
+            return '';
+        }
+
+        try {
+            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+            return is_array($data) ? trim((string) ($data['erp_version'] ?? '')) : '';
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    /**
+     * @param  array{state: string, message?: string, expected_version?: string, health_version?: string}  $status
+     */
+    private function writeDesktopRuntimeStatus(string $appPath, array $status): void
+    {
+        $root = $this->desktopPendingRoot($appPath);
+        File::ensureDirectoryExists($root);
+        $status['updated_at'] = now()->toIso8601String();
+        File::put(
+            $root.DIRECTORY_SEPARATOR.'status.json',
+            json_encode($status, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    /**
+     * @return array{state?: string, message?: string, expected_version?: string, health_version?: string}
+     */
+    private function readDesktopRuntimeStatus(string $appPath): array
+    {
+        $path = $this->desktopPendingRoot($appPath).DIRECTORY_SEPARATOR.'status.json';
+        if (! is_file($path)) {
+            return [];
+        }
+
+        try {
+            $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+            return is_array($data) ? $data : [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function resolvePhp(string $appPath): string

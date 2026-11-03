@@ -126,7 +126,11 @@ final class AtualizacaoPasta
             return false;
         }
 
-        $installed = (string) config('unitec.versao', '');
+        // Disco é a fonte de verdade (config:cache pode estar defasado).
+        $installed = \App\Support\Erp\ErpUpdateService::readInstalledVersion($appPath);
+        if ($installed === '') {
+            $installed = (string) config('unitec.versao', '');
+        }
         if ($installed === '') {
             return true;
         }

@@ -38,15 +38,20 @@ final class ErpUpdateService
     /**
      * Versão efetiva instalada: o arquivo no disco é a fonte de verdade pós-update.
      */
-    public static function readInstalledVersion(): string
+    public static function readInstalledVersion(?string $appPath = null): string
     {
-        $path = base_path('config/unitec.php');
+        $root = rtrim($appPath ?: base_path(), '\\/');
+        $path = $root.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'unitec.php';
         $content = is_file($path) ? (string) @file_get_contents($path) : '';
 
         if (preg_match("/'versao'\s*=>\s*'([^']+)'/", $content, $matches)) {
             return trim($matches[1]);
         }
 
-        return (string) config('unitec.versao', '');
+        if ($appPath === null || rtrim((string) $appPath, '\\/') === rtrim(base_path(), '\\/')) {
+            return (string) config('unitec.versao', '');
+        }
+
+        return '';
     }
 }

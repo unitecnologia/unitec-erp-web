@@ -15,6 +15,7 @@ use App\Support\Erp\Atualizacao\AtualizacaoPasta;
 use App\Support\Erp\Hotfix\HotfixLauncher;
 use App\Support\Erp\ErpAccess;
 use App\Support\Erp\ErpUpdateProcessLauncher;
+use App\Support\Erp\ErpUpdateService;
 use App\Support\Erp\License\LicencaRemotaService;
 use App\Support\Erp\License\LicencaSnapshot;
 use App\Support\Erp\RequestOrigin;
@@ -630,21 +631,39 @@ class Login extends BaseLogin
 
         $this->applyingUpdate = true;
         $this->updateApplyError = null;
-        AtualizacaoApplyService::initializeProgress(base_path());
 
         $usuario = Auth::user();
         $nome = $usuario instanceof User ? trim((string) $usuario->name) : '';
         $pacote = trim((string) ($this->pendingUpdateVersion ?? AtualizacaoPasta::pendingVersion() ?? ''));
+        $runId = AtualizacaoApplyService::initializeProgress(base_path(), $pacote !== '' ? $pacote : null);
+
         AtualizacaoLog::line(
             'Sim',
             'usuario='.($nome !== '' ? $nome : 'desconhecido')
-            .' instalada='.(string) config('unitec.versao', '')
-            .' pacote='.($pacote !== '' ? $pacote : 'desconhecida'),
+            .' instalada='.ErpUpdateService::readInstalledVersion()
+            .' pacote='.($pacote !== '' ? $pacote : 'desconhecida')
+            .' run_id='.$runId,
         );
 
-        if (! ErpUpdateProcessLauncher::launch(base_path())) {
+        // Poll só depois do progress novo (run_id) existir — evita completed stale.
+        $this->js(
+            'window.UnitecUpdateProgress && window.UnitecUpdateProgress.start('
+            .'document.querySelector("[data-unitec-update-dialog]"),'
+            .'(runId) => $wire.finalizarAtualizacaoAplicada(runId),'
+            .'(message) => $wire.falharAtualizacaoAplicada(message),'
+            .Js::from($runId)
+            .')'
+        );
+
+        if (! ErpUpdateProcessLauncher::launch(base_path(), $runId)) {
             $this->applyingUpdate = false;
             $this->updateApplyError = 'Não foi possível iniciar o processo de atualização.';
+            AtualizacaoApplyService::writeFailedProgress(
+                base_path(),
+                $this->updateApplyError,
+                $runId,
+                $pacote !== '' ? $pacote : null,
+            );
             AtualizacaoLog::line('Disparo', $this->updateApplyError);
             throw ValidationException::withMessages([
                 'data.login_senha' => $this->updateApplyError,
@@ -652,7 +671,7 @@ class Login extends BaseLogin
         }
     }
 
-    public function finalizarAtualizacaoAplicada(): void
+    public function finalizarAtualizacaoAplicada(?string $runId = null): void
     {
         if (! filament()->auth()->check()) {
             return;
@@ -660,6 +679,24 @@ class Login extends BaseLogin
 
         $progress = AtualizacaoApplyService::readProgress(base_path());
         if (($progress['state'] ?? '') !== 'completed') {
+            return;
+        }
+
+        $runId = trim((string) $runId);
+        $progressRunId = trim((string) ($progress['run_id'] ?? ''));
+        if ($runId !== '' && $progressRunId !== '' && $runId !== $progressRunId) {
+            AtualizacaoLog::line('Tela', 'ignore finalize run_id mismatch ui='.$runId.' progress='.$progressRunId);
+
+            return;
+        }
+
+        $target = trim((string) ($progress['target_version'] ?? $this->pendingUpdateVersion ?? ''));
+        $installed = ErpUpdateService::readInstalledVersion();
+        if ($target !== '' && strcasecmp($installed, $target) !== 0) {
+            $this->falharAtualizacaoAplicada(
+                'Atualização incompleta: versão instalada ('.$installed.') difere do pacote ('.$target.').'
+            );
+
             return;
         }
 

@@ -182,11 +182,6 @@
                         class="unitec-update-prompt__yes"
                         wire:click="aceitarAtualizacao"
                         wire:loading.attr="disabled"
-                        x-on:click="window.UnitecUpdateProgress.start(
-                            $el.closest('[data-unitec-update-dialog]'),
-                            () => $wire.finalizarAtualizacaoAplicada(),
-                            (message) => $wire.falharAtualizacaoAplicada(message)
-                        )"
                     >Sim</button>
                     <button
                         type="button"
@@ -359,6 +354,7 @@
             let progressUrl = '';
             let onComplete = null;
             let onFailed = null;
+            let expectedRunId = '';
             let displayPercent = 1;
             let targetPercent = 1;
             let pendingComplete = false;
@@ -422,9 +418,16 @@
 
             function finishComplete() {
                 stopAll();
+                const runId = expectedRunId;
                 window.setTimeout(function () {
-                    if (typeof onComplete === 'function') onComplete();
+                    if (typeof onComplete === 'function') onComplete(runId);
                 }, 350);
+            }
+
+            function runIdMatches(data) {
+                if (!expectedRunId) return true;
+                const got = data && data.run_id != null ? String(data.run_id) : '';
+                return got !== '' && got === expectedRunId;
             }
 
             function tickDisplay() {
@@ -469,6 +472,11 @@
                     if (!response.ok) return;
 
                     const data = await response.json();
+                    if (!runIdMatches(data)) {
+                        // Progresso de outra tentativa (ex.: completed residual) — ignora.
+                        return;
+                    }
+
                     applyMeta(data);
                     setTarget(data.percent);
                     paintUi();
@@ -488,15 +496,16 @@
                         if (typeof onFailed === 'function') onFailed(message);
                     }
                 } catch (e) {
-                    // O Laravel pode ficar indisponivel por instantes ao regenerar caches.
+                    // O Laravel pode ficar indisponivel por instantes ao regenerar caches / reiniciar runtime.
                     // Mantem o polling; o limite global de 15 minutos evita loop infinito.
                 }
             }
 
-            function start(dialog, complete, failed) {
+            function start(dialog, complete, failed, runId) {
                 progressUrl = dialog?.dataset?.progressUrl || progressUrl;
                 onComplete = complete;
                 onFailed = failed;
+                expectedRunId = runId != null ? String(runId) : '';
                 ticks = 0;
                 pendingComplete = false;
                 displayPercent = 1;

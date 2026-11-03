@@ -57,7 +57,7 @@ final class HotfixService
     /** O próprio mecanismo de hotfix só muda por atualização oficial (um hotfix ruim não pode desligá-lo). */
     private const CAMINHOS_BLOQUEADOS = ['app/Support/Erp/Hotfix/', 'app/Console/Commands/HotfixCommand.php'];
 
-    private const ESTADOS_ATUALIZACAO_OFICIAL_ATIVA = ['starting', 'copying', 'discovering', 'migrating', 'caching', 'finalizing'];
+    private const ESTADOS_ATUALIZACAO_OFICIAL_ATIVA = ['starting', 'copying', 'discovering', 'migrating', 'caching', 'runtime', 'finalizing'];
 
     public static function tag(string $versao): string
     {

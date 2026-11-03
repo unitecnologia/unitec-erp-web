@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Process;
  */
 final class ErpUpdateProcessLauncher
 {
-    public static function launch(string $appPath): bool
+    public static function launch(string $appPath, ?string $runId = null): bool
     {
         $appPath = rtrim($appPath, '\\/');
         $php = self::resolvePhpBinary($appPath);
@@ -50,10 +50,18 @@ final class ErpUpdateProcessLauncher
             }
         }
 
+        $runId = trim((string) $runId);
+
         for ($i = 0; $i < 8; $i++) {
-            $state = (string) (AtualizacaoApplyService::readProgress($appPath)['state'] ?? 'idle');
-            if (in_array($state, ['starting', 'copying', 'discovering', 'migrating', 'caching', 'finalizing', 'completed', 'failed'], true)) {
-                return true;
+            $progress = AtualizacaoApplyService::readProgress($appPath);
+            $state = (string) ($progress['state'] ?? 'idle');
+            $progressRunId = trim((string) ($progress['run_id'] ?? ''));
+
+            // Nao tratar completed/failed antigos como sucesso do novo disparo.
+            if (in_array($state, ['starting', 'copying', 'discovering', 'migrating', 'caching', 'runtime', 'finalizing'], true)) {
+                if ($runId === '' || $progressRunId === '' || $progressRunId === $runId) {
+                    return true;
+                }
             }
 
             usleep(500_000);
